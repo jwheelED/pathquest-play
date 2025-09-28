@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          points_reward: number
+          requirement_type: string
+          requirement_value: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          icon: string
+          id?: string
+          name: string
+          points_reward?: number
+          requirement_type: string
+          requirement_value: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points_reward?: number
+          requirement_type?: string
+          requirement_value?: number
+        }
+        Relationships: []
+      }
       lesson_progress: {
         Row: {
           completed: boolean
@@ -76,6 +109,41 @@ export type Database = {
         }
         Relationships: []
       }
+      problem_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          is_correct: boolean
+          problem_id: string
+          time_spent_seconds: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_correct: boolean
+          problem_id: string
+          time_spent_seconds?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          problem_id?: string
+          time_spent_seconds?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -103,6 +171,154 @@ export type Database = {
           id?: string
           onboarded?: boolean | null
           study_days?: string[] | null
+        }
+        Relationships: []
+      }
+      spaced_repetition: {
+        Row: {
+          created_at: string
+          ease_factor: number
+          id: string
+          interval_days: number
+          last_reviewed_date: string | null
+          next_review_date: string
+          problem_id: string
+          repetition_number: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ease_factor?: number
+          id?: string
+          interval_days?: number
+          last_reviewed_date?: string | null
+          next_review_date?: string
+          problem_id: string
+          repetition_number?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ease_factor?: number
+          id?: string
+          interval_days?: number
+          last_reviewed_date?: string | null
+          next_review_date?: string
+          problem_id?: string
+          repetition_number?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaced_repetition_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stem_problems: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          difficulty: string
+          explanation: string | null
+          id: string
+          options: Json | null
+          points_reward: number
+          problem_text: string
+          subject: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          difficulty: string
+          explanation?: string | null
+          id?: string
+          options?: Json | null
+          points_reward?: number
+          problem_text: string
+          subject: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          difficulty?: string
+          explanation?: string | null
+          id?: string
+          options?: Json | null
+          points_reward?: number
+          problem_text?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_stats: {
+        Row: {
+          coins: number
+          created_at: string
+          current_streak: number
+          experience_points: number
+          id: string
+          last_activity_date: string | null
+          level: number
+          longest_streak: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          coins?: number
+          created_at?: string
+          current_streak?: number
+          experience_points?: number
+          id?: string
+          last_activity_date?: string | null
+          level?: number
+          longest_streak?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          coins?: number
+          created_at?: string
+          current_streak?: number
+          experience_points?: number
+          id?: string
+          last_activity_date?: string | null
+          level?: number
+          longest_streak?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
