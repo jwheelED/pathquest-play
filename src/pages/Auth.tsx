@@ -35,20 +35,30 @@ export default function AuthPage() {
 
       const user = data.user;
       if (user) {
+        // Create user profile
         const { error: insertError } = await supabase.from("users").insert({
           id: user.id,
+          user_id: user.id,
           name,
           email,
           phone,
           age: parseInt(age) || null,
         });
 
+        // Create user stats for gamification
+        const { error: statsError } = await supabase.from("user_stats").insert({
+          user_id: user.id,
+        });
+
         if (insertError) {
           console.error("Insert user error:", insertError.message);
-        } else {
-          setSuccess("Sign-up email sent!");
-          fetchSession();
         }
+        if (statsError) {
+          console.error("Insert user stats error:", statsError.message);
+        }
+        
+        setSuccess("Sign-up email sent!");
+        navigate("/onboarding");
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -57,7 +67,21 @@ export default function AuthPage() {
         setError(error.message);
       } else {
         setSuccess("Signed in successfully!");
-        fetchSession();
+        // Check if user has completed onboarding
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarded")
+            .eq("id", user.id)
+            .single();
+          
+          if (profile?.onboarded) {
+            navigate("/dashboard");
+          } else {
+            navigate("/onboarding");
+          }
+        }
       }
     }
   };
@@ -83,12 +107,17 @@ export default function AuthPage() {
 
       if (session) {
         const checkOnboarding = async () => {
-          const { data: profile, error } = await supabase
+          const { data: profile } = await supabase
             .from("profiles")
             .select("onboarded")
             .eq("id", session.user.id)
-            .single();
+            .maybeSingle();
 
+          if (profile?.onboarded) {
+            navigate("/dashboard");
+          } else {
+            navigate("/onboarding");
+          }
         };
 
         checkOnboarding();
