@@ -3,7 +3,7 @@
 import { supabase } from "@/integrations/supabase/client"
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { toast } from "sonner"
+import { toast, Toaster } from "sonner"
 
 const weekdays = ["Sun", "M", "Tu", "W", "Th", "F", "Sat"]
 

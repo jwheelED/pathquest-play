@@ -40,8 +40,7 @@ export default function AuthPage() {
           name,
           email,
           phone,
-          age,
-          created_at: new Date(),
+          age: parseInt(age) || null,
         });
 
         if (insertError) {
@@ -97,7 +96,7 @@ export default function AuthPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [navigate]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
