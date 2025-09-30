@@ -49,33 +49,6 @@ export default function InstructorAuth() {
         if (error) throw error;
 
         if (data.user) {
-          // Create instructor profile
-          const { error: profileError } = await supabase.from("profiles").insert({
-            id: data.user.id,
-            full_name: name,
-            role: "instructor",
-            onboarded: true,
-          });
-
-          if (profileError) {
-            console.error("Profile creation error:", profileError);
-            toast.error("Failed to create instructor profile");
-            return;
-          }
-
-          const { error: userError } = await supabase.from("users").insert({
-            id: data.user.id,
-            user_id: data.user.id,
-            name,
-            email,
-          });
-
-          if (userError) {
-            console.error("User creation error:", userError);
-            toast.error("Failed to create user record");
-            return;
-          }
-
           toast.success("Account created! Please sign in.");
           setIsSignUp(false);
         }
