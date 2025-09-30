@@ -147,7 +147,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-                🎮 PathQuest
+                🎮 Edvana
               </h1>
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
                 Dashboard

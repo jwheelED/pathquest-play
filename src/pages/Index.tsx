@@ -51,7 +51,7 @@ const Index = () => {
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <div className="space-y-4">
           <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-            🎮 PathQuest
+            🎮 Edvana
           </h1>
           <p className="text-2xl font-semibold text-primary">
             Gamified STEM Learning Platform
