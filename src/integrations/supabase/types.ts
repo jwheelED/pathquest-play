@@ -47,6 +47,27 @@ export type Database = {
         }
         Relationships: []
       }
+      instructor_students: {
+        Row: {
+          created_at: string | null
+          id: string
+          instructor_id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          instructor_id: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          instructor_id?: string
+          student_id?: string
+        }
+        Relationships: []
+      }
       lesson_progress: {
         Row: {
           completed: boolean
@@ -109,6 +130,33 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          read: boolean | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          read?: boolean | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          read?: boolean | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       problem_attempts: {
         Row: {
           created_at: string
@@ -152,6 +200,7 @@ export type Database = {
           goals: string[] | null
           id: string
           onboarded: boolean | null
+          role: string | null
           study_days: string[] | null
         }
         Insert: {
@@ -161,6 +210,7 @@ export type Database = {
           goals?: string[] | null
           id: string
           onboarded?: boolean | null
+          role?: string | null
           study_days?: string[] | null
         }
         Update: {
@@ -170,6 +220,7 @@ export type Database = {
           goals?: string[] | null
           id?: string
           onboarded?: boolean | null
+          role?: string | null
           study_days?: string[] | null
         }
         Relationships: []
