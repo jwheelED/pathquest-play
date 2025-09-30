@@ -127,12 +127,8 @@ export default function InstructorDashboard() {
   };
 
   const handleStudentClick = async (studentId: string) => {
-    // Fetch detailed student data
-    const student = students.find(s => s.id === studentId);
-    if (student) {
-      setSelectedStudentId(studentId);
-      setDialogOpen(true);
-    }
+    setSelectedStudentId(studentId);
+    setDialogOpen(true);
   };
 
   // Calculate struggling students (low streak, low progress)
@@ -153,12 +149,80 @@ export default function InstructorDashboard() {
     .sort((a, b) => b.experience_points - a.experience_points)
     .map((s, idx) => ({ ...s, rank: idx + 1 }));
 
-  const selectedStudent = selectedStudentId ? students.find(s => s.id === selectedStudentId) : null;
-  const selectedStudentDetail = selectedStudent ? {
-    ...selectedStudent,
-    problemAttempts: [], // Fetch from problem_attempts table
-    recentActivity: [], // Fetch from various tables
-  } : null;
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
+
+  useEffect(() => {
+    if (selectedStudentId && dialogOpen) {
+      fetchStudentDetail(selectedStudentId);
+    }
+  }, [selectedStudentId, dialogOpen]);
+
+  const fetchStudentDetail = async (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+
+    try {
+      // Fetch problem attempts
+      const { data: attempts } = await supabase
+        .from("problem_attempts")
+        .select(`
+          *,
+          stem_problems(problem_text)
+        `)
+        .eq("user_id", studentId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      // Fetch recent activity from lesson progress
+      const { data: lessonActivity } = await supabase
+        .from("lesson_progress")
+        .select(`
+          *,
+          lessons(title)
+        `)
+        .eq("user_id", studentId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      // Fetch achievements
+      const { data: achievementActivity } = await supabase
+        .from("user_achievements")
+        .select(`
+          *,
+          achievements(name)
+        `)
+        .eq("user_id", studentId)
+        .order("earned_at", { ascending: false })
+        .limit(5);
+
+      // Combine activities
+      const recentActivity = [
+        ...(lessonActivity?.map(l => ({
+          type: "Lesson Completed",
+          description: (l as any).lessons?.title || "Unknown lesson",
+          date: l.created_at || new Date().toISOString(),
+        })) || []),
+        ...(achievementActivity?.map(a => ({
+          type: "Achievement Unlocked",
+          description: (a as any).achievements?.name || "Unknown achievement",
+          date: a.earned_at,
+        })) || []),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+
+      setSelectedStudentDetail({
+        ...student,
+        problemAttempts: attempts?.map(a => ({
+          problem_text: (a as any).stem_problems?.problem_text || "Unknown problem",
+          is_correct: a.is_correct,
+          time_spent_seconds: a.time_spent_seconds || 0,
+          created_at: a.created_at,
+        })) || [],
+        recentActivity,
+      });
+    } catch (error) {
+      toast.error("Failed to load student details");
+    }
+  };
 
   if (loading) {
     return (
