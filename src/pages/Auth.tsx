@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -254,6 +254,11 @@ export default function AuthPage() {
               >
                 {isSignUp ? "Sign In" : "Sign Up"}
               </button>
+            </p>
+            <p className="mt-4 text-sm text-center text-gray-600">
+              <Link to="/" className="text-emerald-500 hover:underline">
+                ← Back to Home
+              </Link>
             </p>
           </>
         )}

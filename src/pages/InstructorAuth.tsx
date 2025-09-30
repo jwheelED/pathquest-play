@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,6 +156,11 @@ export default function InstructorAuth() {
           >
             {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
           </Button>
+          <p className="text-sm text-center text-muted-foreground">
+            <Link to="/" className="text-primary hover:underline">
+              ← Back to Home
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>
