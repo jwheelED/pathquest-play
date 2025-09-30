@@ -14,6 +14,12 @@ export default function InstructorAuth() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAuth();
+    }
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -115,6 +121,7 @@ export default function InstructorAuth() {
               placeholder="Full Name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyPress={handleKeyPress}
               className="retro-input"
             />
           )}
@@ -123,6 +130,7 @@ export default function InstructorAuth() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyPress={handleKeyPress}
             className="retro-input"
           />
           <Input
@@ -130,6 +138,7 @@ export default function InstructorAuth() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyPress={handleKeyPress}
             className="retro-input"
           />
           <Button

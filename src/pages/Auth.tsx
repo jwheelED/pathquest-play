@@ -19,6 +19,12 @@ export default function AuthPage() {
 
   const navigate = useNavigate();
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAuth();
+    }
+  };
+
   const handleAuth = async () => {
     setError("");
     setSuccess("");
@@ -186,6 +192,7 @@ export default function AuthPage() {
                   placeholder="Full Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
                 />
                 <input
@@ -193,6 +200,7 @@ export default function AuthPage() {
                   placeholder="Phone Number"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
                 />
                 <input
@@ -200,6 +208,7 @@ export default function AuthPage() {
                   placeholder="Age"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
                 />
                 <input
@@ -207,6 +216,7 @@ export default function AuthPage() {
                   placeholder="Instructor Code (Optional)"
                   value={instructorCode}
                   onChange={(e) => setInstructorCode(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
                 />
               </>
@@ -217,6 +227,7 @@ export default function AuthPage() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyPress={handleKeyPress}
               className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
             />
             <input
@@ -224,6 +235,7 @@ export default function AuthPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyPress={handleKeyPress}
               className="w-full mb-6 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
             />
 
