@@ -104,10 +104,10 @@ export default function InstructorAuth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-accent/5 to-secondary/10 p-4">
-      <Card className="w-full max-w-md pixel-corners">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/5 to-secondary/10 p-4">
+      <Card className="w-full max-w-md border-2 border-secondary-glow shadow-glow">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-primary">
+          <CardTitle className="text-3xl font-bold text-secondary">
             Instructor Portal
           </CardTitle>
           <CardDescription>
@@ -144,8 +144,7 @@ export default function InstructorAuth() {
           <Button
             onClick={handleAuth}
             disabled={loading}
-            className="w-full retro-button"
-            variant="retro"
+            className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold shadow-glow"
           >
             {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
           </Button>
@@ -157,7 +156,7 @@ export default function InstructorAuth() {
             {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
           </Button>
           <p className="text-sm text-center text-muted-foreground">
-            <Link to="/" className="text-primary hover:underline">
+            <Link to="/" className="text-secondary hover:underline">
               ← Back to Home
             </Link>
           </p>

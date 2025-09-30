@@ -163,27 +163,27 @@ export default function AuthPage() {
   }, [navigate]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md p-8 bg-white shadow-md rounded-xl">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
+      <div className="w-full max-w-md p-8 bg-card shadow-glow border border-primary-glow rounded-xl">
         {session ? (
           <div>
-            <h2 className="text-2xl font-bold mb-6 text-center">You are signed in</h2>
-            <p className="text-center text-sm mb-4">{session.user.email}</p>
+            <h2 className="text-2xl font-bold mb-6 text-center text-foreground">You are signed in</h2>
+            <p className="text-center text-sm mb-4 text-muted-foreground">{session.user.email}</p>
             <button
               onClick={handleLogout}
-              className="w-full bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 transition"
+              className="w-full bg-destructive text-destructive-foreground p-2 rounded-lg hover:bg-destructive/90 transition"
             >
               Logout
             </button>
           </div>
         ) : (
           <>
-            <h2 className="text-2xl font-bold mb-6 text-center text-emerald-500">
+            <h2 className="text-2xl font-bold mb-6 text-center text-primary">
               {isSignUp ? "Create an account" : "Sign in to your account"}
             </h2>
 
-            {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
-            {success && <p className="text-green-500 mb-4 text-sm">{success}</p>}
+            {error && <p className="text-destructive mb-4 text-sm">{error}</p>}
+            {success && <p className="text-primary mb-4 text-sm">{success}</p>}
 
             {isSignUp && (
               <>
@@ -193,7 +193,7 @@ export default function AuthPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <input
                   type="text"
@@ -201,7 +201,7 @@ export default function AuthPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <input
                   type="number"
@@ -209,7 +209,7 @@ export default function AuthPage() {
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <input
                   type="text"
@@ -217,7 +217,7 @@ export default function AuthPage() {
                   value={instructorCode}
                   onChange={(e) => setInstructorCode(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </>
             )}
@@ -228,7 +228,7 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+              className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <input
               type="password"
@@ -236,27 +236,27 @@ export default function AuthPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="w-full mb-6 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+              className="w-full mb-6 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
 
             <button
               onClick={handleAuth}
-              className="w-full bg-emerald-500 p-2 rounded-lg hover:bg-sky-400 text-white transition"
+              className="w-full bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow"
             >
               {isSignUp ? "Sign Up" : "Sign In"}
             </button>
 
-            <p className="mt-4 text-sm text-center text-emerald-500">
+            <p className="mt-4 text-sm text-center text-foreground">
               {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
               <button
                 onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sky-400 hover:underline"
+                className="text-primary hover:underline font-semibold"
               >
                 {isSignUp ? "Sign In" : "Sign Up"}
               </button>
             </p>
-            <p className="mt-4 text-sm text-center text-gray-600">
-              <Link to="/" className="text-emerald-500 hover:underline">
+            <p className="mt-4 text-sm text-center text-muted-foreground">
+              <Link to="/" className="text-primary hover:underline">
                 ← Back to Home
               </Link>
             </p>
