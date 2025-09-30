@@ -49,8 +49,19 @@ export default function InstructorAuth() {
         if (error) throw error;
 
         if (data.user) {
-          toast.success("Account created! Please sign in.");
-          setIsSignUp(false);
+          // Check if email confirmation is required
+          if (data.user.identities && data.user.identities.length === 0) {
+            toast.error("This email is already registered. Please sign in instead.");
+            setIsSignUp(false);
+          } else if (data.session) {
+            // User is auto-confirmed, redirect to dashboard
+            toast.success("Account created successfully!");
+            navigate("/instructor/dashboard");
+          } else {
+            // Email confirmation required
+            toast.success("Account created! Please check your email to confirm your account before signing in.");
+            setIsSignUp(false);
+          }
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
