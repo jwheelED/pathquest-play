@@ -58,7 +58,7 @@ export default function AuthPage() {
           console.error("Insert user stats error:", statsError.message);
         }
 
-        // Link student to instructor if code provided
+        // Link to instructor if code provided
         if (instructorCode.trim()) {
           const { data: instructorProfile } = await supabase
             .from("profiles")
@@ -68,13 +68,21 @@ export default function AuthPage() {
             .maybeSingle();
 
           if (instructorProfile) {
-            await supabase.from("instructor_students").insert({
-              instructor_id: instructorProfile.id,
-              student_id: user.id,
-            });
-            toast.success("Successfully linked to your instructor!");
+            const { error: linkError } = await supabase
+              .from("instructor_students")
+              .insert({
+                instructor_id: instructorProfile.id,
+                student_id: user.id,
+              });
+
+            if (linkError) {
+              console.error("Error linking to instructor:", linkError.message);
+              toast.error("Valid code, but failed to link to instructor");
+            } else {
+              toast.success("Successfully linked to instructor!");
+            }
           } else {
-            toast.error("Invalid instructor code, but your account was created.");
+            toast.error("Invalid instructor code");
           }
         }
         
