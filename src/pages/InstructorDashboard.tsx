@@ -23,6 +23,7 @@ interface Student {
 export default function InstructorDashboard() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [instructorCode, setInstructorCode] = useState<string>("");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,7 +43,7 @@ export default function InstructorDashboard() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, instructor_code")
       .eq("id", session.user.id)
       .single();
 
@@ -53,6 +54,7 @@ export default function InstructorDashboard() {
     }
 
     setCurrentUser(session.user);
+    setInstructorCode(profile.instructor_code || "");
   };
 
   const fetchStudents = async () => {
@@ -253,6 +255,30 @@ export default function InstructorDashboard() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* Instructor Code Card */}
+        {instructorCode && (
+          <div className="mb-6 p-6 bg-card border rounded-lg shadow-sm">
+            <h3 className="text-lg font-semibold mb-2">Your Instructor Code</h3>
+            <div className="flex items-center gap-4">
+              <code className="text-2xl font-bold text-primary bg-muted px-4 py-2 rounded">
+                {instructorCode}
+              </code>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(instructorCode);
+                  toast.success("Code copied to clipboard!");
+                }}
+              >
+                Copy Code
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Share this code with your students so they can join your class during signup.
+            </p>
+          </div>
+        )}
+
         {students.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />

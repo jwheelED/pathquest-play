@@ -11,6 +11,7 @@ export default function AuthPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [age, setAge] = useState("");
+  const [instructorCode, setInstructorCode] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -55,6 +56,26 @@ export default function AuthPage() {
         }
         if (statsError) {
           console.error("Insert user stats error:", statsError.message);
+        }
+
+        // Link student to instructor if code provided
+        if (instructorCode.trim()) {
+          const { data: instructorProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("instructor_code", instructorCode.toUpperCase())
+            .eq("role", "instructor")
+            .maybeSingle();
+
+          if (instructorProfile) {
+            await supabase.from("instructor_students").insert({
+              instructor_id: instructorProfile.id,
+              student_id: user.id,
+            });
+            toast.success("Successfully linked to your instructor!");
+          } else {
+            toast.error("Invalid instructor code, but your account was created.");
+          }
         }
         
         setSuccess("Sign-up email sent!");
@@ -171,6 +192,13 @@ export default function AuthPage() {
                   placeholder="Age"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
+                  className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Instructor Code (Optional)"
+                  value={instructorCode}
+                  onChange={(e) => setInstructorCode(e.target.value)}
                   className="w-full mb-4 p-2 border rounded-lg focus:outline-none focus:ring-3 focus:ring-sky-200 text-emerald-500"
                 />
               </>
