@@ -36,24 +36,45 @@ export default function InstructorAuth() {
     setLoading(true);
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              full_name: name,
+              role: "instructor"
+            }
+          }
+        });
         if (error) throw error;
 
         if (data.user) {
           // Create instructor profile
-          await supabase.from("profiles").insert({
+          const { error: profileError } = await supabase.from("profiles").insert({
             id: data.user.id,
             full_name: name,
             role: "instructor",
             onboarded: true,
           });
 
-          await supabase.from("users").insert({
+          if (profileError) {
+            console.error("Profile creation error:", profileError);
+            toast.error("Failed to create instructor profile");
+            return;
+          }
+
+          const { error: userError } = await supabase.from("users").insert({
             id: data.user.id,
             user_id: data.user.id,
             name,
             email,
           });
+
+          if (userError) {
+            console.error("User creation error:", userError);
+            toast.error("Failed to create user record");
+            return;
+          }
 
           toast.success("Account created! Please sign in.");
           setIsSignUp(false);
@@ -64,12 +85,19 @@ export default function InstructorAuth() {
 
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from("profiles")
             .select("role")
             .eq("id", user.id)
-            .single();
+            .maybeSingle();
           
+          if (profileError) {
+            console.error("Profile fetch error:", profileError);
+            toast.error("Error checking instructor status");
+            await supabase.auth.signOut();
+            return;
+          }
+
           if (profile?.role === "instructor") {
             navigate("/instructor/dashboard");
           } else {
