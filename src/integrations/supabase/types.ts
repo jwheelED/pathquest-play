@@ -190,6 +190,13 @@ export type Database = {
             referencedRelation: "stem_problems"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "student_problems"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -268,6 +275,13 @@ export type Database = {
             columns: ["problem_id"]
             isOneToOne: false
             referencedRelation: "stem_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaced_repetition_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "student_problems"
             referencedColumns: ["id"]
           },
         ]
@@ -408,12 +422,48 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      student_problems: {
+        Row: {
+          created_at: string | null
+          difficulty: string | null
+          id: string | null
+          options: Json | null
+          points_reward: number | null
+          problem_text: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_instructor_code: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_problem_answer: {
+        Args: { problem_id: string }
+        Returns: {
+          correct_answer: string
+          explanation: string
+        }[]
       }
     }
     Enums: {

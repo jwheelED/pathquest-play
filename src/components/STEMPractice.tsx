@@ -16,8 +16,8 @@ interface STEMProblem {
   difficulty: string;
   problem_text: string;
   options: string[];
-  correct_answer: string;
-  explanation: string;
+  correct_answer?: string; // Optional - only available after submission
+  explanation?: string; // Optional - only available after submission
   points_reward: number;
 }
 
@@ -61,38 +61,25 @@ export default function STEMPractice({ userId, onPointsEarned }: STEMPracticePro
   const loadNextProblem = async () => {
     setLoading(true);
     try {
-      // Get problems due for review first, then new problems
-      const { data: reviewProblems, error: reviewError } = await supabase
-        .from("spaced_repetition")
-        .select(`
-          problem_id,
-          stem_problems (
-            id, subject, difficulty, problem_text, options, 
-            correct_answer, explanation, points_reward
-          )
-        `)
-        .eq("user_id", userId)
-        .lte("next_review_date", new Date().toISOString().split('T')[0]);
-
-      let problem = null;
+      // Get problems without answers (students can't see answers until after submission)
+      const { data: newProblems, error: newError } = await supabase
+        .from("student_problems")
+        .select("*")
+        .limit(10);
       
-      if (!reviewError && reviewProblems && reviewProblems.length > 0) {
-        // Use a review problem
-        const randomReview = reviewProblems[Math.floor(Math.random() * reviewProblems.length)];
-        problem = randomReview.stem_problems;
+      if (!newError && newProblems && newProblems.length > 0) {
+        const problemData = newProblems[Math.floor(Math.random() * newProblems.length)];
+        // Cast the problem data to the correct type
+        const problem: STEMProblem = {
+          ...problemData,
+          options: problemData.options as string[],
+        };
+        setCurrentProblem(problem);
       } else {
-        // Get a random new problem
-        const { data: newProblems, error: newError } = await supabase
-          .from("stem_problems")
-          .select("*")
-          .limit(10);
-        
-        if (!newError && newProblems && newProblems.length > 0) {
-          problem = newProblems[Math.floor(Math.random() * newProblems.length)];
-        }
+        console.error("Error loading problems:", newError);
+        toast.error("Failed to load problems");
       }
 
-      setCurrentProblem(problem);
       setSelectedAnswer("");
       setShowResult(false);
     } catch (error) {
@@ -105,18 +92,45 @@ export default function STEMPractice({ userId, onPointsEarned }: STEMPracticePro
   const submitAnswer = async () => {
     if (!currentProblem || !selectedAnswer || !userId) return;
 
-    const correct = selectedAnswer === currentProblem.correct_answer;
-    setIsCorrect(correct);
-    setShowResult(true);
-
-    // Record the attempt
+    // Record the attempt FIRST
     await supabase
       .from("problem_attempts")
       .insert([{
         user_id: userId,
         problem_id: currentProblem.id,
-        is_correct: correct,
+        is_correct: false, // We'll update this after getting the answer
       }]);
+
+    // Now fetch the answer securely - only available after attempt
+    const { data: answerData } = await supabase
+      .rpc('get_problem_answer', { problem_id: currentProblem.id });
+
+    if (!answerData || answerData.length === 0) {
+      toast.error("Failed to verify answer");
+      return;
+    }
+
+    const { correct_answer, explanation } = answerData[0];
+    const correct = selectedAnswer === correct_answer;
+    
+    // Update the problem with the answer
+    setCurrentProblem({
+      ...currentProblem,
+      correct_answer,
+      explanation,
+    });
+
+    setIsCorrect(correct);
+    setShowResult(true);
+
+    // Update the attempt with the correct result
+    await supabase
+      .from("problem_attempts")
+      .update({ is_correct: correct })
+      .eq("user_id", userId)
+      .eq("problem_id", currentProblem.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     // Update spaced repetition schedule
     if (correct) {
@@ -124,14 +138,14 @@ export default function STEMPractice({ userId, onPointsEarned }: STEMPracticePro
       await updateUserStats(currentProblem.points_reward);
       
       toast.success(`Correct! +${currentProblem.points_reward} XP`, {
-        description: currentProblem.explanation,
+        description: explanation,
       });
       
       onPointsEarned?.(currentProblem.points_reward);
     } else {
       await updateSpacedRepetition(currentProblem.id, correct);
       toast.error("Incorrect answer", {
-        description: currentProblem.explanation,
+        description: explanation,
       });
     }
 
@@ -298,7 +312,6 @@ export default function STEMPractice({ userId, onPointsEarned }: STEMPracticePro
                   ${showResult && selectedAnswer === option && option !== currentProblem.correct_answer
                     ? 'border-destructive bg-destructive/10'
                     : ''}
-                  disabled:cursor-not-allowed
                 `}
               >
                 {option}
@@ -327,7 +340,9 @@ export default function STEMPractice({ userId, onPointsEarned }: STEMPracticePro
                 <p className="font-semibold">
                   {isCorrect ? '🎉 Correct!' : '❌ Incorrect'}
                 </p>
-                <p className="text-sm mt-2">{currentProblem.explanation}</p>
+                {currentProblem.explanation && (
+                  <p className="text-sm mt-2">{currentProblem.explanation}</p>
+                )}
               </div>
               
               <Button 
