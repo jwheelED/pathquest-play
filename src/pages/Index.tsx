@@ -11,18 +11,34 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const checkSessionAndRedirect = async (session: any) => {
+      if (session) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        
+        if (profile?.role === "instructor") {
+          navigate("/instructor/dashboard");
+        } else {
+          navigate("/dashboard");
+        }
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
-        navigate("/dashboard");
-      }
+      checkSessionAndRedirect(session);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         if (session) {
-          navigate("/dashboard");
+          setTimeout(() => {
+            checkSessionAndRedirect(session);
+          }, 0);
         }
       }
     );
@@ -46,32 +62,63 @@ const Index = () => {
           </p>
         </div>
 
-        <Card className="p-8 bg-gradient-to-br from-card to-primary/10 border-2 border-primary-glow shadow-glow max-w-md mx-auto">
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="text-4xl">🚀</div>
-              <h2 className="text-xl font-bold text-foreground">Ready to Start Learning?</h2>
-              <p className="text-sm text-muted-foreground">
-                Join thousands of learners earning XP, unlocking achievements, and mastering STEM subjects.
-              </p>
-            </div>
-            
-            <div className="space-y-3">
-              <Button 
-                onClick={() => navigate("/auth")}
-                variant="retro"
-                size="xl"
-                className="w-full"
-              >
-                🎯 Start Your Quest
-              </Button>
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {/* Student Path */}
+          <Card className="p-8 bg-gradient-to-br from-card to-primary/10 border-2 border-primary-glow shadow-glow hover:shadow-elegant transition-all">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="text-5xl">🎮</div>
+                <h2 className="text-2xl font-bold text-foreground">I'm a Student</h2>
+                <p className="text-sm text-muted-foreground">
+                  Join thousands of learners earning XP, unlocking achievements, and mastering STEM subjects through gamified learning.
+                </p>
+              </div>
               
-              <p className="text-xs text-muted-foreground">
-                New to PathQuest? Sign up and complete onboarding to get started!
-              </p>
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => navigate("/auth")}
+                  variant="retro"
+                  size="lg"
+                  className="w-full"
+                >
+                  🎯 Start Learning
+                </Button>
+                
+                <p className="text-xs text-muted-foreground">
+                  Sign up and complete onboarding to begin your quest!
+                </p>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+
+          {/* Instructor Path */}
+          <Card className="p-8 bg-gradient-to-br from-card to-secondary/10 border-2 border-secondary-glow shadow-glow hover:shadow-elegant transition-all">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="text-5xl">👨‍🏫</div>
+                <h2 className="text-2xl font-bold text-foreground">I'm an Instructor</h2>
+                <p className="text-sm text-muted-foreground">
+                  Track student progress, provide support, communicate with learners, and monitor achievement across your classroom.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => navigate("/instructor/auth")}
+                  variant="retro"
+                  size="lg"
+                  className="w-full bg-secondary hover:bg-secondary/90"
+                >
+                  📊 Instructor Portal
+                </Button>
+                
+                <p className="text-xs text-muted-foreground">
+                  Sign in to access your instructor dashboard
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
           <Card className="p-4 bg-gradient-secondary border border-secondary-glow">
