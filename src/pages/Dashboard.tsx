@@ -10,6 +10,7 @@ import AchievementSystem from "@/components/AchievementSystem";
 import GameifiedLessons from "@/components/GameifiedLessons";
 import ChatBox from "@/components/ChatBox";
 import JoinClassCard from "@/components/JoinClassCard";
+import InstructorChatCard from "@/components/InstructorChatCard";
 import { toast } from "sonner";
 
 interface User {
@@ -316,10 +317,16 @@ export default function Dashboard() {
               
             </div>
 
-            {/* Chat Interface */}
-            <Card className="p-6 border-2 border-energy-glow bg-gradient-to-br from-card to-energy/5">
-              <ChatBox goal={goals.join(", ")} />
-            </Card>
+            {/* Chat Interfaces */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Instructor Messages */}
+              <InstructorChatCard userId={user.id} />
+              
+              {/* AI Chat */}
+              <Card className="p-6 border-2 border-energy-glow bg-gradient-to-br from-card to-energy/5">
+                <ChatBox goal={goals.join(", ")} />
+              </Card>
+            </div>
             
           </main>
         </div>
