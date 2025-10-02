@@ -21,6 +21,8 @@ const Index = () => {
         
         if (profile?.role === "instructor") {
           navigate("/instructor/dashboard");
+        } else if (profile?.role === "admin") {
+          navigate("/admin/dashboard");
         } else {
           navigate("/dashboard");
         }
@@ -62,7 +64,7 @@ const Index = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {/* Student Path */}
           <Card className="p-8 bg-gradient-to-br from-card to-primary/10 border-2 border-primary-glow shadow-glow hover:shadow-elegant transition-all">
             <div className="space-y-6">
@@ -114,6 +116,34 @@ const Index = () => {
                 
                 <p className="text-xs text-muted-foreground">
                   Sign in to access your instructor dashboard
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Administrator Path */}
+          <Card className="p-8 bg-gradient-to-br from-card to-accent/10 border-2 border-accent shadow-glow hover:shadow-elegant transition-all">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="text-5xl">🏢</div>
+                <h2 className="text-2xl font-bold text-foreground">I'm an Admin</h2>
+                <p className="text-sm text-muted-foreground">
+                  Access school-wide analytics, ROI metrics, exportable reports, and comprehensive engagement data.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => navigate("/admin/auth")}
+                  variant="retro"
+                  size="lg"
+                  className="w-full bg-accent hover:bg-accent/90"
+                >
+                  📈 Admin Portal
+                </Button>
+                
+                <p className="text-xs text-muted-foreground">
+                  Sign in to access analytics and reports
                 </p>
               </div>
             </div>
