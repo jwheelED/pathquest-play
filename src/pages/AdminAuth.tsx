@@ -152,8 +152,8 @@ export default function AdminAuth() {
           >
             {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
           </Button>
-          <p className="text-sm text-center text-muted-foreground text-sky-600">
-            <Link to="/" className="text-accent hover:underline">
+          <p className="text-sm text-center text-muted-foreground">
+            <Link to="/" className="text-accent text-black-600 hover:underline">
               ← Back to Home
             </Link>
           </p>
