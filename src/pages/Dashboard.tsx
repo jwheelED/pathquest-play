@@ -9,6 +9,7 @@ import STEMPractice from "@/components/STEMPractice";
 import AchievementSystem from "@/components/AchievementSystem";
 import GameifiedLessons from "@/components/GameifiedLessons";
 import ChatBox from "@/components/ChatBox";
+import JoinClassCard from "@/components/JoinClassCard";
 import { toast } from "sonner";
 
 interface User {
@@ -131,6 +132,57 @@ export default function Dashboard() {
     console.log(`Points earned: ${points}`);
   };
 
+  const handleJoinClass = async (classCode: string) => {
+    if (!user?.id || !classCode.trim()) return;
+    
+    try {
+      // Find instructor with this code
+      const { data: instructorProfile, error: instructorError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("instructor_code", classCode.trim())
+        .eq("role", "instructor")
+        .single();
+
+      if (instructorError || !instructorProfile) {
+        toast.error("Invalid class code. Please check and try again.");
+        return;
+      }
+
+      // Check if already connected
+      const { data: existing } = await supabase
+        .from("instructor_students")
+        .select("id")
+        .eq("instructor_id", instructorProfile.id)
+        .eq("student_id", user.id)
+        .maybeSingle();
+
+      if (existing) {
+        toast.info("You're already connected to this instructor.");
+        return;
+      }
+
+      // Create connection
+      const { error: connectionError } = await supabase
+        .from("instructor_students")
+        .insert({
+          instructor_id: instructorProfile.id,
+          student_id: user.id,
+        });
+
+      if (connectionError) {
+        toast.error("Failed to connect to instructor.");
+        console.error(connectionError);
+        return;
+      }
+
+      toast.success("Successfully connected to your instructor!");
+    } catch (err) {
+      console.error("Error joining class:", err);
+      toast.error("An error occurred. Please try again.");
+    }
+  };
+
   if (!session || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -214,6 +266,9 @@ export default function Dashboard() {
                 <div className="text-sm text-achievement-foreground/80">Total Lessons</div>
               </Card>
             </div>
+
+            {/* Join Class Card */}
+            <JoinClassCard onJoinClass={handleJoinClass} />
 
             {/* Learning Path & Generation */}
             <Card className="p-6 border-2 border-primary-glow bg-gradient-to-br from-card to-primary/5">
