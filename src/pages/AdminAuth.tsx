@@ -104,7 +104,7 @@ export default function AdminAuth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-accent/5 to-accent/10 p-4">
       <Card className="w-full max-w-md border-2 border-accent shadow-glow">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-accent">
+          <CardTitle className="text-3xl font-bold text-foreground">
             Administrator Portal
           </CardTitle>
           <CardDescription>
@@ -153,7 +153,7 @@ export default function AdminAuth() {
             {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
           </Button>
           <p className="text-sm text-center text-muted-foreground">
-            <Link to="/" className="text-accent hover:underline">
+            <Link to="/" className="text-foreground hover:underline">
               ← Back to Home
             </Link>
           </p>
