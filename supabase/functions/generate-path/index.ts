@@ -178,71 +178,121 @@ function generateJavaScriptPath(level: string) {
 }
 
 function generatePythonPath(level: string) {
-  return generateGenericPath("Python", level);
+  return [
+    {
+      title: "Introduction to Python",
+      type: "Lesson",
+      content: {
+        text: `# Introduction to Python\n\n## What is Python?\nPython is a versatile, beginner-friendly programming language known for its readable syntax and powerful capabilities.\n\n## Why Learn Python?\n- **Easy to Learn**: Clean, readable syntax\n- **Versatile**: Web development, data science, AI, automation\n- **In-Demand**: Top language for jobs in tech\n- **Great Community**: Extensive libraries and support\n\n## Your First Python Program\n\`\`\`python\nprint("Hello, World!")\n\`\`\`\n\nThat's it! Python is that simple.\n\n## Key Features\n1. **No Compilation**: Run code directly\n2. **Dynamic Typing**: Variables don't need type declarations\n3. **Extensive Libraries**: Tools for almost everything\n4. **Cross-Platform**: Works on Windows, Mac, Linux\n\n## Applications\n- **Web Development**: Django, Flask\n- **Data Science**: Pandas, NumPy, Matplotlib\n- **Machine Learning**: TensorFlow, PyTorch\n- **Automation**: Scripting, testing\n\nLet's start coding!`
+      }
+    },
+    {
+      title: "Python Basics",
+      type: "Lesson",
+      content: {
+        text: `# Python Basics\n\n## Variables\n\`\`\`python\nname = "Alice"\nage = 25\nheight = 5.7\nis_student = True\n\`\`\`\n\n## Data Types\n- **int**: Whole numbers\n- **float**: Decimal numbers\n- **str**: Text\n- **bool**: True/False\n\n## Basic Operations\n\`\`\`python\n# Math\nsum = 5 + 3\nproduct = 4 * 7\n\n# Strings\ngreeting = "Hello" + " " + "World"\n\n# Print\nprint(f"My name is {name}")\n\`\`\`\n\n## Lists\n\`\`\`python\nfruits = ["apple", "banana", "orange"]\nprint(fruits[0])  # "apple"\nfruits.append("grape")\n\`\`\`\n\n## Control Flow\n\`\`\`python\nif age >= 18:\n    print("Adult")\nelse:\n    print("Minor")\n\nfor fruit in fruits:\n    print(fruit)\n\`\`\`\n\n## Functions\n\`\`\`python\ndef greet(name):\n    return f"Hello, {name}!"\n\nprint(greet("Bob"))\n\`\`\``
+      }
+    },
+    {
+      title: "Python Quiz",
+      type: "Quiz",
+      content: {
+        questions: [
+          {
+            question: "How do you print 'Hello' in Python?",
+            options: ["echo('Hello')", "print('Hello')", "console.log('Hello')", "cout << 'Hello'"],
+            correct: 1
+          },
+          {
+            question: "What symbol is used for comments in Python?",
+            options: ["//", "/*", "#", "--"],
+            correct: 2
+          },
+          {
+            question: "How do you create a list in Python?",
+            options: ["list = (1, 2, 3)", "list = {1, 2, 3}", "list = [1, 2, 3]", "list = <1, 2, 3>"],
+            correct: 2
+          }
+        ]
+      }
+    },
+    {
+      title: "Python Practice",
+      type: "Lesson",
+      content: {
+        text: `# Practice Exercises\n\nWork through these exercises:\n\n1. Create variables for your name, age, and favorite color\n2. Write a function that adds two numbers\n3. Create a list of 5 numbers and print each one\n4. Write an if-statement to check if a number is even\n5. Create a simple calculator that adds, subtracts, multiplies, and divides`
+      }
+    },
+    {
+      title: "Python Mini Project",
+      type: "Lesson",
+      content: {
+        text: `# Build a Number Guessing Game\n\n\`\`\`python\nimport random\n\nnumber = random.randint(1, 100)\nguesses = 0\n\nprint("Guess a number between 1 and 100!")\n\nwhile True:\n    guess = int(input("Your guess: "))\n    guesses += 1\n    \n    if guess < number:\n        print("Too low!")\n    elif guess > number:\n        print("Too high!")\n    else:\n        print(f"Correct! You guessed in {guesses} tries!")\n        break\n\`\`\``
+      }
+    }
+  ];
 }
 
 function generateCppPath(level: string) {
-  if (level === "Beginner") {
-    return [
-      {
-        title: "Introduction to C++",
-        type: "Lesson",
-        content: {
-          text: `# Introduction to C++\n\n## What is C++?\nC++ is a powerful, high-performance programming language used for system software, game development, and applications requiring speed and efficiency.\n\n## Why Learn C++?\n- **High Performance**: Direct hardware control and memory management\n- **Industry Standard**: Used in game engines, operating systems, and embedded systems\n- **Object-Oriented**: Supports modern programming paradigms\n- **Career Opportunities**: High demand for C++ developers\n\n## Your First C++ Program\n\`\`\`cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n\`\`\`\n\n## Key Concepts\n1. **Compiled Language**: C++ code is compiled into machine code\n2. **Static Typing**: Variable types are checked at compile time\n3. **Memory Management**: Direct control over memory allocation\n4. **Templates**: Generic programming capabilities\n\n## Getting Started\nYou'll need:\n- A C++ compiler (GCC, Clang, or MSVC)\n- A text editor or IDE (VS Code, Visual Studio, or CLion)\n\n## Real-World Applications\n- **Game Engines**: Unreal Engine, Unity (core)\n- **Operating Systems**: Windows, Linux, macOS components\n- **Browsers**: Chrome, Firefox\n- **Databases**: MySQL, MongoDB\n\nLet's start your C++ journey!`
-        }
-      },
-      {
-        title: "Variables and Data Types",
-        type: "Lesson",
-        content: {
-          text: `# Variables and Data Types in C++\n\n## Declaring Variables\nC++ requires explicit type declaration:\n\n\`\`\`cpp\nint age = 25;\ndouble price = 19.99;\nchar grade = 'A';\nbool isPassing = true;\nstring name = "Alice";\n\`\`\`\n\n## Basic Data Types\n\n### Integer Types\n\`\`\`cpp\nint x = 42;        // Standard integer\nlong y = 1000000L; // Long integer\nshort z = 100;     // Short integer\n\`\`\`\n\n### Floating Point\n\`\`\`cpp\nfloat pi = 3.14f;      // Single precision\ndouble precise = 3.14159; // Double precision\n\`\`\`\n\n### Character and String\n\`\`\`cpp\nchar letter = 'A';\nstring text = "Hello, C++!";\n\`\`\`\n\n### Boolean\n\`\`\`cpp\nbool isTrue = true;\nbool isFalse = false;\n\`\`\`\n\n## Type Modifiers\n\`\`\`cpp\nunsigned int positive = 100; // Only positive values\nconst double PI = 3.14159;   // Cannot be changed\n\`\`\`\n\n## Input and Output\n\`\`\`cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    string name;\n    int age;\n    \n    cout << "Enter your name: ";\n    cin >> name;\n    \n    cout << "Enter your age: ";\n    cin >> age;\n    \n    cout << "Hello " << name << ", you are " << age << " years old." << endl;\n    \n    return 0;\n}\n\`\`\`\n\n## Best Practices\n- Use meaningful variable names\n- Initialize variables when declaring\n- Use const for values that won't change\n- Choose appropriate data types for efficiency`
-        }
-      },
-      {
-        title: "C++ Basics Quiz",
-        type: "Quiz",
-        content: {
-          questions: [
-            {
-              question: "Which header file is needed for input/output in C++?",
-              options: ["<stdio.h>", "<iostream>", "<string>", "<cmath>"],
-              correct: 1
-            },
-            {
-              question: "What is the correct way to declare an integer variable?",
-              options: ["integer x = 5;", "int x = 5;", "var x = 5;", "number x = 5;"],
-              correct: 1
-            },
-            {
-              question: "Which keyword makes a variable unchangeable?",
-              options: ["final", "static", "const", "readonly"],
-              correct: 2
-            },
-            {
-              question: "What does 'endl' do in C++?",
-              options: ["Ends the program", "Creates a new line", "Ends a loop", "Defines a variable"],
-              correct: 1
-            }
-          ]
-        }
-      },
-      {
-        title: "Control Structures Practice",
-        type: "Lesson",
-        content: {
-          text: `# Control Structures in C++\n\n## If Statements\n\`\`\`cpp\nint age = 18;\n\nif (age >= 18) {\n    cout << "Adult" << endl;\n} else {\n    cout << "Minor" << endl;\n}\n\`\`\`\n\n## Loops\n\n### For Loop\n\`\`\`cpp\nfor (int i = 0; i < 5; i++) {\n    cout << i << " ";\n}\n// Output: 0 1 2 3 4\n\`\`\`\n\n### While Loop\n\`\`\`cpp\nint count = 0;\nwhile (count < 5) {\n    cout << count << " ";\n    count++;\n}\n\`\`\`\n\n## Practice Exercises\nTry implementing these:\n1. Print numbers 1-10\n2. Calculate sum of first 100 numbers\n3. Check if a number is even or odd\n4. Find the largest of three numbers`
-        }
-      },
-      {
-        title: "C++ Calculator Project",
-        type: "Lesson",
-        content: {
-          text: `# Build a C++ Calculator\n\n## Project Goal\nCreate a simple calculator that performs basic arithmetic operations.\n\n## Requirements\n\`\`\`cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    double num1, num2;\n    char operation;\n    \n    cout << "Enter first number: ";\n    cin >> num1;\n    \n    cout << "Enter operation (+, -, *, /): ";\n    cin >> operation;\n    \n    cout << "Enter second number: ";\n    cin >> num2;\n    \n    switch(operation) {\n        case '+':\n            cout << "Result: " << (num1 + num2) << endl;\n            break;\n        case '-':\n            cout << "Result: " << (num1 - num2) << endl;\n            break;\n        case '*':\n            cout << "Result: " << (num1 * num2) << endl;\n            break;\n        case '/':\n            if (num2 != 0) {\n                cout << "Result: " << (num1 / num2) << endl;\n            } else {\n                cout << "Error: Division by zero!" << endl;\n            }\n            break;\n        default:\n            cout << "Invalid operation!" << endl;\n    }\n    \n    return 0;\n}\n\`\`\`\n\n## Challenges\n1. Add error handling\n2. Support multiple operations\n3. Add power and modulo operations`
-        }
+  // Return comprehensive content for all levels, not just beginners
+  return [
+    {
+      title: "Introduction to C++",
+      type: "Lesson",
+      content: {
+        text: `# Introduction to C++\n\n## What is C++?\nC++ is a powerful, high-performance programming language used for system software, game development, and applications requiring speed and efficiency.\n\n## Why Learn C++?\n- **High Performance**: Direct hardware control and memory management\n- **Industry Standard**: Used in game engines, operating systems, and embedded systems\n- **Object-Oriented**: Supports modern programming paradigms\n- **Career Opportunities**: High demand for C++ developers\n\n## Your First C++ Program\n\`\`\`cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n\`\`\`\n\n## Key Concepts\n1. **Compiled Language**: C++ code is compiled into machine code\n2. **Static Typing**: Variable types are checked at compile time\n3. **Memory Management**: Direct control over memory allocation\n4. **Templates**: Generic programming capabilities\n\n## Getting Started\nYou'll need:\n- A C++ compiler (GCC, Clang, or MSVC)\n- A text editor or IDE (VS Code, Visual Studio, or CLion)\n\n## Real-World Applications\n- **Game Engines**: Unreal Engine, Unity (core)\n- **Operating Systems**: Windows, Linux, macOS components\n- **Browsers**: Chrome, Firefox\n- **Databases**: MySQL, MongoDB\n\nLet's start your C++ journey!`
       }
-    ];
-  }
-  return generateGenericPath("C++", level);
+    },
+    {
+      title: "Variables and Data Types",
+      type: "Lesson",
+      content: {
+        text: `# Variables and Data Types in C++\n\n## Declaring Variables\nC++ requires explicit type declaration:\n\n\`\`\`cpp\nint age = 25;\ndouble price = 19.99;\nchar grade = 'A';\nbool isPassing = true;\nstring name = "Alice";\n\`\`\`\n\n## Basic Data Types\n\n### Integer Types\n\`\`\`cpp\nint x = 42;        // Standard integer\nlong y = 1000000L; // Long integer\nshort z = 100;     // Short integer\n\`\`\`\n\n### Floating Point\n\`\`\`cpp\nfloat pi = 3.14f;      // Single precision\ndouble precise = 3.14159; // Double precision\n\`\`\`\n\n### Character and String\n\`\`\`cpp\nchar letter = 'A';\nstring text = "Hello, C++!";\n\`\`\`\n\n### Boolean\n\`\`\`cpp\nbool isTrue = true;\nbool isFalse = false;\n\`\`\`\n\n## Type Modifiers\n\`\`\`cpp\nunsigned int positive = 100; // Only positive values\nconst double PI = 3.14159;   // Cannot be changed\n\`\`\`\n\n## Input and Output\n\`\`\`cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    string name;\n    int age;\n    \n    cout << "Enter your name: ";\n    cin >> name;\n    \n    cout << "Enter your age: ";\n    cin >> age;\n    \n    cout << "Hello " << name << ", you are " << age << " years old." << endl;\n    \n    return 0;\n}\n\`\`\`\n\n## Best Practices\n- Use meaningful variable names\n- Initialize variables when declaring\n- Use const for values that won't change\n- Choose appropriate data types for efficiency`
+      }
+    },
+    {
+      title: "C++ Basics Quiz",
+      type: "Quiz",
+      content: {
+        questions: [
+          {
+            question: "Which header file is needed for input/output in C++?",
+            options: ["<stdio.h>", "<iostream>", "<string>", "<cmath>"],
+            correct: 1
+          },
+          {
+            question: "What is the correct way to declare an integer variable?",
+            options: ["integer x = 5;", "int x = 5;", "var x = 5;", "number x = 5;"],
+            correct: 1
+          },
+          {
+            question: "Which keyword makes a variable unchangeable?",
+            options: ["final", "static", "const", "readonly"],
+            correct: 2
+          },
+          {
+            question: "What does 'endl' do in C++?",
+            options: ["Ends the program", "Creates a new line", "Ends a loop", "Defines a variable"],
+            correct: 1
+          }
+        ]
+      }
+    },
+    {
+      title: "Control Structures",
+      type: "Lesson",
+      content: {
+        text: `# Control Structures in C++\n\n## If Statements\n\`\`\`cpp\nint age = 18;\n\nif (age >= 18) {\n    cout << "Adult" << endl;\n} else {\n    cout << "Minor" << endl;\n}\n\`\`\`\n\n## Loops\n\n### For Loop\n\`\`\`cpp\nfor (int i = 0; i < 5; i++) {\n    cout << i << " ";\n}\n// Output: 0 1 2 3 4\n\`\`\`\n\n### While Loop\n\`\`\`cpp\nint count = 0;\nwhile (count < 5) {\n    cout << count << " ";\n    count++;\n}\n\`\`\`\n\n### Do-While Loop\n\`\`\`cpp\nint num = 0;\ndo {\n    cout << num << " ";\n    num++;\n} while (num < 5);\n\`\`\`\n\n## Switch Statements\n\`\`\`cpp\nint choice = 2;\nswitch(choice) {\n    case 1:\n        cout << "Option 1" << endl;\n        break;\n    case 2:\n        cout << "Option 2" << endl;\n        break;\n    default:\n        cout << "Invalid option" << endl;\n}\n\`\`\`\n\n## Practice Tips\n- Use loops to avoid repeating code\n- Choose the right control structure for the task\n- Always test edge cases\n- Remember to use break in switch statements`
+      }
+    },
+    {
+      title: "C++ Calculator Project",
+      type: "Lesson",
+      content: {
+        text: `# Build a C++ Calculator\n\n## Project Goal\nCreate a simple calculator that performs basic arithmetic operations.\n\n## Complete Code Example\n\`\`\`cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    double num1, num2;\n    char operation;\n    \n    cout << "Enter first number: ";\n    cin >> num1;\n    \n    cout << "Enter operation (+, -, *, /): ";\n    cin >> operation;\n    \n    cout << "Enter second number: ";\n    cin >> num2;\n    \n    switch(operation) {\n        case '+':\n            cout << "Result: " << (num1 + num2) << endl;\n            break;\n        case '-':\n            cout << "Result: " << (num1 - num2) << endl;\n            break;\n        case '*':\n            cout << "Result: " << (num1 * num2) << endl;\n            break;\n        case '/':\n            if (num2 != 0) {\n                cout << "Result: " << (num1 / num2) << endl;\n            } else {\n                cout << "Error: Division by zero!" << endl;\n            }\n            break;\n        default:\n            cout << "Invalid operation!" << endl;\n    }\n    \n    return 0;\n}\n\`\`\`\n\n## Enhancement Ideas\n1. Add error handling for invalid inputs\n2. Support multiple operations in sequence\n3. Add power and modulo operations\n4. Create a loop to perform multiple calculations\n5. Add a menu system for better user experience\n\n## What You Learned\n- User input with cin\n- Switch statements for multiple conditions\n- Type casting and arithmetic operations\n- Error handling for edge cases\n- Program flow control`
+      }
+    }
+  ];
 }
 
 function generateMLPath(level: string) {
