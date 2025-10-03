@@ -25,14 +25,21 @@ export default function LessonViewer({ lesson, onComplete, onClose }: LessonView
 
   // Parse content based on lesson type
   const parseContent = () => {
-    if (!lesson.content) {
+    // Always use default content if content is null, empty, or invalid
+    if (!lesson.content || lesson.content.trim() === '' || lesson.content === 'null') {
       return getDefaultContent();
     }
     
     try {
-      return JSON.parse(lesson.content);
+      const parsed = JSON.parse(lesson.content);
+      // If parsed content is empty or invalid, use default
+      if (!parsed || Object.keys(parsed).length === 0) {
+        return getDefaultContent();
+      }
+      return parsed;
     } catch {
-      return { text: lesson.content };
+      // If it's not valid JSON, use default content
+      return getDefaultContent();
     }
   };
 

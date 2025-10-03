@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import LessonViewer from "./LessonViewer";
 
@@ -366,6 +366,9 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
         {/* Lesson Viewer Dialog */}
         <Dialog open={!!selectedLesson} onOpenChange={(open) => !open && setSelectedLesson(null)}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden">
+            <DialogTitle className="sr-only">
+              {selectedLesson?.title || "Lesson Viewer"}
+            </DialogTitle>
             {selectedLesson && (
               <LessonViewer
                 lesson={selectedLesson}
