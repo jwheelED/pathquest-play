@@ -68,6 +68,50 @@ export type Database = {
         }
         Relationships: []
       }
+      lesson_mastery: {
+        Row: {
+          attempt_count: number
+          created_at: string | null
+          id: string
+          is_mastered: boolean
+          last_attempt_date: string | null
+          lesson_id: string
+          mastery_threshold: number
+          successful_attempts: number
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string | null
+          id?: string
+          is_mastered?: boolean
+          last_attempt_date?: string | null
+          lesson_id: string
+          mastery_threshold?: number
+          successful_attempts?: number
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string | null
+          id?: string
+          is_mastered?: boolean
+          last_attempt_date?: string | null
+          lesson_id?: string
+          mastery_threshold?: number
+          successful_attempts?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_mastery_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lesson_progress: {
         Row: {
           completed: boolean
@@ -454,6 +498,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_mastery_threshold: {
+        Args: { p_lesson_id: string; p_user_id: string }
+        Returns: number
+      }
       generate_instructor_code: {
         Args: Record<PropertyKey, never>
         Returns: string

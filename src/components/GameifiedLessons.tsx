@@ -19,9 +19,18 @@ interface Lesson {
   content: string | null;
 }
 
+interface LessonMastery {
+  lesson_id: string;
+  attempt_count: number;
+  successful_attempts: number;
+  mastery_threshold: number;
+  is_mastered: boolean;
+}
+
 export default function GameifiedLessons({ userId, onProgressChange, onLessonComplete }: GameifiedLessonsProps) {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+  const [masteryData, setMasteryData] = useState<Map<string, LessonMastery>>(new Map());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -48,6 +57,12 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
         .select("lesson_id")
         .eq("user_id", userId);
 
+      // Fetch mastery data for this user
+      const { data: masteryDataResult, error: masteryError } = await supabase
+        .from("lesson_mastery")
+        .select("*")
+        .eq("user_id", userId);
+
       if (!lessonError && lessonData) {
         setLessons(lessonData);
       }
@@ -59,6 +74,14 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
           onProgressChange((ids.length / lessonData.length) * 100);
         }
       }
+
+      if (!masteryError && masteryDataResult) {
+        const masteryMap = new Map<string, LessonMastery>();
+        masteryDataResult.forEach((mastery) => {
+          masteryMap.set(mastery.lesson_id, mastery);
+        });
+        setMasteryData(masteryMap);
+      }
     } catch (error) {
       console.error("Error fetching lessons:", error);
     }
@@ -69,11 +92,12 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
     if (!userId) return;
     
     const alreadyCompleted = completedLessons.includes(lessonId);
+    const mastery = masteryData.get(lessonId);
     
     setLoading(true);
     try {
       if (alreadyCompleted) {
-        // Mark as incomplete
+        // Mark as incomplete (reset mastery tracking)
         const { error } = await supabase
           .from("lesson_progress")
           .delete()
@@ -89,29 +113,76 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
           toast.info(`${lessonTitle} marked as incomplete`);
         }
       } else {
-        // Mark as complete
-        const { error } = await supabase
-          .from("lesson_progress")
-          .insert({ user_id: userId, lesson_id: lessonId, completed: true });
+        // Track mastery attempt
+        const { data: threshold } = await supabase.rpc('calculate_mastery_threshold', {
+          p_user_id: userId,
+          p_lesson_id: lessonId
+        });
 
-        if (!error) {
-          const updated = [...completedLessons, lessonId];
-          setCompletedLessons(updated);
-          
-          // Award XP and coins for completing lesson
-          const xpReward = 25;
-          const coinReward = 10;
-          
-          await updateUserStats(xpReward, coinReward);
-          
-          if (onProgressChange) {
-            onProgressChange((updated.length / lessons.length) * 100);
+        const currentAttempts = (mastery?.attempt_count || 0) + 1;
+        const currentSuccessful = (mastery?.successful_attempts || 0) + 1;
+        const masteryThreshold = threshold || 3;
+        const isMastered = currentSuccessful >= masteryThreshold;
+
+        // Update or insert mastery record
+        const { error: masteryError } = await supabase
+          .from("lesson_mastery")
+          .upsert({
+            user_id: userId,
+            lesson_id: lessonId,
+            attempt_count: currentAttempts,
+            successful_attempts: currentSuccessful,
+            mastery_threshold: masteryThreshold,
+            is_mastered: isMastered,
+            last_attempt_date: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,lesson_id'
+          });
+
+        if (masteryError) {
+          console.error("Error updating mastery:", masteryError);
+        }
+
+        // Update local mastery state
+        const newMasteryData = new Map(masteryData);
+        newMasteryData.set(lessonId, {
+          lesson_id: lessonId,
+          attempt_count: currentAttempts,
+          successful_attempts: currentSuccessful,
+          mastery_threshold: masteryThreshold,
+          is_mastered: isMastered
+        });
+        setMasteryData(newMasteryData);
+
+        if (isMastered) {
+          // Mark as complete only when mastered
+          const { error } = await supabase
+            .from("lesson_progress")
+            .insert({ user_id: userId, lesson_id: lessonId, completed: true });
+
+          if (!error) {
+            const updated = [...completedLessons, lessonId];
+            setCompletedLessons(updated);
+            
+            // Award XP and coins for completing lesson
+            const xpReward = 25;
+            const coinReward = 10;
+            
+            await updateUserStats(xpReward, coinReward);
+            
+            if (onProgressChange) {
+              onProgressChange((updated.length / lessons.length) * 100);
+            }
+            
+            onLessonComplete?.(xpReward);
+            
+            toast.success(`🎉 Lesson mastered!`, {
+              description: `+${xpReward} XP, +${coinReward} coins. You can now advance!`,
+            });
           }
-          
-          onLessonComplete?.(xpReward);
-          
-          toast.success(`🎉 Lesson completed!`, {
-            description: `+${xpReward} XP, +${coinReward} coins`,
+        } else {
+          toast.info(`Practice makes perfect! ${currentSuccessful}/${masteryThreshold} attempts`, {
+            description: `Keep practicing to master this lesson.`,
           });
         }
       }
@@ -203,6 +274,8 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
             {lessons.map((lesson, index) => {
               const isCompleted = completedLessons.includes(lesson.id);
               const isUnlocked = index === 0 || completedLessons.includes(lessons[index - 1]?.id);
+              const mastery = masteryData.get(lesson.id);
+              const masteryProgress = mastery ? (mastery.successful_attempts / mastery.mastery_threshold) * 100 : 0;
 
               return (
                 <div
@@ -218,21 +291,26 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
                   `}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1">
                       <div className="text-xl">
                         {getLessonIcon(lesson.type)}
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1 flex-1">
                         <h4 className="font-semibold text-secondary-foreground">
                           {lesson.step_number}. {lesson.title}
                         </h4>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-xs">
                             {lesson.type}
                           </Badge>
                           {isCompleted && (
                             <Badge variant="secondary" className="text-xs bg-achievement text-achievement-foreground">
-                              ✓ Complete
+                              ✓ Mastered
+                            </Badge>
+                          )}
+                          {!isCompleted && mastery && mastery.attempt_count > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {mastery.successful_attempts}/{mastery.mastery_threshold} attempts
                             </Badge>
                           )}
                           {!isUnlocked && (
@@ -241,6 +319,17 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
                             </Badge>
                           )}
                         </div>
+                        {/* Mastery Progress Bar */}
+                        {isUnlocked && !isCompleted && mastery && mastery.attempt_count > 0 && (
+                          <div className="mt-2">
+                            <div className="w-full bg-secondary-foreground/20 rounded-full h-1.5">
+                              <div 
+                                className="bg-secondary h-1.5 rounded-full transition-all duration-500"
+                                style={{ width: `${masteryProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -251,7 +340,7 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
                         variant={isCompleted ? "achievement" : "retro"}
                         size="sm"
                       >
-                        {isCompleted ? "✓ Done" : "Start"}
+                        {isCompleted ? "✓ Done" : "Practice"}
                       </Button>
                     )}
                   </div>

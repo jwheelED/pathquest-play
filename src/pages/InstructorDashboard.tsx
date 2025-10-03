@@ -18,6 +18,7 @@ interface Student {
   current_streak: number;
   completedLessons: number;
   totalLessons: number;
+  averageMasteryAttempts?: number;
 }
 
 export default function InstructorDashboard() {
@@ -93,11 +94,23 @@ export default function InstructorDashboard() {
         .select("user_id, completed")
         .in("user_id", studentIds);
 
+      // Fetch mastery data
+      const { data: masteryData } = await supabase
+        .from("lesson_mastery")
+        .select("user_id, attempt_count, is_mastered")
+        .in("user_id", studentIds);
+
       // Combine data
       const combinedStudents = studentsData?.map(student => {
         const stats = statsData?.find(s => s.user_id === student.id);
         const progress = progressData?.filter(p => p.user_id === student.id) || [];
         const completedLessons = progress.filter(p => p.completed).length;
+        
+        // Calculate average mastery attempts for mastered lessons
+        const studentMastery = masteryData?.filter(m => m.user_id === student.id && m.is_mastered) || [];
+        const avgMasteryAttempts = studentMastery.length > 0
+          ? studentMastery.reduce((sum, m) => sum + m.attempt_count, 0) / studentMastery.length
+          : undefined;
 
         return {
           id: student.id,
@@ -107,6 +120,7 @@ export default function InstructorDashboard() {
           current_streak: stats?.current_streak || 0,
           completedLessons,
           totalLessons: 10, // This could be dynamic
+          averageMasteryAttempts: avgMasteryAttempts,
         };
       }) || [];
 

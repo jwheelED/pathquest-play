@@ -11,6 +11,7 @@ interface StudentProgressCardProps {
     current_streak: number;
     completedLessons: number;
     totalLessons: number;
+    averageMasteryAttempts?: number;
   }>;
 }
 
@@ -50,8 +51,15 @@ export default function StudentProgressCard({ students }: StudentProgressCardPro
                 className="h-2"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              {student.experience_points} XP earned
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {student.experience_points} XP earned
+              </span>
+              {student.averageMasteryAttempts && (
+                <span className="text-muted-foreground">
+                  Avg mastery: {student.averageMasteryAttempts.toFixed(1)} attempts
+                </span>
+              )}
             </div>
           </div>
         ))}
