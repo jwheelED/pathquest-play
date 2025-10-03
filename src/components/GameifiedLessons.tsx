@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import LessonViewer from "./LessonViewer";
 
 interface GameifiedLessonsProps {
   userId?: string;
@@ -32,6 +34,7 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [masteryData, setMasteryData] = useState<Map<string, LessonMastery>>(new Map());
   const [loading, setLoading] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
 
   useEffect(() => {
     if (userId) {
@@ -88,103 +91,89 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
     setLoading(false);
   };
 
-  const toggleLesson = async (lessonId: string, lessonTitle: string) => {
-    if (!userId) return;
+  const handleLessonComplete = async () => {
+    if (!userId || !selectedLesson) return;
     
-    const alreadyCompleted = completedLessons.includes(lessonId);
+    const lessonId = selectedLesson.id;
+    const lessonTitle = selectedLesson.title;
     const mastery = masteryData.get(lessonId);
     
     setLoading(true);
     try {
-      if (alreadyCompleted) {
-        // Mark as incomplete (reset mastery tracking)
-        const { error } = await supabase
-          .from("lesson_progress")
-          .delete()
-          .eq("user_id", userId)
-          .eq("lesson_id", lessonId);
+      // Track mastery attempt
+      const { data: threshold } = await supabase.rpc('calculate_mastery_threshold', {
+        p_user_id: userId,
+        p_lesson_id: lessonId
+      });
 
-        if (!error) {
-          const updated = completedLessons.filter((id) => id !== lessonId);
-          setCompletedLessons(updated);
-          if (onProgressChange) {
-            onProgressChange((updated.length / lessons.length) * 100);
-          }
-          toast.info(`${lessonTitle} marked as incomplete`);
-        }
-      } else {
-        // Track mastery attempt
-        const { data: threshold } = await supabase.rpc('calculate_mastery_threshold', {
-          p_user_id: userId,
-          p_lesson_id: lessonId
-        });
+      const currentAttempts = (mastery?.attempt_count || 0) + 1;
+      const currentSuccessful = (mastery?.successful_attempts || 0) + 1;
+      const masteryThreshold = threshold || 3;
+      const isMastered = currentSuccessful >= masteryThreshold;
 
-        const currentAttempts = (mastery?.attempt_count || 0) + 1;
-        const currentSuccessful = (mastery?.successful_attempts || 0) + 1;
-        const masteryThreshold = threshold || 3;
-        const isMastered = currentSuccessful >= masteryThreshold;
-
-        // Update or insert mastery record
-        const { error: masteryError } = await supabase
-          .from("lesson_mastery")
-          .upsert({
-            user_id: userId,
-            lesson_id: lessonId,
-            attempt_count: currentAttempts,
-            successful_attempts: currentSuccessful,
-            mastery_threshold: masteryThreshold,
-            is_mastered: isMastered,
-            last_attempt_date: new Date().toISOString()
-          }, {
-            onConflict: 'user_id,lesson_id'
-          });
-
-        if (masteryError) {
-          console.error("Error updating mastery:", masteryError);
-        }
-
-        // Update local mastery state
-        const newMasteryData = new Map(masteryData);
-        newMasteryData.set(lessonId, {
+      // Update or insert mastery record
+      const { error: masteryError } = await supabase
+        .from("lesson_mastery")
+        .upsert({
+          user_id: userId,
           lesson_id: lessonId,
           attempt_count: currentAttempts,
           successful_attempts: currentSuccessful,
           mastery_threshold: masteryThreshold,
-          is_mastered: isMastered
+          is_mastered: isMastered,
+          last_attempt_date: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,lesson_id'
         });
-        setMasteryData(newMasteryData);
 
-        if (isMastered) {
-          // Mark as complete only when mastered
-          const { error } = await supabase
-            .from("lesson_progress")
-            .insert({ user_id: userId, lesson_id: lessonId, completed: true });
+      if (masteryError) {
+        console.error("Error updating mastery:", masteryError);
+      }
 
-          if (!error) {
-            const updated = [...completedLessons, lessonId];
-            setCompletedLessons(updated);
-            
-            // Award XP and coins for completing lesson
-            const xpReward = 25;
-            const coinReward = 10;
-            
-            await updateUserStats(xpReward, coinReward);
-            
-            if (onProgressChange) {
-              onProgressChange((updated.length / lessons.length) * 100);
-            }
-            
-            onLessonComplete?.(xpReward);
-            
-            toast.success(`🎉 Lesson mastered!`, {
-              description: `+${xpReward} XP, +${coinReward} coins. You can now advance!`,
-            });
+      // Update local mastery state
+      const newMasteryData = new Map(masteryData);
+      newMasteryData.set(lessonId, {
+        lesson_id: lessonId,
+        attempt_count: currentAttempts,
+        successful_attempts: currentSuccessful,
+        mastery_threshold: masteryThreshold,
+        is_mastered: isMastered
+      });
+      setMasteryData(newMasteryData);
+
+      if (isMastered) {
+        // Mark as complete only when mastered
+        const { error } = await supabase
+          .from("lesson_progress")
+          .insert({ user_id: userId, lesson_id: lessonId, completed: true });
+
+        if (!error) {
+          const updated = [...completedLessons, lessonId];
+          setCompletedLessons(updated);
+          
+          // Award XP and coins for completing lesson
+          const xpReward = 25;
+          const coinReward = 10;
+          
+          await updateUserStats(xpReward, coinReward);
+          
+          if (onProgressChange) {
+            onProgressChange((updated.length / lessons.length) * 100);
           }
-        } else {
-          toast.info(`Practice makes perfect! ${currentSuccessful}/${masteryThreshold} attempts`, {
-            description: `Keep practicing to master this lesson.`,
+          
+          onLessonComplete?.(xpReward);
+          
+          setSelectedLesson(null);
+          
+          toast.success(`🎉 Lesson mastered!`, {
+            description: `+${xpReward} XP, +${coinReward} coins. You can now advance!`,
           });
         }
+      } else {
+        setSelectedLesson(null);
+        toast.info(`Practice makes perfect! ${currentSuccessful}/${masteryThreshold} attempts`, {
+          description: `Keep practicing to master this lesson.`,
+        });
       }
     } catch (error) {
       console.error("Error updating lesson progress:", error);
@@ -335,12 +324,12 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
 
                     {isUnlocked && (
                       <Button
-                        onClick={() => toggleLesson(lesson.id, lesson.title)}
+                        onClick={() => setSelectedLesson(lesson)}
                         disabled={loading}
                         variant={isCompleted ? "achievement" : "retro"}
                         size="sm"
                       >
-                        {isCompleted ? "✓ Done" : "Practice"}
+                        {isCompleted ? "Review" : "Start"}
                       </Button>
                     )}
                   </div>
@@ -373,6 +362,19 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
             </div>
           </div>
         )}
+
+        {/* Lesson Viewer Dialog */}
+        <Dialog open={!!selectedLesson} onOpenChange={(open) => !open && setSelectedLesson(null)}>
+          <DialogContent className="max-w-4xl p-0 overflow-hidden">
+            {selectedLesson && (
+              <LessonViewer
+                lesson={selectedLesson}
+                onComplete={handleLessonComplete}
+                onClose={() => setSelectedLesson(null)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Card>
   );
