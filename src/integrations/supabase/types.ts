@@ -502,6 +502,10 @@ export type Database = {
         Args: { p_lesson_id: string; p_user_id: string }
         Returns: number
       }
+      can_view_user: {
+        Args: { _target_user_id: string; _viewer_id: string }
+        Returns: boolean
+      }
       generate_instructor_code: {
         Args: Record<PropertyKey, never>
         Returns: string
