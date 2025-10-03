@@ -53,18 +53,17 @@ export default function OnboardingPage() {
       return
     }
 
-    const response = await fetch("/api/generate-path", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    userId: user.id,
-    goal: selectedGoals[0],
-    experienceLevel,
-  }),
-})
+    const response = await supabase.functions.invoke("generate-path", {
+      body: {
+        userId: user.id,
+        goal: selectedGoals[0] || "General Learning",
+        experienceLevel: experienceLevel || "Beginner",
+      },
+    })
 
 
-    if (!response.ok) {
+    if (response.error) {
+      console.error("Error generating path:", response.error);
       toast.error("Failed to generate learning path")
       return
     }

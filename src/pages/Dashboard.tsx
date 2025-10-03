@@ -115,7 +115,18 @@ export default function Dashboard() {
     
     setLoading(true);
     try {
-      // In a real implementation, this would call your path generation API
+      const response = await supabase.functions.invoke("generate-path", {
+        body: {
+          userId: user.id,
+          goal: goals[0] || "General Learning",
+          experienceLevel: "Beginner",
+        },
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
       toast.success("Learning path generated!", {
         description: "Check your lessons below to start learning.",
       });
