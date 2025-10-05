@@ -64,29 +64,23 @@ export default function InstructorDashboard() {
       if (!user) return;
 
       // Get students linked to this instructor
-      const { data: studentLinks, error: linksError } = await supabase
+      const { data: studentLinks } = await supabase
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", user.id);
 
-      console.log("Student links:", studentLinks, "Error:", linksError);
-
       if (!studentLinks || studentLinks.length === 0) {
-        console.log("No student links found");
         setLoading(false);
         return;
       }
 
       const studentIds = studentLinks.map(link => link.student_id);
-      console.log("Student IDs:", studentIds);
 
       // Fetch student data
-      const { data: studentsData, error: usersError } = await supabase
+      const { data: studentsData } = await supabase
         .from("users")
         .select("id, name")
         .in("id", studentIds);
-
-      console.log("Students data:", studentsData, "Error:", usersError);
 
       // Fetch student stats
       const { data: statsData } = await supabase
