@@ -15,11 +15,15 @@ interface Assignment {
   content: any;
   completed: boolean;
   created_at: string;
+  grade?: number | null;
+  quiz_responses?: any;
 }
 
 export const AssignedContent = ({ userId }: { userId: string }) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
+  const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,6 +42,55 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       return;
     }
     setAssignments(data || []);
+  };
+
+  const handleAnswerSelect = (assignmentId: string, questionIndex: number, answer: string) => {
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [assignmentId]: {
+        ...(prev[assignmentId] || {}),
+        [questionIndex]: answer
+      }
+    }));
+  };
+
+  const handleSubmitQuiz = async (assignment: Assignment) => {
+    const answers = selectedAnswers[assignment.id] || {};
+    const questions = assignment.content.questions || [];
+    
+    // Check if all questions are answered
+    if (Object.keys(answers).length !== questions.length) {
+      toast({ title: "Please answer all questions", variant: "destructive" });
+      return;
+    }
+
+    // Calculate grade
+    let correct = 0;
+    questions.forEach((q: any, idx: number) => {
+      if (answers[idx] === q.correctAnswer) {
+        correct++;
+      }
+    });
+    const grade = (correct / questions.length) * 100;
+
+    // Save quiz responses and grade
+    const { error } = await supabase
+      .from('student_assignments')
+      .update({ 
+        completed: true,
+        quiz_responses: answers,
+        grade: grade
+      })
+      .eq('id', assignment.id);
+
+    if (error) {
+      toast({ title: "Failed to submit quiz", variant: "destructive" });
+      return;
+    }
+
+    setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
+    toast({ title: `Quiz submitted! Score: ${grade.toFixed(0)}%` });
+    fetchAssignments();
   };
 
   const handleComplete = async (id: string) => {
@@ -91,34 +144,79 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                   {/* Quiz Display */}
                   {assignment.assignment_type === 'quiz' && assignment.content.questions && (
                     <div className="space-y-4">
-                      {assignment.content.questions.map((q: any, idx: number) => (
-                        <div key={idx} className="border rounded-lg p-4 space-y-3">
-                          <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
-                          <div className="space-y-1">
-                            {q.options?.map((opt: string, i: number) => (
-                              <div key={i} className="text-sm">{opt}</div>
-                            ))}
+                      {assignment.content.questions.map((q: any, idx: number) => {
+                        const selectedAnswer = selectedAnswers[assignment.id]?.[idx];
+                        const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
+                        const isCorrect = selectedAnswer === q.correctAnswer;
+                        
+                        return (
+                          <div key={idx} className="border rounded-lg p-4 space-y-3">
+                            <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                            <div className="space-y-2">
+                              {q.options?.map((opt: string, i: number) => {
+                                const optionLetter = opt.charAt(0);
+                                const isSelected = selectedAnswer === optionLetter;
+                                const showCorrect = isSubmitted && optionLetter === q.correctAnswer;
+                                const showWrong = isSubmitted && isSelected && !isCorrect;
+                                
+                                return (
+                                  <button
+                                    key={i}
+                                    disabled={isSubmitted}
+                                    onClick={() => handleAnswerSelect(assignment.id, idx, optionLetter)}
+                                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                                      isSelected && !isSubmitted ? 'border-primary bg-primary/5' :
+                                      showCorrect ? 'border-green-500 bg-green-50' :
+                                      showWrong ? 'border-red-500 bg-red-50' :
+                                      'border-border hover:border-primary/50'
+                                    } ${isSubmitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                  >
+                                    <span className="text-sm">{opt}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            
+                            {isSubmitted && (
+                              <div className={`p-3 rounded ${isCorrect ? 'bg-green-50' : 'bg-red-50'}`}>
+                                <p className="text-sm font-medium">
+                                  {isCorrect ? '✓ Correct!' : `✗ Incorrect. Correct answer: ${q.correctAnswer}`}
+                                </p>
+                              </div>
+                            )}
+                            
+                            {(assignment.mode === "hints_only" || assignment.mode === "hints_solutions") && !isSubmitted && (
+                              <div className="bg-muted/50 p-3 rounded space-y-2">
+                                <p className="text-xs font-medium">Hint 1 (Conceptual):</p>
+                                <p className="text-xs text-muted-foreground">{q.hint1}</p>
+                                <p className="text-xs font-medium">Hint 2 (Narrowing):</p>
+                                <p className="text-xs text-muted-foreground">{q.hint2}</p>
+                                <p className="text-xs font-medium">Hint 3 (Reasoning):</p>
+                                <p className="text-xs text-muted-foreground">{q.hint3}</p>
+                              </div>
+                            )}
+                            
+                            {assignment.mode === "hints_solutions" && isSubmitted && (
+                              <div className="bg-primary/5 p-3 rounded space-y-1">
+                                <p className="text-xs font-semibold">Explanation:</p>
+                                <p className="text-xs text-muted-foreground">{q.solution}</p>
+                              </div>
+                            )}
                           </div>
-                          
-                          {(assignment.mode === "hints_only" || assignment.mode === "hints_solutions") && (
-                            <div className="bg-muted/50 p-3 rounded space-y-2">
-                              <p className="text-xs font-medium">Hint 1 (Conceptual):</p>
-                              <p className="text-xs text-muted-foreground">{q.hint1}</p>
-                              <p className="text-xs font-medium">Hint 2 (Narrowing):</p>
-                              <p className="text-xs text-muted-foreground">{q.hint2}</p>
-                              <p className="text-xs font-medium">Hint 3 (Reasoning):</p>
-                              <p className="text-xs text-muted-foreground">{q.hint3}</p>
-                            </div>
-                          )}
-                          
-                          {assignment.mode === "hints_solutions" && (
-                            <div className="bg-primary/5 p-3 rounded space-y-1">
-                              <p className="text-xs font-semibold">Answer: {q.correctAnswer}</p>
-                              <p className="text-xs text-muted-foreground">{q.solution}</p>
-                            </div>
-                          )}
+                        );
+                      })}
+                      
+                      {!assignment.completed && (
+                        <Button onClick={() => handleSubmitQuiz(assignment)} className="w-full">
+                          Submit Quiz
+                        </Button>
+                      )}
+                      
+                      {assignment.completed && assignment.grade !== undefined && (
+                        <div className="bg-primary/10 p-4 rounded-lg text-center">
+                          <p className="text-lg font-semibold">Your Score: {assignment.grade.toFixed(0)}%</p>
                         </div>
-                      ))}
+                      )}
                     </div>
                   )}
 
@@ -174,7 +272,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                     </div>
                   )}
 
-                  {!assignment.completed && (
+                  {assignment.assignment_type !== 'quiz' && !assignment.completed && (
                     <Button onClick={() => handleComplete(assignment.id)} className="w-full">
                       <CheckCircle className="mr-2 h-4 w-4" />
                       Mark as Complete

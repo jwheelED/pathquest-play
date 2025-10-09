@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { LogOut, Users } from "lucide-react";
 import { toast } from "sonner";
-import StudentProgressCard from "@/components/instructor/StudentProgressCard";
+import { StudentProgressCard } from "@/components/instructor/StudentProgressCard";
 import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
@@ -293,7 +293,7 @@ export default function InstructorDashboard() {
             <ReviewQueue refreshTrigger={refreshQueue} />
 
             <div className="grid lg:grid-cols-2 gap-6">
-              <StudentProgressCard students={students} />
+              <StudentProgressCard instructorId={currentUser.id} />
               <StrugglingStudentsCard 
                 students={strugglingStudents}
                 onMessageStudent={() => {}}

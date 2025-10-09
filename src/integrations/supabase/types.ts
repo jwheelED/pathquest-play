@@ -412,9 +412,11 @@ export type Database = {
           content: Json
           created_at: string
           draft_id: string | null
+          grade: number | null
           id: string
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
+          quiz_responses: Json | null
           student_id: string
           title: string
         }
@@ -424,9 +426,11 @@ export type Database = {
           content: Json
           created_at?: string
           draft_id?: string | null
+          grade?: number | null
           id?: string
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
+          quiz_responses?: Json | null
           student_id: string
           title: string
         }
@@ -436,9 +440,11 @@ export type Database = {
           content?: Json
           created_at?: string
           draft_id?: string | null
+          grade?: number | null
           id?: string
           instructor_id?: string
           mode?: Database["public"]["Enums"]["assignment_mode"]
+          quiz_responses?: Json | null
           student_id?: string
           title?: string
         }
