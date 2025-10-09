@@ -81,12 +81,8 @@ export const AssignContent = () => {
         draft_id: content.id,
         assignment_type: content.assignment_type as any,
         mode: assignmentMode,
-        title: content.topic,
-        content: {
-          slideText: content.slide_text,
-          codeExample: content.code_example,
-          demoSnippets: content.demo_snippets
-        }
+        title: content.slide_text,
+        content: content.demo_snippets
       }]);
 
     if (error) {

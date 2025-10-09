@@ -20,10 +20,32 @@ serve(async (req) => {
 
     // Create tailored prompt based on student progress and assignment type
     const systemPrompt = assignmentType === 'quiz' 
-      ? `You are an educational content creator. Generate a quiz with 5 multiple-choice questions on ${topic}. Include hints and full solutions for each question. Format: JSON with {questions: [{question, options: [4 options], correctAnswer, hint1, hint2, hint3, solution}]}`
+      ? `You are an educational content creator. Generate a quiz with 5 multiple-choice questions on ${topic}. 
+         For each question provide:
+         - question: clear question text
+         - options: array of 4 options (A, B, C, D)
+         - correctAnswer: the correct option letter
+         - hint1: conceptual hint about the topic
+         - hint2: hint that narrows down the options
+         - hint3: hint pointing toward the answer with reasoning
+         - solution: full explanation of why the answer is correct
+         Return valid JSON: {"questions": [{"question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "correctAnswer": "A", "hint1": "...", "hint2": "...", "hint3": "...", "solution": "..."}]}`
       : assignmentType === 'mini_project'
-      ? `You are an educational content creator. Generate a mini-project on ${topic} tailored to student progress: ${studentProgress}. Include: project description, learning objectives, 3 milestones, and conceptual/coding hints. Format: JSON with {title, description, objectives: [], milestones: [{title, description, hints: []}]}`
-      : `You are an educational content creator. Generate a comprehensive lesson on ${topic}. Include: slide text (200-300 words), a code example with explanation, and 3 demo snippets showing different aspects. Format: JSON with {slideText, codeExample: {code, explanation}, demoSnippets: [{title, code, explanation}]}`;
+      ? `You are an educational content creator. Generate a mini-project prompt on ${topic} for a ${studentProgress} level student.
+         Provide:
+         - title: catchy project title
+         - prompt: detailed project description and what to build (200-300 words)
+         - hint1: conceptual approach to solving the problem
+         - hint2: key steps or algorithm outline
+         - hint3: pseudo-code or structure guidance
+         Return valid JSON: {"title": "...", "prompt": "...", "hint1": "...", "hint2": "...", "hint3": "..."}`
+      : `You are an educational content creator. Generate a comprehensive lesson on ${topic}.
+         Provide:
+         - title: lesson title
+         - content: main lesson text (300-400 words), well-structured with paragraphs
+         - codeExample: a practical code example (if applicable)
+         - explanation: explanation of the code example
+         Return valid JSON: {"title": "...", "content": "...", "codeExample": "...", "explanation": "..."}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

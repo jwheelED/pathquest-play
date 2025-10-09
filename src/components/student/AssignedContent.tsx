@@ -88,39 +88,89 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-4 pt-2">
-                  <div>
-                    <h4 className="font-semibold mb-2">Content</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {assignment.content.slideText || assignment.content.description || 'No content available'}
-                    </p>
-                  </div>
-
-                  {assignment.mode === "hints_only" && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Hints</h4>
-                      <ul className="text-sm space-y-1 list-disc list-inside">
-                        <li>Hint 1: Conceptual approach</li>
-                        <li>Hint 2: Nudge in the right direction</li>
-                        <li>Hint 3: Pseudo-code guidance</li>
-                      </ul>
+                  {/* Quiz Display */}
+                  {assignment.assignment_type === 'quiz' && assignment.content.questions && (
+                    <div className="space-y-4">
+                      {assignment.content.questions.map((q: any, idx: number) => (
+                        <div key={idx} className="border rounded-lg p-4 space-y-3">
+                          <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                          <div className="space-y-1">
+                            {q.options?.map((opt: string, i: number) => (
+                              <div key={i} className="text-sm">{opt}</div>
+                            ))}
+                          </div>
+                          
+                          {(assignment.mode === "hints_only" || assignment.mode === "hints_solutions") && (
+                            <div className="bg-muted/50 p-3 rounded space-y-2">
+                              <p className="text-xs font-medium">Hint 1 (Conceptual):</p>
+                              <p className="text-xs text-muted-foreground">{q.hint1}</p>
+                              <p className="text-xs font-medium">Hint 2 (Narrowing):</p>
+                              <p className="text-xs text-muted-foreground">{q.hint2}</p>
+                              <p className="text-xs font-medium">Hint 3 (Reasoning):</p>
+                              <p className="text-xs text-muted-foreground">{q.hint3}</p>
+                            </div>
+                          )}
+                          
+                          {assignment.mode === "hints_solutions" && (
+                            <div className="bg-primary/5 p-3 rounded space-y-1">
+                              <p className="text-xs font-semibold">Answer: {q.correctAnswer}</p>
+                              <p className="text-xs text-muted-foreground">{q.solution}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {assignment.mode === "hints_solutions" && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Solution Available</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Hints and full solution are available for this assignment
-                      </p>
+                  {/* Lesson Display */}
+                  {assignment.assignment_type === 'lesson' && (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-semibold mb-2">{assignment.content.title}</h4>
+                        <div className="text-sm text-muted-foreground whitespace-pre-line">
+                          {assignment.content.content}
+                        </div>
+                      </div>
+                      {assignment.content.codeExample && (
+                        <div>
+                          <h4 className="font-semibold mb-2">Code Example</h4>
+                          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto">
+                            {assignment.content.codeExample}
+                          </pre>
+                          {assignment.content.explanation && (
+                            <p className="text-sm text-muted-foreground mt-2">{assignment.content.explanation}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {assignment.content.codeExample && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Code Example</h4>
-                      <pre className="bg-muted p-3 rounded text-xs overflow-x-auto">
-                        {assignment.content.codeExample}
-                      </pre>
+                  {/* Mini Project Display */}
+                  {assignment.assignment_type === 'mini_project' && (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-semibold mb-2">{assignment.content.title}</h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-line">
+                          {assignment.content.prompt}
+                        </p>
+                      </div>
+                      
+                      {(assignment.mode === "hints_only" || assignment.mode === "hints_solutions") && (
+                        <div className="bg-muted/50 p-4 rounded space-y-3">
+                          <div>
+                            <p className="text-sm font-medium">Hint 1 (Conceptual Approach):</p>
+                            <p className="text-sm text-muted-foreground">{assignment.content.hint1}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Hint 2 (Key Steps):</p>
+                            <p className="text-sm text-muted-foreground">{assignment.content.hint2}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Hint 3 (Structure Guidance):</p>
+                            <p className="text-sm text-muted-foreground">{assignment.content.hint3}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

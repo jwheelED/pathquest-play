@@ -43,9 +43,9 @@ export const ContentGenerator = ({ onGenerated }: ContentGeneratorProps) => {
           instructor_id: user.id,
           topic,
           assignment_type: assignmentType,
-          slide_text: content.slideText || content.description || JSON.stringify(content),
-          code_example: content.codeExample?.code || content.milestones?.[0]?.hints?.[0] || null,
-          demo_snippets: content.demoSnippets || content.questions || content.milestones || [],
+          slide_text: content.title || topic,
+          code_example: content.codeExample || content.explanation || null,
+          demo_snippets: content,
           status: 'draft'
         }]);
 

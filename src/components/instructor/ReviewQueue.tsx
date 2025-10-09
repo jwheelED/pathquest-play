@@ -58,23 +58,25 @@ export const ReviewQueue = ({ refreshTrigger }: { refreshTrigger: number }) => {
 
   const handleEdit = (draft: Draft) => {
     setEditingId(draft.id);
-    setEditContent(draft.slide_text);
+    setEditContent(JSON.stringify(draft.demo_snippets, null, 2));
   };
 
   const handleSaveEdit = async (id: string) => {
-    const { error } = await supabase
-      .from('content_drafts')
-      .update({ slide_text: editContent })
-      .eq('id', id);
+    try {
+      const parsedContent = JSON.parse(editContent);
+      const { error } = await supabase
+        .from('content_drafts')
+        .update({ demo_snippets: parsedContent })
+        .eq('id', id);
 
-    if (error) {
-      toast({ title: "Failed to save", variant: "destructive" });
-      return;
+      if (error) throw error;
+
+      toast({ title: "Changes saved!" });
+      setEditingId(null);
+      fetchDrafts();
+    } catch (error) {
+      toast({ title: "Invalid JSON format", variant: "destructive" });
     }
-
-    toast({ title: "Changes saved!" });
-    setEditingId(null);
-    fetchDrafts();
   };
 
   const handleDelete = async (id: string) => {
@@ -138,7 +140,8 @@ export const ReviewQueue = ({ refreshTrigger }: { refreshTrigger: number }) => {
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  rows={6}
+                  rows={10}
+                  className="font-mono text-xs"
                 />
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => handleSaveEdit(draft.id)}>Save</Button>
@@ -146,7 +149,24 @@ export const ReviewQueue = ({ refreshTrigger }: { refreshTrigger: number }) => {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground line-clamp-3">{draft.slide_text}</p>
+              <div className="space-y-3">
+                {draft.assignment_type === 'quiz' && draft.demo_snippets?.questions && (
+                  <div className="text-sm space-y-2">
+                    <p className="font-medium">Questions: {draft.demo_snippets.questions.length}</p>
+                    {draft.demo_snippets.questions.slice(0, 2).map((q: any, i: number) => (
+                      <div key={i} className="pl-3 border-l-2 border-primary/20">
+                        <p className="text-muted-foreground">{i + 1}. {q.question}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {draft.assignment_type === 'lesson' && draft.demo_snippets?.content && (
+                  <p className="text-sm text-muted-foreground line-clamp-4">{draft.demo_snippets.content}</p>
+                )}
+                {draft.assignment_type === 'mini_project' && draft.demo_snippets?.prompt && (
+                  <p className="text-sm text-muted-foreground line-clamp-3">{draft.demo_snippets.prompt}</p>
+                )}
+              </div>
             )}
           </div>
         ))}
