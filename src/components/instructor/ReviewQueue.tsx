@@ -1,0 +1,156 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { CheckCircle, Edit, Trash2, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Draft {
+  id: string;
+  topic: string;
+  assignment_type: string;
+  slide_text: string;
+  code_example: string | null;
+  demo_snippets: any;
+  status: string;
+}
+
+export const ReviewQueue = ({ refreshTrigger }: { refreshTrigger: number }) => {
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchDrafts();
+  }, [refreshTrigger]);
+
+  const fetchDrafts = async () => {
+    const { data, error } = await supabase
+      .from('content_drafts')
+      .select('*')
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching drafts:', error);
+      return;
+    }
+    setDrafts(data || []);
+  };
+
+  const handleApprove = async (id: string) => {
+    const { error } = await supabase
+      .from('content_drafts')
+      .update({ status: 'approved' })
+      .eq('id', id);
+
+    if (error) {
+      toast({ title: "Failed to approve", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Content approved!" });
+    fetchDrafts();
+  };
+
+  const handleEdit = (draft: Draft) => {
+    setEditingId(draft.id);
+    setEditContent(draft.slide_text);
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    const { error } = await supabase
+      .from('content_drafts')
+      .update({ slide_text: editContent })
+      .eq('id', id);
+
+    if (error) {
+      toast({ title: "Failed to save", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Changes saved!" });
+    setEditingId(null);
+    fetchDrafts();
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase
+      .from('content_drafts')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({ title: "Failed to delete", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Draft deleted" });
+    fetchDrafts();
+  };
+
+  if (drafts.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Review Queue</CardTitle>
+          <CardDescription>No drafts pending review</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Review Queue</CardTitle>
+        <CardDescription>{drafts.length} draft(s) pending approval</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {drafts.map((draft) => (
+          <div key={draft.id} className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-semibold">{draft.topic}</h3>
+                <Badge variant="secondary" className="mt-1">
+                  {draft.assignment_type.replace('_', ' ')}
+                </Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => handleEdit(draft)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handleDelete(draft.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button size="sm" onClick={() => handleApprove(draft.id)}>
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Approve
+                </Button>
+              </div>
+            </div>
+            
+            {editingId === draft.id ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={6}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => handleSaveEdit(draft.id)}>Save</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground line-clamp-3">{draft.slide_text}</p>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+};

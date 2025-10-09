@@ -7,8 +7,10 @@ import { toast } from "sonner";
 import StudentProgressCard from "@/components/instructor/StudentProgressCard";
 import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
-import StudentChatCard from "@/components/instructor/StudentChatCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
+import { ContentGenerator } from "@/components/instructor/ContentGenerator";
+import { ReviewQueue } from "@/components/instructor/ReviewQueue";
+import { AssignContent } from "@/components/instructor/AssignContent";
 
 interface Student {
   id: string;
@@ -29,6 +31,7 @@ export default function InstructorDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshQueue, setRefreshQueue] = useState(0);
 
   useEffect(() => {
     checkAuth();
@@ -63,7 +66,6 @@ export default function InstructorDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get students linked to this instructor
       const { data: studentLinks } = await supabase
         .from("instructor_students")
         .select("student_id")
@@ -76,37 +78,31 @@ export default function InstructorDashboard() {
 
       const studentIds = studentLinks.map(link => link.student_id);
 
-      // Fetch student data
       const { data: studentsData } = await supabase
         .from("users")
         .select("id, name")
         .in("id", studentIds);
 
-      // Fetch student stats
       const { data: statsData } = await supabase
         .from("user_stats")
         .select("*")
         .in("user_id", studentIds);
 
-      // Fetch lesson progress
       const { data: progressData } = await supabase
         .from("lesson_progress")
         .select("user_id, completed")
         .in("user_id", studentIds);
 
-      // Fetch mastery data
       const { data: masteryData } = await supabase
         .from("lesson_mastery")
         .select("user_id, attempt_count, is_mastered")
         .in("user_id", studentIds);
 
-      // Combine data
       const combinedStudents = studentsData?.map(student => {
         const stats = statsData?.find(s => s.user_id === student.id);
         const progress = progressData?.filter(p => p.user_id === student.id) || [];
         const completedLessons = progress.filter(p => p.completed).length;
         
-        // Calculate average mastery attempts for mastered lessons
         const studentMastery = masteryData?.filter(m => m.user_id === student.id && m.is_mastered) || [];
         const avgMasteryAttempts = studentMastery.length > 0
           ? studentMastery.reduce((sum, m) => sum + m.attempt_count, 0) / studentMastery.length
@@ -119,7 +115,7 @@ export default function InstructorDashboard() {
           experience_points: stats?.experience_points || 0,
           current_streak: stats?.current_streak || 0,
           completedLessons,
-          totalLessons: 10, // This could be dynamic
+          totalLessons: 10,
           averageMasteryAttempts: avgMasteryAttempts,
         };
       }) || [];
@@ -137,17 +133,11 @@ export default function InstructorDashboard() {
     navigate("/instructor/auth");
   };
 
-  const handleMessageStudent = (studentId: string) => {
-    setSelectedStudentId(studentId);
-    // Scroll to chat card or open in a dialog
-  };
-
   const handleStudentClick = async (studentId: string) => {
     setSelectedStudentId(studentId);
     setDialogOpen(true);
   };
 
-  // Calculate struggling students (low streak, low progress)
   const strugglingStudents = students
     .filter(s => s.current_streak < 2 || (s.completedLessons / s.totalLessons) < 0.3)
     .map(s => ({
@@ -157,10 +147,9 @@ export default function InstructorDashboard() {
         ? "Low activity streak" 
         : "Behind on lessons",
       severity: (s.completedLessons / s.totalLessons) < 0.2 ? "high" as const : "medium" as const,
-      lastActive: "2 days ago", // This could be calculated from last_activity_date
+      lastActive: "2 days ago",
     }));
 
-  // Rank students by XP
   const rankedStudents = [...students]
     .sort((a, b) => b.experience_points - a.experience_points)
     .map((s, idx) => ({ ...s, rank: idx + 1 }));
@@ -178,7 +167,6 @@ export default function InstructorDashboard() {
     if (!student) return;
 
     try {
-      // Fetch problem attempts
       const { data: attempts } = await supabase
         .from("problem_attempts")
         .select(`
@@ -189,7 +177,6 @@ export default function InstructorDashboard() {
         .order("created_at", { ascending: false })
         .limit(10);
 
-      // Fetch recent activity from lesson progress
       const { data: lessonActivity } = await supabase
         .from("lesson_progress")
         .select(`
@@ -200,7 +187,6 @@ export default function InstructorDashboard() {
         .order("created_at", { ascending: false })
         .limit(5);
 
-      // Fetch achievements
       const { data: achievementActivity } = await supabase
         .from("user_achievements")
         .select(`
@@ -211,7 +197,6 @@ export default function InstructorDashboard() {
         .order("earned_at", { ascending: false })
         .limit(5);
 
-      // Combine activities
       const recentActivity = [
         ...(lessonActivity?.map(l => ({
           type: "Lesson Completed",
@@ -250,7 +235,6 @@ export default function InstructorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-secondary/10">
-      {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -267,9 +251,7 @@ export default function InstructorDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Instructor Code Card */}
         {instructorCode && (
           <div className="mb-6 p-6 bg-card border rounded-lg shadow-sm">
             <h3 className="text-lg font-semibold mb-2">Your Instructor Code</h3>
@@ -288,7 +270,7 @@ export default function InstructorDashboard() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              Share this code with your students so they can join your class during signup.
+              Share this code with your students so they can join your class.
             </p>
           </div>
         )}
@@ -298,36 +280,34 @@ export default function InstructorDashboard() {
             <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">No Students Yet</h2>
             <p className="text-muted-foreground">
-              Students will appear here once they're assigned to you.
+              Students will appear here once they join with your code.
             </p>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Top Row: Progress and Struggling Students */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ContentGenerator onGenerated={() => setRefreshQueue(prev => prev + 1)} />
+              <AssignContent />
+            </div>
+            
+            <ReviewQueue refreshTrigger={refreshQueue} />
+
             <div className="grid lg:grid-cols-2 gap-6">
               <StudentProgressCard students={students} />
               <StrugglingStudentsCard 
                 students={strugglingStudents}
-                onMessageStudent={handleMessageStudent}
+                onMessageStudent={() => {}}
               />
             </div>
 
-            {/* Middle Row: Rankings and Chat */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              <StudentRankingCard 
-                students={rankedStudents}
-                onStudentClick={handleStudentClick}
-              />
-              <StudentChatCard 
-                students={students}
-                currentUserId={currentUser?.id || ""}
-              />
-            </div>
+            <StudentRankingCard 
+              students={rankedStudents}
+              onStudentClick={handleStudentClick}
+            />
           </div>
         )}
       </main>
 
-      {/* Student Detail Dialog */}
       <StudentDetailDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

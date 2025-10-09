@@ -1,1 +1,10 @@
 project_id = "otsmjgrhyteyvpufkwdh"
+
+[auth]
+site_url = "http://localhost:5173"
+
+[functions.generate-path]
+verify_jwt = false
+
+[functions.generate-content]
+verify_jwt = true

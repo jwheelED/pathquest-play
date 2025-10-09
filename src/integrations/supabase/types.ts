@@ -47,6 +47,45 @@ export type Database = {
         }
         Relationships: []
       }
+      content_drafts: {
+        Row: {
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          code_example: string | null
+          created_at: string
+          demo_snippets: Json | null
+          id: string
+          instructor_id: string
+          slide_text: string
+          status: Database["public"]["Enums"]["draft_status"]
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          code_example?: string | null
+          created_at?: string
+          demo_snippets?: Json | null
+          id?: string
+          instructor_id: string
+          slide_text: string
+          status?: Database["public"]["Enums"]["draft_status"]
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_type?: Database["public"]["Enums"]["assignment_type"]
+          code_example?: string | null
+          created_at?: string
+          demo_snippets?: Json | null
+          id?: string
+          instructor_id?: string
+          slide_text?: string
+          status?: Database["public"]["Enums"]["draft_status"]
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       instructor_students: {
         Row: {
           created_at: string | null
@@ -366,6 +405,53 @@ export type Database = {
         }
         Relationships: []
       }
+      student_assignments: {
+        Row: {
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          completed: boolean
+          content: Json
+          created_at: string
+          draft_id: string | null
+          id: string
+          instructor_id: string
+          mode: Database["public"]["Enums"]["assignment_mode"]
+          student_id: string
+          title: string
+        }
+        Insert: {
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          completed?: boolean
+          content: Json
+          created_at?: string
+          draft_id?: string | null
+          id?: string
+          instructor_id: string
+          mode: Database["public"]["Enums"]["assignment_mode"]
+          student_id: string
+          title: string
+        }
+        Update: {
+          assignment_type?: Database["public"]["Enums"]["assignment_type"]
+          completed?: boolean
+          content?: Json
+          created_at?: string
+          draft_id?: string | null
+          id?: string
+          instructor_id?: string
+          mode?: Database["public"]["Enums"]["assignment_mode"]
+          student_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_assignments_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "content_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_achievements: {
         Row: {
           achievement_id: string
@@ -519,7 +605,9 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      assignment_mode: "hints_only" | "hints_solutions" | "auto_grade"
+      assignment_type: "quiz" | "lesson" | "mini_project"
+      draft_status: "draft" | "approved" | "published"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -646,6 +734,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      assignment_mode: ["hints_only", "hints_solutions", "auto_grade"],
+      assignment_type: ["quiz", "lesson", "mini_project"],
+      draft_status: ["draft", "approved", "published"],
+    },
   },
 } as const

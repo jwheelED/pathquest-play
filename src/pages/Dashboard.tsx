@@ -8,9 +8,9 @@ import UserStats from "@/components/UserStats";
 import STEMPractice from "@/components/STEMPractice";
 import AchievementSystem from "@/components/AchievementSystem";
 import GameifiedLessons from "@/components/GameifiedLessons";
-import ChatBox from "@/components/ChatBox";
 import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
+import { AssignedContent } from "@/components/student/AssignedContent";
 import { toast } from "sonner";
 
 interface User {
@@ -140,7 +140,6 @@ export default function Dashboard() {
   };
 
   const handlePointsEarned = (points: number) => {
-    // Trigger any global effects when points are earned
     console.log(`Points earned: ${points}`);
   };
 
@@ -148,7 +147,6 @@ export default function Dashboard() {
     if (!user?.id || !classCode.trim()) return;
     
     try {
-      // Find instructor with this code
       const { data: instructorProfile, error: instructorError } = await supabase
         .from("profiles")
         .select("id")
@@ -161,7 +159,6 @@ export default function Dashboard() {
         return;
       }
 
-      // Check if already connected
       const { data: existing } = await supabase
         .from("instructor_students")
         .select("id")
@@ -174,7 +171,6 @@ export default function Dashboard() {
         return;
       }
 
-      // Create connection
       const { error: connectionError } = await supabase
         .from("instructor_students")
         .insert({
@@ -205,7 +201,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b-2 border-primary bg-gradient-to-r from-card to-primary/5 shadow-glow">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -230,11 +225,9 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* Left Sidebar - User Stats & Navigation */}
           <aside className="lg:col-span-3 space-y-6">
             <UserStats userId={user.id} />
             
@@ -255,10 +248,8 @@ export default function Dashboard() {
             <AchievementSystem userId={user.id} />
           </aside>
 
-          {/* Main Content Area */}
           <main className="lg:col-span-9 space-y-6">
             
-            {/* Quick Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="p-4 bg-gradient-secondary border-2 border-secondary-glow text-center">
                 <div className="text-2xl font-bold text-secondary-foreground">📊</div>
@@ -279,10 +270,11 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Join Class Card */}
-            <JoinClassCard onJoinClass={handleJoinClass} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <JoinClassCard onJoinClass={handleJoinClass} />
+              <AssignedContent userId={user.id} />
+            </div>
 
-            {/* Learning Path & Generation */}
             <Card className="p-6 border-2 border-primary-glow bg-gradient-to-br from-card to-primary/5">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -305,39 +297,25 @@ export default function Dashboard() {
                   </span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Generate a personalized learning path based on your goals and experience level.
+                  Generate a personalized learning path based on your goals.
                 </p>
               </div>
             </Card>
 
-            {/* Two Column Layout for Main Activities */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              
-              {/* STEM Practice */}
               <STEMPractice 
                 userId={user.id} 
                 onPointsEarned={handlePointsEarned} 
               />
               
-              {/* Lessons */}
               <GameifiedLessons 
                 userId={user.id}
                 onProgressChange={setProgress}
                 onLessonComplete={handlePointsEarned}
               />
-              
             </div>
 
-            {/* Chat Interfaces */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* Instructor Messages */}
-              <InstructorChatCard userId={user.id} />
-              
-              {/* AI Chat */}
-              <Card className="p-6 border-2 border-energy-glow bg-gradient-to-br from-card to-energy/5">
-                <ChatBox goal={goals.join(", ")} />
-              </Card>
-            </div>
+            <InstructorChatCard userId={user.id} />
             
           </main>
         </div>
