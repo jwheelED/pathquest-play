@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Send } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Student {
   id: string;
@@ -25,6 +26,7 @@ interface ApprovedContent {
 export const AssignContent = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [approvedContent, setApprovedContent] = useState<ApprovedContent[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState("");
   const [selectedContent, setSelectedContent] = useState("");
   const [assignmentMode, setAssignmentMode] = useState<"hints_only" | "hints_solutions" | "auto_grade">("hints_only");
@@ -33,6 +35,7 @@ export const AssignContent = () => {
   useEffect(() => {
     fetchStudents();
     fetchApprovedContent();
+    fetchAssignments();
   }, []);
 
   const fetchStudents = async () => {
@@ -59,6 +62,22 @@ export const AssignContent = () => {
       .order('created_at', { ascending: false });
 
     setApprovedContent(data || []);
+  };
+
+  const fetchAssignments = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('student_assignments')
+      .select(`
+        *,
+        users!student_assignments_student_id_fkey(name)
+      `)
+      .eq('instructor_id', user.id)
+      .order('created_at', { ascending: false });
+
+    setAssignments(data || []);
   };
 
   const handleAssign = async () => {
@@ -93,6 +112,22 @@ export const AssignContent = () => {
     toast({ title: "Content assigned successfully!" });
     setSelectedStudent("");
     setSelectedContent("");
+    fetchAssignments();
+  };
+
+  const handleDeleteAssignment = async (assignmentId: string) => {
+    const { error } = await supabase
+      .from('student_assignments')
+      .delete()
+      .eq('id', assignmentId);
+
+    if (error) {
+      toast({ title: "Failed to remove assignment", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Assignment removed successfully!" });
+    fetchAssignments();
   };
 
   return (
@@ -157,6 +192,48 @@ export const AssignContent = () => {
           <Send className="mr-2 h-4 w-4" />
           Assign to Student
         </Button>
+
+        {assignments.length > 0 && (
+          <div className="mt-6 space-y-2 border-t pt-4">
+            <h3 className="text-sm font-semibold mb-3">Current Assignments</h3>
+            {assignments.map((assignment) => (
+              <div
+                key={assignment.id}
+                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+              >
+                <div className="flex-1">
+                  <p className="font-medium">{assignment.title}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(assignment.users as any)?.name} • {assignment.assignment_type} • {assignment.mode.replace('_', ' ')}
+                    {assignment.completed && " • ✓ Completed"}
+                    {assignment.grade !== null && ` • Grade: ${assignment.grade}%`}
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remove Assignment?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently remove this assignment from the student's dashboard. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDeleteAssignment(assignment.id)}>
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
