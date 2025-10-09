@@ -79,13 +79,17 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const generatedContent = data.choices[0].message.content;
+    let generatedContent = data.choices[0].message.content;
+
+    // Remove markdown code block markers if present
+    generatedContent = generatedContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
     // Parse JSON response
     let parsedContent;
     try {
       parsedContent = JSON.parse(generatedContent);
-    } catch {
+    } catch (e) {
+      console.error('Failed to parse AI response as JSON:', e);
       // If AI didn't return valid JSON, wrap the content
       parsedContent = { content: generatedContent };
     }
