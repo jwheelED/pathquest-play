@@ -12,6 +12,7 @@ import { ContentGenerator } from "@/components/instructor/ContentGenerator";
 import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { AssignContent } from "@/components/instructor/AssignContent";
 import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
+import StudentChatCard from "@/components/instructor/StudentChatCard";
 
 interface Student {
   id: string;
@@ -306,6 +307,11 @@ export default function InstructorDashboard() {
             <StudentRankingCard 
               students={rankedStudents}
               onStudentClick={handleStudentClick}
+            />
+
+            <StudentChatCard 
+              students={students.map(s => ({ id: s.id, name: s.name }))}
+              currentUserId={currentUser.id}
             />
           </div>
         )}
