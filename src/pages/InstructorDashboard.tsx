@@ -11,6 +11,7 @@ import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { ContentGenerator } from "@/components/instructor/ContentGenerator";
 import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { AssignContent } from "@/components/instructor/AssignContent";
+import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
 
 interface Student {
   id: string;
@@ -291,6 +292,8 @@ export default function InstructorDashboard() {
             </div>
             
             <ReviewQueue refreshTrigger={refreshQueue} />
+
+            <AssignedContentManager />
 
             <div className="grid lg:grid-cols-2 gap-6">
               <StudentProgressCard instructorId={currentUser.id} />
