@@ -3,9 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { BookOpen, CheckCircle, Eye } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { VersionHistoryTracker } from "./VersionHistoryTracker";
 
 interface Assignment {
   id: string;
@@ -24,6 +26,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
+  const [liveCheckIns, setLiveCheckIns] = useState<Assignment[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,7 +44,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       console.error('Error fetching assignments:', error);
       return;
     }
-    setAssignments(data || []);
+    
+    const allAssignments = data || [];
+    setAssignments(allAssignments);
+    
+    // Separate live check-ins for prominent display
+    const checkIns = allAssignments.filter(
+      a => a.assignment_type === 'lecture_checkin' && !a.completed
+    );
+    setLiveCheckIns(checkIns);
   };
 
   const handleAnswerSelect = (assignmentId: string, questionIndex: number, answer: string) => {
@@ -126,23 +137,53 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         <CardDescription>{assignments.filter(a => !a.completed).length} active assignment(s)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Live Lecture Check-in Alert */}
+        {liveCheckIns.length > 0 && (
+          <Alert className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+            <Bell className="h-5 w-5 text-orange-600 animate-pulse" />
+            <AlertTitle className="text-orange-900 dark:text-orange-200 font-bold">
+              🎯 Live Check-in Available!
+            </AlertTitle>
+            <AlertDescription className="text-orange-800 dark:text-orange-300">
+              Your instructor has sent {liveCheckIns.length} check-in question(s) during the lecture. 
+              Answer now to show engagement!
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Accordion type="single" collapsible>
           {assignments.map((assignment) => (
             <AccordionItem key={assignment.id} value={assignment.id}>
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
+                  {assignment.assignment_type === 'lecture_checkin' && !assignment.completed && (
+                    <Bell className="h-4 w-4 text-orange-500 animate-pulse" />
+                  )}
                   <BookOpen className="h-4 w-4" />
                   <span>{assignment.title}</span>
-                  <Badge variant={assignment.completed ? "default" : "secondary"}>
-                    {assignment.assignment_type.replace('_', ' ')}
+                  <Badge variant={assignment.completed ? "default" : assignment.assignment_type === 'lecture_checkin' ? "destructive" : "secondary"}>
+                    {assignment.assignment_type === 'lecture_checkin' ? 'LIVE CHECK-IN' : assignment.assignment_type.replace('_', ' ')}
                   </Badge>
                   {assignment.completed && <CheckCircle className="h-4 w-4 text-green-500" />}
                 </div>
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-4 pt-2">
-                  {/* Quiz Display */}
-                  {assignment.assignment_type === 'quiz' && assignment.content.questions && (
+                  {/* Live Check-in Notice */}
+                  {assignment.assignment_type === 'lecture_checkin' && !assignment.completed && (
+                    <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+                      <AlertCircle className="h-4 w-4 text-blue-600" />
+                      <AlertTitle className="text-blue-900 dark:text-blue-200">
+                        Your answer activity is being tracked
+                      </AlertTitle>
+                      <AlertDescription className="text-blue-800 dark:text-blue-300 text-sm">
+                        Type vs. paste detection is enabled to ensure academic integrity.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Quiz/Lecture Check-in Display */}
+                  {(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && assignment.content.questions && (
                     <div className="space-y-4">
                       {assignment.content.questions.map((q: any, idx: number) => {
                         const selectedAnswer = selectedAnswers[assignment.id]?.[idx];

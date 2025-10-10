@@ -82,14 +82,35 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         return;
       }
 
+      // Format questions for student quiz format
+      const formattedQuestions = selectedQuestion.map((q: Question) => {
+        if (q.type === 'multiple_choice') {
+          return {
+            question: q.text,
+            options: q.options || [],
+            correctAnswer: q.expectedAnswer || q.options?.[0]?.charAt(0) || 'A',
+            hint1: 'Think about what was just discussed',
+            hint2: 'Review the key concepts from the lecture',
+            hint3: 'Consider the main points emphasized',
+            solution: 'Based on the lecture content'
+          };
+        } else {
+          return {
+            question: q.text,
+            expectedAnswer: q.expectedAnswer || '',
+            type: 'short_answer'
+          };
+        }
+      });
+
       // Create assignments for all students
       const assignments = studentLinks.map(link => ({
         instructor_id: user.id,
         student_id: link.student_id,
-        assignment_type: 'quiz' as const,
+        assignment_type: 'lecture_checkin' as const,
         mode: 'auto_grade' as const,
-        title: 'Live Lecture Check-in',
-        content: { questions: selectedQuestion } as any,
+        title: '🎯 Live Lecture Check-in',
+        content: { questions: formattedQuestions, isLive: true } as any,
         completed: false,
       }));
 

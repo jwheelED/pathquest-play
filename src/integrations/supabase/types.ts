@@ -692,7 +692,7 @@ export type Database = {
     }
     Enums: {
       assignment_mode: "hints_only" | "hints_solutions" | "auto_grade"
-      assignment_type: "quiz" | "lesson" | "mini_project"
+      assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
       draft_status: "draft" | "approved" | "published"
     }
     CompositeTypes: {
@@ -822,7 +822,7 @@ export const Constants = {
   public: {
     Enums: {
       assignment_mode: ["hints_only", "hints_solutions", "auto_grade"],
-      assignment_type: ["quiz", "lesson", "mini_project"],
+      assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
       draft_status: ["draft", "approved", "published"],
     },
   },
