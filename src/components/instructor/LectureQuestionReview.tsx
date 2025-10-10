@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Send, Trash2, AlertCircle } from "lucide-react";
+import { CheckCircle, Send, Trash2, AlertCircle, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -230,13 +231,20 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
               </RadioGroup>
             </div>
 
+            <Alert>
+              <Users className="h-4 w-4" />
+              <AlertDescription>
+                This will send the selected question to <strong>all your students</strong> immediately as a live lecture check-in.
+              </AlertDescription>
+            </Alert>
+
             <Button 
               onClick={() => handleSendToStudents(lq)}
               disabled={selectedQuestions[lq.id] === undefined}
               className="w-full"
             >
-              <Send className="mr-2 h-4 w-4" />
-              Send to Students
+              <Users className="mr-2 h-4 w-4" />
+              Send to All Students
             </Button>
           </div>
         ))}
