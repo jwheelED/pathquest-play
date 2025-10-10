@@ -34,7 +34,9 @@ export default function InstructorChatCard({ userId }: InstructorChatCardProps) 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchInstructors();
+    if (userId) {
+      fetchInstructors();
+    }
   }, [userId]);
 
   useEffect(() => {

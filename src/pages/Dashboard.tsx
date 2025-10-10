@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -182,6 +183,8 @@ export default function Dashboard() {
       }
 
       toast.success("Successfully connected to your instructor!");
+      // Trigger refresh of InstructorChatCard
+      setRefreshKey(prev => prev + 1);
     } catch (err) {
       console.error("Error joining class:", err);
       toast.error("An error occurred. Please try again.");
@@ -312,7 +315,7 @@ export default function Dashboard() {
               />
             </div>
 
-            <InstructorChatCard userId={user.id} />
+            <InstructorChatCard key={refreshKey} userId={user.id} />
             
           </main>
         </div>
