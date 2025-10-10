@@ -66,18 +66,15 @@ export default function AuthPage() {
 
         // Link to instructor if code provided
         if (instructorCode.trim()) {
-          const { data: instructorProfile } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("instructor_code", instructorCode.toUpperCase())
-            .eq("role", "instructor")
-            .maybeSingle();
+          // Use validate_instructor_code RPC function
+          const { data: instructorId, error: validateError } = await supabase
+            .rpc("validate_instructor_code", { code: instructorCode.toUpperCase() });
 
-          if (instructorProfile) {
+          if (instructorId) {
             const { error: linkError } = await supabase
               .from("instructor_students")
               .insert({
-                instructor_id: instructorProfile.id,
+                instructor_id: instructorId,
                 student_id: user.id,
               });
 

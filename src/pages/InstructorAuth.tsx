@@ -24,13 +24,14 @@ export default function InstructorAuth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const { data: profile } = await supabase
-          .from("profiles")
+        const { data: roleData } = await supabase
+          .from("user_roles")
           .select("role")
-          .eq("id", session.user.id)
+          .eq("user_id", session.user.id)
+          .eq("role", "instructor")
           .maybeSingle();
         
-        if (profile?.role === "instructor") {
+        if (roleData) {
           navigate("/instructor/dashboard");
         }
       }
@@ -75,20 +76,21 @@ export default function InstructorAuth() {
 
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
+          const { data: roleData, error: roleError } = await supabase
+            .from("user_roles")
             .select("role")
-            .eq("id", user.id)
+            .eq("user_id", user.id)
+            .eq("role", "instructor")
             .maybeSingle();
           
-          if (profileError) {
-            console.error("Profile fetch error:", profileError);
+          if (roleError) {
+            console.error("Role fetch error:", roleError);
             toast.error("Error checking instructor status");
             await supabase.auth.signOut();
             return;
           }
 
-          if (profile?.role === "instructor") {
+          if (roleData) {
             navigate("/instructor/dashboard");
           } else {
             toast.error("This account is not registered as an instructor");

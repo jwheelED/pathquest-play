@@ -53,14 +53,15 @@ export default function AdminDashboard() {
     } else {
       setSession(data.session);
       
-      // Check if user is admin
-      const { data: profile } = await supabase
-        .from("profiles")
+      // Check if user is admin using user_roles table
+      const { data: roleData } = await supabase
+        .from("user_roles")
         .select("role")
-        .eq("id", data.session.user.id)
-        .single();
+        .eq("user_id", data.session.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
       
-      if (profile?.role !== "admin") {
+      if (!roleData) {
         toast.error("Access denied. Admin privileges required.");
         navigate("/");
       }
@@ -71,9 +72,9 @@ export default function AdminDashboard() {
     setLoading(true);
     
     try {
-      // Fetch total students
+      // Fetch total students by counting from user_roles table
       const { count: totalStudents } = await supabase
-        .from("profiles")
+        .from("user_roles")
         .select("*", { count: 'exact', head: true })
         .eq("role", "student");
 

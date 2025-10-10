@@ -13,19 +13,34 @@ const Index = () => {
   useEffect(() => {
     const checkSessionAndRedirect = async (session: any) => {
       if (session) {
-        const { data: profile } = await supabase
-          .from("profiles")
+        // Check for admin role
+        const { data: adminRole } = await supabase
+          .from("user_roles")
           .select("role")
-          .eq("id", session.user.id)
+          .eq("user_id", session.user.id)
+          .eq("role", "admin")
           .maybeSingle();
         
-        if (profile?.role === "instructor") {
-          navigate("/instructor/dashboard");
-        } else if (profile?.role === "admin") {
+        if (adminRole) {
           navigate("/admin/dashboard");
-        } else {
-          navigate("/dashboard");
+          return;
         }
+        
+        // Check for instructor role
+        const { data: instructorRole } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", session.user.id)
+          .eq("role", "instructor")
+          .maybeSingle();
+        
+        if (instructorRole) {
+          navigate("/instructor/dashboard");
+          return;
+        }
+        
+        // Default to student dashboard
+        navigate("/dashboard");
       }
     };
 

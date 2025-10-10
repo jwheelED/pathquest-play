@@ -52,20 +52,29 @@ export default function InstructorDashboard() {
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, instructor_code, course_title, course_schedule, course_topics")
-      .eq("id", session.user.id)
-      .single();
-
-    if (profile?.role !== "instructor") {
-      toast.error("Access denied");
+    // Verify instructor role using user_roles table
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id)
+      .eq("role", "instructor")
+      .maybeSingle();
+    
+    if (!roleData) {
+      toast.error("Access denied. Instructor privileges required.");
       navigate("/instructor/auth");
       return;
     }
+    
+    // Fetch profile details
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("instructor_code, course_title, course_schedule, course_topics")
+      .eq("id", session.user.id)
+      .single();
 
     // Check if instructor has completed the new onboarding with course details
-    if (!profile.course_title || !profile.course_schedule || !profile.course_topics || profile.course_topics.length === 0) {
+    if (!profile?.course_title || !profile.course_schedule || !profile.course_topics || profile.course_topics.length === 0) {
       toast.info("Please complete your instructor onboarding");
       navigate("/instructor/onboarding");
       return;
