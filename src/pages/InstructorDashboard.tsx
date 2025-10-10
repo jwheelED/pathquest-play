@@ -52,13 +52,20 @@ export default function InstructorDashboard() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, instructor_code")
+      .select("role, instructor_code, course_title, course_schedule, course_topics")
       .eq("id", session.user.id)
       .single();
 
     if (profile?.role !== "instructor") {
       toast.error("Access denied");
       navigate("/instructor/auth");
+      return;
+    }
+
+    // Check if instructor has completed the new onboarding with course details
+    if (!profile.course_title || !profile.course_schedule || !profile.course_topics || profile.course_topics.length === 0) {
+      toast.info("Please complete your instructor onboarding");
+      navigate("/instructor/onboarding");
       return;
     }
 
