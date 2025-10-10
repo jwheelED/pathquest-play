@@ -606,6 +606,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_stats: {
         Row: {
           coins: number
@@ -728,8 +749,24 @@ export type Database = {
           explanation: string
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      submit_quiz: {
+        Args: { p_assignment_id: string; p_user_answers: Json }
+        Returns: Json
+      }
+      validate_instructor_code: {
+        Args: { code: string }
+        Returns: string
+      }
     }
     Enums: {
+      app_role: "admin" | "instructor" | "student"
       assignment_mode: "hints_only" | "hints_solutions" | "auto_grade"
       assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
       draft_status: "draft" | "approved" | "published"
@@ -860,6 +897,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "instructor", "student"],
       assignment_mode: ["hints_only", "hints_solutions", "auto_grade"],
       assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
       draft_status: ["draft", "approved", "published"],

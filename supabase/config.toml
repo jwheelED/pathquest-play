@@ -4,7 +4,7 @@ project_id = "otsmjgrhyteyvpufkwdh"
 site_url = "http://localhost:5173"
 
 [functions.generate-path]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-content]
 verify_jwt = true

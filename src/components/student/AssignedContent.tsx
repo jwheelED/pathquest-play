@@ -75,32 +75,29 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       return;
     }
 
-    // Calculate grade
-    let correct = 0;
-    questions.forEach((q: any, idx: number) => {
-      if (answers[idx] === q.correctAnswer) {
-        correct++;
-      }
-    });
-    const grade = (correct / questions.length) * 100;
-
-    // Save quiz responses and grade
-    const { error } = await supabase
-      .from('student_assignments')
-      .update({ 
-        completed: true,
-        quiz_responses: answers,
-        grade: grade
-      })
-      .eq('id', assignment.id);
+    // Use secure RPC function for server-side grading
+    const { data, error } = await supabase
+      .rpc('submit_quiz', {
+        p_assignment_id: assignment.id,
+        p_user_answers: answers
+      });
 
     if (error) {
-      toast({ title: "Failed to submit quiz", variant: "destructive" });
+      toast({ 
+        title: "Failed to submit quiz", 
+        description: error.message,
+        variant: "destructive" 
+      });
       return;
     }
 
+    const result = data as { grade: number; correct: number; total: number };
+
     setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
-    toast({ title: `Quiz submitted! Score: ${grade.toFixed(0)}%` });
+    toast({ 
+      title: `Quiz submitted! Score: ${result.grade.toFixed(0)}%`,
+      description: `You got ${result.correct} out of ${result.total} questions correct.`
+    });
     fetchAssignments();
   };
 

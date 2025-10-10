@@ -147,14 +147,11 @@ export default function Dashboard() {
     if (!user?.id || !classCode.trim()) return;
     
     try {
-      const { data: instructorProfile, error: instructorError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("instructor_code", classCode.trim())
-        .eq("role", "instructor")
-        .single();
+      // Use secure RPC function to validate instructor code
+      const { data: instructorId, error: instructorError } = await supabase
+        .rpc("validate_instructor_code", { code: classCode.trim() });
 
-      if (instructorError || !instructorProfile) {
+      if (instructorError || !instructorId) {
         toast.error("Invalid class code. Please check and try again.");
         return;
       }
@@ -162,7 +159,7 @@ export default function Dashboard() {
       const { data: existing } = await supabase
         .from("instructor_students")
         .select("id")
-        .eq("instructor_id", instructorProfile.id)
+        .eq("instructor_id", instructorId)
         .eq("student_id", user.id)
         .maybeSingle();
 
@@ -174,7 +171,7 @@ export default function Dashboard() {
       const { error: connectionError } = await supabase
         .from("instructor_students")
         .insert({
-          instructor_id: instructorProfile.id,
+          instructor_id: instructorId,
           student_id: user.id,
         });
 
