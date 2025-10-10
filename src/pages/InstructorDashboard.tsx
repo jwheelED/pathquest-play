@@ -16,6 +16,7 @@ import { LectureQuestionReview } from "@/components/instructor/LectureQuestionRe
 import { AssignContent } from "@/components/instructor/AssignContent";
 import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
+import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 
 interface Student {
   id: string;
@@ -299,8 +300,10 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
-              <AssignContent />
+              <LectureMaterialsUpload />
             </div>
+            
+            <AssignContent />
             
             <LectureQuestionReview refreshTrigger={refreshQueue} />
 

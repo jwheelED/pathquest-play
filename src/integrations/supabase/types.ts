@@ -148,6 +148,45 @@ export type Database = {
         }
         Relationships: []
       }
+      lecture_materials: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          instructor_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          instructor_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          instructor_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lecture_questions: {
         Row: {
           created_at: string
