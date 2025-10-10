@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Send, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -69,36 +69,49 @@ export default function InstructorChatCard({ userId }: InstructorChatCardProps) 
   }, [selectedInstructor, userId]);
 
   const fetchInstructors = async () => {
+    console.log("InstructorChatCard: Fetching instructors for userId:", userId);
+    
     const { data: connections, error: connectionsError } = await supabase
       .from("instructor_students")
       .select("instructor_id")
       .eq("student_id", userId);
 
+    console.log("InstructorChatCard: Connections data:", connections, "Error:", connectionsError);
+
     if (connectionsError) {
-      console.error("Error fetching instructors:", connectionsError);
+      console.error("Error fetching instructor connections:", connectionsError);
+      toast.error("Failed to load instructor connections");
       return;
     }
 
     if (!connections || connections.length === 0) {
+      console.log("InstructorChatCard: No instructor connections found");
       return;
     }
 
     const instructorIds = connections.map(c => c.instructor_id);
+    console.log("InstructorChatCard: Fetching profiles for instructor IDs:", instructorIds);
+    
     const { data: instructorData, error: instructorError } = await supabase
       .from("profiles")
       .select("id, full_name")
       .in("id", instructorIds);
 
+    console.log("InstructorChatCard: Instructor profiles:", instructorData, "Error:", instructorError);
+
     if (instructorError) {
       console.error("Error fetching instructor profiles:", instructorError);
+      toast.error("Failed to load instructor details");
       return;
     }
 
     setInstructors(instructorData || []);
+    console.log("InstructorChatCard: Set instructors:", instructorData);
     
     // Auto-select first instructor if available
     if (instructorData && instructorData.length > 0 && !selectedInstructor) {
       setSelectedInstructor(instructorData[0].id);
+      console.log("InstructorChatCard: Auto-selected instructor:", instructorData[0].id);
     }
   };
 
@@ -167,10 +180,23 @@ export default function InstructorChatCard({ userId }: InstructorChatCardProps) 
   return (
     <Card className="p-6 border-2 border-primary-glow bg-gradient-to-br from-card to-primary/5">
       <CardHeader className="px-0 pt-0">
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-primary" />
-          💬 Instructor Messages
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-primary" />
+            💬 Instructor Messages
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              console.log("Manual refresh triggered");
+              fetchInstructors();
+            }}
+            className="h-8"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
         <CardDescription>Chat with your instructors</CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
