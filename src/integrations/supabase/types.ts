@@ -47,6 +47,47 @@ export type Database = {
         }
         Relationships: []
       }
+      answer_version_history: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          id: string
+          pasted_count: number
+          student_id: string
+          typed_count: number
+          updated_at: string
+          version_events: Json
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          id?: string
+          pasted_count?: number
+          student_id: string
+          typed_count?: number
+          updated_at?: string
+          version_events?: Json
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          pasted_count?: number
+          student_id?: string
+          typed_count?: number
+          updated_at?: string
+          version_events?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_version_history_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "student_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_drafts: {
         Row: {
           assignment_type: Database["public"]["Enums"]["assignment_type"]
@@ -104,6 +145,36 @@ export type Database = {
           id?: string
           instructor_id?: string
           student_id?: string
+        }
+        Relationships: []
+      }
+      lecture_questions: {
+        Row: {
+          created_at: string
+          id: string
+          instructor_id: string
+          questions: Json
+          status: string
+          transcript_snippet: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructor_id: string
+          questions: Json
+          status?: string
+          transcript_snippet: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          questions?: Json
+          status?: string
+          transcript_snippet?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -284,6 +355,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          course_schedule: string | null
+          course_title: string | null
+          course_topics: string[] | null
           created_at: string | null
           experience_level: string | null
           full_name: string | null
@@ -295,6 +369,9 @@ export type Database = {
           study_days: string[] | null
         }
         Insert: {
+          course_schedule?: string | null
+          course_title?: string | null
+          course_topics?: string[] | null
           created_at?: string | null
           experience_level?: string | null
           full_name?: string | null
@@ -306,6 +383,9 @@ export type Database = {
           study_days?: string[] | null
         }
         Update: {
+          course_schedule?: string | null
+          course_title?: string | null
+          course_topics?: string[] | null
           created_at?: string | null
           experience_level?: string | null
           full_name?: string | null

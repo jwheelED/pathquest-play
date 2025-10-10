@@ -8,8 +8,11 @@ import { StudentProgressCard } from "@/components/instructor/StudentProgressCard
 import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
-import { ContentGenerator } from "@/components/instructor/ContentGenerator";
-import { ReviewQueue } from "@/components/instructor/ReviewQueue";
+// LEGACY: Content Generator replaced by Lecture Transcription
+// import { ContentGenerator } from "@/components/instructor/ContentGenerator";
+// import { ReviewQueue } from "@/components/instructor/ReviewQueue";
+import { LectureTranscription } from "@/components/instructor/LectureTranscription";
+import { LectureQuestionReview } from "@/components/instructor/LectureQuestionReview";
 import { AssignContent } from "@/components/instructor/AssignContent";
 import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
@@ -288,11 +291,11 @@ export default function InstructorDashboard() {
         ) : (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ContentGenerator onGenerated={() => setRefreshQueue(prev => prev + 1)} />
+              <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
               <AssignContent />
             </div>
             
-            <ReviewQueue refreshTrigger={refreshQueue} />
+            <LectureQuestionReview refreshTrigger={refreshQueue} />
 
             <AssignedContentManager />
 

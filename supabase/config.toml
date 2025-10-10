@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.generate-content]
 verify_jwt = true
+
+[functions.transcribe-lecture]
+verify_jwt = true
+
+[functions.generate-lecture-questions]
+verify_jwt = true

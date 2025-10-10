@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import InstructorAuth from "./pages/InstructorAuth";
+import InstructorOnboarding from "./pages/InstructorOnboarding";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/instructor/auth" element={<InstructorAuth />} />
+          <Route path="/instructor/onboarding" element={<InstructorOnboarding />} />
           <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
           <Route path="/admin/auth" element={<AdminAuth />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
