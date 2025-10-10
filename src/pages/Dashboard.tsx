@@ -21,11 +21,13 @@ interface User {
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [goals, setGoals] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
-  const [lessons, setLessons] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [courseContext, setCourseContext] = useState<{
+    courseTitle?: string;
+    courseTopics?: string[];
+    courseSchedule?: string;
+  }>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,8 +50,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (user?.id) {
       checkOnboarding();
-      fetchProfile();
-      fetchLessons();
+      fetchCourseContext();
     }
   }, [user]);
 
@@ -77,31 +78,36 @@ export default function Dashboard() {
     }
   };
 
-  const fetchProfile = async () => {
+  const fetchCourseContext = async () => {
     if (!user?.id) return;
     
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("goals")
-      .eq("id", user.id)
-      .single();
+    try {
+      // Get instructor connection
+      const { data: connection } = await supabase
+        .from("instructor_students")
+        .select("instructor_id")
+        .eq("student_id", user.id)
+        .maybeSingle();
 
-    if (!error && data) {
-      setGoals(data.goals || []);
+      if (connection?.instructor_id) {
+        // Fetch instructor's course info
+        const { data: instructorProfile } = await supabase
+          .from("profiles")
+          .select("course_title, course_topics, course_schedule")
+          .eq("id", connection.instructor_id)
+          .single();
+
+        if (instructorProfile) {
+          setCourseContext({
+            courseTitle: instructorProfile.course_title,
+            courseTopics: instructorProfile.course_topics,
+            courseSchedule: instructorProfile.course_schedule,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching course context:", error);
     }
-  };
-
-  const fetchLessons = async () => {
-    if (!user?.id) return;
-    
-    const { data, error } = await supabase
-      .from("lessons")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("step_number");
-
-    if (error) console.error("Error fetching lessons:", error);
-    setLessons(data || []);
   };
 
   const handleLogout = async () => {
@@ -109,35 +115,6 @@ export default function Dashboard() {
     setSession(null);
     setUser(null);
     navigate("/");
-  };
-
-  const handleGeneratePath = async () => {
-    if (!user?.id) return;
-    
-    setLoading(true);
-    try {
-      const response = await supabase.functions.invoke("generate-path", {
-        body: {
-          userId: user.id,
-          goal: goals[0] || "General Learning",
-          experienceLevel: "Beginner",
-        },
-      });
-
-      if (response.error) {
-        throw response.error;
-      }
-
-      toast.success("Learning path generated!", {
-        description: "Check your lessons below to start learning.",
-      });
-      fetchLessons();
-    } catch (err) {
-      console.error("Error generating path:", err);
-      toast.error("Failed to generate learning path");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handlePointsEarned = (points: number) => {
@@ -183,8 +160,9 @@ export default function Dashboard() {
       }
 
       toast.success("Successfully connected to your instructor!");
-      // Trigger refresh of InstructorChatCard
+      // Trigger refresh of InstructorChatCard and course context
       setRefreshKey(prev => prev + 1);
+      fetchCourseContext();
     } catch (err) {
       console.error("Error joining class:", err);
       toast.error("An error occurred. Please try again.");
@@ -250,70 +228,55 @@ export default function Dashboard() {
 
           <main className="lg:col-span-9 space-y-6">
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {courseContext.courseTitle && (
+              <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
+                <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
+                  📚 {courseContext.courseTitle}
+                </h2>
+                {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {courseContext.courseTopics.map((topic, idx) => (
+                      <Badge key={idx} variant="secondary">
+                        {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {courseContext.courseSchedule && (
+                  <p className="text-sm text-muted-foreground">
+                    📅 {courseContext.courseSchedule}
+                  </p>
+                )}
+              </Card>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="p-4 bg-gradient-secondary border-2 border-secondary-glow text-center">
                 <div className="text-2xl font-bold text-secondary-foreground">📊</div>
                 <div className="text-xl font-bold text-secondary-foreground">{progress.toFixed(0)}%</div>
-                <div className="text-sm text-secondary-foreground/80">Progress</div>
-              </Card>
-              
-              <Card className="p-4 bg-gradient-energy border-2 border-energy-glow text-center">
-                <div className="text-2xl font-bold text-energy-foreground">🎯</div>
-                <div className="text-xl font-bold text-energy-foreground">{goals.length}</div>
-                <div className="text-sm text-energy-foreground/80">Active Goals</div>
+                <div className="text-sm text-secondary-foreground/80">Course Progress</div>
               </Card>
               
               <Card className="p-4 bg-gradient-achievement border-2 border-achievement-glow text-center">
-                <div className="text-2xl font-bold text-achievement-foreground">📚</div>
-                <div className="text-xl font-bold text-achievement-foreground">{lessons.length}</div>
-                <div className="text-sm text-achievement-foreground/80">Total Lessons</div>
+                <div className="text-2xl font-bold text-achievement-foreground">🎓</div>
+                <div className="text-xl font-bold text-achievement-foreground">
+                  {courseContext.courseTitle ? "Enrolled" : "Not Enrolled"}
+                </div>
+                <div className="text-sm text-achievement-foreground/80">Class Status</div>
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {!courseContext.courseTitle && (
               <JoinClassCard onJoinClass={handleJoinClass} />
-              <AssignedContent userId={user.id} />
-            </div>
+            )}
+            
+            <AssignedContent userId={user.id} />
 
-            <Card className="p-6 border-2 border-primary-glow bg-gradient-to-br from-card to-primary/5">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  🗺️ Learning Plan Generator
-                </h2>
-                <Button
-                  onClick={handleGeneratePath}
-                  disabled={loading}
-                  variant="retro"
-                  size="lg"
-                >
-                  {loading ? "Generating..." : "🚀 Generate New Path"}
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                <p className="text-muted-foreground">
-                  Current Goals: <span className="text-foreground font-semibold">
-                    {goals.length > 0 ? goals.join(", ") : "No goals set"}
-                  </span>
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Generate a personalized learning path based on your goals.
-                </p>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <STEMPractice 
-                userId={user.id} 
-                onPointsEarned={handlePointsEarned} 
-              />
-              
-              <GameifiedLessons 
-                userId={user.id}
-                onProgressChange={setProgress}
-                onLessonComplete={handlePointsEarned}
-              />
-            </div>
+            <STEMPractice 
+              userId={user.id} 
+              onPointsEarned={handlePointsEarned}
+              courseContext={courseContext}
+            />
 
             <InstructorChatCard key={refreshKey} userId={user.id} />
             

@@ -8,6 +8,11 @@ import { toast } from "sonner";
 interface STEMPracticeProps {
   userId?: string;
   onPointsEarned?: (points: number) => void;
+  courseContext?: {
+    courseTitle?: string;
+    courseTopics?: string[];
+    courseSchedule?: string;
+  };
 }
 
 interface STEMProblem {
@@ -21,7 +26,7 @@ interface STEMProblem {
   points_reward: number;
 }
 
-export default function STEMPractice({ userId, onPointsEarned }: STEMPracticeProps) {
+export default function STEMPractice({ userId, onPointsEarned, courseContext }: STEMPracticeProps) {
   const [currentProblem, setCurrentProblem] = useState<STEMProblem | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   const [showResult, setShowResult] = useState(false);
@@ -266,8 +271,15 @@ export default function STEMPractice({ userId, onPointsEarned }: STEMPracticePro
     );
   }
 
+  const practiceTitle = courseContext?.courseTitle 
+    ? `${courseContext.courseTitle} Practice`
+    : "Practice Problems";
+
   return (
     <Card className="p-6 border-2 border-secondary-glow bg-gradient-to-br from-card to-secondary/10">
+      <h2 className="text-xl font-bold mb-4 text-foreground flex items-center gap-2">
+        🧪 {practiceTitle}
+      </h2>
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
