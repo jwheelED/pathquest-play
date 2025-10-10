@@ -13,6 +13,7 @@ import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 // import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureQuestionReview } from "@/components/instructor/LectureQuestionReview";
+import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AssignContent } from "@/components/instructor/AssignContent";
 import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
@@ -306,6 +307,8 @@ export default function InstructorDashboard() {
             <AssignContent />
             
             <LectureQuestionReview refreshTrigger={refreshQueue} />
+
+            <LectureCheckInResults />
 
             <AssignedContentManager />
 
