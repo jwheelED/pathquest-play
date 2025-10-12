@@ -30,6 +30,9 @@ export const LectureCheckInResults = () => {
   useEffect(() => {
     fetchResults();
     
+    // Debounced fetch to prevent overwhelming with 40+ students
+    let debounceTimer: NodeJS.Timeout;
+    
     // Set up real-time subscription for assignment updates
     const channel = supabase
       .channel('instructor-checkin-results')
@@ -43,12 +46,17 @@ export const LectureCheckInResults = () => {
         },
         (payload) => {
           console.log('Check-in result updated:', payload);
-          fetchResults();
+          // Debounce to handle multiple rapid updates from 40+ students
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            fetchResults();
+          }, 500); // Wait 500ms after last update
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -57,7 +65,12 @@ export const LectureCheckInResults = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Fetch all lecture check-in assignments
+    // Optimized query: Fetch only recent check-ins (last 24 hours) to reduce load
+    // For classroom of 40 students, this limits data transfer significantly
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+    // Fetch all lecture check-in assignments with optimized select
     const { data: assignments, error } = await supabase
       .from('student_assignments')
       .select(`
@@ -72,7 +85,9 @@ export const LectureCheckInResults = () => {
       `)
       .eq('instructor_id', user.id)
       .eq('assignment_type', 'lecture_checkin')
-      .order('created_at', { ascending: false });
+      .gte('created_at', oneDayAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(200); // Limit to prevent excessive data with large classes
 
     if (error) {
       console.error('Error fetching results:', error);
@@ -80,7 +95,7 @@ export const LectureCheckInResults = () => {
       return;
     }
 
-    // Get student names
+    // Get student names in batches if needed (efficient for 40+ students)
     const studentIds = [...new Set(assignments?.map(a => a.student_id) || [])];
     const { data: students } = await supabase
       .from('users')

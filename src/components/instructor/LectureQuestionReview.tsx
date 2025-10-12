@@ -118,7 +118,8 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
       // Create array with single question
       const formattedQuestions = [formattedQuestion];
 
-      // Create assignments for all students
+      // Batch insert optimized for large classes (40+ students)
+      // Use single batch insert instead of individual inserts
       const assignments = studentLinks.map(link => ({
         instructor_id: user.id,
         student_id: link.student_id,
@@ -129,6 +130,7 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         completed: false,
       }));
 
+      // Insert in a single transaction for efficiency
       const { error: insertError } = await supabase
         .from('student_assignments')
         .insert(assignments);

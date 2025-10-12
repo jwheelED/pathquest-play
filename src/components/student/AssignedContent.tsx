@@ -32,6 +32,8 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   useEffect(() => {
     fetchAssignments();
     
+    let debounceTimer: NodeJS.Timeout;
+    
     // Set up real-time subscription for new assignments
     const channel = supabase
       .channel('student-assignments-changes')
@@ -45,22 +47,33 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         },
         (payload) => {
           console.log('Assignment change detected:', payload);
-          fetchAssignments();
+          // Debounce to handle rapid updates gracefully
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            fetchAssignments();
+          }, 300);
         }
       )
       .subscribe();
 
     return () => {
+      clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [userId]);
 
   const fetchAssignments = async () => {
+    // Optimized query: Only fetch recent assignments to reduce load
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
     const { data, error } = await supabase
       .from('student_assignments')
       .select('*')
       .eq('student_id', userId)
-      .order('created_at', { ascending: false });
+      .gte('created_at', threeDaysAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(50); // Reasonable limit per student
 
     if (error) {
       console.error('Error fetching assignments:', error);

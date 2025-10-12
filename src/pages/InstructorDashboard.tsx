@@ -17,6 +17,7 @@ import { LectureCheckInResults } from "@/components/instructor/LectureCheckInRes
 import { AssignContent } from "@/components/instructor/AssignContent";
 import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
+import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 
 interface Student {
@@ -39,10 +40,37 @@ export default function InstructorDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshQueue, setRefreshQueue] = useState(0);
+  const [classroomStats, setClassroomStats] = useState({
+    totalStudents: 0,
+    activeCheckIns: 0,
+    completedResponses: 0
+  });
 
   useEffect(() => {
     checkAuth();
     fetchStudents();
+    fetchClassroomStats();
+    
+    // Real-time updates for classroom stats
+    const channel = supabase
+      .channel('classroom-stats-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_assignments',
+          filter: `assignment_type=eq.lecture_checkin`
+        },
+        () => {
+          fetchClassroomStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const checkAuth = async () => {
@@ -84,15 +112,48 @@ export default function InstructorDashboard() {
     setInstructorCode(profile.instructor_code || "");
   };
 
+  const fetchClassroomStats = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get total students
+    const { count: totalStudents } = await supabase
+      .from("instructor_students")
+      .select("*", { count: 'exact', head: true })
+      .eq("instructor_id", user.id);
+
+    // Get active check-ins (last 2 hours)
+    const twoHoursAgo = new Date();
+    twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
+
+    const { data: activeAssignments } = await supabase
+      .from("student_assignments")
+      .select("id, completed")
+      .eq("instructor_id", user.id)
+      .eq("assignment_type", "lecture_checkin")
+      .gte("created_at", twoHoursAgo.toISOString());
+
+    const activeCheckIns = activeAssignments?.length || 0;
+    const completedResponses = activeAssignments?.filter(a => a.completed).length || 0;
+
+    setClassroomStats({
+      totalStudents: totalStudents || 0,
+      activeCheckIns,
+      completedResponses
+    });
+  };
+
   const fetchStudents = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Optimized: Single query with limit for large classes
       const { data: studentLinks } = await supabase
         .from("instructor_students")
         .select("student_id")
-        .eq("instructor_id", user.id);
+        .eq("instructor_id", user.id)
+        .limit(100); // Reasonable limit for classroom size
 
       if (!studentLinks || studentLinks.length === 0) {
         setLoading(false);
@@ -101,35 +162,42 @@ export default function InstructorDashboard() {
 
       const studentIds = studentLinks.map(link => link.student_id);
 
-      const { data: studentsData } = await supabase
-        .from("users")
-        .select("id, name")
-        .in("id", studentIds);
+      // Parallel queries for better performance with 40+ students
+      const [usersData, statsData, progressData, masteryData] = await Promise.all([
+        supabase.from("users").select("id, name").in("id", studentIds),
+        supabase.from("user_stats").select("*").in("user_id", studentIds),
+        supabase.from("lesson_progress").select("user_id, completed").in("user_id", studentIds),
+        supabase.from("lesson_mastery").select("user_id, attempt_count, is_mastered").in("user_id", studentIds)
+      ]);
 
-      const { data: statsData } = await supabase
-        .from("user_stats")
-        .select("*")
-        .in("user_id", studentIds);
+      // Create lookup maps for O(1) access - much faster with 40+ students
+      const statsMap = new Map(statsData.data?.map(s => [s.user_id, s]));
+      const progressMap = new Map<string, number>();
+      const masteryMap = new Map<string, { total: number; sum: number }>();
 
-      const { data: progressData } = await supabase
-        .from("lesson_progress")
-        .select("user_id, completed")
-        .in("user_id", studentIds);
+      // Aggregate progress efficiently
+      progressData.data?.forEach(p => {
+        if (p.completed) {
+          progressMap.set(p.user_id, (progressMap.get(p.user_id) || 0) + 1);
+        }
+      });
 
-      const { data: masteryData } = await supabase
-        .from("lesson_mastery")
-        .select("user_id, attempt_count, is_mastered")
-        .in("user_id", studentIds);
+      // Aggregate mastery efficiently  
+      masteryData.data?.forEach(m => {
+        if (m.is_mastered) {
+          const existing = masteryMap.get(m.user_id) || { total: 0, sum: 0 };
+          masteryMap.set(m.user_id, {
+            total: existing.total + 1,
+            sum: existing.sum + m.attempt_count
+          });
+        }
+      });
 
-      const combinedStudents = studentsData?.map(student => {
-        const stats = statsData?.find(s => s.user_id === student.id);
-        const progress = progressData?.filter(p => p.user_id === student.id) || [];
-        const completedLessons = progress.filter(p => p.completed).length;
-        
-        const studentMastery = masteryData?.filter(m => m.user_id === student.id && m.is_mastered) || [];
-        const avgMasteryAttempts = studentMastery.length > 0
-          ? studentMastery.reduce((sum, m) => sum + m.attempt_count, 0) / studentMastery.length
-          : undefined;
+      const combinedStudents = usersData.data?.map(student => {
+        const stats = statsMap.get(student.id);
+        const completedLessons = progressMap.get(student.id) || 0;
+        const mastery = masteryMap.get(student.id);
+        const avgMasteryAttempts = mastery ? mastery.sum / mastery.total : undefined;
 
         return {
           id: student.id,
@@ -308,6 +376,12 @@ export default function InstructorDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
+            <LiveClassroomStatus 
+              totalStudents={classroomStats.totalStudents}
+              activeCheckIns={classroomStats.activeCheckIns}
+              completedResponses={classroomStats.completedResponses}
+            />
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
               <LectureMaterialsUpload />
