@@ -31,6 +31,28 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
 
   useEffect(() => {
     fetchAssignments();
+    
+    // Set up real-time subscription for new assignments
+    const channel = supabase
+      .channel('student-assignments-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_assignments',
+          filter: `student_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('Assignment change detected:', payload);
+          fetchAssignments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const fetchAssignments = async () => {
@@ -69,51 +91,70 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     const answers = selectedAnswers[assignment.id] || {};
     const questions = assignment.content.questions || [];
     
-    // Check if all questions are answered
-    if (Object.keys(answers).length !== questions.length) {
-      toast({ title: "Please answer all questions", variant: "destructive" });
-      return;
-    }
-
-    // Use secure RPC function for server-side grading
-    const { data, error } = await supabase
-      .rpc('submit_quiz', {
-        p_assignment_id: assignment.id,
-        p_user_answers: answers
-      });
-
-    if (error) {
+    // Check if all questions are answered (starting from index 0)
+    const answeredCount = Object.keys(answers).length;
+    if (answeredCount !== questions.length) {
       toast({ 
-        title: "Failed to submit quiz", 
-        description: error.message,
+        title: "Please answer all questions", 
+        description: `You've answered ${answeredCount} out of ${questions.length} questions`,
         variant: "destructive" 
       });
       return;
     }
 
-    const result = data as { grade: number; correct: number; total: number };
+    try {
+      // Use secure RPC function for server-side grading
+      const { data, error } = await supabase
+        .rpc('submit_quiz', {
+          p_assignment_id: assignment.id,
+          p_user_answers: answers
+        });
 
-    setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
-    toast({ 
-      title: `Quiz submitted! Score: ${result.grade.toFixed(0)}%`,
-      description: `You got ${result.correct} out of ${result.total} questions correct.`
-    });
-    fetchAssignments();
+      if (error) {
+        throw error;
+      }
+
+      const result = data as { grade: number; correct: number; total: number };
+
+      setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
+      
+      // Show success feedback
+      toast({ 
+        title: "✅ Quiz Submitted Successfully!",
+        description: `Score: ${result.grade.toFixed(0)}% (${result.correct}/${result.total} correct)`
+      });
+      
+      // Refresh assignments to show updated state
+      await fetchAssignments();
+    } catch (error: any) {
+      console.error('Submit quiz error:', error);
+      toast({ 
+        title: "Failed to submit quiz", 
+        description: error.message || "Please try again",
+        variant: "destructive" 
+      });
+    }
   };
 
   const handleComplete = async (id: string) => {
-    const { error } = await supabase
-      .from('student_assignments')
-      .update({ completed: true })
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('student_assignments')
+        .update({ completed: true })
+        .eq('id', id);
 
-    if (error) {
-      toast({ title: "Failed to mark complete", variant: "destructive" });
-      return;
+      if (error) throw error;
+
+      toast({ title: "✅ Assignment completed!" });
+      await fetchAssignments();
+    } catch (error: any) {
+      console.error('Complete assignment error:', error);
+      toast({ 
+        title: "Failed to mark complete", 
+        description: error.message || "Please try again",
+        variant: "destructive" 
+      });
     }
-
-    toast({ title: "Assignment completed!" });
-    fetchAssignments();
   };
 
   if (assignments.length === 0) {

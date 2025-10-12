@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Send, Trash2, AlertCircle, Users } from "lucide-react";
+import { Send, Trash2, AlertCircle, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,7 +70,11 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const selectedQuestion = lectureQuestion.questions[selectedIndex];
+      // selectedQuestion is an ARRAY of questions - we need to send ONLY ONE question
+      const selectedQuestionSet = lectureQuestion.questions[selectedIndex];
+      
+      // Take only the FIRST question from the set
+      const singleQuestion = selectedQuestionSet[0];
 
       // Get all students for this instructor
       const { data: studentLinks } = await supabase
@@ -83,34 +87,36 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         return;
       }
 
-      // Format questions for student quiz format
-      const formattedQuestions = selectedQuestion.map((q: Question) => {
-        if (q.type === 'multiple_choice') {
-          // Extract correct answer - handle both formats: "A) Answer" or just "A"
-          let correctAnswer = q.expectedAnswer || 'A';
-          if (correctAnswer && correctAnswer.length > 1 && correctAnswer.includes(')')) {
-            correctAnswer = correctAnswer.charAt(0).toUpperCase();
-          } else if (correctAnswer) {
-            correctAnswer = correctAnswer.charAt(0).toUpperCase();
-          }
-          
-          return {
-            question: q.text,
-            options: q.options || [],
-            correctAnswer: correctAnswer,
-            hint1: 'Think about what was just discussed',
-            hint2: 'Review the key concepts from the lecture',
-            hint3: 'Consider the main points emphasized',
-            solution: 'Based on the lecture content'
-          };
-        } else {
-          return {
-            question: q.text,
-            expectedAnswer: q.expectedAnswer || '',
-            type: 'short_answer'
-          };
+      // Format single question for student quiz format
+      let formattedQuestion;
+      if (singleQuestion.type === 'multiple_choice') {
+        // Extract correct answer - handle both formats: "A) Answer" or just "A"
+        let correctAnswer = singleQuestion.expectedAnswer || 'A';
+        if (correctAnswer && correctAnswer.length > 1 && correctAnswer.includes(')')) {
+          correctAnswer = correctAnswer.charAt(0).toUpperCase();
+        } else if (correctAnswer) {
+          correctAnswer = correctAnswer.charAt(0).toUpperCase();
         }
-      });
+        
+        formattedQuestion = {
+          question: singleQuestion.text,
+          options: singleQuestion.options || [],
+          correctAnswer: correctAnswer,
+          hint1: 'Think about what was just discussed',
+          hint2: 'Review the key concepts from the lecture',
+          hint3: 'Consider the main points emphasized',
+          solution: 'Based on the lecture content'
+        };
+      } else {
+        formattedQuestion = {
+          question: singleQuestion.text,
+          expectedAnswer: singleQuestion.expectedAnswer || '',
+          type: 'short_answer'
+        };
+      }
+
+      // Create array with single question
+      const formattedQuestions = [formattedQuestion];
 
       // Create assignments for all students
       const assignments = studentLinks.map(link => ({
@@ -246,14 +252,16 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
               </AlertDescription>
             </Alert>
 
-            <Button 
-              onClick={() => handleSendToStudents(lq)}
-              disabled={selectedQuestions[lq.id] === undefined}
-              className="w-full"
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Send to All Students
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleSendToStudents(lq)}
+                disabled={selectedQuestions[lq.id] === undefined}
+                className="flex-1"
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Send to All Students
+              </Button>
+            </div>
           </div>
         ))}
       </CardContent>

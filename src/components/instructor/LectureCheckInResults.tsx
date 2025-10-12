@@ -29,6 +29,28 @@ export const LectureCheckInResults = () => {
 
   useEffect(() => {
     fetchResults();
+    
+    // Set up real-time subscription for assignment updates
+    const channel = supabase
+      .channel('instructor-checkin-results')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_assignments',
+          filter: `assignment_type=eq.lecture_checkin`
+        },
+        (payload) => {
+          console.log('Check-in result updated:', payload);
+          fetchResults();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchResults = async () => {
@@ -210,42 +232,71 @@ export const LectureCheckInResults = () => {
                       </div>
 
                       <div className="border-t pt-3">
-                        <p className="text-sm font-medium mb-2">Student Responses:</p>
+                        <p className="text-sm font-medium mb-2">Student Responses (Kahoot-style):</p>
                         <div className="space-y-2">
                           {group.assignments.map((assignment) => {
-                            const response = assignment.quiz_responses?.[qIdx];
-                            const isCorrect = response?.correct === true;
+                            const studentAnswer = assignment.quiz_responses?.[qIdx];
                             const isCompleted = assignment.completed;
+                            const isCorrect = studentAnswer === question.correctAnswer;
 
                             return (
-                              <div key={assignment.id} className="flex items-center justify-between text-sm">
-                                <span>{assignment.student_name}</span>
+                              <div key={assignment.id} className="flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50">
+                                <span className="font-medium">{assignment.student_name}</span>
                                 <div className="flex items-center gap-2">
                                   {!isCompleted ? (
                                     <Badge variant="outline" className="gap-1">
                                       <Clock className="h-3 w-3" />
-                                      Pending
-                                    </Badge>
-                                  ) : isCorrect ? (
-                                    <Badge variant="default" className="gap-1 bg-green-600">
-                                      <CheckCircle className="h-3 w-3" />
-                                      Correct
+                                      Not Answered
                                     </Badge>
                                   ) : (
-                                    <Badge variant="destructive" className="gap-1">
-                                      <XCircle className="h-3 w-3" />
-                                      Incorrect
-                                    </Badge>
-                                  )}
-                                  {response?.answer && (
-                                    <span className="text-muted-foreground">
-                                      ({response.answer})
-                                    </span>
+                                    <>
+                                      <Badge 
+                                        variant={isCorrect ? "default" : "destructive"} 
+                                        className={`gap-1 ${isCorrect ? 'bg-green-600' : ''}`}
+                                      >
+                                        {isCorrect ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                                        {isCorrect ? 'Correct' : 'Incorrect'}
+                                      </Badge>
+                                      <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+                                        Answer: {studentAnswer}
+                                      </span>
+                                    </>
                                   )}
                                 </div>
                               </div>
                             );
                           })}
+                        </div>
+                        
+                        {/* Answer distribution */}
+                        <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                          <p className="text-xs font-medium mb-2">Answer Distribution:</p>
+                          <div className="space-y-1">
+                            {question.options?.map((opt: string) => {
+                              const optionLetter = opt.charAt(0);
+                              const count = group.assignments.filter(a => 
+                                a.completed && a.quiz_responses?.[qIdx] === optionLetter
+                              ).length;
+                              const total = group.assignments.filter(a => a.completed).length;
+                              const percentage = total > 0 ? (count / total) * 100 : 0;
+                              const isCorrect = optionLetter === question.correctAnswer;
+                              
+                              return (
+                                <div key={optionLetter} className="flex items-center gap-2 text-xs">
+                                  <span className={`font-mono w-6 ${isCorrect ? 'text-green-600 font-bold' : ''}`}>
+                                    {optionLetter}{isCorrect ? ' ✓' : ''}
+                                  </span>
+                                  <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                                    <div 
+                                      className={`h-full ${isCorrect ? 'bg-green-500' : 'bg-primary'}`}
+                                      style={{ width: `${percentage}%` }}
+                                    />
+                                  </div>
+                                  <span className="w-16 text-right">{count}/{total} ({percentage.toFixed(0)}%)</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     </div>

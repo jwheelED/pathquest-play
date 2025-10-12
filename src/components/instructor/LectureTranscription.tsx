@@ -31,6 +31,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const startRecording = async () => {
     try {
+      // Clear previous transcript when starting new recording
+      setTranscript("");
+      transcriptBufferRef.current = "";
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           sampleRate: 16000,
