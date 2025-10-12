@@ -86,10 +86,18 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
       // Format questions for student quiz format
       const formattedQuestions = selectedQuestion.map((q: Question) => {
         if (q.type === 'multiple_choice') {
+          // Extract correct answer - handle both formats: "A) Answer" or just "A"
+          let correctAnswer = q.expectedAnswer || 'A';
+          if (correctAnswer && correctAnswer.length > 1 && correctAnswer.includes(')')) {
+            correctAnswer = correctAnswer.charAt(0).toUpperCase();
+          } else if (correctAnswer) {
+            correctAnswer = correctAnswer.charAt(0).toUpperCase();
+          }
+          
           return {
             question: q.text,
             options: q.options || [],
-            correctAnswer: q.expectedAnswer || q.options?.[0]?.charAt(0) || 'A',
+            correctAnswer: correctAnswer,
             hint1: 'Think about what was just discussed',
             hint2: 'Review the key concepts from the lecture',
             hint3: 'Consider the main points emphasized',

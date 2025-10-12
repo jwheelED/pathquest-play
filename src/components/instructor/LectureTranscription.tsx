@@ -14,8 +14,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const transcriptBufferRef = useRef<string>("");
   const { toast } = useToast();
 
@@ -45,15 +45,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
       
       mediaRecorderRef.current = mediaRecorder;
-      const chunks: Blob[] = [];
+      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          chunks.push(event.data);
-          // Process chunks every 30 seconds
-          if (chunks.length >= 30) {
-            processAudioChunk(new Blob(chunks, { type: 'audio/webm' }));
-            chunks.length = 0;
+          audioChunksRef.current.push(event.data);
+          // Process chunks every 30 seconds (30 chunks at 1 second each)
+          if (audioChunksRef.current.length >= 30) {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            processAudioChunk(audioBlob);
+            audioChunksRef.current = [];
           }
         }
       };
@@ -71,6 +72,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      
+      // Process any remaining chunks
+      if (audioChunksRef.current.length > 0) {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        processAudioChunk(audioBlob);
+        audioChunksRef.current = [];
+      }
+      
       setIsRecording(false);
       toast({ title: "Recording stopped" });
     }
@@ -82,21 +91,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
         const base64Audio = reader.result?.toString().split(',')[1];
-        if (!base64Audio) return;
+        if (!base64Audio) {
+          console.error('Failed to convert audio to base64');
+          return;
+        }
 
         const { data, error } = await supabase.functions.invoke('transcribe-lecture', {
           body: { audio: base64Audio }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Transcription error:', error);
+          toast({ 
+            title: "Transcription failed", 
+            description: error.message,
+            variant: "destructive" 
+          });
+          return;
+        }
         
-        if (data?.text) {
-          transcriptBufferRef.current += " " + data.text;
-          setTranscript(transcriptBufferRef.current);
+        if (data?.text && data.text.trim()) {
+          transcriptBufferRef.current += " " + data.text.trim();
+          setTranscript(transcriptBufferRef.current.trim());
+          console.log('Transcribed:', data.text);
         }
       };
     } catch (error) {
-      console.error('Transcription error:', error);
+      console.error('Transcription processing error:', error);
     }
   };
 
