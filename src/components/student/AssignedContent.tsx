@@ -134,7 +134,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       // Show success feedback
       toast({ 
         title: "✅ Quiz Submitted Successfully!",
-        description: `Score: ${result.grade.toFixed(0)}% (${result.correct}/${result.total} correct)`
+        description: `Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct)`
       });
       
       // Refresh assignments to show updated state
@@ -304,9 +304,9 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                         </Button>
                       )}
                       
-                      {assignment.completed && assignment.grade !== undefined && (
+                      {assignment.completed && assignment.grade !== undefined && assignment.grade !== null && (
                         <div className="bg-primary/10 p-4 rounded-lg text-center">
-                          <p className="text-lg font-semibold">Your Score: {assignment.grade.toFixed(0)}%</p>
+                          <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
                         </div>
                       )}
                     </div>
