@@ -25,6 +25,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
   const [liveCheckIns, setLiveCheckIns] = useState<Assignment[]>([]);
   const { toast } = useToast();
@@ -100,12 +101,33 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     }));
   };
 
+  const handleTextAnswerChange = (assignmentId: string, questionIndex: number, answer: string) => {
+    setTextAnswers(prev => ({
+      ...prev,
+      [assignmentId]: {
+        ...(prev[assignmentId] || {}),
+        [questionIndex]: answer
+      }
+    }));
+  };
+
   const handleSubmitQuiz = async (assignment: Assignment) => {
-    const answers = selectedAnswers[assignment.id] || {};
+    const mcAnswers = selectedAnswers[assignment.id] || {};
+    const textAns = textAnswers[assignment.id] || {};
     const questions = assignment.content.questions || [];
     
-    // Check if all questions are answered (starting from index 0)
-    const answeredCount = Object.keys(answers).length;
+    // Combine both answer types
+    const allAnswers: Record<number, string> = {};
+    questions.forEach((q: any, idx: number) => {
+      if (q.type === 'short_answer') {
+        allAnswers[idx] = textAns[idx] || '';
+      } else {
+        allAnswers[idx] = mcAnswers[idx] || '';
+      }
+    });
+    
+    // Check if all questions are answered
+    const answeredCount = Object.keys(allAnswers).filter(key => allAnswers[parseInt(key)]).length;
     if (answeredCount !== questions.length) {
       toast({ 
         title: "Please answer all questions", 
@@ -120,7 +142,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       const { data, error } = await supabase
         .rpc('submit_quiz', {
           p_assignment_id: assignment.id,
-          p_user_answers: answers
+          p_user_answers: allAnswers
         });
 
       if (error) {
@@ -237,8 +259,34 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                   {(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && assignment.content.questions && (
                     <div className="space-y-4">
                       {assignment.content.questions.map((q: any, idx: number) => {
-                        const selectedAnswer = selectedAnswers[assignment.id]?.[idx];
                         const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
+                        
+                        // Handle short answer questions
+                        if (q.type === 'short_answer') {
+                          const textAnswer = textAnswers[assignment.id]?.[idx] || '';
+                          
+                          return (
+                            <div key={idx} className="border rounded-lg p-4 space-y-3">
+                              <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                              <textarea
+                                disabled={isSubmitted}
+                                value={textAnswer}
+                                onChange={(e) => handleTextAnswerChange(assignment.id, idx, e.target.value)}
+                                placeholder="Type your answer here..."
+                                className="w-full min-h-[100px] p-3 rounded-lg border-2 border-border focus:border-primary focus:outline-none resize-y disabled:bg-muted disabled:cursor-not-allowed"
+                              />
+                              {isSubmitted && q.expectedAnswer && (
+                                <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
+                                  <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
+                                  <p className="text-sm text-blue-800 dark:text-blue-300">{q.expectedAnswer}</p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        // Handle multiple choice questions
+                        const selectedAnswer = selectedAnswers[assignment.id]?.[idx];
                         const isCorrect = selectedAnswer === q.correctAnswer;
                         
                         return (
@@ -253,13 +301,13 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                                 
                                 return (
                                   <button
-                                    key={i}
+                                    key={`${idx}-${i}`}
                                     disabled={isSubmitted}
                                     onClick={() => handleAnswerSelect(assignment.id, idx, optionLetter)}
                                     className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                                       isSelected && !isSubmitted ? 'border-primary bg-primary/5' :
-                                      showCorrect ? 'border-green-500 bg-green-50' :
-                                      showWrong ? 'border-red-500 bg-red-50' :
+                                      showCorrect ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
+                                      showWrong ? 'border-red-500 bg-red-50 dark:bg-red-950/20' :
                                       'border-border hover:border-primary/50'
                                     } ${isSubmitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                   >
