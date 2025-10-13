@@ -149,15 +149,24 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         throw error;
       }
 
-      const result = data as { grade: number; correct: number; total: number };
+      const result = data as { grade: number | null; correct: number; total: number; pending_review: boolean };
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
       // Show success feedback
-      toast({ 
-        title: "✅ Quiz Submitted Successfully!",
-        description: `Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct)`
-      });
+      if (result.pending_review) {
+        toast({ 
+          title: "✅ Quiz Submitted Successfully!",
+          description: result.grade !== null 
+            ? `Multiple Choice Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct). Short answers pending instructor review.`
+            : "Your answers have been submitted and are pending instructor review."
+        });
+      } else {
+        toast({ 
+          title: "✅ Quiz Submitted Successfully!",
+          description: `Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct)`
+        });
+      }
       
       // Refresh assignments to show updated state
       await fetchAssignments();
@@ -275,10 +284,18 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                                 placeholder="Type your answer here..."
                                 className="w-full min-h-[100px] p-3 rounded-lg border-2 border-border focus:border-primary focus:outline-none resize-y disabled:bg-muted disabled:cursor-not-allowed"
                               />
-                              {isSubmitted && q.expectedAnswer && (
-                                <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
-                                  <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
-                                  <p className="text-sm text-blue-800 dark:text-blue-300">{q.expectedAnswer}</p>
+                              {isSubmitted && (
+                                <div className="space-y-2">
+                                  {q.expectedAnswer && (
+                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
+                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
+                                      <p className="text-sm text-blue-800 dark:text-blue-300">{q.expectedAnswer}</p>
+                                    </div>
+                                  )}
+                                  <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
+                                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
+                                    <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade this answer.</p>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -352,9 +369,18 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                         </Button>
                       )}
                       
-                      {assignment.completed && assignment.grade !== undefined && assignment.grade !== null && (
-                        <div className="bg-primary/10 p-4 rounded-lg text-center">
-                          <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
+                      {assignment.completed && (
+                        <div className="space-y-2">
+                          {assignment.grade !== undefined && assignment.grade !== null ? (
+                            <div className="bg-primary/10 p-4 rounded-lg text-center">
+                              <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
+                            </div>
+                          ) : (
+                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
+                              <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Pending Review</p>
+                              <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor is reviewing your answers</p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

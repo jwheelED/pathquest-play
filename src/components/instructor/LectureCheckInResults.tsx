@@ -284,35 +284,73 @@ export const LectureCheckInResults = () => {
                         </div>
                         
                         {/* Answer distribution */}
-                        <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                          <p className="text-xs font-medium mb-2">Answer Distribution:</p>
-                          <div className="space-y-1">
-                            {question.options?.map((opt: string) => {
-                              const optionLetter = opt.charAt(0);
-                              const count = group.assignments.filter(a => 
-                                a.completed && a.quiz_responses?.[qIdx] === optionLetter
-                              ).length;
-                              const total = group.assignments.filter(a => a.completed).length;
-                              const percentage = total > 0 ? (count / total) * 100 : 0;
-                              const isCorrect = optionLetter === question.correctAnswer;
-                              
-                              return (
-                                <div key={optionLetter} className="flex items-center gap-2 text-xs">
-                                  <span className={`font-mono w-6 ${isCorrect ? 'text-green-600 font-bold' : ''}`}>
-                                    {optionLetter}{isCorrect ? ' ✓' : ''}
-                                  </span>
-                                  <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                                    <div 
-                                      className={`h-full ${isCorrect ? 'bg-green-500' : 'bg-primary'}`}
-                                      style={{ width: `${percentage}%` }}
-                                    />
+                        {question.options && (
+                          <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                            <p className="text-xs font-medium mb-2">Answer Distribution:</p>
+                            <div className="space-y-1">
+                              {question.options?.map((opt: string) => {
+                                const optionLetter = opt.charAt(0);
+                                const count = group.assignments.filter(a => 
+                                  a.completed && a.quiz_responses?.[qIdx] === optionLetter
+                                ).length;
+                                const total = group.assignments.filter(a => a.completed).length;
+                                const percentage = total > 0 ? (count / total) * 100 : 0;
+                                const isCorrect = optionLetter === question.correctAnswer;
+                                
+                                return (
+                                  <div key={optionLetter} className="flex items-center gap-2 text-xs">
+                                    <span className={`font-mono w-6 ${isCorrect ? 'text-green-600 font-bold' : ''}`}>
+                                      {optionLetter}{isCorrect ? ' ✓' : ''}
+                                    </span>
+                                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                                      <div 
+                                        className={`h-full ${isCorrect ? 'bg-green-500' : 'bg-primary'}`}
+                                        style={{ width: `${percentage}%` }}
+                                      />
+                                    </div>
+                                    <span className="w-16 text-right">{count}/{total} ({(percentage || 0).toFixed(0)}%)</span>
                                   </div>
-                                  <span className="w-16 text-right">{count}/{total} ({(percentage || 0).toFixed(0)}%)</span>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
+                        )}
+                        
+                        {/* Short answer review section */}
+                        {question.type === 'short_answer' && (
+                          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                            <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-200">Student Text Responses:</p>
+                            <div className="space-y-2">
+                              {group.assignments.map((assignment) => {
+                                const studentAnswer = assignment.quiz_responses?.[qIdx];
+                                const isCompleted = assignment.completed;
+                                
+                                return (
+                                  <div key={assignment.id} className="bg-white dark:bg-gray-900 p-3 rounded border">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <span className="font-medium text-sm">{assignment.student_name}</span>
+                                      {!isCompleted && (
+                                        <Badge variant="outline" className="gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          Not Answered
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {isCompleted && studentAnswer && (
+                                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{studentAnswer}</p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {question.expectedAnswer && (
+                              <div className="mt-3 pt-3 border-t">
+                                <p className="text-xs font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
+                                <p className="text-xs text-blue-800 dark:text-blue-300">{question.expectedAnswer}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
