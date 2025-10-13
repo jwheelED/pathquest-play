@@ -90,11 +90,24 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
       // Format single question for student quiz format
       let formattedQuestion;
       if (singleQuestion.type === 'multiple_choice') {
-        // Extract correct answer - handle both formats: "A) Answer" or just "A"
+        // Extract correct answer letter - handle multiple formats
         let correctAnswer = singleQuestion.expectedAnswer || 'A';
-        if (correctAnswer && correctAnswer.length > 1 && correctAnswer.includes(')')) {
-          correctAnswer = correctAnswer.charAt(0).toUpperCase();
-        } else if (correctAnswer) {
+        
+        // If it's the full text answer, find which option it matches
+        if (correctAnswer.length > 3) {
+          // Find the matching option by comparing the text (case-insensitive)
+          const matchingOption = singleQuestion.options?.find((opt: string) => 
+            correctAnswer.toLowerCase().includes(opt.toLowerCase()) || 
+            opt.toLowerCase().includes(correctAnswer.toLowerCase())
+          );
+          
+          if (matchingOption) {
+            // Extract the letter from the matching option (e.g., "A. Text" -> "A")
+            correctAnswer = matchingOption.charAt(0).toUpperCase();
+          }
+        } else {
+          // It's already just a letter or short format like "A)" or "A."
+          // Extract just the first character
           correctAnswer = correctAnswer.charAt(0).toUpperCase();
         }
         
