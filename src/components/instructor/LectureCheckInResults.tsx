@@ -138,11 +138,11 @@ export const LectureCheckInResults = () => {
     setLoading(false);
   };
 
-  const calculateQuestionStats = (assignments: Assignment[], questionIndex: number) => {
+  const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, correctAnswer: string) => {
     const completed = assignments.filter(a => a.completed);
     const correct = completed.filter(a => {
       const response = a.quiz_responses?.[questionIndex];
-      return response?.correct === true;
+      return response === correctAnswer;
     });
 
     return {
@@ -219,7 +219,7 @@ export const LectureCheckInResults = () => {
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
                 {group.questions.map((question, qIdx) => {
-                  const stats = calculateQuestionStats(group.assignments, qIdx);
+                  const stats = calculateQuestionStats(group.assignments, qIdx, question.correctAnswer);
                   
                   return (
                     <div key={qIdx} className="border rounded-lg p-4 space-y-3">
@@ -238,7 +238,7 @@ export const LectureCheckInResults = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-2xl font-bold">
-                            {stats.percentage.toFixed(0)}%
+                            {(stats.percentage || 0).toFixed(0)}%
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {stats.correct}/{stats.completed} correct
@@ -307,7 +307,7 @@ export const LectureCheckInResults = () => {
                                       style={{ width: `${percentage}%` }}
                                     />
                                   </div>
-                                  <span className="w-16 text-right">{count}/{total} ({percentage.toFixed(0)}%)</span>
+                                  <span className="w-16 text-right">{count}/{total} ({(percentage || 0).toFixed(0)}%)</span>
                                 </div>
                               );
                             })}

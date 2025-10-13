@@ -72,7 +72,7 @@ export const LiveClassroomStatus = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Completion Rate</span>
-              <span className="text-muted-foreground">{completionRate.toFixed(0)}%</span>
+              <span className="text-muted-foreground">{(completionRate || 0).toFixed(0)}%</span>
             </div>
             <Progress value={completionRate} className="h-2" />
             {completionRate === 100 && (
