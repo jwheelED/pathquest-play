@@ -14,8 +14,8 @@ import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureQuestionReview } from "@/components/instructor/LectureQuestionReview";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
-import { AssignContent } from "@/components/instructor/AssignContent";
 import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
+import { PendingReviewCard } from "@/components/instructor/PendingReviewCard";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
@@ -387,7 +387,7 @@ export default function InstructorDashboard() {
               <LectureMaterialsUpload />
             </div>
             
-            <AssignContent />
+            <PendingReviewCard />
             
             <LectureQuestionReview refreshTrigger={refreshQueue} />
 
