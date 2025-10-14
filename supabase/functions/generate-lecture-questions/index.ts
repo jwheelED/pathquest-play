@@ -50,7 +50,8 @@ serve(async (req) => {
 
     const { transcript, courseContext } = await req.json();
     
-    if (!transcript || transcript.length < 50) {
+    // Reduced minimum to 30 chars for faster response
+    if (!transcript || transcript.length < 30) {
       throw new Error('Transcript too short to generate questions');
     }
 
@@ -92,7 +93,8 @@ Question format:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Transcript excerpt: "${transcript}"\n\nGenerate 3 different question options based on this lecture content.` }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0.7
       }),
     });
 

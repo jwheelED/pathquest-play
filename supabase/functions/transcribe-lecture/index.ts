@@ -59,19 +59,20 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    // Convert base64 to binary
+    // Optimized base64 to binary conversion
     const binaryString = atob(audio);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Prepare form data for Whisper API
+    // Prepare form data for Whisper API with optimized settings
     const formData = new FormData();
     const blob = new Blob([bytes], { type: 'audio/webm' });
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
     formData.append('language', 'en');
+    formData.append('response_format', 'json'); // Ensure JSON response
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',

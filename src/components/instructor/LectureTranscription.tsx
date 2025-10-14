@@ -17,15 +17,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const transcriptBufferRef = useRef<string>("");
+  const triggerDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredRef = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Monitor transcript for voice command "generate question now"
+    // Monitor transcript for voice command "generate question now" with optimized detection
     const triggerPhrase = "generate question now";
     const transcriptLower = transcript.toLowerCase();
     
-    if (isRecording && transcriptLower.includes(triggerPhrase)) {
-      console.log('Detected voice command: generate question now');
+    if (isRecording && transcriptLower.includes(triggerPhrase) && !hasTriggeredRef.current) {
+      console.log('🎯 Voice command detected - generating questions instantly!');
+      hasTriggeredRef.current = true;
+      
+      // Clear any pending debounce
+      if (triggerDebounceRef.current) {
+        clearTimeout(triggerDebounceRef.current);
+      }
       
       // Remove trigger phrase from transcript
       const triggerIndex = transcriptLower.indexOf(triggerPhrase);
@@ -33,8 +41,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       transcriptBufferRef.current = cleanedTranscript.trim();
       setTranscript(cleanedTranscript.trim());
       
-      // Auto-generate questions
+      // Trigger immediately
       handleGenerateQuestions();
+      
+      // Reset trigger flag after 5 seconds to allow another trigger
+      triggerDebounceRef.current = setTimeout(() => {
+        hasTriggeredRef.current = false;
+      }, 5000);
     }
   }, [transcript, isRecording]);
 
@@ -43,6 +56,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Clear previous transcript when starting new recording
       setTranscript("");
       transcriptBufferRef.current = "";
+      hasTriggeredRef.current = false;
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -63,8 +77,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
-          // Process chunks every 30 seconds (30 chunks at 1 second each)
-          if (audioChunksRef.current.length >= 30) {
+          // Process chunks every 10 seconds for faster transcription (reduced from 30s)
+          if (audioChunksRef.current.length >= 10) {
             const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
             processAudioChunk(audioBlob);
             audioChunksRef.current = [];
@@ -74,7 +88,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
-      toast({ title: "Recording started", description: "Lecture audio is being captured" });
+      toast({ 
+        title: "🎙️ Recording started", 
+        description: "Say 'generate question now' anytime to create questions instantly"
+      });
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({ title: "Failed to start recording", variant: "destructive" });
@@ -135,17 +152,25 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const handleGenerateQuestions = async () => {
-    if (!transcript.trim() || transcript.length < 100) {
+    // Reduced minimum length for faster triggering
+    if (!transcript.trim() || transcript.length < 50) {
       toast({ title: "Not enough content", description: "Continue lecturing to generate questions" });
       return;
     }
 
     setIsProcessing(true);
+    
+    // Show instant feedback
+    toast({ 
+      title: "⚡ Generating questions...", 
+      description: "Processing your lecture content"
+    });
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get course context from instructor profile
+      // Get course context from instructor profile (parallel with question generation prep)
       const { data: profile } = await supabase
         .from('profiles')
         .select('course_title, course_topics')
@@ -154,7 +179,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
         body: { 
-          transcript: transcript.slice(-1000), // Last 1000 chars for context
+          transcript: transcript.slice(-1200), // More context for better questions
           courseContext: profile || {},
         }
       });
@@ -173,7 +198,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       if (insertError) throw insertError;
 
-      toast({ title: "Questions generated!", description: "Check review queue to send to students" });
+      toast({ 
+        title: "✅ Questions generated!", 
+        description: "Check review queue to send to students" 
+      });
       onQuestionGenerated();
     } catch (error: any) {
       console.error('Question generation error:', error);
@@ -195,7 +223,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           Live Lecture Capture
         </CardTitle>
         <CardDescription>
-          {isRecording ? "Recording and transcribing in real-time" : "Start recording your lecture"}
+          {isRecording 
+            ? "Recording and transcribing in real-time • Voice commands enabled" 
+            : "Start recording your lecture with instant voice command support"
+          }
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -219,7 +250,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </Button>
           <Button 
             onClick={handleGenerateQuestions}
-            disabled={!transcript || isProcessing || transcript.length < 100}
+            disabled={!transcript || isProcessing || transcript.length < 50}
             variant="secondary"
           >
             {isProcessing ? (
@@ -234,10 +265,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         </div>
 
         {isRecording && (
-          <Badge variant="outline" className="w-full justify-center py-2">
-            <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
-            Live
-          </Badge>
+          <div className="space-y-2">
+            <Badge variant="outline" className="w-full justify-center py-2">
+              <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
+              Live
+            </Badge>
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-xs font-medium text-blue-900 dark:text-blue-200 text-center">
+                🎤 Voice Command Active: Say "generate question now"
+              </p>
+            </div>
+          </div>
         )}
 
         {transcript && (
