@@ -395,23 +395,27 @@ export default function InstructorDashboard() {
 
             <AssignedContentManager />
 
-            <div className="grid lg:grid-cols-2 gap-6">
-              <StudentProgressCard instructorId={currentUser.id} />
-              <StrugglingStudentsCard 
-                students={strugglingStudents}
-                onMessageStudent={() => {}}
-              />
-            </div>
+            {currentUser && (
+              <>
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <StudentProgressCard instructorId={currentUser.id} />
+                  <StrugglingStudentsCard 
+                    students={strugglingStudents}
+                    onMessageStudent={() => {}}
+                  />
+                </div>
 
-            <StudentRankingCard 
-              students={rankedStudents}
-              onStudentClick={handleStudentClick}
-            />
+                <StudentRankingCard 
+                  students={rankedStudents}
+                  onStudentClick={handleStudentClick}
+                />
 
-            <StudentChatCard 
-              students={students.map(s => ({ id: s.id, name: s.name }))}
-              currentUserId={currentUser.id}
-            />
+                <StudentChatCard 
+                  students={students.map(s => ({ id: s.id, name: s.name }))}
+                  currentUserId={currentUser.id}
+                />
+              </>
+            )}
           </div>
         )}
       </main>
