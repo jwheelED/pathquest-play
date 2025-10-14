@@ -320,7 +320,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                                   <button
                                     key={`${idx}-${i}`}
                                     disabled={isSubmitted}
-                                    onClick={() => handleAnswerSelect(assignment.id, idx, optionLetter)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAnswerSelect(assignment.id, idx, optionLetter);
+                                    }}
                                     className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                                       isSelected && !isSubmitted ? 'border-primary bg-primary/5' :
                                       showCorrect ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
