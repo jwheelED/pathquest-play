@@ -20,14 +20,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const { toast } = useToast();
 
   useEffect(() => {
-    // Auto-generate questions every 2 minutes during lecture
-    if (isRecording && transcript.length > 200) {
-      const interval = setInterval(() => {
-        handleGenerateQuestions();
-      }, 120000); // 2 minutes
-      return () => clearInterval(interval);
+    // Monitor transcript for voice command "generate question now"
+    const triggerPhrase = "generate question now";
+    const transcriptLower = transcript.toLowerCase();
+    
+    if (isRecording && transcriptLower.includes(triggerPhrase)) {
+      console.log('Detected voice command: generate question now');
+      
+      // Remove trigger phrase from transcript
+      const triggerIndex = transcriptLower.indexOf(triggerPhrase);
+      const cleanedTranscript = transcript.slice(0, triggerIndex) + transcript.slice(triggerIndex + triggerPhrase.length);
+      transcriptBufferRef.current = cleanedTranscript.trim();
+      setTranscript(cleanedTranscript.trim());
+      
+      // Auto-generate questions
+      handleGenerateQuestions();
     }
-  }, [isRecording, transcript]);
+  }, [transcript, isRecording]);
 
   const startRecording = async () => {
     try {
