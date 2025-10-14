@@ -60,15 +60,25 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
-          sampleRate: 16000,
-          channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         } 
       });
       
+      // Try to use the best available audio format
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/ogg;codecs=opus';
+      }
+      
+      console.log('Using audio format:', mimeType);
+      
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType
       });
       
       mediaRecorderRef.current = mediaRecorder;
@@ -117,6 +127,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const processAudioChunk = async (audioBlob: Blob) => {
     try {
+      // Validate audio blob
+      if (!audioBlob || audioBlob.size === 0) {
+        console.warn('Empty audio blob, skipping');
+        return;
+      }
+
+      console.log('Processing audio chunk:', audioBlob.size, 'bytes, type:', audioBlob.type);
+
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
@@ -134,7 +152,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           console.error('Transcription error:', error);
           toast({ 
             title: "Transcription failed", 
-            description: error.message,
+            description: "Audio processing issue. Please check microphone and try again.",
             variant: "destructive" 
           });
           return;
@@ -143,8 +161,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         if (data?.text && data.text.trim()) {
           transcriptBufferRef.current += " " + data.text.trim();
           setTranscript(transcriptBufferRef.current.trim());
-          console.log('Transcribed:', data.text);
+          console.log('Transcribed:', data.text.substring(0, 100));
+        } else {
+          console.log('No transcription result');
         }
+      };
+      
+      reader.onerror = () => {
+        console.error('FileReader error:', reader.error);
       };
     } catch (error) {
       console.error('Transcription processing error:', error);

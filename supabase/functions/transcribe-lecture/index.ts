@@ -59,20 +59,37 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    // Optimized base64 to binary conversion
-    const binaryString = atob(audio);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    // Decode base64 with better error handling
+    let bytes: Uint8Array;
+    try {
+      const binaryString = atob(audio);
+      bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+    } catch (decodeError) {
+      console.error('Base64 decode error:', decodeError);
+      throw new Error('Invalid audio data encoding');
     }
 
-    // Prepare form data for Whisper API with optimized settings
+    // Check if audio data is valid
+    if (bytes.length === 0) {
+      throw new Error('Empty audio data');
+    }
+
+    console.log(`Processing audio: ${bytes.length} bytes`);
+
+    // Prepare form data - try multiple approaches
     const formData = new FormData();
-    const blob = new Blob([bytes], { type: 'audio/webm' });
-    formData.append('file', blob, 'audio.webm');
+    
+    // Create blob - cast buffer to ArrayBuffer for type compatibility
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const blob = new Blob([buffer], { type: 'audio/webm;codecs=opus' });
+    
+    // Use a simple filename
+    formData.append('file', blob, 'recording.webm');
     formData.append('model', 'whisper-1');
     formData.append('language', 'en');
-    formData.append('response_format', 'json'); // Ensure JSON response
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -84,14 +101,25 @@ serve(async (req) => {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('OpenAI API error:', error);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      console.error('OpenAI Whisper API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: error,
+        audioSize: bytes.length
+      });
+      
+      // Return more helpful error to client
+      if (response.status === 400) {
+        throw new Error(`Audio format issue. Please ensure microphone is working and try again.`);
+      }
+      throw new Error(`Transcription failed: ${response.status} - ${response.statusText}`);
     }
 
     const result = await response.json();
+    console.log('Transcription successful:', result.text.substring(0, 100));
 
     return new Response(
-      JSON.stringify({ text: result.text }),
+      JSON.stringify({ text: result.text || '' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
