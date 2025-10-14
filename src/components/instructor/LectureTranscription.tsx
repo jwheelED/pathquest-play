@@ -87,14 +87,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
-          // Process chunks every 10 seconds for faster transcription (reduced from 30s)
-          if (audioChunksRef.current.length >= 10) {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            processAudioChunk(audioBlob);
-            audioChunksRef.current = [];
-          }
         }
       };
+
+      // Process complete recordings every 5 seconds for real-time transcription
+      const transcribeInterval = setInterval(() => {
+        if (audioChunksRef.current.length > 0 && mediaRecorderRef.current?.state === 'recording') {
+          // Stop current recording to get a complete audio file
+          mediaRecorderRef.current.stop();
+          
+          // Immediately start a new recording to continue capturing
+          setTimeout(() => {
+            if (mediaRecorderRef.current && isRecording) {
+              mediaRecorderRef.current.start(1000);
+            }
+          }, 100);
+        }
+      }, 5000);
+
+      mediaRecorder.onstop = () => {
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+          processAudioChunk(audioBlob);
+          audioChunksRef.current = [];
+        }
+      };
+
+      // Store interval ID for cleanup
+      (mediaRecorder as any).transcribeInterval = transcribeInterval;
 
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
@@ -110,15 +130,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
+      // Clear the transcribe interval
+      if ((mediaRecorderRef.current as any).transcribeInterval) {
+        clearInterval((mediaRecorderRef.current as any).transcribeInterval);
+      }
+      
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      
-      // Process any remaining chunks
-      if (audioChunksRef.current.length > 0) {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        processAudioChunk(audioBlob);
-        audioChunksRef.current = [];
-      }
       
       setIsRecording(false);
       toast({ title: "Recording stopped" });
