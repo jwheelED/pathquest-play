@@ -212,28 +212,31 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get course context from instructor profile (parallel with question generation prep)
+      // Get course context from instructor profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('course_title, course_topics')
         .eq('id', user.id)
         .single();
 
+      // Use full accumulated transcript (up to 5000 chars for better context)
+      const fullTranscript = transcript.slice(-5000);
+
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
         body: { 
-          transcript: transcript.slice(-1200), // More context for better questions
+          transcript: fullTranscript,
           courseContext: profile || {},
         }
       });
 
       if (functionError) throw functionError;
 
-      // Save to review queue as lecture questions
+      // Save to review queue with full context snippet
       const { error: insertError } = await supabase
         .from('lecture_questions')
         .insert([{
           instructor_id: user.id,
-          transcript_snippet: transcript.slice(-500),
+          transcript_snippet: transcript.slice(-1000),
           questions: functionData.questions,
           status: 'pending'
         }]);
@@ -244,6 +247,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         title: "✅ Questions generated!", 
         description: "Check review queue to send to students" 
       });
+      
+      // Clear transcript after successful generation to start fresh
+      setTranscript("");
+      transcriptBufferRef.current = "";
+      
       onQuestionGenerated();
     } catch (error: any) {
       console.error('Question generation error:', error);
