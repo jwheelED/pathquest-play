@@ -19,6 +19,7 @@ import { PendingReviewCard } from "@/components/instructor/PendingReviewCard";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
+import { AudioSetup } from "@/components/instructor/AudioSetup";
 
 interface Student {
   id: string;
@@ -384,7 +385,10 @@ export default function InstructorDashboard() {
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
-              <LectureMaterialsUpload />
+              <div className="space-y-6">
+                <LectureMaterialsUpload />
+                <AudioSetup />
+              </div>
             </div>
             
             <PendingReviewCard />
