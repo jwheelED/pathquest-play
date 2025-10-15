@@ -1,13 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Mic, MicOff, CheckCircle, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export const AudioSetup = () => {
   const [audioPermission, setAudioPermission] = useState<boolean | null>(null);
   const [isTestingAudio, setIsTestingAudio] = useState(false);
+  const [volumeLevel, setVolumeLevel] = useState(0);
   const { toast } = useToast();
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   const checkAudioPermission = async () => {
     try {
@@ -20,7 +26,55 @@ export const AudioSetup = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      stopAudioTest();
+    };
+  }, []);
+
+  const stopAudioTest = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setVolumeLevel(0);
+    setIsTestingAudio(false);
+  };
+
+  const analyzeAudio = () => {
+    if (!analyserRef.current) return;
+
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(dataArray);
+    
+    // Calculate average volume level
+    const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+    const normalizedVolume = Math.min(100, (average / 128) * 100);
+    
+    setVolumeLevel(normalizedVolume);
+
+    animationFrameRef.current = requestAnimationFrame(analyzeAudio);
+  };
+
   const handleAudioSetup = async () => {
+    if (isTestingAudio) {
+      stopAudioTest();
+      toast({ 
+        title: "Test stopped",
+        description: "Microphone test ended"
+      });
+      return;
+    }
+
     setIsTestingAudio(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -30,14 +84,40 @@ export const AudioSetup = () => {
           autoGainControl: true,
         } 
       });
-      stream.getTracks().forEach(track => track.stop());
+
+      streamRef.current = stream;
+
+      // Set up Web Audio API for volume analysis
+      audioContextRef.current = new AudioContext();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+
+      // Start analyzing audio
+      analyzeAudio();
+
       setAudioPermission(true);
       toast({ 
-        title: "✅ Audio access granted", 
-        description: "Microphone is working properly" 
+        title: "✅ Testing microphone", 
+        description: "Speak to see the volume meter respond" 
       });
+
+      // Auto-stop after 10 seconds
+      setTimeout(() => {
+        if (isTestingAudio) {
+          stopAudioTest();
+          toast({ 
+            title: "Test complete",
+            description: "Microphone is working properly"
+          });
+        }
+      }, 10000);
+
     } catch (error: any) {
       setAudioPermission(false);
+      setIsTestingAudio(false);
       toast({ 
         title: "❌ Audio access denied", 
         description: error.name === 'NotAllowedError' 
@@ -45,8 +125,6 @@ export const AudioSetup = () => {
           : "Failed to access microphone. Check your device settings.",
         variant: "destructive" 
       });
-    } finally {
-      setIsTestingAudio(false);
     }
   };
 
@@ -85,7 +163,9 @@ export const AudioSetup = () => {
       <CardContent className="space-y-4">
         <div className="border rounded-lg p-6 bg-muted/30">
           <div className="flex items-center justify-center mb-4">
-            {audioPermission === null ? (
+            {isTestingAudio ? (
+              <Mic className={`h-16 w-16 text-primary ${volumeLevel > 10 ? 'animate-pulse' : ''}`} />
+            ) : audioPermission === null ? (
               <Mic className="h-16 w-16 text-muted-foreground" />
             ) : audioPermission ? (
               <CheckCircle className="h-16 w-16 text-green-600" />
@@ -94,7 +174,27 @@ export const AudioSetup = () => {
             )}
           </div>
           
-          {audioPermission === null && (
+          {isTestingAudio && (
+            <div className="space-y-3 mb-4">
+              <div className="text-center">
+                <p className="text-sm font-medium text-primary">🎤 Testing Microphone...</p>
+                <p className="text-xs text-muted-foreground">Speak to see the volume respond</p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Volume Level</span>
+                  <span className="font-mono font-semibold">{Math.round(volumeLevel)}%</span>
+                </div>
+                <Progress value={volumeLevel} className="h-3" />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Quiet</span>
+                  <span>Loud</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {!isTestingAudio && audioPermission === null && (
             <div className="text-center space-y-2">
               <p className="text-sm font-medium">Microphone Status Unknown</p>
               <p className="text-xs text-muted-foreground">
@@ -103,7 +203,7 @@ export const AudioSetup = () => {
             </div>
           )}
           
-          {audioPermission === true && (
+          {!isTestingAudio && audioPermission === true && (
             <div className="text-center space-y-2">
               <p className="text-sm font-medium text-green-600">✓ Microphone Ready</p>
               <p className="text-xs text-muted-foreground">
@@ -112,7 +212,7 @@ export const AudioSetup = () => {
             </div>
           )}
           
-          {audioPermission === false && (
+          {!isTestingAudio && audioPermission === false && (
             <div className="text-center space-y-2">
               <p className="text-sm font-medium text-destructive">✗ No Microphone Access</p>
               <p className="text-xs text-muted-foreground">
@@ -125,16 +225,26 @@ export const AudioSetup = () => {
         <div className="flex gap-2">
           <Button 
             onClick={handleAudioSetup}
-            disabled={isTestingAudio}
+            variant={isTestingAudio ? "destructive" : "default"}
             className="flex-1"
           >
-            <Mic className="mr-2 h-4 w-4" />
-            {isTestingAudio ? "Testing..." : "Test Microphone"}
+            {isTestingAudio ? (
+              <>
+                <MicOff className="mr-2 h-4 w-4" />
+                Stop Test
+              </>
+            ) : (
+              <>
+                <Mic className="mr-2 h-4 w-4" />
+                Test Microphone
+              </>
+            )}
           </Button>
           <Button 
             onClick={handleCheckPermission}
             variant="outline"
             className="flex-1"
+            disabled={isTestingAudio}
           >
             <Settings className="mr-2 h-4 w-4" />
             Check Status
