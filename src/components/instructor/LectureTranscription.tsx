@@ -53,9 +53,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const startRecording = async () => {
     try {
-      // Clear previous transcript when starting new recording
-      setTranscript("");
-      transcriptBufferRef.current = "";
+      // Reset trigger flag but keep transcript to accumulate across recording sessions
       hasTriggeredRef.current = false;
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -250,10 +248,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         description: "Check review queue to send to students" 
       });
       
-      // Clear transcript after successful generation to start fresh
-      setTranscript("");
-      transcriptBufferRef.current = "";
-      
       onQuestionGenerated();
     } catch (error: any) {
       console.error('Question generation error:', error);
@@ -265,6 +259,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const clearTranscript = () => {
+    setTranscript("");
+    transcriptBufferRef.current = "";
+    hasTriggeredRef.current = false;
+    toast({ title: "Transcript cleared" });
   };
 
   return (
@@ -314,6 +315,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               "Generate Questions"
             )}
           </Button>
+          {transcript && (
+            <Button 
+              onClick={clearTranscript}
+              disabled={isProcessing}
+              variant="outline"
+              size="sm"
+            >
+              Clear
+            </Button>
+          )}
         </div>
 
         {isRecording && (
