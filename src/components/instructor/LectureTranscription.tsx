@@ -41,8 +41,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       transcriptBufferRef.current = cleanedTranscript.trim();
       setTranscript(cleanedTranscript.trim());
       
-      // Trigger immediately
-      handleGenerateQuestions();
+      // Trigger immediately with voice command flag
+      handleGenerateQuestions(true);
       
       // Reset trigger flag after 5 seconds to allow another trigger
       triggerDebounceRef.current = setTimeout(() => {
@@ -193,9 +193,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  const handleGenerateQuestions = async () => {
-    // Reduced minimum length for faster triggering
-    if (!transcript.trim() || transcript.length < 50) {
+  const handleGenerateQuestions = async (isVoiceCommand = false) => {
+    // For voice commands, allow shorter transcripts; for manual, require more content
+    const minLength = isVoiceCommand ? 20 : 50;
+    
+    if (!transcript.trim() || transcript.length < minLength) {
       toast({ title: "Not enough content", description: "Continue lecturing to generate questions" });
       return;
     }
@@ -299,7 +301,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             )}
           </Button>
           <Button 
-            onClick={handleGenerateQuestions}
+            onClick={() => handleGenerateQuestions(false)}
             disabled={!transcript || isProcessing || transcript.length < 50}
             variant="secondary"
           >
