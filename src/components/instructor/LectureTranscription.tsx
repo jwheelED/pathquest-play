@@ -121,9 +121,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const processAudioChunk = async (audioBlob: Blob) => {
     try {
-      // Validate audio blob
-      if (!audioBlob || audioBlob.size === 0) {
-        console.warn('Empty audio blob, skipping');
+      // Validate audio blob - require minimum size
+      if (!audioBlob || audioBlob.size < 1000) {
+        console.warn('Audio chunk too small, skipping:', audioBlob.size);
         return;
       }
 
@@ -138,26 +138,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           return;
         }
 
-        const { data, error } = await supabase.functions.invoke('transcribe-lecture', {
-          body: { audio: base64Audio }
-        });
-
-        if (error) {
-          console.error('Transcription error:', error);
-          toast({ 
-            title: "Transcription failed", 
-            description: "Audio processing issue. Please check microphone and try again.",
-            variant: "destructive" 
+        try {
+          const { data, error } = await supabase.functions.invoke('transcribe-lecture', {
+            body: { audio: base64Audio }
           });
-          return;
-        }
-        
-        if (data?.text && data.text.trim()) {
-          transcriptBufferRef.current += " " + data.text.trim();
-          setTranscript(transcriptBufferRef.current.trim());
-          console.log('Transcribed:', data.text.substring(0, 100));
-        } else {
-          console.log('No transcription result');
+
+          if (error) {
+            console.error('Transcription error:', error);
+            // Only show toast for critical errors, not for empty responses
+            if (error.message && !error.message.includes('too small')) {
+              toast({ 
+                title: "Transcription error", 
+                description: "Please ensure your microphone is working properly.",
+                variant: "destructive" 
+              });
+            }
+            return;
+          }
+          
+          if (data?.text && data.text.trim()) {
+            transcriptBufferRef.current += " " + data.text.trim();
+            setTranscript(transcriptBufferRef.current.trim());
+            console.log('Transcribed:', data.text.substring(0, 100));
+          } else {
+            console.log('No transcription result (audio may be silence)');
+          }
+        } catch (invokeError) {
+          console.error('Function invoke error:', invokeError);
         }
       };
       
