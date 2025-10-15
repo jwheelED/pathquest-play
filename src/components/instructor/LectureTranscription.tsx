@@ -76,45 +76,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log('Using audio format:', mimeType);
       
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType
+        mimeType,
+        audioBitsPerSecond: 128000
       });
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
+      mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+          console.log('Audio data available:', event.data.size, 'bytes');
+          // Process each chunk immediately as it becomes available
+          const audioBlob = new Blob([event.data], { type: mimeType });
+          await processAudioChunk(audioBlob);
         }
       };
-
-      // Process complete recordings every 5 seconds for real-time transcription
-      const transcribeInterval = setInterval(() => {
-        if (audioChunksRef.current.length > 0 && mediaRecorderRef.current?.state === 'recording') {
-          // Stop current recording to get a complete audio file
-          mediaRecorderRef.current.stop();
-          
-          // Immediately start a new recording to continue capturing
-          setTimeout(() => {
-            if (mediaRecorderRef.current && isRecording) {
-              mediaRecorderRef.current.start(1000);
-            }
-          }, 100);
-        }
-      }, 5000);
 
       mediaRecorder.onstop = () => {
-        if (audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-          processAudioChunk(audioBlob);
-          audioChunksRef.current = [];
-        }
+        console.log('Recording stopped');
       };
 
-      // Store interval ID for cleanup
-      (mediaRecorder as any).transcribeInterval = transcribeInterval;
-
-      mediaRecorder.start(1000); // Collect data every second
+      // Start recording with 10-second chunks for better transcription quality
+      mediaRecorder.start(10000);
       setIsRecording(true);
       toast({ 
         title: "🎙️ Recording started", 
@@ -128,11 +111,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      // Clear the transcribe interval
-      if ((mediaRecorderRef.current as any).transcribeInterval) {
-        clearInterval((mediaRecorderRef.current as any).transcribeInterval);
-      }
-      
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       
