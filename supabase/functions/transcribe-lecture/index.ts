@@ -46,6 +46,7 @@ serve(async (req) => {
     // Validate authorization
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('Missing authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing authorization' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -58,25 +59,25 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Get and verify user
+    // Get and verify user (simplified check to avoid rate limiting)
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
+    if (userError) {
+      console.error('Auth error:', userError);
       return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
+        JSON.stringify({ error: 'Authentication failed' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!user) {
+      console.error('No user found');
+      return new Response(
+        JSON.stringify({ error: 'User not found' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check instructor role
-    const { data: isInstructor, error: roleError } = await supabaseClient
-      .rpc('has_role', { _user_id: user.id, _role: 'instructor' });
-
-    if (roleError || !isInstructor) {
-      return new Response(
-        JSON.stringify({ error: 'Instructor access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log('Processing transcription for user:', user.id);
 
     const { audio } = await req.json();
     

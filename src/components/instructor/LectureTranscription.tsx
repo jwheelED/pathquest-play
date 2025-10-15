@@ -53,8 +53,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const startRecording = async () => {
     try {
-      // Reset trigger flag but keep transcript to accumulate across recording sessions
+      // Reset trigger flag and clear transcript for fresh recording session
       hasTriggeredRef.current = false;
+      setTranscript("");
+      transcriptBufferRef.current = "";
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -157,9 +159,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           }
           
           if (data?.text && data.text.trim()) {
-            transcriptBufferRef.current += " " + data.text.trim();
+            const newText = data.text.trim();
+            console.log('✅ Transcribed chunk:', newText.substring(0, 100));
+            
+            // Accumulate transcript with proper spacing
+            if (transcriptBufferRef.current) {
+              transcriptBufferRef.current += " " + newText;
+            } else {
+              transcriptBufferRef.current = newText;
+            }
+            
+            // Update display
             setTranscript(transcriptBufferRef.current.trim());
-            console.log('Transcribed:', data.text.substring(0, 100));
+            console.log('📝 Total transcript length:', transcriptBufferRef.current.length);
           } else {
             console.log('No transcription result (audio may be silence)');
           }
