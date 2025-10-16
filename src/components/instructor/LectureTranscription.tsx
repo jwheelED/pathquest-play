@@ -351,19 +351,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {isRecording ? <Radio className="h-5 w-5 text-red-500 animate-pulse" /> : <Mic className="h-5 w-5" />}
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-xl">
+          {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
           Live Lecture Capture
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           {isRecording 
             ? "Recording and transcribing in real-time • Voice commands enabled" 
             : "Start recording your lecture with instant voice command support"
           }
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Button 
             onClick={isRecording ? stopRecording : startRecording}
@@ -410,11 +410,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
         {isRecording && (
           <div className="space-y-2">
-            <Badge variant="outline" className="w-full justify-center py-2">
+            <Badge variant="outline" className="w-full justify-center py-1.5">
               <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
               Live
             </Badge>
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
               <p className="text-xs font-medium text-blue-900 dark:text-blue-200 text-center">
                 🎤 Voice Command Active: Say "generate question now"
               </p>
@@ -423,10 +423,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         )}
 
         {transcriptChunks.length > 0 && (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-64 overflow-y-auto">
             <p className="text-sm font-medium">Transcript Chunks:</p>
             {transcriptChunks.map((chunk, index) => (
-              <div key={index} className="border rounded-lg p-3 bg-muted/30">
+              <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
                 <p className="text-xs font-medium text-muted-foreground mb-1">
                   Chunk {index + 1}
                 </p>

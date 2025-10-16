@@ -386,13 +386,7 @@ export default function InstructorDashboard() {
               completedResponses={classroomStats.completedResponses}
             />
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
-              <div className="space-y-6">
-                <LectureMaterialsUpload />
-                <AudioSetup />
-              </div>
-            </div>
+            <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
             
             <LectureQuestionReview refreshTrigger={refreshQueue} />
             
@@ -401,6 +395,11 @@ export default function InstructorDashboard() {
             <LectureCheckInResults />
 
             <AssignedContentManager />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LectureMaterialsUpload />
+              <AudioSetup />
+            </div>
 
             {currentUser && (
               <>
