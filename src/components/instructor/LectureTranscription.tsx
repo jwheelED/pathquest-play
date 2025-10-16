@@ -13,7 +13,7 @@ interface LectureTranscriptionProps {
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [transcript, setTranscript] = useState("");
+  const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -25,7 +25,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useEffect(() => {
     // Monitor transcript for voice command "generate question now" with optimized detection
     const triggerPhrase = "generate question now";
-    const transcriptLower = transcript.toLowerCase();
+    const fullTranscript = transcriptBufferRef.current;
+    const transcriptLower = fullTranscript.toLowerCase();
     
     if (isRecording && transcriptLower.includes(triggerPhrase) && !hasTriggeredRef.current) {
       console.log('🎯 Voice command detected - generating questions instantly!');
@@ -38,9 +39,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       // Remove trigger phrase from transcript
       const triggerIndex = transcriptLower.indexOf(triggerPhrase);
-      const cleanedTranscript = transcript.slice(0, triggerIndex) + transcript.slice(triggerIndex + triggerPhrase.length);
+      const cleanedTranscript = fullTranscript.slice(0, triggerIndex) + fullTranscript.slice(triggerIndex + triggerPhrase.length);
       transcriptBufferRef.current = cleanedTranscript.trim();
-      setTranscript(cleanedTranscript.trim());
       
       // Trigger immediately with voice command flag
       handleGenerateQuestions(true);
@@ -50,7 +50,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         hasTriggeredRef.current = false;
       }, 5000);
     }
-  }, [transcript, isRecording]);
+  }, [transcriptChunks, isRecording]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -71,7 +71,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     try {
       // Reset trigger flag and clear transcript for fresh recording session
       hasTriggeredRef.current = false;
-      setTranscript("");
+      setTranscriptChunks([]);
       transcriptBufferRef.current = "";
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -233,15 +233,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             const newText = data.text.trim();
             console.log('✅ Transcribed chunk:', newText.substring(0, 100));
             
-            // Accumulate transcript with proper spacing
+            // Add new chunk to array for display
+            setTranscriptChunks(prev => [...prev, newText]);
+            
+            // Accumulate full transcript for question generation
             if (transcriptBufferRef.current) {
               transcriptBufferRef.current += " " + newText;
             } else {
               transcriptBufferRef.current = newText;
             }
             
-            // Update display
-            setTranscript(transcriptBufferRef.current.trim());
             console.log('📝 Total transcript length:', transcriptBufferRef.current.length);
           } else {
             console.log('No transcription result (audio may be silence)');
@@ -262,8 +263,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const handleGenerateQuestions = async (isVoiceCommand = false) => {
     // For voice commands, allow shorter transcripts; for manual, require more content
     const minLength = isVoiceCommand ? 20 : 50;
+    const fullTranscript = transcriptBufferRef.current;
     
-    if (!transcript.trim() || transcript.length < minLength) {
+    if (!fullTranscript.trim() || fullTranscript.length < minLength) {
       toast({ title: "Not enough content", description: "Continue lecturing to generate questions" });
       return;
     }
@@ -288,11 +290,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         .single();
 
       // Use full accumulated transcript (up to 5000 chars for better context)
-      const fullTranscript = transcript.slice(-5000);
+      const transcriptForGeneration = transcriptBufferRef.current.slice(-5000);
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
         body: { 
-          transcript: fullTranscript,
+          transcript: transcriptForGeneration,
           courseContext: profile || {},
         }
       });
@@ -304,7 +306,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         .from('lecture_questions')
         .insert([{
           instructor_id: user.id,
-          transcript_snippet: transcript.slice(-1000),
+          transcript_snippet: transcriptBufferRef.current.slice(-1000),
           questions: functionData.questions,
           status: 'pending'
         }]);
@@ -330,7 +332,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const clearTranscript = () => {
-    setTranscript("");
+    setTranscriptChunks([]);
     transcriptBufferRef.current = "";
     hasTriggeredRef.current = false;
     toast({ title: "Transcript cleared" });
@@ -371,7 +373,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </Button>
           <Button 
             onClick={() => handleGenerateQuestions(false)}
-            disabled={!transcript || isProcessing || transcript.length < 50}
+            disabled={transcriptChunks.length === 0 || isProcessing || transcriptBufferRef.current.length < 50}
             variant="secondary"
           >
             {isProcessing ? (
@@ -383,7 +385,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               "Generate Questions"
             )}
           </Button>
-          {transcript && (
+          {transcriptChunks.length > 0 && (
             <Button 
               onClick={clearTranscript}
               disabled={isProcessing}
@@ -409,12 +411,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </div>
         )}
 
-        {transcript && (
-          <div className="border rounded-lg p-4 max-h-48 overflow-y-auto bg-muted/30">
-            <p className="text-sm font-medium mb-2">Transcript:</p>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {transcript || "Waiting for audio..."}
-            </p>
+        {transcriptChunks.length > 0 && (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            <p className="text-sm font-medium">Transcript Chunks:</p>
+            {transcriptChunks.map((chunk, index) => (
+              <div key={index} className="border rounded-lg p-3 bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Chunk {index + 1}
+                </p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">
+                  {chunk}
+                </p>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
