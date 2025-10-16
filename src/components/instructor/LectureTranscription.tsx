@@ -20,6 +20,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const transcriptBufferRef = useRef<string>("");
   const triggerDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredRef = useRef(false);
+  const isRecordingRef = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,6 +85,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
       
       streamRef.current = stream;
+      isRecordingRef.current = true;
       setIsRecording(true);
       
       toast({ 
@@ -130,24 +132,27 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Create complete audio blob from all chunks
         if (chunks.length > 0) {
           const audioBlob = new Blob(chunks, { type: mimeType });
-          console.log('Complete audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
+          console.log('📦 Complete audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
           await processAudioChunk(audioBlob);
         }
 
-        // Continue recording cycle if still active
-        if (isRecording && streamRef.current) {
+        // Continue recording cycle if still active (use ref to avoid stale closure)
+        if (isRecordingRef.current && streamRef.current) {
+          console.log('♻️ Continuing recording cycle...');
           // Small delay before next cycle
           setTimeout(() => {
-            if (isRecording && streamRef.current) {
+            if (isRecordingRef.current && streamRef.current) {
               startRecordingCycle();
             }
           }, 100);
+        } else {
+          console.log('🛑 Recording cycle stopped');
         }
       };
 
       // Record for 8 seconds then stop to get a complete audio file
       mediaRecorder.start();
-      console.log('Started recording cycle with format:', mimeType);
+      console.log('🎙️ Started recording cycle with format:', mimeType);
       
       // Stop after 8 seconds to create a complete audio file
       recordingIntervalRef.current = setTimeout(() => {
@@ -170,6 +175,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const stopRecording = () => {
+    isRecordingRef.current = false;
     setIsRecording(false);
     
     // Clear interval
@@ -232,9 +238,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           if (data?.text && data.text.trim()) {
             const newText = data.text.trim();
             console.log('✅ Transcribed chunk:', newText.substring(0, 100));
+            console.log('📊 Current chunks count before adding:', transcriptChunks.length);
             
             // Add new chunk to array for display
-            setTranscriptChunks(prev => [...prev, newText]);
+            setTranscriptChunks(prev => {
+              const updated = [...prev, newText];
+              console.log('📊 Chunks count after adding:', updated.length);
+              return updated;
+            });
             
             // Accumulate full transcript for question generation
             if (transcriptBufferRef.current) {
@@ -245,7 +256,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             
             console.log('📝 Total transcript length:', transcriptBufferRef.current.length);
           } else {
-            console.log('No transcription result (audio may be silence)');
+            console.log('ℹ️ No transcription result (audio may be silence)');
           }
         } catch (invokeError) {
           console.error('Function invoke error:', invokeError);
