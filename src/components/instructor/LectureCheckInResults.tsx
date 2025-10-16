@@ -29,29 +29,29 @@ export const LectureCheckInResults = () => {
 
   useEffect(() => {
     fetchResults();
-    
+
     // Debounced fetch to prevent overwhelming with 40+ students
     let debounceTimer: NodeJS.Timeout;
-    
+
     // Set up real-time subscription for assignment updates
     const channel = supabase
-      .channel('instructor-checkin-results')
+      .channel("instructor-checkin-results")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'student_assignments',
-          filter: `assignment_type=eq.lecture_checkin`
+          event: "*",
+          schema: "public",
+          table: "student_assignments",
+          filter: `assignment_type=eq.lecture_checkin`,
         },
         (payload) => {
-          console.log('Check-in result updated:', payload);
+          console.log("Check-in result updated:", payload);
           // Debounce to handle multiple rapid updates from 40+ students
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             fetchResults();
           }, 500); // Wait 500ms after last update
-        }
+        },
       )
       .subscribe();
 
@@ -62,7 +62,9 @@ export const LectureCheckInResults = () => {
   }, []);
 
   const fetchResults = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     // Optimized query: Fetch only recent check-ins (last 24 hours) to reduce load
@@ -72,8 +74,9 @@ export const LectureCheckInResults = () => {
 
     // Fetch all lecture check-in assignments with optimized select
     const { data: assignments, error } = await supabase
-      .from('student_assignments')
-      .select(`
+      .from("student_assignments")
+      .select(
+        `
         id,
         student_id,
         title,
@@ -82,42 +85,41 @@ export const LectureCheckInResults = () => {
         grade,
         completed,
         created_at
-      `)
-      .eq('instructor_id', user.id)
-      .eq('assignment_type', 'lecture_checkin')
-      .gte('created_at', oneDayAgo.toISOString())
-      .order('created_at', { ascending: false })
+      `,
+      )
+      .eq("instructor_id", user.id)
+      .eq("assignment_type", "lecture_checkin")
+      .gte("created_at", oneDayAgo.toISOString())
+      .order("created_at", { ascending: false })
       .limit(200); // Limit to prevent excessive data with large classes
 
     if (error) {
-      console.error('Error fetching results:', error);
+      console.error("Error fetching results:", error);
       setLoading(false);
       return;
     }
 
     // Get student names in batches if needed (efficient for 40+ students)
-    const studentIds = [...new Set(assignments?.map(a => a.student_id) || [])];
-    const { data: students } = await supabase
-      .from('users')
-      .select('id, name')
-      .in('id', studentIds);
+    const studentIds = [...new Set(assignments?.map((a) => a.student_id) || [])];
+    const { data: students } = await supabase.from("users").select("id, name").in("id", studentIds);
 
-    const studentMap = new Map(students?.map(s => [s.id, s.name]) || []);
+    const studentMap = new Map(students?.map((s) => [s.id, s.name]) || []);
 
     // Add student names to assignments
-    const assignmentsWithNames = assignments?.map(a => ({
-      ...a,
-      student_name: studentMap.get(a.student_id) || 'Unknown'
-    })) || [];
+    const assignmentsWithNames =
+      assignments?.map((a) => ({
+        ...a,
+        student_name: studentMap.get(a.student_id) || "Unknown",
+      })) || [];
 
     // Group by timestamp (within 5 minutes)
     const groups: GroupedAssignment[] = [];
-    
-    assignmentsWithNames.forEach(assignment => {
+
+    assignmentsWithNames.forEach((assignment) => {
       const timestamp = new Date(assignment.created_at).getTime();
-      
+
       // Find existing group within 5 minutes
-      const existingGroup = groups.find(g => {
+      const existingGroup = groups.find((g) => {
         const groupTime = new Date(g.timestamp).getTime();
         return Math.abs(timestamp - groupTime) < 5 * 60 * 1000;
       });
@@ -129,7 +131,7 @@ export const LectureCheckInResults = () => {
         groups.push({
           timestamp: assignment.created_at,
           assignments: [assignment],
-          questions: content?.questions || []
+          questions: content?.questions || [],
         });
       }
     });
@@ -139,8 +141,8 @@ export const LectureCheckInResults = () => {
   };
 
   const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, correctAnswer: string) => {
-    const completed = assignments.filter(a => a.completed);
-    const correct = completed.filter(a => {
+    const completed = assignments.filter((a) => a.completed);
+    const correct = completed.filter((a) => {
       const response = a.quiz_responses?.[questionIndex];
       return response === correctAnswer;
     });
@@ -149,7 +151,7 @@ export const LectureCheckInResults = () => {
       total: assignments.length,
       completed: completed.length,
       correct: correct.length,
-      percentage: completed.length > 0 ? (correct.length / completed.length) * 100 : 0
+      percentage: completed.length > 0 ? (correct.length / completed.length) * 100 : 0,
     };
   };
 
@@ -184,9 +186,7 @@ export const LectureCheckInResults = () => {
           <TrendingUp className="h-5 w-5" />
           Live Lecture Check-In Results
         </CardTitle>
-        <CardDescription>
-          Auto-graded student performance on lecture questions
-        </CardDescription>
+        <CardDescription>Auto-graded student performance on lecture questions</CardDescription>
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible className="space-y-2" defaultValue="group-0">
@@ -195,15 +195,11 @@ export const LectureCheckInResults = () => {
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center justify-between w-full pr-4">
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline">
-                      {new Date(group.timestamp).toLocaleString()}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {group.assignments.length} student(s)
-                    </span>
+                    <Badge variant="outline">{new Date(group.timestamp).toLocaleString()}</Badge>
+                    <span className="text-sm text-muted-foreground">{group.assignments.length} student(s)</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {group.assignments.filter(a => a.completed).length === group.assignments.length ? (
+                    {group.assignments.filter((a) => a.completed).length === group.assignments.length ? (
                       <Badge variant="default" className="gap-1">
                         <CheckCircle className="h-3 w-3" />
                         All Complete
@@ -211,7 +207,7 @@ export const LectureCheckInResults = () => {
                     ) : (
                       <Badge variant="secondary" className="gap-1">
                         <Clock className="h-3 w-3" />
-                        {group.assignments.filter(a => a.completed).length}/{group.assignments.length} Complete
+                        {group.assignments.filter((a) => a.completed).length}/{group.assignments.length} Complete
                       </Badge>
                     )}
                   </div>
@@ -220,7 +216,7 @@ export const LectureCheckInResults = () => {
               <AccordionContent className="space-y-4 pt-4">
                 {group.questions.map((question, qIdx) => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question.correctAnswer);
-                  
+
                   return (
                     <div key={qIdx} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-start justify-between gap-4">
@@ -229,17 +225,18 @@ export const LectureCheckInResults = () => {
                           {question.options && (
                             <ul className="text-sm text-muted-foreground space-y-1">
                               {question.options.map((opt: string, oIdx: number) => (
-                                <li key={oIdx} className={opt.startsWith(question.correctAnswer) ? 'font-medium text-green-600' : ''}>
-                                  {opt} {opt.startsWith(question.correctAnswer) && '✓'}
+                                <li
+                                  key={oIdx}
+                                  className={opt.startsWith(question.correctAnswer) ? "font-medium text-green-600" : ""}
+                                >
+                                  {opt} {opt.startsWith(question.correctAnswer) && "✓"}
                                 </li>
                               ))}
                             </ul>
                           )}
                         </div>
                         <div className="text-right">
-                          <div className="text-2xl font-bold">
-                            {(stats.percentage || 0).toFixed(0)}%
-                          </div>
+                          <div className="text-2xl font-bold">{(stats.percentage || 0).toFixed(0)}%</div>
                           <div className="text-xs text-muted-foreground">
                             {stats.correct}/{stats.completed} correct
                           </div>
@@ -247,7 +244,7 @@ export const LectureCheckInResults = () => {
                       </div>
 
                       <div className="border-t pt-3">
-                        <p className="text-sm font-medium mb-2">Student Responses (Kahoot-style):</p>
+                        <p className="text-sm font-medium mb-2">Student Responses:</p>
                         <div className="space-y-2">
                           {group.assignments.map((assignment) => {
                             const studentAnswer = assignment.quiz_responses?.[qIdx];
@@ -255,7 +252,10 @@ export const LectureCheckInResults = () => {
                             const isCorrect = studentAnswer === question.correctAnswer;
 
                             return (
-                              <div key={assignment.id} className="flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50">
+                              <div
+                                key={assignment.id}
+                                className="flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50"
+                              >
                                 <span className="font-medium">{assignment.student_name}</span>
                                 <div className="flex items-center gap-2">
                                   {!isCompleted ? (
@@ -265,12 +265,16 @@ export const LectureCheckInResults = () => {
                                     </Badge>
                                   ) : (
                                     <>
-                                      <Badge 
-                                        variant={isCorrect ? "default" : "destructive"} 
-                                        className={`gap-1 ${isCorrect ? 'bg-green-600' : ''}`}
+                                      <Badge
+                                        variant={isCorrect ? "default" : "destructive"}
+                                        className={`gap-1 ${isCorrect ? "bg-green-600" : ""}`}
                                       >
-                                        {isCorrect ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                                        {isCorrect ? 'Correct' : 'Incorrect'}
+                                        {isCorrect ? (
+                                          <CheckCircle className="h-3 w-3" />
+                                        ) : (
+                                          <XCircle className="h-3 w-3" />
+                                        )}
+                                        {isCorrect ? "Correct" : "Incorrect"}
                                       </Badge>
                                       <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
                                         Answer: {studentAnswer}
@@ -282,7 +286,7 @@ export const LectureCheckInResults = () => {
                             );
                           })}
                         </div>
-                        
+
                         {/* Answer distribution */}
                         {question.options && (
                           <div className="mt-4 p-3 bg-muted/30 rounded-lg">
@@ -290,41 +294,46 @@ export const LectureCheckInResults = () => {
                             <div className="space-y-1">
                               {question.options?.map((opt: string) => {
                                 const optionLetter = opt.charAt(0);
-                                const count = group.assignments.filter(a => 
-                                  a.completed && a.quiz_responses?.[qIdx] === optionLetter
+                                const count = group.assignments.filter(
+                                  (a) => a.completed && a.quiz_responses?.[qIdx] === optionLetter,
                                 ).length;
-                                const total = group.assignments.filter(a => a.completed).length;
+                                const total = group.assignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const isCorrect = optionLetter === question.correctAnswer;
-                                
+
                                 return (
                                   <div key={optionLetter} className="flex items-center gap-2 text-xs">
-                                    <span className={`font-mono w-6 ${isCorrect ? 'text-green-600 font-bold' : ''}`}>
-                                      {optionLetter}{isCorrect ? ' ✓' : ''}
+                                    <span className={`font-mono w-6 ${isCorrect ? "text-green-600 font-bold" : ""}`}>
+                                      {optionLetter}
+                                      {isCorrect ? " ✓" : ""}
                                     </span>
                                     <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                                      <div 
-                                        className={`h-full ${isCorrect ? 'bg-green-500' : 'bg-primary'}`}
+                                      <div
+                                        className={`h-full ${isCorrect ? "bg-green-500" : "bg-primary"}`}
                                         style={{ width: `${percentage}%` }}
                                       />
                                     </div>
-                                    <span className="w-16 text-right">{count}/{total} ({(percentage || 0).toFixed(0)}%)</span>
+                                    <span className="w-16 text-right">
+                                      {count}/{total} ({(percentage || 0).toFixed(0)}%)
+                                    </span>
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
                         )}
-                        
+
                         {/* Short answer review section */}
-                        {question.type === 'short_answer' && (
+                        {question.type === "short_answer" && (
                           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                            <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-200">Student Text Responses:</p>
+                            <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-200">
+                              Student Text Responses:
+                            </p>
                             <div className="space-y-2">
                               {group.assignments.map((assignment) => {
                                 const studentAnswer = assignment.quiz_responses?.[qIdx];
                                 const isCompleted = assignment.completed;
-                                
+
                                 return (
                                   <div key={assignment.id} className="bg-white dark:bg-gray-900 p-3 rounded border">
                                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -337,7 +346,9 @@ export const LectureCheckInResults = () => {
                                       )}
                                     </div>
                                     {isCompleted && studentAnswer && (
-                                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{studentAnswer}</p>
+                                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                        {studentAnswer}
+                                      </p>
                                     )}
                                   </div>
                                 );
