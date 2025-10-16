@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Assignment {
   id: string;
@@ -140,6 +143,24 @@ export const LectureCheckInResults = () => {
     setLoading(false);
   };
 
+  const handleDeleteGroup = async (group: GroupedAssignment) => {
+    try {
+      const assignmentIds = group.assignments.map(a => a.id);
+      const { error } = await supabase
+        .from("student_assignments")
+        .delete()
+        .in("id", assignmentIds);
+
+      if (error) throw error;
+      
+      toast.success("Check-in deleted successfully!");
+      fetchResults();
+    } catch (error) {
+      console.error("Error deleting check-in:", error);
+      toast.error("Failed to delete check-in");
+    }
+  };
+
   const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, correctAnswer: string) => {
     const completed = assignments.filter((a) => a.completed);
     const correct = completed.filter((a) => {
@@ -198,7 +219,7 @@ export const LectureCheckInResults = () => {
                     <Badge variant="outline">{new Date(group.timestamp).toLocaleString()}</Badge>
                     <span className="text-sm text-muted-foreground">{group.assignments.length} student(s)</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     {group.assignments.filter((a) => a.completed).length === group.assignments.length ? (
                       <Badge variant="default" className="gap-1">
                         <CheckCircle className="h-3 w-3" />
@@ -210,6 +231,33 @@ export const LectureCheckInResults = () => {
                         {group.assignments.filter((a) => a.completed).length}/{group.assignments.length} Complete
                       </Badge>
                     )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Check-In?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove this check-in for all {group.assignments.length} student(s). This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteGroup(group);
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </AccordionTrigger>

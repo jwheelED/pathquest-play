@@ -14,12 +14,12 @@ import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureQuestionReview } from "@/components/instructor/LectureQuestionReview";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
-import { AssignedContentManager } from "@/components/instructor/AssignedContentManager";
+
 import { PendingReviewCard } from "@/components/instructor/PendingReviewCard";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
-import { AudioSetup } from "@/components/instructor/AudioSetup";
+
 import { TeachingAnalytics } from "@/components/instructor/TeachingAnalytics";
 
 interface Student {
@@ -394,12 +394,7 @@ export default function InstructorDashboard() {
 
             <LectureCheckInResults />
 
-            <AssignedContentManager />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LectureMaterialsUpload />
-              <AudioSetup />
-            </div>
+            <LectureMaterialsUpload />
 
             {currentUser && (
               <>
