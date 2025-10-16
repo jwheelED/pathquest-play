@@ -20,6 +20,7 @@ import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { AudioSetup } from "@/components/instructor/AudioSetup";
+import { TeachingAnalytics } from "@/components/instructor/TeachingAnalytics";
 
 interface Student {
   id: string;
@@ -377,6 +378,8 @@ export default function InstructorDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
+            <TeachingAnalytics instructorId={currentUser.id} />
+            
             <LiveClassroomStatus 
               totalStudents={classroomStats.totalStudents}
               activeCheckIns={classroomStats.activeCheckIns}
