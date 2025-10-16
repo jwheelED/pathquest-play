@@ -110,17 +110,38 @@ serve(async (req) => {
 
     console.log(`Processing audio: ${bytes.length} bytes`);
 
-    // Prepare form data - try multiple approaches
+    // Prepare form data with proper audio file
     const formData = new FormData();
     
-    // Create blob - cast buffer to ArrayBuffer for type compatibility
+    // Create blob - cast buffer to ArrayBuffer for type compatibility  
     const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-    const blob = new Blob([buffer], { type: 'audio/webm;codecs=opus' });
     
-    // Use a simple filename
-    formData.append('file', blob, 'recording.webm');
+    // Try webm first, fallback to ogg if needed
+    let blob: Blob;
+    let filename: string;
+    
+    // Check file signature to determine actual format
+    const signature = bytes.slice(0, 4);
+    const signatureStr = Array.from(signature).map(b => b.toString(16).padStart(2, '0')).join('');
+    console.log('Audio signature:', signatureStr);
+    
+    // WebM signature: 1A 45 DF A3
+    if (signature[0] === 0x1A && signature[1] === 0x45 && signature[2] === 0xDF && signature[3] === 0xA3) {
+      blob = new Blob([buffer], { type: 'audio/webm' });
+      filename = 'audio.webm';
+      console.log('Detected WebM format');
+    } else {
+      // Fallback to ogg
+      blob = new Blob([buffer], { type: 'audio/ogg' });
+      filename = 'audio.ogg';
+      console.log('Using OGG format as fallback');
+    }
+    
+    formData.append('file', blob, filename);
     formData.append('model', 'whisper-1');
     formData.append('language', 'en');
+    
+    console.log('Sending to OpenAI:', { size: bytes.length, type: blob.type, filename });
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',

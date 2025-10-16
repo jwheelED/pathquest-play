@@ -15,7 +15,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptBufferRef = useRef<string>("");
   const triggerDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredRef = useRef(false);
@@ -51,6 +52,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   }, [transcript, isRecording]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearTimeout(recordingIntervalRef.current);
+      }
+      if (triggerDebounceRef.current) {
+        clearTimeout(triggerDebounceRef.current);
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   const startRecording = async () => {
     try {
       // Reset trigger flag and clear transcript for fresh recording session
@@ -63,9 +79,30 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          sampleRate: 48000,
         } 
       });
       
+      streamRef.current = stream;
+      setIsRecording(true);
+      
+      toast({ 
+        title: "🎙️ Recording started", 
+        description: "Say 'generate question now' anytime to create questions instantly"
+      });
+
+      // Start the continuous recording cycle
+      startRecordingCycle();
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({ title: "Failed to start recording", variant: "destructive" });
+    }
+  };
+
+  const startRecordingCycle = async () => {
+    if (!streamRef.current) return;
+
+    try {
       // Try to use the best available audio format
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -75,50 +112,84 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         mimeType = 'audio/ogg;codecs=opus';
       }
       
-      console.log('Using audio format:', mimeType);
-      
-      const mediaRecorder = new MediaRecorder(stream, {
+      const mediaRecorder = new MediaRecorder(streamRef.current, {
         mimeType,
         audioBitsPerSecond: 128000
       });
       
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
+      const chunks: Blob[] = [];
 
-      mediaRecorder.ondataavailable = async (event) => {
+      mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          console.log('Audio data available:', event.data.size, 'bytes');
-          // Process each chunk immediately as it becomes available
-          const audioBlob = new Blob([event.data], { type: mimeType });
-          await processAudioChunk(audioBlob);
+          chunks.push(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        console.log('Recording stopped');
+      mediaRecorder.onstop = async () => {
+        // Create complete audio blob from all chunks
+        if (chunks.length > 0) {
+          const audioBlob = new Blob(chunks, { type: mimeType });
+          console.log('Complete audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
+          await processAudioChunk(audioBlob);
+        }
+
+        // Continue recording cycle if still active
+        if (isRecording && streamRef.current) {
+          // Small delay before next cycle
+          setTimeout(() => {
+            if (isRecording && streamRef.current) {
+              startRecordingCycle();
+            }
+          }, 100);
+        }
       };
 
-      // Start recording with 10-second chunks for better transcription quality
-      mediaRecorder.start(10000);
-      setIsRecording(true);
-      toast({ 
-        title: "🎙️ Recording started", 
-        description: "Say 'generate question now' anytime to create questions instantly"
-      });
+      // Record for 8 seconds then stop to get a complete audio file
+      mediaRecorder.start();
+      console.log('Started recording cycle with format:', mimeType);
+      
+      // Stop after 8 seconds to create a complete audio file
+      recordingIntervalRef.current = setTimeout(() => {
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+      }, 8000);
+      
     } catch (error) {
-      console.error('Error starting recording:', error);
-      toast({ title: "Failed to start recording", variant: "destructive" });
+      console.error('Error in recording cycle:', error);
+      if (isRecording) {
+        // Try to restart the cycle
+        setTimeout(() => {
+          if (isRecording && streamRef.current) {
+            startRecordingCycle();
+          }
+        }, 1000);
+      }
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      
-      setIsRecording(false);
-      toast({ title: "Recording stopped" });
+    setIsRecording(false);
+    
+    // Clear interval
+    if (recordingIntervalRef.current) {
+      clearTimeout(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
     }
+    
+    // Stop current recorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    
+    // Stop stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    toast({ title: "Recording stopped" });
   };
 
   const processAudioChunk = async (audioBlob: Blob) => {
