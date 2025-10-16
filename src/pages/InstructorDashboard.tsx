@@ -394,9 +394,9 @@ export default function InstructorDashboard() {
               </div>
             </div>
             
-            <PendingReviewCard />
-            
             <LectureQuestionReview refreshTrigger={refreshQueue} />
+            
+            <PendingReviewCard />
 
             <LectureCheckInResults />
 

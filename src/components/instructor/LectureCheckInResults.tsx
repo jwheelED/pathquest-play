@@ -189,7 +189,7 @@ export const LectureCheckInResults = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Accordion type="single" collapsible className="space-y-2">
+        <Accordion type="single" collapsible className="space-y-2" defaultValue="group-0">
           {groupedResults.map((group, groupIdx) => (
             <AccordionItem key={groupIdx} value={`group-${groupIdx}`} className="border rounded-lg px-4">
               <AccordionTrigger className="hover:no-underline">
