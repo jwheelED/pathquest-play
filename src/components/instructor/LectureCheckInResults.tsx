@@ -344,8 +344,8 @@ export const LectureCheckInResults = () => {
                           <div className="mt-4 p-3 bg-muted/30 rounded-lg">
                             <p className="text-xs font-medium mb-2">Answer Distribution:</p>
                             <div className="space-y-1">
-                              {question.options?.map((opt: string) => {
-                                const optionLetter = opt.charAt(0);
+                              {question.options?.map((opt: string, optIdx: number) => {
+                                const optionLetter = String.fromCharCode(65 + optIdx); // A, B, C, D...
                                 const count = group.assignments.filter(
                                   (a) => a.completed && a.quiz_responses?.[qIdx] === optionLetter,
                                 ).length;
