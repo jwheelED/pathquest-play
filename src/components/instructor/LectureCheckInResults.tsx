@@ -272,14 +272,18 @@ export const LectureCheckInResults = () => {
                           <p className="font-medium mb-2">{question.question}</p>
                           {question.options && (
                             <ul className="text-sm text-muted-foreground space-y-1">
-                              {question.options.map((opt: string, oIdx: number) => (
-                                <li
-                                  key={oIdx}
-                                  className={opt.startsWith(question.correctAnswer) ? "font-medium text-green-600" : ""}
-                                >
-                                  {opt} {opt.startsWith(question.correctAnswer) && "✓"}
-                                </li>
-                              ))}
+                              {question.options.map((opt: string, oIdx: number) => {
+                                const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
+                                const isCorrect = letter === question.correctAnswer;
+                                return (
+                                  <li
+                                    key={oIdx}
+                                    className={isCorrect ? "font-medium text-green-600" : ""}
+                                  >
+                                    <span className="font-bold">{letter}.</span> {opt} {isCorrect && "✓"}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           )}
                         </div>

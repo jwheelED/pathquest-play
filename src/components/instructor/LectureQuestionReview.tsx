@@ -245,10 +245,15 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
                           <div key={qIdx}>
                             <p className="font-medium">{q.text}</p>
                             {q.type === 'multiple_choice' && q.options && (
-                              <ul className="text-sm text-muted-foreground ml-4 mt-1">
-                                {q.options.map((opt, oIdx) => (
-                                  <li key={oIdx}>• {opt}</li>
-                                ))}
+                              <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
+                                {q.options.map((opt, oIdx) => {
+                                  const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
+                                  return (
+                                    <li key={oIdx} className="font-medium">
+                                      <span className="font-bold">{letter}.</span> {opt}
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             )}
                           </div>
