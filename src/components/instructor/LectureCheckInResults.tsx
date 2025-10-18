@@ -379,39 +379,81 @@ export const LectureCheckInResults = () => {
                         {question.type === "short_answer" && (
                           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                             <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-200">
-                              Student Text Responses:
+                              Student Text Responses & Grading:
                             </p>
                             <div className="space-y-2">
                               {group.assignments.map((assignment) => {
                                 const studentAnswer = assignment.quiz_responses?.[qIdx];
                                 const isCompleted = assignment.completed;
+                                const currentGrade = assignment.grade;
 
                                 return (
                                   <div key={assignment.id} className="bg-white dark:bg-gray-900 p-3 rounded border">
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                       <span className="font-medium text-sm">{assignment.student_name}</span>
-                                      {!isCompleted && (
-                                        <Badge variant="outline" className="gap-1">
-                                          <Clock className="h-3 w-3" />
-                                          Not Answered
-                                        </Badge>
-                                      )}
+                                      <div className="flex items-center gap-2">
+                                        {!isCompleted && (
+                                          <Badge variant="outline" className="gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            Not Answered
+                                          </Badge>
+                                        )}
+                                        {isCompleted && currentGrade !== null && (
+                                          <Badge variant="default" className="bg-green-600">
+                                            Grade: {currentGrade}/100
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
                                     {isCompleted && studentAnswer && (
-                                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                        {studentAnswer}
-                                      </p>
+                                      <>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">
+                                          {studentAnswer}
+                                        </p>
+                                        <div className="flex items-center gap-2 pt-2 border-t">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            placeholder="Grade (0-100)"
+                                            defaultValue={currentGrade ?? ''}
+                                            className="w-24 px-2 py-1 text-sm border rounded"
+                                            id={`grade-${assignment.id}`}
+                                          />
+                                          <Button
+                                            size="sm"
+                                            onClick={async () => {
+                                              const input = document.getElementById(`grade-${assignment.id}`) as HTMLInputElement;
+                                              const grade = parseInt(input.value);
+                                              
+                                              if (isNaN(grade) || grade < 0 || grade > 100) {
+                                                toast.error("Please enter a valid grade (0-100)");
+                                                return;
+                                              }
+
+                                              const { error } = await supabase
+                                                .from('student_assignments')
+                                                .update({ grade })
+                                                .eq('id', assignment.id);
+
+                                              if (error) {
+                                                toast.error("Failed to save grade");
+                                                return;
+                                              }
+
+                                              toast.success(`Grade saved: ${grade}/100`);
+                                              fetchResults();
+                                            }}
+                                          >
+                                            Save Grade
+                                          </Button>
+                                        </div>
+                                      </>
                                     )}
                                   </div>
                                 );
                               })}
                             </div>
-                            {question.expectedAnswer && (
-                              <div className="mt-3 pt-3 border-t">
-                                <p className="text-xs font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
-                                <p className="text-xs text-blue-800 dark:text-blue-300">{question.expectedAnswer}</p>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>

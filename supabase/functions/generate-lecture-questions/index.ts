@@ -64,21 +64,23 @@ serve(async (req) => {
 
 Course Context: ${JSON.stringify(courseContext)}
 
-Generate exactly 3 different question options. For each option, create 1-2 questions that:
-1. Test understanding of key concepts from the transcript
-2. Are appropriate for real-time lecture check-ins
-3. Can be answered quickly (2-3 minutes)
-4. Mix multiple choice and short answer formats
+Generate exactly 3 different question options. CRITICAL: Each option must contain ONLY ONE question.
 
-Return a JSON array with 3 question sets. Each set is an array of 1-2 question objects.
+For each option, create ONE question that:
+1. Tests understanding of key concepts from the transcript
+2. Is appropriate for real-time lecture check-ins
+3. Can be answered quickly (2-3 minutes)
+4. Is EITHER multiple choice OR short answer (not both)
+
+Return a JSON array with 3 question sets. Each set is an array containing EXACTLY ONE question object.
 
 Question format:
 {
   "id": "unique_id",
   "text": "question text",
   "type": "multiple_choice" | "short_answer",
-  "options": ["A", "B", "C", "D"], // only for multiple_choice
-  "expectedAnswer": "correct answer or key points"
+  "options": ["Option text 1", "Option text 2", "Option text 3", "Option text 4"], // only for multiple_choice, provide ONLY the text without letters
+  "expectedAnswer": "A" | "B" | "C" | "D" // for multiple choice, provide ONLY the letter
 }`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {

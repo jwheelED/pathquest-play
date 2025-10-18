@@ -236,32 +236,39 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
                 value={selectedQuestions[lq.id]?.toString()} 
                 onValueChange={(value) => handleSelectQuestion(lq.id, parseInt(value))}
               >
-                {lq.questions.map((questionSet, idx) => (
-                  <div key={idx} className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/30">
-                    <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />
-                    <Label htmlFor={`${lq.id}-${idx}`} className="flex-1 cursor-pointer">
-                      <div className="space-y-2">
-                        {questionSet.map((q, qIdx) => (
-                          <div key={qIdx}>
-                            <p className="font-medium">{q.text}</p>
-                            {q.type === 'multiple_choice' && q.options && (
-                              <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
-                                {q.options.map((opt, oIdx) => {
-                                  const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
-                                  return (
-                                    <li key={oIdx} className="font-medium">
-                                      <span className="font-bold">{letter}.</span> {opt}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </Label>
-                  </div>
-                ))}
+                {lq.questions.map((questionSet, idx) => {
+                  // Only show the first question in each set to fix the "2 questions in 1 card" bug
+                  const q = questionSet[0];
+                  if (!q) return null;
+                  
+                  return (
+                    <div key={idx} className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/30">
+                      <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />
+                      <Label htmlFor={`${lq.id}-${idx}`} className="flex-1 cursor-pointer">
+                        <div className="space-y-2">
+                          <p className="font-medium">{q.text}</p>
+                          {q.type === 'multiple_choice' && q.options && (
+                            <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
+                              {q.options.map((opt, oIdx) => {
+                                const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
+                                return (
+                                  <li key={oIdx} className="font-medium">
+                                    <span className="font-bold">{letter}.</span> {opt}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                          {q.type === 'short_answer' && (
+                            <p className="text-sm text-muted-foreground italic ml-4 mt-1">
+                              Students will type their answer
+                            </p>
+                          )}
+                        </div>
+                      </Label>
+                    </div>
+                  );
+                })}
               </RadioGroup>
             </div>
 
