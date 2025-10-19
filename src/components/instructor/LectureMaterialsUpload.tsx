@@ -177,7 +177,7 @@ export function LectureMaterialsUpload() {
       <CardHeader>
         <CardTitle>Lecture Materials</CardTitle>
         <CardDescription>
-          Upload and manage your lecture slides, PDFs, and other course materials
+          Upload course materials (slides, PDFs, documents) - AI will use them to generate contextually relevant questions during live lectures
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

@@ -310,7 +310,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (!isVoiceCommand) {
       toast({ 
         title: "⚡ Generating questions...", 
-        description: "Processing your lecture content"
+        description: "Processing lecture content and course materials"
       });
     }
 
@@ -329,18 +329,61 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.warn('Profile fetch error (non-critical):', profileError);
       }
 
+      // Fetch uploaded lecture materials
+      const { data: materials, error: materialsError } = await supabase
+        .from('lecture_materials')
+        .select('id, title, description, file_path, file_type')
+        .eq('instructor_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5); // Get most recent 5 materials
+
+      console.log('📚 Found', materials?.length || 0, 'lecture materials');
+
+      // Parse content from materials
+      let materialContext: any[] = [];
+      if (materials && materials.length > 0) {
+        const parsePromises = materials.map(async (material) => {
+          try {
+            console.log('📖 Parsing material:', material.title);
+            const { data, error } = await supabase.functions.invoke('parse-lecture-material', {
+              body: { filePath: material.file_path }
+            });
+
+            if (error) {
+              console.warn('Failed to parse material:', material.title, error);
+              return null;
+            }
+
+            return {
+              title: material.title,
+              description: material.description,
+              content: data.text
+            };
+          } catch (error) {
+            console.warn('Error parsing material:', material.title, error);
+            return null;
+          }
+        });
+
+        const parsedMaterials = await Promise.all(parsePromises);
+        materialContext = parsedMaterials.filter(m => m !== null);
+        console.log('✅ Successfully parsed', materialContext.length, 'materials');
+      }
+
       // Use full accumulated transcript (up to 5000 chars for better context)
       const transcriptForGeneration = fullTranscript.slice(-5000);
       
       console.log('📤 Sending to edge function:', {
         transcriptLength: transcriptForGeneration.length,
-        courseContext: profile ? 'present' : 'missing'
+        courseContext: profile ? 'present' : 'missing',
+        materialsCount: materialContext.length
       });
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
         body: { 
           transcript: transcriptForGeneration,
           courseContext: profile || {},
+          materialContext: materialContext,
         }
       });
 
@@ -373,7 +416,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       toast({ 
         title: "✅ Questions generated!", 
-        description: "Check review queue to send to students" 
+        description: materialContext.length > 0 
+          ? `Using insights from ${materialContext.length} course materials`
+          : "Check review queue to send to students"
       });
       
       onQuestionGenerated();
@@ -405,8 +450,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         </CardTitle>
         <CardDescription className="text-sm">
           {isRecording 
-            ? "Recording and transcribing in real-time • Voice commands enabled" 
-            : "Start recording your lecture with instant voice command support"
+            ? "Recording and transcribing in real-time • Voice commands enabled • Using course materials for context" 
+            : "Start recording your lecture - AI uses uploaded materials and transcription for questions"
           }
         </CardDescription>
       </CardHeader>

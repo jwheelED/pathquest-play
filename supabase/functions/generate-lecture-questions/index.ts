@@ -48,7 +48,7 @@ serve(async (req) => {
       );
     }
 
-    const { transcript, courseContext } = await req.json();
+    const { transcript, courseContext, materialContext } = await req.json();
     
     // Reduced minimum to 30 chars for faster response
     if (!transcript || transcript.length < 30) {
@@ -60,17 +60,36 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const systemPrompt = `You are an expert educational assessment designer. Based on lecture transcripts, generate adaptive check-in questions to test student comprehension and engagement.
+    // Build context from both course info and uploaded materials
+    let contextInfo = `Course Context: ${JSON.stringify(courseContext)}\n`;
+    
+    if (materialContext && materialContext.length > 0) {
+      contextInfo += `\nUploaded Course Materials:\n`;
+      materialContext.forEach((material: any, idx: number) => {
+        contextInfo += `\nMaterial ${idx + 1}: ${material.title}\n`;
+        if (material.description) {
+          contextInfo += `Description: ${material.description}\n`;
+        }
+        if (material.content) {
+          contextInfo += `Content excerpt: ${material.content.slice(0, 1000)}\n`;
+        }
+      });
+    }
 
-Course Context: ${JSON.stringify(courseContext)}
+    const systemPrompt = `You are an expert educational assessment designer. Based on lecture transcripts AND uploaded course materials, generate adaptive check-in questions to test student comprehension and engagement.
+
+${contextInfo}
+
+IMPORTANT: Use the uploaded course materials to inform your questions. Reference specific concepts, examples, or topics mentioned in the materials when relevant to the lecture content.
 
 Generate exactly 3 different question options. CRITICAL: Each option must contain ONLY ONE question.
 
 For each option, create ONE question that:
-1. Tests understanding of key concepts from the transcript
+1. Tests understanding of key concepts from BOTH the transcript AND the course materials
 2. Is appropriate for real-time lecture check-ins
 3. Can be answered quickly (2-3 minutes)
 4. Is EITHER multiple choice OR short answer (not both)
+5. Aligns with concepts covered in the uploaded materials when applicable
 
 Return a JSON array with 3 question sets. Each set is an array containing EXACTLY ONE question object.
 
