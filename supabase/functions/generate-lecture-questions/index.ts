@@ -119,18 +119,41 @@ Question format:
     }
 
     const result = await response.json();
-    const content = result.choices[0].message.content;
+    console.log('AI response received:', JSON.stringify(result).substring(0, 200));
+    
+    const content = result.choices?.[0]?.message?.content;
+    if (!content) {
+      console.error('No content in AI response:', result);
+      throw new Error('AI returned empty response');
+    }
     
     let parsedContent;
     try {
       parsedContent = JSON.parse(content);
     } catch (e) {
-      console.error('Failed to parse AI response:', content);
-      throw new Error('Invalid AI response format');
+      console.error('Failed to parse AI response:', content.substring(0, 500));
+      throw new Error('Invalid AI response format - could not parse JSON');
     }
 
+    // Validate that we have questions
+    const questions = parsedContent.questions || parsedContent;
+    if (!Array.isArray(questions) || questions.length === 0) {
+      console.error('Invalid questions format:', parsedContent);
+      throw new Error('AI did not return valid question sets');
+    }
+
+    // Validate each question set
+    for (let i = 0; i < questions.length; i++) {
+      if (!Array.isArray(questions[i]) || questions[i].length === 0) {
+        console.error(`Question set ${i} is invalid:`, questions[i]);
+        throw new Error(`Question set ${i} is not properly formatted`);
+      }
+    }
+
+    console.log('✅ Successfully generated', questions.length, 'question sets');
+
     return new Response(
-      JSON.stringify({ questions: parsedContent.questions || parsedContent }),
+      JSON.stringify({ questions }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

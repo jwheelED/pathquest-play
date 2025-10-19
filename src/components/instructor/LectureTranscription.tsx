@@ -24,13 +24,27 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const { toast } = useToast();
 
   useEffect(() => {
-    // Monitor transcript for voice command "generate question now" with optimized detection
-    const triggerPhrase = "generate question now";
+    // Monitor transcript for voice command with multiple pattern matching
     const fullTranscript = transcriptBufferRef.current;
-    const transcriptLower = fullTranscript.toLowerCase();
+    const transcriptLower = fullTranscript.toLowerCase().replace(/[^\w\s]/g, '');
     
-    if (isRecording && transcriptLower.includes(triggerPhrase) && !hasTriggeredRef.current) {
-      console.log('🎯 Voice command detected - generating questions instantly!');
+    // Multiple trigger patterns for better detection
+    const triggerPatterns = [
+      'generate question now',
+      'generate questions now',
+      'generate a question now',
+      'generate the question now',
+      'create question now',
+      'make question now'
+    ];
+    
+    const matchedPattern = triggerPatterns.find(pattern => 
+      transcriptLower.includes(pattern.replace(/[^\w\s]/g, ''))
+    );
+    
+    if (isRecording && matchedPattern && !hasTriggeredRef.current) {
+      console.log('🎯 Voice command detected:', matchedPattern);
+      console.log('📝 Full transcript:', fullTranscript);
       hasTriggeredRef.current = true;
       
       // Clear any pending debounce
@@ -38,18 +52,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         clearTimeout(triggerDebounceRef.current);
       }
       
-      // Remove trigger phrase from transcript
-      const triggerIndex = transcriptLower.indexOf(triggerPhrase);
-      const cleanedTranscript = fullTranscript.slice(0, triggerIndex) + fullTranscript.slice(triggerIndex + triggerPhrase.length);
-      transcriptBufferRef.current = cleanedTranscript.trim();
+      // Don't remove the trigger phrase - keep all lecture content
+      // Just mark that we've triggered
+      
+      toast({
+        title: "🎤 Voice command recognized!",
+        description: "Generating questions from your lecture..."
+      });
       
       // Trigger immediately with voice command flag
       handleGenerateQuestions(true);
       
-      // Reset trigger flag after 5 seconds to allow another trigger
+      // Reset trigger flag after 3 seconds to allow another trigger
       triggerDebounceRef.current = setTimeout(() => {
         hasTriggeredRef.current = false;
-      }, 5000);
+        console.log('✅ Voice command ready again');
+      }, 3000);
     }
   }, [transcriptChunks, isRecording]);
 
@@ -272,36 +290,52 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const handleGenerateQuestions = async (isVoiceCommand = false) => {
-    // For voice commands, allow shorter transcripts; for manual, require more content
-    const minLength = isVoiceCommand ? 20 : 50;
+    // For voice commands, be very lenient; for manual, require more content
+    const minLength = isVoiceCommand ? 15 : 50;
     const fullTranscript = transcriptBufferRef.current;
     
+    console.log('📊 Generation check - length:', fullTranscript.length, 'min required:', minLength, 'voice command:', isVoiceCommand);
+    
     if (!fullTranscript.trim() || fullTranscript.length < minLength) {
-      toast({ title: "Not enough content", description: "Continue lecturing to generate questions" });
+      toast({ 
+        title: "Not enough content", 
+        description: `Need at least ${minLength} characters. Current: ${fullTranscript.length}`
+      });
       return;
     }
 
     setIsProcessing(true);
     
     // Show instant feedback
-    toast({ 
-      title: "⚡ Generating questions...", 
-      description: "Processing your lecture content"
-    });
+    if (!isVoiceCommand) {
+      toast({ 
+        title: "⚡ Generating questions...", 
+        description: "Processing your lecture content"
+      });
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       // Get course context from instructor profile
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('course_title, course_topics')
         .eq('id', user.id)
         .single();
 
+      if (profileError) {
+        console.warn('Profile fetch error (non-critical):', profileError);
+      }
+
       // Use full accumulated transcript (up to 5000 chars for better context)
-      const transcriptForGeneration = transcriptBufferRef.current.slice(-5000);
+      const transcriptForGeneration = fullTranscript.slice(-5000);
+      
+      console.log('📤 Sending to edge function:', {
+        transcriptLength: transcriptForGeneration.length,
+        courseContext: profile ? 'present' : 'missing'
+      });
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
         body: { 
@@ -310,19 +344,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
       });
 
-      if (functionError) throw functionError;
+      if (functionError) {
+        console.error('Edge function error:', functionError);
+        throw new Error(functionError.message || 'Failed to call generation function');
+      }
+
+      if (!functionData || !functionData.questions) {
+        console.error('Invalid response from edge function:', functionData);
+        throw new Error('Invalid response format from AI');
+      }
+
+      console.log('✅ Received questions:', functionData.questions.length, 'sets');
 
       // Save to review queue with full context snippet
       const { error: insertError } = await supabase
         .from('lecture_questions')
         .insert([{
           instructor_id: user.id,
-          transcript_snippet: transcriptBufferRef.current.slice(-1000),
+          transcript_snippet: fullTranscript.slice(-1000),
           questions: functionData.questions,
           status: 'pending'
         }]);
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Database insert error:', insertError);
+        throw new Error('Failed to save questions to database');
+      }
 
       toast({ 
         title: "✅ Questions generated!", 
@@ -334,7 +381,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.error('Question generation error:', error);
       toast({ 
         title: "Failed to generate questions", 
-        description: error.message,
+        description: error.message || 'Unknown error occurred',
         variant: "destructive" 
       });
     } finally {
