@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Send, Trash2, AlertCircle, Users } from "lucide-react";
+import { Send, Trash2, AlertCircle, Users, Bot, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface Question {
   id: string;
@@ -28,6 +29,7 @@ interface LectureQuestion {
 export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: number }) => {
   const [pendingQuestions, setPendingQuestions] = useState<LectureQuestion[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<{[key: string]: number}>({});
+  const [gradingModes, setGradingModes] = useState<{[key: string]: 'auto_grade' | 'manual_grade'}>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -89,6 +91,11 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
 
       // Format single question for student quiz format
       let formattedQuestion;
+      const isShortAnswer = singleQuestion.type === 'short_answer';
+      
+      // Get grading mode for this question (default to auto_grade for MC, check setting for short answer)
+      const gradingMode = isShortAnswer ? (gradingModes[lectureQuestion.id] || 'auto_grade') : 'auto_grade';
+      
       if (singleQuestion.type === 'multiple_choice') {
         // Extract correct answer letter - handle multiple formats
         let correctAnswer = singleQuestion.expectedAnswer || 'A';
@@ -124,7 +131,8 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         formattedQuestion = {
           question: singleQuestion.text,
           expectedAnswer: singleQuestion.expectedAnswer || '',
-          type: 'short_answer'
+          type: 'short_answer',
+          gradingMode // Include grading mode in the question data
         };
       }
 
@@ -137,7 +145,7 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         instructor_id: user.id,
         student_id: link.student_id,
         assignment_type: 'lecture_checkin' as const,
-        mode: 'auto_grade' as const,
+        mode: gradingMode as any, // Use selected grading mode
         title: '🎯 Live Lecture Check-in',
         content: { questions: formattedQuestions, isLive: true } as any,
         completed: false,
@@ -241,6 +249,8 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
                   const q = questionSet[0];
                   if (!q) return null;
                   
+                  const isShortAnswer = q.type === 'short_answer';
+                  
                   return (
                     <div key={idx} className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/30">
                       <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />
@@ -259,10 +269,15 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
                               })}
                             </ul>
                           )}
-                          {q.type === 'short_answer' && (
-                            <p className="text-sm text-muted-foreground italic ml-4 mt-1">
-                              Students will type their answer
-                            </p>
+                          {isShortAnswer && (
+                            <div className="ml-4 mt-2 space-y-2">
+                              <p className="text-sm text-muted-foreground italic">
+                                Students will type their answer
+                              </p>
+                              <Badge variant="outline" className="text-xs">
+                                Short Answer Question
+                              </Badge>
+                            </div>
                           )}
                         </div>
                       </Label>
@@ -271,6 +286,44 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
                 })}
               </RadioGroup>
             </div>
+
+            {/* Show grading mode toggle only when a short answer question is selected */}
+            {selectedQuestions[lq.id] !== undefined && 
+             lq.questions[selectedQuestions[lq.id]]?.[0]?.type === 'short_answer' && (
+              <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`grading-mode-${lq.id}`} className="text-sm font-medium">
+                        Short Answer Grading Mode
+                      </Label>
+                      <Badge variant={gradingModes[lq.id] === 'manual_grade' ? 'default' : 'secondary'} className="text-xs">
+                        {gradingModes[lq.id] === 'manual_grade' ? (
+                          <><UserCog className="h-3 w-3 mr-1" /> Manual</>
+                        ) : (
+                          <><Bot className="h-3 w-3 mr-1" /> Auto-Grade</>
+                        )}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {gradingModes[lq.id] === 'manual_grade' 
+                        ? "You will manually grade each student's response" 
+                        : "AI will automatically grade responses based on expected answer"}
+                    </p>
+                  </div>
+                  <Switch
+                    id={`grading-mode-${lq.id}`}
+                    checked={gradingModes[lq.id] === 'manual_grade'}
+                    onCheckedChange={(checked) => {
+                      setGradingModes(prev => ({
+                        ...prev,
+                        [lq.id]: checked ? 'manual_grade' : 'auto_grade'
+                      }));
+                    }}
+                  />
+                </div>
+              </div>
+            )}
 
             <Alert>
               <Users className="h-4 w-4" />

@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.generate-lecture-questions]
 verify_jwt = true
+
+[functions.auto-grade-short-answer]
+verify_jwt = true

@@ -764,7 +764,11 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "instructor" | "student"
-      assignment_mode: "hints_only" | "hints_solutions" | "auto_grade"
+      assignment_mode:
+        | "hints_only"
+        | "hints_solutions"
+        | "auto_grade"
+        | "manual_grade"
       assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
       draft_status: "draft" | "approved" | "published"
     }
@@ -895,7 +899,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "instructor", "student"],
-      assignment_mode: ["hints_only", "hints_solutions", "auto_grade"],
+      assignment_mode: [
+        "hints_only",
+        "hints_solutions",
+        "auto_grade",
+        "manual_grade",
+      ],
       assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
       draft_status: ["draft", "approved", "published"],
     },

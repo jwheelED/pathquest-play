@@ -149,12 +149,81 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         throw error;
       }
 
-      const result = data as { grade: number | null; correct: number; total: number; pending_review: boolean };
+      const result = data as { 
+        grade: number | null; 
+        correct: number; 
+        total: number; 
+        pending_review: boolean;
+        has_short_answer: boolean;
+        assignment_mode: string;
+      };
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
-      // Show success feedback
-      if (result.pending_review) {
+      // If there are short answers with auto_grade mode, auto-grade them
+      if (result.has_short_answer && result.assignment_mode === 'auto_grade') {
+        toast({
+          title: "Auto-grading short answers...",
+          description: "Please wait while we grade your responses"
+        });
+
+        let totalShortAnswerGrade = 0;
+        let shortAnswerCount = 0;
+
+        for (let idx = 0; idx < questions.length; idx++) {
+          const q = questions[idx];
+          if (q.type === 'short_answer') {
+            shortAnswerCount++;
+            const studentAnswer = allAnswers[idx];
+            
+            try {
+              const { data: gradeData, error: gradeError } = await supabase.functions.invoke(
+                'auto-grade-short-answer',
+                {
+                  body: {
+                    studentAnswer,
+                    expectedAnswer: q.expectedAnswer || '',
+                    question: q.question
+                  }
+                }
+              );
+
+              if (gradeError) {
+                console.error('Auto-grade error:', gradeError);
+                throw gradeError;
+              }
+
+              totalShortAnswerGrade += gradeData.grade;
+            } catch (gradeErr) {
+              console.error('Failed to auto-grade question', idx, gradeErr);
+              // Continue with other questions even if one fails
+            }
+          }
+        }
+
+        // Calculate combined grade (MC + short answer average)
+        const shortAnswerAvg = shortAnswerCount > 0 ? totalShortAnswerGrade / shortAnswerCount : 0;
+        const mcGrade = result.grade || 0;
+        const combinedGrade = result.total > 0 
+          ? ((mcGrade * result.total) + (shortAnswerAvg * shortAnswerCount)) / (result.total + shortAnswerCount)
+          : shortAnswerAvg;
+
+        // Update assignment with combined grade
+        const { error: updateError } = await supabase
+          .from('student_assignments')
+          .update({ grade: combinedGrade })
+          .eq('id', assignment.id);
+
+        if (updateError) {
+          console.error('Failed to update grade:', updateError);
+        }
+
+        toast({ 
+          title: "✅ Quiz Auto-Graded Successfully!",
+          description: `Final Score: ${combinedGrade.toFixed(0)}%`
+        });
+      } else if (result.pending_review) {
+        // Manual review needed
         toast({ 
           title: "✅ Quiz Submitted Successfully!",
           description: result.grade !== null 
@@ -162,6 +231,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
             : "Your answers have been submitted and are pending instructor review."
         });
       } else {
+        // No short answers or all MC
         toast({ 
           title: "✅ Quiz Submitted Successfully!",
           description: `Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct)`
