@@ -29,12 +29,44 @@ export default function StudentChatCard({ students, currentUserId }: StudentChat
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // Create anonymous mapping for students
+  const anonymousStudents = students.map((student, index) => ({
+    ...student,
+    anonymousName: `Anonymous Student ${index + 1}`,
+    anonymousInitials: `A${index + 1}`
+  }));
 
   useEffect(() => {
     if (selectedStudent) {
       fetchMessages();
     }
   }, [selectedStudent]);
+  
+  useEffect(() => {
+    // Set up real-time subscription for new messages
+    if (!selectedStudent) return;
+    
+    const channel = supabase
+      .channel('instructor-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `or(and(sender_id=eq.${selectedStudent},recipient_id=eq.${currentUserId}),and(sender_id=eq.${currentUserId},recipient_id=eq.${selectedStudent}))`
+        },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedStudent, currentUserId]);
 
   const fetchMessages = async () => {
     if (!selectedStudent) return;
@@ -72,7 +104,7 @@ export default function StudentChatCard({ students, currentUserId }: StudentChat
     setLoading(false);
   };
 
-  const selectedStudentData = students.find(s => s.id === selectedStudent);
+  const selectedStudentData = anonymousStudents.find(s => s.id === selectedStudent);
 
   return (
     <Card className="pixel-corners h-[500px] flex flex-col">
@@ -84,10 +116,10 @@ export default function StudentChatCard({ students, currentUserId }: StudentChat
         <CardDescription>Chat with your students</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 flex gap-4 min-h-0">
-        {/* Student List */}
+        {/* Anonymous Student List */}
         <div className="w-1/3 border-r pr-4 space-y-2">
           <ScrollArea className="h-full">
-            {students.map((student) => (
+            {anonymousStudents.map((student) => (
               <div
                 key={student.id}
                 onClick={() => setSelectedStudent(student.id)}
@@ -99,10 +131,10 @@ export default function StudentChatCard({ students, currentUserId }: StudentChat
               >
                 <Avatar className="w-8 h-8">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {student.name.split(' ').map(n => n[0]).join('')}
+                    {student.anonymousInitials}
                   </AvatarFallback>
                 </Avatar>
-                <span className="font-medium text-sm">{student.name}</span>
+                <span className="font-medium text-sm">{student.anonymousName}</span>
               </div>
             ))}
           </ScrollArea>
@@ -113,7 +145,8 @@ export default function StudentChatCard({ students, currentUserId }: StudentChat
           {selectedStudent ? (
             <>
               <div className="mb-3 pb-3 border-b">
-                <h3 className="font-semibold">{selectedStudentData?.name}</h3>
+                <h3 className="font-semibold">{selectedStudentData?.anonymousName}</h3>
+                <p className="text-xs text-muted-foreground">Anonymous messaging enabled for student privacy</p>
               </div>
               <ScrollArea className="flex-1 mb-3">
                 <div className="space-y-3">
