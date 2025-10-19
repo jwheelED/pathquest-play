@@ -89,6 +89,23 @@ export default function AchievementSystem({ userId }: AchievementSystemProps) {
         .eq("user_id", userId)
         .eq("is_correct", true);
 
+      // Get check-in stats
+      const { data: checkInAssignments } = await supabase
+        .from("student_assignments")
+        .select("*")
+        .eq("student_id", userId)
+        .eq("assignment_type", "lecture_checkin")
+        .eq("completed", true);
+
+      const { data: checkInStreaks } = await supabase
+        .from("checkin_streaks")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+
+      // Count perfect check-ins (grade = 100)
+      const perfectCheckIns = checkInAssignments?.filter(a => a.grade === 100).length || 0;
+
       if (!stats) return;
 
       // Check each achievement
@@ -113,6 +130,15 @@ export default function AchievementSystem({ userId }: AchievementSystemProps) {
             break;
           case 'problems_solved':
             shouldUnlock = (problemAttempts?.length || 0) >= achievement.requirement_value;
+            break;
+          case 'checkins_completed':
+            shouldUnlock = (checkInAssignments?.length || 0) >= achievement.requirement_value;
+            break;
+          case 'perfect_checkins':
+            shouldUnlock = perfectCheckIns >= achievement.requirement_value;
+            break;
+          case 'checkin_streak':
+            shouldUnlock = (checkInStreaks?.current_streak || 0) >= achievement.requirement_value;
             break;
           default:
             break;

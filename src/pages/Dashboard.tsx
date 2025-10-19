@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import UserStats from "@/components/UserStats";
 import STEMPractice from "@/components/STEMPractice";
 import AchievementSystem from "@/components/AchievementSystem";
+import { AchievementBadges } from "@/components/student/AchievementBadges";
 import GameifiedLessons from "@/components/GameifiedLessons";
 import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
@@ -208,6 +209,9 @@ export default function Dashboard() {
           
           <aside className="lg:col-span-3 space-y-6">
             <UserStats userId={user.id} />
+            
+            {/* Achievement Badges - Only visible to student */}
+            <AchievementBadges userId={user.id} />
             
             <Card className="p-4 bg-gradient-to-br from-card to-accent/20">
               <div className="space-y-3">

@@ -8,6 +8,7 @@ import { BookOpen, CheckCircle, Eye, Bell, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
+import { toast as sonnerToast } from "sonner";
 
 interface Assignment {
   id: string;
@@ -240,6 +241,11 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       
       // Refresh assignments to show updated state
       await fetchAssignments();
+
+      // For lecture check-ins, update streak tracking and trigger achievement check
+      if (assignment.assignment_type === 'lecture_checkin') {
+        await updateCheckInStreak(assignment.grade || 0);
+      }
     } catch (error: any) {
       console.error('Submit quiz error:', error);
       toast({ 
@@ -247,6 +253,97 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         description: error.message || "Please try again",
         variant: "destructive" 
       });
+    }
+  };
+
+  const updateCheckInStreak = async (grade: number) => {
+    if (!userId) return;
+
+    try {
+      const isPerfectScore = grade === 100;
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get or create check-in streak record
+      let { data: streakData, error: fetchError } = await supabase
+        .from('checkin_streaks')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError && fetchError.code === 'PGRST116') {
+        // Create new streak record
+        const { data: newStreak, error: insertError } = await supabase
+          .from('checkin_streaks')
+          .insert([{
+            user_id: userId,
+            current_streak: isPerfectScore ? 1 : 0,
+            longest_streak: isPerfectScore ? 1 : 0,
+            last_correct_date: isPerfectScore ? today : null
+          }])
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        streakData = newStreak;
+      }
+
+      if (streakData) {
+        const lastCorrectDate = streakData.last_correct_date;
+        let newCurrentStreak = streakData.current_streak;
+        let newLongestStreak = streakData.longest_streak;
+
+        if (isPerfectScore) {
+          // Check if this continues the streak (answered today or yesterday)
+          const lastDate = lastCorrectDate ? new Date(lastCorrectDate) : null;
+          const isConsecutive = lastDate && 
+            (lastDate.toISOString().split('T')[0] === today || 
+             Math.abs(new Date(today).getTime() - lastDate.getTime()) <= 24 * 60 * 60 * 1000);
+
+          if (isConsecutive) {
+            newCurrentStreak += 1;
+          } else {
+            newCurrentStreak = 1;
+          }
+
+          newLongestStreak = Math.max(newLongestStreak, newCurrentStreak);
+
+          // Update streak
+          const { error: updateError } = await supabase
+            .from('checkin_streaks')
+            .update({
+              current_streak: newCurrentStreak,
+              longest_streak: newLongestStreak,
+              last_correct_date: today,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId);
+
+          if (updateError) throw updateError;
+
+          // Check for streak achievements
+          if (newCurrentStreak === 3) {
+            sonnerToast.success("🍎 Achievement Progress!", {
+              description: "Teacher's Pet achievement incoming! Keep the streak going!"
+            });
+          }
+        } else {
+          // Reset streak on incorrect answer
+          if (newCurrentStreak > 0) {
+            const { error: resetError } = await supabase
+              .from('checkin_streaks')
+              .update({
+                current_streak: 0,
+                updated_at: new Date().toISOString()
+              })
+              .eq('user_id', userId);
+
+            if (resetError) throw resetError;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating check-in streak:', error);
+      // Don't throw - streak tracking shouldn't block submission
     }
   };
 

@@ -88,6 +88,36 @@ export type Database = {
           },
         ]
       }
+      checkin_streaks: {
+        Row: {
+          created_at: string
+          current_streak: number
+          id: string
+          last_correct_date: string | null
+          longest_streak: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_correct_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_correct_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_drafts: {
         Row: {
           assignment_type: Database["public"]["Enums"]["assignment_type"]
