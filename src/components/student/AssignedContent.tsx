@@ -161,15 +161,18 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
-      // If there are short answers with auto_grade mode, auto-grade them
-      if (result.has_short_answer && result.assignment_mode === 'auto_grade') {
+      // If there are short answers, get AI grades (for auto-grading or recommendations)
+      if (result.has_short_answer) {
+        const isAutoGrade = result.assignment_mode === 'auto_grade';
+        
         toast({
-          title: "Auto-grading short answers...",
-          description: "Please wait while we grade your responses"
+          title: isAutoGrade ? "Auto-grading short answers..." : "Getting AI recommendations...",
+          description: isAutoGrade ? "Please wait while we grade your responses" : "Generating recommended grades for instructor review"
         });
 
         let totalShortAnswerGrade = 0;
         let shortAnswerCount = 0;
+        const recommendedGrades: Record<number, { grade: number; feedback: string }> = {};
 
         for (let idx = 0; idx < questions.length; idx++) {
           const q = questions[idx];
@@ -195,6 +198,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
               }
 
               totalShortAnswerGrade += gradeData.grade;
+              recommendedGrades[idx] = {
+                grade: gradeData.grade,
+                feedback: gradeData.feedback
+              };
             } catch (gradeErr) {
               console.error('Failed to auto-grade question', idx, gradeErr);
               // Continue with other questions even if one fails
@@ -209,20 +216,42 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           ? ((mcGrade * result.total) + (shortAnswerAvg * shortAnswerCount)) / (result.total + shortAnswerCount)
           : shortAnswerAvg;
 
-        // Update assignment with combined grade
-        const { error: updateError } = await supabase
-          .from('student_assignments')
-          .update({ grade: combinedGrade })
-          .eq('id', assignment.id);
+        if (isAutoGrade) {
+          // Update assignment with combined grade for auto-grade mode
+          const { error: updateError } = await supabase
+            .from('student_assignments')
+            .update({ grade: combinedGrade })
+            .eq('id', assignment.id);
 
-        if (updateError) {
-          console.error('Failed to update grade:', updateError);
+          if (updateError) {
+            console.error('Failed to update grade:', updateError);
+          }
+
+          toast({ 
+            title: "✅ Quiz Auto-Graded Successfully!",
+            description: `Final Score: ${combinedGrade.toFixed(0)}%`
+          });
+        } else {
+          // For manual_grade mode, store recommended grades in quiz_responses
+          const updatedResponses = {
+            ...allAnswers,
+            _ai_recommendations: recommendedGrades
+          };
+
+          const { error: updateError } = await supabase
+            .from('student_assignments')
+            .update({ quiz_responses: updatedResponses })
+            .eq('id', assignment.id);
+
+          if (updateError) {
+            console.error('Failed to store recommendations:', updateError);
+          }
+
+          toast({ 
+            title: "✅ Quiz Submitted Successfully!",
+            description: "Your answers have been submitted with AI-recommended grades for instructor review."
+          });
         }
-
-        toast({ 
-          title: "✅ Quiz Auto-Graded Successfully!",
-          description: `Final Score: ${combinedGrade.toFixed(0)}%`
-        });
       } else if (result.pending_review) {
         // Manual review needed
         toast({ 

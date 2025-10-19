@@ -405,18 +405,28 @@ export const LectureCheckInResults = () => {
                                         )}
                                       </div>
                                     </div>
-                                    {isCompleted && studentAnswer && (
+                                     {isCompleted && studentAnswer && (
                                       <>
                                         <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">
                                           {studentAnswer}
                                         </p>
+                                        {assignment.quiz_responses?._ai_recommendations?.[qIdx] && (
+                                          <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded">
+                                            <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-1">
+                                              🤖 AI Recommended Grade: {assignment.quiz_responses._ai_recommendations[qIdx].grade}/100
+                                            </p>
+                                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                                              {assignment.quiz_responses._ai_recommendations[qIdx].feedback}
+                                            </p>
+                                          </div>
+                                        )}
                                         <div className="flex items-center gap-2 pt-2 border-t">
                                           <input
                                             type="number"
                                             min="0"
                                             max="100"
                                             placeholder="Grade (0-100)"
-                                            defaultValue={currentGrade ?? ''}
+                                            defaultValue={currentGrade ?? assignment.quiz_responses?._ai_recommendations?.[qIdx]?.grade ?? ''}
                                             className="w-24 px-2 py-1 text-sm border rounded"
                                             id={`grade-${assignment.id}`}
                                           />
