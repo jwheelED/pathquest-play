@@ -8,6 +8,7 @@ import UserStats from "@/components/UserStats";
 import STEMPractice from "@/components/STEMPractice";
 import AchievementSystem from "@/components/AchievementSystem";
 import { AchievementBadges } from "@/components/student/AchievementBadges";
+import { BadgeShowcase } from "@/components/student/BadgeShowcase";
 import GameifiedLessons from "@/components/GameifiedLessons";
 import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
@@ -275,6 +276,8 @@ export default function Dashboard() {
             )}
             
             <AssignedContent userId={user.id} />
+
+            <BadgeShowcase userId={user.id} />
 
             <STEMPractice 
               userId={user.id} 

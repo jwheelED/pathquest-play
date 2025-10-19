@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       achievements: {
         Row: {
+          category: string
           created_at: string
           description: string
           icon: string
@@ -24,8 +25,10 @@ export type Database = {
           points_reward: number
           requirement_type: string
           requirement_value: number
+          tier: string
         }
         Insert: {
+          category?: string
           created_at?: string
           description: string
           icon: string
@@ -34,8 +37,10 @@ export type Database = {
           points_reward?: number
           requirement_type: string
           requirement_value: number
+          tier?: string
         }
         Update: {
+          category?: string
           created_at?: string
           description?: string
           icon?: string
@@ -44,6 +49,7 @@ export type Database = {
           points_reward?: number
           requirement_type?: string
           requirement_value?: number
+          tier?: string
         }
         Relationships: []
       }

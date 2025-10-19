@@ -61,6 +61,17 @@ All colors MUST be HSL for consistency across light/dark modes.
     --coins: 45 100% 55%;
     --health: 0 100% 55%;
 
+    /* Badge tier colors */
+    --badge-bronze: 25 75% 45%;
+    --badge-bronze-glow: 25 75% 60%;
+    --badge-silver: 210 15% 60%;
+    --badge-silver-glow: 210 15% 75%;
+    --badge-gold: 45 100% 55%;
+    --badge-gold-glow: 45 100% 70%;
+    --badge-platinum: 280 70% 65%;
+    --badge-platinum-glow: 280 70% 80%;
+    --badge-locked: 240 8% 45%;
+
     /* Retro gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-glow)));
