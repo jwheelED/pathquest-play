@@ -34,13 +34,21 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const [loading, setLoading] = useState(false);
   const [problemsToday, setProblemsToday] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [courseQuestions, setCourseQuestions] = useState<STEMProblem[]>([]);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
 
   useEffect(() => {
     if (userId) {
       fetchDailyProgress();
-      loadNextProblem();
+      
+      // If we have course context, generate course-specific questions
+      if (courseContext?.courseTitle) {
+        generateCourseQuestions();
+      } else {
+        loadNextProblem();
+      }
     }
-  }, [userId]);
+  }, [userId, courseContext?.courseTitle]);
 
   const fetchDailyProgress = async () => {
     if (!userId) return;
@@ -63,26 +71,80 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     }
   };
 
+  const generateCourseQuestions = async () => {
+    if (!courseContext?.courseTitle || generatingQuestions) return;
+    
+    setGeneratingQuestions(true);
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-course-questions', {
+        body: {
+          courseTitle: courseContext.courseTitle,
+          courseTopics: courseContext.courseTopics || [],
+          difficulty: 'intermediate'
+        }
+      });
+
+      if (error) {
+        console.error('Error generating course questions:', error);
+        toast.error('Failed to generate course-specific questions. Loading general questions instead.');
+        loadNextProblem();
+        return;
+      }
+
+      if (data?.questions && data.questions.length > 0) {
+        setCourseQuestions(data.questions);
+        // Load the first question
+        setCurrentProblem(data.questions[0]);
+        setSelectedAnswer("");
+        setShowResult(false);
+        toast.success(`Generated ${data.questions.length} questions for ${courseContext.courseTitle}!`);
+      } else {
+        toast.error('No questions generated. Loading general questions.');
+        loadNextProblem();
+      }
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      toast.error('Failed to generate questions');
+      loadNextProblem();
+    } finally {
+      setLoading(false);
+      setGeneratingQuestions(false);
+    }
+  };
+
   const loadNextProblem = async () => {
     setLoading(true);
     try {
-      // Get problems without answers (students can't see answers until after submission)
-      const { data: newProblems, error: newError } = await supabase
-        .from("student_problems")
-        .select("*")
-        .limit(10);
-      
-      if (!newError && newProblems && newProblems.length > 0) {
-        const problemData = newProblems[Math.floor(Math.random() * newProblems.length)];
-        // Cast the problem data to the correct type
-        const problem: STEMProblem = {
-          ...problemData,
-          options: problemData.options as string[],
-        };
-        setCurrentProblem(problem);
+      // If we have course-specific questions, use those
+      if (courseQuestions.length > 0) {
+        // Find the next unviewed question
+        const nextQuestion = courseQuestions.find(q => q.id !== currentProblem?.id);
+        if (nextQuestion) {
+          setCurrentProblem(nextQuestion);
+        } else {
+          // All questions viewed, regenerate
+          await generateCourseQuestions();
+        }
       } else {
-        console.error("Error loading problems:", newError);
-        toast.error("Failed to load problems");
+        // Fallback to general problems if no course context
+        const { data: newProblems, error: newError } = await supabase
+          .from("student_problems")
+          .select("*")
+          .limit(10);
+        
+        if (!newError && newProblems && newProblems.length > 0) {
+          const problemData = newProblems[Math.floor(Math.random() * newProblems.length)];
+          const problem: STEMProblem = {
+            ...problemData,
+            options: problemData.options as string[],
+          };
+          setCurrentProblem(problem);
+        } else {
+          console.error("Error loading problems:", newError);
+          toast.error("Failed to load problems");
+        }
       }
 
       setSelectedAnswer("");
@@ -97,16 +159,50 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const submitAnswer = async () => {
     if (!currentProblem || !selectedAnswer || !userId) return;
 
-    // Record the attempt FIRST
+    // For course-generated questions, we already have the answer
+    if (currentProblem.correct_answer) {
+      const correct = selectedAnswer === currentProblem.correct_answer;
+      setIsCorrect(correct);
+      setShowResult(true);
+
+      // Record attempt (no need to fetch answer)
+      await supabase
+        .from("problem_attempts")
+        .insert([{
+          user_id: userId,
+          problem_id: currentProblem.id,
+          is_correct: correct,
+        }]);
+
+      if (correct) {
+        await updateSpacedRepetition(currentProblem.id, correct);
+        await updateUserStats(currentProblem.points_reward);
+        
+        toast.success(`Correct! +${currentProblem.points_reward} XP`, {
+          description: currentProblem.explanation,
+        });
+        
+        onPointsEarned?.(currentProblem.points_reward);
+      } else {
+        await updateSpacedRepetition(currentProblem.id, correct);
+        toast.error("Incorrect answer", {
+          description: currentProblem.explanation,
+        });
+      }
+
+      setProblemsToday(prev => prev + 1);
+      return;
+    }
+
+    // Legacy flow for database problems
     await supabase
       .from("problem_attempts")
       .insert([{
         user_id: userId,
         problem_id: currentProblem.id,
-        is_correct: false, // We'll update this after getting the answer
+        is_correct: false,
       }]);
 
-    // Now fetch the answer securely - only available after attempt
     const { data: answerData } = await supabase
       .rpc('get_problem_answer', { problem_id: currentProblem.id });
 
@@ -118,7 +214,6 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     const { correct_answer, explanation } = answerData[0];
     const correct = selectedAnswer === correct_answer;
     
-    // Update the problem with the answer
     setCurrentProblem({
       ...currentProblem,
       correct_answer,
@@ -128,7 +223,6 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     setIsCorrect(correct);
     setShowResult(true);
 
-    // Update the attempt with the correct result
     await supabase
       .from("problem_attempts")
       .update({ is_correct: correct })
@@ -137,7 +231,6 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
       .order("created_at", { ascending: false })
       .limit(1);
 
-    // Update spaced repetition schedule
     if (correct) {
       await updateSpacedRepetition(currentProblem.id, correct);
       await updateUserStats(currentProblem.points_reward);
