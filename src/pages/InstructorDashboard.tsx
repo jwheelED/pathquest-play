@@ -15,7 +15,6 @@ import { LectureTranscription } from "@/components/instructor/LectureTranscripti
 import { LectureQuestionReview } from "@/components/instructor/LectureQuestionReview";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 
-import { PendingReviewCard } from "@/components/instructor/PendingReviewCard";
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
@@ -389,8 +388,6 @@ export default function InstructorDashboard() {
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
             
             <LectureQuestionReview refreshTrigger={refreshQueue} />
-            
-            <PendingReviewCard />
 
             <LectureCheckInResults />
 
