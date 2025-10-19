@@ -46,13 +46,15 @@ Generate 5 high-quality practice questions that:
 3. Have 4 answer options each (A, B, C, D)
 4. Include clear explanations for the correct answer
 5. Are at ${difficulty} difficulty level
+6. Keep problem_text concise and avoid code snippets with special characters
 
-Return the questions as a JSON array with this exact structure:
+IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no code blocks, no explanations.
+
 [
   {
     "subject": "${courseTitle}",
     "difficulty": "${difficulty}",
-    "problem_text": "Clear question text",
+    "problem_text": "Clear, concise question text without code blocks",
     "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
     "correct_answer": "Option X text (exact match to one of the options)",
     "explanation": "Brief explanation of why this is correct",
@@ -111,21 +113,35 @@ Return the questions as a JSON array with this exact structure:
       );
     }
 
-    // Extract JSON from the response (handle markdown code blocks)
-    let questionsJson = content;
-    if (content.includes('```json')) {
-      questionsJson = content.split('```json')[1].split('```')[0].trim();
-    } else if (content.includes('```')) {
-      questionsJson = content.split('```')[1].split('```')[0].trim();
+    // Extract JSON from the response (handle markdown code blocks and clean up)
+    let questionsJson = content.trim();
+    
+    // Remove markdown code blocks if present
+    if (questionsJson.includes('```json')) {
+      questionsJson = questionsJson.split('```json')[1].split('```')[0].trim();
+    } else if (questionsJson.includes('```')) {
+      questionsJson = questionsJson.split('```')[1].split('```')[0].trim();
+    }
+    
+    // Remove any leading/trailing text that's not part of the JSON array
+    const arrayStart = questionsJson.indexOf('[');
+    const arrayEnd = questionsJson.lastIndexOf(']');
+    if (arrayStart !== -1 && arrayEnd !== -1) {
+      questionsJson = questionsJson.substring(arrayStart, arrayEnd + 1);
     }
 
     let questions;
     try {
       questions = JSON.parse(questionsJson);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', questionsJson);
+      console.error('Failed to parse AI response. Raw content:', content);
+      console.error('Extracted JSON:', questionsJson);
+      console.error('Parse error:', parseError);
       return new Response(
-        JSON.stringify({ error: 'Failed to parse generated questions' }),
+        JSON.stringify({ 
+          error: 'Failed to parse generated questions',
+          details: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
