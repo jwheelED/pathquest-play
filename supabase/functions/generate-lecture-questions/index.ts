@@ -48,7 +48,7 @@ serve(async (req) => {
       );
     }
 
-    const { transcript, courseContext, materialContext } = await req.json();
+    const { transcript, materialContext } = await req.json();
     
     // Reduced minimum to 30 chars for faster response
     if (!transcript || transcript.length < 30) {
@@ -60,11 +60,11 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    // Build context from both course info and uploaded materials
-    let contextInfo = `Course Context: ${JSON.stringify(courseContext)}\n`;
+    // Build context from uploaded materials only
+    let contextInfo = '';
     
     if (materialContext && materialContext.length > 0) {
-      contextInfo += `\nUploaded Course Materials:\n`;
+      contextInfo += `Reference Course Materials:\n`;
       materialContext.forEach((material: any, idx: number) => {
         contextInfo += `\nMaterial ${idx + 1}: ${material.title}\n`;
         if (material.description) {
@@ -76,20 +76,18 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = `You are an expert educational assessment designer. Based on lecture transcripts AND uploaded course materials, generate adaptive check-in questions to test student comprehension and engagement.
+    const systemPrompt = `You are an expert educational assessment designer. Generate adaptive check-in questions based ONLY on what the professor is saying in the lecture transcript.
 
-${contextInfo}
-
-IMPORTANT: Use the uploaded course materials to inform your questions. Reference specific concepts, examples, or topics mentioned in the materials when relevant to the lecture content.
+${contextInfo ? contextInfo + '\n' : ''}${contextInfo ? 'IMPORTANT: Use the uploaded course materials ONLY as reference context to better understand concepts mentioned in the lecture. Generate questions strictly based on what the professor actually says in the transcript.\n\n' : ''}
 
 Generate exactly 3 different question options. CRITICAL: Each option must contain ONLY ONE question.
 
 For each option, create ONE question that:
-1. Tests understanding of key concepts from BOTH the transcript AND the course materials
+1. Tests understanding of key concepts directly mentioned in the lecture transcript
 2. Is appropriate for real-time lecture check-ins
 3. Can be answered quickly (2-3 minutes)
 4. Is EITHER multiple choice OR short answer (not both)
-5. Aligns with concepts covered in the uploaded materials when applicable
+5. Focuses on what the professor actually said, not on general course topics
 
 Return a JSON array with 3 question sets. Each set is an array containing EXACTLY ONE question object.
 

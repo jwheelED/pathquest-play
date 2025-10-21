@@ -318,17 +318,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get course context from instructor profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('course_title, course_topics')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) {
-        console.warn('Profile fetch error (non-critical):', profileError);
-      }
-
       // Fetch uploaded lecture materials
       const { data: materials, error: materialsError } = await supabase
         .from('lecture_materials')
@@ -375,14 +364,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       console.log('📤 Sending to edge function:', {
         transcriptLength: transcriptForGeneration.length,
-        courseContext: profile ? 'present' : 'missing',
         materialsCount: materialContext.length
       });
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
         body: { 
           transcript: transcriptForGeneration,
-          courseContext: profile || {},
           materialContext: materialContext,
         }
       });
