@@ -31,36 +31,51 @@ export const LectureCheckInResults = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchResults();
-
-    // Debounced fetch to prevent overwhelming with 40+ students
     let debounceTimer: NodeJS.Timeout;
+    let channel: any;
 
-    // Set up real-time subscription for assignment updates
-    const channel = supabase
-      .channel("instructor-checkin-results")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "student_assignments",
-          filter: `assignment_type=eq.lecture_checkin`,
-        },
-        (payload) => {
-          console.log("Check-in result updated:", payload);
-          // Debounce to handle multiple rapid updates from 40+ students
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            fetchResults();
-          }, 500); // Wait 500ms after last update
-        },
-      )
-      .subscribe();
+    const setupRealtimeSubscription = async () => {
+      await fetchResults();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Set up real-time subscription for assignment updates - filtered by instructor
+      channel = supabase
+        .channel("instructor-checkin-results")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "student_assignments",
+            filter: `instructor_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // Only process lecture check-ins
+            const newData = payload.new as any;
+            if (newData?.assignment_type === 'lecture_checkin') {
+              console.log("Check-in result updated:", payload);
+              // Debounce to handle multiple rapid updates from 40+ students
+              clearTimeout(debounceTimer);
+              debounceTimer = setTimeout(() => {
+                fetchResults();
+              }, 300); // Reduced to 300ms for faster updates
+            }
+          },
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
 
     return () => {
       clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, []);
 

@@ -29,6 +29,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
   const [liveCheckIns, setLiveCheckIns] = useState<Assignment[]>([]);
+  const [showAllCheckIns, setShowAllCheckIns] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -417,20 +418,44 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       <CardContent className="space-y-4">
         {/* Live Lecture Check-in Alert */}
         {liveCheckIns.length > 0 && (
-          <Alert className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
-            <Bell className="h-5 w-5 text-orange-600 animate-pulse" />
-            <AlertTitle className="text-orange-900 dark:text-orange-200 font-bold">
-              🎯 Live Check-in Available!
-            </AlertTitle>
-            <AlertDescription className="text-orange-800 dark:text-orange-300">
-              Your instructor has sent {liveCheckIns.length} check-in question(s) during the lecture. 
-              Answer now to show engagement!
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-3">
+            <Alert className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+              <Bell className="h-5 w-5 text-orange-600 animate-pulse" />
+              <AlertTitle className="text-orange-900 dark:text-orange-200 font-bold">
+                🎯 Live Check-in Available!
+              </AlertTitle>
+              <AlertDescription className="text-orange-800 dark:text-orange-300">
+                Your instructor has sent {liveCheckIns.length} check-in question(s) during the lecture. 
+                Answer now to show engagement!
+              </AlertDescription>
+            </Alert>
+            {liveCheckIns.length > 3 && (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllCheckIns(!showAllCheckIns)}
+                >
+                  {showAllCheckIns ? 'Show Recent (3)' : `Show All (${liveCheckIns.length})`}
+                </Button>
+              </div>
+            )}
+          </div>
         )}
 
         <Accordion type="single" collapsible>
-          {assignments.map((assignment) => (
+          {assignments
+            .filter(assignment => {
+              // Filter live check-ins based on showAllCheckIns state
+              if (assignment.assignment_type === 'lecture_checkin' && !assignment.completed) {
+                if (!showAllCheckIns && liveCheckIns.length > 3) {
+                  // Only show last 3 check-ins
+                  return liveCheckIns.slice(0, 3).some(ci => ci.id === assignment.id);
+                }
+              }
+              return true;
+            })
+            .map((assignment) => (
             <AccordionItem key={assignment.id} value={assignment.id}>
               <AccordionTrigger>
                 <div className="flex items-center gap-2">
@@ -482,16 +507,33 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               />
                               {isSubmitted && (
                                 <div className="space-y-2">
-                                  {q.expectedAnswer && (
-                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
-                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
-                                      <p className="text-sm text-blue-800 dark:text-blue-300">{q.expectedAnswer}</p>
-                                    </div>
+                                  {assignment.mode === 'manual_grade' ? (
+                                    // Show pending review for manual grade mode
+                                    <>
+                                      {q.expectedAnswer && (
+                                        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
+                                          <p className="text-sm font-medium text-blue-900 dark:text-blue-200">Expected Answer:</p>
+                                          <p className="text-sm text-blue-800 dark:text-blue-300">{q.expectedAnswer}</p>
+                                        </div>
+                                      )}
+                                      <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
+                                        <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
+                                        <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade this answer.</p>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    // Show AI feedback for auto grade mode
+                                    assignment.quiz_responses?._ai_recommendations?.[idx] && (
+                                      <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
+                                        <p className="text-sm font-medium text-green-900 dark:text-green-200">
+                                          ✅ Score: {assignment.quiz_responses._ai_recommendations[idx].grade}%
+                                        </p>
+                                        <p className="text-xs text-green-800 dark:text-green-300 mt-1">
+                                          {assignment.quiz_responses._ai_recommendations[idx].feedback}
+                                        </p>
+                                      </div>
+                                    )
                                   )}
-                                  <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
-                                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
-                                    <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade this answer.</p>
-                                  </div>
                                 </div>
                               )}
                             </div>
