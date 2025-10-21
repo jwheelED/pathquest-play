@@ -45,8 +45,9 @@ Generate 5 high-quality practice questions that:
 2. Cover fundamental concepts from the course topics
 3. Have 4 answer options each (A, B, C, D)
 4. Include clear explanations for the correct answer
-5. Are at ${difficulty} difficulty level
-6. Keep problem_text concise and avoid code snippets with special characters
+5. Include explanations for why each WRONG answer is incorrect
+6. Are at ${difficulty} difficulty level
+7. Keep problem_text concise and avoid code snippets with special characters
 
 IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no code blocks, no explanations.
 
@@ -58,9 +59,16 @@ IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no code bl
     "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
     "correct_answer": "Option X text (exact match to one of the options)",
     "explanation": "Brief explanation of why this is correct",
+    "wrong_answer_explanations": {
+      "Option A text": "Why this option is wrong (only include if it's NOT the correct answer)",
+      "Option B text": "Why this option is wrong (only include if it's NOT the correct answer)",
+      "Option C text": "Why this option is wrong (only include if it's NOT the correct answer)"
+    },
     "points_reward": 10
   }
-]`;
+]
+
+Note: wrong_answer_explanations should only contain entries for incorrect options, NOT the correct answer.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

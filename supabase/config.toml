@@ -23,3 +23,6 @@ verify_jwt = true
 
 [functions.parse-lecture-material]
 verify_jwt = true
+
+[functions.generate-detailed-explanation]
+verify_jwt = true

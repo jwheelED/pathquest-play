@@ -23,6 +23,7 @@ interface STEMProblem {
   options: string[];
   correct_answer?: string; // Optional - only available after submission
   explanation?: string; // Optional - only available after submission
+  wrong_answer_explanations?: Record<string, string>; // Explanations for incorrect answers
   points_reward: number;
 }
 
@@ -36,6 +37,9 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const [streak, setStreak] = useState(0);
   const [courseQuestions, setCourseQuestions] = useState<STEMProblem[]>([]);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [detailedExplanation, setDetailedExplanation] = useState<string>("");
+  const [showDetailedExplanation, setShowDetailedExplanation] = useState(false);
+  const [loadingDetailedExplanation, setLoadingDetailedExplanation] = useState(false);
 
   useEffect(() => {
     if (userId) {
@@ -345,6 +349,47 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
       .eq("user_id", userId);
   };
 
+  const loadDetailedExplanation = async () => {
+    if (!currentProblem || !selectedAnswer) return;
+    
+    setLoadingDetailedExplanation(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-detailed-explanation', {
+        body: {
+          problemText: currentProblem.problem_text,
+          correctAnswer: currentProblem.correct_answer,
+          userAnswer: selectedAnswer,
+          wasCorrect: isCorrect,
+          courseContext: courseContext?.courseTitle 
+            ? `${courseContext.courseTitle}${courseContext.courseTopics ? ` - Topics: ${courseContext.courseTopics.join(', ')}` : ''}`
+            : null
+        }
+      });
+
+      if (error) {
+        console.error('Error loading detailed explanation:', error);
+        toast.error('Failed to load detailed explanation');
+        return;
+      }
+
+      if (data?.detailedExplanation) {
+        setDetailedExplanation(data.detailedExplanation);
+        setShowDetailedExplanation(true);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to load detailed explanation');
+    } finally {
+      setLoadingDetailedExplanation(false);
+    }
+  };
+
+  const handleNextProblem = () => {
+    setDetailedExplanation("");
+    setShowDetailedExplanation(false);
+    loadNextProblem();
+  };
+
   if (loading) {
     return (
       <Card className="p-6 animate-pulse">
@@ -439,19 +484,72 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
             <div className="space-y-4">
               <div className={`p-4 rounded-lg border-2 ${
                 isCorrect 
-                  ? 'border-secondary bg-secondary/10 text-secondary-foreground' 
-                  : 'border-destructive bg-destructive/10 text-destructive-foreground'
+                  ? 'border-secondary bg-secondary/10' 
+                  : 'border-destructive bg-destructive/10'
               }`}>
-                <p className="font-semibold">
-                  {isCorrect ? '🎉 Correct!' : '❌ Incorrect'}
+                <p className={`font-semibold ${
+                  isCorrect ? 'text-secondary-foreground' : 'text-destructive-foreground'
+                }`}>
+                  {isCorrect ? '✅ Correct!' : '❌ Incorrect'}
                 </p>
+                
+                {!isCorrect && currentProblem.wrong_answer_explanations?.[selectedAnswer] && (
+                  <div className="mt-3 p-3 bg-card rounded border border-destructive/30">
+                    <p className="text-sm font-medium text-destructive mb-1">
+                      🔍 Why "{selectedAnswer}" is wrong:
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {currentProblem.wrong_answer_explanations[selectedAnswer]}
+                    </p>
+                  </div>
+                )}
+                
                 {currentProblem.explanation && (
-                  <p className="text-sm mt-2">{currentProblem.explanation}</p>
+                  <div className={`mt-3 p-3 rounded ${
+                    isCorrect 
+                      ? 'bg-card' 
+                      : 'bg-secondary/20 border border-secondary/30'
+                  }`}>
+                    {!isCorrect && (
+                      <p className="text-sm font-medium text-secondary mb-1">
+                        ✅ Why "{currentProblem.correct_answer}" is correct:
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {currentProblem.explanation}
+                    </p>
+                  </div>
                 )}
               </div>
+
+              <Button
+                onClick={loadDetailedExplanation}
+                variant="outline"
+                className="w-full"
+                disabled={loadingDetailedExplanation}
+              >
+                {loadingDetailedExplanation ? (
+                  <>Loading...</>
+                ) : showDetailedExplanation ? (
+                  <>📚 Hide Detailed Explanation</>
+                ) : (
+                  <>📚 Show Detailed Explanation</>
+                )}
+              </Button>
+
+              {showDetailedExplanation && detailedExplanation && (
+                <div className="p-4 bg-primary/5 rounded-lg border-2 border-primary/20">
+                  <h4 className="font-semibold text-primary mb-2 flex items-center gap-2">
+                    🎓 In-Depth Explanation
+                  </h4>
+                  <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    {detailedExplanation}
+                  </div>
+                </div>
+              )}
               
               <Button 
-                onClick={loadNextProblem}
+                onClick={handleNextProblem}
                 variant="neon"
                 size="lg"
                 className="w-full"
