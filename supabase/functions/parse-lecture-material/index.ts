@@ -36,9 +36,37 @@ serve(async (req) => {
 
     const { filePath } = await req.json();
     
-    if (!filePath) {
+    // Input validation for security
+    if (!filePath || typeof filePath !== 'string') {
       return new Response(
-        JSON.stringify({ error: 'File path is required' }),
+        JSON.stringify({ error: 'File path must be a non-empty string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate file path length
+    if (filePath.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'File path exceeds maximum length of 500 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Prevent path traversal attacks
+    if (filePath.includes('..') || filePath.includes('//') || filePath.startsWith('/')) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid file path format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate file extension
+    const allowedExtensions = ['txt', 'pdf', 'doc', 'docx', 'ppt', 'pptx'];
+    const fileExt = filePath.split('.').pop()?.toLowerCase();
+    
+    if (!fileExt || !allowedExtensions.includes(fileExt)) {
+      return new Response(
+        JSON.stringify({ error: `File type not supported. Allowed: ${allowedExtensions.join(', ')}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -57,9 +85,6 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Get file extension
-    const fileExt = filePath.split('.').pop()?.toLowerCase();
 
     // Handle text files directly
     if (fileExt === 'txt') {

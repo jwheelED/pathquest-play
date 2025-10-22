@@ -85,9 +85,30 @@ serve(async (req) => {
 
     const { audio } = await req.json();
     
-    if (!audio) {
-      throw new Error('No audio data provided');
+    // Input validation for security
+    if (!audio || typeof audio !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Audio data must be a non-empty base64 string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+    
+    // Estimate decoded size before processing
+    // Base64 encoding increases size by ~33%, so decoded size is ~75% of encoded
+    const estimatedDecodedSize = (audio.length * 3) / 4;
+    const maxSize = 25 * 1024 * 1024; // 25MB limit
+    
+    if (estimatedDecodedSize > maxSize) {
+      return new Response(
+        JSON.stringify({ 
+          error: `Audio file too large (estimated ${Math.round(estimatedDecodedSize / 1024 / 1024)}MB, maximum 25MB)`,
+          retryable: false
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log(`Processing audio data (estimated size: ${Math.round(estimatedDecodedSize / 1024 / 1024)}MB)...`);
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {

@@ -37,8 +37,72 @@ serve(async (req) => {
 
     const { studentAnswer, expectedAnswer, question } = await req.json();
     
-    if (!studentAnswer || !expectedAnswer) {
-      throw new Error('Missing required fields');
+    // Input validation for security
+    if (!studentAnswer || typeof studentAnswer !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'studentAnswer must be a non-empty string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!expectedAnswer || typeof expectedAnswer !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'expectedAnswer must be a non-empty string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (question && typeof question !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'question must be a string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Length validation to prevent resource exhaustion
+    if (studentAnswer.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: 'studentAnswer exceeds maximum length of 5,000 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (expectedAnswer.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: 'expectedAnswer exceeds maximum length of 5,000 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (question && question.length > 1000) {
+      return new Response(
+        JSON.stringify({ error: 'question exceeds maximum length of 1,000 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Check for control characters
+    const hasInvalidChars = (text: string) => /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+    
+    if (hasInvalidChars(studentAnswer)) {
+      return new Response(
+        JSON.stringify({ error: 'studentAnswer contains invalid characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (hasInvalidChars(expectedAnswer)) {
+      return new Response(
+        JSON.stringify({ error: 'expectedAnswer contains invalid characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (question && hasInvalidChars(question)) {
+      return new Response(
+        JSON.stringify({ error: 'question contains invalid characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');

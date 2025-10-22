@@ -50,9 +50,62 @@ serve(async (req) => {
 
     const { transcript, materialContext } = await req.json();
     
-    // Reduced minimum to 30 chars for faster response
-    if (!transcript || transcript.length < 30) {
-      throw new Error('Transcript too short to generate questions');
+    // Input validation for security
+    if (!transcript || typeof transcript !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Transcript must be a non-empty string' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (transcript.length < 30) {
+      return new Response(
+        JSON.stringify({ error: 'Transcript too short (minimum 30 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (transcript.length > 50000) {
+      return new Response(
+        JSON.stringify({ error: 'Transcript too long (maximum 50,000 characters)' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate transcript doesn't contain control characters
+    if (/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(transcript)) {
+      return new Response(
+        JSON.stringify({ error: 'Transcript contains invalid characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate materialContext if provided
+    if (materialContext !== undefined && materialContext !== null) {
+      if (!Array.isArray(materialContext)) {
+        return new Response(
+          JSON.stringify({ error: 'materialContext must be an array' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (materialContext.length > 10) {
+        return new Response(
+          JSON.stringify({ error: 'materialContext cannot contain more than 10 items' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Validate each material item
+      for (let i = 0; i < materialContext.length; i++) {
+        const material = materialContext[i];
+        if (typeof material.content === 'string' && material.content.length > 10000) {
+          return new Response(
+            JSON.stringify({ error: `Material ${i + 1} content exceeds 10,000 characters` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
