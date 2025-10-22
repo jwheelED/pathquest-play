@@ -107,7 +107,11 @@ serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+      console.error('LOVABLE_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'Grading service temporarily unavailable' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Use AI to grade the short answer
@@ -162,9 +166,12 @@ Grade this answer from 0-100 and provide brief feedback.`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      const error = await response.text();
-      console.error('AI API error:', error);
-      throw new Error(`AI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('AI API error:', errorText);
+      return new Response(
+        JSON.stringify({ error: 'Failed to grade answer. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const result = await response.json();
@@ -172,7 +179,10 @@ Grade this answer from 0-100 and provide brief feedback.`;
     
     if (!content) {
       console.error('No content in AI response');
-      throw new Error('AI returned empty response');
+      return new Response(
+        JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     let gradingResult;
@@ -180,13 +190,19 @@ Grade this answer from 0-100 and provide brief feedback.`;
       gradingResult = JSON.parse(content);
     } catch (e) {
       console.error('Failed to parse AI response:', content);
-      throw new Error('Invalid AI response format');
+      return new Response(
+        JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Validate grade is between 0-100
     if (typeof gradingResult.grade !== 'number' || gradingResult.grade < 0 || gradingResult.grade > 100) {
       console.error('Invalid grade value:', gradingResult.grade);
-      throw new Error('Invalid grade value from AI');
+      return new Response(
+        JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('✅ Auto-graded answer:', gradingResult.grade);
@@ -199,7 +215,7 @@ Grade this answer from 0-100 and provide brief feedback.`;
   } catch (error) {
     console.error('Auto-grading error:', error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({ error: 'Failed to grade answer. Please try again.' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

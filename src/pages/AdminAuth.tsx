@@ -24,6 +24,9 @@ export default function AdminAuth() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        // CLIENT-SIDE CHECK: This is for UX only!
+        // Security is enforced server-side via RLS policies.
+        // Never rely on this check alone for authorization.
         const { data: roleData } = await supabase
           .from("user_roles")
           .select("role")

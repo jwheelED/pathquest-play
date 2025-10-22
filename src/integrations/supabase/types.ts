@@ -771,10 +771,7 @@ export type Database = {
         Args: { _target_user_id: string; _viewer_id: string }
         Returns: boolean
       }
-      generate_instructor_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_instructor_code: { Args: never; Returns: string }
       get_problem_answer: {
         Args: { problem_id: string }
         Returns: {
@@ -793,10 +790,7 @@ export type Database = {
         Args: { p_assignment_id: string; p_user_answers: Json }
         Returns: Json
       }
-      validate_instructor_code: {
-        Args: { code: string }
-        Returns: string
-      }
+      validate_instructor_code: { Args: { code: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "instructor" | "student"

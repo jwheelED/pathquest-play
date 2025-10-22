@@ -112,7 +112,11 @@ serve(async (req) => {
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+      console.error('OPENAI_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'Transcription service temporarily unavailable' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Decode base64 with chunked processing to handle large files
@@ -121,7 +125,10 @@ serve(async (req) => {
       bytes = processBase64Chunks(audio);
     } catch (decodeError) {
       console.error('Base64 decode error:', decodeError);
-      throw new Error('Invalid audio data encoding');
+      return new Response(
+        JSON.stringify({ error: 'Invalid audio data. Please try recording again.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Check if audio data is valid and has minimum size
@@ -186,11 +193,10 @@ serve(async (req) => {
         audioSize: bytes.length
       });
       
-      // Return more helpful error to client
-      if (response.status === 400) {
-        throw new Error(`Audio format issue. Please ensure microphone is working and try again.`);
-      }
-      throw new Error(`Transcription failed: ${response.status} - ${response.statusText}`);
+      return new Response(
+        JSON.stringify({ error: 'Failed to transcribe audio. Please try again with a clear recording.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const result = await response.json();

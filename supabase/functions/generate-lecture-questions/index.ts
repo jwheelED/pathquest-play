@@ -110,7 +110,11 @@ serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+      console.error('LOVABLE_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'Service temporarily unavailable' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Build context from uploaded materials only
@@ -183,9 +187,12 @@ Question format:
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      const error = await response.text();
-      console.error('AI API error:', error);
-      throw new Error(`AI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('AI API error:', response.status, errorText);
+      return new Response(
+        JSON.stringify({ error: 'Failed to generate questions. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const result = await response.json();
@@ -202,21 +209,30 @@ Question format:
       parsedContent = JSON.parse(content);
     } catch (e) {
       console.error('Failed to parse AI response:', content.substring(0, 500));
-      throw new Error('Invalid AI response format - could not parse JSON');
+      return new Response(
+        JSON.stringify({ error: 'Invalid response format. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Validate that we have questions
     const questions = parsedContent.questions || parsedContent;
     if (!Array.isArray(questions) || questions.length === 0) {
       console.error('Invalid questions format:', parsedContent);
-      throw new Error('AI did not return valid question sets');
+      return new Response(
+        JSON.stringify({ error: 'Invalid response format. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Validate each question set
     for (let i = 0; i < questions.length; i++) {
       if (!Array.isArray(questions[i]) || questions[i].length === 0) {
         console.error(`Question set ${i} is invalid:`, questions[i]);
-        throw new Error(`Question set ${i} is not properly formatted`);
+        return new Response(
+          JSON.stringify({ error: 'Invalid response format. Please try again.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 
@@ -230,7 +246,7 @@ Question format:
   } catch (error) {
     console.error('Question generation error:', error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({ error: 'Failed to generate questions. Please try again.' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
