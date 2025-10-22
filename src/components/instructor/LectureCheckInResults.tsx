@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Assignment {
   id: string;
@@ -29,6 +30,13 @@ interface GroupedAssignment {
 export const LectureCheckInResults = () => {
   const [groupedResults, setGroupedResults] = useState<GroupedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
+  const [selectedOverride, setSelectedOverride] = useState<{
+    groupIdx: number;
+    questionIdx: number;
+    newAnswer: string;
+    group: GroupedAssignment;
+  } | null>(null);
 
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
@@ -176,7 +184,10 @@ export const LectureCheckInResults = () => {
     }
   };
 
-  const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, correctAnswer: string) => {
+  const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, question: any) => {
+    // Use overridden answer if it exists, otherwise use original correctAnswer
+    const correctAnswer = question.overriddenAnswer || question.correctAnswer;
+    
     const completed = assignments.filter((a) => a.completed);
     const correct = completed.filter((a) => {
       const response = a.quiz_responses?.[questionIndex];
@@ -189,6 +200,106 @@ export const LectureCheckInResults = () => {
       correct: correct.length,
       percentage: completed.length > 0 ? (correct.length / completed.length) * 100 : 0,
     };
+  };
+
+  const handleInitiateOverride = (groupIdx: number, questionIdx: number, currentAnswer: string) => {
+    const group = groupedResults[groupIdx];
+    setSelectedOverride({
+      groupIdx,
+      questionIdx,
+      newAnswer: currentAnswer,
+      group,
+    });
+    setOverrideDialogOpen(true);
+  };
+
+  const recalculateGradesForQuestion = async (assignments: Assignment[], questionIdx: number, questions: any[]) => {
+    try {
+      for (const assignment of assignments) {
+        if (!assignment.completed) continue;
+
+        // Get all multiple choice questions
+        const mcQuestions = questions.filter((q: any) => q.type !== 'short_answer');
+        
+        if (mcQuestions.length === 0) continue;
+
+        // Calculate correct count using overridden answers where applicable
+        let correctCount = 0;
+        mcQuestions.forEach((q: any, idx: number) => {
+          const userAnswer = assignment.quiz_responses?.[idx];
+          const rightAnswer = q.overriddenAnswer || q.correctAnswer;
+          if (userAnswer === rightAnswer) {
+            correctCount++;
+          }
+        });
+
+        // Calculate new grade
+        const newGrade = (correctCount / mcQuestions.length) * 100;
+
+        // Update in database
+        const { error } = await supabase
+          .from('student_assignments')
+          .update({ grade: newGrade })
+          .eq('id', assignment.id);
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error recalculating grades:', error);
+      throw error;
+    }
+  };
+
+  const handleConfirmOverride = async () => {
+    if (!selectedOverride) return;
+
+    const { groupIdx, questionIdx, newAnswer, group } = selectedOverride;
+
+    try {
+      // Update all assignments in this group with the overridden answer
+      const assignmentIds = group.assignments.map(a => a.id);
+      
+      // Update each assignment's content with the overridden answer
+      for (const assignment of group.assignments) {
+        const updatedContent = { ...assignment.content };
+        if (!updatedContent.questions[questionIdx]) continue;
+        
+        // Store original answer if not already stored
+        if (!updatedContent.questions[questionIdx].originalAnswer) {
+          updatedContent.questions[questionIdx].originalAnswer = 
+            updatedContent.questions[questionIdx].correctAnswer;
+        }
+        
+        // Set the overridden answer
+        updatedContent.questions[questionIdx].overriddenAnswer = newAnswer;
+
+        const { error: updateError } = await supabase
+          .from('student_assignments')
+          .update({ content: updatedContent })
+          .eq('id', assignment.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // Recalculate all grades for this group
+      const updatedQuestions = [...group.questions];
+      if (!updatedQuestions[questionIdx].originalAnswer) {
+        updatedQuestions[questionIdx].originalAnswer = updatedQuestions[questionIdx].correctAnswer;
+      }
+      updatedQuestions[questionIdx].overriddenAnswer = newAnswer;
+
+      await recalculateGradesForQuestion(group.assignments, questionIdx, updatedQuestions);
+
+      toast.success(`Answer overridden! Grades recalculated for ${group.assignments.length} student(s).`);
+      
+      // Refresh results
+      await fetchResults();
+      setOverrideDialogOpen(false);
+      setSelectedOverride(null);
+    } catch (error) {
+      console.error('Error applying override:', error);
+      toast.error('Failed to apply override');
+    }
   };
 
   if (loading) {
@@ -278,10 +389,20 @@ export const LectureCheckInResults = () => {
               </AccordionTrigger>
               <AccordionContent className="space-y-4 pt-4">
                 {group.questions.map((question, qIdx) => {
-                  const stats = calculateQuestionStats(group.assignments, qIdx, question.correctAnswer);
+                  const stats = calculateQuestionStats(group.assignments, qIdx, question);
+                  const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
+                  const isOverridden = !!question.overriddenAnswer;
 
                   return (
-                    <div key={qIdx} className="border rounded-lg p-4 space-y-3">
+                    <div key={qIdx} className={`border rounded-lg p-4 space-y-3 ${isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
+                      {isOverridden && (
+                        <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-400 text-sm">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span className="font-medium">
+                            Answer Overridden: {question.originalAnswer} → {question.overriddenAnswer}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <p className="font-medium mb-2">{question.question}</p>
@@ -289,11 +410,11 @@ export const LectureCheckInResults = () => {
                             <ul className="text-sm text-muted-foreground space-y-1">
                               {question.options.map((opt: string, oIdx: number) => {
                                 const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
-                                const isCorrect = letter === question.correctAnswer;
+                                const isCorrect = letter === currentCorrectAnswer;
                                 return (
                                   <li
                                     key={oIdx}
-                                    className={isCorrect ? "font-medium text-green-600" : ""}
+                                    className={isCorrect ? "font-medium text-green-600 dark:text-green-500" : ""}
                                   >
                                     <span className="font-bold">{letter}.</span> {opt} {isCorrect && "✓"}
                                   </li>
@@ -302,11 +423,23 @@ export const LectureCheckInResults = () => {
                             </ul>
                           )}
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">{(stats.percentage || 0).toFixed(0)}%</div>
-                          <div className="text-xs text-muted-foreground">
-                            {stats.correct}/{stats.completed} correct
+                        <div className="text-right space-y-2">
+                          <div>
+                            <div className="text-2xl font-bold">{(stats.percentage || 0).toFixed(0)}%</div>
+                            <div className="text-xs text-muted-foreground">
+                              {stats.correct}/{stats.completed} correct
+                            </div>
                           </div>
+                          {question.options && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleInitiateOverride(groupIdx, qIdx, currentCorrectAnswer)}
+                              className="text-xs"
+                            >
+                              Override Answer
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -316,7 +449,8 @@ export const LectureCheckInResults = () => {
                           {group.assignments.map((assignment) => {
                             const studentAnswer = assignment.quiz_responses?.[qIdx];
                             const isCompleted = assignment.completed;
-                            const isCorrect = studentAnswer === question.correctAnswer;
+                            const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
+                            const isCorrect = studentAnswer === correctAnswerToUse;
 
                             return (
                               <div
@@ -366,7 +500,8 @@ export const LectureCheckInResults = () => {
                                 ).length;
                                 const total = group.assignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
-                                const isCorrect = optionLetter === question.correctAnswer;
+                                const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
+                                const isCorrect = optionLetter === correctAnswerToUse;
 
                                 return (
                                   <div key={optionLetter} className="flex items-center gap-2 text-xs">
@@ -489,6 +624,63 @@ export const LectureCheckInResults = () => {
             </AccordionItem>
           ))}
         </Accordion>
+
+        {/* Override Dialog */}
+        <AlertDialog open={overrideDialogOpen} onOpenChange={setOverrideDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Override Correct Answer</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <p>
+                  Select the correct answer for this question. This will automatically recalculate grades for all students in this check-in.
+                </p>
+                {selectedOverride && (
+                  <>
+                    <div className="p-3 bg-muted rounded-lg text-sm">
+                      <p className="font-medium mb-1">Question:</p>
+                      <p className="text-foreground">{selectedOverride.group.questions[selectedOverride.questionIdx]?.question}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Select Correct Answer:</label>
+                      <Select value={selectedOverride.newAnswer} onValueChange={(value) => setSelectedOverride({ ...selectedOverride, newAnswer: value })}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectedOverride.group.questions[selectedOverride.questionIdx]?.options?.map((opt: string, idx: number) => {
+                            const letter = String.fromCharCode(65 + idx);
+                            return (
+                              <SelectItem key={letter} value={letter}>
+                                {letter}. {opt}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <p className="text-sm text-amber-900 dark:text-amber-200">
+                        <strong>Impact:</strong> This will affect {selectedOverride.group.assignments.length} student(s). 
+                        Grades will be automatically recalculated based on the new correct answer.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setOverrideDialogOpen(false);
+                setSelectedOverride(null);
+              }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmOverride}>
+                Apply Override
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
