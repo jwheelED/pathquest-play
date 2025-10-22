@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2 } from "lucide-react";
+import { Mic, MicOff, Radio, Loader2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,10 +10,21 @@ interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
 }
 
+// Constants for memory and resource management
+const MAX_BUFFER_SIZE = 50000; // 50K characters max
+const KEEP_RECENT_SIZE = 40000; // Keep 40K most recent
+const RESTART_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const TOKEN_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes
+const MAX_RECORDING_CYCLES = 50; // Force restart after 50 cycles (~6.5 min)
+const MAX_CONSECUTIVE_FAILURES = 3;
+
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
+  const [failureCount, setFailureCount] = useState(0);
+  const [isCircuitOpen, setIsCircuitOpen] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -21,6 +32,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const triggerDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const recordingCycleCountRef = useRef(0);
+  const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -71,6 +84,67 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   }, [transcriptChunks, isRecording]);
 
+  // Periodic system restart for resource cleanup
+  useEffect(() => {
+    if (!isRecording) return;
+    
+    const restartTimer = setTimeout(() => {
+      console.log('🔄 Performing periodic restart for resource cleanup');
+      toast({
+        title: "System refresh",
+        description: "Refreshing audio system for optimal performance"
+      });
+      const wasRecording = isRecording;
+      stopRecording();
+      if (wasRecording) {
+        setTimeout(() => startRecording(), 1000);
+      }
+    }, RESTART_INTERVAL);
+    
+    return () => clearTimeout(restartTimer);
+  }, [isRecording]);
+
+  // Token refresh for extended sessions
+  useEffect(() => {
+    if (!isRecording) return;
+    
+    const refreshTimer = setInterval(async () => {
+      console.log('🔑 Refreshing auth token');
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('Token refresh failed:', error);
+        toast({
+          title: "Session refresh issue",
+          description: "Attempting to refresh authentication",
+          variant: "destructive"
+        });
+      } else {
+        console.log('✅ Token refreshed successfully');
+      }
+    }, TOKEN_REFRESH_INTERVAL);
+    
+    return () => clearInterval(refreshTimer);
+  }, [isRecording]);
+
+  // Recording duration timer
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingDuration(0);
+      return;
+    }
+    
+    const startTime = Date.now();
+    durationTimerRef.current = setInterval(() => {
+      setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    
+    return () => {
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+      }
+    };
+  }, [isRecording]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -80,18 +154,41 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (triggerDebounceRef.current) {
         clearTimeout(triggerDebounceRef.current);
       }
+      if (durationTimerRef.current) {
+        clearInterval(durationTimerRef.current);
+      }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+        streamRef.current = null;
+      }
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current = null;
       }
     };
   }, []);
 
   const startRecording = async () => {
     try {
-      // Reset trigger flag and clear transcript for fresh recording session
+      // Check circuit breaker
+      if (isCircuitOpen) {
+        toast({
+          title: "Please wait",
+          description: "System is recovering from errors. Try again in a moment.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Reset state for fresh recording session
       hasTriggeredRef.current = false;
       setTranscriptChunks([]);
       transcriptBufferRef.current = "";
+      recordingCycleCountRef.current = 0;
+      setFailureCount(0);
+      setIsCircuitOpen(false);
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -123,6 +220,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (!streamRef.current) return;
 
     try {
+      // Force restart after MAX_RECORDING_CYCLES for resource cleanup
+      recordingCycleCountRef.current++;
+      if (recordingCycleCountRef.current >= MAX_RECORDING_CYCLES) {
+        console.log('🔄 Forcing cycle restart for resource cleanup');
+        recordingCycleCountRef.current = 0;
+        
+        // Clean up current recorder
+        if (mediaRecorderRef.current) {
+          mediaRecorderRef.current.ondataavailable = null;
+          mediaRecorderRef.current.onstop = null;
+          mediaRecorderRef.current = null;
+        }
+      }
+
       // Try to use the best available audio format
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -154,6 +265,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           await processAudioChunk(audioBlob);
         }
 
+        // Clean up chunks
+        chunks.length = 0;
+
         // Continue recording cycle if still active (use ref to avoid stale closure)
         if (isRecordingRef.current && streamRef.current) {
           console.log('♻️ Continuing recording cycle...');
@@ -168,26 +282,43 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
       };
 
-      // Record for 8 seconds then stop to get a complete audio file
+      // Record for 6 seconds (reduced from 8 for more frequent cleanup)
       mediaRecorder.start();
-      console.log('🎙️ Started recording cycle with format:', mimeType);
+      console.log('🎙️ Started recording cycle', recordingCycleCountRef.current, 'with format:', mimeType);
       
-      // Stop after 8 seconds to create a complete audio file
+      // Stop after 6 seconds to create a complete audio file
       recordingIntervalRef.current = setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
         }
-      }, 8000);
+      }, 6000);
       
     } catch (error) {
       console.error('Error in recording cycle:', error);
-      if (isRecording) {
-        // Try to restart the cycle
+      setFailureCount(prev => prev + 1);
+      
+      if (failureCount >= MAX_CONSECUTIVE_FAILURES - 1) {
+        setIsCircuitOpen(true);
+        stopRecording();
+        toast({
+          title: "Recording paused",
+          description: "Multiple errors detected. Please restart recording.",
+          variant: "destructive"
+        });
+        
+        // Auto-recover after 2 minutes
+        setTimeout(() => {
+          setIsCircuitOpen(false);
+          setFailureCount(0);
+        }, 2 * 60 * 1000);
+      } else if (isRecording) {
+        // Try to restart the cycle with exponential backoff
+        const backoffDelay = Math.min(1000 * Math.pow(2, failureCount), 5000);
         setTimeout(() => {
           if (isRecording && streamRef.current) {
             startRecordingCycle();
           }
-        }, 1000);
+        }, backoffDelay);
       }
     }
   };
@@ -195,6 +326,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const stopRecording = () => {
     isRecordingRef.current = false;
     setIsRecording(false);
+    recordingCycleCountRef.current = 0;
     
     // Clear interval
     if (recordingIntervalRef.current) {
@@ -202,14 +334,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       recordingIntervalRef.current = null;
     }
     
-    // Stop current recorder
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+    // Stop current recorder with cleanup
+    if (mediaRecorderRef.current) {
+      if (mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current = null;
     }
     
-    // Stop stream
+    // Stop stream with proper cleanup
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
       streamRef.current = null;
     }
     
@@ -258,6 +398,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             console.log('✅ Transcribed chunk:', newText.substring(0, 100));
             console.log('📊 Current chunks count before adding:', transcriptChunks.length);
             
+            // Reset failure count on success
+            setFailureCount(0);
+            
             // Add new chunk to array for display
             setTranscriptChunks(prev => {
               const updated = [...prev, newText];
@@ -265,19 +408,49 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               return updated;
             });
             
-            // Accumulate full transcript for question generation
+            // Accumulate full transcript with buffer size management
             if (transcriptBufferRef.current) {
               transcriptBufferRef.current += " " + newText;
             } else {
               transcriptBufferRef.current = newText;
             }
             
+            // Implement sliding window for memory management
+            if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
+              const trimmed = transcriptBufferRef.current.slice(-KEEP_RECENT_SIZE);
+              transcriptBufferRef.current = trimmed;
+              console.log('🧹 Trimmed transcript buffer to prevent memory issues');
+            }
+            
             console.log('📝 Total transcript length:', transcriptBufferRef.current.length);
           } else {
             console.log('ℹ️ No transcription result (audio may be silence)');
           }
-        } catch (invokeError) {
+        } catch (invokeError: any) {
           console.error('Function invoke error:', invokeError);
+          
+          // Handle auth errors with retry
+          if (invokeError?.message?.includes('401') || invokeError?.status === 401) {
+            console.log('🔑 Auth error, attempting token refresh');
+            const { error } = await supabase.auth.refreshSession();
+            if (!error) {
+              // Retry the request once
+              const { data: retryData, error: retryError } = await supabase.functions.invoke('transcribe-lecture', {
+                body: { audio: base64Audio }
+              });
+              
+              if (!retryError && retryData?.text?.trim()) {
+                const newText = retryData.text.trim();
+                setTranscriptChunks(prev => [...prev, newText]);
+                transcriptBufferRef.current += " " + newText;
+                setFailureCount(0);
+                return;
+              }
+            }
+          }
+          
+          // Track failures
+          setFailureCount(prev => prev + 1);
         }
       };
       
@@ -489,10 +662,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
         {isRecording && (
           <div className="space-y-2">
-            <Badge variant="outline" className="w-full justify-center py-1.5">
-              <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
-              Live
-            </Badge>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="flex-1 justify-center py-1.5">
+                <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
+                Live
+              </Badge>
+              <Badge variant="secondary" className="flex-1 justify-center py-1.5">
+                {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+              </Badge>
+            </div>
+            {failureCount > 0 && (
+              <Badge variant="destructive" className="w-full justify-center py-1.5">
+                <AlertCircle className="mr-2 h-3 w-3" />
+                {failureCount} transcription {failureCount === 1 ? 'failure' : 'failures'}
+              </Badge>
+            )}
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
               <p className="text-xs font-medium text-blue-900 dark:text-blue-200 text-center">
                 🎤 Voice Command Active: Say "generate question now"

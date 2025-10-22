@@ -42,6 +42,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Add request timeout handling
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), 30000); // 30 second timeout
+
   try {
     // Validate authorization
     const authHeader = req.headers.get('Authorization');
@@ -149,6 +153,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: formData,
+      signal: timeoutController.signal,
     });
 
     if (!response.ok) {
@@ -170,15 +175,40 @@ serve(async (req) => {
     const result = await response.json();
     console.log('Transcription successful:', result.text.substring(0, 100));
 
+    clearTimeout(timeoutId);
+
     return new Response(
       JSON.stringify({ text: result.text || '' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error('Transcription error:', error);
+    
+    // Check if error is due to timeout
+    if (error instanceof Error && error.name === 'AbortError') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Request timeout - please try again',
+          retryable: true 
+        }),
+        {
+          status: 408,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+    
+    // Better error messages with retry hints
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isRetryable = errorMessage.includes('rate limit') || errorMessage.includes('timeout');
+    
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        retryable: isRetryable
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
