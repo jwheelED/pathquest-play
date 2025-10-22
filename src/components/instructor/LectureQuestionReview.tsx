@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Send, Trash2, AlertCircle, Users, Bot, UserCog } from "lucide-react";
+import { Send, Trash2, AlertCircle, Users, Bot, UserCog, Edit2, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Question {
   id: string;
@@ -30,6 +32,8 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
   const [pendingQuestions, setPendingQuestions] = useState<LectureQuestion[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<{[key: string]: number}>({});
   const [gradingModes, setGradingModes] = useState<{[key: string]: 'auto_grade' | 'manual_grade'}>({});
+  const [editingQuestion, setEditingQuestion] = useState<{[key: string]: number | null}>({});
+  const [editedQuestions, setEditedQuestions] = useState<{[key: string]: any}>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -61,6 +65,58 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
     }));
   };
 
+  const startEditing = (lectureQuestionId: string, questionIndex: number, question: any) => {
+    setEditingQuestion(prev => ({
+      ...prev,
+      [lectureQuestionId]: questionIndex
+    }));
+    
+    // Initialize edited question with current values
+    const editKey = `${lectureQuestionId}-${questionIndex}`;
+    if (!editedQuestions[editKey]) {
+      setEditedQuestions(prev => ({
+        ...prev,
+        [editKey]: {
+          text: question.text,
+          options: question.options ? [...question.options] : [],
+          expectedAnswer: question.expectedAnswer || '',
+          type: question.type
+        }
+      }));
+    }
+  };
+
+  const cancelEditing = (lectureQuestionId: string) => {
+    setEditingQuestion(prev => ({
+      ...prev,
+      [lectureQuestionId]: null
+    }));
+  };
+
+  const saveEdit = (lectureQuestionId: string, questionIndex: number) => {
+    setEditingQuestion(prev => ({
+      ...prev,
+      [lectureQuestionId]: null
+    }));
+    toast({ title: "Question updated", description: "Changes saved" });
+  };
+
+  const updateEditedQuestion = (lectureQuestionId: string, questionIndex: number, field: string, value: any) => {
+    const editKey = `${lectureQuestionId}-${questionIndex}`;
+    setEditedQuestions(prev => ({
+      ...prev,
+      [editKey]: {
+        ...prev[editKey],
+        [field]: value
+      }
+    }));
+  };
+
+  const getQuestionToDisplay = (lectureQuestionId: string, questionIndex: number, originalQuestion: any) => {
+    const editKey = `${lectureQuestionId}-${questionIndex}`;
+    return editedQuestions[editKey] || originalQuestion;
+  };
+
   const handleSendToStudents = async (lectureQuestion: LectureQuestion) => {
     const selectedIndex = selectedQuestions[lectureQuestion.id];
     if (selectedIndex === undefined) {
@@ -76,7 +132,10 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
       const selectedQuestionSet = lectureQuestion.questions[selectedIndex];
       
       // Take only the FIRST question from the set
-      const singleQuestion = selectedQuestionSet[0];
+      const originalQuestion = selectedQuestionSet[0];
+      
+      // Use edited version if available
+      const singleQuestion = getQuestionToDisplay(lectureQuestion.id, selectedIndex, originalQuestion);
 
       // Get all students for this instructor
       const { data: studentLinks } = await supabase
@@ -246,41 +305,110 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
               >
                 {lq.questions.map((questionSet, idx) => {
                   // Only show the first question in each set to fix the "2 questions in 1 card" bug
-                  const q = questionSet[0];
-                  if (!q) return null;
+                  const originalQ = questionSet[0];
+                  if (!originalQ) return null;
                   
+                  const q = getQuestionToDisplay(lq.id, idx, originalQ);
                   const isShortAnswer = q.type === 'short_answer';
+                  const isEditing = editingQuestion[lq.id] === idx;
                   
                   return (
                     <div key={idx} className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/30">
-                      <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />
-                      <Label htmlFor={`${lq.id}-${idx}`} className="flex-1 cursor-pointer">
-                        <div className="space-y-2">
-                          <p className="font-medium">{q.text}</p>
-                          {q.type === 'multiple_choice' && q.options && (
-                            <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
-                              {q.options.map((opt, oIdx) => {
-                                const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
-                                return (
-                                  <li key={oIdx} className="font-medium">
-                                    <span className="font-bold">{letter}.</span> {opt}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                          {isShortAnswer && (
-                            <div className="ml-4 mt-2 space-y-2">
-                              <p className="text-sm text-muted-foreground italic">
-                                Students will type their answer
-                              </p>
-                              <Badge variant="outline" className="text-xs">
-                                Short Answer Question
-                              </Badge>
+                      {!isEditing && <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />}
+                      <div className="flex-1">
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Question Text</Label>
+                              <Textarea
+                                value={q.text}
+                                onChange={(e) => updateEditedQuestion(lq.id, idx, 'text', e.target.value)}
+                                className="min-h-[60px]"
+                              />
                             </div>
-                          )}
-                        </div>
-                      </Label>
+                            
+                            {q.type === 'multiple_choice' && q.options && (
+                              <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Answer Options</Label>
+                                {q.options.map((opt: string, oIdx: number) => (
+                                  <div key={oIdx} className="flex items-center gap-2">
+                                    <span className="font-bold text-sm w-6">{String.fromCharCode(65 + oIdx)}.</span>
+                                    <Input
+                                      value={opt}
+                                      onChange={(e) => {
+                                        const newOptions = [...q.options];
+                                        newOptions[oIdx] = e.target.value;
+                                        updateEditedQuestion(lq.id, idx, 'options', newOptions);
+                                      }}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {isShortAnswer && (
+                              <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Expected Answer (for auto-grading)</Label>
+                                <Input
+                                  value={q.expectedAnswer || ''}
+                                  onChange={(e) => updateEditedQuestion(lq.id, idx, 'expectedAnswer', e.target.value)}
+                                  placeholder="Expected answer..."
+                                />
+                              </div>
+                            )}
+                            
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => saveEdit(lq.id, idx)}>
+                                <Check className="h-3 w-3 mr-1" /> Save
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => cancelEditing(lq.id)}>
+                                <X className="h-3 w-3 mr-1" /> Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Label htmlFor={`${lq.id}-${idx}`} className="cursor-pointer">
+                            <div className="space-y-2">
+                              <div className="flex items-start justify-between">
+                                <p className="font-medium">{q.text}</p>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    startEditing(lq.id, idx, q);
+                                  }}
+                                  className="h-7 w-7 p-0"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              {q.type === 'multiple_choice' && q.options && (
+                                <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
+                                  {q.options.map((opt: string, oIdx: number) => {
+                                    const letter = String.fromCharCode(65 + oIdx);
+                                    return (
+                                      <li key={oIdx} className="font-medium">
+                                        <span className="font-bold">{letter}.</span> {opt}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
+                              {isShortAnswer && (
+                                <div className="ml-4 mt-2 space-y-2">
+                                  <p className="text-sm text-muted-foreground italic">
+                                    Students will type their answer
+                                  </p>
+                                  <Badge variant="outline" className="text-xs">
+                                    Short Answer Question
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          </Label>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
