@@ -159,27 +159,29 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         // Extract correct answer letter - handle multiple formats
         let correctAnswer = singleQuestion.expectedAnswer || 'A';
         
-        // If it's the full text answer, find which option it matches
-        if (correctAnswer.length > 3) {
-          // Find the matching option by comparing the text (case-insensitive)
-          const matchingOption = singleQuestion.options?.find((opt: string) => 
-            correctAnswer.toLowerCase().includes(opt.toLowerCase()) || 
-            opt.toLowerCase().includes(correctAnswer.toLowerCase())
-          );
-          
-          if (matchingOption) {
-            // Extract the letter from the matching option (e.g., "A. Text" -> "A")
-            correctAnswer = matchingOption.charAt(0).toUpperCase();
-          }
-        } else {
-          // It's already just a letter or short format like "A)" or "A."
-          // Extract just the first character
+        // Ensure correctAnswer is just a single letter
+        if (correctAnswer.length > 1) {
+          // Extract just the first letter (handles "A)", "A.", or just "A")
           correctAnswer = correctAnswer.charAt(0).toUpperCase();
+        } else {
+          correctAnswer = correctAnswer.toUpperCase();
         }
+        
+        // Add letter prefixes to options (A., B., C., D.)
+        const letters = ['A', 'B', 'C', 'D'];
+        const optionsWithLetters = (singleQuestion.options || []).map((opt: string, idx: number) => {
+          // Check if option already has letter prefix
+          const hasPrefix = /^[A-D][\.\)]\s/.test(opt);
+          if (hasPrefix) {
+            return opt;
+          }
+          // Add letter prefix
+          return `${letters[idx]}. ${opt}`;
+        });
         
         formattedQuestion = {
           question: singleQuestion.text,
-          options: singleQuestion.options || [],
+          options: optionsWithLetters,
           correctAnswer: correctAnswer,
           hint1: 'Think about what was just discussed',
           hint2: 'Review the key concepts from the lecture',
