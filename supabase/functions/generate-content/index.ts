@@ -49,6 +49,30 @@ serve(async (req) => {
     }
 
     const { topic, studentProgress, assignmentType } = await req.json();
+    
+    // Input validation
+    if (!topic || typeof topic !== 'string' || topic.length > 200) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid topic' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (studentProgress && typeof studentProgress !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid student progress' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const validTypes = ['quiz', 'mini_project', 'lesson'];
+    if (assignmentType && !validTypes.includes(assignmentType)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid assignment type' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {

@@ -13,9 +13,25 @@ serve(async (req) => {
   try {
     const { courseTitle, courseTopics, difficulty = 'intermediate' } = await req.json();
     
-    if (!courseTitle) {
+    // Input validation
+    if (!courseTitle || typeof courseTitle !== 'string' || courseTitle.length > 200) {
       return new Response(
-        JSON.stringify({ error: 'Course title is required' }),
+        JSON.stringify({ error: 'Invalid course title' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (courseTopics && (!Array.isArray(courseTopics) || courseTopics.length > 20)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid course topics' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const validDifficulties = ['beginner', 'intermediate', 'advanced'];
+    if (difficulty && !validDifficulties.includes(difficulty.toLowerCase())) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid difficulty level' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
