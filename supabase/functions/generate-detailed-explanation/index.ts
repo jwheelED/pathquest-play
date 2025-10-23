@@ -13,9 +13,32 @@ serve(async (req) => {
   try {
     const { problemText, correctAnswer, userAnswer, wasCorrect, courseContext } = await req.json();
     
-    if (!problemText || !correctAnswer) {
+    // Input validation
+    if (!problemText || typeof problemText !== 'string' || 
+        problemText.length > 1000 || /[\x00-\x1F]/.test(problemText)) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Invalid problem text' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!correctAnswer || typeof correctAnswer !== 'string' || correctAnswer.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid correct answer' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (userAnswer && (typeof userAnswer !== 'string' || userAnswer.length > 5000)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid user answer' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (courseContext && (typeof courseContext !== 'string' || courseContext.length > 2000)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid course context' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
