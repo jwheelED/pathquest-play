@@ -39,6 +39,22 @@ serve(async (req) => {
 
     const { goal, experienceLevel } = await req.json();
     
+    // Input validation
+    if (!goal || typeof goal !== 'string' || goal.trim().length === 0 || goal.length > 200) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid goal parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const validLevels = ['Beginner', 'Intermediate', 'Advanced'];
+    if (!experienceLevel || !validLevels.includes(experienceLevel)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid experience level' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // CRITICAL: Use authenticated user's ID, not request parameter
     const userId = user.id;
 
