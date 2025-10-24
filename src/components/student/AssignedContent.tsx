@@ -162,6 +162,26 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
+      // Save version history for cheat detection (if any short answers with tracking)
+      const versionHistoryData = textAns[`${questions.findIndex((q: any) => q.type === 'short_answer')}_version_history`];
+      if (versionHistoryData && userId) {
+        const { error: versionError } = await supabase
+          .from('answer_version_history')
+          .upsert({
+            student_id: userId,
+            assignment_id: assignment.id,
+            version_events: versionHistoryData.events,
+            typed_count: versionHistoryData.typed_count,
+            pasted_count: versionHistoryData.pasted_count
+          }, {
+            onConflict: 'student_id,assignment_id'
+          });
+
+        if (versionError) {
+          console.error('Failed to save version history:', versionError);
+        }
+      }
+      
       // If there are short answers, get AI grades (for auto-grading or recommendations)
       if (result.has_short_answer) {
         const isAutoGrade = result.assignment_mode === 'auto_grade';
@@ -498,12 +518,27 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                           return (
                             <div key={idx} className="border rounded-lg p-4 space-y-3">
                               <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
-                              <textarea
-                                disabled={isSubmitted}
+                              <VersionHistoryTracker
                                 value={textAnswer}
-                                onChange={(e) => handleTextAnswerChange(assignment.id, idx, e.target.value)}
-                                placeholder="Type your answer here..."
-                                className="w-full min-h-[100px] p-3 rounded-lg border-2 border-border focus:border-primary focus:outline-none resize-y disabled:bg-muted disabled:cursor-not-allowed"
+                                onChange={(value) => handleTextAnswerChange(assignment.id, idx, value)}
+                                onVersionChange={(history) => {
+                                  // Store version history for cheat detection
+                                  const typedCount = history.filter(e => e.type === 'typed').length;
+                                  const pastedCount = history.filter(e => e.type === 'pasted').length;
+                                  
+                                  // Store in state for submission
+                                  setTextAnswers(prev => ({
+                                    ...prev,
+                                    [assignment.id]: {
+                                      ...(prev[assignment.id] || {}),
+                                      [`${idx}_version_history`]: {
+                                        events: history,
+                                        typed_count: typedCount,
+                                        pasted_count: pastedCount
+                                      }
+                                    }
+                                  }));
+                                }}
                               />
                               {isSubmitted && (
                                 <div className="space-y-2">

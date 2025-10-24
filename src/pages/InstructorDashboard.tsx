@@ -8,6 +8,7 @@ import { StudentProgressCard } from "@/components/instructor/StudentProgressCard
 import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
+import { CheatDetectionCard } from "@/components/instructor/CheatDetectionCard";
 // LEGACY: Content Generator replaced by Lecture Transcription
 // import { ContentGenerator } from "@/components/instructor/ContentGenerator";
 // import { ReviewQueue } from "@/components/instructor/ReviewQueue";
@@ -395,6 +396,8 @@ export default function InstructorDashboard() {
 
             {currentUser && (
               <>
+                <CheatDetectionCard instructorId={currentUser.id} />
+                
                 <div className="grid lg:grid-cols-2 gap-6">
                   <StudentProgressCard instructorId={currentUser.id} />
                   <StrugglingStudentsCard 
