@@ -159,24 +159,16 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
         // Extract correct answer letter - handle multiple formats
         let correctAnswer = singleQuestion.expectedAnswer || 'A';
         
-        // Ensure correctAnswer is just a single letter
-        if (correctAnswer.length > 1) {
-          // Extract just the first letter (handles "A)", "A.", or just "A")
-          correctAnswer = correctAnswer.charAt(0).toUpperCase();
-        } else {
-          correctAnswer = correctAnswer.toUpperCase();
-        }
+        // Ensure correctAnswer is just a single letter - extract and clean
+        correctAnswer = correctAnswer.trim().charAt(0).toUpperCase();
         
         // Add letter prefixes to options (A., B., C., D.)
         const letters = ['A', 'B', 'C', 'D'];
         const optionsWithLetters = (singleQuestion.options || []).map((opt: string, idx: number) => {
-          // Check if option already has letter prefix
-          const hasPrefix = /^[A-D][\.\)]\s/.test(opt);
-          if (hasPrefix) {
-            return opt;
-          }
-          // Add letter prefix
-          return `${letters[idx]}. ${opt}`;
+          // Remove any existing letter prefix to avoid duplication
+          const cleanOpt = opt.replace(/^[A-D][\.\)]\s*/, '').trim();
+          // Add standardized letter prefix
+          return `${letters[idx]}. ${cleanOpt}`;
         });
         
         formattedQuestion = {
