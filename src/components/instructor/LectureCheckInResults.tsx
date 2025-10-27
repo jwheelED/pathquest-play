@@ -19,6 +19,7 @@ interface Assignment {
   completed: boolean;
   created_at: string;
   student_name?: string;
+  response_time_seconds?: number | null;
 }
 
 interface GroupedAssignment {
@@ -110,7 +111,8 @@ export const LectureCheckInResults = () => {
         quiz_responses,
         grade,
         completed,
-        created_at
+        created_at,
+        response_time_seconds
       `,
       )
       .eq("instructor_id", user.id)
@@ -194,12 +196,29 @@ export const LectureCheckInResults = () => {
       return response === correctAnswer;
     });
 
+    // Calculate average response time for completed assignments
+    const responseTimes = completed
+      .map(a => a.response_time_seconds)
+      .filter((time): time is number => time !== null && time !== undefined);
+    
+    const avgResponseTime = responseTimes.length > 0 
+      ? Math.round(responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length)
+      : null;
+
     return {
       total: assignments.length,
       completed: completed.length,
       correct: correct.length,
       percentage: completed.length > 0 ? (correct.length / completed.length) * 100 : 0,
+      avgResponseTime,
     };
+  };
+
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
   };
 
   const handleInitiateOverride = (groupIdx: number, questionIdx: number, currentAnswer: string) => {
@@ -429,6 +448,12 @@ export const LectureCheckInResults = () => {
                             <div className="text-xs text-muted-foreground">
                               {stats.correct}/{stats.completed} correct
                             </div>
+                            {stats.avgResponseTime !== null && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <Clock className="h-3 w-3 inline mr-1" />
+                                Avg: {formatTime(stats.avgResponseTime)}
+                              </div>
+                            )}
                           </div>
                           {question.options && (
                             <Button 
@@ -464,7 +489,7 @@ export const LectureCheckInResults = () => {
                                       <Clock className="h-3 w-3" />
                                       Not Answered
                                     </Badge>
-                                  ) : (
+                                   ) : (
                                     <>
                                       <Badge
                                         variant={isCorrect ? "default" : "destructive"}
@@ -480,6 +505,12 @@ export const LectureCheckInResults = () => {
                                       <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
                                         Answer: {studentAnswer}
                                       </span>
+                                      {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                          <Clock className="h-3 w-3" />
+                                          {formatTime(assignment.response_time_seconds)}
+                                        </Badge>
+                                      )}
                                     </>
                                   )}
                                 </div>

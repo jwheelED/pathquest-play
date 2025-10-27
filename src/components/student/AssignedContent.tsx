@@ -22,6 +22,8 @@ interface Assignment {
   quiz_responses?: any;
   saved_by_student?: boolean;
   auto_delete_at?: string | null;
+  opened_at?: string | null;
+  response_time_seconds?: number | null;
 }
 
 export const AssignedContent = ({ userId }: { userId: string }) => {
@@ -32,6 +34,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
   const [liveCheckIns, setLiveCheckIns] = useState<Assignment[]>([]);
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
+  const [openedTimes, setOpenedTimes] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -148,6 +151,12 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       return;
     }
 
+    // Calculate response time if this was opened (for lecture check-ins)
+    let responseTimeSeconds: number | null = null;
+    if (openedTimes[assignment.id]) {
+      responseTimeSeconds = Math.floor((Date.now() - openedTimes[assignment.id]) / 1000);
+    }
+
     try {
       // Use secure RPC function for server-side grading
       const { data, error } = await supabase
@@ -168,6 +177,14 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         has_short_answer: boolean;
         assignment_mode: string;
       };
+
+      // Update response time in database if tracked
+      if (responseTimeSeconds !== null) {
+        await supabase
+          .from('student_assignments')
+          .update({ response_time_seconds: responseTimeSeconds })
+          .eq('id', assignment.id);
+      }
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
@@ -451,6 +468,21 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     }
   };
 
+  const handleOpenAssignment = async (assignment: Assignment) => {
+    // Only track opening for lecture check-ins that haven't been opened yet
+    if (assignment.assignment_type === 'lecture_checkin' && !assignment.opened_at && !openedTimes[assignment.id]) {
+      setOpenedTimes(prev => ({ ...prev, [assignment.id]: Date.now() }));
+      
+      // Update database with opened timestamp
+      await supabase
+        .from('student_assignments')
+        .update({ opened_at: new Date().toISOString() })
+        .eq('id', assignment.id);
+    }
+    
+    setViewingId(assignment.id);
+  };
+
   if (assignments.length === 0) {
     return (
       <Card>
@@ -496,7 +528,18 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           </div>
         )}
 
-        <Accordion type="single" collapsible>
+        <Accordion 
+          type="single" 
+          collapsible
+          onValueChange={(value) => {
+            if (value) {
+              const assignment = assignments.find(a => a.id === value);
+              if (assignment) {
+                handleOpenAssignment(assignment);
+              }
+            }
+          }}
+        >
           {assignments
             .filter(assignment => {
               // Filter live check-ins based on showAllCheckIns state

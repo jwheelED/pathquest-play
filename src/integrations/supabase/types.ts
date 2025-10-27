@@ -569,7 +569,9 @@ export type Database = {
           id: string
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
+          opened_at: string | null
           quiz_responses: Json | null
+          response_time_seconds: number | null
           saved_by_student: boolean | null
           student_id: string
           title: string
@@ -585,7 +587,9 @@ export type Database = {
           id?: string
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
+          opened_at?: string | null
           quiz_responses?: Json | null
+          response_time_seconds?: number | null
           saved_by_student?: boolean | null
           student_id: string
           title: string
@@ -601,7 +605,9 @@ export type Database = {
           id?: string
           instructor_id?: string
           mode?: Database["public"]["Enums"]["assignment_mode"]
+          opened_at?: string | null
           quiz_responses?: Json | null
+          response_time_seconds?: number | null
           saved_by_student?: boolean | null
           student_id?: string
           title?: string
