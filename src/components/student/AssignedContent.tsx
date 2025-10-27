@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BookOpen, CheckCircle, Eye, Bell, AlertCircle } from "lucide-react";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
@@ -20,6 +20,8 @@ interface Assignment {
   created_at: string;
   grade?: number | null;
   quiz_responses?: any;
+  saved_by_student?: boolean;
+  auto_delete_at?: string | null;
 }
 
 export const AssignedContent = ({ userId }: { userId: string }) => {
@@ -66,6 +68,13 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   }, [userId]);
 
   const fetchAssignments = async () => {
+    // First, clean up old unsaved lecture check-ins
+    try {
+      await supabase.rpc('cleanup_unsaved_lecture_checkins');
+    } catch (cleanupError) {
+      console.error('Cleanup error (non-critical):', cleanupError);
+    }
+
     // Optimized query: Only fetch recent assignments to reduce load
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
@@ -418,6 +427,30 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     }
   };
 
+  const handleSaveQuestion = async (assignmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('student_assignments')
+        .update({ saved_by_student: true, auto_delete_at: null })
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: "📌 Question Saved!", 
+        description: "This question will be kept in your assignments" 
+      });
+      await fetchAssignments();
+    } catch (error: any) {
+      console.error('Save question error:', error);
+      toast({ 
+        title: "Failed to save question", 
+        description: error.message || "Please try again",
+        variant: "destructive" 
+      });
+    }
+  };
+
   if (assignments.length === 0) {
     return (
       <Card>
@@ -653,7 +686,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                       )}
                       
                       {assignment.completed && (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {assignment.grade !== undefined && assignment.grade !== null ? (
                             <div className="bg-primary/10 p-4 rounded-lg text-center">
                               <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
@@ -662,6 +695,43 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                             <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
                               <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Pending Review</p>
                               <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor is reviewing your answers</p>
+                            </div>
+                          )}
+                          
+                          {/* Save button for lecture check-ins */}
+                          {assignment.assignment_type === 'lecture_checkin' && !assignment.saved_by_student && (
+                            <div className="space-y-2">
+                              <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200">
+                                <Trash2 className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-900 dark:text-amber-200 text-sm">
+                                  Auto-Delete in 24 hours
+                                </AlertTitle>
+                                <AlertDescription className="text-amber-800 dark:text-amber-300 text-xs">
+                                  This question will be automatically deleted unless you save it.
+                                  {assignment.auto_delete_at && (
+                                    <span className="block mt-1">
+                                      Deletes at: {new Date(assignment.auto_delete_at).toLocaleString()}
+                                    </span>
+                                  )}
+                                </AlertDescription>
+                              </Alert>
+                              <Button 
+                                onClick={() => handleSaveQuestion(assignment.id)} 
+                                className="w-full"
+                                variant="outline"
+                              >
+                                <Save className="mr-2 h-4 w-4" />
+                                Save This Question
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {assignment.assignment_type === 'lecture_checkin' && assignment.saved_by_student && (
+                            <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded-lg text-center border border-green-200 dark:border-green-800">
+                              <p className="text-sm font-medium text-green-900 dark:text-green-200">
+                                <Save className="inline h-4 w-4 mr-1" />
+                                Question Saved
+                              </p>
                             </div>
                           )}
                         </div>

@@ -560,6 +560,7 @@ export type Database = {
       student_assignments: {
         Row: {
           assignment_type: Database["public"]["Enums"]["assignment_type"]
+          auto_delete_at: string | null
           completed: boolean
           content: Json
           created_at: string
@@ -569,11 +570,13 @@ export type Database = {
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
           quiz_responses: Json | null
+          saved_by_student: boolean | null
           student_id: string
           title: string
         }
         Insert: {
           assignment_type: Database["public"]["Enums"]["assignment_type"]
+          auto_delete_at?: string | null
           completed?: boolean
           content: Json
           created_at?: string
@@ -583,11 +586,13 @@ export type Database = {
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
           quiz_responses?: Json | null
+          saved_by_student?: boolean | null
           student_id: string
           title: string
         }
         Update: {
           assignment_type?: Database["public"]["Enums"]["assignment_type"]
+          auto_delete_at?: string | null
           completed?: boolean
           content?: Json
           created_at?: string
@@ -597,6 +602,7 @@ export type Database = {
           instructor_id?: string
           mode?: Database["public"]["Enums"]["assignment_mode"]
           quiz_responses?: Json | null
+          saved_by_student?: boolean | null
           student_id?: string
           title?: string
         }
@@ -771,6 +777,7 @@ export type Database = {
         Args: { _target_user_id: string; _viewer_id: string }
         Returns: boolean
       }
+      cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
       generate_instructor_code: { Args: never; Returns: string }
       get_problem_answer: {
         Args: { problem_id: string }
