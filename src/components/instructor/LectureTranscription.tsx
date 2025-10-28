@@ -29,6 +29,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptBufferRef = useRef<string>("");
+  const lastGeneratedIndexRef = useRef<number>(0);
   const triggerDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredRef = useRef(false);
   const isRecordingRef = useRef(false);
@@ -532,12 +533,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.log('✅ Successfully parsed', materialContext.length, 'materials');
       }
 
-      // Use full accumulated transcript (up to 5000 chars for better context)
-      const transcriptForGeneration = fullTranscript.slice(-5000);
+      // Get new content since last generation
+      // Use content starting from where we last generated, with at least 200 chars
+      const startIndex = lastGeneratedIndexRef.current;
+      const newContentLength = fullTranscript.length - startIndex;
+      
+      let transcriptForGeneration: string;
+      if (newContentLength >= 200) {
+        // Use new content since last generation
+        transcriptForGeneration = fullTranscript.slice(startIndex);
+        console.log('📊 Using NEW content from index', startIndex, 'length:', transcriptForGeneration.length);
+      } else {
+        // Not enough new content, use last 3000 chars with some overlap
+        transcriptForGeneration = fullTranscript.slice(-3000);
+        console.log('📊 Using RECENT content (not enough new), length:', transcriptForGeneration.length);
+      }
+      
+      // Cap at 5000 chars for API limits
+      if (transcriptForGeneration.length > 5000) {
+        transcriptForGeneration = transcriptForGeneration.slice(-5000);
+      }
       
       console.log('📤 Sending to edge function:', {
         transcriptLength: transcriptForGeneration.length,
-        materialsCount: materialContext.length
+        materialsCount: materialContext.length,
+        startIndex,
+        fullTranscriptLength: fullTranscript.length
       });
 
       const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
@@ -558,6 +579,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       console.log('✅ Received questions:', functionData.questions.length, 'sets');
+
+      // Update the last generated index to current position
+      lastGeneratedIndexRef.current = fullTranscript.length;
+      console.log('✅ Updated last generated index to:', lastGeneratedIndexRef.current);
 
       // Save to review queue with full context snippet
       const { error: insertError } = await supabase
@@ -597,6 +622,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const clearTranscript = () => {
     setTranscriptChunks([]);
     transcriptBufferRef.current = "";
+    lastGeneratedIndexRef.current = 0;
     hasTriggeredRef.current = false;
     toast({ title: "Transcript cleared" });
   };
