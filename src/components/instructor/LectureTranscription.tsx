@@ -533,11 +533,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.log('✅ Successfully parsed', materialContext.length, 'materials');
       }
 
-      // Always use the most recent 4000 chars to capture what professor just said
-      // This ensures we get the absolute latest content regardless of generation history
-      const transcriptForGeneration = fullTranscript.slice(-4000);
+      // Use only the most recent 1200 chars (~1-2 minutes of speech)
+      // This captures what professor JUST said with minimal tokens for cost efficiency
+      const transcriptForGeneration = fullTranscript.slice(-1200);
       
-      console.log('📊 Using most recent content, length:', transcriptForGeneration.length, 'of total:', fullTranscript.length);
+      console.log('📊 Using most recent speech, length:', transcriptForGeneration.length, 'of total:', fullTranscript.length);
       
       console.log('📤 Sending to edge function:', {
         transcriptLength: transcriptForGeneration.length,

@@ -137,14 +137,17 @@ serve(async (req) => {
 
 ${contextInfo ? contextInfo + '\n' : ''}${contextInfo ? 'IMPORTANT: Use the uploaded course materials ONLY as reference context to better understand concepts mentioned in the lecture. Generate questions strictly based on what the professor actually says in the transcript.\n\n' : ''}
 
+CRITICAL: Focus on the MOST RECENT content in the transcript - the professor may have just asked a question or introduced a new topic. Prioritize the last few sentences.
+
 Generate exactly 3 different question options. CRITICAL: Each option must contain ONLY ONE question.
 
 For each option, create ONE question that:
-1. Tests understanding of key concepts directly mentioned in the lecture transcript
-2. Is appropriate for real-time lecture check-ins
-3. Can be answered quickly (2-3 minutes)
-4. Is EITHER multiple choice OR short answer (not both)
-5. Focuses on what the professor actually said, not on general course topics
+1. Tests understanding of the MOST RECENT key concept or question mentioned by the professor
+2. If the professor asked a question at the end, make that the focus of your generated question
+3. Is appropriate for real-time lecture check-ins
+4. Can be answered quickly (2-3 minutes)
+5. Is EITHER multiple choice OR short answer (not both)
+6. Focuses on what the professor actually said in the most recent part of the transcript
 
 Return a JSON array with 3 question sets. Each set is an array containing EXACTLY ONE question object.
 
