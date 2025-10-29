@@ -305,164 +305,168 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
                   const q = getQuestionToDisplay(lq.id, idx, originalQ);
                   const isShortAnswer = q.type === 'short_answer';
                   const isEditing = editingQuestion[lq.id] === idx;
+                  const isSelected = selectedQuestions[lq.id] === idx;
                   
                   return (
-                    <div key={idx} className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/30">
-                      {!isEditing && <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />}
-                      <div className="flex-1">
-                        {isEditing ? (
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              <Label className="text-xs text-muted-foreground">Question Text</Label>
-                              <Textarea
-                                value={q.text}
-                                onChange={(e) => updateEditedQuestion(lq.id, idx, 'text', e.target.value)}
-                                className="min-h-[60px]"
-                              />
-                            </div>
-                            
-                            {q.type === 'multiple_choice' && q.options && (
+                    <div key={idx} className="space-y-3">
+                      <div className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/30">
+                        {!isEditing && <RadioGroupItem value={idx.toString()} id={`${lq.id}-${idx}`} />}
+                        <div className="flex-1">
+                          {isEditing ? (
+                            <div className="space-y-3">
                               <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">Answer Options</Label>
-                                {q.options.map((opt: string, oIdx: number) => (
-                                  <div key={oIdx} className="flex items-center gap-2">
-                                    <span className="font-bold text-sm w-6">{String.fromCharCode(65 + oIdx)}.</span>
-                                    <Input
-                                      value={opt}
-                                      onChange={(e) => {
-                                        const newOptions = [...q.options];
-                                        newOptions[oIdx] = e.target.value;
-                                        updateEditedQuestion(lq.id, idx, 'options', newOptions);
-                                      }}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {isShortAnswer && (
-                              <div className="space-y-2">
-                                <Label className="text-xs text-muted-foreground">Expected Answer (for auto-grading)</Label>
-                                <Input
-                                  value={q.expectedAnswer || ''}
-                                  onChange={(e) => updateEditedQuestion(lq.id, idx, 'expectedAnswer', e.target.value)}
-                                  placeholder="Expected answer..."
+                                <Label className="text-xs text-muted-foreground">Question Text</Label>
+                                <Textarea
+                                  value={q.text}
+                                  onChange={(e) => updateEditedQuestion(lq.id, idx, 'text', e.target.value)}
+                                  className="min-h-[60px]"
                                 />
                               </div>
-                            )}
-                            
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => saveEdit(lq.id, idx)}>
-                                <Check className="h-3 w-3 mr-1" /> Save
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => cancelEditing(lq.id)}>
-                                <X className="h-3 w-3 mr-1" /> Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Label htmlFor={`${lq.id}-${idx}`} className="cursor-pointer">
-                            <div className="space-y-2">
-                              <div className="flex items-start justify-between">
-                                <p className="font-medium">{q.text}</p>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    startEditing(lq.id, idx, q);
-                                  }}
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </Button>
-                              </div>
+                              
                               {q.type === 'multiple_choice' && q.options && (
-                                <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
-                                  {q.options.map((opt: string, oIdx: number) => {
-                                    const letter = String.fromCharCode(65 + oIdx);
-                                    return (
-                                      <li key={oIdx} className="font-medium">
-                                        <span className="font-bold">{letter}.</span> {opt}
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              )}
-                              {isShortAnswer && (
-                                <div className="ml-4 mt-2 space-y-2">
-                                  <p className="text-sm text-muted-foreground italic">
-                                    Students will type their answer
-                                  </p>
-                                  <Badge variant="outline" className="text-xs">
-                                    Short Answer Question
-                                  </Badge>
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-muted-foreground">Answer Options</Label>
+                                  {q.options.map((opt: string, oIdx: number) => (
+                                    <div key={oIdx} className="flex items-center gap-2">
+                                      <span className="font-bold text-sm w-6">{String.fromCharCode(65 + oIdx)}.</span>
+                                      <Input
+                                        value={opt}
+                                        onChange={(e) => {
+                                          const newOptions = [...q.options];
+                                          newOptions[oIdx] = e.target.value;
+                                          updateEditedQuestion(lq.id, idx, 'options', newOptions);
+                                        }}
+                                      />
+                                    </div>
+                                  ))}
                                 </div>
                               )}
+                              
+                              {isShortAnswer && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-muted-foreground">Expected Answer (for auto-grading)</Label>
+                                  <Input
+                                    value={q.expectedAnswer || ''}
+                                    onChange={(e) => updateEditedQuestion(lq.id, idx, 'expectedAnswer', e.target.value)}
+                                    placeholder="Expected answer..."
+                                  />
+                                </div>
+                              )}
+                              
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => saveEdit(lq.id, idx)}>
+                                  <Check className="h-3 w-3 mr-1" /> Save
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => cancelEditing(lq.id)}>
+                                  <X className="h-3 w-3 mr-1" /> Cancel
+                                </Button>
+                              </div>
                             </div>
-                          </Label>
-                        )}
+                          ) : (
+                            <Label htmlFor={`${lq.id}-${idx}`} className="cursor-pointer">
+                              <div className="space-y-2">
+                                <div className="flex items-start justify-between">
+                                  <p className="font-medium">{q.text}</p>
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      startEditing(lq.id, idx, q);
+                                    }}
+                                    className="h-7 w-7 p-0"
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                {q.type === 'multiple_choice' && q.options && (
+                                  <ul className="text-sm text-muted-foreground ml-4 mt-1 space-y-1">
+                                    {q.options.map((opt: string, oIdx: number) => {
+                                      const letter = String.fromCharCode(65 + oIdx);
+                                      return (
+                                        <li key={oIdx} className="font-medium">
+                                          <span className="font-bold">{letter}.</span> {opt}
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                                {isShortAnswer && (
+                                  <div className="ml-4 mt-2 space-y-2">
+                                    <p className="text-sm text-muted-foreground italic">
+                                      Students will type their answer
+                                    </p>
+                                    <Badge variant="outline" className="text-xs">
+                                      Short Answer Question
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+                            </Label>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Show send card right under this question when selected */}
+                      {isSelected && (
+                        <div className="ml-8 space-y-3 animate-in fade-in-50 slide-in-from-top-2">
+                          {/* Show grading mode toggle only for short answer questions */}
+                          {isShortAnswer && (
+                            <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <Label htmlFor={`grading-mode-${lq.id}`} className="text-sm font-medium">
+                                      Short Answer Grading Mode
+                                    </Label>
+                                    <Badge variant={gradingModes[lq.id] === 'manual_grade' ? 'default' : 'secondary'} className="text-xs">
+                                      {gradingModes[lq.id] === 'manual_grade' ? (
+                                        <><UserCog className="h-3 w-3 mr-1" /> Manual</>
+                                      ) : (
+                                        <><Bot className="h-3 w-3 mr-1" /> Auto-Grade</>
+                                      )}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {gradingModes[lq.id] === 'manual_grade' 
+                                      ? "You will manually grade each student's response" 
+                                      : "AI will automatically grade responses based on expected answer"}
+                                  </p>
+                                </div>
+                                <Switch
+                                  id={`grading-mode-${lq.id}`}
+                                  checked={gradingModes[lq.id] === 'manual_grade'}
+                                  onCheckedChange={(checked) => {
+                                    setGradingModes(prev => ({
+                                      ...prev,
+                                      [lq.id]: checked ? 'manual_grade' : 'auto_grade'
+                                    }));
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <Alert>
+                            <Users className="h-4 w-4" />
+                            <AlertDescription>
+                              This will send the selected question to <strong>all your students</strong> immediately as a live lecture check-in.
+                            </AlertDescription>
+                          </Alert>
+
+                          <Button 
+                            onClick={() => handleSendToStudents(lq)}
+                            className="w-full"
+                          >
+                            <Send className="mr-2 h-4 w-4" />
+                            Send to All Students
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </RadioGroup>
-            </div>
-
-            {/* Show grading mode toggle only when a short answer question is selected */}
-            {selectedQuestions[lq.id] !== undefined && 
-             lq.questions[selectedQuestions[lq.id]]?.[0]?.type === 'short_answer' && (
-              <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`grading-mode-${lq.id}`} className="text-sm font-medium">
-                        Short Answer Grading Mode
-                      </Label>
-                      <Badge variant={gradingModes[lq.id] === 'manual_grade' ? 'default' : 'secondary'} className="text-xs">
-                        {gradingModes[lq.id] === 'manual_grade' ? (
-                          <><UserCog className="h-3 w-3 mr-1" /> Manual</>
-                        ) : (
-                          <><Bot className="h-3 w-3 mr-1" /> Auto-Grade</>
-                        )}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {gradingModes[lq.id] === 'manual_grade' 
-                        ? "You will manually grade each student's response" 
-                        : "AI will automatically grade responses based on expected answer"}
-                    </p>
-                  </div>
-                  <Switch
-                    id={`grading-mode-${lq.id}`}
-                    checked={gradingModes[lq.id] === 'manual_grade'}
-                    onCheckedChange={(checked) => {
-                      setGradingModes(prev => ({
-                        ...prev,
-                        [lq.id]: checked ? 'manual_grade' : 'auto_grade'
-                      }));
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <Alert>
-              <Users className="h-4 w-4" />
-              <AlertDescription>
-                This will send the selected question to <strong>all your students</strong> immediately as a live lecture check-in.
-              </AlertDescription>
-            </Alert>
-
-            <div className="flex gap-2">
-              <Button 
-                onClick={() => handleSendToStudents(lq)}
-                disabled={selectedQuestions[lq.id] === undefined}
-                className="flex-1"
-              >
-                <Send className="mr-2 h-4 w-4" />
-                Send to All Students
-              </Button>
             </div>
           </div>
         ))}
