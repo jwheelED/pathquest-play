@@ -533,31 +533,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.log('✅ Successfully parsed', materialContext.length, 'materials');
       }
 
-      // Get new content since last generation
-      // Use content starting from where we last generated, with at least 200 chars
-      const startIndex = lastGeneratedIndexRef.current;
-      const newContentLength = fullTranscript.length - startIndex;
+      // Always use the most recent 4000 chars to capture what professor just said
+      // This ensures we get the absolute latest content regardless of generation history
+      const transcriptForGeneration = fullTranscript.slice(-4000);
       
-      let transcriptForGeneration: string;
-      if (newContentLength >= 200) {
-        // Use new content since last generation
-        transcriptForGeneration = fullTranscript.slice(startIndex);
-        console.log('📊 Using NEW content from index', startIndex, 'length:', transcriptForGeneration.length);
-      } else {
-        // Not enough new content, use last 3000 chars with some overlap
-        transcriptForGeneration = fullTranscript.slice(-3000);
-        console.log('📊 Using RECENT content (not enough new), length:', transcriptForGeneration.length);
-      }
-      
-      // Cap at 5000 chars for API limits
-      if (transcriptForGeneration.length > 5000) {
-        transcriptForGeneration = transcriptForGeneration.slice(-5000);
-      }
+      console.log('📊 Using most recent content, length:', transcriptForGeneration.length, 'of total:', fullTranscript.length);
       
       console.log('📤 Sending to edge function:', {
         transcriptLength: transcriptForGeneration.length,
         materialsCount: materialContext.length,
-        startIndex,
         fullTranscriptLength: fullTranscript.length
       });
 
@@ -579,10 +563,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       console.log('✅ Received questions:', functionData.questions.length, 'sets');
-
-      // Update the last generated index to current position
-      lastGeneratedIndexRef.current = fullTranscript.length;
-      console.log('✅ Updated last generated index to:', lastGeneratedIndexRef.current);
 
       // Save to review queue with full context snippet
       const { error: insertError } = await supabase

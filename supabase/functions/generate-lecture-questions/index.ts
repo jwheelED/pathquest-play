@@ -216,7 +216,7 @@ Question format:
     }
 
     // Validate that we have questions
-    const questions = parsedContent.questions || parsedContent;
+    let questions = parsedContent.questions || parsedContent;
     if (!Array.isArray(questions) || questions.length === 0) {
       console.error('Invalid questions format:', parsedContent);
       return new Response(
@@ -225,16 +225,18 @@ Question format:
       );
     }
 
-    // Validate each question set
-    for (let i = 0; i < questions.length; i++) {
-      if (!Array.isArray(questions[i]) || questions[i].length === 0) {
-        console.error(`Question set ${i} is invalid:`, questions[i]);
-        return new Response(
-          JSON.stringify({ error: 'Invalid response format. Please try again.' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    // Normalize format: wrap each question in an array if not already wrapped
+    questions = questions.map((q: any, i: number) => {
+      if (Array.isArray(q)) {
+        return q; // Already wrapped
+      } else if (typeof q === 'object' && q !== null) {
+        // Single question object, wrap it
+        return [q];
+      } else {
+        console.error(`Question ${i} is invalid:`, q);
+        throw new Error('Invalid question format');
       }
-    }
+    });
 
     console.log('✅ Successfully generated', questions.length, 'question sets');
 
