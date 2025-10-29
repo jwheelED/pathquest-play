@@ -40,47 +40,45 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useEffect(() => {
     // Monitor transcript for voice command with multiple pattern matching
     const fullTranscript = transcriptBufferRef.current;
-    const transcriptLower = fullTranscript.toLowerCase().replace(/[^\w\s]/g, '');
-    
+    const transcriptLower = fullTranscript.toLowerCase().replace(/[^\w\s]/g, "");
+
     // Multiple trigger patterns for better detection
     const triggerPatterns = [
-      'generate question now',
-      'generate questions now',
-      'generate a question now',
-      'generate the question now',
-      'create question now',
-      'make question now'
+      "generate question now",
+      "generate questions now",
+      "generate a question now",
+      "generate the question now",
+      "create question now",
+      "make question now",
     ];
-    
-    const matchedPattern = triggerPatterns.find(pattern => 
-      transcriptLower.includes(pattern.replace(/[^\w\s]/g, ''))
-    );
-    
+
+    const matchedPattern = triggerPatterns.find((pattern) => transcriptLower.includes(pattern.replace(/[^\w\s]/g, "")));
+
     if (isRecording && matchedPattern && !hasTriggeredRef.current) {
-      console.log('🎯 Voice command detected:', matchedPattern);
-      console.log('📝 Full transcript:', fullTranscript);
+      console.log("🎯 Voice command detected:", matchedPattern);
+      console.log("📝 Full transcript:", fullTranscript);
       hasTriggeredRef.current = true;
-      
+
       // Clear any pending debounce
       if (triggerDebounceRef.current) {
         clearTimeout(triggerDebounceRef.current);
       }
-      
+
       // Don't remove the trigger phrase - keep all lecture content
       // Just mark that we've triggered
-      
+
       toast({
         title: "🎤 Voice command recognized!",
-        description: "Generating questions from your lecture..."
+        description: "Generating questions from your lecture...",
       });
-      
+
       // Trigger immediately with voice command flag
       handleGenerateQuestions(true);
-      
+
       // Reset trigger flag after 3 seconds to allow another trigger
       triggerDebounceRef.current = setTimeout(() => {
         hasTriggeredRef.current = false;
-        console.log('✅ Voice command ready again');
+        console.log("✅ Voice command ready again");
       }, 3000);
     }
   }, [transcriptChunks, isRecording]);
@@ -88,12 +86,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Periodic system restart for resource cleanup
   useEffect(() => {
     if (!isRecording) return;
-    
+
     const restartTimer = setTimeout(() => {
-      console.log('🔄 Performing periodic restart for resource cleanup');
+      console.log("🔄 Performing periodic restart for resource cleanup");
       toast({
         title: "System refresh",
-        description: "Refreshing audio system for optimal performance"
+        description: "Refreshing audio system for optimal performance",
       });
       const wasRecording = isRecording;
       stopRecording();
@@ -101,29 +99,29 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         setTimeout(() => startRecording(), 1000);
       }
     }, RESTART_INTERVAL);
-    
+
     return () => clearTimeout(restartTimer);
   }, [isRecording]);
 
   // Token refresh for extended sessions
   useEffect(() => {
     if (!isRecording) return;
-    
+
     const refreshTimer = setInterval(async () => {
-      console.log('🔑 Refreshing auth token');
+      console.log("🔑 Refreshing auth token");
       const { error } = await supabase.auth.refreshSession();
       if (error) {
-        console.error('Token refresh failed:', error);
+        console.error("Token refresh failed:", error);
         toast({
           title: "Session refresh issue",
           description: "Attempting to refresh authentication",
-          variant: "destructive"
+          variant: "destructive",
         });
       } else {
-        console.log('✅ Token refreshed successfully');
+        console.log("✅ Token refreshed successfully");
       }
     }, TOKEN_REFRESH_INTERVAL);
-    
+
     return () => clearInterval(refreshTimer);
   }, [isRecording]);
 
@@ -133,12 +131,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setRecordingDuration(0);
       return;
     }
-    
+
     const startTime = Date.now();
     durationTimerRef.current = setInterval(() => {
       setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
-    
+
     return () => {
       if (durationTimerRef.current) {
         clearInterval(durationTimerRef.current);
@@ -159,7 +157,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         clearInterval(durationTimerRef.current);
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
+        streamRef.current.getTracks().forEach((track) => {
           track.stop();
           track.enabled = false;
         });
@@ -178,7 +176,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         toast({
           title: "Please wait",
           description: "System is recovering from errors. Try again in a moment.",
-          variant: "destructive"
+          variant: "destructive",
         });
         return;
       }
@@ -190,29 +188,29 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       recordingCycleCountRef.current = 0;
       setFailureCount(0);
       setIsCircuitOpen(false);
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 48000,
-        } 
+        },
       });
-      
+
       streamRef.current = stream;
       isRecordingRef.current = true;
       setIsRecording(true);
-      
-      toast({ 
-        title: "🎙️ Recording started", 
-        description: "Say 'generate question now' anytime to create questions instantly"
+
+      toast({
+        title: "🎙️ Recording started",
+        description: "Say 'generate question now' anytime to create questions instantly",
       });
 
       // Start the continuous recording cycle
       startRecordingCycle();
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error("Error starting recording:", error);
       toast({ title: "Failed to start recording", variant: "destructive" });
     }
   };
@@ -224,9 +222,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Force restart after MAX_RECORDING_CYCLES for resource cleanup
       recordingCycleCountRef.current++;
       if (recordingCycleCountRef.current >= MAX_RECORDING_CYCLES) {
-        console.log('🔄 Forcing cycle restart for resource cleanup');
+        console.log("🔄 Forcing cycle restart for resource cleanup");
         recordingCycleCountRef.current = 0;
-        
+
         // Clean up current recorder
         if (mediaRecorderRef.current) {
           mediaRecorderRef.current.ondataavailable = null;
@@ -236,19 +234,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       // Try to use the best available audio format
-      let mimeType = 'audio/webm;codecs=opus';
+      let mimeType = "audio/webm;codecs=opus";
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/webm';
+        mimeType = "audio/webm";
       }
       if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/ogg;codecs=opus';
+        mimeType = "audio/ogg;codecs=opus";
       }
-      
+
       const mediaRecorder = new MediaRecorder(streamRef.current, {
         mimeType,
-        audioBitsPerSecond: 128000
+        audioBitsPerSecond: 128000,
       });
-      
+
       mediaRecorderRef.current = mediaRecorder;
       const chunks: Blob[] = [];
 
@@ -262,7 +260,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Create complete audio blob from all chunks
         if (chunks.length > 0) {
           const audioBlob = new Blob(chunks, { type: mimeType });
-          console.log('📦 Complete audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
+          console.log("📦 Complete audio blob:", audioBlob.size, "bytes, type:", audioBlob.type);
           await processAudioChunk(audioBlob);
         }
 
@@ -271,7 +269,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
         // Continue recording cycle if still active (use ref to avoid stale closure)
         if (isRecordingRef.current && streamRef.current) {
-          console.log('♻️ Continuing recording cycle...');
+          console.log("♻️ Continuing recording cycle...");
           // Small delay before next cycle
           setTimeout(() => {
             if (isRecordingRef.current && streamRef.current) {
@@ -279,39 +277,41 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             }
           }, 100);
         } else {
-          console.log('🛑 Recording cycle stopped');
+          console.log("🛑 Recording cycle stopped");
         }
       };
 
       // Record for 6 seconds (reduced from 8 for more frequent cleanup)
       mediaRecorder.start();
-      console.log('🎙️ Started recording cycle', recordingCycleCountRef.current, 'with format:', mimeType);
-      
+      console.log("🎙️ Started recording cycle", recordingCycleCountRef.current, "with format:", mimeType);
+
       // Stop after 6 seconds to create a complete audio file
       recordingIntervalRef.current = setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
+        if (mediaRecorder.state === "recording") {
           mediaRecorder.stop();
         }
       }, 6000);
-      
     } catch (error) {
-      console.error('Error in recording cycle:', error);
-      setFailureCount(prev => prev + 1);
-      
+      console.error("Error in recording cycle:", error);
+      setFailureCount((prev) => prev + 1);
+
       if (failureCount >= MAX_CONSECUTIVE_FAILURES - 1) {
         setIsCircuitOpen(true);
         stopRecording();
         toast({
           title: "Recording paused",
           description: "Multiple errors detected. Please restart recording.",
-          variant: "destructive"
+          variant: "destructive",
         });
-        
+
         // Auto-recover after 2 minutes
-        setTimeout(() => {
-          setIsCircuitOpen(false);
-          setFailureCount(0);
-        }, 2 * 60 * 1000);
+        setTimeout(
+          () => {
+            setIsCircuitOpen(false);
+            setFailureCount(0);
+          },
+          2 * 60 * 1000,
+        );
       } else if (isRecording) {
         // Try to restart the cycle with exponential backoff
         const backoffDelay = Math.min(1000 * Math.pow(2, failureCount), 5000);
@@ -328,32 +328,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     isRecordingRef.current = false;
     setIsRecording(false);
     recordingCycleCountRef.current = 0;
-    
+
     // Clear interval
     if (recordingIntervalRef.current) {
       clearTimeout(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
     }
-    
+
     // Stop current recorder with cleanup
     if (mediaRecorderRef.current) {
-      if (mediaRecorderRef.current.state === 'recording') {
+      if (mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
       }
       mediaRecorderRef.current.ondataavailable = null;
       mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current = null;
     }
-    
+
     // Stop stream with proper cleanup
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
+      streamRef.current.getTracks().forEach((track) => {
         track.stop();
         track.enabled = false;
       });
       streamRef.current = null;
     }
-    
+
     toast({ title: "Recording stopped" });
   };
 
@@ -361,105 +361,105 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     try {
       // Validate audio blob - require minimum size
       if (!audioBlob || audioBlob.size < 1000) {
-        console.warn('Audio chunk too small, skipping:', audioBlob.size);
+        console.warn("Audio chunk too small, skipping:", audioBlob.size);
         return;
       }
 
-      console.log('Processing audio chunk:', audioBlob.size, 'bytes, type:', audioBlob.type);
+      console.log("Processing audio chunk:", audioBlob.size, "bytes, type:", audioBlob.type);
 
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
-        const base64Audio = reader.result?.toString().split(',')[1];
+        const base64Audio = reader.result?.toString().split(",")[1];
         if (!base64Audio) {
-          console.error('Failed to convert audio to base64');
+          console.error("Failed to convert audio to base64");
           return;
         }
 
         try {
-          const { data, error } = await supabase.functions.invoke('transcribe-lecture', {
-            body: { audio: base64Audio }
+          const { data, error } = await supabase.functions.invoke("transcribe-lecture", {
+            body: { audio: base64Audio },
           });
 
           if (error) {
-            console.error('Transcription error:', error);
+            console.error("Transcription error:", error);
             // Only show toast for critical errors, not for empty responses
-            if (error.message && !error.message.includes('too small')) {
-              toast({ 
-                title: "Transcription error", 
+            if (error.message && !error.message.includes("too small")) {
+              toast({
+                title: "Transcription error",
                 description: "Please ensure your microphone is working properly.",
-                variant: "destructive" 
+                variant: "destructive",
               });
             }
             return;
           }
-          
+
           if (data?.text && data.text.trim()) {
             const newText = data.text.trim();
-            console.log('✅ Transcribed chunk:', newText.substring(0, 100));
-            console.log('📊 Current chunks count before adding:', transcriptChunks.length);
-            
+            console.log("✅ Transcribed chunk:", newText.substring(0, 100));
+            console.log("📊 Current chunks count before adding:", transcriptChunks.length);
+
             // Reset failure count on success
             setFailureCount(0);
-            
+
             // Add new chunk to array for display
-            setTranscriptChunks(prev => {
+            setTranscriptChunks((prev) => {
               const updated = [...prev, newText];
-              console.log('📊 Chunks count after adding:', updated.length);
+              console.log("📊 Chunks count after adding:", updated.length);
               return updated;
             });
-            
+
             // Accumulate full transcript with buffer size management
             if (transcriptBufferRef.current) {
               transcriptBufferRef.current += " " + newText;
             } else {
               transcriptBufferRef.current = newText;
             }
-            
+
             // Implement sliding window for memory management
             if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
               const trimmed = transcriptBufferRef.current.slice(-KEEP_RECENT_SIZE);
               transcriptBufferRef.current = trimmed;
-              console.log('🧹 Trimmed transcript buffer to prevent memory issues');
+              console.log("🧹 Trimmed transcript buffer to prevent memory issues");
             }
-            
-            console.log('📝 Total transcript length:', transcriptBufferRef.current.length);
+
+            console.log("📝 Total transcript length:", transcriptBufferRef.current.length);
           } else {
-            console.log('ℹ️ No transcription result (audio may be silence)');
+            console.log("ℹ️ No transcription result (audio may be silence)");
           }
         } catch (invokeError: any) {
-          console.error('Function invoke error:', invokeError);
-          
+          console.error("Function invoke error:", invokeError);
+
           // Handle auth errors with retry
-          if (invokeError?.message?.includes('401') || invokeError?.status === 401) {
-            console.log('🔑 Auth error, attempting token refresh');
+          if (invokeError?.message?.includes("401") || invokeError?.status === 401) {
+            console.log("🔑 Auth error, attempting token refresh");
             const { error } = await supabase.auth.refreshSession();
             if (!error) {
               // Retry the request once
-              const { data: retryData, error: retryError } = await supabase.functions.invoke('transcribe-lecture', {
-                body: { audio: base64Audio }
+              const { data: retryData, error: retryError } = await supabase.functions.invoke("transcribe-lecture", {
+                body: { audio: base64Audio },
               });
-              
+
               if (!retryError && retryData?.text?.trim()) {
                 const newText = retryData.text.trim();
-                setTranscriptChunks(prev => [...prev, newText]);
+                setTranscriptChunks((prev) => [...prev, newText]);
                 transcriptBufferRef.current += " " + newText;
                 setFailureCount(0);
                 return;
               }
             }
           }
-          
+
           // Track failures
-          setFailureCount(prev => prev + 1);
+          setFailureCount((prev) => prev + 1);
         }
       };
-      
+
       reader.onerror = () => {
-        console.error('FileReader error:', reader.error);
+        console.error("FileReader error:", reader.error);
       };
     } catch (error) {
-      console.error('Transcription processing error:', error);
+      console.error("Transcription processing error:", error);
     }
   };
 
@@ -467,132 +467,150 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     // For voice commands, be very lenient; for manual, require more content
     const minLength = isVoiceCommand ? 15 : 50;
     const fullTranscript = transcriptBufferRef.current;
-    
-    console.log('📊 Generation check - length:', fullTranscript.length, 'min required:', minLength, 'voice command:', isVoiceCommand);
-    
+
+    console.log(
+      "📊 Generation check - length:",
+      fullTranscript.length,
+      "min required:",
+      minLength,
+      "voice command:",
+      isVoiceCommand,
+    );
+
     if (!fullTranscript.trim() || fullTranscript.length < minLength) {
-      toast({ 
-        title: "Not enough content", 
-        description: `Need at least ${minLength} characters. Current: ${fullTranscript.length}`
+      toast({
+        title: "Not enough content",
+        description: `Need at least ${minLength} characters. Current: ${fullTranscript.length}`,
       });
       return;
     }
 
     setIsProcessing(true);
-    
+
     // Show instant feedback
     if (!isVoiceCommand) {
-      toast({ 
-        title: "⚡ Generating questions...", 
-        description: "Processing lecture content and course materials"
+      toast({
+        title: "⚡ Generating questions...",
+        description: "Processing lecture content and course materials",
       });
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       // Fetch uploaded lecture materials
       const { data: materials, error: materialsError } = await supabase
-        .from('lecture_materials')
-        .select('id, title, description, file_path, file_type')
-        .eq('instructor_id', user.id)
-        .order('created_at', { ascending: false })
+        .from("lecture_materials")
+        .select("id, title, description, file_path, file_type")
+        .eq("instructor_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(5); // Get most recent 5 materials
 
-      console.log('📚 Found', materials?.length || 0, 'lecture materials');
+      console.log("📚 Found", materials?.length || 0, "lecture materials");
 
       // Parse content from materials
       let materialContext: any[] = [];
       if (materials && materials.length > 0) {
         const parsePromises = materials.map(async (material) => {
           try {
-            console.log('📖 Parsing material:', material.title);
-            const { data, error } = await supabase.functions.invoke('parse-lecture-material', {
-              body: { filePath: material.file_path }
+            console.log("📖 Parsing material:", material.title);
+            const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
+              body: { filePath: material.file_path },
             });
 
             if (error) {
-              console.warn('Failed to parse material:', material.title, error);
+              console.warn("Failed to parse material:", material.title, error);
               return null;
             }
 
             return {
               title: material.title,
               description: material.description,
-              content: data.text
+              content: data.text,
             };
           } catch (error) {
-            console.warn('Error parsing material:', material.title, error);
+            console.warn("Error parsing material:", material.title, error);
             return null;
           }
         });
 
         const parsedMaterials = await Promise.all(parsePromises);
-        materialContext = parsedMaterials.filter(m => m !== null);
-        console.log('✅ Successfully parsed', materialContext.length, 'materials');
+        materialContext = parsedMaterials.filter((m) => m !== null);
+        console.log("✅ Successfully parsed", materialContext.length, "materials");
       }
 
       // Use only the most recent 1200 chars (~1-2 minutes of speech)
       // This captures what professor JUST said with minimal tokens for cost efficiency
-      const transcriptForGeneration = fullTranscript.slice(-1200);
-      
-      console.log('📊 Using most recent speech, length:', transcriptForGeneration.length, 'of total:', fullTranscript.length);
-      
-      console.log('📤 Sending to edge function:', {
+      const transcriptForGeneration = fullTranscript.slice(-600);
+
+      console.log(
+        "📊 Using most recent speech, length:",
+        transcriptForGeneration.length,
+        "of total:",
+        fullTranscript.length,
+      );
+
+      console.log("📤 Sending to edge function:", {
         transcriptLength: transcriptForGeneration.length,
         materialsCount: materialContext.length,
-        fullTranscriptLength: fullTranscript.length
+        fullTranscriptLength: fullTranscript.length,
       });
 
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('generate-lecture-questions', {
-        body: { 
-          transcript: transcriptForGeneration,
-          materialContext: materialContext,
-        }
-      });
+      const { data: functionData, error: functionError } = await supabase.functions.invoke(
+        "generate-lecture-questions",
+        {
+          body: {
+            transcript: transcriptForGeneration,
+            materialContext: materialContext,
+          },
+        },
+      );
 
       if (functionError) {
-        console.error('Edge function error:', functionError);
-        throw new Error(functionError.message || 'Failed to call generation function');
+        console.error("Edge function error:", functionError);
+        throw new Error(functionError.message || "Failed to call generation function");
       }
 
       if (!functionData || !functionData.questions) {
-        console.error('Invalid response from edge function:', functionData);
-        throw new Error('Invalid response format from AI');
+        console.error("Invalid response from edge function:", functionData);
+        throw new Error("Invalid response format from AI");
       }
 
-      console.log('✅ Received questions:', functionData.questions.length, 'sets');
+      console.log("✅ Received questions:", functionData.questions.length, "sets");
 
       // Save to review queue with full context snippet
-      const { error: insertError } = await supabase
-        .from('lecture_questions')
-        .insert([{
+      const { error: insertError } = await supabase.from("lecture_questions").insert([
+        {
           instructor_id: user.id,
           transcript_snippet: fullTranscript.slice(-1000),
           questions: functionData.questions,
-          status: 'pending'
-        }]);
+          status: "pending",
+        },
+      ]);
 
       if (insertError) {
-        console.error('Database insert error:', insertError);
-        throw new Error('Failed to save questions to database');
+        console.error("Database insert error:", insertError);
+        throw new Error("Failed to save questions to database");
       }
 
-      toast({ 
-        title: "✅ Questions generated!", 
-        description: materialContext.length > 0 
-          ? `Using insights from ${materialContext.length} course materials`
-          : "Check review queue to send to students"
+      toast({
+        title: "✅ Questions generated!",
+        description:
+          materialContext.length > 0
+            ? `Using insights from ${materialContext.length} course materials`
+            : "Check review queue to send to students",
       });
-      
+
       onQuestionGenerated();
     } catch (error: any) {
-      console.error('Question generation error:', error);
-      toast({ 
-        title: "Failed to generate questions", 
-        description: error.message || 'Unknown error occurred',
-        variant: "destructive" 
+      console.error("Question generation error:", error);
+      toast({
+        title: "Failed to generate questions",
+        description: error.message || "Unknown error occurred",
+        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);
@@ -615,15 +633,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           Live Lecture Capture
         </CardTitle>
         <CardDescription className="text-sm">
-          {isRecording 
-            ? "Recording and transcribing in real-time • Voice commands enabled • Using course materials for context" 
-            : "Start recording your lecture - AI uses uploaded materials and transcription for questions"
-          }
+          {isRecording
+            ? "Recording and transcribing in real-time • Voice commands enabled • Using course materials for context"
+            : "Start recording your lecture - AI uses uploaded materials and transcription for questions"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
-          <Button 
+          <Button
             onClick={isRecording ? stopRecording : startRecording}
             variant={isRecording ? "destructive" : "default"}
             className="flex-1"
@@ -640,7 +657,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               </>
             )}
           </Button>
-          <Button 
+          <Button
             onClick={() => handleGenerateQuestions(false)}
             disabled={transcriptChunks.length === 0 || isProcessing || transcriptBufferRef.current.length < 50}
             variant="secondary"
@@ -655,12 +672,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             )}
           </Button>
           {transcriptChunks.length > 0 && (
-            <Button 
-              onClick={clearTranscript}
-              disabled={isProcessing}
-              variant="outline"
-              size="sm"
-            >
+            <Button onClick={clearTranscript} disabled={isProcessing} variant="outline" size="sm">
               Clear
             </Button>
           )}
@@ -674,13 +686,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 Live
               </Badge>
               <Badge variant="secondary" className="flex-1 justify-center py-1.5">
-                {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
               </Badge>
             </div>
             {failureCount > 0 && (
               <Badge variant="destructive" className="w-full justify-center py-1.5">
                 <AlertCircle className="mr-2 h-3 w-3" />
-                {failureCount} transcription {failureCount === 1 ? 'failure' : 'failures'}
+                {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
               </Badge>
             )}
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
@@ -696,12 +708,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             <p className="text-sm font-medium">Transcript Chunks:</p>
             {transcriptChunks.map((chunk, index) => (
               <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Chunk {index + 1}
-                </p>
-                <p className="text-sm text-foreground whitespace-pre-wrap">
-                  {chunk}
-                </p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
               </div>
             ))}
           </div>
