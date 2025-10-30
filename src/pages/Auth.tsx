@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { studentSignUpSchema, signInSchema } from "@/lib/validation";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -30,9 +31,28 @@ export default function AuthPage() {
     setSuccess("");
 
     if (isSignUp) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
+      // Validate student signup inputs
+      const validationResult = studentSignUpSchema.safeParse({
+        email: email.trim(),
         password,
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        age: age ? parseInt(age) : undefined,
+        instructorCode: instructorCode.trim().toUpperCase() || undefined
+      });
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        setError(firstError.message);
+        toast.error(firstError.message);
+        return;
+      }
+
+      const validData = validationResult.data;
+
+      const { data, error } = await supabase.auth.signUp({
+        email: validData.email,
+        password: validData.password,
       });
 
       if (error) {
@@ -46,10 +66,10 @@ export default function AuthPage() {
         const { error: insertError } = await supabase.from("users").insert({
           id: user.id,
           user_id: user.id,
-          name,
-          email,
-          phone,
-          age: parseInt(age) || null,
+          name: validData.name,
+          email: validData.email,
+          phone: validData.phone || null,
+          age: validData.age || null,
         });
 
         // Create user stats for gamification
@@ -58,17 +78,17 @@ export default function AuthPage() {
         });
 
         if (insertError) {
-          console.error("Insert user error:", insertError.message);
+          toast.error("Error creating user profile");
         }
         if (statsError) {
-          console.error("Insert user stats error:", statsError.message);
+          toast.error("Error creating user stats");
         }
 
         // Link to instructor if code provided
-        if (instructorCode.trim()) {
+        if (validData.instructorCode) {
           // Use validate_instructor_code RPC function
           const { data: instructorId, error: validateError } = await supabase
-            .rpc("validate_instructor_code", { code: instructorCode.toUpperCase() });
+            .rpc("validate_instructor_code", { code: validData.instructorCode });
 
           if (instructorId) {
             const { error: linkError } = await supabase
@@ -79,7 +99,6 @@ export default function AuthPage() {
               });
 
             if (linkError) {
-              console.error("Error linking to instructor:", linkError.message);
               toast.error("Valid code, but failed to link to instructor");
             } else {
               toast.success("Successfully linked to instructor!");
@@ -93,7 +112,23 @@ export default function AuthPage() {
         navigate("/onboarding");
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // Validate sign-in inputs
+      const validationResult = signInSchema.safeParse({
+        email: email.trim(),
+        password
+      });
+
+      if (!validationResult.success) {
+        const firstError = validationResult.error.errors[0];
+        setError(firstError.message);
+        toast.error(firstError.message);
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ 
+        email: validationResult.data.email, 
+        password: validationResult.data.password 
+      });
 
       if (error) {
         setError(error.message);

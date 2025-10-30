@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
 
 export default function InstructorAuth() {
   const [email, setEmail] = useState("");
@@ -46,12 +47,28 @@ export default function InstructorAuth() {
     setLoading(true);
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({ 
-          email, 
+        // Validate instructor signup inputs
+        const validationResult = instructorAdminSignUpSchema.safeParse({
+          email: email.trim(),
           password,
+          name: name.trim()
+        });
+
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          toast.error(firstError.message);
+          setLoading(false);
+          return;
+        }
+
+        const validData = validationResult.data;
+
+        const { data, error } = await supabase.auth.signUp({ 
+          email: validData.email, 
+          password: validData.password,
           options: {
             data: {
-              full_name: name,
+              full_name: validData.name,
               role: "instructor"
             }
           }
@@ -74,7 +91,23 @@ export default function InstructorAuth() {
           }
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        // Validate sign-in inputs
+        const validationResult = signInSchema.safeParse({
+          email: email.trim(),
+          password
+        });
+
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          toast.error(firstError.message);
+          setLoading(false);
+          return;
+        }
+
+        const { error } = await supabase.auth.signInWithPassword({ 
+          email: validationResult.data.email, 
+          password: validationResult.data.password 
+        });
         if (error) throw error;
 
         const { data: { user } } = await supabase.auth.getUser();
@@ -87,7 +120,6 @@ export default function InstructorAuth() {
             .maybeSingle();
           
           if (roleError) {
-            console.error("Role fetch error:", roleError);
             toast.error("Error checking instructor status");
             await supabase.auth.signOut();
             return;
