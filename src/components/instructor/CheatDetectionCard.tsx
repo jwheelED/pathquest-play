@@ -88,7 +88,7 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
         return;
       }
 
-      // Filter and format flagged students (>40% paste)
+      // Filter for unusual pasting patterns (not normal time-saving pastes)
       const flagged = versionData
         .map((record: any) => {
           const total = record.typed_count + record.pasted_count;
@@ -105,7 +105,26 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             flagged_at: record.created_at
           };
         })
-        .filter((record: FlaggedStudent) => record.paste_percentage > 40)
+        .filter((record: FlaggedStudent) => {
+          const total = record.typed_count + record.pasted_count;
+          const pastePercentage = record.paste_percentage;
+          const pasteCount = record.pasted_count;
+          
+          // Ignore if too few events (likely just started)
+          if (total < 5) return false;
+          
+          // Flag if:
+          // 1. Extremely high paste percentage (>70%) - suggests copying entire answer
+          if (pastePercentage > 70) return true;
+          
+          // 2. High paste percentage (>60%) with many paste events (>5) - repeated copying
+          if (pastePercentage > 60 && pasteCount > 5) return true;
+          
+          // 3. Very high paste count (>10) with majority pasted (>55%) - excessive copying
+          if (pasteCount > 10 && pastePercentage > 55) return true;
+          
+          return false;
+        })
         .sort((a: FlaggedStudent, b: FlaggedStudent) => 
           new Date(b.flagged_at).getTime() - new Date(a.flagged_at).getTime()
         );
@@ -159,7 +178,7 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           Cheat Detection
         </CardTitle>
         <CardDescription>
-          {flaggedStudents.length} submission(s) flagged for excessive pasting
+          {flaggedStudents.length} submission(s) flagged for unusual pasting patterns
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -185,8 +204,13 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
                   <Clock className="h-3 w-3" />
-                  <span>Last cheat attempt on {format(new Date(student.flagged_at), 'MMM d, yyyy h:mm a')}</span>
+                  <span>Flagged on {format(new Date(student.flagged_at), 'MMM d, yyyy h:mm a')}</span>
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {student.paste_percentage > 70 && "⚠️ Extremely high paste percentage"}
+                  {student.paste_percentage <= 70 && student.pasted_count > 10 && "⚠️ Excessive paste operations"}
+                  {student.paste_percentage <= 70 && student.pasted_count <= 10 && student.pasted_count > 5 && "⚠️ Repeated copying pattern"}
+                </p>
               </div>
             </div>
           ))}
