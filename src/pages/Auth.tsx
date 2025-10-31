@@ -10,8 +10,6 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [age, setAge] = useState("");
   const [instructorCode, setInstructorCode] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
@@ -36,8 +34,6 @@ export default function AuthPage() {
         email: email.trim(),
         password,
         name: name.trim(),
-        phone: phone.trim() || undefined,
-        age: age ? parseInt(age) : undefined,
         instructorCode: instructorCode.trim().toUpperCase() || undefined
       });
 
@@ -68,8 +64,6 @@ export default function AuthPage() {
           user_id: user.id,
           name: validData.name,
           email: validData.email,
-          phone: validData.phone || null,
-          age: validData.age || null,
         });
 
         // Create user stats for gamification
@@ -224,22 +218,6 @@ export default function AuthPage() {
                   placeholder="Full Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  placeholder="Phone Number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <input
-                  type="number"
-                  placeholder="Age"
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
                   onKeyPress={handleKeyPress}
                   className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />

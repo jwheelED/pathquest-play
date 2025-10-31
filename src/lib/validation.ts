@@ -17,15 +17,6 @@ export const studentSignUpSchema = z.object({
     .min(1, 'Name is required')
     .max(100, 'Name is too long')
     .regex(/^[a-zA-Z\s'-]+$/, 'Name can only contain letters, spaces, hyphens, and apostrophes'),
-  phone: z.string().trim()
-    .regex(/^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/, 'Invalid phone number format')
-    .optional()
-    .or(z.literal('')),
-  age: z.number({ invalid_type_error: 'Age must be a number' })
-    .int('Age must be a whole number')
-    .min(13, 'Must be at least 13 years old')
-    .max(120, 'Invalid age')
-    .optional(),
   instructorCode: z.string().trim()
     .regex(/^[A-Z0-9]{6}$/, 'Instructor code must be exactly 6 characters (letters and numbers)')
     .optional()
