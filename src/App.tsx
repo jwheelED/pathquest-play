@@ -13,6 +13,7 @@ import InstructorDashboard from "./pages/InstructorDashboard";
 import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -26,12 +27,28 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute requiredRole="student" redirectTo="/auth">
+              <Dashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/instructor/auth" element={<InstructorAuth />} />
-          <Route path="/instructor/onboarding" element={<InstructorOnboarding />} />
-          <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+          <Route path="/instructor/onboarding" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <InstructorOnboarding />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/dashboard" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <InstructorDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/auth" element={<AdminAuth />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/dashboard" element={
+            <ProtectedRoute requiredRole="admin" redirectTo="/admin/auth">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

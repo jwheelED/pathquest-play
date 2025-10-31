@@ -14,6 +14,7 @@ import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface User {
   id: string;
@@ -108,7 +109,7 @@ export default function Dashboard() {
         }
       }
     } catch (error) {
-      console.error("Error fetching course context:", error);
+      logger.error("Error fetching course context:", error);
     }
   };
 
@@ -120,7 +121,7 @@ export default function Dashboard() {
   };
 
   const handlePointsEarned = (points: number) => {
-    console.log(`Points earned: ${points}`);
+    logger.info(`Points earned: ${points}`);
   };
 
   const handleJoinClass = async (classCode: string) => {
@@ -157,7 +158,7 @@ export default function Dashboard() {
 
       if (connectionError) {
         toast.error("Failed to connect to instructor.");
-        console.error(connectionError);
+        logger.error("Connection error:", connectionError);
         return;
       }
 
@@ -166,7 +167,7 @@ export default function Dashboard() {
       setRefreshKey(prev => prev + 1);
       fetchCourseContext();
     } catch (err) {
-      console.error("Error joining class:", err);
+      logger.error("Error joining class:", err);
       toast.error("An error occurred. Please try again.");
     }
   };

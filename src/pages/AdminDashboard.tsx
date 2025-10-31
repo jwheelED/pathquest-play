@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import ROIMetricsCard from "@/components/admin/ROIMetricsCard";
 import EngagementChart from "@/components/admin/EngagementChart";
 import SchoolProgressCard from "@/components/admin/SchoolProgressCard";
@@ -144,7 +145,7 @@ export default function AdminDashboard() {
       })));
 
     } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      logger.error("Error fetching dashboard data:", error);
       toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);

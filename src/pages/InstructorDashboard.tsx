@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { LogOut, Users } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { StudentProgressCard } from "@/components/instructor/StudentProgressCard";
 import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
@@ -215,6 +216,7 @@ export default function InstructorDashboard() {
 
       setStudents(combinedStudents);
     } catch (error) {
+      logger.error("Error fetching students:", error);
       toast.error("Failed to load students");
     } finally {
       setLoading(false);
@@ -314,6 +316,7 @@ export default function InstructorDashboard() {
         recentActivity,
       });
     } catch (error) {
+      logger.error("Error fetching student details:", error);
       toast.error("Failed to load student details");
     }
   };
