@@ -250,6 +250,25 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
     fetchPendingQuestions();
   };
 
+  const handleDeleteAll = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('lecture_questions')
+      .delete()
+      .eq('instructor_id', user.id)
+      .eq('status', 'pending');
+
+    if (error) {
+      toast({ title: "Failed to delete all questions", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "All questions deleted" });
+    fetchPendingQuestions();
+  };
+
   if (pendingQuestions.length === 0) {
     return (
       <Card>
@@ -264,13 +283,26 @@ export const LectureQuestionReview = ({ refreshTrigger }: { refreshTrigger: numb
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertCircle className="h-5 w-5" />
-          Lecture Question Review
-        </CardTitle>
-        <CardDescription>
-          {pendingQuestions.length} question set(s) ready to send
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Lecture Question Review
+            </CardTitle>
+            <CardDescription>
+              {pendingQuestions.length} question set(s) ready to send
+            </CardDescription>
+          </div>
+          <Button 
+            variant="destructive" 
+            size="sm"
+            onClick={handleDeleteAll}
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete All
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {pendingQuestions.map((lq) => (
