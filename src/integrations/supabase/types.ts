@@ -57,8 +57,16 @@ export type Database = {
         Row: {
           assignment_id: string
           created_at: string
+          editing_events_after_first_paste: number | null
+          final_answer_length: number | null
+          first_interaction_at: string | null
+          first_interaction_size: number | null
+          first_interaction_type: string | null
           id: string
           pasted_count: number
+          question_copied: boolean | null
+          question_copied_at: string | null
+          question_displayed_at: string | null
           student_id: string
           typed_count: number
           updated_at: string
@@ -67,8 +75,16 @@ export type Database = {
         Insert: {
           assignment_id: string
           created_at?: string
+          editing_events_after_first_paste?: number | null
+          final_answer_length?: number | null
+          first_interaction_at?: string | null
+          first_interaction_size?: number | null
+          first_interaction_type?: string | null
           id?: string
           pasted_count?: number
+          question_copied?: boolean | null
+          question_copied_at?: string | null
+          question_displayed_at?: string | null
           student_id: string
           typed_count?: number
           updated_at?: string
@@ -77,8 +93,16 @@ export type Database = {
         Update: {
           assignment_id?: string
           created_at?: string
+          editing_events_after_first_paste?: number | null
+          final_answer_length?: number | null
+          first_interaction_at?: string | null
+          first_interaction_size?: number | null
+          first_interaction_type?: string | null
           id?: string
           pasted_count?: number
+          question_copied?: boolean | null
+          question_copied_at?: string | null
+          question_displayed_at?: string | null
           student_id?: string
           typed_count?: number
           updated_at?: string

@@ -14,6 +14,11 @@ interface FlaggedStudent {
   pasted_count: number;
   paste_percentage: number;
   flagged_at: string;
+  pattern_type: string;
+  suspicion_level: 'HIGH' | 'MEDIUM' | 'LOW';
+  time_to_first_interaction?: number | null;
+  first_interaction_type?: string | null;
+  question_copied?: boolean;
 }
 
 interface CheatDetectionCardProps {
@@ -63,7 +68,7 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
 
       const studentIds = studentLinks.map(link => link.student_id);
 
-      // Get version history with high paste percentage (>40% indicates potential cheating)
+      // Get version history with enhanced tracking fields
       const { data: versionData } = await supabase
         .from('answer_version_history')
         .select(`
@@ -72,6 +77,14 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           typed_count,
           pasted_count,
           created_at,
+          question_displayed_at,
+          first_interaction_at,
+          first_interaction_type,
+          first_interaction_size,
+          question_copied,
+          question_copied_at,
+          final_answer_length,
+          editing_events_after_first_paste,
           student_assignments!inner(
             title,
             instructor_id
@@ -88,11 +101,71 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
         return;
       }
 
-      // Filter for unusual pasting patterns (not normal time-saving pastes)
+      // Filter for unusual pasting patterns with enhanced detection
       const flagged = versionData
         .map((record: any) => {
           const total = record.typed_count + record.pasted_count;
           const pastePercentage = total > 0 ? (record.pasted_count / total) * 100 : 0;
+          
+          // Calculate time to first interaction (in seconds)
+          let timeToFirstInteraction: number | null = null;
+          if (record.question_displayed_at && record.first_interaction_at) {
+            const displayTime = new Date(record.question_displayed_at).getTime();
+            const interactionTime = new Date(record.first_interaction_at).getTime();
+            timeToFirstInteraction = Math.floor((interactionTime - displayTime) / 1000);
+          }
+          
+          // Determine suspicion level and pattern type
+          let suspicionLevel: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
+          let patternType = '';
+          
+          // HIGH SUSPICION: Complete answer in single paste
+          if (
+            total <= 3 &&
+            record.first_interaction_type === 'pasted' &&
+            (record.first_interaction_size || 0) > 50 &&
+            timeToFirstInteraction !== null &&
+            timeToFirstInteraction >= 30 &&
+            timeToFirstInteraction <= 300 && // 5 minutes
+            (record.final_answer_length || 0) > 0 &&
+            ((record.first_interaction_size || 0) / (record.final_answer_length || 1)) > 0.8
+          ) {
+            suspicionLevel = 'HIGH';
+            patternType = 'Complete answer pasted in single event';
+          }
+          // HIGH SUSPICION: Question copied then quick paste
+          else if (
+            record.question_copied &&
+            record.pasted_count === 1 &&
+            timeToFirstInteraction !== null &&
+            timeToFirstInteraction < 120 &&
+            record.editing_events_after_first_paste < 5
+          ) {
+            suspicionLevel = 'HIGH';
+            patternType = 'Question copied, then quick paste';
+          }
+          // MEDIUM SUSPICION: Minimal interaction for answer length
+          else if (
+            (record.final_answer_length || 0) > 300 &&
+            total <= 5 &&
+            record.pasted_count >= 1
+          ) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Minimal interaction for answer length';
+          }
+          // Existing detection: Multiple paste patterns
+          else if (pastePercentage > 70 && total >= 5) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Extremely high paste percentage';
+          }
+          else if (pastePercentage > 60 && record.pasted_count > 5) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Repeated copying pattern';
+          }
+          else if (record.pasted_count > 10 && pastePercentage > 55) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Excessive paste operations';
+          }
           
           return {
             student_id: record.student_id,
@@ -102,32 +175,25 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             typed_count: record.typed_count,
             pasted_count: record.pasted_count,
             paste_percentage: pastePercentage,
-            flagged_at: record.created_at
+            flagged_at: record.created_at,
+            pattern_type: patternType,
+            suspicion_level: suspicionLevel,
+            time_to_first_interaction: timeToFirstInteraction,
+            first_interaction_type: record.first_interaction_type,
+            question_copied: record.question_copied
           };
         })
         .filter((record: FlaggedStudent) => {
-          const total = record.typed_count + record.pasted_count;
-          const pastePercentage = record.paste_percentage;
-          const pasteCount = record.pasted_count;
-          
-          // Ignore if too few events (likely just started)
-          if (total < 5) return false;
-          
-          // Flag if:
-          // 1. Extremely high paste percentage (>70%) - suggests copying entire answer
-          if (pastePercentage > 70) return true;
-          
-          // 2. High paste percentage (>60%) with many paste events (>5) - repeated copying
-          if (pastePercentage > 60 && pasteCount > 5) return true;
-          
-          // 3. Very high paste count (>10) with majority pasted (>55%) - excessive copying
-          if (pasteCount > 10 && pastePercentage > 55) return true;
-          
-          return false;
+          // Flag if any suspicion level is detected
+          return record.suspicion_level !== 'LOW';
         })
-        .sort((a: FlaggedStudent, b: FlaggedStudent) => 
-          new Date(b.flagged_at).getTime() - new Date(a.flagged_at).getTime()
-        );
+        .sort((a: FlaggedStudent, b: FlaggedStudent) => {
+          // Sort by suspicion level first, then by time
+          if (a.suspicion_level !== b.suspicion_level) {
+            return a.suspicion_level === 'HIGH' ? -1 : 1;
+          }
+          return new Date(b.flagged_at).getTime() - new Date(a.flagged_at).getTime();
+        });
 
       setFlaggedStudents(flagged);
     } catch (error) {
@@ -191,9 +257,17 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold text-foreground">{student.student_name}</p>
-                  <Badge variant="destructive" className="text-xs">
-                    {student.paste_percentage.toFixed(0)}% pasted
+                  <Badge 
+                    variant={student.suspicion_level === 'HIGH' ? 'destructive' : 'secondary'} 
+                    className="text-xs"
+                  >
+                    {student.suspicion_level} SUSPICION
                   </Badge>
+                  {student.paste_percentage > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {student.paste_percentage.toFixed(0)}% pasted
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {student.assignment_title}
@@ -201,15 +275,28 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <span>Typed: {student.typed_count} events</span>
                   <span>Pasted: {student.pasted_count} events</span>
+                  {student.time_to_first_interaction !== null && (
+                    <span>Time to answer: {student.time_to_first_interaction}s</span>
+                  )}
                 </div>
+                {student.question_copied && (
+                  <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>Question was copied</span>
+                  </div>
+                )}
+                {student.first_interaction_type === 'pasted' && (
+                  <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>First action was paste</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
                   <Clock className="h-3 w-3" />
                   <span>Flagged on {format(new Date(student.flagged_at), 'MMM d, yyyy h:mm a')}</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {student.paste_percentage > 70 && "⚠️ Extremely high paste percentage"}
-                  {student.paste_percentage <= 70 && student.pasted_count > 10 && "⚠️ Excessive paste operations"}
-                  {student.paste_percentage <= 70 && student.pasted_count <= 10 && student.pasted_count > 5 && "⚠️ Repeated copying pattern"}
+                <p className="text-xs font-medium text-orange-700 dark:text-orange-400 mt-1">
+                  ⚠️ {student.pattern_type}
                 </p>
               </div>
             </div>

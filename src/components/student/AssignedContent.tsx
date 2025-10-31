@@ -198,7 +198,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
             assignment_id: assignment.id,
             version_events: versionHistoryData.events,
             typed_count: versionHistoryData.typed_count,
-            pasted_count: versionHistoryData.pasted_count
+            pasted_count: versionHistoryData.pasted_count,
+            question_displayed_at: versionHistoryData.question_displayed_at,
+            first_interaction_at: versionHistoryData.first_interaction_at,
+            first_interaction_type: versionHistoryData.first_interaction_type,
+            first_interaction_size: versionHistoryData.first_interaction_size,
+            question_copied: versionHistoryData.question_copied,
+            question_copied_at: versionHistoryData.question_copied_at,
+            final_answer_length: versionHistoryData.final_answer_length,
+            editing_events_after_first_paste: versionHistoryData.editing_events_after_first_paste
           }, {
             onConflict: 'student_id,assignment_id'
           });
@@ -599,22 +607,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                                 onChange={(value) => handleTextAnswerChange(assignment.id, idx, value)}
                                 onVersionChange={(history) => {
                                   // Store version history for cheat detection
-                                  const typedCount = history.filter(e => e.type === 'typed').length;
-                                  const pastedCount = history.filter(e => e.type === 'pasted').length;
-                                  
-                                  // Store in state for submission
                                   setTextAnswers(prev => ({
                                     ...prev,
                                     [assignment.id]: {
                                       ...(prev[assignment.id] || {}),
-                                      [`${idx}_version_history`]: {
-                                        events: history,
-                                        typed_count: typedCount,
-                                        pasted_count: pastedCount
-                                      }
+                                      [`${idx}_version_history`]: history
                                     }
                                   }));
                                 }}
+                                questionText={q.question}
                               />
                               {isSubmitted && (
                                 <div className="space-y-2">

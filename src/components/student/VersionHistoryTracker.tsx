@@ -10,21 +10,61 @@ interface VersionEvent {
   charCount: number;
 }
 
-interface VersionHistoryTrackerProps {
-  onVersionChange: (history: VersionEvent[]) => void;
-  value: string;
-  onChange: (value: string) => void;
+export interface VersionHistoryData {
+  events: VersionEvent[];
+  typed_count: number;
+  pasted_count: number;
+  question_displayed_at: Date;
+  first_interaction_at: Date | null;
+  first_interaction_type: string | null;
+  first_interaction_size: number | null;
+  question_copied: boolean;
+  question_copied_at: Date | null;
+  final_answer_length: number;
+  editing_events_after_first_paste: number;
 }
 
-export const VersionHistoryTracker = ({ onVersionChange, value, onChange }: VersionHistoryTrackerProps) => {
+interface VersionHistoryTrackerProps {
+  onVersionChange: (history: VersionHistoryData) => void;
+  value: string;
+  onChange: (value: string) => void;
+  questionText?: string;
+}
+
+export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questionText }: VersionHistoryTrackerProps) => {
   const [versionHistory, setVersionHistory] = useState<VersionEvent[]>([]);
   const [isPasteDetected, setIsPasteDetected] = useState(false);
+  const [questionCopied, setQuestionCopied] = useState(false);
+  const [questionCopiedAt, setQuestionCopiedAt] = useState<Date | null>(null);
+  const [questionDisplayedAt] = useState(new Date());
+  const [firstInteractionAt, setFirstInteractionAt] = useState<Date | null>(null);
+  const [firstInteractionType, setFirstInteractionType] = useState<string | null>(null);
+  const [firstInteractionSize, setFirstInteractionSize] = useState<number | null>(null);
+  const [firstPasteIndex, setFirstPasteIndex] = useState<number | null>(null);
   const lastValueRef = useRef(value);
   const lastTimestampRef = useRef(Date.now());
 
   useEffect(() => {
-    onVersionChange(versionHistory);
-  }, [versionHistory]);
+    const editingEventsAfterFirstPaste = firstPasteIndex !== null 
+      ? versionHistory.slice(firstPasteIndex + 1).length 
+      : 0;
+    
+    const historyData: VersionHistoryData = {
+      events: versionHistory,
+      typed_count: versionHistory.filter(v => v.type === 'typed').length,
+      pasted_count: versionHistory.filter(v => v.type === 'pasted').length,
+      question_displayed_at: questionDisplayedAt,
+      first_interaction_at: firstInteractionAt,
+      first_interaction_type: firstInteractionType,
+      first_interaction_size: firstInteractionSize,
+      question_copied: questionCopied,
+      question_copied_at: questionCopiedAt,
+      final_answer_length: value.length,
+      editing_events_after_first_paste: editingEventsAfterFirstPaste
+    };
+    
+    onVersionChange(historyData);
+  }, [versionHistory, questionCopied, questionCopiedAt, value]);
 
   const addVersionEvent = (type: 'typed' | 'pasted' | 'deleted', content: string) => {
     const event: VersionEvent = {
@@ -34,9 +74,34 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange }: Vers
       charCount: content.length,
     };
 
-    setVersionHistory(prev => [...prev, event]);
+    setVersionHistory(prev => {
+      const newHistory = [...prev, event];
+      
+      // Track first interaction
+      if (prev.length === 0) {
+        setFirstInteractionAt(event.timestamp);
+        setFirstInteractionType(type);
+        setFirstInteractionSize(content.length);
+      }
+      
+      // Track first paste for editing analysis
+      if (type === 'pasted' && firstPasteIndex === null) {
+        setFirstPasteIndex(newHistory.length - 1);
+      }
+      
+      return newHistory;
+    });
     
     if (type === 'pasted') {
+      setIsPasteDetected(true);
+      setTimeout(() => setIsPasteDetected(false), 3000);
+    }
+  };
+
+  const handleQuestionCopy = () => {
+    if (!questionCopied) {
+      setQuestionCopied(true);
+      setQuestionCopiedAt(new Date());
       setIsPasteDetected(true);
       setTimeout(() => setIsPasteDetected(false), 3000);
     }
@@ -79,6 +144,16 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange }: Vers
 
   return (
     <div className="space-y-4">
+      {questionText && (
+        <div 
+          onCopy={handleQuestionCopy}
+          className="p-4 bg-muted rounded-lg border"
+        >
+          <p className="text-sm font-medium mb-2">Question:</p>
+          <p className="text-sm">{questionText}</p>
+        </div>
+      )}
+      
       <textarea
         value={value}
         onChange={handleChange}
@@ -131,6 +206,14 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange }: Vers
                   </Badge>
                 </div>
               ))}
+              {questionCopied && (
+                <div className="text-xs flex items-center gap-2 py-1 border-t pt-2 mt-2">
+                  <AlertTriangle className="h-3 w-3 text-orange-600" />
+                  <span className="text-muted-foreground">
+                    Question copied at {questionCopiedAt?.toLocaleTimeString()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
