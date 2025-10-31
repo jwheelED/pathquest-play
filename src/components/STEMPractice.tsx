@@ -131,31 +131,88 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
           // All questions viewed, regenerate
           await generateCourseQuestions();
         }
-      } else {
-        // Fallback to general problems if no course context
-        const { data: newProblems, error: newError } = await supabase
-          .from("student_problems")
-          .select("*")
-          .limit(10);
-        
-        if (!newError && newProblems && newProblems.length > 0) {
-          const problemData = newProblems[Math.floor(Math.random() * newProblems.length)];
-          const problem: STEMProblem = {
-            ...problemData,
-            options: problemData.options as string[],
-          };
-          setCurrentProblem(problem);
-        } else {
-          console.error("Error loading problems:", newError);
-          toast.error("Failed to load problems");
+        setSelectedAnswer("");
+        setShowResult(false);
+        setLoading(false);
+        return;
+      }
+
+      // Check for problems due for spaced repetition review
+      if (userId) {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: dueProblems, error: srError } = await supabase
+          .from("spaced_repetition")
+          .select("problem_id")
+          .eq("user_id", userId)
+          .lte("next_review_date", today)
+          .limit(5);
+
+        if (!srError && dueProblems && dueProblems.length > 0) {
+          // Try to load one of the due problems
+          const problemIds = dueProblems.map(p => p.problem_id);
+          const { data: dueProblemsData } = await supabase
+            .from("stem_problems")
+            .select("*")
+            .in("id", problemIds)
+            .limit(1);
+
+          if (dueProblemsData && dueProblemsData.length > 0) {
+            const problemData = dueProblemsData[0];
+            const problem: STEMProblem = {
+              ...problemData,
+              options: problemData.options as string[],
+            };
+            setCurrentProblem(problem);
+            setSelectedAnswer("");
+            setShowResult(false);
+            setLoading(false);
+            return;
+          }
         }
+      }
+
+      // Fallback to general problems from stem_problems table
+      const { data: newProblems, error: newError } = await supabase
+        .from("stem_problems")
+        .select("*")
+        .limit(20);
+      
+      if (!newError && newProblems && newProblems.length > 0) {
+        const problemData = newProblems[Math.floor(Math.random() * newProblems.length)];
+        const problem: STEMProblem = {
+          ...problemData,
+          options: problemData.options as string[],
+        };
+        setCurrentProblem(problem);
+        setSelectedAnswer("");
+        setShowResult(false);
+        setLoading(false);
+        return;
+      }
+
+      // Last resort: try student_problems view
+      const { data: studentProblems } = await supabase
+        .from("student_problems")
+        .select("*")
+        .limit(20);
+      
+      if (studentProblems && studentProblems.length > 0) {
+        const problemData = studentProblems[Math.floor(Math.random() * studentProblems.length)];
+        const problem: STEMProblem = {
+          ...problemData,
+          options: problemData.options as string[],
+        };
+        setCurrentProblem(problem);
+      } else {
+        console.error("Error loading problems:", newError);
+        toast.error("No practice problems available at the moment");
       }
 
       setSelectedAnswer("");
       setShowResult(false);
     } catch (error) {
       console.error("Error loading problem:", error);
-      toast.error("Failed to load problem");
+      toast.error("Error loading problem. Please try again.");
     }
     setLoading(false);
   };
@@ -263,7 +320,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
       .select("*")
       .eq("user_id", userId)
       .eq("problem_id", problemId)
-      .single();
+      .maybeSingle();
 
     const calculateNextReview = (interval: number, easeFactor: number, correct: boolean) => {
       let newInterval = interval;
