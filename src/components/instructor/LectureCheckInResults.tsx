@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -321,6 +321,74 @@ export const LectureCheckInResults = () => {
     }
   };
 
+  const exportToCSV = () => {
+    try {
+      // Build CSV content
+      const csvRows: string[] = [];
+      
+      // Add header row
+      csvRows.push('Check-In Date,Student Name,Question #,Question Text,Student Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
+      
+      // Add data rows
+      groupedResults.forEach((group) => {
+        const checkInDate = new Date(group.timestamp).toLocaleString();
+        
+        group.assignments.forEach((assignment) => {
+          group.questions.forEach((question, qIdx) => {
+            const correctAnswer = question.overriddenAnswer || question.correctAnswer;
+            const studentAnswer = assignment.quiz_responses?.[qIdx] || 'No Answer';
+            const isCorrect = studentAnswer === correctAnswer;
+            const questionNum = qIdx + 1;
+            
+            // Escape quotes and commas in text fields
+            const escapeCSV = (str: string) => {
+              if (str === null || str === undefined) return '';
+              const stringValue = String(str);
+              if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+              }
+              return stringValue;
+            };
+            
+            csvRows.push([
+              escapeCSV(checkInDate),
+              escapeCSV(assignment.student_name || 'Unknown'),
+              questionNum,
+              escapeCSV(question.question),
+              escapeCSV(studentAnswer),
+              escapeCSV(correctAnswer),
+              isCorrect ? 'Yes' : 'No',
+              assignment.grade !== null ? assignment.grade.toFixed(1) : 'N/A',
+              assignment.response_time_seconds !== null ? assignment.response_time_seconds : 'N/A',
+              assignment.completed ? 'Yes' : 'No'
+            ].join(','));
+          });
+        });
+      });
+      
+      // Create CSV content
+      const csvContent = csvRows.join('\n');
+      
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `lecture-checkin-results-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('CSV exported successfully!');
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export CSV');
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -348,11 +416,19 @@ export const LectureCheckInResults = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Live Lecture Check-In Results
-        </CardTitle>
-        <CardDescription>Auto-graded student performance on lecture questions</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Live Lecture Check-In Results
+            </CardTitle>
+            <CardDescription>Auto-graded student performance on lecture questions</CardDescription>
+          </div>
+          <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible className="space-y-2" defaultValue="group-0">
