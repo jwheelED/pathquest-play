@@ -203,12 +203,9 @@ export default function Dashboard() {
         <AchievementSystem userId={user.id} />
         
         <div className="space-y-6">
-          {/* Live Lecture Check-ins - Most Important Section */}
           {!courseContext.courseTitle && (
             <JoinClassCard onJoinClass={handleJoinClass} />
           )}
-          
-          <AssignedContent userId={user.id} />
           
           {courseContext.courseTitle && (
             <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
@@ -231,6 +228,9 @@ export default function Dashboard() {
               )}
             </Card>
           )}
+          
+          {/* Live Lecture Check-ins - Most Important Section */}
+          <AssignedContent userId={user.id} />
 
           <InstructorChatCard key={refreshKey} userId={user.id} />
         </div>
