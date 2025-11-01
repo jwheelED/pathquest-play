@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -19,6 +19,10 @@ interface FlaggedStudent {
   time_to_first_interaction?: number | null;
   first_interaction_type?: string | null;
   question_copied?: boolean;
+  tab_switch_count: number;
+  total_time_away_seconds: number;
+  longest_absence_seconds: number;
+  switched_away_immediately: boolean;
 }
 
 interface CheatDetectionCardProps {
@@ -85,6 +89,11 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           question_copied_at,
           final_answer_length,
           editing_events_after_first_paste,
+          tab_switch_count,
+          total_time_away_seconds,
+          tab_switches,
+          longest_absence_seconds,
+          switched_away_immediately,
           student_assignments!inner(
             title,
             instructor_id
@@ -114,27 +123,82 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             const interactionTime = new Date(record.first_interaction_at).getTime();
             timeToFirstInteraction = Math.floor((interactionTime - displayTime) / 1000);
           }
+
+          // Parse tab switches for analysis
+          const tabSwitches = (record.tab_switches || []) as Array<{
+            left_at: string;
+            returned_at: string;
+            duration_seconds: number;
+          }>;
           
           // Determine suspicion level and pattern type
           let suspicionLevel: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
           let patternType = '';
           
+          // HIGH SUSPICION: Switch-Paste Pattern (left for ChatGPT time, returned, pasted)
+          if (
+            tabSwitches.length > 0 &&
+            record.pasted_count >= 1 &&
+            record.first_interaction_type === 'pasted'
+          ) {
+            const lastSwitch = tabSwitches[tabSwitches.length - 1];
+            if (
+              lastSwitch.duration_seconds >= 30 &&
+              lastSwitch.duration_seconds <= 300 &&
+              record.first_interaction_at
+            ) {
+              const timeSinceReturn = Math.round(
+                (new Date(record.first_interaction_at).getTime() -
+                  new Date(lastSwitch.returned_at).getTime()) /
+                  1000
+              );
+              if (timeSinceReturn <= 10) {
+                suspicionLevel = 'HIGH';
+                patternType = 'Left tab for ChatGPT workflow, returned and pasted';
+              }
+            }
+          }
+          
+          // HIGH SUSPICION: Immediate Switch + Single Paste
+          if (
+            suspicionLevel !== 'HIGH' &&
+            record.switched_away_immediately &&
+            record.pasted_count === 1 &&
+            (record.first_interaction_size || 0) > 50
+          ) {
+            suspicionLevel = 'HIGH';
+            patternType = 'Switched away immediately, returned with answer';
+          }
+          
+          // HIGH SUSPICION: Multiple Extended Absences + Paste
+          if (
+            suspicionLevel !== 'HIGH' &&
+            tabSwitches.filter((ts: any) => ts.duration_seconds > 30).length >= 2 &&
+            record.pasted_count >= 1
+          ) {
+            suspicionLevel = 'HIGH';
+            patternType = 'Multiple extended absences with paste activity';
+          }
+          
           // HIGH SUSPICION: Complete answer in single paste
           if (
+            suspicionLevel !== 'HIGH' &&
             total <= 3 &&
             record.first_interaction_type === 'pasted' &&
             (record.first_interaction_size || 0) > 50 &&
             timeToFirstInteraction !== null &&
             timeToFirstInteraction >= 30 &&
-            timeToFirstInteraction <= 300 && // 5 minutes
+            timeToFirstInteraction <= 300 &&
             (record.final_answer_length || 0) > 0 &&
             ((record.first_interaction_size || 0) / (record.final_answer_length || 1)) > 0.8
           ) {
             suspicionLevel = 'HIGH';
             patternType = 'Complete answer pasted in single event';
           }
+          
           // HIGH SUSPICION: Question copied then quick paste
-          else if (
+          if (
+            suspicionLevel !== 'HIGH' &&
             record.question_copied &&
             record.pasted_count === 1 &&
             timeToFirstInteraction !== null &&
@@ -144,8 +208,36 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             suspicionLevel = 'HIGH';
             patternType = 'Question copied, then quick paste';
           }
+          
+          // MEDIUM SUSPICION: Frequent Switching
+          if (suspicionLevel === 'LOW' && (record.tab_switch_count || 0) >= 5) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Frequent tab switching during question';
+          }
+          
+          // MEDIUM SUSPICION: Majority Time Away
+          if (
+            suspicionLevel === 'LOW' &&
+            timeToFirstInteraction !== null &&
+            (record.total_time_away_seconds || 0) > timeToFirstInteraction * 0.5
+          ) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Spent majority of time away from tab';
+          }
+          
+          // MEDIUM SUSPICION: Long Absence Pattern
+          if (
+            suspicionLevel === 'LOW' &&
+            (record.longest_absence_seconds || 0) > 120 &&
+            record.pasted_count >= 1
+          ) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Long absence followed by paste';
+          }
+          
           // MEDIUM SUSPICION: Minimal interaction for answer length
-          else if (
+          if (
+            suspicionLevel === 'LOW' &&
             (record.final_answer_length || 0) > 300 &&
             total <= 5 &&
             record.pasted_count >= 1
@@ -153,16 +245,15 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             suspicionLevel = 'MEDIUM';
             patternType = 'Minimal interaction for answer length';
           }
+          
           // Existing detection: Multiple paste patterns
-          else if (pastePercentage > 70 && total >= 5) {
+          if (suspicionLevel === 'LOW' && pastePercentage > 70 && total >= 5) {
             suspicionLevel = 'MEDIUM';
             patternType = 'Extremely high paste percentage';
-          }
-          else if (pastePercentage > 60 && record.pasted_count > 5) {
+          } else if (suspicionLevel === 'LOW' && pastePercentage > 60 && record.pasted_count > 5) {
             suspicionLevel = 'MEDIUM';
             patternType = 'Repeated copying pattern';
-          }
-          else if (record.pasted_count > 10 && pastePercentage > 55) {
+          } else if (suspicionLevel === 'LOW' && record.pasted_count > 10 && pastePercentage > 55) {
             suspicionLevel = 'MEDIUM';
             patternType = 'Excessive paste operations';
           }
@@ -180,7 +271,11 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             suspicion_level: suspicionLevel,
             time_to_first_interaction: timeToFirstInteraction,
             first_interaction_type: record.first_interaction_type,
-            question_copied: record.question_copied
+            question_copied: record.question_copied || false,
+            tab_switch_count: record.tab_switch_count || 0,
+            total_time_away_seconds: record.total_time_away_seconds || 0,
+            longest_absence_seconds: record.longest_absence_seconds || 0,
+            switched_away_immediately: record.switched_away_immediately || false
           };
         })
         .filter((record: FlaggedStudent) => {
@@ -289,6 +384,21 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
                   <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
                     <AlertTriangle className="h-3 w-3" />
                     <span>First action was paste</span>
+                  </div>
+                )}
+                {student.tab_switch_count > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>
+                      Switched tabs {student.tab_switch_count} time{student.tab_switch_count > 1 ? 's' : ''} ({Math.round(student.total_time_away_seconds)}s total
+                      {student.longest_absence_seconds > 30 ? `, longest: ${Math.round(student.longest_absence_seconds)}s` : ''})
+                    </span>
+                  </div>
+                )}
+                {student.switched_away_immediately && (
+                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>Switched away immediately after seeing question</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">

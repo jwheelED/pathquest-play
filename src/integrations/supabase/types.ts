@@ -63,11 +63,16 @@ export type Database = {
           first_interaction_size: number | null
           first_interaction_type: string | null
           id: string
+          longest_absence_seconds: number
           pasted_count: number
           question_copied: boolean | null
           question_copied_at: string | null
           question_displayed_at: string | null
           student_id: string
+          switched_away_immediately: boolean
+          tab_switch_count: number
+          tab_switches: Json
+          total_time_away_seconds: number
           typed_count: number
           updated_at: string
           version_events: Json
@@ -81,11 +86,16 @@ export type Database = {
           first_interaction_size?: number | null
           first_interaction_type?: string | null
           id?: string
+          longest_absence_seconds?: number
           pasted_count?: number
           question_copied?: boolean | null
           question_copied_at?: string | null
           question_displayed_at?: string | null
           student_id: string
+          switched_away_immediately?: boolean
+          tab_switch_count?: number
+          tab_switches?: Json
+          total_time_away_seconds?: number
           typed_count?: number
           updated_at?: string
           version_events?: Json
@@ -99,11 +109,16 @@ export type Database = {
           first_interaction_size?: number | null
           first_interaction_type?: string | null
           id?: string
+          longest_absence_seconds?: number
           pasted_count?: number
           question_copied?: boolean | null
           question_copied_at?: string | null
           question_displayed_at?: string | null
           student_id?: string
+          switched_away_immediately?: boolean
+          tab_switch_count?: number
+          tab_switches?: Json
+          total_time_away_seconds?: number
           typed_count?: number
           updated_at?: string
           version_events?: Json

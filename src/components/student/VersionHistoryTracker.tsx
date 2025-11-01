@@ -10,6 +10,12 @@ interface VersionEvent {
   charCount: number;
 }
 
+interface TabSwitch {
+  left_at: string;
+  returned_at: string;
+  duration_seconds: number;
+}
+
 export interface VersionHistoryData {
   events: VersionEvent[];
   typed_count: number;
@@ -22,6 +28,11 @@ export interface VersionHistoryData {
   question_copied_at: Date | null;
   final_answer_length: number;
   editing_events_after_first_paste: number;
+  tab_switch_count: number;
+  total_time_away_seconds: number;
+  tab_switches: TabSwitch[];
+  longest_absence_seconds: number;
+  switched_away_immediately: boolean;
 }
 
 interface VersionHistoryTrackerProps {
@@ -41,13 +52,48 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
   const [firstInteractionType, setFirstInteractionType] = useState<string | null>(null);
   const [firstInteractionSize, setFirstInteractionSize] = useState<number | null>(null);
   const [firstPasteIndex, setFirstPasteIndex] = useState<number | null>(null);
+  const [tabSwitches, setTabSwitches] = useState<TabSwitch[]>([]);
+  const [lastTabLeaveTime, setLastTabLeaveTime] = useState<Date | null>(null);
   const lastValueRef = useRef(value);
   const lastTimestampRef = useRef(Date.now());
+
+  // Track tab visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // User switched away from tab
+        setLastTabLeaveTime(new Date());
+      } else if (lastTabLeaveTime) {
+        // User returned to tab
+        const returnTime = new Date();
+        const durationSeconds = Math.round((returnTime.getTime() - lastTabLeaveTime.getTime()) / 1000);
+        
+        setTabSwitches(prev => [...prev, {
+          left_at: lastTabLeaveTime.toISOString(),
+          returned_at: returnTime.toISOString(),
+          duration_seconds: durationSeconds
+        }]);
+        setLastTabLeaveTime(null);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [lastTabLeaveTime]);
 
   useEffect(() => {
     const editingEventsAfterFirstPaste = firstPasteIndex !== null 
       ? versionHistory.slice(firstPasteIndex + 1).length 
       : 0;
+    
+    const totalTimeAwaySeconds = tabSwitches.reduce((sum, ts) => sum + ts.duration_seconds, 0);
+    const longestAbsenceSeconds = tabSwitches.length > 0 
+      ? Math.max(...tabSwitches.map(ts => ts.duration_seconds))
+      : 0;
+    
+    const switchedAwayImmediately = tabSwitches.length > 0 && firstInteractionAt
+      ? (new Date(tabSwitches[0].left_at).getTime() - questionDisplayedAt.getTime()) < 10000
+      : false;
     
     const historyData: VersionHistoryData = {
       events: versionHistory,
@@ -60,11 +106,16 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
       question_copied: questionCopied,
       question_copied_at: questionCopiedAt,
       final_answer_length: value.length,
-      editing_events_after_first_paste: editingEventsAfterFirstPaste
+      editing_events_after_first_paste: editingEventsAfterFirstPaste,
+      tab_switch_count: tabSwitches.length,
+      total_time_away_seconds: totalTimeAwaySeconds,
+      tab_switches: tabSwitches,
+      longest_absence_seconds: longestAbsenceSeconds,
+      switched_away_immediately: switchedAwayImmediately,
     };
     
     onVersionChange(historyData);
-  }, [versionHistory, questionCopied, questionCopiedAt, value]);
+  }, [versionHistory, questionCopied, questionCopiedAt, value, tabSwitches, firstInteractionAt]);
 
   const addVersionEvent = (type: 'typed' | 'pasted' | 'deleted', content: string) => {
     const event: VersionEvent = {

@@ -206,7 +206,12 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
             question_copied: versionHistoryData.question_copied,
             question_copied_at: versionHistoryData.question_copied_at,
             final_answer_length: versionHistoryData.final_answer_length,
-            editing_events_after_first_paste: versionHistoryData.editing_events_after_first_paste
+            editing_events_after_first_paste: versionHistoryData.editing_events_after_first_paste,
+            tab_switch_count: versionHistoryData.tab_switch_count,
+            total_time_away_seconds: versionHistoryData.total_time_away_seconds,
+            tab_switches: versionHistoryData.tab_switches,
+            longest_absence_seconds: versionHistoryData.longest_absence_seconds,
+            switched_away_immediately: versionHistoryData.switched_away_immediately
           }, {
             onConflict: 'student_id,assignment_id'
           });
