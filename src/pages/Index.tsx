@@ -68,14 +68,14 @@ const Index = () => {
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <div className="space-y-4">
           <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-            🎮 Edvana
+            🎤 Edvana
           </h1>
           <p className="text-2xl font-semibold text-primary">
-            Gamified STEM Learning Platform
+            Live Lecture Capture & Learning Platform
           </p>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Level up your knowledge with personalized learning paths, spaced repetition, 
-            achievements, and retro-style gamification!
+            Real-time lecture transcription, AI-powered check-ins, and intelligent content generation 
+            to enhance classroom engagement and learning outcomes.
           </p>
         </div>
 
@@ -84,10 +84,10 @@ const Index = () => {
           <Card className="p-8 bg-gradient-to-br from-card to-primary/10 border-2 border-primary-glow shadow-glow hover:shadow-elegant transition-all">
             <div className="space-y-6">
               <div className="space-y-4">
-                <div className="text-5xl">🎮</div>
+                <div className="text-5xl">📚</div>
                 <h2 className="text-2xl font-bold text-foreground">I'm a Student</h2>
                 <p className="text-sm text-muted-foreground">
-                  Join thousands of learners earning XP, unlocking achievements, and mastering STEM subjects through gamified learning.
+                  Engage with live lecture check-ins, receive instant feedback, and track your progress with AI-powered assessments.
                 </p>
               </div>
               
@@ -98,7 +98,7 @@ const Index = () => {
                   size="lg"
                   className="w-full"
                 >
-                  🎯 Start Learning
+                  📖 Start Learning
                 </Button>
                 
                 <p className="text-xs text-muted-foreground">
@@ -115,7 +115,7 @@ const Index = () => {
                 <div className="text-5xl">👨‍🏫</div>
                 <h2 className="text-2xl font-bold text-foreground">I'm an Instructor</h2>
                 <p className="text-sm text-muted-foreground">
-                  Track student progress, provide support, communicate with learners, and monitor achievement across your classroom.
+                  Capture live lectures, generate real-time check-ins, monitor student engagement, and detect academic integrity concerns with AI-powered tools.
                 </p>
               </div>
               
@@ -167,21 +167,21 @@ const Index = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
           <Card className="p-4 bg-gradient-secondary border border-secondary-glow">
-            <div className="text-2xl mb-2">🧠</div>
-            <h3 className="font-semibold text-secondary-foreground">STEM Problems</h3>
-            <p className="text-sm text-secondary-foreground/80">Practice with spaced repetition</p>
+            <div className="text-2xl mb-2">🎙️</div>
+            <h3 className="font-semibold text-secondary-foreground">Live Lecture Capture</h3>
+            <p className="text-sm text-secondary-foreground/80">Real-time audio transcription</p>
           </Card>
           
           <Card className="p-4 bg-gradient-achievement border border-achievement-glow">
-            <div className="text-2xl mb-2">🏆</div>
-            <h3 className="font-semibold text-achievement-foreground">Achievements</h3>
-            <p className="text-sm text-achievement-foreground/80">Unlock rewards and level up</p>
+            <div className="text-2xl mb-2">✅</div>
+            <h3 className="font-semibold text-achievement-foreground">Smart Check-Ins</h3>
+            <p className="text-sm text-achievement-foreground/80">AI-powered comprehension questions</p>
           </Card>
           
           <Card className="p-4 bg-gradient-energy border border-energy-glow">
-            <div className="text-2xl mb-2">📚</div>
-            <h3 className="font-semibold text-energy-foreground">Learning Paths</h3>
-            <p className="text-sm text-energy-foreground/80">AI-generated personalized courses</p>
+            <div className="text-2xl mb-2">🔍</div>
+            <h3 className="font-semibold text-energy-foreground">Cheat Detection</h3>
+            <p className="text-sm text-energy-foreground/80">Tab switching & paste behavior analysis</p>
           </Card>
         </div>
       </div>
