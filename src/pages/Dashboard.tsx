@@ -4,12 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import UserStats from "@/components/UserStats";
-import STEMPractice from "@/components/STEMPractice";
 import AchievementSystem from "@/components/AchievementSystem";
-import { AchievementBadges } from "@/components/student/AchievementBadges";
-import { BadgeShowcase } from "@/components/student/BadgeShowcase";
-import GameifiedLessons from "@/components/GameifiedLessons";
+import { BadgesButton } from "@/components/student/BadgesButton";
 import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
@@ -24,7 +20,6 @@ interface User {
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [progress, setProgress] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [courseContext, setCourseContext] = useState<{
     courseTitle?: string;
@@ -120,10 +115,6 @@ export default function Dashboard() {
     navigate("/");
   };
 
-  const handlePointsEarned = (points: number) => {
-    logger.info(`Points earned: ${points}`);
-  };
-
   const handleJoinClass = async (classCode: string) => {
     if (!user?.id || !classCode.trim()) return;
     
@@ -187,14 +178,15 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-                🎮 Edvana
+                🎤 Edvana
               </h1>
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
-                Dashboard
+                Student Dashboard
               </Badge>
             </div>
             
             <div className="flex items-center gap-4">
+              <BadgesButton userId={user.id} />
               <span className="text-sm text-muted-foreground">
                 {user.email || "User"}
               </span>
@@ -207,88 +199,40 @@ export default function Dashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Headless achievement checker - only triggers pop-ups */}
+        <AchievementSystem userId={user.id} />
+        
+        <div className="space-y-6">
+          {/* Live Lecture Check-ins - Most Important Section */}
+          {!courseContext.courseTitle && (
+            <JoinClassCard onJoinClass={handleJoinClass} />
+          )}
           
-          <aside className="lg:col-span-3 space-y-6">
-            <UserStats userId={user.id} />
-            
-            {/* Achievement Badges - Only visible to student */}
-            <AchievementBadges userId={user.id} />
-            
-            <Card className="p-4 bg-gradient-to-br from-card to-accent/20">
-              <div className="space-y-3">
-                <Button variant="retro" size="lg" className="w-full">
-                  🏠 Home
-                </Button>
-                <Button variant="neon" size="lg" className="w-full">
-                  🔍 Explore
-                </Button>
-                <Button variant="achievement" size="lg" className="w-full">
-                  🏆 Achievements
-                </Button>
-              </div>
-            </Card>
-
-            <AchievementSystem userId={user.id} />
-          </aside>
-
-          <main className="lg:col-span-9 space-y-6">
-            
-            {courseContext.courseTitle && (
-              <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
-                <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
-                  📚 {courseContext.courseTitle}
-                </h2>
-                {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {courseContext.courseTopics.map((topic, idx) => (
-                      <Badge key={idx} variant="secondary">
-                        {topic}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {courseContext.courseSchedule && (
-                  <p className="text-sm text-muted-foreground">
-                    📅 {courseContext.courseSchedule}
-                  </p>
-                )}
-              </Card>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="p-4 bg-gradient-secondary border-2 border-secondary-glow text-center">
-                <div className="text-2xl font-bold text-secondary-foreground">📊</div>
-                <div className="text-xl font-bold text-secondary-foreground">{progress.toFixed(0)}%</div>
-                <div className="text-sm text-secondary-foreground/80">Course Progress</div>
-              </Card>
-              
-              <Card className="p-4 bg-gradient-achievement border-2 border-achievement-glow text-center">
-                <div className="text-2xl font-bold text-achievement-foreground">🎓</div>
-                <div className="text-xl font-bold text-achievement-foreground">
-                  {courseContext.courseTitle ? "Enrolled" : "Not Enrolled"}
+          <AssignedContent userId={user.id} />
+          
+          {courseContext.courseTitle && (
+            <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
+              <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
+                📚 {courseContext.courseTitle}
+              </h2>
+              {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {courseContext.courseTopics.map((topic, idx) => (
+                    <Badge key={idx} variant="secondary">
+                      {topic}
+                    </Badge>
+                  ))}
                 </div>
-                <div className="text-sm text-achievement-foreground/80">Class Status</div>
-              </Card>
-            </div>
+              )}
+              {courseContext.courseSchedule && (
+                <p className="text-sm text-muted-foreground">
+                  📅 {courseContext.courseSchedule}
+                </p>
+              )}
+            </Card>
+          )}
 
-            {!courseContext.courseTitle && (
-              <JoinClassCard onJoinClass={handleJoinClass} />
-            )}
-            
-            <AssignedContent userId={user.id} />
-
-            <BadgeShowcase userId={user.id} />
-
-            <STEMPractice 
-              userId={user.id} 
-              onPointsEarned={handlePointsEarned}
-              courseContext={courseContext}
-            />
-
-            <InstructorChatCard key={refreshKey} userId={user.id} />
-            
-          </main>
+          <InstructorChatCard key={refreshKey} userId={user.id} />
         </div>
       </div>
     </div>
