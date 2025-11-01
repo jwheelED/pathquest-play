@@ -814,6 +814,13 @@ export type Database = {
       }
     }
     Functions: {
+      assign_oauth_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       calculate_mastery_threshold: {
         Args: { p_lesson_id: string; p_user_id: string }
         Returns: number
