@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
 import { toast as sonnerToast } from "sonner";
+import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 
 interface Assignment {
   id: string;
@@ -35,7 +36,11 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [liveCheckIns, setLiveCheckIns] = useState<Assignment[]>([]);
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
   const [openedTimes, setOpenedTimes] = useState<Record<string, number>>({});
+  const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Tab switching detection for the currently open assignment
+  const { tabSwitchingData, resetTracking } = useTabSwitchingDetection(!!activeAssignmentId);
 
   useEffect(() => {
     fetchAssignments();
@@ -188,30 +193,39 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
-      // Save version history for cheat detection (if any short answers with tracking)
-      const versionHistoryData = textAns[`${questions.findIndex((q: any) => q.type === 'short_answer')}_version_history`];
-      if (versionHistoryData && userId) {
+      // Save version history for cheat detection
+      // For short answers, use version history data; for MCQ-only, use tab switching data
+      const firstShortAnswerIdx = questions.findIndex((q: any) => q.type === 'short_answer');
+      const versionHistoryData = firstShortAnswerIdx >= 0 
+        ? textAns[`${firstShortAnswerIdx}_version_history`]
+        : null;
+      
+      // Prepare tab switching data - use version history data if available (short answer),
+      // otherwise use global tab switching detection (MCQ)
+      const tabData = versionHistoryData || tabSwitchingData;
+      
+      if (tabData && userId) {
         const { error: versionError } = await supabase
           .from('answer_version_history')
           .upsert({
             student_id: userId,
             assignment_id: assignment.id,
-            version_events: versionHistoryData.events,
-            typed_count: versionHistoryData.typed_count,
-            pasted_count: versionHistoryData.pasted_count,
-            question_displayed_at: versionHistoryData.question_displayed_at,
-            first_interaction_at: versionHistoryData.first_interaction_at,
-            first_interaction_type: versionHistoryData.first_interaction_type,
-            first_interaction_size: versionHistoryData.first_interaction_size,
-            question_copied: versionHistoryData.question_copied,
-            question_copied_at: versionHistoryData.question_copied_at,
-            final_answer_length: versionHistoryData.final_answer_length,
-            editing_events_after_first_paste: versionHistoryData.editing_events_after_first_paste,
-            tab_switch_count: versionHistoryData.tab_switch_count,
-            total_time_away_seconds: versionHistoryData.total_time_away_seconds,
-            tab_switches: versionHistoryData.tab_switches,
-            longest_absence_seconds: versionHistoryData.longest_absence_seconds,
-            switched_away_immediately: versionHistoryData.switched_away_immediately
+            version_events: versionHistoryData?.events || [],
+            typed_count: versionHistoryData?.typed_count || 0,
+            pasted_count: versionHistoryData?.pasted_count || 0,
+            question_displayed_at: tabData.question_displayed_at,
+            first_interaction_at: versionHistoryData?.first_interaction_at,
+            first_interaction_type: versionHistoryData?.first_interaction_type,
+            first_interaction_size: versionHistoryData?.first_interaction_size,
+            question_copied: versionHistoryData?.question_copied || false,
+            question_copied_at: versionHistoryData?.question_copied_at,
+            final_answer_length: versionHistoryData?.final_answer_length || 0,
+            editing_events_after_first_paste: versionHistoryData?.editing_events_after_first_paste || 0,
+            tab_switch_count: tabData.tab_switch_count,
+            total_time_away_seconds: tabData.total_time_away_seconds,
+            tab_switches: tabData.tab_switches,
+            longest_absence_seconds: tabData.longest_absence_seconds,
+            switched_away_immediately: tabData.switched_away_immediately
           }, {
             onConflict: 'student_id,assignment_id'
           });
@@ -220,6 +234,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           console.error('Failed to save version history:', versionError);
         }
       }
+      
+      // Reset tab switching tracking after submission
+      setActiveAssignmentId(null);
+      resetTracking();
       
       // If there are short answers, get AI grades (for auto-grading or recommendations)
       if (result.has_short_answer) {
@@ -493,6 +511,8 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         .eq('id', assignment.id);
     }
     
+    // Start tab switching detection for this assignment
+    setActiveAssignmentId(assignment.id);
     setViewingId(assignment.id);
   };
 
@@ -550,6 +570,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
               if (assignment) {
                 handleOpenAssignment(assignment);
               }
+            } else {
+              // Reset tab switching detection when accordion closes
+              setActiveAssignmentId(null);
+              resetTracking();
             }
           }}
         >
@@ -589,7 +613,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                         Your answer activity is being tracked
                       </AlertTitle>
                       <AlertDescription className="text-blue-800 dark:text-blue-300 text-sm">
-                        Type vs. paste detection is enabled to ensure academic integrity.
+                        Tab switching and answer input detection is enabled to ensure academic integrity.
                       </AlertDescription>
                     </Alert>
                   )}
