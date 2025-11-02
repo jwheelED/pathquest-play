@@ -14,6 +14,8 @@ import AdminAuth from "./pages/AdminAuth";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { InstallPrompt } from "./components/InstallPrompt";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +24,8 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <OfflineIndicator />
+      <InstallPrompt />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
