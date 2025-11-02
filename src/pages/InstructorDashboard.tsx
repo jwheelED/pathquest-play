@@ -381,8 +381,6 @@ export default function InstructorDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            <TeachingAnalytics instructorId={currentUser.id} />
-            
             <LiveClassroomStatus 
               totalStudents={classroomStats.totalStudents}
               activeCheckIns={classroomStats.activeCheckIns}
@@ -394,6 +392,8 @@ export default function InstructorDashboard() {
             <LectureQuestionReview refreshTrigger={refreshQueue} />
 
             <LectureCheckInResults />
+
+            <TeachingAnalytics instructorId={currentUser.id} />
 
             <LectureMaterialsUpload />
 
