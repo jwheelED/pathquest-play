@@ -9,8 +9,11 @@ import { BadgesButton } from "@/components/student/BadgesButton";
 import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
+import { MobileHeader } from "@/components/mobile/MobileHeader";
+import { BottomNav } from "@/components/mobile/BottomNav";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import UserStats from "@/components/UserStats";
 
 interface User {
   id: string;
@@ -26,6 +29,8 @@ export default function Dashboard() {
     courseTopics?: string[];
     courseSchedule?: string;
   }>({});
+  const [userName, setUserName] = useState("");
+  const [userStats, setUserStats] = useState({ level: 1, streak: 0 });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,8 +54,23 @@ export default function Dashboard() {
     if (user?.id) {
       checkOnboarding();
       fetchCourseContext();
+      fetchUserProfile();
     }
   }, [user]);
+
+  const fetchUserProfile = async () => {
+    if (!user?.id) return;
+    
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+    
+    if (data?.full_name) {
+      setUserName(data.full_name);
+    }
+  };
 
   const checkSession = async () => {
     const { data } = await supabase.auth.getSession();
@@ -172,8 +192,18 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b-2 border-primary bg-gradient-to-r from-card to-primary/5 shadow-glow">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
+      {/* Mobile Header */}
+      <MobileHeader
+        userName={userName || user.email || "Student"}
+        userEmail={user.email || ""}
+        role="student"
+        onLogout={handleLogout}
+        stats={userStats}
+      />
+
+      {/* Desktop Header */}
+      <header className="hidden md:block border-b-2 border-primary bg-gradient-to-r from-card to-primary/5 shadow-glow">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -198,31 +228,36 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
         {/* Headless achievement checker - only triggers pop-ups */}
         <AchievementSystem userId={user.id} />
         
-        <div className="space-y-6">
+        {/* Mobile Stats Card */}
+        <div className="md:hidden mb-4">
+          <UserStats userId={user.id} onStatsUpdate={setUserStats} />
+        </div>
+        
+        <div className="space-y-4 md:space-y-6">
           {!courseContext.courseTitle && (
             <JoinClassCard onJoinClass={handleJoinClass} />
           )}
           
           {courseContext.courseTitle && (
-            <Card className="p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
-              <h2 className="text-2xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
+              <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3 md:mb-4 flex items-center gap-2">
                 📚 {courseContext.courseTitle}
               </h2>
               {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {courseContext.courseTopics.map((topic, idx) => (
-                    <Badge key={idx} variant="secondary">
+                    <Badge key={idx} variant="secondary" className="text-xs">
                       {topic}
                     </Badge>
                   ))}
                 </div>
               )}
               {courseContext.courseSchedule && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs md:text-sm text-muted-foreground">
                   📅 {courseContext.courseSchedule}
                 </p>
               )}
@@ -235,6 +270,9 @@ export default function Dashboard() {
           <InstructorChatCard key={refreshKey} userId={user.id} />
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav role="student" />
     </div>
   );
 }
