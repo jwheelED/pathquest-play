@@ -68,6 +68,45 @@ serve(async (req) => {
       });
     }
 
+    // Rate limiting: max 10 detection calls per minute
+    const rateLimitKey = `question_detection:${user.id}`;
+    const windowStart = new Date(Date.now() - (Date.now() % 60000)); // Current minute window
+    
+    const { data: rateLimitData, error: rateLimitError } = await supabase
+      .from('rate_limits')
+      .select('count')
+      .eq('key', rateLimitKey)
+      .eq('window_start', windowStart.toISOString())
+      .single();
+
+    if (rateLimitData && rateLimitData.count >= 10) {
+      console.log('🚫 Rate limit exceeded for user:', user.id);
+      return new Response(JSON.stringify({ 
+        error: 'Rate limit exceeded: max 10 detections per minute',
+        retry_after: 60 - Math.floor((Date.now() % 60000) / 1000)
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Record this detection attempt
+    if (rateLimitData) {
+      await supabase
+        .from('rate_limits')
+        .update({ count: rateLimitData.count + 1 })
+        .eq('key', rateLimitKey)
+        .eq('window_start', windowStart.toISOString());
+    } else {
+      await supabase
+        .from('rate_limits')
+        .insert({
+          key: rateLimitKey,
+          window_start: windowStart.toISOString(),
+          count: 1
+        });
+    }
+
     const { recentChunk, context } = await req.json();
 
     if (!recentChunk || !context) {

@@ -120,14 +120,70 @@ serve(async (req) => {
     }
 
     // Verify instructor role
-    const { data: roleData } = await supabase.rpc('has_role', {
-      user_id: user.id,
-      role_name: 'instructor'
+    const { data: roleData, error: roleError } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'instructor'
     });
+
+    if (roleError) {
+      console.error('Role check failed:', roleError);
+      return new Response(JSON.stringify({ 
+        error: 'Authorization check failed', 
+        details: roleError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!roleData) {
       return new Response(JSON.stringify({ error: 'Unauthorized: Instructor role required' }), {
         status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Check when last question was sent (minimum 60 second gap)
+    const { data: lastQuestion } = await supabase
+      .from('student_assignments')
+      .select('created_at')
+      .eq('instructor_id', user.id)
+      .eq('assignment_type', 'lecture_checkin')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastQuestion) {
+      const timeSinceLastQuestion = Date.now() - new Date(lastQuestion.created_at).getTime();
+      if (timeSinceLastQuestion < 60000) { // 60 seconds
+        const retryAfter = Math.ceil((60000 - timeSinceLastQuestion) / 1000);
+        console.log(`⏳ Rate limit: ${retryAfter}s until next question`);
+        return new Response(JSON.stringify({ 
+          error: 'Please wait 60 seconds between questions',
+          retry_after: retryAfter
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Check daily limit (50 questions per day)
+    const today = new Date().toISOString().split('T')[0];
+    const { count } = await supabase
+      .from('student_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('instructor_id', user.id)
+      .eq('assignment_type', 'lecture_checkin')
+      .gte('created_at', today);
+
+    if (count && count >= 50) {
+      console.log('🚫 Daily question limit reached');
+      return new Response(JSON.stringify({ 
+        error: 'Daily question limit reached (50)',
+        quota_reset: 'midnight UTC'
+      }), {
+        status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

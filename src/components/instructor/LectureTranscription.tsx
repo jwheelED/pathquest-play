@@ -35,7 +35,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const isRecordingRef = useRef(false);
   const recordingCycleCountRef = useRef(0);
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastDetectionTimeRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Client-side throttling: 10 seconds minimum between detection attempts
+  const MIN_DETECTION_INTERVAL = 10000; // 10 seconds
 
   // Real-time question detection - monitors transcript continuously
   useEffect(() => {
@@ -53,6 +57,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, [transcriptChunks, isRecording]);
 
   const checkForProfessorQuestion = async (chunk: string, context: string) => {
+    // Client-side throttling
+    const now = Date.now();
+    if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
+      console.log('⏳ Skipping detection - too soon after last check');
+      return;
+    }
+    lastDetectionTimeRef.current = now;
     try {
       console.log('🔍 Checking for question in chunk:', chunk.substring(0, 100));
 

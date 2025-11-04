@@ -509,6 +509,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          count: number
+          created_at: string
+          id: string
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          created_at?: string
+          id?: string
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          id?: string
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       spaced_repetition: {
         Row: {
           created_at: string
@@ -829,6 +853,7 @@ export type Database = {
         Args: { _target_user_id: string; _viewer_id: string }
         Returns: boolean
       }
+      cleanup_old_rate_limits: { Args: never; Returns: number }
       cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
       generate_instructor_code: { Args: never; Returns: string }
       get_problem_answer: {
