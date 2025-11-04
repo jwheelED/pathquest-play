@@ -6,6 +6,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validate file magic bytes against expected file type
+function validateMagicBytes(bytes: Uint8Array, fileExt: string): boolean {
+  // Check first few bytes of file to verify actual file type
+  if (bytes.length < 4) return false;
+
+  const header = Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  switch (fileExt) {
+    case 'pdf':
+      // PDF: %PDF (25 50 44 46)
+      return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+    
+    case 'docx':
+    case 'pptx':
+      // Office Open XML: PK (50 4B) - ZIP format
+      return bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04;
+    
+    case 'doc':
+    case 'ppt':
+      // Legacy Office: D0 CF 11 E0 A1 B1 1A E1 (Compound File Binary)
+      return bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0;
+    
+    case 'txt':
+      // Text files: Allow any content (no specific magic bytes)
+      return true;
+    
+    default:
+      return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -86,6 +117,20 @@ serve(async (req) => {
       );
     }
 
+    // Server-side file validation: Check magic bytes to verify file type
+    const arrayBuffer = await fileData.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    
+    // Validate magic bytes match declared extension
+    const magicByteValid = validateMagicBytes(bytes, fileExt);
+    if (!magicByteValid) {
+      console.error('File magic bytes do not match extension:', fileExt);
+      return new Response(
+        JSON.stringify({ error: 'File type mismatch: content does not match file extension' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Handle text files directly
     if (fileExt === 'txt') {
       const text = await fileData.text();
@@ -105,8 +150,7 @@ serve(async (req) => {
       );
     }
 
-    // Convert file to base64 for AI processing
-    const arrayBuffer = await fileData.arrayBuffer();
+    // Convert file to base64 for AI processing (arrayBuffer already loaded above)
     const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
     console.log('Sending to AI for text extraction, file size:', arrayBuffer.byteLength);

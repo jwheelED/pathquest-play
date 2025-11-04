@@ -32,3 +32,6 @@ verify_jwt = true
 
 [functions.format-and-send-question]
 verify_jwt = true
+
+[functions.get-material-signed-url]
+verify_jwt = true
