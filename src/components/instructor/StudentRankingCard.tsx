@@ -6,8 +6,7 @@ interface StudentRankingCardProps {
   students: Array<{
     id: string;
     name: string;
-    experience_points: number;
-    level: number;
+    average_grade?: number;
     rank: number;
   }>;
   onStudentClick: (studentId: string) => void;
@@ -30,7 +29,7 @@ export default function StudentRankingCard({ students, onStudentClick }: Student
           <Trophy className="w-5 h-5 text-primary" />
           Student Rankings
         </CardTitle>
-        <CardDescription>See where each student stands</CardDescription>
+        <CardDescription>Ranked by overall check-in quiz performance</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {students.map((student) => (
@@ -49,7 +48,11 @@ export default function StudentRankingCard({ students, onStudentClick }: Student
             </Avatar>
             <div className="flex-1">
               <h3 className="font-semibold">{student.name}</h3>
-              <p className="text-sm text-muted-foreground">Level {student.level} • {student.experience_points} XP</p>
+              <p className="text-sm text-muted-foreground">
+                {student.average_grade !== undefined 
+                  ? `Average Grade: ${student.average_grade.toFixed(1)}%` 
+                  : 'No grades yet'}
+              </p>
             </div>
           </div>
         ))}

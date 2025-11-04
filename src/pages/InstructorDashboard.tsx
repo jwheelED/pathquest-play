@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Users } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { StudentProgressCard } from "@/components/instructor/StudentProgressCard";
 import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
@@ -26,12 +25,11 @@ import { TeachingAnalytics } from "@/components/instructor/TeachingAnalytics";
 interface Student {
   id: string;
   name: string;
-  level: number;
-  experience_points: number;
   current_streak: number;
   completedLessons: number;
   totalLessons: number;
   averageMasteryAttempts?: number;
+  average_grade?: number;
 }
 
 export default function InstructorDashboard() {
@@ -166,17 +164,19 @@ export default function InstructorDashboard() {
       const studentIds = studentLinks.map(link => link.student_id);
 
       // Parallel queries for better performance with 40+ students
-      const [usersData, statsData, progressData, masteryData] = await Promise.all([
+      const [usersData, statsData, progressData, masteryData, gradesData] = await Promise.all([
         supabase.from("users").select("id, name").in("id", studentIds),
         supabase.from("user_stats").select("*").in("user_id", studentIds),
         supabase.from("lesson_progress").select("user_id, completed").in("user_id", studentIds),
-        supabase.from("lesson_mastery").select("user_id, attempt_count, is_mastered").in("user_id", studentIds)
+        supabase.from("lesson_mastery").select("user_id, attempt_count, is_mastered").in("user_id", studentIds),
+        supabase.from("student_assignments").select("student_id, grade").eq("assignment_type", "lecture_checkin").eq("instructor_id", user.id).in("student_id", studentIds)
       ]);
 
       // Create lookup maps for O(1) access - much faster with 40+ students
       const statsMap = new Map(statsData.data?.map(s => [s.user_id, s]));
       const progressMap = new Map<string, number>();
       const masteryMap = new Map<string, { total: number; sum: number }>();
+      const gradesMap = new Map<string, number[]>();
 
       // Aggregate progress efficiently
       progressData.data?.forEach(p => {
@@ -196,21 +196,33 @@ export default function InstructorDashboard() {
         }
       });
 
+      // Aggregate grades efficiently
+      gradesData.data?.forEach(g => {
+        if (g.grade !== null) {
+          const existing = gradesMap.get(g.student_id) || [];
+          existing.push(Number(g.grade));
+          gradesMap.set(g.student_id, existing);
+        }
+      });
+
       const combinedStudents = usersData.data?.map(student => {
         const stats = statsMap.get(student.id);
         const completedLessons = progressMap.get(student.id) || 0;
         const mastery = masteryMap.get(student.id);
         const avgMasteryAttempts = mastery ? mastery.sum / mastery.total : undefined;
+        const grades = gradesMap.get(student.id) || [];
+        const average_grade = grades.length > 0 
+          ? grades.reduce((sum, g) => sum + g, 0) / grades.length 
+          : undefined;
 
         return {
           id: student.id,
           name: student.name || "Unknown",
-          level: stats?.level || 1,
-          experience_points: stats?.experience_points || 0,
           current_streak: stats?.current_streak || 0,
           completedLessons,
           totalLessons: 10,
           averageMasteryAttempts: avgMasteryAttempts,
+          average_grade,
         };
       }) || [];
 
@@ -246,7 +258,7 @@ export default function InstructorDashboard() {
     }));
 
   const rankedStudents = [...students]
-    .sort((a, b) => b.experience_points - a.experience_points)
+    .sort((a, b) => (b.average_grade || 0) - (a.average_grade || 0))
     .map((s, idx) => ({ ...s, rank: idx + 1 }));
 
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
@@ -401,13 +413,10 @@ export default function InstructorDashboard() {
               <>
                 <CheatDetectionCard instructorId={currentUser.id} />
                 
-                <div className="grid lg:grid-cols-2 gap-6">
-                  <StudentProgressCard instructorId={currentUser.id} />
-                  <StrugglingStudentsCard 
-                    students={strugglingStudents}
-                    onMessageStudent={() => {}}
-                  />
-                </div>
+                <StrugglingStudentsCard 
+                  students={strugglingStudents}
+                  onMessageStudent={() => {}}
+                />
 
                 <StudentRankingCard 
                   students={rankedStudents}
