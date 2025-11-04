@@ -26,3 +26,9 @@ verify_jwt = true
 
 [functions.generate-detailed-explanation]
 verify_jwt = true
+
+[functions.detect-lecture-question]
+verify_jwt = true
+
+[functions.format-and-send-question]
+verify_jwt = true

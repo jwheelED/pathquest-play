@@ -37,51 +37,90 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
+  // Real-time question detection - monitors transcript continuously
   useEffect(() => {
-    // Monitor transcript for voice command with multiple pattern matching
-    const fullTranscript = transcriptBufferRef.current;
-    const transcriptLower = fullTranscript.toLowerCase().replace(/[^\w\s]/g, "");
+    if (!isRecording || transcriptChunks.length === 0) return;
 
-    // Multiple trigger patterns for better detection
-    const triggerPatterns = [
-      "generate question now",
-      "generate questions now",
-      "generate a question now",
-      "generate the question now",
-      "create question now",
-      "make question now",
-    ];
+    const lastChunk = transcriptChunks[transcriptChunks.length - 1];
+    
+    // Only check chunks that are substantial enough
+    if (!lastChunk || lastChunk.length < 20) return;
 
-    const matchedPattern = triggerPatterns.find((pattern) => transcriptLower.includes(pattern.replace(/[^\w\s]/g, "")));
+    // Use 30-second sliding window for context
+    const contextWindow = transcriptBufferRef.current.slice(-1500);
 
-    if (isRecording && matchedPattern && !hasTriggeredRef.current) {
-      console.log("🎯 Voice command detected:", matchedPattern);
-      console.log("📝 Full transcript:", fullTranscript);
-      hasTriggeredRef.current = true;
+    checkForProfessorQuestion(lastChunk, contextWindow);
+  }, [transcriptChunks, isRecording]);
 
-      // Clear any pending debounce
-      if (triggerDebounceRef.current) {
-        clearTimeout(triggerDebounceRef.current);
-      }
+  const checkForProfessorQuestion = async (chunk: string, context: string) => {
+    try {
+      console.log('🔍 Checking for question in chunk:', chunk.substring(0, 100));
 
-      // Don't remove the trigger phrase - keep all lecture content
-      // Just mark that we've triggered
-
-      toast({
-        title: "🎤 Voice command recognized!",
-        description: "Generating questions from your lecture...",
+      const { data, error } = await supabase.functions.invoke('detect-lecture-question', {
+        body: { 
+          recentChunk: chunk,
+          context: context 
+        }
       });
 
-      // Trigger immediately with voice command flag
-      handleGenerateQuestions(true);
+      if (error) {
+        console.error('Question detection error:', error);
+        return;
+      }
 
-      // Reset trigger flag after 3 seconds to allow another trigger
-      triggerDebounceRef.current = setTimeout(() => {
-        hasTriggeredRef.current = false;
-        console.log("✅ Voice command ready again");
-      }, 3000);
+      if (data?.is_question && data.confidence > 0.75) {
+        console.log('✅ Question detected!', data.question_text);
+        console.log('📊 Confidence:', data.confidence, 'Type:', data.suggested_type);
+        
+        // Auto-send question
+        handleAutomaticQuestionSend(data);
+      } else if (data?.is_question && data.confidence > 0.5) {
+        console.log('⚠️ Low confidence question:', data.confidence, data.reasoning);
+      }
+    } catch (error) {
+      console.error('Error in question detection:', error);
     }
-  }, [transcriptChunks, isRecording]);
+  };
+
+  const handleAutomaticQuestionSend = async (detectionData: any) => {
+    try {
+      toast({
+        title: "🎯 Question detected!",
+        description: `"${detectionData.question_text.substring(0, 60)}..." - Sending to students...`,
+      });
+
+      const fullContext = transcriptBufferRef.current.slice(-1000);
+
+      const { data, error } = await supabase.functions.invoke('format-and-send-question', {
+        body: {
+          question_text: detectionData.question_text,
+          suggested_type: detectionData.suggested_type,
+          context: fullContext
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.success) {
+        toast({
+          title: "✅ Question sent!",
+          description: `${data.question_type} question sent to ${data.sent_to} students`,
+        });
+        onQuestionGenerated();
+      } else {
+        throw new Error(data?.message || 'Failed to send question');
+      }
+    } catch (error: any) {
+      console.error('Failed to send question:', error);
+      toast({
+        title: "Failed to send question",
+        description: error.message || "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Periodic system restart for resource cleanup
   useEffect(() => {
@@ -204,7 +243,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       toast({
         title: "🎙️ Recording started",
-        description: "Say 'generate question now' anytime to create questions instantly",
+        description: "AI will automatically detect when you ask questions to students",
       });
 
       // Start the continuous recording cycle
@@ -634,8 +673,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         </CardTitle>
         <CardDescription className="text-sm">
           {isRecording
-            ? "Recording and transcribing in real-time • Voice commands enabled • Using course materials for context"
-            : "Start recording your lecture - AI uses uploaded materials and transcription for questions"}
+            ? "Recording and transcribing in real-time • AI auto-detects questions • Sends directly to students"
+            : "Start recording your lecture - AI will detect when you ask questions and send them automatically"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -657,22 +696,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               </>
             )}
           </Button>
-          <Button
-            onClick={() => handleGenerateQuestions(false)}
-            disabled={transcriptChunks.length === 0 || isProcessing || transcriptBufferRef.current.length < 50}
-            variant="secondary"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              "Generate Questions"
-            )}
-          </Button>
           {transcriptChunks.length > 0 && (
-            <Button onClick={clearTranscript} disabled={isProcessing} variant="outline" size="sm">
+            <Button onClick={clearTranscript} variant="outline" size="sm">
               Clear
             </Button>
           )}
@@ -695,9 +720,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
               </Badge>
             )}
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
-              <p className="text-xs font-medium text-blue-900 dark:text-blue-200 text-center">
-                🎤 Voice Command Active: Say "generate question now"
+            <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+              <p className="text-xs font-medium text-green-900 dark:text-green-200 text-center">
+                🤖 Auto-Detection Active: Questions sent instantly to students
               </p>
             </div>
           </div>

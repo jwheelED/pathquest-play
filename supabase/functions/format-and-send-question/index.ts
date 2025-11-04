@@ -1,0 +1,243 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+
+const generateMCQ = async (questionText: string, context: string) => {
+  const prompt = `The professor asked: "${questionText}"
+
+Context from lecture: "${context}"
+
+Generate a multiple choice question with 4 options (A-D):
+- One correct answer
+- Three plausible distractors based on common misconceptions
+- Match the difficulty to what was just taught
+- Keep it concise and clear
+
+Return JSON:
+{
+  "question": "the question text",
+  "options": ["A. option1", "B. option2", "C. option3", "D. option4"],
+  "correctAnswer": "A",
+  "explanation": "Why this is correct and others are wrong"
+}`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: 'You are an educational AI that creates high-quality multiple choice questions.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" }
+    }),
+  });
+
+  const aiResponse = await response.json();
+  return JSON.parse(aiResponse.choices[0].message.content);
+};
+
+const generateCodingQuestion = async (questionText: string, context: string) => {
+  const prompt = `The professor asked: "${questionText}"
+
+Context from lecture: "${context}"
+
+Create a coding question with:
+1. Clear problem statement
+2. Function signature/starter code
+3. Test cases (input/output examples)
+4. Hints if needed
+
+Detect the programming language from context (Python, JavaScript, Java, C++, etc.)
+
+Return JSON:
+{
+  "question": "problem statement",
+  "language": "python" | "javascript" | "java" | etc,
+  "starterCode": "function/class template",
+  "testCases": [{"input": "...", "expectedOutput": "..."}],
+  "hints": ["hint1", "hint2"]
+}`;
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: 'You are an educational AI that creates coding challenges for students.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" }
+    }),
+  });
+
+  const aiResponse = await response.json();
+  return JSON.parse(aiResponse.choices[0].message.content);
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify instructor role
+    const { data: roleData } = await supabase.rpc('has_role', {
+      user_id: user.id,
+      role_name: 'instructor'
+    });
+
+    if (!roleData) {
+      return new Response(JSON.stringify({ error: 'Unauthorized: Instructor role required' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { question_text, suggested_type, context } = await req.json();
+
+    if (!question_text || !suggested_type) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('📝 Formatting question:', suggested_type, question_text.substring(0, 50));
+
+    let formattedQuestion: any;
+
+    // Format based on detected type
+    if (suggested_type === 'coding') {
+      const codingQ = await generateCodingQuestion(question_text, context || '');
+      formattedQuestion = {
+        question: codingQ.question,
+        type: 'coding',
+        language: codingQ.language,
+        starterCode: codingQ.starterCode,
+        testCases: codingQ.testCases,
+        hints: codingQ.hints
+      };
+    } else if (suggested_type === 'multiple_choice') {
+      const mcq = await generateMCQ(question_text, context || '');
+      formattedQuestion = {
+        question: mcq.question,
+        type: 'multiple_choice',
+        options: mcq.options,
+        correctAnswer: mcq.correctAnswer,
+        explanation: mcq.explanation
+      };
+    } else {
+      // Short answer format
+      formattedQuestion = {
+        question: question_text,
+        type: 'short_answer',
+        expectedAnswer: '',
+        gradingMode: 'auto_grade'
+      };
+    }
+
+    // Fetch students linked to this instructor
+    const { data: studentLinks, error: linkError } = await supabase
+      .from('instructor_students')
+      .select('student_id')
+      .eq('instructor_id', user.id);
+
+    if (linkError) {
+      throw new Error(`Failed to fetch students: ${linkError.message}`);
+    }
+
+    if (!studentLinks || studentLinks.length === 0) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: 'No students linked to instructor' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('👥 Sending to', studentLinks.length, 'students');
+
+    // Create assignments for all students
+    const assignments = studentLinks.map(link => ({
+      instructor_id: user.id,
+      student_id: link.student_id,
+      assignment_type: 'lecture_checkin',
+      mode: 'auto_grade',
+      title: '🎯 Live Lecture Question',
+      content: { 
+        questions: [formattedQuestion],
+        isLive: true,
+        detectedAutomatically: true
+      },
+      completed: false,
+      auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 min expiry
+    }));
+
+    const { error: insertError } = await supabase
+      .from('student_assignments')
+      .insert(assignments);
+
+    if (insertError) {
+      throw new Error(`Failed to create assignments: ${insertError.message}`);
+    }
+
+    console.log('✅ Questions sent successfully');
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      sent_to: studentLinks.length,
+      question_type: suggested_type,
+      question: formattedQuestion
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in format-and-send-question:', error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
