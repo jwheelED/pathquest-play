@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ export default function InstructorDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshQueue, setRefreshQueue] = useState(0);
+  const [selectedChatStudent, setSelectedChatStudent] = useState<string | null>(null);
+  const chatCardRef = useRef<HTMLDivElement>(null);
   const [classroomStats, setClassroomStats] = useState({
     totalStudents: 0,
     activeCheckIns: 0,
@@ -245,6 +247,14 @@ export default function InstructorDashboard() {
     setDialogOpen(true);
   };
 
+  const handleMessageStudent = (studentId: string) => {
+    setSelectedChatStudent(studentId);
+    // Scroll to chat card
+    setTimeout(() => {
+      chatCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
   const strugglingStudents = students
     .filter(s => s.current_streak < 2 || (s.completedLessons / s.totalLessons) < 0.3)
     .map(s => ({
@@ -415,7 +425,7 @@ export default function InstructorDashboard() {
                 
                 <StrugglingStudentsCard 
                   students={strugglingStudents}
-                  onMessageStudent={() => {}}
+                  onMessageStudent={handleMessageStudent}
                 />
 
                 <StudentRankingCard 
@@ -423,10 +433,13 @@ export default function InstructorDashboard() {
                   onStudentClick={handleStudentClick}
                 />
 
-                <StudentChatCard 
-                  students={students.map(s => ({ id: s.id, name: s.name }))}
-                  currentUserId={currentUser.id}
-                />
+                <div ref={chatCardRef}>
+                  <StudentChatCard 
+                    students={students.map(s => ({ id: s.id, name: s.name }))}
+                    currentUserId={currentUser.id}
+                    selectedStudentId={selectedChatStudent}
+                  />
+                </div>
               </>
             )}
           </div>

@@ -22,13 +22,21 @@ interface StudentChatCardProps {
     name: string;
   }>;
   currentUserId: string;
+  selectedStudentId?: string | null;
 }
 
-export default function StudentChatCard({ students, currentUserId }: StudentChatCardProps) {
+export default function StudentChatCard({ students, currentUserId, selectedStudentId }: StudentChatCardProps) {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Auto-select student when selectedStudentId prop changes
+  useEffect(() => {
+    if (selectedStudentId) {
+      setSelectedStudent(selectedStudentId);
+    }
+  }, [selectedStudentId]);
 
   useEffect(() => {
     if (selectedStudent) {
