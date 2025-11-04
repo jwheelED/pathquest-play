@@ -15,8 +15,10 @@ const MAX_BUFFER_SIZE = 50000; // 50K characters max
 const KEEP_RECENT_SIZE = 40000; // Keep 40K most recent
 const RESTART_INTERVAL = 15 * 60 * 1000; // 15 minutes
 const TOKEN_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes
-const MAX_RECORDING_CYCLES = 50; // Force restart after 50 cycles (~6.5 min)
+const MAX_RECORDING_CYCLES = 50; // Force restart after 50 cycles (~8.5 min)
 const MAX_CONSECUTIVE_FAILURES = 3;
+const RECORDING_CHUNK_DURATION = 8000; // 8 seconds for better sentence completion
+const MIN_CHUNK_LENGTH = 30; // Minimum characters to analyze
 
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -38,8 +40,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const lastDetectionTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Client-side throttling: 10 seconds minimum between detection attempts
-  const MIN_DETECTION_INTERVAL = 10000; // 10 seconds
+  // Client-side throttling: 12 seconds minimum between detection attempts
+  const MIN_DETECTION_INTERVAL = 12000; // 12 seconds (aligned with audio chunks)
 
   // Real-time question detection - monitors transcript continuously
   useEffect(() => {
@@ -48,12 +50,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     const lastChunk = transcriptChunks[transcriptChunks.length - 1];
     
     // Only check chunks that are substantial enough
-    if (!lastChunk || lastChunk.length < 20) return;
+    if (!lastChunk || lastChunk.length < MIN_CHUNK_LENGTH) return;
 
-    // Use 30-second sliding window for context
-    const contextWindow = transcriptBufferRef.current.slice(-1500);
+    // Use last 2-3 chunks for better context (about 60 seconds of speech)
+    const recentChunks = transcriptChunks.slice(-3).join(' ');
+    // Provide broader context from full buffer (90 seconds)
+    const contextWindow = transcriptBufferRef.current.slice(-2500);
 
-    checkForProfessorQuestion(lastChunk, contextWindow);
+    checkForProfessorQuestion(recentChunks, contextWindow);
   }, [transcriptChunks, isRecording]);
 
   const checkForProfessorQuestion = async (chunk: string, context: string) => {
@@ -64,8 +68,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
     lastDetectionTimeRef.current = now;
+    
     try {
-      console.log('🔍 Checking for question in chunk:', chunk.substring(0, 100));
+      console.log('🔍 Analyzing speech for questions...');
+      console.log('📝 Recent text:', chunk.substring(0, 120));
+      console.log('📚 Context length:', context.length, 'chars');
 
       const { data, error } = await supabase.functions.invoke('detect-lecture-question', {
         body: { 
@@ -75,21 +82,49 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
 
       if (error) {
-        console.error('Question detection error:', error);
+        console.error('❌ Question detection error:', error);
+        // Handle rate limiting gracefully
+        if (error.message?.includes('Rate limit')) {
+          console.log('⏸️ Rate limit hit - detection will resume automatically');
+        }
         return;
       }
 
-      if (data?.is_question && data.confidence > 0.75) {
-        console.log('✅ Question detected!', data.question_text);
-        console.log('📊 Confidence:', data.confidence, 'Type:', data.suggested_type);
+      console.log('🎯 Detection result:', {
+        is_question: data?.is_question,
+        confidence: data?.confidence,
+        type: data?.suggested_type,
+        reasoning: data?.reasoning?.substring(0, 100)
+      });
+
+      // High confidence - auto-send immediately
+      if (data?.is_question && data.confidence >= 0.78) {
+        console.log('✅ HIGH CONFIDENCE QUESTION DETECTED!');
+        console.log('📋 Question:', data.question_text);
+        console.log('📊 Confidence:', data.confidence, '| Type:', data.suggested_type);
         
-        // Auto-send question
         handleAutomaticQuestionSend(data);
-      } else if (data?.is_question && data.confidence > 0.5) {
-        console.log('⚠️ Low confidence question:', data.confidence, data.reasoning);
+      } 
+      // Medium confidence - log but don't send (could add instructor review option later)
+      else if (data?.is_question && data.confidence >= 0.55) {
+        console.log('⚠️ Medium confidence question (not sent):', {
+          confidence: data.confidence,
+          question: data.question_text?.substring(0, 80),
+          reasoning: data.reasoning
+        });
+        
+        toast({
+          title: "Possible question detected",
+          description: `Confidence: ${(data.confidence * 100).toFixed(0)}% - "${data.question_text?.substring(0, 50)}..."`,
+          variant: "default"
+        });
+      }
+      // Low confidence - just log
+      else if (data?.is_question) {
+        console.log('ℹ️ Low confidence detection:', data.confidence, data.reasoning);
       }
     } catch (error) {
-      console.error('Error in question detection:', error);
+      console.error('❌ Error in question detection:', error);
     }
   };
 
@@ -100,13 +135,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         description: `"${detectionData.question_text.substring(0, 60)}..." - Sending to students...`,
       });
 
-      const fullContext = transcriptBufferRef.current.slice(-1000);
+      // Provide richer context for better question formatting
+      const fullContext = transcriptBufferRef.current.slice(-1500);
 
       const { data, error } = await supabase.functions.invoke('format-and-send-question', {
         body: {
           question_text: detectionData.question_text,
           suggested_type: detectionData.suggested_type,
-          context: fullContext
+          context: fullContext,
+          confidence: detectionData.confidence
         }
       });
 
@@ -331,16 +368,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
       };
 
-      // Record for 6 seconds (reduced from 8 for more frequent cleanup)
+      // Record for 8 seconds for better sentence completion and context
       mediaRecorder.start();
       console.log("🎙️ Started recording cycle", recordingCycleCountRef.current, "with format:", mimeType);
 
-      // Stop after 6 seconds to create a complete audio file
+      // Stop after 8 seconds to capture complete thoughts/sentences
       recordingIntervalRef.current = setTimeout(() => {
         if (mediaRecorder.state === "recording") {
+          console.log("⏹️ Stopping recording cycle after", RECORDING_CHUNK_DURATION, "ms");
           mediaRecorder.stop();
         }
-      }, 6000);
+      }, RECORDING_CHUNK_DURATION);
     } catch (error) {
       console.error("Error in recording cycle:", error);
       setFailureCount((prev) => prev + 1);
@@ -446,8 +484,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
           if (data?.text && data.text.trim()) {
             const newText = data.text.trim();
-            console.log("✅ Transcribed chunk:", newText.substring(0, 100));
-            console.log("📊 Current chunks count before adding:", transcriptChunks.length);
+            const wordCount = newText.split(/\s+/).length;
+            console.log("✅ Transcribed:", wordCount, "words -", newText.substring(0, 120));
+            console.log("📊 Total chunks:", transcriptChunks.length + 1);
 
             // Reset failure count on success
             setFailureCount(0);
@@ -455,7 +494,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             // Add new chunk to array for display
             setTranscriptChunks((prev) => {
               const updated = [...prev, newText];
-              console.log("📊 Chunks count after adding:", updated.length);
               return updated;
             });
 
@@ -473,9 +511,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               console.log("🧹 Trimmed transcript buffer to prevent memory issues");
             }
 
-            console.log("📝 Total transcript length:", transcriptBufferRef.current.length);
+            console.log("📝 Buffer: ~" + Math.round(transcriptBufferRef.current.length / 100) + "00 chars total");
           } else {
-            console.log("ℹ️ No transcription result (audio may be silence)");
+            console.log("ℹ️ No speech detected in this chunk (silence or background noise)");
           }
         } catch (invokeError: any) {
           console.error("Function invoke error:", invokeError);
@@ -684,8 +722,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         </CardTitle>
         <CardDescription className="text-sm">
           {isRecording
-            ? "Recording and transcribing in real-time • AI auto-detects questions • Sends directly to students"
-            : "Start recording your lecture - AI will detect when you ask questions and send them automatically"}
+            ? "🎙️ Recording in 8-second cycles • 🤖 AI analyzes last 60 seconds for questions • ✅ Auto-sends with 78%+ confidence"
+            : "Start recording your lecture - AI will detect when you ask questions (78%+ confidence) and send them automatically"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

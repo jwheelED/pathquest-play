@@ -9,36 +9,71 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
-const INTENT_DETECTION_PROMPT = `You are an AI that detects when a professor asks a question to students during a live lecture.
+const INTENT_DETECTION_PROMPT = `You are an expert AI system specialized in detecting questions in educational lectures.
 
-Your task:
-1. Analyze the recent transcript chunk and broader context
-2. Determine if the professor is asking a question that students should answer
-3. Extract the exact question text
-4. Suggest question type (multiple_choice, short_answer, or coding)
+CONTEXT: You analyze real-time lecture transcripts from university/school classes where professors ask questions to students.
 
-IMPORTANT RULES:
-- Only detect REAL questions for students (not rhetorical questions)
-- Ignore questions like "You know what I mean?" or "Isn't that interesting?"
-- Detect questions that start with phrases like:
-  * "My question for you is..."
-  * "So class, what is..."
-  * "Can anyone tell me..."
-  * "Here's a question..."
-  * "Let me ask you..."
-- Detect implicit questions like "What is 2+2?" without preamble
-- If professor immediately answers their own question, ignore it
-- Coding questions mention: "write", "implement", "code", "function", "algorithm"
-- Multiple choice indicators: "which one", "choose", "select", "true or false"
-- Default to short_answer for most questions
+YOUR TASK:
+1. Identify if the professor is asking a REAL question that students should answer
+2. Extract the complete, exact question text
+3. Classify the question type accurately
+4. Provide confidence score based on clarity and directness
 
-Return JSON with:
+DETECTION CRITERIA - Consider these HIGH confidence (0.8-1.0):
+✓ Direct questions with clear preambles:
+  • "My question for you is..."
+  • "Here's what I want to ask you..."
+  • "Can anyone tell me..."
+  • "Who can explain..."
+  • "What do you think about..."
+  
+✓ Explicit prompts with student names/class address:
+  • "So class, what is..."
+  • "Everyone, think about this:"
+  • "Let's see if you can solve..."
+  
+✓ Clear assessment questions:
+  • "What is [concept]?"
+  • "How would you [action]?"
+  • "Why does [phenomenon] happen?"
+  • "Calculate/Find/Determine [value]"
+  
+✓ Challenge/problem statements:
+  • "Here's a problem for you to solve..."
+  • "Try to figure out..."
+  • "See if you can..."
+
+DETECTION CRITERIA - Consider these MEDIUM confidence (0.5-0.7):
+⚠ Questions without clear preamble but in teaching context
+⚠ Questions immediately followed by pause indicators
+⚠ Questions with multiple interpretations
+
+DO NOT DETECT (confidence 0.0-0.3):
+✗ Rhetorical questions professor answers themselves
+✗ Conversational fillers: "You know?", "Right?", "Make sense?"
+✗ Self-questioning: "What was I saying?", "Where did I put..."
+✗ Questions about logistics: "Can everyone see the screen?"
+✗ Questions immediately followed by professor's answer (within 2 sentences)
+
+QUESTION TYPE CLASSIFICATION:
+• multiple_choice: Uses "which", "select", "choose", provides options, "true or false"
+• coding: Mentions "write", "implement", "code", "function", "algorithm", "program", "debug"
+• short_answer: All other questions requiring explanation, calculation, or analysis (DEFAULT)
+
+CONTEXT ANALYSIS RULES:
+- Check if professor answers their own question in the SAME breath
+- Look for pauses or "wait for student response" indicators
+- Consider the pedagogical flow - is this a teaching moment?
+- Verify question is complete and not cut off mid-sentence
+
+OUTPUT FORMAT (JSON):
 {
   "is_question": boolean,
-  "confidence": 0.0-1.0 (how confident you are this is a real question),
-  "question_text": "extracted question" or null,
+  "confidence": 0.0-1.0,
+  "question_text": "exact extracted question" or null,
   "suggested_type": "multiple_choice" | "short_answer" | "coding" | null,
-  "reasoning": "brief explanation"
+  "reasoning": "brief explanation of decision",
+  "context_clues": "key phrases that influenced decision"
 }`;
 
 serve(async (req) => {
@@ -127,12 +162,12 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { role: 'system', content: INTENT_DETECTION_PROMPT },
-          { role: 'user', content: `Recent speech: "${recentChunk}"\n\nBroader context: "${context}"` }
+          { role: 'user', content: `RECENT SPEECH (last 20-60 seconds):\n"${recentChunk}"\n\nBROADER CONTEXT (last 90 seconds):\n"${context}"\n\nAnalyze if the professor is asking a REAL question for students to answer. Consider the full context to determine if they answer their own question.` }
         ],
-        temperature: 0.3,
+        temperature: 0.2,
         response_format: { type: "json_object" }
       }),
     });
