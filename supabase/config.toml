@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.get-material-signed-url]
 verify_jwt = true
+
+[functions.extract-voice-command-question]
+verify_jwt = true

@@ -52,6 +52,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     // Only check chunks that are substantial enough
     if (!lastChunk || lastChunk.length < MIN_CHUNK_LENGTH) return;
 
+    // PRIORITY 1: Check for voice commands first (immediate send)
+    const voiceCommandDetected = checkForVoiceCommand(lastChunk);
+    if (voiceCommandDetected) {
+      return; // Voice command handled, skip automatic detection
+    }
+
+    // PRIORITY 2: Automatic detection with high confidence
     // Use last 2-3 chunks for better context (about 60 seconds of speech)
     const recentChunks = transcriptChunks.slice(-3).join(' ');
     // Provide broader context from full buffer (90 seconds)
@@ -59,6 +66,77 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     checkForProfessorQuestion(recentChunks, contextWindow);
   }, [transcriptChunks, isRecording]);
+
+  const checkForVoiceCommand = (chunk: string): boolean => {
+    // Voice command patterns - case insensitive, fuzzy matching
+    const commandPatterns = [
+      /send\s+(this\s+)?question(\s+now)?/i,
+      /send\s+(that\s+)?question(\s+now)?/i,
+      /send\s+it(\s+now)?/i,
+      /push\s+(this\s+)?question/i,
+      /submit\s+(this\s+)?question/i,
+    ];
+
+    const hasCommand = commandPatterns.some(pattern => pattern.test(chunk));
+
+    if (hasCommand) {
+      console.log('🎤 VOICE COMMAND DETECTED:', chunk.substring(0, 100));
+      handleVoiceCommandQuestion();
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleVoiceCommandQuestion = async () => {
+    try {
+      toast({
+        title: "🎤 Voice command detected",
+        description: "Extracting question from recent speech...",
+      });
+
+      // Get last 45 seconds of transcript (before the voice command)
+      // This gives enough context without including the command itself
+      const recentTranscript = transcriptBufferRef.current.slice(-1500);
+
+      console.log('📝 Extracting question from transcript:', recentTranscript.length, 'chars');
+
+      const { data, error } = await supabase.functions.invoke('extract-voice-command-question', {
+        body: { recentTranscript }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success || !data?.question_text) {
+        toast({
+          title: "Could not extract question",
+          description: "Try asking the question more clearly before using the voice command",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Question extracted via voice command:', data.question_text);
+
+      // Send immediately without confidence threshold
+      await handleAutomaticQuestionSend({
+        question_text: data.question_text,
+        suggested_type: data.suggested_type,
+        confidence: 1.0, // Voice command = maximum confidence
+        extraction_method: 'voice_command'
+      });
+
+    } catch (error: any) {
+      console.error('Voice command error:', error);
+      toast({
+        title: "Voice command failed",
+        description: error.message || "Could not process voice command",
+        variant: "destructive",
+      });
+    }
+  };
 
   const checkForProfessorQuestion = async (chunk: string, context: string) => {
     // Client-side throttling
@@ -722,8 +800,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         </CardTitle>
         <CardDescription className="text-sm">
           {isRecording
-            ? "🎙️ Recording in 8-second cycles • 🤖 AI analyzes last 60 seconds for questions • ✅ Auto-sends with 78%+ confidence"
-            : "Start recording your lecture - AI will detect when you ask questions (78%+ confidence) and send them automatically"}
+            ? "🎙️ Recording • 🎤 Say 'send question now' after asking • 🤖 AI auto-detects 78%+ confidence • ⚡ Voice commands = instant send"
+            : "Start recording - use 'send question now' for instant sends, or let AI auto-detect questions (78%+ confidence)"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -769,9 +847,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
               </Badge>
             )}
-            <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+            <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-2 space-y-1">
               <p className="text-xs font-medium text-green-900 dark:text-green-200 text-center">
-                🤖 Auto-Detection Active: Questions sent instantly to students
+                🤖 Auto-Detection Active (78%+ confidence)
+              </p>
+              <p className="text-xs text-green-700 dark:text-green-300 text-center">
+                💡 Say "send question now" after asking for instant send
               </p>
             </div>
           </div>
