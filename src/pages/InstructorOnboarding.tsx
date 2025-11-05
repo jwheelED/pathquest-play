@@ -46,9 +46,19 @@ export default function InstructorOnboarding() {
   };
 
   const handleNext = () => {
-    if (step === 1 && !courseTitle) {
-      toast({ title: "Please enter course title", variant: "destructive" });
-      return;
+    if (step === 1) {
+      if (!courseTitle) {
+        toast({ title: "Please enter course title", variant: "destructive" });
+        return;
+      }
+      if (!schedule) {
+        toast({ title: "Please enter class schedule", variant: "destructive" });
+        return;
+      }
+      if (!topics) {
+        toast({ title: "Please enter key topics", variant: "destructive" });
+        return;
+      }
     }
     if (step < totalSteps) {
       setStep(step + 1);
@@ -117,7 +127,7 @@ export default function InstructorOnboarding() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="schedule">Class Schedule</Label>
+                <Label htmlFor="schedule">Class Schedule *</Label>
                 <Input
                   id="schedule"
                   placeholder="e.g., Mon/Wed/Fri 10:00-11:30 AM"
@@ -126,7 +136,7 @@ export default function InstructorOnboarding() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="topics">Key Topics (comma-separated)</Label>
+                <Label htmlFor="topics">Key Topics (comma-separated) *</Label>
                 <Textarea
                   id="topics"
                   placeholder="e.g., algorithms, data structures, python, object-oriented programming"
