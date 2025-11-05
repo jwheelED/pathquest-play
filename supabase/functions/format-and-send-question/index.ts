@@ -14,17 +14,18 @@ const generateMCQ = async (questionText: string, context: string) => {
 
 Context from lecture: "${context}"
 
-Generate a multiple choice question with 4 options (A-D):
+Generate a multiple choice question with 4 options:
 - One correct answer
 - Three plausible distractors based on common misconceptions
+- IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
 - Keep it concise and clear
 
-Return JSON:
+Return JSON (provide ONLY the option text without letters):
 {
   "question": "the question text",
-  "options": ["A. option1", "B. option2", "C. option3", "D. option4"],
-  "correctAnswer": "A",
+  "options": ["option1 text", "option2 text", "option3 text", "option4 text"],
+  "correctAnswer": "A" | "B" | "C" | "D",
   "explanation": "Why this is correct and others are wrong"
 }`;
 

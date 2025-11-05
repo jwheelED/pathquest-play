@@ -59,11 +59,12 @@ Difficulty Level: ${difficulty}
 Generate 5 high-quality practice questions that:
 1. Are directly relevant to ${courseTitle}
 2. Cover fundamental concepts from the course topics
-3. Have 4 answer options each (A, B, C, D)
-4. Include clear explanations for the correct answer
-5. Include explanations for why each WRONG answer is incorrect
-6. Are at ${difficulty} difficulty level
-7. Keep problem_text concise and avoid code snippets with special characters
+3. Have 4 answer options each
+4. RANDOMIZE which option is correct - don't always make the first option correct
+5. Include clear explanations for the correct answer
+6. Include explanations for why each WRONG answer is incorrect
+7. Are at ${difficulty} difficulty level
+8. Keep problem_text concise and avoid code snippets with special characters
 
 IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no code blocks, no explanations.
 
@@ -72,13 +73,13 @@ IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no code bl
     "subject": "${courseTitle}",
     "difficulty": "${difficulty}",
     "problem_text": "Clear, concise question text without code blocks",
-    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
-    "correct_answer": "Option X text (exact match to one of the options)",
+    "options": ["Option 1 text", "Option 2 text", "Option 3 text", "Option 4 text"],
+    "correct_answer": "Option X text (exact match to one of the options - randomize which one is correct)",
     "explanation": "Brief explanation of why this is correct",
     "wrong_answer_explanations": {
-      "Option A text": "Why this option is wrong (only include if it's NOT the correct answer)",
-      "Option B text": "Why this option is wrong (only include if it's NOT the correct answer)",
-      "Option C text": "Why this option is wrong (only include if it's NOT the correct answer)"
+      "Option 1 text": "Why this option is wrong (only include if it's NOT the correct answer)",
+      "Option 2 text": "Why this option is wrong (only include if it's NOT the correct answer)",
+      "Option 3 text": "Why this option is wrong (only include if it's NOT the correct answer)"
     },
     "points_reward": 10
   }
