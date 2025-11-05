@@ -42,6 +42,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const recordingCycleCountRef = useRef(0);
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastDetectionTimeRef = useRef<number>(0);
+  const lastDetectedChunkIndexRef = useRef<number>(-1);
   const { toast } = useToast();
 
   // Client-side cooldown: 5 seconds minimum between detection attempts
@@ -76,6 +77,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useEffect(() => {
     if (!isRecording || transcriptChunks.length === 0) return;
 
+    const currentChunkIndex = transcriptChunks.length - 1;
+    
+    // Prevent re-checking the same chunks we already processed
+    if (currentChunkIndex <= lastDetectedChunkIndexRef.current) {
+      return;
+    }
+
     // Sliding window: Check last 3 chunks combined to catch commands split across boundaries
     const windowSize = Math.min(3, transcriptChunks.length);
     const recentChunks = transcriptChunks.slice(-windowSize);
@@ -88,10 +96,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (slidingWindow.length < MIN_CHUNK_LENGTH) return;
 
     // Check for voice commands in the sliding window
-    checkForVoiceCommand(slidingWindow);
+    checkForVoiceCommand(slidingWindow, currentChunkIndex);
   }, [transcriptChunks, isRecording]);
 
-  const checkForVoiceCommand = (text: string): boolean => {
+  const checkForVoiceCommand = (text: string, currentChunkIndex: number): boolean => {
     // Cooldown check - prevent duplicate triggers
     const now = Date.now();
     if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
@@ -156,11 +164,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         text: text.slice(-100),
         regexMatch: hasRegexMatch,
         keywordMatch: hasKeywords,
-        fuzzyMatch: hasFuzzyMatch
+        fuzzyMatch: hasFuzzyMatch,
+        chunkIndex: currentChunkIndex
       });
       
-      // Update cooldown timestamp
+      // Update cooldown timestamp AND mark this chunk as processed
       lastDetectionTimeRef.current = now;
+      lastDetectedChunkIndexRef.current = currentChunkIndex;
       
       handleVoiceCommandQuestion();
       return true;
@@ -442,6 +452,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       recordingCycleCountRef.current = 0;
       setFailureCount(0);
       setIsCircuitOpen(false);
+      lastDetectionTimeRef.current = 0;
+      lastDetectedChunkIndexRef.current = -1;
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -877,6 +889,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     transcriptBufferRef.current = "";
     lastGeneratedIndexRef.current = 0;
     hasTriggeredRef.current = false;
+    lastDetectionTimeRef.current = 0;
+    lastDetectedChunkIndexRef.current = -1;
     toast({ title: "Transcript cleared" });
   };
 
