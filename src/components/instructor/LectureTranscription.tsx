@@ -797,30 +797,61 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   return (
-    <Card className="relative overflow-hidden">
-      {/* Voice Command Flash Overlay */}
-      {voiceCommandDetected && (
-        <div className="absolute inset-0 z-50 pointer-events-none">
-          <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
-              <Zap className="h-12 w-12 animate-pulse" />
+    <>
+      {/* Tutorial Section */}
+      <Card className="mb-4 bg-muted/50 border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-primary" />
+            How to Use Live Lecture Capture
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2 text-sm">
+            <div className="flex gap-2">
+              <Badge variant="outline" className="shrink-0">Step 1</Badge>
+              <p>Click "Start Recording" to begin capturing your lecture audio in real-time.</p>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="shrink-0">Step 2</Badge>
+              <p>Speak naturally - the system automatically detects when you ask questions to the class.</p>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="shrink-0">Step 3</Badge>
+              <p>For manual control, say <strong>"send question now"</strong> right after asking a question to instantly send it to students.</p>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="shrink-0">Step 4</Badge>
+              <p>Review detected questions below before they're sent, or let high-confidence questions go out automatically.</p>
             </div>
           </div>
-        </div>
-      )}
+        </CardContent>
+      </Card>
 
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-xl">
-          {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
-          Live Lecture Capture
-        </CardTitle>
-        <CardDescription className="text-sm">
-          {isRecording
-            ? "🎙️ Recording • 🎤 Say 'send question now' after asking • 🤖 AI auto-detects 78%+ confidence • ⚡ Voice commands = instant send"
-            : "Start recording - use 'send question now' for instant sends, or let AI auto-detect questions (78%+ confidence)"}
-        </CardDescription>
-      </CardHeader>
+      <Card className="relative overflow-hidden">
+        {/* Voice Command Flash Overlay */}
+        {voiceCommandDetected && (
+          <div className="absolute inset-0 z-50 pointer-events-none">
+            <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
+                <Zap className="h-12 w-12 animate-pulse" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
+            Live Lecture Capture
+          </CardTitle>
+          <CardDescription className="text-sm">
+            {isRecording
+              ? "🎙️ Recording • 🎤 Say 'send question now' after asking • 🤖 AI automatically detects questions • ⚡ Voice commands = instant send"
+              : "Start recording - use 'send question now' for instant sends, or let AI automatically detect and send questions"}
+          </CardDescription>
+        </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Button
@@ -888,5 +919,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         )}
       </CardContent>
     </Card>
+    </>
   );
 };
