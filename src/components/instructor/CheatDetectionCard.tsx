@@ -331,36 +331,81 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
     );
   }
 
+  const highSuspicionCount = flaggedStudents.filter(s => s.suspicion_level === 'HIGH').length;
+  const mediumSuspicionCount = flaggedStudents.filter(s => s.suspicion_level === 'MEDIUM').length;
+
   return (
-    <Card className="border-orange-500/50">
+    <Card className="border-red-500/50 bg-red-50/50 dark:bg-red-950/20">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-orange-500" />
-          Cheat Detection
+          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+          Cheat Detection - Original Work Warning
         </CardTitle>
         <CardDescription>
-          {flaggedStudents.length} submission(s) flagged for unusual pasting patterns
+          <div className="space-y-1 mt-2">
+            <p className="text-foreground font-medium">
+              {flaggedStudents.length} submission(s) flagged for lack of original work
+            </p>
+            <div className="flex gap-3 text-sm">
+              {highSuspicionCount > 0 && (
+                <span className="text-red-600 dark:text-red-400 font-medium">
+                  🚨 {highSuspicionCount} HIGH risk (likely copied from AI/external source)
+                </span>
+              )}
+              {mediumSuspicionCount > 0 && (
+                <span className="text-orange-600 dark:text-orange-400">
+                  ⚠️ {mediumSuspicionCount} MEDIUM risk (unusual patterns)
+                </span>
+              )}
+            </div>
+          </div>
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-800 rounded-lg">
+          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200 mb-2">
+            ⚠️ How to identify lack of original work:
+          </p>
+          <ul className="text-xs text-yellow-800 dark:text-yellow-300 space-y-1 ml-4 list-disc">
+            <li><strong>HIGH risk:</strong> Student switched to another tab (likely ChatGPT/AI), returned and immediately pasted answer</li>
+            <li><strong>HIGH risk:</strong> Complete answer pasted in one action with minimal typing</li>
+            <li><strong>HIGH risk:</strong> Question copied, then quick paste response (copy-paste to AI)</li>
+            <li><strong>MEDIUM risk:</strong> Frequent tab switching or majority of time spent away from the question</li>
+            <li><strong>MEDIUM risk:</strong> Long absence followed by paste, or minimal interaction for answer length</li>
+          </ul>
+        </div>
+        
         <div className="space-y-3">
           {flaggedStudents.map((student, idx) => (
             <div
               key={`${student.student_id}-${student.assignment_id}-${idx}`}
-              className="flex items-start justify-between p-4 rounded-lg border border-orange-200 bg-orange-50/50 dark:bg-orange-950/20"
+              className={`flex items-start justify-between p-4 rounded-lg border ${
+                student.suspicion_level === 'HIGH' 
+                  ? 'border-red-300 bg-red-50/70 dark:bg-red-950/30 dark:border-red-800' 
+                  : 'border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-800'
+              }`}
             >
               <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-semibold text-foreground">{student.student_name}</p>
                   <Badge 
                     variant={student.suspicion_level === 'HIGH' ? 'destructive' : 'secondary'} 
-                    className="text-xs"
+                    className={`text-xs font-bold ${
+                      student.suspicion_level === 'HIGH' 
+                        ? 'bg-red-600 text-white' 
+                        : ''
+                    }`}
                   >
-                    {student.suspicion_level} SUSPICION
+                    {student.suspicion_level === 'HIGH' ? '🚨 HIGH RISK' : '⚠️ MEDIUM RISK'} - Likely No Original Work
                   </Badge>
                   {student.paste_percentage > 0 && (
                     <Badge variant="outline" className="text-xs">
                       {student.paste_percentage.toFixed(0)}% pasted
+                    </Badge>
+                  )}
+                  {student.typed_count === 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      0 typing events
                     </Badge>
                   )}
                 </div>
@@ -405,9 +450,26 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
                   <Clock className="h-3 w-3" />
                   <span>Flagged on {format(new Date(student.flagged_at), 'MMM d, yyyy h:mm a')}</span>
                 </div>
-                <p className="text-xs font-medium text-orange-700 dark:text-orange-400 mt-1">
-                  ⚠️ {student.pattern_type}
-                </p>
+                <div className={`p-2 mt-2 rounded border ${
+                  student.suspicion_level === 'HIGH'
+                    ? 'bg-red-100 dark:bg-red-950/50 border-red-300 dark:border-red-800'
+                    : 'bg-orange-100 dark:bg-orange-950/50 border-orange-300 dark:border-orange-800'
+                }`}>
+                  <p className={`text-xs font-bold ${
+                    student.suspicion_level === 'HIGH'
+                      ? 'text-red-800 dark:text-red-300'
+                      : 'text-orange-800 dark:text-orange-300'
+                  }`}>
+                    {student.suspicion_level === 'HIGH' ? '🚨 Evidence: ' : '⚠️ Pattern: '}{student.pattern_type}
+                  </p>
+                  <p className={`text-xs mt-1 ${
+                    student.suspicion_level === 'HIGH'
+                      ? 'text-red-700 dark:text-red-400'
+                      : 'text-orange-700 dark:text-orange-400'
+                  }`}>
+                    This indicates the student {student.suspicion_level === 'HIGH' ? 'likely' : 'may have'} used an external source (AI, internet) instead of original work.
+                  </p>
+                </div>
               </div>
             </div>
           ))}
