@@ -31,6 +31,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(true);
   const [lastTranscript, setLastTranscript] = useState<string>("");
+  const [isSendingQuestion, setIsSendingQuestion] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,6 +101,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, [transcriptChunks, isRecording]);
 
   const checkForVoiceCommand = (text: string, currentChunkIndex: number): boolean => {
+    // Prevent detection while already sending a question
+    if (isSendingQuestion) {
+      console.log('🚫 Already sending a question, skipping detection');
+      return false;
+    }
+
     // Cooldown check - prevent duplicate triggers
     const now = Date.now();
     if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
@@ -180,7 +187,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const handleVoiceCommandQuestion = async () => {
+    // Prevent multiple simultaneous sends
+    if (isSendingQuestion) {
+      console.log('🚫 Already processing a question, ignoring duplicate trigger');
+      return;
+    }
+
     try {
+      setIsSendingQuestion(true);
+      
       // Trigger visual feedback immediately
       setVoiceCommandDetected(true);
       setTimeout(() => setVoiceCommandDetected(false), 2000);
@@ -235,11 +250,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      // Always clear the sending flag, even on error
+      setIsSendingQuestion(false);
     }
   };
 
   const handleManualQuestionSend = async () => {
+    // Prevent multiple simultaneous sends
+    if (isSendingQuestion) {
+      console.log('🚫 Already processing a question');
+      return;
+    }
+
     try {
+      setIsSendingQuestion(true);
+
       if (!transcriptBufferRef.current || transcriptBufferRef.current.length < 50) {
         toast({
           title: "Not enough content",
@@ -293,6 +319,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         description: error.message || "Could not process request",
         variant: "destructive",
       });
+    } finally {
+      // Always clear the sending flag
+      setIsSendingQuestion(false);
     }
   };
 
@@ -332,6 +361,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           duration: 5000,
         });
         onQuestionGenerated();
+        
+        // After successful send, extend the cooldown to prevent immediate re-detection
+        lastDetectionTimeRef.current = Date.now();
       } else {
         console.error('❌ Question send failed:', data);
         throw new Error(data?.message || 'Failed to send question');
@@ -344,6 +376,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         variant: "destructive",
         duration: 5000,
       });
+      throw error; // Re-throw to be caught by caller
     }
   };
 
@@ -998,9 +1031,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               onClick={handleManualQuestionSend} 
               variant="default"
               className="w-full"
+              disabled={isSendingQuestion}
             >
-              <Zap className="mr-2 h-4 w-4" />
-              Send Question
+              {isSendingQuestion ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-4 w-4" />
+                  Send Question
+                </>
+              )}
             </Button>
           )}
         </div>
