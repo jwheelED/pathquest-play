@@ -14,6 +14,7 @@ import { CheatDetectionCard } from "@/components/instructor/CheatDetectionCard";
 // import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
+import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
@@ -407,6 +408,8 @@ export default function InstructorDashboard() {
               activeCheckIns={classroomStats.activeCheckIns}
               completedResponses={classroomStats.completedResponses}
             />
+            
+            <QuestionFormatSettings instructorId={currentUser.id} />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
 

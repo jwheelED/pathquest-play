@@ -195,6 +195,19 @@ serve(async (req) => {
     }
 
     const { question_text, suggested_type, context } = await req.json();
+    
+    // Fetch instructor's question format preference
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('question_format_preference')
+      .eq('id', user.id)
+      .single();
+    
+    const instructorPreference = profileData?.question_format_preference || 'multiple_choice';
+    console.log('📋 Instructor preference:', instructorPreference);
+    
+    // Use instructor preference instead of AI suggestion
+    const finalType = instructorPreference;
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -203,12 +216,12 @@ serve(async (req) => {
       });
     }
 
-    console.log('📝 Formatting question:', suggested_type, question_text.substring(0, 50));
+    console.log('📝 Formatting question as:', finalType, '-', question_text.substring(0, 50));
 
     let formattedQuestion: any;
 
-    // Format based on detected type
-    if (suggested_type === 'coding') {
+    // Format based on instructor preference
+    if (finalType === 'coding') {
       // Use exact transcribed question for coding - always manual grade
       formattedQuestion = {
         question: question_text,
@@ -217,7 +230,7 @@ serve(async (req) => {
         expectedAnswer: '',
         gradingMode: 'manual_grade'
       };
-    } else if (suggested_type === 'multiple_choice') {
+    } else if (finalType === 'multiple_choice') {
       const mcq = await generateMCQ(question_text, context || '');
       formattedQuestion = {
         question: mcq.question,
@@ -286,7 +299,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       sent_to: studentLinks.length,
-      question_type: suggested_type,
+      question_type: finalType,
       question: formattedQuestion
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

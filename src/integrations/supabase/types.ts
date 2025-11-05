@@ -479,6 +479,7 @@ export type Database = {
           id: string
           instructor_code: string | null
           onboarded: boolean | null
+          question_format_preference: string | null
           study_days: string[] | null
         }
         Insert: {
@@ -492,6 +493,7 @@ export type Database = {
           id: string
           instructor_code?: string | null
           onboarded?: boolean | null
+          question_format_preference?: string | null
           study_days?: string[] | null
         }
         Update: {
@@ -505,6 +507,7 @@ export type Database = {
           id?: string
           instructor_code?: string | null
           onboarded?: boolean | null
+          question_format_preference?: string | null
           study_days?: string[] | null
         }
         Relationships: []
