@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2, AlertCircle } from "lucide-react";
+import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,6 +27,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [failureCount, setFailureCount] = useState(0);
   const [isCircuitOpen, setIsCircuitOpen] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -90,6 +91,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const handleVoiceCommandQuestion = async () => {
     try {
+      // Trigger visual feedback immediately
+      setVoiceCommandDetected(true);
+      setTimeout(() => setVoiceCommandDetected(false), 2000);
+
       toast({
         title: "🎤 Voice command detected",
         description: "Extracting question from recent speech...",
@@ -792,7 +797,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   return (
-    <Card>
+    <Card className="relative overflow-hidden">
+      {/* Voice Command Flash Overlay */}
+      {voiceCommandDetected && (
+        <div className="absolute inset-0 z-50 pointer-events-none">
+          <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
+              <Zap className="h-12 w-12 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
+
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-xl">
           {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
