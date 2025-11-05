@@ -624,6 +624,63 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                       {assignment.content.questions.map((q: any, idx: number) => {
                         const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
                         
+                        // Handle coding questions
+                        if (q.type === 'coding') {
+                          const codeAnswer = textAnswers[assignment.id]?.[idx] || '';
+                          
+                          return (
+                            <div key={idx} className="border rounded-lg p-4 space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                                {q.language && (
+                                  <Badge variant="secondary" className="shrink-0">
+                                    {q.language}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Your Code:</label>
+                                <VersionHistoryTracker
+                                  value={codeAnswer}
+                                  onChange={(value) => handleTextAnswerChange(assignment.id, idx, value)}
+                                  onVersionChange={(history) => {
+                                    setTextAnswers(prev => ({
+                                      ...prev,
+                                      [assignment.id]: {
+                                        ...(prev[assignment.id] || {}),
+                                        [`${idx}_version_history`]: history
+                                      }
+                                    }));
+                                  }}
+                                  questionText={q.question}
+                                  isCodeEditor={true}
+                                />
+                              </div>
+                              {isSubmitted && (
+                                <div className="space-y-2">
+                                  {assignment.mode === 'manual_grade' ? (
+                                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
+                                      <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
+                                      <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade your code.</p>
+                                    </div>
+                                  ) : (
+                                    assignment.quiz_responses?._ai_recommendations?.[idx] && (
+                                      <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
+                                        <p className="text-sm font-medium text-green-900 dark:text-green-200">
+                                          ✅ Score: {assignment.quiz_responses._ai_recommendations[idx].grade}%
+                                        </p>
+                                        <p className="text-xs text-green-800 dark:text-green-300 mt-1">
+                                          {assignment.quiz_responses._ai_recommendations[idx].feedback}
+                                        </p>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        
                         // Handle short answer questions
                         if (q.type === 'short_answer') {
                           const textAnswer = textAnswers[assignment.id]?.[idx] || '';

@@ -209,14 +209,13 @@ serve(async (req) => {
 
     // Format based on detected type
     if (suggested_type === 'coding') {
-      const codingQ = await generateCodingQuestion(question_text, context || '');
+      // Use exact transcribed question for coding
       formattedQuestion = {
-        question: codingQ.question,
+        question: question_text,
         type: 'coding',
-        language: codingQ.language,
-        starterCode: codingQ.starterCode,
-        testCases: codingQ.testCases,
-        hints: codingQ.hints
+        language: 'python',  // default language
+        expectedAnswer: '',
+        gradingMode: 'manual_grade'
       };
     } else if (suggested_type === 'multiple_choice') {
       const mcq = await generateMCQ(question_text, context || '');

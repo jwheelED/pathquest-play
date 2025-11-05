@@ -40,9 +40,10 @@ interface VersionHistoryTrackerProps {
   value: string;
   onChange: (value: string) => void;
   questionText?: string;
+  isCodeEditor?: boolean;
 }
 
-export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questionText }: VersionHistoryTrackerProps) => {
+export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questionText, isCodeEditor = false }: VersionHistoryTrackerProps) => {
   const [versionHistory, setVersionHistory] = useState<VersionEvent[]>([]);
   const [isPasteDetected, setIsPasteDetected] = useState(false);
   const [questionCopied, setQuestionCopied] = useState(false);
@@ -209,8 +210,13 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
         value={value}
         onChange={handleChange}
         onPaste={handlePaste}
-        className="w-full min-h-[200px] p-4 border rounded-lg font-mono text-sm"
-        placeholder="Type your answer here..."
+        className={`w-full p-4 border rounded-lg text-sm resize-y ${
+          isCodeEditor 
+            ? 'font-mono bg-slate-950 text-slate-100 dark:bg-slate-900 min-h-[300px] leading-relaxed' 
+            : 'font-mono min-h-[200px]'
+        }`}
+        placeholder={isCodeEditor ? "# Write your code here...\n\ndef solution():\n    pass" : "Type your answer here..."}
+        spellCheck={!isCodeEditor}
       />
 
       <Card>
