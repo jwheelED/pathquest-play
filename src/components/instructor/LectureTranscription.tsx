@@ -62,17 +62,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const checkForVoiceCommand = (chunk: string): boolean => {
     // Voice command patterns - case insensitive, fuzzy matching
     const commandPatterns = [
-      /send\s+(this\s+)?question(\s+now)?/i,
-      /send\s+(that\s+)?question(\s+now)?/i,
-      /send\s+it(\s+now)?/i,
-      /push\s+(this\s+)?question/i,
-      /submit\s+(this\s+)?question/i,
+      /send\s+(this\s+)?question(\s+now)?[!.]?/i,
+      /send\s+(that\s+)?question(\s+now)?[!.]?/i,
+      /send\s+it(\s+now)?[!.]?/i,
+      /push\s+(this\s+)?question[!.]?/i,
+      /submit\s+(this\s+)?question[!.]?/i,
     ];
 
     const hasCommand = commandPatterns.some(pattern => pattern.test(chunk));
 
     if (hasCommand) {
-      console.log('🎤 VOICE COMMAND DETECTED:', chunk.substring(0, 100));
+      console.log('🎤 VOICE COMMAND DETECTED in chunk:', chunk);
       handleVoiceCommandQuestion();
       return true;
     }
@@ -86,9 +86,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setVoiceCommandDetected(true);
       setTimeout(() => setVoiceCommandDetected(false), 2000);
 
+      console.log('🎤 Voice command triggered! Processing...');
+
       toast({
-        title: "🎤 Voice command detected",
+        title: "🎤 Voice command detected!",
         description: "Extracting question from recent speech...",
+        duration: 3000,
       });
 
       // Get last 45 seconds of transcript (before the voice command)
@@ -102,12 +105,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
 
       if (error) {
+        console.error('Extract error:', error);
         throw error;
       }
 
       if (!data?.success || !data?.question_text) {
         toast({
-          title: "Could not extract question",
+          title: "❌ Could not extract question",
           description: "Try asking the question more clearly before using the voice command",
           variant: "destructive",
         });
@@ -127,9 +131,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     } catch (error: any) {
       console.error('Voice command error:', error);
       toast({
-        title: "Voice command failed",
-        description: error.message || "Could not process voice command",
+        title: "❌ Voice command failed",
+        description: error.message || "Could not process voice command. Please try again.",
         variant: "destructive",
+        duration: 5000,
       });
     }
   };
