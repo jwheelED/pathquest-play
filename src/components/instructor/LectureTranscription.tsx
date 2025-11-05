@@ -32,6 +32,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isTutorialOpen, setIsTutorialOpen] = useState(true);
   const [lastTranscript, setLastTranscript] = useState<string>("");
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
+  const [nextQuestionAllowedAt, setNextQuestionAllowedAt] = useState<number>(0);
+  const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -109,8 +111,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return false;
     }
 
-    // Cooldown check - prevent duplicate triggers
+    // Check if we're in a rate limit window
     const now = Date.now();
+    if (now < nextQuestionAllowedAt) {
+      console.log('⏱️ Rate limit active, skipping detection');
+      return false;
+    }
+
+    // Cooldown check - prevent duplicate triggers
     if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
       console.log('⏱️ Cooldown active, skipping detection');
       return false;
@@ -177,9 +185,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         chunkIndex: currentChunkIndex
       });
       
-      // Update cooldown timestamp AND mark this chunk as processed
+      // CRITICAL: Set cooldown IMMEDIATELY to prevent re-detection
       lastDetectionTimeRef.current = now;
       lastDetectedChunkIndexRef.current = currentChunkIndex;
+      
+      // Clear the command phrase from buffer to prevent re-detection
+      // Remove last ~25 characters (the "send question now" phrase)
+      if (transcriptBufferRef.current.length > 25) {
+        transcriptBufferRef.current = transcriptBufferRef.current.slice(0, -25);
+        console.log('🧹 Cleared command phrase from buffer');
+      }
       
       handleVoiceCommandQuestion();
       return true;
@@ -352,6 +367,45 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       if (error) {
         console.error('❌ Edge function error:', error);
+        
+        // Handle 429 Rate Limit specifically
+        if (error.message?.includes('429') || error.status === 429) {
+          const retryAfter = error.context?.retry_after || 60;
+          const nextAllowed = Date.now() + (retryAfter * 1000);
+          setNextQuestionAllowedAt(nextAllowed);
+          
+          toast({
+            title: "⏱️ Question sent! Please wait",
+            description: `You can send another question in ${retryAfter} seconds`,
+            duration: 5000,
+          });
+          
+          // Don't throw - this is expected behavior, not an error
+          return;
+        }
+        
+        // Handle other specific errors
+        if (error.status === 400) {
+          toast({
+            title: "❌ Invalid question",
+            description: error.message || "The question format was invalid",
+            variant: "destructive",
+            duration: 5000,
+          });
+          throw error;
+        }
+        
+        if (error.status === 500) {
+          toast({
+            title: "❌ Server error",
+            description: "There was a problem on the server. Please try again.",
+            variant: "destructive",
+            duration: 5000,
+          });
+          throw error;
+        }
+        
+        // Generic error handling
         throw error;
       }
 
@@ -373,13 +427,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
     } catch (error: any) {
       console.error('❌ Failed to send question:', error);
-      toast({
-        title: "❌ Failed to send question",
-        description: error.message || "Unknown error occurred. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
-      throw error; // Re-throw to be caught by caller
+      
+      // Don't show duplicate toasts if already handled above
+      if (!error.status || (error.status !== 429 && error.status !== 400 && error.status !== 500)) {
+        toast({
+          title: "❌ Failed to send question",
+          description: error.message || "Network error. Please check your connection.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+      throw error;
     }
   };
 
@@ -425,7 +483,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     return () => clearInterval(refreshTimer);
   }, [isRecording]);
 
-  // Recording duration timer
+  // Recording duration timer + Rate limit countdown
   useEffect(() => {
     if (!isRecording) {
       setRecordingDuration(0);
@@ -435,6 +493,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     const startTime = Date.now();
     durationTimerRef.current = setInterval(() => {
       setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
+      
+      // Update rate limit countdown
+      const now = Date.now();
+      if (now < nextQuestionAllowedAt) {
+        setRateLimitSecondsLeft(Math.ceil((nextQuestionAllowedAt - now) / 1000));
+      } else {
+        setRateLimitSecondsLeft(0);
+      }
     }, 1000);
 
     return () => {
@@ -442,7 +508,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         clearInterval(durationTimerRef.current);
       }
     };
-  }, [isRecording]);
+  }, [isRecording, nextQuestionAllowedAt]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1044,12 +1110,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               onClick={handleManualQuestionSend} 
               variant="default"
               className="w-full"
-              disabled={isSendingQuestion}
+              disabled={isSendingQuestion || rateLimitSecondsLeft > 0}
             >
               {isSendingQuestion ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Sending...
+                </>
+              ) : rateLimitSecondsLeft > 0 ? (
+                <>
+                  ⏱️ Wait {rateLimitSecondsLeft}s
                 </>
               ) : (
                 <>
@@ -1072,17 +1142,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
               </Badge>
             </div>
+            
+            {/* Rate limit indicator */}
+            {rateLimitSecondsLeft > 0 && (
+              <Badge variant="default" className="w-full justify-center py-1.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                ⏱️ Rate limit: Next question in {rateLimitSecondsLeft}s
+              </Badge>
+            )}
+            
             {failureCount > 0 && (
               <Badge variant="destructive" className="w-full justify-center py-1.5">
                 <AlertCircle className="mr-2 h-3 w-3" />
                 {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
               </Badge>
             )}
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
-              <p className="text-xs font-medium text-center">
-                💡 Click "Send Question" button or say "send question now"
-              </p>
-            </div>
+            
+            {rateLimitSecondsLeft === 0 && (
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
+                <p className="text-xs font-medium text-center">
+                  ✅ Ready • Click "Send Question" or say "send question now"
+                </p>
+              </div>
+            )}
             
             {lastTranscript && (
               <div className="bg-muted border border-border rounded-lg p-3 space-y-1">
