@@ -49,8 +49,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const lastQuestionSentTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Client-side cooldown: 5 seconds minimum between detection attempts
-  const MIN_DETECTION_INTERVAL = 5000; // 5 seconds cooldown
+  // Client-side cooldown: 10 seconds minimum between detection attempts
+  const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
   // Levenshtein distance for fuzzy matching
@@ -124,7 +124,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return false;
     }
 
-    // Method 1: Expanded regex patterns - more flexible matching
+    // CONTEXT WINDOW VALIDATION: Only check last 100 characters for commands
+    // Commands should be at the END of speech, not buried in middle
+    const contextWindow = text.slice(-100);
+    
+    // PRE-VALIDATION: Check if there's actually a question before triggering
+    const hasQuestionMark = text.includes('?');
+    const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'whose', 'whom', 'can', 'could', 'would', 'should', 'is', 'are', 'do', 'does'];
+    const lowerText = text.toLowerCase();
+    const hasQuestionWords = questionWords.some(word => {
+      // Check for word boundaries to avoid false matches
+      const regex = new RegExp(`\\b${word}\\b`, 'i');
+      return regex.test(lowerText);
+    });
+    
+    // Method 1: Tightened regex patterns - require "question" + send verb close together
     const commandPatterns = [
       // Core patterns with optional words
       /send\s+(the\s+|a\s+|this\s+|that\s+)?question(\s+now)?(\s+please)?[!.]?/i,
@@ -134,21 +148,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Alternative verbs
       /push\s+(the\s+|this\s+)?question[!.]?/i,
       /submit\s+(the\s+|this\s+)?question[!.]?/i,
-      /ask\s+(the\s+)?question(\s+now)?[!.]?/i,
+      // REMOVED: /ask\s+(the\s+)?question(\s+now)?[!.]?/i - too broad
       
       // Direct commands
       /question\s+now[!.]?/i,
       /post\s+(the\s+)?question[!.]?/i,
     ];
 
-    const hasRegexMatch = commandPatterns.some(pattern => pattern.test(text));
+    const hasRegexMatch = commandPatterns.some(pattern => pattern.test(contextWindow));
 
     // Method 2: Keyword-based detection (just needs "send" + "question")
-    const lowerText = text.toLowerCase();
-    const hasKeywords = (lowerText.includes('send') || lowerText.includes('submit') || lowerText.includes('push')) && 
-                        lowerText.includes('question');
+    const lowerContext = contextWindow.toLowerCase();
+    const hasKeywords = (lowerContext.includes('send') || lowerContext.includes('submit') || lowerContext.includes('push')) && 
+                        lowerContext.includes('question');
 
-    // Method 3: Fuzzy matching for common command phrases
+    // Method 3: Fuzzy matching for common command phrases with INCREASED threshold
     const targetPhrases = [
       "send question now",
       "send the question",
@@ -157,15 +171,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       "submit question"
     ];
     
-    // Extract last ~30 characters for fuzzy matching to focus on recent speech
-    const recentText = text.slice(-100).toLowerCase();
     const hasFuzzyMatch = targetPhrases.some(phrase => {
-      // Check if phrase appears in text with high similarity
-      const words = recentText.split(/\s+/);
+      // Check if phrase appears in context window with high similarity
+      const words = lowerContext.split(/\s+/);
       for (let i = 0; i <= words.length - phrase.split(' ').length; i++) {
         const segment = words.slice(i, i + phrase.split(' ').length).join(' ');
         const similarity = calculateSimilarity(segment, phrase);
-        if (similarity >= 0.75) { // 75% similarity threshold
+        if (similarity >= 0.85) { // INCREASED from 0.75 to 0.85 (85% similarity)
           console.log(`🎯 Fuzzy match: "${segment}" ≈ "${phrase}" (${Math.round(similarity * 100)}%)`);
           return true;
         }
@@ -173,12 +185,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return false;
     });
 
-    // Trigger if ANY method detects the command
-    const isDetected = hasRegexMatch || hasKeywords || hasFuzzyMatch;
+    // Trigger if ANY method detects the command AND there's evidence of a question
+    const commandDetected = hasRegexMatch || hasKeywords || hasFuzzyMatch;
+    const hasQuestionEvidence = hasQuestionMark || hasQuestionWords;
+    
+    // PRE-VALIDATION: Only proceed if we have both command and question evidence
+    if (commandDetected && !hasQuestionEvidence) {
+      console.log('⚠️ Command detected but no question evidence - likely false positive');
+      return false;
+    }
+    
+    const isDetected = commandDetected && hasQuestionEvidence;
 
     if (isDetected) {
       console.log('🎤 VOICE COMMAND DETECTED:', {
-        text: text.slice(-100),
+        contextWindow: contextWindow,
+        hasQuestionMark,
+        hasQuestionWords,
         regexMatch: hasRegexMatch,
         keywordMatch: hasKeywords,
         fuzzyMatch: hasFuzzyMatch,
@@ -241,11 +264,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       if (!data?.success || !data?.question_text) {
-        toast({
-          title: "❌ Could not extract question",
-          description: "Try asking the question more clearly before using the voice command",
-          variant: "destructive",
-        });
+        // SUPPRESS ERROR: This is likely a false positive detection
+        // Log it silently instead of showing error toast to user
+        console.log('⚠️ No question found in transcript - likely false positive detection');
+        console.log('Transcript analyzed:', recentTranscript.slice(-200));
         return;
       }
 
