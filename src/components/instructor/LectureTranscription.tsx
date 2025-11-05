@@ -46,7 +46,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Client-side throttling: 12 seconds minimum between detection attempts
   const MIN_DETECTION_INTERVAL = 12000; // 12 seconds (aligned with audio chunks)
 
-  // Real-time question detection - monitors transcript continuously
+  // Real-time voice command detection - monitors transcript for send commands
   useEffect(() => {
     if (!isRecording || transcriptChunks.length === 0) return;
 
@@ -55,19 +55,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     // Only check chunks that are substantial enough
     if (!lastChunk || lastChunk.length < MIN_CHUNK_LENGTH) return;
 
-    // PRIORITY 1: Check for voice commands first (immediate send)
-    const voiceCommandDetected = checkForVoiceCommand(lastChunk);
-    if (voiceCommandDetected) {
-      return; // Voice command handled, skip automatic detection
-    }
-
-    // PRIORITY 2: Automatic detection with high confidence
-    // Use last 2-3 chunks for better context (about 60 seconds of speech)
-    const recentChunks = transcriptChunks.slice(-3).join(' ');
-    // Provide broader context from full buffer (90 seconds)
-    const contextWindow = transcriptBufferRef.current.slice(-2500);
-
-    checkForProfessorQuestion(recentChunks, contextWindow);
+    // Check for voice commands (immediate send)
+    checkForVoiceCommand(lastChunk);
   }, [transcriptChunks, isRecording]);
 
   const checkForVoiceCommand = (chunk: string): boolean => {
@@ -128,7 +117,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log('✅ Question extracted via voice command:', data.question_text);
 
       // Send immediately without confidence threshold
-      await handleAutomaticQuestionSend({
+      await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: 1.0, // Voice command = maximum confidence
@@ -145,75 +134,65 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  const checkForProfessorQuestion = async (chunk: string, context: string) => {
-    // Client-side throttling
-    const now = Date.now();
-    if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
-      console.log('⏳ Skipping detection - too soon after last check');
-      return;
-    }
-    lastDetectionTimeRef.current = now;
-    
+  const handleManualQuestionSend = async () => {
     try {
-      console.log('🔍 Analyzing speech for questions...');
-      console.log('📝 Recent text:', chunk.substring(0, 120));
-      console.log('📚 Context length:', context.length, 'chars');
-
-      const { data, error } = await supabase.functions.invoke('detect-lecture-question', {
-        body: { 
-          recentChunk: chunk,
-          context: context 
-        }
-      });
-
-      if (error) {
-        console.error('❌ Question detection error:', error);
-        // Handle rate limiting gracefully
-        if (error.message?.includes('Rate limit')) {
-          console.log('⏸️ Rate limit hit - detection will resume automatically');
-        }
+      if (!transcriptBufferRef.current || transcriptBufferRef.current.length < 50) {
+        toast({
+          title: "Not enough content",
+          description: "Please record more lecture content before sending a question",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log('🎯 Detection result:', {
-        is_question: data?.is_question,
-        confidence: data?.confidence,
-        type: data?.suggested_type,
-        reasoning: data?.reasoning?.substring(0, 100)
+      toast({
+        title: "🔍 Extracting question",
+        description: "Analyzing recent speech...",
       });
 
-      // High confidence - auto-send immediately
-      if (data?.is_question && data.confidence >= 0.78) {
-        console.log('✅ HIGH CONFIDENCE QUESTION DETECTED!');
-        console.log('📋 Question:', data.question_text);
-        console.log('📊 Confidence:', data.confidence, '| Type:', data.suggested_type);
-        
-        handleAutomaticQuestionSend(data);
-      } 
-      // Medium confidence - log but don't send (could add instructor review option later)
-      else if (data?.is_question && data.confidence >= 0.55) {
-        console.log('⚠️ Medium confidence question (not sent):', {
-          confidence: data.confidence,
-          question: data.question_text?.substring(0, 80),
-          reasoning: data.reasoning
-        });
-        
+      // Get last 45 seconds of transcript
+      const recentTranscript = transcriptBufferRef.current.slice(-1500);
+
+      console.log('📝 Manual send - extracting question from transcript:', recentTranscript.length, 'chars');
+
+      const { data, error } = await supabase.functions.invoke('extract-voice-command-question', {
+        body: { recentTranscript }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success || !data?.question_text) {
         toast({
-          title: "Possible question detected",
-          description: `Confidence: ${(data.confidence * 100).toFixed(0)}% - "${data.question_text?.substring(0, 50)}..."`,
-          variant: "default"
+          title: "Could not extract question",
+          description: "Try asking a clearer question or use the voice command 'send question now'",
+          variant: "destructive",
         });
+        return;
       }
-      // Low confidence - just log
-      else if (data?.is_question) {
-        console.log('ℹ️ Low confidence detection:', data.confidence, data.reasoning);
-      }
-    } catch (error) {
-      console.error('❌ Error in question detection:', error);
+
+      console.log('✅ Question extracted via manual send:', data.question_text);
+
+      // Send immediately
+      await handleQuestionSend({
+        question_text: data.question_text,
+        suggested_type: data.suggested_type,
+        confidence: 1.0,
+        extraction_method: 'manual_button'
+      });
+
+    } catch (error: any) {
+      console.error('Manual send error:', error);
+      toast({
+        title: "Failed to send question",
+        description: error.message || "Could not process request",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleAutomaticQuestionSend = async (detectionData: any) => {
+  const handleQuestionSend = async (detectionData: any) => {
     try {
       toast({
         title: "🎯 Question detected!",
@@ -830,15 +809,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 </div>
                 <div className="flex gap-2">
                   <Badge variant="outline" className="shrink-0">Step 2</Badge>
-                  <p>Speak naturally - the system automatically detects when you ask questions to the class.</p>
+                  <p>Ask your question naturally during the lecture.</p>
                 </div>
                 <div className="flex gap-2">
                   <Badge variant="outline" className="shrink-0">Step 3</Badge>
-                  <p>For manual control, say <strong>"send question now"</strong> right after asking a question to instantly send it to students.</p>
+                  <p>Either click the <strong>"Send Question"</strong> button below, or say <strong>"send question now"</strong> to instantly send it to students.</p>
                 </div>
                 <div className="flex gap-2">
                   <Badge variant="outline" className="shrink-0">Step 4</Badge>
-                  <p>Review detected questions below before they're sent, or let high-confidence questions go out automatically.</p>
+                  <p>The system will extract the most recent question from your speech and send it to all students.</p>
                 </div>
               </div>
             </CardContent>
@@ -866,32 +845,45 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </CardTitle>
           <CardDescription className="text-sm">
             {isRecording
-              ? "🎙️ Recording • 🎤 Say 'send question now' after asking • 🤖 AI automatically detects questions • ⚡ Voice commands = instant send"
-              : "Start recording - use 'send question now' for instant sends, or let AI automatically detect and send questions"}
+              ? "🎙️ Recording • Click 'Send Question' button or say 'send question now' to send your most recent question to students"
+              : "Start recording - use the 'Send Question' button or say 'send question now' to send questions to students"}
           </CardDescription>
         </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex gap-2">
-          <Button
-            onClick={isRecording ? stopRecording : startRecording}
-            variant={isRecording ? "destructive" : "default"}
-            className="flex-1"
-          >
-            {isRecording ? (
-              <>
-                <MicOff className="mr-2 h-4 w-4" />
-                Stop Recording
-              </>
-            ) : (
-              <>
-                <Mic className="mr-2 h-4 w-4" />
-                Start Recording
-              </>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button
+              onClick={isRecording ? stopRecording : startRecording}
+              variant={isRecording ? "destructive" : "default"}
+              className="flex-1"
+            >
+              {isRecording ? (
+                <>
+                  <MicOff className="mr-2 h-4 w-4" />
+                  Stop Recording
+                </>
+              ) : (
+                <>
+                  <Mic className="mr-2 h-4 w-4" />
+                  Start Recording
+                </>
+              )}
+            </Button>
+            {transcriptChunks.length > 0 && (
+              <Button onClick={clearTranscript} variant="outline" size="sm">
+                Clear
+              </Button>
             )}
-          </Button>
-          {transcriptChunks.length > 0 && (
-            <Button onClick={clearTranscript} variant="outline" size="sm">
-              Clear
+          </div>
+          
+          {isRecording && transcriptChunks.length > 0 && (
+            <Button 
+              onClick={handleManualQuestionSend} 
+              variant="default"
+              className="w-full"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              Send Question
             </Button>
           )}
         </div>
@@ -913,12 +905,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
               </Badge>
             )}
-            <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-2 space-y-1">
-              <p className="text-xs font-medium text-green-900 dark:text-green-200 text-center">
-                🤖 Auto-Detection Active (78%+ confidence)
-              </p>
-              <p className="text-xs text-green-700 dark:text-green-300 text-center">
-                💡 Say "send question now" after asking for instant send
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
+              <p className="text-xs font-medium text-center">
+                💡 Click "Send Question" button or say "send question now"
               </p>
             </div>
           </div>
