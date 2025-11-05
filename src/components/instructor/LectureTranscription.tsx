@@ -199,6 +199,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   const handleQuestionSend = async (detectionData: any) => {
     try {
+      console.log('📤 Sending question to students:', detectionData);
+      
       toast({
         title: "🎯 Question detected!",
         description: `"${detectionData.question_text.substring(0, 60)}..." - Sending to students...`,
@@ -216,25 +218,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
       });
 
+      console.log('📥 Edge function response:', { data, error });
+
       if (error) {
+        console.error('❌ Edge function error:', error);
         throw error;
       }
 
       if (data?.success) {
+        console.log('✅ Question successfully sent!');
         toast({
           title: "✅ Question sent!",
           description: `${data.question_type} question sent to ${data.sent_to} students`,
+          duration: 5000,
         });
         onQuestionGenerated();
       } else {
+        console.error('❌ Question send failed:', data);
         throw new Error(data?.message || 'Failed to send question');
       }
     } catch (error: any) {
-      console.error('Failed to send question:', error);
+      console.error('❌ Failed to send question:', error);
       toast({
-        title: "Failed to send question",
-        description: error.message || "Unknown error",
+        title: "❌ Failed to send question",
+        description: error.message || "Unknown error occurred. Please try again.",
         variant: "destructive",
+        duration: 5000,
       });
     }
   };

@@ -209,7 +209,7 @@ serve(async (req) => {
 
     // Format based on detected type
     if (suggested_type === 'coding') {
-      // Use exact transcribed question for coding
+      // Use exact transcribed question for coding - always manual grade
       formattedQuestion = {
         question: question_text,
         type: 'coding',
@@ -227,12 +227,12 @@ serve(async (req) => {
         explanation: mcq.explanation
       };
     } else {
-      // Short answer format
+      // Short answer format - always manual grade for lecture check-ins
       formattedQuestion = {
         question: question_text,
         type: 'short_answer',
         expectedAnswer: '',
-        gradingMode: 'auto_grade'
+        gradingMode: 'manual_grade'
       };
     }
 
@@ -262,7 +262,7 @@ serve(async (req) => {
       instructor_id: user.id,
       student_id: link.student_id,
       assignment_type: 'lecture_checkin',
-      mode: 'auto_grade',
+      mode: 'manual_grade',  // Always manual grade for lecture check-ins
       title: '🎯 Live Lecture Question',
       content: { 
         questions: [formattedQuestion],
