@@ -44,10 +44,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastDetectionTimeRef = useRef<number>(0);
   const lastDetectedChunkIndexRef = useRef<number>(-1);
+  const lastQuestionSentTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
   // Client-side cooldown: 5 seconds minimum between detection attempts
   const MIN_DETECTION_INTERVAL = 5000; // 5 seconds cooldown
+  const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
   // Levenshtein distance for fuzzy matching
   const calculateSimilarity = (str1: string, str2: string): number => {
@@ -362,8 +364,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
         onQuestionGenerated();
         
-        // After successful send, extend the cooldown to prevent immediate re-detection
+        // After successful send, extend the cooldown and record send time
         lastDetectionTimeRef.current = Date.now();
+        lastQuestionSentTimeRef.current = Date.now();
       } else {
         console.error('❌ Question send failed:', data);
         throw new Error(data?.message || 'Failed to send question');
@@ -683,6 +686,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
           if (error) {
             console.error("Transcription error:", error);
+            
+            // Suppress errors shortly after sending a question (pending requests may fail)
+            const timeSinceLastSend = Date.now() - lastQuestionSentTimeRef.current;
+            const shouldSuppressError = timeSinceLastSend < SUPPRESS_ERRORS_AFTER_SEND;
+            
+            if (shouldSuppressError) {
+              console.log('🔇 Suppressing transcription error (question just sent)');
+              return;
+            }
+            
             // Only show toast for critical errors, not for empty responses
             if (error.message && !error.message.includes("too small")) {
               toast({
