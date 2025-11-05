@@ -648,9 +648,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                                   isCodeEditor={true}
                                 />
                               </div>
-                              {isSubmitted && (
+                               {isSubmitted && (
                                 <div className="space-y-2">
-                                  {assignment.mode === 'manual_grade' ? (
+                                  {assignment.assignment_type === 'lecture_checkin' ? (
+                                    // Hide feedback for lecture check-ins
+                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
+                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                                      <p className="text-xs text-blue-800 dark:text-blue-300">Your instructor will review your code.</p>
+                                    </div>
+                                  ) : assignment.mode === 'manual_grade' ? (
                                     <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
                                       <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
                                       <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade your code.</p>
@@ -697,7 +703,13 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               />
                               {isSubmitted && (
                                 <div className="space-y-2">
-                                  {assignment.mode === 'manual_grade' ? (
+                                  {assignment.assignment_type === 'lecture_checkin' ? (
+                                    // Hide feedback for lecture check-ins
+                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
+                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                                      <p className="text-xs text-blue-800 dark:text-blue-300">Your instructor will review this answer.</p>
+                                    </div>
+                                  ) : assignment.mode === 'manual_grade' ? (
                                     // Show pending review for manual grade mode
                                     <>
                                       {q.expectedAnswer && (
@@ -761,7 +773,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               })}
                             </div>
                             
-                            {isSubmitted && (
+                            {isSubmitted && assignment.assignment_type === 'lecture_checkin' && (
+                              <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                                  ✓ Submitted - Your instructor will review your answer
+                                </p>
+                              </div>
+                            )}
+                            
+                            {isSubmitted && assignment.assignment_type !== 'lecture_checkin' && (
                               <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
                                 <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
                                   ✓ Submitted - Pending Review
@@ -798,15 +818,24 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                       
                       {assignment.completed && (
                         <div className="space-y-3">
-                          {assignment.grade !== undefined && assignment.grade !== null ? (
-                            <div className="bg-primary/10 p-4 rounded-lg text-center">
-                              <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
+                          {/* Hide score for lecture check-ins - instructors can see it on their side */}
+                          {assignment.assignment_type === 'lecture_checkin' ? (
+                            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
+                              <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                              <p className="text-sm text-blue-800 dark:text-blue-300">Your instructor will review your response</p>
                             </div>
                           ) : (
-                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
-                              <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Pending Review</p>
-                              <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor is reviewing your answers</p>
-                            </div>
+                            // Show scores for regular quizzes and assignments
+                            assignment.grade !== undefined && assignment.grade !== null ? (
+                              <div className="bg-primary/10 p-4 rounded-lg text-center">
+                                <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
+                              </div>
+                            ) : (
+                              <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
+                                <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Pending Review</p>
+                                <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor is reviewing your answers</p>
+                              </div>
+                            )
                           )}
                           
                           {/* Save button for lecture check-ins */}
