@@ -21,10 +21,10 @@ Generate a multiple choice question with 4 options:
 - Match the difficulty to what was just taught
 - Keep it concise and clear
 
-Return JSON (provide ONLY the option text without letters):
+Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
   "question": "the question text",
-  "options": ["option1 text", "option2 text", "option3 text", "option4 text"],
+  "options": ["A. first option text", "B. second option text", "C. third option text", "D. fourth option text"],
   "correctAnswer": "A" | "B" | "C" | "D",
   "explanation": "Why this is correct and others are wrong"
 }`;

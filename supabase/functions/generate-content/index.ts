@@ -84,13 +84,14 @@ serve(async (req) => {
       ? `You are an educational content creator. Generate a quiz with 5 multiple-choice questions on ${topic}. 
          For each question provide:
          - question: clear question text
-         - options: array of 4 options (A, B, C, D)
-         - correctAnswer: the correct option letter
+         - options: array of 4 options formatted as "A. text", "B. text", "C. text", "D. text"
+         - correctAnswer: the correct option letter (A, B, C, or D)
          - hint1: conceptual hint about the topic
          - hint2: hint that narrows down the options
          - hint3: hint pointing toward the answer with reasoning
          - solution: full explanation of why the answer is correct
-         Return valid JSON: {"questions": [{"question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "correctAnswer": "A", "hint1": "...", "hint2": "...", "hint3": "...", "solution": "..."}]}`
+         IMPORTANT: Randomize which option is correct - don't always make A correct
+         Return valid JSON: {"questions": [{"question": "...", "options": ["A. option text", "B. option text", "C. option text", "D. option text"], "correctAnswer": "A", "hint1": "...", "hint2": "...", "hint3": "...", "solution": "..."}]}`
       : assignmentType === 'mini_project'
       ? `You are an educational content creator. Generate a mini-project prompt on ${topic} for a ${studentProgress} level student.
          Provide:
