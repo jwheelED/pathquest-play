@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap } from "lucide-react";
+import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 
 interface LectureTranscriptionProps {
@@ -28,6 +29,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isCircuitOpen, setIsCircuitOpen] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -799,34 +801,50 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   return (
     <>
       {/* Tutorial Section */}
-      <Card className="mb-4 bg-muted/50 border-primary/20">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-primary" />
-            How to Use Live Lecture Capture
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-2 text-sm">
-            <div className="flex gap-2">
-              <Badge variant="outline" className="shrink-0">Step 1</Badge>
-              <p>Click "Start Recording" to begin capturing your lecture audio in real-time.</p>
+      <Collapsible open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
+        <Card className="mb-4 bg-muted/50 border-primary/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-primary" />
+                How to Use Live Lecture Capture
+              </CardTitle>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  {isTutorialOpen ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                  <span className="sr-only">Toggle tutorial</span>
+                </Button>
+              </CollapsibleTrigger>
             </div>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="shrink-0">Step 2</Badge>
-              <p>Speak naturally - the system automatically detects when you ask questions to the class.</p>
-            </div>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="shrink-0">Step 3</Badge>
-              <p>For manual control, say <strong>"send question now"</strong> right after asking a question to instantly send it to students.</p>
-            </div>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="shrink-0">Step 4</Badge>
-              <p>Review detected questions below before they're sent, or let high-confidence questions go out automatically.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-3">
+              <div className="space-y-2 text-sm">
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="shrink-0">Step 1</Badge>
+                  <p>Click "Start Recording" to begin capturing your lecture audio in real-time.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="shrink-0">Step 2</Badge>
+                  <p>Speak naturally - the system automatically detects when you ask questions to the class.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="shrink-0">Step 3</Badge>
+                  <p>For manual control, say <strong>"send question now"</strong> right after asking a question to instantly send it to students.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="shrink-0">Step 4</Badge>
+                  <p>Review detected questions below before they're sent, or let high-confidence questions go out automatically.</p>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <Card className="relative overflow-hidden">
         {/* Voice Command Flash Overlay */}
