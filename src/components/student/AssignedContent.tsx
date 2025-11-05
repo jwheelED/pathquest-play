@@ -740,24 +740,23 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                         
                         // Handle multiple choice questions
                         const selectedAnswer = selectedAnswers[assignment.id]?.[idx];
-                        // Normalize both for comparison - trim and uppercase
-                        const normalizedSelected = selectedAnswer?.trim().toUpperCase();
-                        const normalizedCorrect = q.correctAnswer?.trim().toUpperCase();
-                        const isCorrect = normalizedSelected === normalizedCorrect;
+                        const isCorrect = assignment.assignment_type === 'lecture_checkin' 
+                          ? null  // Don't show correct/incorrect for lecture check-ins
+                          : selectedAnswer?.trim().toUpperCase() === q.correctAnswer?.trim().toUpperCase();
                         
                         return (
                           <div key={idx} className="border rounded-lg p-4 space-y-3">
                             <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
                             <div className="space-y-2">
                               {q.options?.map((opt: string, i: number) => {
-                                // Extract letter from "A. Option text" format
                                 const optionLetter = opt.trim().charAt(0).toUpperCase();
-                                // Normalize for comparison
                                 const normalizedSelected = selectedAnswer?.trim().toUpperCase();
                                 const normalizedCorrect = q.correctAnswer?.trim().toUpperCase();
                                 const isSelected = normalizedSelected === optionLetter;
-                                const showCorrect = isSubmitted && optionLetter === normalizedCorrect;
-                                const showWrong = isSubmitted && isSelected && !isCorrect;
+                                
+                                // For lecture check-ins, don't show correct/incorrect
+                                const showCorrect = isSubmitted && assignment.assignment_type !== 'lecture_checkin' && optionLetter === normalizedCorrect;
+                                const showWrong = isSubmitted && assignment.assignment_type !== 'lecture_checkin' && isSelected && !isCorrect;
                                 
                                 return (
                                   <button
@@ -780,7 +779,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               })}
                             </div>
                             
-                            {isSubmitted && (
+                            {isSubmitted && assignment.assignment_type === 'lecture_checkin' && (
+                              <div className="p-3 rounded bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
+                                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
+                                  ⏳ Pending Instructor Review
+                                </p>
+                              </div>
+                            )}
+                            
+                            {isSubmitted && assignment.assignment_type !== 'lecture_checkin' && (
                               <div className={`p-3 rounded ${isCorrect ? 'bg-green-50' : 'bg-red-50'}`}>
                                 <p className="text-sm font-medium">
                                   {isCorrect ? '✓ Correct!' : `✗ Incorrect. Correct answer: ${q.correctAnswer}`}

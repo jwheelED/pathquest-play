@@ -13,7 +13,6 @@ import { CheatDetectionCard } from "@/components/instructor/CheatDetectionCard";
 // import { ContentGenerator } from "@/components/instructor/ContentGenerator";
 // import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
-import { LectureQuestionReview } from "@/components/instructor/LectureQuestionReview";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
@@ -410,8 +409,6 @@ export default function InstructorDashboard() {
             />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
-            
-            <LectureQuestionReview refreshTrigger={refreshQueue} />
 
             <LectureCheckInResults />
 
