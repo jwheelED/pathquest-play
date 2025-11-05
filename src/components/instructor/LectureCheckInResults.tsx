@@ -187,11 +187,15 @@ export const LectureCheckInResults = () => {
   };
 
   const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, question: any) => {
-    // Use overridden answer if it exists, otherwise use original correctAnswer
-    const correctAnswer = question.overriddenAnswer || question.correctAnswer;
+    // For short answer questions requiring manual grading, don't calculate correct/incorrect stats
+    const isManualGradeShortAnswer = question.type === 'short_answer' && 
+      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
     
     const completed = assignments.filter((a) => a.completed);
-    const correct = completed.filter((a) => {
+    
+    // Use overridden answer if it exists, otherwise use original correctAnswer
+    const correctAnswer = question.overriddenAnswer || question.correctAnswer;
+    const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
       const response = a.quiz_responses?.[questionIndex];
       return response === correctAnswer;
     });
@@ -209,8 +213,9 @@ export const LectureCheckInResults = () => {
       total: assignments.length,
       completed: completed.length,
       correct: correct.length,
-      percentage: completed.length > 0 ? (correct.length / completed.length) * 100 : 0,
+      percentage: isManualGradeShortAnswer ? null : (completed.length > 0 ? (correct.length / completed.length) * 100 : 0),
       avgResponseTime,
+      isManualGradeShortAnswer,
     };
   };
 
@@ -520,10 +525,21 @@ export const LectureCheckInResults = () => {
                         </div>
                         <div className="text-right space-y-2">
                           <div>
-                            <div className="text-2xl font-bold">{(stats.percentage || 0).toFixed(0)}%</div>
-                            <div className="text-xs text-muted-foreground">
-                              {stats.correct}/{stats.completed} correct
-                            </div>
+                            {stats.isManualGradeShortAnswer ? (
+                              <>
+                                <div className="text-sm font-medium text-blue-600 dark:text-blue-400">Manual Review Required</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {stats.completed} response(s)
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-2xl font-bold">{(stats.percentage || 0).toFixed(0)}%</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {stats.correct}/{stats.completed} correct
+                                </div>
+                              </>
+                            )}
                             {stats.avgResponseTime !== null && (
                               <div className="text-xs text-muted-foreground mt-1">
                                 <Clock className="h-3 w-3 inline mr-1" />
@@ -551,7 +567,11 @@ export const LectureCheckInResults = () => {
                             const studentAnswer = assignment.quiz_responses?.[qIdx];
                             const isCompleted = assignment.completed;
                             const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
-                            const isCorrect = studentAnswer === correctAnswerToUse;
+                            
+                            // For manual grade short answers, don't show correct/incorrect
+                            const isManualGradeShortAnswer = question.type === 'short_answer' && 
+                              (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+                            const isCorrect = isManualGradeShortAnswer ? null : studentAnswer === correctAnswerToUse;
 
                             return (
                               <div
@@ -565,6 +585,19 @@ export const LectureCheckInResults = () => {
                                       <Clock className="h-3 w-3" />
                                       Not Answered
                                     </Badge>
+                                   ) : isManualGradeShortAnswer ? (
+                                    <>
+                                      <Badge variant="outline" className="gap-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300">
+                                        <Clock className="h-3 w-3" />
+                                        Pending Review
+                                      </Badge>
+                                      {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                          <Clock className="h-3 w-3" />
+                                          {formatTime(assignment.response_time_seconds)}
+                                        </Badge>
+                                      )}
+                                    </>
                                    ) : (
                                     <>
                                       <Badge
