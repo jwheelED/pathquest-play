@@ -306,8 +306,8 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           }
 
           toast({ 
-            title: "✅ Quiz Auto-Graded Successfully!",
-            description: `Final Score: ${combinedGrade.toFixed(0)}%`
+            title: "✅ Quiz Submitted Successfully!",
+            description: "Your answers have been submitted for review."
           });
         } else {
           // For manual_grade mode, store recommended grades in quiz_responses
@@ -327,22 +327,14 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
 
           toast({ 
             title: "✅ Quiz Submitted Successfully!",
-            description: "Your answers have been submitted with AI-recommended grades for instructor review."
+            description: "Your answers have been submitted for review."
           });
         }
-      } else if (result.pending_review) {
-        // Manual review needed
-        toast({ 
-          title: "✅ Quiz Submitted Successfully!",
-          description: result.grade !== null 
-            ? `Multiple Choice Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct). Short answers pending instructor review.`
-            : "Your answers have been submitted and are pending instructor review."
-        });
       } else {
-        // No short answers or all MC
+        // All submissions show same message without scores
         toast({ 
           title: "✅ Quiz Submitted Successfully!",
-          description: `Score: ${(result.grade || 0).toFixed(0)}% (${result.correct}/${result.total} correct)`
+          description: "Your answers have been submitted for review."
         });
       }
       
@@ -740,9 +732,6 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                         
                         // Handle multiple choice questions
                         const selectedAnswer = selectedAnswers[assignment.id]?.[idx];
-                        const isCorrect = assignment.assignment_type === 'lecture_checkin' 
-                          ? null  // Don't show correct/incorrect for lecture check-ins
-                          : selectedAnswer?.trim().toUpperCase() === q.correctAnswer?.trim().toUpperCase();
                         
                         return (
                           <div key={idx} className="border rounded-lg p-4 space-y-3">
@@ -751,12 +740,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               {q.options?.map((opt: string, i: number) => {
                                 const optionLetter = opt.trim().charAt(0).toUpperCase();
                                 const normalizedSelected = selectedAnswer?.trim().toUpperCase();
-                                const normalizedCorrect = q.correctAnswer?.trim().toUpperCase();
                                 const isSelected = normalizedSelected === optionLetter;
-                                
-                                // For lecture check-ins, don't show correct/incorrect
-                                const showCorrect = isSubmitted && assignment.assignment_type !== 'lecture_checkin' && optionLetter === normalizedCorrect;
-                                const showWrong = isSubmitted && assignment.assignment_type !== 'lecture_checkin' && isSelected && !isCorrect;
                                 
                                 return (
                                   <button
@@ -768,10 +752,8 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                                     }}
                                     className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                                       isSelected && !isSubmitted ? 'border-primary bg-primary/5' :
-                                      showCorrect ? 'border-green-500 bg-green-50 dark:bg-green-950/20' :
-                                      showWrong ? 'border-red-500 bg-red-50 dark:bg-red-950/20' :
                                       'border-border hover:border-primary/50'
-                                    } ${isSubmitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                    } ${isSubmitted ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                                   >
                                     <span className="text-sm">{opt}</span>
                                   </button>
@@ -779,18 +761,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               })}
                             </div>
                             
-                            {isSubmitted && assignment.assignment_type === 'lecture_checkin' && (
-                              <div className="p-3 rounded bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800">
-                                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
-                                  ⏳ Pending Instructor Review
-                                </p>
-                              </div>
-                            )}
-                            
-                            {isSubmitted && assignment.assignment_type !== 'lecture_checkin' && (
-                              <div className={`p-3 rounded ${isCorrect ? 'bg-green-50' : 'bg-red-50'}`}>
-                                <p className="text-sm font-medium">
-                                  {isCorrect ? '✓ Correct!' : `✗ Incorrect. Correct answer: ${q.correctAnswer}`}
+                            {isSubmitted && (
+                              <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                                  ✓ Submitted - Pending Review
                                 </p>
                               </div>
                             )}
