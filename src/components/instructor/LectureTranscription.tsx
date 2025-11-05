@@ -30,6 +30,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(true);
+  const [lastTranscript, setLastTranscript] = useState<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -43,36 +44,124 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const lastDetectionTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Client-side throttling: 12 seconds minimum between detection attempts
-  const MIN_DETECTION_INTERVAL = 12000; // 12 seconds (aligned with audio chunks)
+  // Client-side cooldown: 5 seconds minimum between detection attempts
+  const MIN_DETECTION_INTERVAL = 5000; // 5 seconds cooldown
 
-  // Real-time voice command detection - monitors transcript for send commands
+  // Levenshtein distance for fuzzy matching
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const s1 = str1.toLowerCase();
+    const s2 = str2.toLowerCase();
+    const costs = [];
+    for (let i = 0; i <= s1.length; i++) {
+      let lastValue = i;
+      for (let j = 0; j <= s2.length; j++) {
+        if (i === 0) {
+          costs[j] = j;
+        } else if (j > 0) {
+          let newValue = costs[j - 1];
+          if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          }
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+      if (i > 0) costs[s2.length] = lastValue;
+    }
+    const maxLen = Math.max(s1.length, s2.length);
+    return maxLen === 0 ? 1 : 1 - costs[s2.length] / maxLen;
+  };
+
+  // Real-time voice command detection - monitors transcript with sliding window
   useEffect(() => {
     if (!isRecording || transcriptChunks.length === 0) return;
 
-    const lastChunk = transcriptChunks[transcriptChunks.length - 1];
+    // Sliding window: Check last 3 chunks combined to catch commands split across boundaries
+    const windowSize = Math.min(3, transcriptChunks.length);
+    const recentChunks = transcriptChunks.slice(-windowSize);
+    const slidingWindow = recentChunks.join(" ");
     
-    // Only check chunks that are substantial enough
-    if (!lastChunk || lastChunk.length < MIN_CHUNK_LENGTH) return;
+    // Update visual feedback with the most recent chunk
+    setLastTranscript(transcriptChunks[transcriptChunks.length - 1]);
+    
+    // Only check if we have substantial content
+    if (slidingWindow.length < MIN_CHUNK_LENGTH) return;
 
-    // Check for voice commands (immediate send)
-    checkForVoiceCommand(lastChunk);
+    // Check for voice commands in the sliding window
+    checkForVoiceCommand(slidingWindow);
   }, [transcriptChunks, isRecording]);
 
-  const checkForVoiceCommand = (chunk: string): boolean => {
-    // Voice command patterns - case insensitive, fuzzy matching
+  const checkForVoiceCommand = (text: string): boolean => {
+    // Cooldown check - prevent duplicate triggers
+    const now = Date.now();
+    if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
+      console.log('⏱️ Cooldown active, skipping detection');
+      return false;
+    }
+
+    // Method 1: Expanded regex patterns - more flexible matching
     const commandPatterns = [
-      /send\s+(this\s+)?question(\s+now)?[!.]?/i,
-      /send\s+(that\s+)?question(\s+now)?[!.]?/i,
-      /send\s+it(\s+now)?[!.]?/i,
-      /push\s+(this\s+)?question[!.]?/i,
-      /submit\s+(this\s+)?question[!.]?/i,
+      // Core patterns with optional words
+      /send\s+(the\s+|a\s+|this\s+|that\s+)?question(\s+now)?(\s+please)?[!.]?/i,
+      /send\s+it(\s+now)?(\s+please)?[!.]?/i,
+      /send\s+out\s+(the\s+)?question[!.]?/i,
+      
+      // Alternative verbs
+      /push\s+(the\s+|this\s+)?question[!.]?/i,
+      /submit\s+(the\s+|this\s+)?question[!.]?/i,
+      /ask\s+(the\s+)?question(\s+now)?[!.]?/i,
+      
+      // Direct commands
+      /question\s+now[!.]?/i,
+      /post\s+(the\s+)?question[!.]?/i,
     ];
 
-    const hasCommand = commandPatterns.some(pattern => pattern.test(chunk));
+    const hasRegexMatch = commandPatterns.some(pattern => pattern.test(text));
 
-    if (hasCommand) {
-      console.log('🎤 VOICE COMMAND DETECTED in chunk:', chunk);
+    // Method 2: Keyword-based detection (just needs "send" + "question")
+    const lowerText = text.toLowerCase();
+    const hasKeywords = (lowerText.includes('send') || lowerText.includes('submit') || lowerText.includes('push')) && 
+                        lowerText.includes('question');
+
+    // Method 3: Fuzzy matching for common command phrases
+    const targetPhrases = [
+      "send question now",
+      "send the question",
+      "send question",
+      "question now",
+      "submit question"
+    ];
+    
+    // Extract last ~30 characters for fuzzy matching to focus on recent speech
+    const recentText = text.slice(-100).toLowerCase();
+    const hasFuzzyMatch = targetPhrases.some(phrase => {
+      // Check if phrase appears in text with high similarity
+      const words = recentText.split(/\s+/);
+      for (let i = 0; i <= words.length - phrase.split(' ').length; i++) {
+        const segment = words.slice(i, i + phrase.split(' ').length).join(' ');
+        const similarity = calculateSimilarity(segment, phrase);
+        if (similarity >= 0.75) { // 75% similarity threshold
+          console.log(`🎯 Fuzzy match: "${segment}" ≈ "${phrase}" (${Math.round(similarity * 100)}%)`);
+          return true;
+        }
+      }
+      return false;
+    });
+
+    // Trigger if ANY method detects the command
+    const isDetected = hasRegexMatch || hasKeywords || hasFuzzyMatch;
+
+    if (isDetected) {
+      console.log('🎤 VOICE COMMAND DETECTED:', {
+        text: text.slice(-100),
+        regexMatch: hasRegexMatch,
+        keywordMatch: hasKeywords,
+        fuzzyMatch: hasFuzzyMatch
+      });
+      
+      // Update cooldown timestamp
+      lastDetectionTimeRef.current = now;
+      
       handleVoiceCommandQuestion();
       return true;
     }
@@ -924,6 +1013,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 💡 Click "Send Question" button or say "send question now"
               </p>
             </div>
+            
+            {lastTranscript && (
+              <div className="bg-muted border border-border rounded-lg p-3 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                  <Radio className="h-3 w-3" />
+                  Last Transcribed:
+                </p>
+                <p className="text-sm text-foreground">{lastTranscript}</p>
+              </div>
+            )}
           </div>
         )}
 
