@@ -271,37 +271,112 @@ serve(async (req) => {
 
     console.log('👥 Sending to', studentLinks.length, 'students');
 
-    // Create assignments for all students
-    const assignments = studentLinks.map(link => ({
-      instructor_id: user.id,
-      student_id: link.student_id,
-      assignment_type: 'lecture_checkin',
-      mode: 'manual_grade',  // Always manual grade for lecture check-ins
-      title: '🎯 Live Lecture Question',
-      content: { 
-        questions: [formattedQuestion],
-        isLive: true,
-        detectedAutomatically: true
-      },
-      completed: false,
-      auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 min expiry
-    }));
-
-    const { error: insertError } = await supabase
-      .from('student_assignments')
-      .insert(assignments);
-
-    if (insertError) {
-      throw new Error(`Failed to create assignments: ${insertError.message}`);
+    // Chunked batch processing for better reliability with large classrooms
+    const BATCH_SIZE = 15; // Process 15 students at a time
+    const studentIds = studentLinks.map(link => link.student_id);
+    const batches: string[][] = [];
+    
+    for (let i = 0; i < studentIds.length; i += BATCH_SIZE) {
+      batches.push(studentIds.slice(i, i + BATCH_SIZE));
     }
 
-    console.log('✅ Questions sent successfully');
+    console.log(`📦 Processing ${batches.length} batches of up to ${BATCH_SIZE} students`);
+
+    let successCount = 0;
+    let failedStudents: string[] = [];
+
+    // Process batches sequentially to avoid overwhelming the database
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      
+      const assignments = batch.map(studentId => ({
+        instructor_id: user.id,
+        student_id: studentId,
+        assignment_type: 'lecture_checkin',
+        mode: 'manual_grade',
+        title: '🎯 Live Lecture Question',
+        content: { 
+          questions: [formattedQuestion],
+          isLive: true,
+          detectedAutomatically: true
+        },
+        completed: false,
+        auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      }));
+
+      try {
+        const { error: insertError } = await supabase
+          .from('student_assignments')
+          .insert(assignments);
+
+        if (insertError) {
+          console.error(`❌ Batch ${batchIndex + 1} failed:`, insertError.message);
+          failedStudents.push(...batch);
+        } else {
+          successCount += batch.length;
+          console.log(`✅ Batch ${batchIndex + 1}/${batches.length} sent (${batch.length} students)`);
+        }
+      } catch (batchError) {
+        console.error(`❌ Batch ${batchIndex + 1} exception:`, batchError);
+        failedStudents.push(...batch);
+      }
+    }
+
+    // Retry failed students once
+    if (failedStudents.length > 0 && failedStudents.length < studentIds.length) {
+      console.log(`🔄 Retrying ${failedStudents.length} failed students...`);
+      
+      const retryAssignments = failedStudents.map(studentId => ({
+        instructor_id: user.id,
+        student_id: studentId,
+        assignment_type: 'lecture_checkin',
+        mode: 'manual_grade',
+        title: '🎯 Live Lecture Question',
+        content: { 
+          questions: [formattedQuestion],
+          isLive: true,
+          detectedAutomatically: true
+        },
+        completed: false,
+        auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      }));
+
+      const { error: retryError } = await supabase
+        .from('student_assignments')
+        .insert(retryAssignments);
+
+      if (!retryError) {
+        successCount += failedStudents.length;
+        failedStudents = [];
+        console.log('✅ Retry successful for all failed students');
+      } else {
+        console.error('❌ Retry failed:', retryError.message);
+      }
+    }
+
+    console.log(`✅ Questions sent: ${successCount}/${studentIds.length} students`);
+
+    // Broadcast notification via Supabase Realtime for instant delivery
+    const broadcastChannel = supabase.channel(`instructor-${user.id}-questions`);
+    await broadcastChannel.send({
+      type: 'broadcast',
+      event: 'new-question',
+      payload: {
+        instructor_id: user.id,
+        question_type: finalType,
+        timestamp: new Date().toISOString()
+      }
+    });
+    await supabase.removeChannel(broadcastChannel);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      sent_to: studentLinks.length,
+      sent_to: successCount,
+      total_students: studentIds.length,
+      failed_count: failedStudents.length,
       question_type: finalType,
-      question: formattedQuestion
+      question: formattedQuestion,
+      batches_processed: batches.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

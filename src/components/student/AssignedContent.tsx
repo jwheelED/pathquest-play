@@ -58,53 +58,79 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     
     let debounceTimer: NodeJS.Timeout;
     
-    // Set up real-time subscription for new assignments
-    const channel = supabase
-      .channel('student-assignments-changes')
+    // Optimized real-time subscription using postgres_changes for new assignments
+    // This provides reliable delivery for each student
+    const assignmentChannel = supabase
+      .channel(`student-assignments-${userId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'student_assignments',
           filter: `student_id=eq.${userId}`
         },
         (payload) => {
-          console.log('Assignment change detected:', payload);
-          // Debounce to handle rapid updates gracefully
+          console.log('📬 New assignment received:', payload);
+          // Immediate optimistic UI update for new assignments
+          if (payload.new) {
+            const newAssignment = payload.new as Assignment;
+            setAssignments(prev => [newAssignment, ...prev]);
+            
+            // Update live check-ins if applicable
+            if (newAssignment.assignment_type === 'lecture_checkin' && !newAssignment.completed) {
+              setLiveCheckIns(prev => [newAssignment, ...prev]);
+            }
+          }
+          
+          // Debounced full refresh to ensure consistency
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             fetchAssignments();
-          }, 300);
+          }, 1000);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'student_assignments',
+          filter: `student_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('📝 Assignment updated:', payload);
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            fetchAssignments();
+          }, 500);
         }
       )
       .subscribe();
 
     return () => {
       clearTimeout(debounceTimer);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(assignmentChannel);
     };
   }, [userId]);
 
   const fetchAssignments = async () => {
-    // First, clean up old unsaved lecture check-ins
-    try {
-      await supabase.rpc('cleanup_unsaved_lecture_checkins');
-    } catch (cleanupError) {
-      console.error('Cleanup error (non-critical):', cleanupError);
-    }
+    // First, clean up old unsaved lecture check-ins (runs in background)
+    supabase.rpc('cleanup_unsaved_lecture_checkins').catch(err => 
+      console.error('Cleanup error (non-critical):', err)
+    );
 
-    // Optimized query: Only fetch recent assignments to reduce load
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    // Optimized query: Fetch only today's assignments for live lecture use
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const { data, error } = await supabase
       .from('student_assignments')
       .select('*')
       .eq('student_id', userId)
-      .gte('created_at', threeDaysAgo.toISOString())
+      .gte('created_at', today.toISOString())
       .order('created_at', { ascending: false })
-      .limit(50); // Reasonable limit per student
+      .limit(30); // Optimized limit for live classroom
 
     if (error) {
       console.error('Error fetching assignments:', error);
