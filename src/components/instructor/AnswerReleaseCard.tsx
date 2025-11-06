@@ -31,6 +31,7 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [releasing, setReleasing] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     fetchAssignments();
@@ -139,6 +140,8 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   }
 
   const pendingReleases = assignments.filter((a: any) => !a.answers_released);
+  const displayedAssignments = showAll ? pendingReleases : pendingReleases.slice(0, 3);
+  const hasMore = pendingReleases.length > 3;
 
   return (
     <Card>
@@ -149,6 +152,11 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
         </CardTitle>
         <CardDescription>
           Control when students can see correct answers and their scores
+          {pendingReleases.length > 0 && (
+            <span className="ml-2 font-semibold text-primary">
+              ({pendingReleases.length} pending)
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -160,7 +168,7 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
           </div>
         ) : (
           <div className="space-y-3">
-            {pendingReleases.map((assignment: any) => (
+            {displayedAssignments.map((assignment: any) => (
               <div
                 key={assignment.id}
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -220,6 +228,18 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
                 </AlertDialog>
               </div>
             ))}
+            
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAll(!showAll)}
+                >
+                  {showAll ? 'Show Less' : `Show ${pendingReleases.length - 3} More`}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
