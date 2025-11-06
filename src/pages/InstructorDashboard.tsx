@@ -15,6 +15,7 @@ import { CheatDetectionCard } from "@/components/instructor/CheatDetectionCard";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
+import { QuestionLimitSettings } from "@/components/instructor/QuestionLimitSettings";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
@@ -411,6 +412,8 @@ export default function InstructorDashboard() {
             />
             
             <QuestionFormatSettings instructorId={currentUser.id} />
+            
+            <QuestionLimitSettings />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
 

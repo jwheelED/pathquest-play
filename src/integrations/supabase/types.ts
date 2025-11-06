@@ -473,6 +473,7 @@ export type Database = {
           course_title: string | null
           course_topics: string[] | null
           created_at: string | null
+          daily_question_limit: number | null
           experience_level: string | null
           full_name: string | null
           goals: string[] | null
@@ -487,6 +488,7 @@ export type Database = {
           course_title?: string | null
           course_topics?: string[] | null
           created_at?: string | null
+          daily_question_limit?: number | null
           experience_level?: string | null
           full_name?: string | null
           goals?: string[] | null
@@ -501,6 +503,7 @@ export type Database = {
           course_title?: string | null
           course_topics?: string[] | null
           created_at?: string | null
+          daily_question_limit?: number | null
           experience_level?: string | null
           full_name?: string | null
           goals?: string[] | null

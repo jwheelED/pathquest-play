@@ -37,7 +37,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [studentCount, setStudentCount] = useState<number>(0);
   const [systemHealthy, setSystemHealthy] = useState<boolean>(true);
   const [dailyQuestionCount, setDailyQuestionCount] = useState<number>(0);
-  const [dailyQuotaLimit] = useState<number>(200);
+  const [dailyQuotaLimit, setDailyQuotaLimit] = useState<number>(200);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -57,7 +57,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
-  // Fetch student count and daily quota on mount and when recording starts
+  // Fetch student count, daily quota, and custom limit on mount and when recording starts
   useEffect(() => {
     const fetchCounts = async () => {
       try {
@@ -72,6 +72,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
         if (!error && students) {
           setStudentCount(students.length);
+        }
+
+        // Fetch instructor's custom daily limit
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('daily_question_limit')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.daily_question_limit) {
+          setDailyQuotaLimit(profile.daily_question_limit);
         }
 
         // Fetch today's question count

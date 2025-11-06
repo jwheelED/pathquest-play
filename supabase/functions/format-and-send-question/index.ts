@@ -176,7 +176,17 @@ serve(async (req) => {
       }
     }
 
-    // Check daily limit (200 questions per day)
+    // Fetch instructor's custom daily limit
+    const { data: instructorProfile } = await supabase
+      .from('profiles')
+      .select('daily_question_limit')
+      .eq('id', user.id)
+      .single();
+    
+    const dailyLimit = instructorProfile?.daily_question_limit || 200;
+    console.log(`📊 Daily limit for instructor: ${dailyLimit}`);
+
+    // Check daily limit (custom per instructor)
     const today = new Date().toISOString().split('T')[0];
     const { count } = await supabase
       .from('student_assignments')
@@ -185,7 +195,7 @@ serve(async (req) => {
       .eq('assignment_type', 'lecture_checkin')
       .gte('created_at', today);
 
-    if (count && count >= 200) {
+    if (count && count >= dailyLimit) {
       console.log('🚫 Daily question limit reached');
       const now = new Date();
       const midnight = new Date(now);
@@ -197,7 +207,7 @@ serve(async (req) => {
         error: 'Daily question limit reached',
         error_type: 'daily_limit',
         current_count: count,
-        daily_limit: 200,
+        daily_limit: dailyLimit,
         quota_reset: 'midnight UTC',
         hours_until_reset: hoursUntilReset,
         minutes_until_reset: minutesUntilReset
