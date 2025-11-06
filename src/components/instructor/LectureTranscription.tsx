@@ -34,6 +34,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
   const [nextQuestionAllowedAt, setNextQuestionAllowedAt] = useState<number>(0);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number>(0);
+  const [studentCount, setStudentCount] = useState<number>(0);
+  const [systemHealthy, setSystemHealthy] = useState<boolean>(true);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -52,6 +54,44 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Client-side cooldown: 10 seconds minimum between detection attempts
   const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
+
+  // Fetch student count on mount and when recording starts
+  useEffect(() => {
+    const fetchStudentCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: students, error } = await supabase
+          .from('instructor_students')
+          .select('student_id')
+          .eq('instructor_id', user.id);
+
+        if (!error && students) {
+          setStudentCount(students.length);
+        }
+      } catch (error) {
+        console.error('Error fetching student count:', error);
+      }
+    };
+
+    fetchStudentCount();
+    
+    // Refresh student count every 30 seconds when recording
+    const interval = setInterval(() => {
+      if (isRecording) {
+        fetchStudentCount();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  // Monitor system health
+  useEffect(() => {
+    const healthy = failureCount < MAX_CONSECUTIVE_FAILURES && !isCircuitOpen;
+    setSystemHealthy(healthy);
+  }, [failureCount, isCircuitOpen]);
 
   // Levenshtein distance for fuzzy matching
   const calculateSimilarity = (str1: string, str2: string): number => {
@@ -364,9 +404,125 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
+  // Pre-validation before sending question
+  const validateBeforeSend = async (): Promise<{ valid: boolean; error?: string }> => {
+    try {
+      // Check rate limit
+      const now = Date.now();
+      if (now < nextQuestionAllowedAt) {
+        const secondsLeft = Math.ceil((nextQuestionAllowedAt - now) / 1000);
+        return { 
+          valid: false, 
+          error: `⏱️ Please wait ${secondsLeft} seconds before sending another question` 
+        };
+      }
+
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        return { 
+          valid: false, 
+          error: "🔐 Session expired - please refresh the page" 
+        };
+      }
+
+      // Check if students are connected
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { 
+          valid: false, 
+          error: "🔐 Authentication required - please refresh the page" 
+        };
+      }
+
+      const { data: students, error: studentsError } = await supabase
+        .from('instructor_students')
+        .select('student_id')
+        .eq('instructor_id', user.id);
+
+      if (studentsError) {
+        console.error('Error checking students:', studentsError);
+        return { 
+          valid: false, 
+          error: "❌ Could not verify student connections" 
+        };
+      }
+
+      if (!students || students.length === 0) {
+        return { 
+          valid: false, 
+          error: "👥 No students connected - please share your instructor code with students" 
+        };
+      }
+
+      // Check if there's enough transcript content
+      if (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30) {
+        return { 
+          valid: false, 
+          error: "📝 Not enough lecture content - continue speaking for a few more seconds" 
+        };
+      }
+
+      return { valid: true };
+    } catch (error: any) {
+      console.error('Validation error:', error);
+      return { 
+        valid: false, 
+        error: "❌ Validation failed - please try again" 
+      };
+    }
+  };
+
+  // Retry logic with exponential backoff
+  const retryWithBackoff = async <T,>(
+    fn: () => Promise<T>,
+    maxRetries = 3,
+    baseDelay = 1000
+  ): Promise<T> => {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+        
+        // Don't retry on specific errors
+        if (error.status === 429 || error.status === 400 || error.status === 401) {
+          throw error;
+        }
+        
+        if (attempt < maxRetries - 1) {
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(`⏳ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw lastError;
+  };
+
   const handleQuestionSend = async (detectionData: any) => {
     try {
       console.log('📤 Sending question to students:', detectionData);
+      
+      // Pre-validation
+      const validation = await validateBeforeSend();
+      if (!validation.valid) {
+        console.log('❌ Pre-validation failed:', validation.error);
+        toast({
+          title: "Cannot send question",
+          description: validation.error,
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
+
+      // Refresh token before critical operation
+      console.log('🔑 Refreshing auth token before send');
+      await supabase.auth.refreshSession();
       
       toast({
         title: "🎯 Question detected!",
@@ -376,13 +532,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Provide richer context for better question formatting
       const fullContext = transcriptBufferRef.current.slice(-1500);
 
-      const { data, error } = await supabase.functions.invoke('format-and-send-question', {
-        body: {
-          question_text: detectionData.question_text,
-          suggested_type: detectionData.suggested_type,
-          context: fullContext,
-          confidence: detectionData.confidence
-        }
+      // Retry logic for transient failures
+      const { data, error } = await retryWithBackoff(async () => {
+        return await supabase.functions.invoke('format-and-send-question', {
+          body: {
+            question_text: detectionData.question_text,
+            suggested_type: detectionData.suggested_type,
+            context: fullContext,
+            confidence: detectionData.confidence
+          }
+        });
       });
 
       console.log('📥 Edge function response:', { data, error });
@@ -406,7 +565,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           return;
         }
         
-        // Handle other specific errors
+        // Handle 401 authentication errors
+        if (error.status === 401) {
+          toast({
+            title: "🔐 Session expired",
+            description: "Please refresh the page to continue",
+            variant: "destructive",
+            duration: 5000,
+          });
+          throw error;
+        }
+        
+        // Handle 400 bad request
         if (error.status === 400) {
           toast({
             title: "❌ Invalid question",
@@ -417,10 +587,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           throw error;
         }
         
+        // Handle 500 server errors
         if (error.status === 500) {
           toast({
             title: "❌ Server error",
             description: "There was a problem on the server. Please try again.",
+            variant: "destructive",
+            duration: 5000,
+          });
+          throw error;
+        }
+        
+        // Handle network errors
+        if (error.message?.includes('fetch') || error.message?.includes('network')) {
+          toast({
+            title: "🌐 Network error",
+            description: "Please check your internet connection and try again",
             variant: "destructive",
             duration: 5000,
           });
@@ -451,13 +633,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.error('❌ Failed to send question:', error);
       
       // Don't show duplicate toasts if already handled above
-      if (!error.status || (error.status !== 429 && error.status !== 400 && error.status !== 500)) {
-        toast({
-          title: "❌ Failed to send question",
-          description: error.message || "Network error. Please check your connection.",
-          variant: "destructive",
-          duration: 5000,
-        });
+      if (!error.status || (error.status !== 429 && error.status !== 400 && error.status !== 401 && error.status !== 500)) {
+        // Check if it's a network error
+        if (error.message?.includes('fetch') || error.message?.includes('network')) {
+          // Already handled above
+        } else {
+          toast({
+            title: "❌ Failed to send question",
+            description: error.message || "An unexpected error occurred. Please try again.",
+            variant: "destructive",
+            duration: 5000,
+          });
+        }
       }
       throw error;
     }
@@ -1030,6 +1217,86 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   return (
     <>
+      {/* System Status Monitoring Dashboard */}
+      {isRecording && (
+        <Card className="mb-4 border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              📊 System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Transcription Status */}
+              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                <div className="flex items-center gap-2 mb-1">
+                  {systemHealthy ? (
+                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  ) : (
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                  )}
+                  <p className="text-xs font-medium text-muted-foreground">Transcription</p>
+                </div>
+                <p className="text-sm font-bold">
+                  {systemHealthy ? '✅ Active' : '❌ Error'}
+                </p>
+              </div>
+
+              {/* Question Detection Status */}
+              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Radio className="h-3 w-3 text-primary animate-pulse" />
+                  <p className="text-xs font-medium text-muted-foreground">Detection</p>
+                </div>
+                <p className="text-sm font-bold">
+                  {isSendingQuestion ? '🔄 Sending' : '👂 Listening'}
+                </p>
+              </div>
+
+              {/* Students Connected */}
+              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Students</p>
+                <p className="text-sm font-bold">
+                  {studentCount === 0 ? (
+                    <span className="text-amber-600 dark:text-amber-400">👥 {studentCount}</span>
+                  ) : (
+                    <span className="text-green-600 dark:text-green-400">✅ {studentCount}</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Next Question Available */}
+              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Next Question</p>
+                <p className="text-sm font-bold">
+                  {rateLimitSecondsLeft > 0 ? (
+                    <span className="text-amber-600 dark:text-amber-400">⏱️ {rateLimitSecondsLeft}s</span>
+                  ) : (
+                    <span className="text-green-600 dark:text-green-400">✅ Ready</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Warning messages */}
+            {studentCount === 0 && (
+              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800">
+                <p className="text-xs text-amber-900 dark:text-amber-200">
+                  ⚠️ No students connected. Share your instructor code with students to enable question sending.
+                </p>
+              </div>
+            )}
+            {!systemHealthy && (
+              <div className="mt-3 p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800">
+                <p className="text-xs text-red-900 dark:text-red-200">
+                  ❌ System experiencing issues. Try stopping and restarting the recording.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tutorial Section */}
       <Collapsible open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
         <Card className="mb-4 bg-muted/50 border-primary/20">
