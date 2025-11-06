@@ -327,9 +327,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         duration: 3000,
       });
 
-      // Get last 45 seconds of transcript (before the voice command)
-      // This gives enough context without including the command itself
-      const recentTranscript = transcriptBufferRef.current.slice(-1500);
+      // Get last ~45-60 seconds of transcript (before the voice command)
+      // Ensure we don't cut off mid-word
+      let recentTranscript = transcriptBufferRef.current.slice(-2000); // Increased from 1500
+
+      // Trim to nearest word boundary at the start to avoid partial words
+      const firstSpaceIndex = recentTranscript.indexOf(' ');
+      if (firstSpaceIndex > 0 && firstSpaceIndex < 100) {
+        recentTranscript = recentTranscript.slice(firstSpaceIndex + 1);
+      }
 
       console.log('📝 Extracting question from transcript:', recentTranscript.length, 'chars');
 

@@ -29,20 +29,22 @@ serve(async (req) => {
 
     const prompt = `You are analyzing a lecture transcript where a professor used a voice command to send a question to students.
 
-TASK: Extract the MOST RECENT complete question the professor asked, from BEFORE the voice command.
+TASK: Extract the MOST RECENT complete question the professor asked, preserving EXACT wording.
 
 TRANSCRIPT (with voice command at the end):
 """
 ${recentTranscript}
 """
 
-EXTRACTION RULES:
+CRITICAL EXTRACTION RULES:
 1. Find the last complete question asked by the professor
-2. It should be a proper educational question (not rhetorical)
-3. Include the full question with proper context
+2. Preserve the EXACT wording - do not paraphrase, shorten, or modify ANY words
+3. Include the FULL question with all words intact (e.g., if they said "business", do not shorten to "bus")
 4. Look for question indicators: "?", "what", "how", "why", "can you", "could you", etc.
-5. The question is BEFORE any phrases like "send question now", "send this", etc.
-6. Return ONLY the question text, nothing else
+5. The question is BEFORE any phrases like "send question now", "send this", "send it", etc.
+6. Do NOT cut off the question mid-sentence or mid-word
+7. Ensure the question makes complete sense when read alone
+8. Return ONLY the question text, nothing else
 
 If no clear question is found in the transcript, respond with "NO_QUESTION_FOUND".
 
@@ -60,7 +62,7 @@ Question:`;
           { role: 'user', content: prompt }
         ],
         temperature: 0.2,
-        max_tokens: 300
+        max_tokens: 500 // Increased from 300 to ensure complete questions
       }),
     });
 
@@ -73,7 +75,20 @@ Question:`;
     const data = await response.json();
     const extractedQuestion = data.choices[0]?.message?.content?.trim();
 
-    if (!extractedQuestion || extractedQuestion === 'NO_QUESTION_FOUND') {
+    // Remove any potential trailing ellipsis or incomplete endings
+    let cleanedQuestion = extractedQuestion;
+    if (cleanedQuestion) {
+      // If it ends with incomplete word indicators, log a warning
+      if (cleanedQuestion.endsWith('...') || 
+          !cleanedQuestion.endsWith('?') && !cleanedQuestion.endsWith('.')) {
+        console.warn('⚠️ Extracted question may be incomplete:', cleanedQuestion);
+      }
+      
+      // Trim any trailing ellipsis
+      cleanedQuestion = cleanedQuestion.replace(/\.\.\.+$/, '').trim();
+    }
+
+    if (!cleanedQuestion || cleanedQuestion === 'NO_QUESTION_FOUND') {
       return new Response(
         JSON.stringify({ 
           success: false,
@@ -86,11 +101,11 @@ Question:`;
       );
     }
 
-    console.log('✅ Extracted question:', extractedQuestion);
+    console.log('✅ Extracted question:', cleanedQuestion);
 
     // Determine question type based on content
     let suggestedType = 'multiple_choice';
-    const lowerQuestion = extractedQuestion.toLowerCase();
+    const lowerQuestion = cleanedQuestion.toLowerCase();
     
     if (lowerQuestion.includes('code') || lowerQuestion.includes('program') || 
         lowerQuestion.includes('function') || lowerQuestion.includes('implement')) {
@@ -103,10 +118,10 @@ Question:`;
     return new Response(
       JSON.stringify({ 
         success: true,
-        question_text: extractedQuestion,
+        question_text: cleanedQuestion,
         suggested_type: suggestedType,
         extraction_method: 'voice_command'
-      }), 
+      }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
