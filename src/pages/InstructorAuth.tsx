@@ -34,7 +34,18 @@ export default function InstructorAuth() {
           .maybeSingle();
         
         if (roleData) {
-          navigate("/instructor/dashboard");
+          // Check if user has completed onboarding
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('onboarded, course_title, course_schedule, course_topics')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+            navigate("/instructor/onboarding");
+          } else {
+            navigate("/instructor/dashboard");
+          }
         } else {
           // Check if this is a new OAuth signup (only has student role)
           const { data: studentRole } = await supabase
@@ -45,7 +56,7 @@ export default function InstructorAuth() {
             .maybeSingle();
           
           if (studentRole) {
-            // New OAuth signup - assign instructor role
+            // New OAuth signup - assign instructor role and send to onboarding
             const { data: success } = await supabase
               .rpc('assign_oauth_role', { 
                 p_user_id: session.user.id, 
@@ -54,7 +65,7 @@ export default function InstructorAuth() {
             
             if (success) {
               toast.success("Instructor account created!");
-              navigate("/instructor/dashboard");
+              navigate("/instructor/onboarding");
             }
           }
         }
@@ -101,9 +112,9 @@ export default function InstructorAuth() {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);
           } else if (data.session) {
-            // User is auto-confirmed, redirect to dashboard
+            // User is auto-confirmed, redirect to onboarding
             toast.success("Account created successfully!");
-            navigate("/instructor/dashboard");
+            navigate("/instructor/onboarding");
           } else {
             // Email confirmation required
             toast.success("Account created! Please check your email to confirm your account before signing in.");
@@ -146,7 +157,18 @@ export default function InstructorAuth() {
           }
 
           if (roleData) {
-            navigate("/instructor/dashboard");
+            // Check if user has completed onboarding
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('onboarded, course_title, course_schedule, course_topics')
+              .eq('id', user.id)
+              .single();
+            
+            if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+              navigate("/instructor/onboarding");
+            } else {
+              navigate("/instructor/dashboard");
+            }
           } else {
             toast.error("This account is not registered as an instructor");
             await supabase.auth.signOut();

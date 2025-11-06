@@ -102,12 +102,12 @@ export default function InstructorDashboard() {
     // Fetch profile details
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded")
       .eq("id", session.user.id)
       .single();
 
     // Check if instructor has completed the new onboarding with course details
-    if (!profile?.course_title || !profile.course_schedule || !profile.course_topics || profile.course_topics.length === 0) {
+    if (!profile?.onboarded || !profile?.course_title || !profile.course_schedule || !profile.course_topics || profile.course_topics.length === 0) {
       toast.info("Please complete your instructor onboarding");
       navigate("/instructor/onboarding");
       return;
