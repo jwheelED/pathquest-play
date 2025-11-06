@@ -38,10 +38,20 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
   const [openedTimes, setOpenedTimes] = useState<Record<string, number>>({});
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
+  const [accordionValue, setAccordionValue] = useState<string>("");
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
   const { tabSwitchingData, resetTracking } = useTabSwitchingDetection(!!activeAssignmentId);
+
+  // Auto-expand first live check-in when available
+  useEffect(() => {
+    if (liveCheckIns.length > 0 && !accordionValue) {
+      const firstLiveCheckIn = liveCheckIns[0];
+      setAccordionValue(firstLiveCheckIn.id);
+      handleOpenAssignment(firstLiveCheckIn);
+    }
+  }, [liveCheckIns]);
 
   useEffect(() => {
     fetchAssignments();
@@ -557,7 +567,9 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         <Accordion 
           type="single" 
           collapsible
+          value={accordionValue}
           onValueChange={(value) => {
+            setAccordionValue(value);
             if (value) {
               const assignment = assignments.find(a => a.id === value);
               if (assignment) {
