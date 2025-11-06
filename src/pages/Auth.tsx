@@ -52,11 +52,14 @@ export default function AuthPage() {
       });
 
       if (error) {
-        const errorMessage = error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')
-          ? 'This email is already registered. Please sign in instead.'
-          : error.message;
-        setError(errorMessage);
-        toast.error(errorMessage);
+        // Check if user already exists
+        if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
+          setError('This email is already registered. Please sign in instead.');
+          toast.error('This email is already registered. Please sign in instead.');
+        } else {
+          setError(error.message);
+          toast.error(error.message);
+        }
         return;
       }
 
@@ -106,8 +109,10 @@ export default function AuthPage() {
           }
         }
         
-        setSuccess("Sign-up email sent!");
-        navigate("/onboarding");
+        setSuccess("Account created! Please check your email to confirm your account.");
+        toast.success("Account created! Check your email to confirm before signing in.");
+        // Don't navigate yet - let them confirm email first
+        setIsSignUp(false); // Switch to sign-in mode
       }
     } else {
       // Validate sign-in inputs
@@ -129,7 +134,19 @@ export default function AuthPage() {
       });
 
       if (error) {
-        setError(error.message);
+        // Check for email not confirmed error
+        if (error.message.toLowerCase().includes('email not confirmed') || 
+            error.message.toLowerCase().includes('verify your email')) {
+          setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+          toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+        } else if (error.message.toLowerCase().includes('invalid login credentials')) {
+          // Could be wrong password OR unconfirmed email
+          setError('Invalid email or password. If you just signed up, please confirm your email first.');
+          toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
+        } else {
+          setError(error.message);
+          toast.error(error.message);
+        }
       } else {
         setSuccess("Signed in successfully!");
         // Check if user has completed onboarding
