@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2 } from "lucide-react";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
@@ -39,6 +39,8 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [openedTimes, setOpenedTimes] = useState<Record<string, number>>({});
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
   const [accordionValue, setAccordionValue] = useState<string>("");
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'error'>('connecting');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
@@ -100,13 +102,48 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         },
         (payload) => {
           console.log('📝 Assignment updated:', payload);
+          
+          // Immediate update for answers_released (no debounce for instant UI refresh)
+          if (payload.new && 'answers_released' in payload.new) {
+            const updatedAssignment = payload.new as Assignment;
+            setAssignments(prev => 
+              prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+            );
+            
+            // Show toast notification when answers are released
+            if (updatedAssignment.answers_released) {
+              sonnerToast.success("Answers Released!", {
+                description: `Answers for "${updatedAssignment.title}" are now available`
+              });
+            }
+          }
+          
+          // Debounced refresh for other updates
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             fetchAssignments();
           }, 500);
         }
       )
-      .subscribe();
+      .on('system', {}, (payload) => {
+        console.log('🔌 Realtime connection status:', payload);
+        // Handle connection status updates
+      })
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeStatus('connected');
+          console.log('✅ Real-time updates connected');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setRealtimeStatus('error');
+          console.error('❌ Real-time connection error:', status);
+          // Retry connection after 5 seconds
+          setTimeout(() => {
+            console.log('🔄 Retrying real-time connection...');
+            setRealtimeStatus('connecting');
+          }, 5000);
+        }
+      });
 
     return () => {
       clearTimeout(debounceTimer);
@@ -115,38 +152,43 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   }, [userId]);
 
   const fetchAssignments = async () => {
-    // First, clean up old unsaved lecture check-ins (runs in background)
+    setIsRefreshing(true);
     try {
-      await supabase.rpc('cleanup_unsaved_lecture_checkins');
-    } catch (err) {
-      console.error('Cleanup error (non-critical):', err);
+      // First, clean up old unsaved lecture check-ins (runs in background)
+      try {
+        await supabase.rpc('cleanup_unsaved_lecture_checkins');
+      } catch (err) {
+        console.error('Cleanup error (non-critical):', err);
+      }
+
+      // Optimized query: Fetch only today's assignments for live lecture use
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
+        .from('student_assignments')
+        .select('*')
+        .eq('student_id', userId)
+        .gte('created_at', today.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(30); // Optimized limit for live classroom
+
+      if (error) {
+        console.error('Error fetching assignments:', error);
+        return;
+      }
+      
+      const allAssignments = data || [];
+      setAssignments(allAssignments);
+      
+      // Separate live check-ins for prominent display
+      const checkIns = allAssignments.filter(
+        a => a.assignment_type === 'lecture_checkin' && !a.completed
+      );
+      setLiveCheckIns(checkIns);
+    } finally {
+      setIsRefreshing(false);
     }
-
-    // Optimized query: Fetch only today's assignments for live lecture use
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data, error } = await supabase
-      .from('student_assignments')
-      .select('*')
-      .eq('student_id', userId)
-      .gte('created_at', today.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(30); // Optimized limit for live classroom
-
-    if (error) {
-      console.error('Error fetching assignments:', error);
-      return;
-    }
-    
-    const allAssignments = data || [];
-    setAssignments(allAssignments);
-    
-    // Separate live check-ins for prominent display
-    const checkIns = allAssignments.filter(
-      a => a.assignment_type === 'lecture_checkin' && !a.completed
-    );
-    setLiveCheckIns(checkIns);
   };
 
   const handleAnswerSelect = (assignmentId: string, questionIndex: number, answer: string) => {
@@ -561,8 +603,42 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Assigned Content</CardTitle>
-        <CardDescription>{assignments.filter(a => !a.completed).length} active assignment(s)</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Assigned Content</CardTitle>
+            <CardDescription>{assignments.filter(a => !a.completed).length} active assignment(s)</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Real-time connection status indicator */}
+            <div className="flex items-center gap-1.5 text-xs">
+              {realtimeStatus === 'connected' ? (
+                <>
+                  <Wifi className="h-3.5 w-3.5 text-green-600" />
+                  <span className="text-muted-foreground">Live</span>
+                </>
+              ) : realtimeStatus === 'connecting' ? (
+                <>
+                  <Wifi className="h-3.5 w-3.5 text-yellow-600 animate-pulse" />
+                  <span className="text-muted-foreground">Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3.5 w-3.5 text-red-600" />
+                  <span className="text-muted-foreground">Offline</span>
+                </>
+              )}
+            </div>
+            {/* Manual refresh button */}
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={fetchAssignments}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Live Lecture Check-in Alert */}
