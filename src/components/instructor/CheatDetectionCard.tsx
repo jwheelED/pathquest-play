@@ -23,6 +23,8 @@ interface FlaggedStudent {
   total_time_away_seconds: number;
   longest_absence_seconds: number;
   switched_away_immediately: boolean;
+  answer_copied?: boolean;
+  answer_copy_count?: number;
 }
 
 interface CheatDetectionCardProps {
@@ -94,6 +96,9 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           tab_switches,
           longest_absence_seconds,
           switched_away_immediately,
+          answer_copied,
+          answer_copy_count,
+          answer_copy_events,
           student_assignments!inner(
             title,
             instructor_id
@@ -209,6 +214,25 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             patternType = 'Question copied, then quick paste';
           }
           
+          // HIGH SUSPICION: Copied from answer box multiple times, then pasted
+          if (
+            suspicionLevel !== 'HIGH' &&
+            (record.answer_copy_count || 0) >= 2 &&
+            record.pasted_count >= 1
+          ) {
+            suspicionLevel = 'HIGH';
+            patternType = 'Copied from answer box multiple times, then pasted';
+          }
+          
+          // MEDIUM SUSPICION: Single answer copy event
+          if (
+            suspicionLevel === 'LOW' &&
+            (record.answer_copy_count || 0) >= 1
+          ) {
+            suspicionLevel = 'MEDIUM';
+            patternType = 'Copied text from answer box';
+          }
+          
           // MEDIUM SUSPICION: Frequent Switching
           if (suspicionLevel === 'LOW' && (record.tab_switch_count || 0) >= 5) {
             suspicionLevel = 'MEDIUM';
@@ -275,7 +299,9 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             tab_switch_count: record.tab_switch_count || 0,
             total_time_away_seconds: record.total_time_away_seconds || 0,
             longest_absence_seconds: record.longest_absence_seconds || 0,
-            switched_away_immediately: record.switched_away_immediately || false
+            switched_away_immediately: record.switched_away_immediately || false,
+            answer_copied: record.answer_copied || false,
+            answer_copy_count: record.answer_copy_count || 0,
           };
         })
         .filter((record: FlaggedStudent) => {
@@ -423,6 +449,12 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
                   <div className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400">
                     <AlertTriangle className="h-3 w-3" />
                     <span>Question was copied</span>
+                  </div>
+                )}
+                {student.answer_copy_count && student.answer_copy_count > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-red-700 dark:text-red-400">
+                    <Copy className="h-3 w-3" />
+                    <span>Copied from answer box {student.answer_copy_count} time{student.answer_copy_count > 1 ? 's' : ''}</span>
                   </div>
                 )}
                 {student.first_interaction_type === 'pasted' && (

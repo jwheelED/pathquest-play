@@ -55,6 +55,9 @@ export type Database = {
       }
       answer_version_history: {
         Row: {
+          answer_copied: boolean | null
+          answer_copy_count: number | null
+          answer_copy_events: Json | null
           assignment_id: string
           created_at: string
           editing_events_after_first_paste: number | null
@@ -78,6 +81,9 @@ export type Database = {
           version_events: Json
         }
         Insert: {
+          answer_copied?: boolean | null
+          answer_copy_count?: number | null
+          answer_copy_events?: Json | null
           assignment_id: string
           created_at?: string
           editing_events_after_first_paste?: number | null
@@ -101,6 +107,9 @@ export type Database = {
           version_events?: Json
         }
         Update: {
+          answer_copied?: boolean | null
+          answer_copy_count?: number | null
+          answer_copy_events?: Json | null
           assignment_id?: string
           created_at?: string
           editing_events_after_first_paste?: number | null

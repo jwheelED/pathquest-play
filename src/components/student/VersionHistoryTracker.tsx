@@ -33,6 +33,9 @@ export interface VersionHistoryData {
   tab_switches: TabSwitch[];
   longest_absence_seconds: number;
   switched_away_immediately: boolean;
+  answer_copied: boolean;
+  answer_copy_count: number;
+  answer_copy_events: { timestamp: string; selectedText: string }[];
 }
 
 interface VersionHistoryTrackerProps {
@@ -55,6 +58,7 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
   const [firstPasteIndex, setFirstPasteIndex] = useState<number | null>(null);
   const [tabSwitches, setTabSwitches] = useState<TabSwitch[]>([]);
   const [lastTabLeaveTime, setLastTabLeaveTime] = useState<Date | null>(null);
+  const [answerCopyEvents, setAnswerCopyEvents] = useState<{ timestamp: string; selectedText: string }[]>([]);
   const lastValueRef = useRef(value);
   const lastTimestampRef = useRef(Date.now());
 
@@ -113,6 +117,9 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
       tab_switches: tabSwitches,
       longest_absence_seconds: longestAbsenceSeconds,
       switched_away_immediately: switchedAwayImmediately,
+      answer_copied: answerCopyEvents.length > 0,
+      answer_copy_count: answerCopyEvents.length,
+      answer_copy_events: answerCopyEvents,
     };
     
     onVersionChange(historyData);
@@ -157,6 +164,22 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
       setIsPasteDetected(true);
       setTimeout(() => setIsPasteDetected(false), 3000);
     }
+  };
+
+  const handleAnswerCopy = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const copiedText = window.getSelection()?.toString() || '';
+    const copyEvent = {
+      timestamp: new Date().toISOString(),
+      selectedText: copiedText.slice(0, 50) // Store first 50 chars for privacy
+    };
+    
+    setAnswerCopyEvents(prev => [...prev, copyEvent]);
+    
+    // Visual feedback
+    setIsPasteDetected(true);
+    setTimeout(() => setIsPasteDetected(false), 3000);
+    
+    console.log('⚠️ Student copied from answer box:', copiedText.length, 'characters');
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -210,6 +233,7 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
         value={value}
         onChange={handleChange}
         onPaste={handlePaste}
+        onCopy={handleAnswerCopy}
         className={`w-full p-4 border rounded-lg text-sm resize-y ${
           isCodeEditor 
             ? 'font-mono bg-slate-950 text-slate-100 dark:bg-slate-900 min-h-[300px] leading-relaxed' 
@@ -269,6 +293,24 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
                   <span className="text-muted-foreground">
                     Question copied at {questionCopiedAt?.toLocaleTimeString()}
                   </span>
+                </div>
+              )}
+              {answerCopyEvents.length > 0 && (
+                <div className="border-t pt-2 mt-2">
+                  <p className="text-xs font-medium text-orange-600 mb-1">
+                    ⚠️ Answer copied {answerCopyEvents.length} time(s)
+                  </p>
+                  {answerCopyEvents.slice(-3).map((event, idx) => (
+                    <div key={idx} className="text-xs flex items-center gap-2 py-1">
+                      <AlertTriangle className="h-3 w-3 text-orange-600" />
+                      <span className="text-muted-foreground">
+                        {new Date(event.timestamp).toLocaleTimeString()}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({event.selectedText.length} chars)
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

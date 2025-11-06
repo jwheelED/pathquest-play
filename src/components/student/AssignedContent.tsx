@@ -330,6 +330,12 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       const tabData = versionHistoryData || tabSwitchingData;
       
       if (tabData && userId) {
+        console.log('💾 Saving tab switching data:', {
+          assignmentId: assignment.id,
+          tabSwitchCount: tabData?.tab_switch_count,
+          source: versionHistoryData ? 'VersionHistoryTracker' : 'Global Hook'
+        });
+
         const { error: versionError } = await supabase
           .from('answer_version_history')
           .upsert({
@@ -350,7 +356,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
             total_time_away_seconds: tabData.total_time_away_seconds,
             tab_switches: tabData.tab_switches,
             longest_absence_seconds: tabData.longest_absence_seconds,
-            switched_away_immediately: tabData.switched_away_immediately
+            switched_away_immediately: tabData.switched_away_immediately,
+            answer_copied: versionHistoryData?.answer_copied || false,
+            answer_copy_count: versionHistoryData?.answer_copy_count || 0,
+            answer_copy_events: versionHistoryData?.answer_copy_events || [],
           }, {
             onConflict: 'student_id,assignment_id'
           });
@@ -630,6 +639,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     
     // Start tab switching detection for this assignment
     setActiveAssignmentId(assignment.id);
+    console.log('🎯 Started tab switching detection for assignment:', assignment.id, assignment.title);
     setViewingId(assignment.id);
   };
 
