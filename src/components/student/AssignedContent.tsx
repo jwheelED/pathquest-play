@@ -25,6 +25,7 @@ interface Assignment {
   auto_delete_at?: string | null;
   opened_at?: string | null;
   response_time_seconds?: number | null;
+  answers_released?: boolean;
 }
 
 export const AssignedContent = ({ userId }: { userId: string }) => {
@@ -773,18 +774,10 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               })}
                             </div>
                             
-                            {isSubmitted && assignment.assignment_type === 'lecture_checkin' && (
+                            {isSubmitted && (
                               <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
                                 <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                                  ✓ Submitted - Your instructor will review your answer
-                                </p>
-                              </div>
-                            )}
-                            
-                            {isSubmitted && assignment.assignment_type !== 'lecture_checkin' && (
-                              <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                                  ✓ Submitted - Pending Review
+                                  ✓ Submitted - {assignment.answers_released ? 'Answers Released' : 'Awaiting answer release'}
                                 </p>
                               </div>
                             )}
@@ -800,7 +793,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                               </div>
                             )}
                             
-                            {assignment.mode === "hints_solutions" && isSubmitted && (
+                            {assignment.mode === "hints_solutions" && isSubmitted && assignment.answers_released && (
                               <div className="bg-primary/5 p-3 rounded space-y-1">
                                 <p className="text-xs font-semibold">Explanation:</p>
                                 <p className="text-xs text-muted-foreground">{q.solution}</p>
@@ -818,14 +811,19 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                       
                       {assignment.completed && (
                         <div className="space-y-3">
-                          {/* Hide score for lecture check-ins - instructors can see it on their side */}
-                          {assignment.assignment_type === 'lecture_checkin' ? (
+                          {/* Hide scores until instructor releases answers */}
+                          {!assignment.answers_released ? (
+                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
+                              <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Awaiting Answer Release</p>
+                              <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor will release answers and scores when ready</p>
+                            </div>
+                          ) : assignment.assignment_type === 'lecture_checkin' ? (
                             <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
                               <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">✓ Submitted</p>
-                              <p className="text-sm text-blue-800 dark:text-blue-300">Your instructor will review your response</p>
+                              <p className="text-sm text-blue-800 dark:text-blue-300">Your instructor has reviewed your response</p>
                             </div>
                           ) : (
-                            // Show scores for regular quizzes and assignments
+                            // Show scores only after answers are released
                             assignment.grade !== undefined && assignment.grade !== null ? (
                               <div className="bg-primary/10 p-4 rounded-lg text-center">
                                 <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
