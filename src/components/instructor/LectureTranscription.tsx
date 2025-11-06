@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,10 +38,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [systemHealthy, setSystemHealthy] = useState<boolean>(true);
   const [dailyQuestionCount, setDailyQuestionCount] = useState<number>(0);
   const [dailyQuotaLimit, setDailyQuotaLimit] = useState<number>(200);
+  const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
+  const [autoQuestionInterval, setAutoQuestionInterval] = useState<number>(15);
+  const [lastAutoQuestionTime, setLastAutoQuestionTime] = useState<number>(0);
+  const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState<number>(0);
+  const [autoQuestionCount, setAutoQuestionCount] = useState<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptBufferRef = useRef<string>("");
+  const intervalTranscriptRef = useRef<string>("");
   const lastGeneratedIndexRef = useRef<number>(0);
   const triggerDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredRef = useRef(false);
@@ -57,7 +63,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
-  // Fetch student count, daily quota, and custom limit on mount and when recording starts
+  // Fetch student count, daily quota, custom limit, and auto-question settings on mount
   useEffect(() => {
     const fetchCounts = async () => {
       try {
@@ -74,15 +80,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setStudentCount(students.length);
         }
 
-        // Fetch instructor's custom daily limit
+        // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from('profiles')
-          .select('daily_question_limit')
+          .select('daily_question_limit, auto_question_enabled, auto_question_interval')
           .eq('id', user.id)
           .single();
 
         if (profile?.daily_question_limit) {
           setDailyQuotaLimit(profile.daily_question_limit);
+        }
+        
+        if (profile) {
+          setAutoQuestionEnabled(profile.auto_question_enabled || false);
+          setAutoQuestionInterval(profile.auto_question_interval || 15);
         }
 
         // Fetch today's question count
@@ -345,8 +356,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: 1.0, // Voice command = maximum confidence
-        extraction_method: 'voice_command'
+        extraction_method: 'voice_command',
+        source: 'voice_command'
       });
+      
+      // Reset auto-question timer after voice command
+      if (autoQuestionEnabled) {
+        setLastAutoQuestionTime(Date.now());
+        intervalTranscriptRef.current = "";
+        console.log('🔄 Auto-question timer reset after voice command');
+      }
 
     } catch (error: any) {
       console.error('Voice command error:', error);
@@ -415,8 +434,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: 1.0,
-        extraction_method: 'manual_button'
+        extraction_method: 'manual_button',
+        source: 'manual_button'
       });
+      
+      // Reset auto-question timer after manual send
+      if (autoQuestionEnabled) {
+        setLastAutoQuestionTime(Date.now());
+        intervalTranscriptRef.current = "";
+        console.log('🔄 Auto-question timer reset after manual send');
+      }
 
     } catch (error: any) {
       console.error('Manual send error:', error);
@@ -566,7 +593,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             question_text: detectionData.question_text,
             suggested_type: detectionData.suggested_type,
             context: fullContext,
-            confidence: detectionData.confidence
+            confidence: detectionData.confidence,
+            source: detectionData.source || 'manual_button'
           }
         });
       });
@@ -699,6 +727,94 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
+  const handleAutoQuestionGeneration = async () => {
+    try {
+      console.log('⏰ Auto-question timer triggered');
+      
+      // Get transcript from current interval only
+      const intervalTranscript = intervalTranscriptRef.current;
+      
+      if (intervalTranscript.length < 200) {
+        console.log('⚠️ Not enough content in interval, skipping auto-question');
+        toast({
+          title: "⏭️ Auto-question skipped",
+          description: "Not enough lecture content in this interval",
+          duration: 3000,
+        });
+        
+        // Reset timer for next interval
+        setLastAutoQuestionTime(Date.now());
+        return;
+      }
+      
+      // Show pre-generation animation
+      setVoiceCommandDetected(true);
+      setTimeout(() => setVoiceCommandDetected(false), 2000);
+      
+      toast({
+        title: "⏰ Auto-question triggered!",
+        description: "Generating question from recent content...",
+        duration: 3000,
+      });
+      
+      // Call new edge function
+      const { data, error } = await supabase.functions.invoke('generate-interval-question', {
+        body: { 
+          interval_transcript: intervalTranscript,
+          interval_minutes: autoQuestionInterval
+        }
+      });
+      
+      if (error || !data?.success) {
+        console.error('Auto-question generation failed:', error);
+        toast({
+          title: "⚠️ Auto-question failed",
+          description: "Could not generate question from recent content. Will try again next interval.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        
+        // Reset timer for next interval
+        setLastAutoQuestionTime(Date.now());
+        intervalTranscriptRef.current = "";
+        return;
+      }
+      
+      console.log('✅ Auto-question generated:', data.question_text);
+      
+      // Send the question using existing flow
+      await handleQuestionSend({
+        question_text: data.question_text,
+        suggested_type: data.suggested_type,
+        confidence: data.confidence,
+        extraction_method: 'auto_interval',
+        source: 'auto_interval'
+      });
+      
+      // Update state
+      setLastAutoQuestionTime(Date.now());
+      setAutoQuestionCount(prev => prev + 1);
+      
+      // Clear interval transcript buffer
+      intervalTranscriptRef.current = "";
+      
+      console.log(`✅ Auto-question sent! Total this session: ${autoQuestionCount + 1}`);
+      
+    } catch (error) {
+      console.error('Auto-question error:', error);
+      toast({
+        title: "❌ Auto-question error",
+        description: "An error occurred while generating the auto-question",
+        variant: "destructive",
+        duration: 5000,
+      });
+      
+      // Reset timer for next interval even on error
+      setLastAutoQuestionTime(Date.now());
+      intervalTranscriptRef.current = "";
+    }
+  };
+
   // Periodic system restart for resource cleanup
   useEffect(() => {
     if (!isRecording) return;
@@ -739,6 +855,49 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }, TOKEN_REFRESH_INTERVAL);
 
     return () => clearInterval(refreshTimer);
+  }, [isRecording]);
+
+  // Auto-question timer logic
+  useEffect(() => {
+    if (!isRecording || !autoQuestionEnabled || isSendingQuestion) return;
+    
+    const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
+    
+    // Initialize timer on first recording start
+    if (lastAutoQuestionTime === 0) {
+      setLastAutoQuestionTime(Date.now());
+      setAutoQuestionCount(0);
+      console.log(`⏰ Auto-questions initialized: every ${autoQuestionInterval} minutes`);
+    }
+    
+    // Check if interval has elapsed
+    const checkInterval = setInterval(() => {
+      if (isSendingQuestion) return; // Don't trigger during send
+      
+      const now = Date.now();
+      const elapsed = now - lastAutoQuestionTime;
+      const timeLeft = intervalMs - elapsed;
+      const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
+      
+      setNextAutoQuestionIn(secondsLeft);
+      
+      // Trigger when interval is reached
+      if (elapsed >= intervalMs) {
+        handleAutoQuestionGeneration();
+      }
+    }, 1000);
+    
+    return () => clearInterval(checkInterval);
+  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion]);
+
+  // Reset auto-question state when recording stops
+  useEffect(() => {
+    if (!isRecording) {
+      setLastAutoQuestionTime(0);
+      setNextAutoQuestionIn(0);
+      setAutoQuestionCount(0);
+      intervalTranscriptRef.current = "";
+    }
   }, [isRecording]);
 
   // Recording duration timer + Rate limit countdown
@@ -1052,6 +1211,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             } else {
               transcriptBufferRef.current = newText;
             }
+            
+            // Also accumulate in interval transcript for auto-questions
+            if (intervalTranscriptRef.current) {
+              intervalTranscriptRef.current += " " + newText;
+            } else {
+              intervalTranscriptRef.current = newText;
+            }
 
             // Implement sliding window for memory management
             if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
@@ -1081,6 +1247,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 const newText = retryData.text.trim();
                 setTranscriptChunks((prev) => [...prev, newText]);
                 transcriptBufferRef.current += " " + newText;
+                intervalTranscriptRef.current += " " + newText;
                 setFailureCount(0);
                 return;
               }
@@ -1340,6 +1507,43 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 </p>
               </div>
             </div>
+
+            {/* Auto-Question Status */}
+            {autoQuestionEnabled && (
+              <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-900 dark:text-blue-200">
+                      Auto-Questions Active
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900">
+                    Every {autoQuestionInterval} min
+                  </Badge>
+                </div>
+                
+                <div className="text-sm text-blue-700 dark:text-blue-300">
+                  Next question in: <strong>{Math.floor(nextAutoQuestionIn / 60)}:{(nextAutoQuestionIn % 60).toString().padStart(2, '0')}</strong>
+                </div>
+                
+                <div className="text-xs text-blue-600 dark:text-blue-400">
+                  Auto-questions sent this session: {autoQuestionCount}
+                </div>
+                
+                {/* 10-second countdown animation */}
+                {nextAutoQuestionIn <= 10 && nextAutoQuestionIn > 0 && (
+                  <div className="animate-pulse bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-yellow-600 animate-bounce" />
+                      <span className="font-bold text-yellow-900 dark:text-yellow-200">
+                        Auto-question in {nextAutoQuestionIn}s...
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Warning messages */}
             {studentCount === 0 && (

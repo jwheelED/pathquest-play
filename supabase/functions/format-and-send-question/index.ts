@@ -217,7 +217,7 @@ serve(async (req) => {
       });
     }
 
-    const { question_text, suggested_type, context } = await req.json();
+    const { question_text, suggested_type, context, source = 'manual_button' } = await req.json();
     
     // Fetch instructor's question format preference
     const { data: profileData } = await supabase
@@ -320,7 +320,8 @@ serve(async (req) => {
         content: { 
           questions: [formattedQuestion],
           isLive: true,
-          detectedAutomatically: true
+          detectedAutomatically: true,
+          source: source // 'voice_command', 'auto_interval', or 'manual_button'
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
@@ -357,7 +358,8 @@ serve(async (req) => {
         content: { 
           questions: [formattedQuestion],
           isLive: true,
-          detectedAutomatically: true
+          detectedAutomatically: true,
+          source: source // 'voice_command', 'auto_interval', or 'manual_button'
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()

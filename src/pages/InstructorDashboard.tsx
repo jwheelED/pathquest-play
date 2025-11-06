@@ -17,6 +17,7 @@ import { LectureCheckInResults } from "@/components/instructor/LectureCheckInRes
 import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 import { QuestionLimitSettings } from "@/components/instructor/QuestionLimitSettings";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
+import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
@@ -440,6 +441,8 @@ export default function InstructorDashboard() {
             <QuestionFormatSettings instructorId={currentUser.id} />
             
             <QuestionLimitSettings />
+            
+            <AutoQuestionSettings />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
 

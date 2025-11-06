@@ -469,6 +469,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          auto_question_enabled: boolean | null
+          auto_question_interval: number | null
           course_schedule: string | null
           course_title: string | null
           course_topics: string[] | null
@@ -479,11 +481,14 @@ export type Database = {
           goals: string[] | null
           id: string
           instructor_code: string | null
+          last_auto_question_at: string | null
           onboarded: boolean | null
           question_format_preference: string | null
           study_days: string[] | null
         }
         Insert: {
+          auto_question_enabled?: boolean | null
+          auto_question_interval?: number | null
           course_schedule?: string | null
           course_title?: string | null
           course_topics?: string[] | null
@@ -494,11 +499,14 @@ export type Database = {
           goals?: string[] | null
           id: string
           instructor_code?: string | null
+          last_auto_question_at?: string | null
           onboarded?: boolean | null
           question_format_preference?: string | null
           study_days?: string[] | null
         }
         Update: {
+          auto_question_enabled?: boolean | null
+          auto_question_interval?: number | null
           course_schedule?: string | null
           course_title?: string | null
           course_topics?: string[] | null
@@ -509,6 +517,7 @@ export type Database = {
           goals?: string[] | null
           id?: string
           instructor_code?: string | null
+          last_auto_question_at?: string | null
           onboarded?: boolean | null
           question_format_preference?: string | null
           study_days?: string[] | null
