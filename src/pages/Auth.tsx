@@ -52,7 +52,11 @@ export default function AuthPage() {
       });
 
       if (error) {
-        setError(error.message);
+        const errorMessage = error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')
+          ? 'This email is already registered. Please sign in instead.'
+          : error.message;
+        setError(errorMessage);
+        toast.error(errorMessage);
         return;
       }
 
