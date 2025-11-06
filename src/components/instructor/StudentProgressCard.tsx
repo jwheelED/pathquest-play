@@ -20,6 +20,42 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
 
   useEffect(() => {
     fetchStudents();
+
+    // Real-time updates for student progress
+    const channel = supabase
+      .channel(`instructor-students-${instructorId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'student_assignments',
+          filter: `instructor_id=eq.${instructorId}`
+        },
+        (payload) => {
+          console.log('📚 Student assignment updated:', payload);
+          // Refetch when students complete assignments
+          fetchStudents();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_stats'
+        },
+        (payload) => {
+          console.log('📈 Student stats updated:', payload);
+          // Refetch to show updated stats
+          fetchStudents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [instructorId]);
 
   const fetchStudents = async () => {

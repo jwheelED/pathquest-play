@@ -103,19 +103,32 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         (payload) => {
           console.log('📝 Assignment updated:', payload);
           
+          const oldAssignment = payload.old as Assignment;
+          const updatedAssignment = payload.new as Assignment;
+          
           // Immediate update for answers_released (no debounce for instant UI refresh)
-          if (payload.new && 'answers_released' in payload.new) {
-            const updatedAssignment = payload.new as Assignment;
+          if ('answers_released' in updatedAssignment) {
             setAssignments(prev => 
               prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
             );
             
             // Show toast notification when answers are released
-            if (updatedAssignment.answers_released) {
+            if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
               sonnerToast.success("Answers Released!", {
                 description: `Answers for "${updatedAssignment.title}" are now available`
               });
             }
+          }
+          
+          // Show toast notification when grade is posted
+          if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
+            setAssignments(prev => 
+              prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+            );
+            
+            sonnerToast.success("Grade Posted!", {
+              description: `Your grade for "${updatedAssignment.title}": ${Math.round(updatedAssignment.grade)}%`
+            });
           }
           
           // Debounced refresh for other updates

@@ -31,6 +31,39 @@ export default function UserStats({ userId, onStatsUpdate }: UserStatsProps) {
     if (userId) {
       fetchUserStats();
     }
+
+    // Real-time updates for stats changes
+    const channel = supabase
+      .channel(`user-stats-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_stats',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('📊 Stats updated in real-time:', payload);
+          if (payload.new) {
+            const newStats = payload.new as UserStats;
+            setStats(newStats);
+            
+            // Notify parent component
+            if (onStatsUpdate) {
+              onStatsUpdate({ 
+                level: newStats.level, 
+                streak: newStats.current_streak 
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const fetchUserStats = async () => {

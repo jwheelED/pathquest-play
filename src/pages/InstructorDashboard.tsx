@@ -56,25 +56,51 @@ export default function InstructorDashboard() {
     fetchStudents();
     fetchClassroomStats();
     
-    // Real-time updates for classroom stats
-    const channel = supabase
-      .channel('classroom-stats-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'student_assignments',
-          filter: `assignment_type=eq.lecture_checkin`
-        },
-        () => {
-          fetchClassroomStats();
-        }
-      )
-      .subscribe();
+    // Set up real-time updates after getting user
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Real-time updates for classroom stats and student progress
+      const channel = supabase
+        .channel('instructor-realtime-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'student_assignments',
+            filter: `instructor_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('📋 Assignment update:', payload);
+            fetchClassroomStats();
+            fetchStudents(); // Refresh student list to show updated grades
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'user_stats'
+          },
+          (payload) => {
+            console.log('📊 Student stats updated:', payload);
+            fetchStudents(); // Refresh to show updated student stats
+          }
+        )
+        .subscribe();
+
+      return channel;
+    };
+
+    const channelPromise = setupRealtime();
 
     return () => {
-      supabase.removeChannel(channel);
+      channelPromise.then(channel => {
+        if (channel) supabase.removeChannel(channel);
+      });
     };
   }, []);
 
