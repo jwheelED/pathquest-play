@@ -32,6 +32,7 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   const [loading, setLoading] = useState(true);
   const [releasing, setReleasing] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [releasingAll, setReleasingAll] = useState(false);
 
   useEffect(() => {
     fetchAssignments();
@@ -128,6 +129,28 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
     setReleasing(null);
   };
 
+  const handleReleaseAll = async () => {
+    setReleasingAll(true);
+
+    // Collect all assignment IDs from pending releases
+    const allAssignmentIds = pendingReleases.flatMap((a: any) => a.assignment_ids);
+
+    const { error } = await supabase
+      .from('student_assignments')
+      .update({ answers_released: true })
+      .in('id', allAssignmentIds);
+
+    if (error) {
+      toast.error('Failed to release all answers');
+      console.error('Error releasing all answers:', error);
+    } else {
+      toast.success(`Answers released for all ${pendingReleases.length} assignments`);
+      fetchAssignments();
+    }
+
+    setReleasingAll(false);
+  };
+
   if (loading) {
     return (
       <Card>
@@ -146,18 +169,62 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Unlock className="h-5 w-5" />
-          Answer Release Control
-        </CardTitle>
-        <CardDescription>
-          Control when students can see correct answers and their scores
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Unlock className="h-5 w-5" />
+              Answer Release Control
+            </CardTitle>
+            <CardDescription>
+              Control when students can see correct answers and their scores
+              {pendingReleases.length > 0 && (
+                <span className="ml-2 font-semibold text-primary">
+                  ({pendingReleases.length} pending)
+                </span>
+              )}
+            </CardDescription>
+          </div>
           {pendingReleases.length > 0 && (
-            <span className="ml-2 font-semibold text-primary">
-              ({pendingReleases.length} pending)
-            </span>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="default"
+                  disabled={releasingAll || releasing !== null}
+                >
+                  {releasingAll ? 'Releasing...' : 'Release All'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Release All Answers?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will release answers for <span className="font-semibold">{pendingReleases.length} assignments</span>, allowing 
+                    all students who submitted to see:
+                    <ul className="list-disc ml-6 mt-2 space-y-1">
+                      <li>Their scores and grades</li>
+                      <li>Correct answers and explanations</li>
+                      <li>Detailed solution feedback</li>
+                    </ul>
+                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded border border-yellow-200 dark:border-yellow-800">
+                      <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-200">
+                        ⚠️ Warning: This action cannot be undone.
+                      </p>
+                      <p className="text-xs text-yellow-800 dark:text-yellow-300 mt-1">
+                        Students will be able to share answers after release.
+                      </p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleReleaseAll}>
+                    Release All ({pendingReleases.length})
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
-        </CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         {pendingReleases.length === 0 ? (
