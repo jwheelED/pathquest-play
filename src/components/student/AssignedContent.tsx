@@ -116,9 +116,11 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
 
   const fetchAssignments = async () => {
     // First, clean up old unsaved lecture check-ins (runs in background)
-    supabase.rpc('cleanup_unsaved_lecture_checkins').catch(err => 
-      console.error('Cleanup error (non-critical):', err)
-    );
+    try {
+      await supabase.rpc('cleanup_unsaved_lecture_checkins');
+    } catch (err) {
+      console.error('Cleanup error (non-critical):', err);
+    }
 
     // Optimized query: Fetch only today's assignments for live lecture use
     const today = new Date();

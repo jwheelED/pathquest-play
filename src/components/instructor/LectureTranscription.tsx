@@ -36,6 +36,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number>(0);
   const [studentCount, setStudentCount] = useState<number>(0);
   const [systemHealthy, setSystemHealthy] = useState<boolean>(true);
+  const [dailyQuestionCount, setDailyQuestionCount] = useState<number>(0);
+  const [dailyQuotaLimit] = useState<number>(200);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -55,13 +57,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
-  // Fetch student count on mount and when recording starts
+  // Fetch student count and daily quota on mount and when recording starts
   useEffect(() => {
-    const fetchStudentCount = async () => {
+    const fetchCounts = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Fetch student count
         const { data: students, error } = await supabase
           .from('instructor_students')
           .select('student_id')
@@ -70,17 +73,30 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         if (!error && students) {
           setStudentCount(students.length);
         }
+
+        // Fetch today's question count
+        const today = new Date().toISOString().split('T')[0];
+        const { count } = await supabase
+          .from('student_assignments')
+          .select('id', { count: 'exact', head: true })
+          .eq('instructor_id', user.id)
+          .eq('assignment_type', 'lecture_checkin')
+          .gte('created_at', today);
+
+        if (count !== null) {
+          setDailyQuestionCount(count);
+        }
       } catch (error) {
-        console.error('Error fetching student count:', error);
+        console.error('Error fetching counts:', error);
       }
     };
 
-    fetchStudentCount();
+    fetchCounts();
     
-    // Refresh student count every 30 seconds when recording
+    // Refresh counts every 30 seconds when recording
     const interval = setInterval(() => {
       if (isRecording) {
-        fetchStudentCount();
+        fetchCounts();
       }
     }, 30000);
 
@@ -549,17 +565,35 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (error) {
         console.error('❌ Edge function error:', error);
         
-        // Handle 429 Rate Limit specifically
+        // Handle 429 Rate Limit - distinguish between cooldown and daily limit
         if (error.message?.includes('429') || error.status === 429) {
-          const retryAfter = error.context?.retry_after || 60;
-          const nextAllowed = Date.now() + (retryAfter * 1000);
-          setNextQuestionAllowedAt(nextAllowed);
+          const errorData = data?.error || error.context || {};
           
-          toast({
-            title: "⏱️ Question sent! Please wait",
-            description: `You can send another question in ${retryAfter} seconds`,
-            duration: 5000,
-          });
+          // Check if this is daily limit or cooldown
+          if (errorData.error_type === 'daily_limit' || errorData.quota_reset) {
+            const hoursLeft = errorData.hours_until_reset || 0;
+            const minutesLeft = errorData.minutes_until_reset || 0;
+            const currentCount = errorData.current_count || dailyQuestionCount;
+            const limit = errorData.daily_limit || dailyQuotaLimit;
+            
+            toast({
+              title: "🚫 Daily question limit reached",
+              description: `You've sent ${currentCount}/${limit} questions today. Resets in ${hoursLeft}h ${minutesLeft}m at midnight UTC.`,
+              variant: "destructive",
+              duration: 10000,
+            });
+          } else {
+            // Regular cooldown
+            const retryAfter = errorData.retry_after || 60;
+            const nextAllowed = Date.now() + (retryAfter * 1000);
+            setNextQuestionAllowedAt(nextAllowed);
+            
+            toast({
+              title: "⏱️ Question sent! Please wait",
+              description: `You can send another question in ${retryAfter} seconds`,
+              duration: 5000,
+            });
+          }
           
           // Don't throw - this is expected behavior, not an error
           return;
@@ -615,6 +649,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       if (data?.success) {
         console.log('✅ Question successfully sent!');
+        
+        // Update daily count
+        setDailyQuestionCount(prev => prev + 1);
+        
         toast({
           title: "✅ Question sent!",
           description: `${data.question_type} question sent to ${data.sent_to} students`,
@@ -1226,7 +1264,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {/* Transcription Status */}
               <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
                 <div className="flex items-center gap-2 mb-1">
@@ -1273,6 +1311,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     <span className="text-amber-600 dark:text-amber-400">⏱️ {rateLimitSecondsLeft}s</span>
                   ) : (
                     <span className="text-green-600 dark:text-green-400">✅ Ready</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Daily Quota */}
+              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Daily Quota</p>
+                <p className="text-sm font-bold">
+                  {dailyQuestionCount >= dailyQuotaLimit ? (
+                    <span className="text-red-600 dark:text-red-400">🚫 {dailyQuestionCount}/{dailyQuotaLimit}</span>
+                  ) : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? (
+                    <span className="text-amber-600 dark:text-amber-400">⚠️ {dailyQuestionCount}/{dailyQuotaLimit}</span>
+                  ) : (
+                    <span className="text-green-600 dark:text-green-400">📊 {dailyQuestionCount}/{dailyQuotaLimit}</span>
                   )}
                 </p>
               </div>

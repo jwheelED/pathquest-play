@@ -167,6 +167,7 @@ serve(async (req) => {
         console.log(`⏳ Rate limit: ${retryAfter}s until next question`);
         return new Response(JSON.stringify({ 
           error: 'Please wait 60 seconds between questions',
+          error_type: 'cooldown',
           retry_after: retryAfter
         }), {
           status: 429,
@@ -175,7 +176,7 @@ serve(async (req) => {
       }
     }
 
-    // Check daily limit (50 questions per day)
+    // Check daily limit (200 questions per day)
     const today = new Date().toISOString().split('T')[0];
     const { count } = await supabase
       .from('student_assignments')
@@ -184,11 +185,22 @@ serve(async (req) => {
       .eq('assignment_type', 'lecture_checkin')
       .gte('created_at', today);
 
-    if (count && count >= 50) {
+    if (count && count >= 200) {
       console.log('🚫 Daily question limit reached');
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setUTCHours(24, 0, 0, 0);
+      const hoursUntilReset = Math.floor((midnight.getTime() - now.getTime()) / (1000 * 60 * 60));
+      const minutesUntilReset = Math.floor(((midnight.getTime() - now.getTime()) % (1000 * 60 * 60)) / (1000 * 60));
+      
       return new Response(JSON.stringify({ 
-        error: 'Daily question limit reached (50)',
-        quota_reset: 'midnight UTC'
+        error: 'Daily question limit reached',
+        error_type: 'daily_limit',
+        current_count: count,
+        daily_limit: 200,
+        quota_reset: 'midnight UTC',
+        hours_until_reset: hoursUntilReset,
+        minutes_until_reset: minutesUntilReset
       }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
