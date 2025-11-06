@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,14 +46,23 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   
   // Tab switching detection for the currently open assignment
   const { tabSwitchingData, resetTracking } = useTabSwitchingDetection(!!activeAssignmentId);
+  
+  // Track previous length to detect new check-ins
+  const prevLiveCheckInsLength = useRef(0);
 
   // Auto-expand first live check-in when available
   useEffect(() => {
-    if (liveCheckIns.length > 0 && !accordionValue) {
+    // Only auto-expand when we transition from 0 to 1+ check-ins
+    // OR when a new check-in arrives and nothing is currently open
+    const hasNewCheckIns = liveCheckIns.length > prevLiveCheckInsLength.current;
+    
+    if (liveCheckIns.length > 0 && !accordionValue && hasNewCheckIns) {
       const firstLiveCheckIn = liveCheckIns[0];
       setAccordionValue(firstLiveCheckIn.id);
       handleOpenAssignment(firstLiveCheckIn);
     }
+    
+    prevLiveCheckInsLength.current = liveCheckIns.length;
   }, [liveCheckIns]);
 
   useEffect(() => {
@@ -624,6 +633,21 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     setViewingId(assignment.id);
   };
 
+  const handleToggleShowAll = () => {
+    const newShowAll = !showAllCheckIns;
+    setShowAllCheckIns(newShowAll);
+    
+    // If we're hiding items and the currently open item would be hidden, close it
+    if (!newShowAll && accordionValue) {
+      const isCurrentItemVisible = liveCheckIns.slice(0, 3).some(ci => ci.id === accordionValue);
+      if (!isCurrentItemVisible) {
+        setAccordionValue("");
+        setActiveAssignmentId(null);
+        resetTracking();
+      }
+    }
+  };
+
   if (assignments.length === 0) {
     return (
       <Card>
@@ -719,7 +743,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowAllCheckIns(!showAllCheckIns)}
+                  onClick={handleToggleShowAll}
                 >
                   {showAllCheckIns ? 'Show Recent (3)' : `Show All (${liveCheckIns.length})`}
                 </Button>
@@ -733,14 +757,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           collapsible
           value={accordionValue}
           onValueChange={(value) => {
-            setAccordionValue(value);
-            if (value) {
-              const assignment = assignments.find(a => a.id === value);
-              if (assignment) {
-                handleOpenAssignment(assignment);
-              }
-            } else {
-              // Reset tab switching detection when accordion closes
+            // Only update if the value corresponds to an actual assignment
+            const assignment = assignments.find(a => a.id === value);
+            
+            if (value && assignment) {
+              setAccordionValue(value);
+              handleOpenAssignment(assignment);
+            } else if (!value) {
+              // Closing accordion
+              setAccordionValue("");
               setActiveAssignmentId(null);
               resetTracking();
             }

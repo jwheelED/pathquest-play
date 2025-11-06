@@ -57,6 +57,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const lastDetectionTimeRef = useRef<number>(0);
   const lastDetectedChunkIndexRef = useRef<number>(-1);
   const lastQuestionSentTimeRef = useRef<number>(0);
+  const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const { toast } = useToast();
 
   // Client-side cooldown: 10 seconds minimum between detection attempts
@@ -742,8 +743,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           duration: 3000,
         });
         
-        // Reset timer for next interval
-        setLastAutoQuestionTime(Date.now());
+        // Timer already reset by caller
         return;
       }
       
@@ -774,8 +774,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           duration: 5000,
         });
         
-        // Reset timer for next interval
-        setLastAutoQuestionTime(Date.now());
+        // Clear interval transcript buffer
         intervalTranscriptRef.current = "";
         return;
       }
@@ -792,7 +791,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
       
       // Update state
-      setLastAutoQuestionTime(Date.now());
       setAutoQuestionCount(prev => prev + 1);
       
       // Clear interval transcript buffer
@@ -809,8 +807,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         duration: 5000,
       });
       
-      // Reset timer for next interval even on error
-      setLastAutoQuestionTime(Date.now());
+      // Clear interval transcript buffer even on error
       intervalTranscriptRef.current = "";
     }
   };
@@ -873,6 +870,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
       if (isSendingQuestion) return; // Don't trigger during send
+      if (isGeneratingAutoQuestionRef.current) return; // Guard against concurrent calls
       
       const now = Date.now();
       const elapsed = now - lastAutoQuestionTime;
@@ -883,7 +881,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
-        handleAutoQuestionGeneration();
+        // Set lock IMMEDIATELY before any async work
+        isGeneratingAutoQuestionRef.current = true;
+        
+        // Update timer IMMEDIATELY to prevent re-trigger
+        const newTime = Date.now();
+        setLastAutoQuestionTime(newTime);
+        
+        // Call async function (won't be called again due to updated lastAutoQuestionTime)
+        handleAutoQuestionGeneration().finally(() => {
+          isGeneratingAutoQuestionRef.current = false;
+        });
       }
     }, 1000);
     
@@ -897,6 +905,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setNextAutoQuestionIn(0);
       setAutoQuestionCount(0);
       intervalTranscriptRef.current = "";
+      isGeneratingAutoQuestionRef.current = false;
     }
   }, [isRecording]);
 
