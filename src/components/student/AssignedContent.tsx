@@ -41,6 +41,7 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [accordionValue, setAccordionValue] = useState<string>("");
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'error'>('connecting');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [questionIncoming, setQuestionIncoming] = useState(false);
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
@@ -74,14 +75,35 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         },
         (payload) => {
           console.log('📬 New assignment received:', payload);
-          // Immediate optimistic UI update for new assignments
+          
+          // Show anticipation animation for lecture check-ins
           if (payload.new) {
             const newAssignment = payload.new as Assignment;
-            setAssignments(prev => [newAssignment, ...prev]);
             
-            // Update live check-ins if applicable
-            if (newAssignment.assignment_type === 'lecture_checkin' && !newAssignment.completed) {
-              setLiveCheckIns(prev => [newAssignment, ...prev]);
+            if (newAssignment.assignment_type === 'lecture_checkin') {
+              // Trigger animation
+              setQuestionIncoming(true);
+              
+              // Show animation for 1.5 seconds before revealing question
+              setTimeout(() => {
+                setQuestionIncoming(false);
+                
+                // Add assignment to state
+                setAssignments(prev => [newAssignment, ...prev]);
+                
+                // Update live check-ins
+                if (!newAssignment.completed) {
+                  setLiveCheckIns(prev => [newAssignment, ...prev]);
+                }
+                
+                // Show notification
+                sonnerToast.success("New Question!", {
+                  description: `"${newAssignment.title}" is ready`
+                });
+              }, 1500);
+            } else {
+              // For non-lecture assignments, add immediately
+              setAssignments(prev => [newAssignment, ...prev]);
             }
           }
           
@@ -614,7 +636,32 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   }
 
   return (
-    <Card>
+    <>
+      {/* Question Incoming Animation Overlay */}
+      {questionIncoming && (
+        <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
+          <div className="absolute inset-0 bg-primary/20 animate-pulse" />
+          <div className="relative z-10 bg-background/95 border-2 border-primary rounded-lg p-8 shadow-2xl animate-scale-in">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <Bell className="h-16 w-16 text-primary animate-bounce" />
+                <div className="absolute inset-0 bg-primary/30 rounded-full blur-xl animate-pulse" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-bold text-primary">Question Incoming!</h3>
+                <p className="text-muted-foreground">Your instructor is sending a new question...</p>
+              </div>
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -1071,5 +1118,6 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         </Accordion>
       </CardContent>
     </Card>
+    </>
   );
 };
