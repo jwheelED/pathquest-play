@@ -634,10 +634,20 @@ export const LectureCheckInResults = () => {
                       <div className="border-t pt-3">
                         <p className="text-sm font-medium mb-2">Student Responses:</p>
                         <div className="space-y-2">
-                          {group.assignments.map((assignment) => {
-                            const studentAnswer = assignment.quiz_responses?.[qIdx];
-                            const isCompleted = assignment.completed;
-                            const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
+                          {(() => {
+                            // Deduplicate students - keep only the latest submission per student
+                            const uniqueStudents = new Map<string, Assignment>();
+                            group.assignments.forEach((assignment) => {
+                              const existing = uniqueStudents.get(assignment.student_id);
+                              if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+                                uniqueStudents.set(assignment.student_id, assignment);
+                              }
+                            });
+                            
+                            return Array.from(uniqueStudents.values()).map((assignment) => {
+                              const studentAnswer = assignment.quiz_responses?.[qIdx];
+                              const isCompleted = assignment.completed;
+                              const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
                             // For manual grade short answers, don't show correct/incorrect
                             const isManualGradeShortAnswer = question.type === 'short_answer' && 
@@ -693,10 +703,11 @@ export const LectureCheckInResults = () => {
                                       )}
                                     </>
                                   )}
-                                </div>
+                                 </div>
                               </div>
                             );
-                          })}
+                          });
+                          })()}
                         </div>
 
                         {/* Answer distribution */}
@@ -743,10 +754,20 @@ export const LectureCheckInResults = () => {
                               Student Text Responses & Grading:
                             </p>
                             <div className="space-y-2">
-                              {group.assignments.map((assignment) => {
-                                const studentAnswer = assignment.quiz_responses?.[qIdx];
-                                const isCompleted = assignment.completed;
-                                const currentGrade = assignment.grade;
+                              {(() => {
+                                // Deduplicate students - keep only the latest submission per student
+                                const uniqueStudents = new Map<string, Assignment>();
+                                group.assignments.forEach((assignment) => {
+                                  const existing = uniqueStudents.get(assignment.student_id);
+                                  if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+                                    uniqueStudents.set(assignment.student_id, assignment);
+                                  }
+                                });
+                                
+                                return Array.from(uniqueStudents.values()).map((assignment) => {
+                                  const studentAnswer = assignment.quiz_responses?.[qIdx];
+                                  const isCompleted = assignment.completed;
+                                  const currentGrade = assignment.grade;
 
                                 return (
                                   <div key={assignment.id} className="bg-white dark:bg-gray-900 p-3 rounded border">
@@ -817,13 +838,14 @@ export const LectureCheckInResults = () => {
                                             }}
                                           >
                                             Save Grade
-                                          </Button>
+                                           </Button>
                                         </div>
                                       </>
                                     )}
                                   </div>
                                 );
-                              })}
+                              });
+                              })()}
                             </div>
                           </div>
                         )}
