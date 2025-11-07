@@ -57,6 +57,18 @@ export default function InstructorDashboard() {
     fetchStudents();
     fetchClassroomStats();
     
+    // Show reminder about course materials once per day
+    const lastReminderDate = localStorage.getItem('lastCourseMaterialsReminder');
+    const today = new Date().toDateString();
+    if (lastReminderDate !== today) {
+      setTimeout(() => {
+        toast.info("💡 Tip: You can upload lecture slides and materials in the Course Materials card below!", {
+          duration: 5000,
+        });
+        localStorage.setItem('lastCourseMaterialsReminder', today);
+      }, 1500);
+    }
+    
     // Set up real-time updates after getting user
     const setupRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser();
