@@ -120,6 +120,11 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
         .map((record: any) => {
           const total = record.typed_count + record.pasted_count;
           const pastePercentage = total > 0 ? (record.pasted_count / total) * 100 : 0;
+
+          // Debug logging for cases that should be flagged
+          if (pastePercentage > 3) {
+            console.log(`📊 Student ${record.users?.name}: ${pastePercentage.toFixed(1)}% pasted (${(100-pastePercentage).toFixed(1)}% original), typed: ${record.typed_count}, pasted: ${record.pasted_count}, total: ${total}`);
+          }
           
           // Calculate time to first interaction (in seconds)
           let timeToFirstInteraction: number | null = null;
@@ -139,6 +144,24 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           // Determine suspicion level and pattern type
           let suspicionLevel: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
           let patternType = '';
+
+          // SIMPLE THRESHOLD: Flag anything less than 97% original work
+          // This catches cases where students paste entire answers regardless of event count
+          if (pastePercentage > 3 && record.pasted_count >= 1) {
+            if (pastePercentage > 50) {
+              // More than 50% pasted = HIGH suspicion (less than 50% original work)
+              suspicionLevel = 'HIGH';
+              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original work) - High lack of original work`;
+            } else if (pastePercentage > 20) {
+              // 20-50% pasted = MEDIUM suspicion (50-80% original work)
+              suspicionLevel = 'MEDIUM';
+              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original work) - Moderate lack of original work`;
+            } else if (pastePercentage > 3) {
+              // 3-20% pasted = MEDIUM suspicion (80-97% original work)
+              suspicionLevel = 'MEDIUM';
+              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original work) - Below originality threshold`;
+            }
+          }
           
           // HIGH SUSPICION: Switch-Paste Pattern (left for ChatGPT time, returned, pasted)
           if (
@@ -270,7 +293,8 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
             patternType = 'Minimal interaction for answer length';
           }
           
-          // Existing detection: Multiple paste patterns
+          // LEGACY: Multiple paste patterns (now covered by simple threshold above)
+          // Kept for backward compatibility but will rarely trigger due to early paste % check
           if (suspicionLevel === 'LOW' && pastePercentage > 70 && total >= 5) {
             suspicionLevel = 'MEDIUM';
             patternType = 'Extremely high paste percentage';
