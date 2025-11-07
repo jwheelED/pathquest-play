@@ -118,7 +118,12 @@ Return JSON:
     }
 
     const aiResponse = await response.json();
-    const result = JSON.parse(aiResponse.choices[0].message.content);
+    let content = aiResponse.choices[0].message.content;
+    
+    // Strip markdown code fences if present
+    content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    
+    const result = JSON.parse(content);
 
     console.log('✅ Auto-question generated:', result.question_text);
     console.log('📊 Confidence:', result.confidence, '| Reasoning:', result.reasoning);
