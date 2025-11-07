@@ -60,22 +60,27 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
   }, [instructorId]);
 
   const fetchFlaggedStudents = async () => {
+    console.log('🔍 [CheatDetection] Fetching flagged students for instructor:', instructorId);
     try {
       // Get all students for this instructor
-      const { data: studentLinks } = await supabase
+      const { data: studentLinks, error: studentLinksError } = await supabase
         .from('instructor_students')
         .select('student_id')
         .eq('instructor_id', instructorId);
 
+      console.log('🔍 [CheatDetection] Student links:', { count: studentLinks?.length, error: studentLinksError });
+
       if (!studentLinks || studentLinks.length === 0) {
+        console.log('🔍 [CheatDetection] No students found');
         setLoading(false);
         return;
       }
 
       const studentIds = studentLinks.map(link => link.student_id);
+      console.log('🔍 [CheatDetection] Student IDs:', studentIds);
 
       // Get version history with enhanced tracking fields
-      const { data: versionData } = await supabase
+      const { data: versionData, error: versionError } = await supabase
         .from('answer_version_history')
         .select(`
           student_id,
@@ -110,7 +115,14 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
         .in('student_id', studentIds)
         .eq('student_assignments.instructor_id', instructorId);
 
-      if (!versionData) {
+      console.log('🔍 [CheatDetection] Version data:', { 
+        count: versionData?.length, 
+        error: versionError,
+        sample: versionData?.[0] 
+      });
+
+      if (!versionData || versionData.length === 0) {
+        console.log('🔍 [CheatDetection] No version history data found');
         setLoading(false);
         return;
       }
