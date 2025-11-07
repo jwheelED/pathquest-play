@@ -234,16 +234,24 @@ export const LectureCheckInResults = () => {
   };
 
   const calculateQuestionStats = (assignments: Assignment[], questionIndex: number, question: any) => {
+    // Filter assignments to only those containing this specific question
+    const questionAssignments = assignments.filter((a) => {
+      const content = a.content as any;
+      const assignmentQuestions = content?.questions || [];
+      return assignmentQuestions.some((q: any) => q.question === question.question);
+    });
+
     // For short answer questions requiring manual grading, don't calculate correct/incorrect stats
     const isManualGradeShortAnswer = question.type === 'short_answer' && 
       (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
     
-    const completed = assignments.filter((a) => a.completed);
+    const completed = questionAssignments.filter((a) => a.completed);
     
     // Use overridden answer if it exists, otherwise use original correctAnswer
     const correctAnswer = question.overriddenAnswer || question.correctAnswer;
     const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
-      const response = a.quiz_responses?.[questionIndex];
+      // Always use index 0 since each assignment has only 1 question
+      const response = a.quiz_responses?.[0];
       return response === correctAnswer;
     });
 
@@ -257,7 +265,7 @@ export const LectureCheckInResults = () => {
       : null;
 
     return {
-      total: assignments.length,
+      total: questionAssignments.length,
       completed: completed.length,
       correct: correct.length,
       percentage: isManualGradeShortAnswer ? null : (completed.length > 0 ? (correct.length / completed.length) * 100 : 0),
@@ -635,9 +643,16 @@ export const LectureCheckInResults = () => {
                         <p className="text-sm font-medium mb-2">Student Responses:</p>
                         <div className="space-y-2">
                           {(() => {
+                            // Filter assignments to only those containing this specific question
+                            const questionAssignments = group.assignments.filter((a) => {
+                              const content = a.content as any;
+                              const assignmentQuestions = content?.questions || [];
+                              return assignmentQuestions.some((q: any) => q.question === question.question);
+                            });
+
                             // Deduplicate students - keep only the latest submission per student
                             const uniqueStudents = new Map<string, Assignment>();
-                            group.assignments.forEach((assignment) => {
+                            questionAssignments.forEach((assignment) => {
                               const existing = uniqueStudents.get(assignment.student_id);
                               if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
                                 uniqueStudents.set(assignment.student_id, assignment);
@@ -645,7 +660,8 @@ export const LectureCheckInResults = () => {
                             });
                             
                             return Array.from(uniqueStudents.values()).map((assignment) => {
-                              const studentAnswer = assignment.quiz_responses?.[qIdx];
+                              // Always use index 0 since each assignment has only 1 question
+                              const studentAnswer = assignment.quiz_responses?.[0];
                               const isCompleted = assignment.completed;
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
@@ -717,10 +733,19 @@ export const LectureCheckInResults = () => {
                             <div className="space-y-1">
                               {question.options?.map((opt: string, optIdx: number) => {
                                 const optionLetter = String.fromCharCode(65 + optIdx); // A, B, C, D...
-                                const count = group.assignments.filter(
-                                  (a) => a.completed && a.quiz_responses?.[qIdx] === optionLetter,
+                                
+                                // Filter assignments to only those containing this specific question
+                                const questionAssignments = group.assignments.filter((a) => {
+                                  const content = a.content as any;
+                                  const assignmentQuestions = content?.questions || [];
+                                  return assignmentQuestions.some((q: any) => q.question === question.question);
+                                });
+
+                                // Always use index 0 since each assignment has only 1 question
+                                const count = questionAssignments.filter(
+                                  (a) => a.completed && a.quiz_responses?.[0] === optionLetter,
                                 ).length;
-                                const total = group.assignments.filter((a) => a.completed).length;
+                                const total = questionAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                                 const isCorrect = optionLetter === correctAnswerToUse;
@@ -755,9 +780,16 @@ export const LectureCheckInResults = () => {
                             </p>
                             <div className="space-y-2">
                               {(() => {
+                                // Filter assignments to only those containing this specific question
+                                const questionAssignments = group.assignments.filter((a) => {
+                                  const content = a.content as any;
+                                  const assignmentQuestions = content?.questions || [];
+                                  return assignmentQuestions.some((q: any) => q.question === question.question);
+                                });
+
                                 // Deduplicate students - keep only the latest submission per student
                                 const uniqueStudents = new Map<string, Assignment>();
-                                group.assignments.forEach((assignment) => {
+                                questionAssignments.forEach((assignment) => {
                                   const existing = uniqueStudents.get(assignment.student_id);
                                   if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
                                     uniqueStudents.set(assignment.student_id, assignment);
@@ -765,7 +797,8 @@ export const LectureCheckInResults = () => {
                                 });
                                 
                                 return Array.from(uniqueStudents.values()).map((assignment) => {
-                                  const studentAnswer = assignment.quiz_responses?.[qIdx];
+                                  // Always use index 0 since each assignment has only 1 question
+                                  const studentAnswer = assignment.quiz_responses?.[0];
                                   const isCompleted = assignment.completed;
                                   const currentGrade = assignment.grade;
 
@@ -792,13 +825,13 @@ export const LectureCheckInResults = () => {
                                         <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">
                                           {studentAnswer}
                                         </p>
-                                        {assignment.quiz_responses?._ai_recommendations?.[qIdx] && (
+                                        {assignment.quiz_responses?._ai_recommendations?.[0] && (
                                           <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded">
                                             <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-1">
-                                              🤖 AI Recommended Grade: {assignment.quiz_responses._ai_recommendations[qIdx].grade}/100
+                                              🤖 AI Recommended Grade: {assignment.quiz_responses._ai_recommendations[0].grade}/100
                                             </p>
                                             <p className="text-xs text-blue-800 dark:text-blue-300">
-                                              {assignment.quiz_responses._ai_recommendations[qIdx].feedback}
+                                              {assignment.quiz_responses._ai_recommendations[0].feedback}
                                             </p>
                                           </div>
                                         )}
