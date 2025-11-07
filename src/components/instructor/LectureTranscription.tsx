@@ -599,7 +599,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Pre-validation
       const validation = await validateBeforeSend();
       if (!validation.valid) {
-        console.log('❌ Pre-validation failed:', validation.error);
+        console.error('❌ Pre-validation failed:', validation.error);
+        console.error('❌ Source:', detectionData.source || 'unknown');
+        console.error('❌ Question:', detectionData.question_text?.substring(0, 100));
+        
         toast({
           title: "Cannot send question",
           description: validation.error,
@@ -800,7 +803,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
       
       if (error || !data?.success) {
-        console.error('Auto-question generation failed:', error);
+        console.error('❌ Auto-question generation failed:', error);
+        console.error('❌ Error data:', data);
         toast({
           title: "⚠️ Auto-question failed",
           description: "Could not generate question from recent content. Will try again next interval.",
@@ -814,6 +818,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
       
       console.log('✅ Auto-question generated:', data.question_text);
+      console.log('📋 Confidence:', data.confidence);
+      console.log('📝 Sending via handleQuestionSend...');
       
       // Send the question using existing flow
       await handleQuestionSend({
@@ -823,6 +829,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         extraction_method: 'auto_interval',
         source: 'auto_interval'
       });
+      
+      console.log('✅ Auto-question send completed');
       
       // Update state
       setAutoQuestionCount(prev => prev + 1);
