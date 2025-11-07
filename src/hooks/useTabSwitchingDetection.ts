@@ -33,15 +33,28 @@ export const useTabSwitchingDetection = (isActive: boolean) => {
     if (!isActive) return;
 
     const handleVisibilityChange = () => {
+      console.log('👀 [TabSwitching] Visibility change:', {
+        hidden: document.hidden,
+        isActive,
+        hasStarted: hasStartedRef.current
+      });
+      
       if (document.hidden) {
         // User switched away from tab
         setLastTabLeaveTime(new Date());
+        console.log('🚪 [TabSwitching] Student left tab at:', new Date().toISOString());
       } else if (lastTabLeaveTime) {
         // User returned to tab
         const returnTime = new Date();
         const durationSeconds = Math.floor(
           (returnTime.getTime() - lastTabLeaveTime.getTime()) / 1000
         );
+        
+        console.log('🔙 [TabSwitching] Student returned to tab:', {
+          duration: durationSeconds,
+          left_at: lastTabLeaveTime.toISOString(),
+          returned_at: returnTime.toISOString()
+        });
 
         setTabSwitches((prev) => [
           ...prev,

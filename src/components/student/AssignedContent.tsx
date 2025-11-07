@@ -330,37 +330,46 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
       // Save version history for cheat detection
-      // For short answers, use version history data; for MCQ-only, use tab switching data
+      // For short answers and MCQ, check for version history data from any question
       const firstShortAnswerIdx = questions.findIndex((q: any) => q.type === 'short_answer');
+      const firstQuestionIdx = 0; // For MCQ, check first question's hidden tracker
+      
+      // Get version history from short answer or MCQ tracker
       const versionHistoryData = firstShortAnswerIdx >= 0 
         ? textAns[`${firstShortAnswerIdx}_version_history`]
-        : null;
+        : textAns[`${firstQuestionIdx}_version_history`];
       
       console.log('🔍 [AssignedContent] Version history details:', {
         firstShortAnswerIdx,
+        firstQuestionIdx,
         hasVersionData: !!versionHistoryData,
         versionDataType: typeof versionHistoryData,
         versionDataKeys: versionHistoryData ? Object.keys(versionHistoryData) : [],
         typed_count: versionHistoryData?.typed_count,
         pasted_count: versionHistoryData?.pasted_count,
+        question_copied: versionHistoryData?.question_copied,
         events_length: versionHistoryData?.events?.length,
-        hasTabSwitchingData: !!tabSwitchingData
+        hasTabSwitchingData: !!tabSwitchingData,
+        tab_switch_count: tabSwitchingData?.tab_switch_count
       });
       
-      // Ensure we have valid version history data, otherwise don't save incomplete records
-      const hasValidVersionData = versionHistoryData && 
-        (versionHistoryData.typed_count > 0 || versionHistoryData.pasted_count > 0);
-
-      const tabData = hasValidVersionData ? versionHistoryData : tabSwitchingData;
+      // ALWAYS prefer versionHistoryData if it exists (even with zero counts)
+      // because it contains tab switching data
+      const tabData = versionHistoryData || tabSwitchingData;
 
       console.log('💾 [AssignedContent] Preparing to save:', {
-        hasValidVersionData,
+        hasVersionHistoryData: !!versionHistoryData,
+        hasTabSwitchingData: !!tabSwitchingData,
         willSaveVersionHistory: !!(tabData && userId),
-        typed_count: versionHistoryData?.typed_count || 0,
-        pasted_count: versionHistoryData?.pasted_count || 0,
-        source: hasValidVersionData ? 'VersionHistoryTracker' : 'TabSwitching'
+        typed_count: tabData?.typed_count || 0,
+        pasted_count: tabData?.pasted_count || 0,
+        tab_switch_count: tabData?.tab_switch_count || 0,
+        question_copied: tabData?.question_copied || false,
+        source: versionHistoryData ? 'VersionHistoryTracker' : 'TabSwitching'
       });
       
+      // CRITICAL: Save version history even if typed/pasted counts are zero
+      // because we still need tab switching and question copy data
       if (tabData && userId) {
 
         const { error: versionError } = await supabase
@@ -368,25 +377,25 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           .upsert({
             student_id: userId,
             assignment_id: assignment.id,
-            version_events: versionHistoryData?.events || [],
-            typed_count: versionHistoryData?.typed_count || 0,
-            pasted_count: versionHistoryData?.pasted_count || 0,
+            version_events: tabData.events || [],
+            typed_count: tabData.typed_count || 0,
+            pasted_count: tabData.pasted_count || 0,
             question_displayed_at: tabData.question_displayed_at,
-            first_interaction_at: versionHistoryData?.first_interaction_at,
-            first_interaction_type: versionHistoryData?.first_interaction_type,
-            first_interaction_size: versionHistoryData?.first_interaction_size,
-            question_copied: versionHistoryData?.question_copied || false,
-            question_copied_at: versionHistoryData?.question_copied_at,
-            final_answer_length: versionHistoryData?.final_answer_length || 0,
-            editing_events_after_first_paste: versionHistoryData?.editing_events_after_first_paste || 0,
-            tab_switch_count: tabData.tab_switch_count,
-            total_time_away_seconds: tabData.total_time_away_seconds,
-            tab_switches: tabData.tab_switches,
-            longest_absence_seconds: tabData.longest_absence_seconds,
-            switched_away_immediately: tabData.switched_away_immediately,
-            answer_copied: versionHistoryData?.answer_copied || false,
-            answer_copy_count: versionHistoryData?.answer_copy_count || 0,
-            answer_copy_events: versionHistoryData?.answer_copy_events || [],
+            first_interaction_at: tabData.first_interaction_at || null,
+            first_interaction_type: tabData.first_interaction_type || null,
+            first_interaction_size: tabData.first_interaction_size || null,
+            question_copied: tabData.question_copied || false,
+            question_copied_at: tabData.question_copied_at || null,
+            final_answer_length: tabData.final_answer_length || 0,
+            editing_events_after_first_paste: tabData.editing_events_after_first_paste || 0,
+            tab_switch_count: tabData.tab_switch_count || 0,
+            total_time_away_seconds: tabData.total_time_away_seconds || 0,
+            tab_switches: tabData.tab_switches || [],
+            longest_absence_seconds: tabData.longest_absence_seconds || 0,
+            switched_away_immediately: tabData.switched_away_immediately || false,
+            answer_copied: tabData.answer_copied || false,
+            answer_copy_count: tabData.answer_copy_count || 0,
+            answer_copy_events: tabData.answer_copy_events || [],
           }, {
             onConflict: 'student_id,assignment_id'
           });
@@ -1000,7 +1009,42 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                         
                         return (
                           <div key={idx} className="border rounded-lg p-4 space-y-3">
-                            <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                            <div onCopy={(e) => {
+                              // Track question copying for MCQ
+                              const versionHistory = textAnswers[assignment.id]?.[`${idx}_version_history`] || {};
+                              setTextAnswers(prev => ({
+                                ...prev,
+                                [assignment.id]: {
+                                  ...(prev[assignment.id] || {}),
+                                  [`${idx}_version_history`]: {
+                                    ...versionHistory,
+                                    question_copied: true,
+                                    question_copied_at: new Date().toISOString()
+                                  }
+                                }
+                              }));
+                            }}>
+                              <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                            </div>
+                            
+                            {/* Hidden tracker for cheat detection on MCQ */}
+                            <div className="sr-only">
+                              <VersionHistoryTracker
+                                value={textAnswers[assignment.id]?.[idx] || ''}
+                                onChange={(value) => handleTextAnswerChange(assignment.id, idx, value)}
+                                onVersionChange={(history) => {
+                                  setTextAnswers(prev => ({
+                                    ...prev,
+                                    [assignment.id]: {
+                                      ...(prev[assignment.id] || {}),
+                                      [`${idx}_version_history`]: history
+                                    }
+                                  }));
+                                }}
+                                questionText={q.question}
+                              />
+                            </div>
+                            
                             <div className="space-y-2">
                               {q.options?.map((opt: string, i: number) => {
                                 const optionLetter = opt.trim().charAt(0).toUpperCase();

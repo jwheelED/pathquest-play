@@ -190,11 +190,21 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           }
           
           // FALLBACK: If we have no typed/pasted data but other suspicious signals
+          // This applies to MCQ questions with hidden trackers
           if (suspicionLevel === 'LOW' && total === 0) {
             // Check for other signals like tab switching, time patterns, etc.
-            if ((record.tab_switch_count || 0) >= 3) {
+            if ((record.tab_switch_count || 0) >= 5) {
+              suspicionLevel = 'HIGH';
+              patternType = 'Multiple choice - Excessive tab switching (5+ times)';
+            } else if ((record.tab_switch_count || 0) >= 3) {
               suspicionLevel = 'MEDIUM';
-              patternType = 'Multiple tab switches (typing/pasting data not captured)';
+              patternType = 'Multiple choice - Moderate tab switching (3-4 times)';
+            } else if ((record.tab_switch_count || 0) >= 1) {
+              suspicionLevel = 'MEDIUM';
+              patternType = 'Multiple choice - Switched tabs during question';
+            } else if (record.question_copied) {
+              suspicionLevel = 'MEDIUM';
+              patternType = 'Multiple choice - Copied question text';
             } else if (record.first_interaction_type === 'pasted') {
               suspicionLevel = 'MEDIUM';
               patternType = 'First interaction was paste (detailed tracking incomplete)';
