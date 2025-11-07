@@ -162,11 +162,11 @@ serve(async (req) => {
 
     if (lastQuestion) {
       const timeSinceLastQuestion = Date.now() - new Date(lastQuestion.created_at).getTime();
-      if (timeSinceLastQuestion < 60000) { // 60 seconds
-        const retryAfter = Math.ceil((60000 - timeSinceLastQuestion) / 1000);
+      if (timeSinceLastQuestion < 15000) { // 15 seconds (reduced from 60)
+        const retryAfter = Math.ceil((15000 - timeSinceLastQuestion) / 1000);
         console.log(`⏳ Rate limit: ${retryAfter}s until next question`);
         return new Response(JSON.stringify({ 
-          error: 'Please wait 60 seconds between questions',
+          error: 'Please wait 15 seconds between questions',
           error_type: 'cooldown',
           retry_after: retryAfter
         }), {

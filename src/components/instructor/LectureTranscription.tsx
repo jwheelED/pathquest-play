@@ -132,6 +132,25 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     setSystemHealthy(healthy);
   }, [failureCount, isCircuitOpen]);
 
+  // Countdown timer for rate limit
+  useEffect(() => {
+    if (nextQuestionAllowedAt > Date.now()) {
+      const interval = setInterval(() => {
+        const secondsLeft = Math.ceil((nextQuestionAllowedAt - Date.now()) / 1000);
+        if (secondsLeft > 0) {
+          setRateLimitSecondsLeft(secondsLeft);
+        } else {
+          setRateLimitSecondsLeft(0);
+          setNextQuestionAllowedAt(0);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setRateLimitSecondsLeft(0);
+    }
+  }, [nextQuestionAllowedAt]);
+
   // Levenshtein distance for fuzzy matching
   const calculateSimilarity = (str1: string, str2: string): number => {
     const s1 = str1.toLowerCase();
@@ -376,12 +395,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     } catch (error: any) {
       console.error('Voice command error:', error);
-      toast({
-        title: "❌ Voice command failed",
-        description: error.message || "Could not process voice command. Please try again.",
-        variant: "destructive",
-        duration: 5000,
-      });
+      
+      // Check if this is a rate limit error (don't show as "failed")
+      if (error.message?.includes('wait') || error.message?.includes('seconds between')) {
+        // Rate limit error is already handled by handleQuestionSend
+        // Just log it, don't show duplicate error
+        console.log('ℹ️ Rate limit applied, countdown shown to user');
+      } else {
+        // Show error only for actual failures (auth, network, etc.)
+        toast({
+          title: "❌ Voice command failed",
+          description: error.message || "Could not process voice command. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
     } finally {
       // Always clear the sending flag, even on error
       setIsSendingQuestion(false);
@@ -635,9 +663,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             setNextQuestionAllowedAt(nextAllowed);
             
             toast({
-              title: "⏱️ Question sent! Please wait",
-              description: `You can send another question in ${retryAfter} seconds`,
-              duration: 5000,
+              title: "✅ Question sent!",
+              description: `Next question available in ${retryAfter}s (prevents accidental duplicates)`,
+              duration: Math.min(retryAfter * 1000, 5000),
             });
           }
           
