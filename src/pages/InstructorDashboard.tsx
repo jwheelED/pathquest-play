@@ -435,15 +435,17 @@ export default function InstructorDashboard() {
         )}
 
         {/* Settings visible regardless of student count */}
-        <div className="space-y-6">
-          <QuestionFormatSettings instructorId={currentUser.id} />
-          
-          <QuestionLimitSettings />
-          
-          <AutoQuestionSettings />
-          
-          <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
-        </div>
+        {currentUser && (
+          <div className="space-y-6">
+            <QuestionFormatSettings instructorId={currentUser.id} />
+            
+            <QuestionLimitSettings />
+            
+            <AutoQuestionSettings />
+            
+            <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
+          </div>
+        )}
 
         {students.length === 0 ? (
           <div className="text-center py-12">

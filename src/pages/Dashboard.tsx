@@ -216,9 +216,9 @@ export default function Dashboard() {
             </div>
             
             <div className="flex items-center gap-4">
-              <BadgesButton userId={user.id} />
+              {user?.id && <BadgesButton userId={user.id} />}
               <span className="text-sm text-muted-foreground">
-                {user.email || "User"}
+                {user?.email || "User"}
               </span>
               <Button onClick={handleLogout} variant="destructive" size="sm">
                 Logout
@@ -230,12 +230,14 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
         {/* Headless achievement checker - only triggers pop-ups */}
-        <AchievementSystem userId={user.id} />
+        {user?.id && <AchievementSystem userId={user.id} />}
         
         {/* Mobile Stats Card */}
-        <div className="md:hidden mb-4">
-          <UserStats userId={user.id} onStatsUpdate={setUserStats} />
-        </div>
+        {user?.id && (
+          <div className="md:hidden mb-4">
+            <UserStats userId={user.id} onStatsUpdate={setUserStats} />
+          </div>
+        )}
         
         <div className="space-y-4 md:space-y-6">
           {!courseContext.courseTitle && (
@@ -265,9 +267,9 @@ export default function Dashboard() {
           )}
           
           {/* Live Lecture Check-ins - Most Important Section */}
-          <AssignedContent userId={user.id} />
+          {user?.id && <AssignedContent userId={user.id} />}
 
-          <InstructorChatCard key={refreshKey} userId={user.id} />
+          {user?.id && <InstructorChatCard key={refreshKey} userId={user.id} />}
         </div>
       </div>
 
