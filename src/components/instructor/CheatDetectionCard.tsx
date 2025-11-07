@@ -150,7 +150,7 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
 
           // Debug logging for cases that should be flagged
           if (pastePercentage > 3) {
-            console.log(`📊 Student ${record.users?.name}: ${pastePercentage.toFixed(1)}% pasted (${(100-pastePercentage).toFixed(1)}% original), typed: ${record.typed_count}, pasted: ${record.pasted_count}, total: ${total}`);
+            console.log(`📊 Student ${nameById.get(record.student_id) || 'Unknown'}: ${pastePercentage.toFixed(1)}% pasted (${(100-pastePercentage).toFixed(1)}% original), typed: ${record.typed_count}, pasted: ${record.pasted_count}, total: ${total}`);
           }
           
           // Calculate time to first interaction (in seconds)
@@ -172,21 +172,32 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           let suspicionLevel: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW';
           let patternType = '';
 
-          // SIMPLE THRESHOLD: Flag anything less than 97% original work
-          // This catches cases where students paste entire answers regardless of event count
-          if (pastePercentage > 3 && record.pasted_count >= 1) {
+          // STRICT THRESHOLD: Flag anything less than 97% original work (>3% pasted)
+          if (total > 0 && pastePercentage > 3) {
             if (pastePercentage > 50) {
-              // More than 50% pasted = HIGH suspicion (less than 50% original work)
+              // More than 50% pasted = HIGH suspicion
               suspicionLevel = 'HIGH';
-              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original work) - High lack of original work`;
+              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original) - Primarily pasted content`;
             } else if (pastePercentage > 20) {
-              // 20-50% pasted = MEDIUM suspicion (50-80% original work)
-              suspicionLevel = 'MEDIUM';
-              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original work) - Moderate lack of original work`;
+              // 20-50% pasted = HIGH suspicion (strict detection)
+              suspicionLevel = 'HIGH';
+              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original) - Significant pasted content`;
             } else if (pastePercentage > 3) {
-              // 3-20% pasted = MEDIUM suspicion (80-97% original work)
+              // 3-20% pasted = MEDIUM suspicion
               suspicionLevel = 'MEDIUM';
-              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original work) - Below originality threshold`;
+              patternType = `${pastePercentage.toFixed(0)}% pasted (${(100 - pastePercentage).toFixed(0)}% original) - Below 97% originality threshold`;
+            }
+          }
+          
+          // FALLBACK: If we have no typed/pasted data but other suspicious signals
+          if (suspicionLevel === 'LOW' && total === 0) {
+            // Check for other signals like tab switching, time patterns, etc.
+            if ((record.tab_switch_count || 0) >= 3) {
+              suspicionLevel = 'MEDIUM';
+              patternType = 'Multiple tab switches (typing/pasting data not captured)';
+            } else if (record.first_interaction_type === 'pasted') {
+              suspicionLevel = 'MEDIUM';
+              patternType = 'First interaction was paste (detailed tracking incomplete)';
             }
           }
           
