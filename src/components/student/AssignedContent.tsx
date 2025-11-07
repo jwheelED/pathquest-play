@@ -34,7 +34,6 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
-  const [liveCheckIns, setLiveCheckIns] = useState<Assignment[]>([]);
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
   const [openedTimes, setOpenedTimes] = useState<Record<string, number>>({});
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
@@ -47,6 +46,11 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
   // Tab switching detection for the currently open assignment
   const { tabSwitchingData, resetTracking } = useTabSwitchingDetection(!!activeAssignmentId);
   
+  // Derive live check-ins from assignments (no separate state needed)
+  const liveCheckIns = assignments.filter(
+    a => a.assignment_type === 'lecture_checkin' && !a.completed
+  );
+  
   // Track previous length to detect new check-ins
   const prevLiveCheckInsLength = useRef(0);
 
@@ -58,12 +62,13 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
     
     if (liveCheckIns.length > 0 && !accordionValue && hasNewCheckIns) {
       const firstLiveCheckIn = liveCheckIns[0];
+      console.log('🎯 Auto-expanding first live check-in:', firstLiveCheckIn.id);
       setAccordionValue(firstLiveCheckIn.id);
       handleOpenAssignment(firstLiveCheckIn);
     }
     
     prevLiveCheckInsLength.current = liveCheckIns.length;
-  }, [liveCheckIns]);
+  }, [liveCheckIns, accordionValue]);
 
   useEffect(() => {
     fetchAssignments();
@@ -85,9 +90,15 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         (payload) => {
           console.log('📬 New assignment received:', payload);
           
-          // Show anticipation animation for lecture check-ins
           if (payload.new) {
             const newAssignment = payload.new as Assignment;
+            
+            // Check if assignment already exists (prevent duplicates)
+            const alreadyExists = assignments.some(a => a.id === newAssignment.id);
+            if (alreadyExists) {
+              console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+              return;
+            }
             
             if (newAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
@@ -97,13 +108,14 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
               setTimeout(() => {
                 setQuestionIncoming(false);
                 
-                // Add assignment to state
-                setAssignments(prev => [newAssignment, ...prev]);
-                
-                // Update live check-ins
-                if (!newAssignment.completed) {
-                  setLiveCheckIns(prev => [newAssignment, ...prev]);
-                }
+                // Add assignment to state (liveCheckIns is derived)
+                setAssignments(prev => {
+                  // Double-check no duplicate before adding
+                  if (prev.some(a => a.id === newAssignment.id)) {
+                    return prev;
+                  }
+                  return [newAssignment, ...prev];
+                });
                 
                 // Show notification
                 sonnerToast.success("New Question!", {
@@ -112,15 +124,20 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
               }, 1500);
             } else {
               // For non-lecture assignments, add immediately
-              setAssignments(prev => [newAssignment, ...prev]);
+              setAssignments(prev => {
+                if (prev.some(a => a.id === newAssignment.id)) {
+                  return prev;
+                }
+                return [newAssignment, ...prev];
+              });
             }
           }
           
-          // Debounced full refresh to ensure consistency
+          // Keep the debounced refresh but with longer delay to avoid conflicts
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             fetchAssignments();
-          }, 1000);
+          }, 2000);
         }
       )
       .on(
@@ -215,21 +232,21 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         .eq('student_id', userId)
         .gte('created_at', today.toISOString())
         .order('created_at', { ascending: false })
-        .limit(30); // Optimized limit for live classroom
+        .limit(30);
 
       if (error) {
         console.error('Error fetching assignments:', error);
         return;
       }
       
-      const allAssignments = data || [];
-      setAssignments(allAssignments);
-      
-      // Separate live check-ins for prominent display
-      const checkIns = allAssignments.filter(
-        a => a.assignment_type === 'lecture_checkin' && !a.completed
+      // Deduplicate by ID (just in case)
+      const uniqueAssignments = Array.from(
+        new Map((data || []).map(a => [a.id, a])).values()
       );
-      setLiveCheckIns(checkIns);
+      
+      setAssignments(uniqueAssignments);
+      
+      console.log(`✅ Fetched ${uniqueAssignments.length} unique assignments`);
     } finally {
       setIsRefreshing(false);
     }
