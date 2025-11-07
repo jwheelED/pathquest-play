@@ -107,13 +107,11 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           student_assignments!inner(
             title,
             instructor_id
-          ),
-          users!inner(
-            name
           )
         `)
         .in('student_id', studentIds)
-        .eq('student_assignments.instructor_id', instructorId);
+        .eq('student_assignments.instructor_id', instructorId)
+        .order('created_at', { ascending: false });
 
       console.log('🔍 [CheatDetection] Version data:', { 
         count: versionData?.length, 
@@ -126,6 +124,23 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
         setLoading(false);
         return;
       }
+
+      // Fetch student names separately (no FK from answer_version_history to public.users)
+      const studentIdsInVersion = Array.from(
+        new Set((versionData ?? []).map((r: any) => r.student_id))
+      );
+
+      const { data: userRows, error: usersError } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', studentIdsInVersion);
+
+      if (usersError) {
+        console.warn('⚠️ [CheatDetection] Could not fetch user names:', usersError);
+      }
+
+      const nameById = new Map((userRows ?? []).map(u => [u.id, u.name || 'Unknown']));
+      console.log('🔍 [CheatDetection] Fetched names for students:', nameById.size);
 
       // Filter for unusual pasting patterns with enhanced detection
       const flagged = versionData
@@ -320,7 +335,7 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           
           return {
             student_id: record.student_id,
-            student_name: record.users?.name || 'Unknown',
+            student_name: nameById.get(record.student_id) || 'Unknown',
             assignment_id: record.assignment_id,
             assignment_title: record.student_assignments?.title || 'Unknown Assignment',
             typed_count: record.typed_count,
