@@ -93,13 +93,6 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           if (payload.new) {
             const newAssignment = payload.new as Assignment;
             
-            // Check if assignment already exists (prevent duplicates)
-            const alreadyExists = assignments.some(a => a.id === newAssignment.id);
-            if (alreadyExists) {
-              console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
-              return;
-            }
-            
             if (newAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
               setQuestionIncoming(true);
@@ -108,12 +101,14 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
               setTimeout(() => {
                 setQuestionIncoming(false);
                 
-                // Add assignment to state (liveCheckIns is derived)
+                // Add assignment to state with proper deduplication
                 setAssignments(prev => {
-                  // Double-check no duplicate before adding
+                  // Check if this exact assignment already exists
                   if (prev.some(a => a.id === newAssignment.id)) {
+                    console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
                     return prev;
                   }
+                  console.log('✅ Adding new assignment:', newAssignment.id);
                   return [newAssignment, ...prev];
                 });
                 
@@ -123,21 +118,20 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
                 });
               }, 1500);
             } else {
-              // For non-lecture assignments, add immediately
+              // For non-lecture assignments, add immediately with deduplication
               setAssignments(prev => {
                 if (prev.some(a => a.id === newAssignment.id)) {
+                  console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
                   return prev;
                 }
+                console.log('✅ Adding new assignment:', newAssignment.id);
                 return [newAssignment, ...prev];
               });
             }
           }
           
-          // Keep the debounced refresh but with longer delay to avoid conflicts
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            fetchAssignments();
-          }, 2000);
+          // NO debounced refresh for INSERT - realtime event handles it
+          // Only refresh is needed for initial load and UPDATE events
         }
       )
       .on(
