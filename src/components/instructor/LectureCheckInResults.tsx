@@ -149,32 +149,41 @@ export const LectureCheckInResults = () => {
       const assignmentQuestions = content?.questions || [];
 
       // Find existing group within 5 minutes
-      const existingGroup = groups.find((g) => {
+      const existingGroupIndex = groups.findIndex((g) => {
         const groupTime = new Date(g.timestamp).getTime();
         return Math.abs(timestamp - groupTime) < 5 * 60 * 1000;
       });
 
-      if (existingGroup) {
-        existingGroup.assignments.push(assignment);
+      if (existingGroupIndex !== -1) {
+        // Create new arrays to ensure React detects the change
+        const existingGroup = groups[existingGroupIndex];
+        const newAssignments = [...existingGroup.assignments, assignment];
         
         // Merge questions from this assignment into the group
-        // Each assignment should have 1 question, so we collect all unique questions
+        const newQuestions = [...existingGroup.questions];
         assignmentQuestions.forEach((newQuestion: any) => {
           // Check if this question already exists (by question text to avoid duplicates)
-          const alreadyExists = existingGroup.questions.some(
+          const alreadyExists = newQuestions.some(
             (q: any) => q.question === newQuestion.question
           );
           
           if (!alreadyExists) {
-            existingGroup.questions.push(newQuestion);
+            newQuestions.push(newQuestion);
           }
         });
+        
+        // Replace the group with a new object (immutable update)
+        groups[existingGroupIndex] = {
+          ...existingGroup,
+          assignments: newAssignments,
+          questions: newQuestions,
+        };
       } else {
         // Create new group with initial questions
         groups.push({
           timestamp: assignment.created_at,
           assignments: [assignment],
-          questions: [...assignmentQuestions], // Create a copy to avoid mutation
+          questions: [...assignmentQuestions],
         });
       }
     });
