@@ -145,6 +145,8 @@ export const LectureCheckInResults = () => {
 
     assignmentsWithNames.forEach((assignment) => {
       const timestamp = new Date(assignment.created_at).getTime();
+      const content = assignment.content as any;
+      const assignmentQuestions = content?.questions || [];
 
       // Find existing group within 5 minutes
       const existingGroup = groups.find((g) => {
@@ -154,12 +156,25 @@ export const LectureCheckInResults = () => {
 
       if (existingGroup) {
         existingGroup.assignments.push(assignment);
+        
+        // Merge questions from this assignment into the group
+        // Each assignment should have 1 question, so we collect all unique questions
+        assignmentQuestions.forEach((newQuestion: any) => {
+          // Check if this question already exists (by question text to avoid duplicates)
+          const alreadyExists = existingGroup.questions.some(
+            (q: any) => q.question === newQuestion.question
+          );
+          
+          if (!alreadyExists) {
+            existingGroup.questions.push(newQuestion);
+          }
+        });
       } else {
-        const content = assignment.content as any;
+        // Create new group with initial questions
         groups.push({
           timestamp: assignment.created_at,
           assignments: [assignment],
-          questions: content?.questions || [],
+          questions: [...assignmentQuestions], // Create a copy to avoid mutation
         });
       }
     });
