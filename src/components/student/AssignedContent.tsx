@@ -325,6 +325,14 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         ? textAns[`${firstShortAnswerIdx}_version_history`]
         : null;
       
+      console.log('🔍 [AssignedContent] Retrieved version history:', {
+        firstShortAnswerIdx,
+        hasData: !!versionHistoryData,
+        typed_count: versionHistoryData?.typed_count,
+        pasted_count: versionHistoryData?.pasted_count,
+        events_length: versionHistoryData?.events?.length
+      });
+      
       // Prepare tab switching data - use version history data if available (short answer),
       // otherwise use global tab switching detection (MCQ)
       const tabData = versionHistoryData || tabSwitchingData;
@@ -333,7 +341,9 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
         console.log('💾 Saving tab switching data:', {
           assignmentId: assignment.id,
           tabSwitchCount: tabData?.tab_switch_count,
-          source: versionHistoryData ? 'VersionHistoryTracker' : 'Global Hook'
+          source: versionHistoryData ? 'VersionHistoryTracker' : 'Global Hook',
+          typed_count: versionHistoryData?.typed_count || 0,
+          pasted_count: versionHistoryData?.pasted_count || 0
         });
 
         const { error: versionError } = await supabase
@@ -365,7 +375,16 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           });
 
         if (versionError) {
-          console.error('Failed to save version history:', versionError);
+          console.error('❌ [AssignedContent] Failed to save version history:', {
+            error: versionError,
+            data: {
+              typed_count: versionHistoryData?.typed_count || 0,
+              pasted_count: versionHistoryData?.pasted_count || 0,
+              has_events: !!versionHistoryData?.events?.length
+            }
+          });
+        } else {
+          console.log('✅ [AssignedContent] Version history saved successfully');
         }
       }
       

@@ -62,6 +62,14 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
   const lastValueRef = useRef(value);
   const lastTimestampRef = useRef(Date.now());
 
+  // Component initialization logging
+  useEffect(() => {
+    console.log('🚀 [VersionTracker] Component initialized', {
+      hasQuestionText: !!questionText,
+      initialValue: value
+    });
+  }, []);
+
   // Track tab visibility changes
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -122,8 +130,28 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
       answer_copy_events: answerCopyEvents,
     };
     
+    console.log('📊 [VersionTracker] Calling onVersionChange with:', {
+      typed_count: historyData.typed_count,
+      pasted_count: historyData.pasted_count,
+      total_events: versionHistory.length,
+      has_data: versionHistory.length > 0
+    });
+    
     onVersionChange(historyData);
-  }, [versionHistory, questionCopied, questionCopiedAt, value, tabSwitches, firstInteractionAt]);
+  }, [
+    versionHistory, 
+    questionCopied, 
+    questionCopiedAt, 
+    value, 
+    tabSwitches, 
+    firstInteractionAt,
+    firstInteractionType,
+    firstInteractionSize,
+    firstPasteIndex,
+    answerCopyEvents,
+    questionDisplayedAt,
+    onVersionChange
+  ]);
 
   const addVersionEvent = (type: 'typed' | 'pasted' | 'deleted', content: string) => {
     const event: VersionEvent = {
@@ -184,6 +212,7 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
 
   const handlePaste = (e: React.ClipboardEvent) => {
     const pastedText = e.clipboardData.getData('text');
+    console.log('📋 [VersionTracker] Paste event detected, length:', pastedText.length);
     addVersionEvent('pasted', pastedText);
   };
 
@@ -196,8 +225,10 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
     // Detect typing vs pasting based on speed and volume
     if (lengthDiff > 10 && timeDiff < 100) {
       // Large change in short time = likely paste
+      console.log('📋 [VersionTracker] Auto-detected paste (speed-based)');
       addVersionEvent('pasted', newValue);
     } else if (lengthDiff > 0) {
+      console.log('⌨️  [VersionTracker] Typed event detected');
       addVersionEvent('typed', newValue);
     } else if (lengthDiff < 0) {
       addVersionEvent('deleted', newValue);
