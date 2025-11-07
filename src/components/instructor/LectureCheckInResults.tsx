@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -207,6 +207,29 @@ export const LectureCheckInResults = () => {
     } catch (error) {
       console.error("Error deleting check-in:", error);
       toast.error("Failed to delete check-in");
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("student_assignments")
+        .delete()
+        .eq("instructor_id", user.id)
+        .eq("assignment_type", "lecture_checkin");
+
+      if (error) throw error;
+      
+      toast.success("All check-ins deleted successfully!");
+      fetchResults();
+    } catch (error) {
+      console.error("Error deleting all check-ins:", error);
+      toast.error("Failed to delete all check-ins");
     }
   };
 
@@ -453,10 +476,34 @@ export const LectureCheckInResults = () => {
             </CardTitle>
             <CardDescription>Auto-graded student performance on lecture questions</CardDescription>
           </div>
-          <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="gap-2">
+                  <Trash className="h-4 w-4" />
+                  Delete All
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete All Check-Ins?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all lecture check-in results and student responses. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
