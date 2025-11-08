@@ -43,6 +43,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [lastAutoQuestionTime, setLastAutoQuestionTime] = useState<number>(0);
   const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState<number>(0);
   const [autoQuestionCount, setAutoQuestionCount] = useState<number>(0);
+  const [intervalTranscriptLength, setIntervalTranscriptLength] = useState<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -390,6 +391,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
         intervalTranscriptRef.current = "";
+        setIntervalTranscriptLength(0);
         console.log('🔄 Auto-question timer reset after voice command');
       }
 
@@ -477,6 +479,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
         intervalTranscriptRef.current = "";
+        setIntervalTranscriptLength(0);
         console.log('🔄 Auto-question timer reset after manual send');
       }
 
@@ -494,11 +497,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   // Pre-validation before sending question
-  const validateBeforeSend = async (): Promise<{ valid: boolean; error?: string }> => {
+  const validateBeforeSend = async (isAutoQuestion = false): Promise<{ valid: boolean; error?: string }> => {
     try {
-      // Check rate limit
+      // Check rate limit (skip for auto-questions - they're on a timer)
       const now = Date.now();
-      if (now < nextQuestionAllowedAt) {
+      if (!isAutoQuestion && now < nextQuestionAllowedAt) {
         const secondsLeft = Math.ceil((nextQuestionAllowedAt - now) / 1000);
         return { 
           valid: false, 
@@ -544,8 +547,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         };
       }
 
-      // Check if there's enough transcript content
-      if (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30) {
+      // Check if there's enough transcript content (skip for auto-questions - already checked)
+      if (!isAutoQuestion && (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30)) {
         return { 
           valid: false, 
           error: "📝 Not enough lecture content - continue speaking for a few more seconds" 
@@ -596,8 +599,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     try {
       console.log('📤 Sending question to students:', detectionData);
       
-      // Pre-validation
-      const validation = await validateBeforeSend();
+      // Pre-validation (pass true for auto-questions to skip rate limit check)
+      const validation = await validateBeforeSend(detectionData.source === 'auto_interval');
       if (!validation.valid) {
         console.error('❌ Pre-validation failed:', validation.error);
         console.error('❌ Source:', detectionData.source || 'unknown');
@@ -772,11 +775,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Get transcript from current interval only
       const intervalTranscript = intervalTranscriptRef.current;
       
-      if (intervalTranscript.length < 200) {
-        console.log('⚠️ Not enough content in interval, skipping auto-question');
+      if (intervalTranscript.length < 100) { // Lowered from 200 to 100
+        console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 100+)');
         toast({
           title: "⏭️ Auto-question skipped",
-          description: "Not enough lecture content in this interval",
+          description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
           duration: 3000,
         });
         
@@ -805,15 +808,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (error || !data?.success) {
         console.error('❌ Auto-question generation failed:', error);
         console.error('❌ Error data:', data);
+        
+        let errorMessage = "Could not generate question from recent content.";
+        if (data?.error?.includes('Not enough content')) {
+          errorMessage = `Need ${100 - intervalTranscript.length} more characters of lecture content.`;
+        } else if (data?.error?.includes('confidence threshold')) {
+          errorMessage = `AI confidence too low (${(data.confidence * 100)?.toFixed(0) || '?'}%). Keep teaching for better questions.`;
+        } else if (data?.error) {
+          errorMessage = data.error;
+        }
+        
         toast({
-          title: "⚠️ Auto-question failed",
-          description: "Could not generate question from recent content. Will try again next interval.",
+          title: "⚠️ Auto-question skipped",
+          description: errorMessage,
           variant: "destructive",
           duration: 5000,
         });
         
-        // Clear interval transcript buffer
-        intervalTranscriptRef.current = "";
+        // Don't clear the buffer - let it accumulate for next attempt
         return;
       }
       
@@ -837,6 +849,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       // Clear interval transcript buffer
       intervalTranscriptRef.current = "";
+      setIntervalTranscriptLength(0);
       
       console.log(`✅ Auto-question sent! Total this session: ${autoQuestionCount + 1}`);
       
@@ -859,6 +872,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (!isRecording) return;
 
     const restartTimer = setTimeout(() => {
+      // Don't restart if auto-question is about to trigger (within 30 seconds)
+      if (autoQuestionEnabled && lastAutoQuestionTime > 0) {
+        const intervalMs = autoQuestionInterval * 60 * 1000;
+        const timeToNextQuestion = intervalMs - (Date.now() - lastAutoQuestionTime);
+        if (timeToNextQuestion < 30000 && timeToNextQuestion > 0) {
+          console.log("⏰ Delaying restart - auto-question imminent in", Math.round(timeToNextQuestion / 1000), "s");
+          return;
+        }
+      }
+      
       console.log("🔄 Performing periodic restart for resource cleanup");
       toast({
         title: "System refresh",
@@ -913,6 +936,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     const checkInterval = setInterval(() => {
       if (isSendingQuestion) return; // Don't trigger during send
       if (isGeneratingAutoQuestionRef.current) return; // Guard against concurrent calls
+      if (isProcessing) return; // Don't trigger during audio processing
       
       const now = Date.now();
       const elapsed = now - lastAutoQuestionTime;
@@ -946,6 +970,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setLastAutoQuestionTime(0);
       setNextAutoQuestionIn(0);
       setAutoQuestionCount(0);
+      setIntervalTranscriptLength(0);
       intervalTranscriptRef.current = "";
       isGeneratingAutoQuestionRef.current = false;
     }
@@ -1269,6 +1294,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             } else {
               intervalTranscriptRef.current = newText;
             }
+            
+            // Update interval transcript length state for UI
+            setIntervalTranscriptLength(intervalTranscriptRef.current.length);
 
             // Implement sliding window for memory management
             if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
@@ -1574,12 +1602,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   </Badge>
                 </div>
                 
-                <div className="text-sm text-blue-700 dark:text-blue-300">
-                  Next question in: <strong>{Math.floor(nextAutoQuestionIn / 60)}:{(nextAutoQuestionIn % 60).toString().padStart(2, '0')}</strong>
-                </div>
-                
-                <div className="text-xs text-blue-600 dark:text-blue-400">
-                  Auto-questions sent this session: {autoQuestionCount}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">Interval Content:</span>
+                    <div className={`font-bold ${intervalTranscriptLength >= 100 ? 'text-green-600 dark:text-green-400' : 'text-orange-500 dark:text-orange-400'}`}>
+                      {intervalTranscriptLength}/100 chars
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">Next In:</span>
+                    <div className="font-bold text-blue-700 dark:text-blue-300">
+                      {Math.floor(nextAutoQuestionIn / 60)}:{(nextAutoQuestionIn % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">Sent This Session:</span>
+                    <div className="font-bold text-blue-700 dark:text-blue-300">
+                      {autoQuestionCount}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">Status:</span>
+                    <div className="font-bold text-green-600 dark:text-green-400">
+                      {intervalTranscriptLength >= 100 ? '✅ Ready' : '⏳ Building'}
+                    </div>
+                  </div>
                 </div>
                 
                 {/* 10-second countdown animation */}

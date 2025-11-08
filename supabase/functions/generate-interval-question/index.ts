@@ -128,12 +128,18 @@ Return JSON:
     console.log('✅ Auto-question generated:', result.question_text);
     console.log('📊 Confidence:', result.confidence, '| Reasoning:', result.reasoning);
 
-    // Only return questions with reasonable confidence
-    if (result.confidence < 0.5) {
+    // Only return questions with reasonable confidence (lowered from 0.5 to 0.4)
+    if (result.confidence < 0.4) { // Changed from 0.5
       console.log('⚠️ Confidence too low, skipping auto-question');
+      console.log('   Question was:', result.question_text);
+      console.log('   Confidence:', result.confidence);
+      console.log('   Reasoning:', result.reasoning);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Generated question did not meet confidence threshold' 
+        error: 'Generated question did not meet confidence threshold',
+        confidence: result.confidence,
+        question_text: result.question_text,
+        reasoning: result.reasoning
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
