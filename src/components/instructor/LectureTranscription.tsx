@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, Clock, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -768,36 +768,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  const handleAutoQuestionGeneration = async () => {
+  // Core auto-question generation logic (extracted for reuse)
+  const generateAndSendAutoQuestion = async (intervalTranscript: string, isManualTest = false) => {
     try {
-      console.log('⏰ Auto-question timer triggered');
-      
-      // Get transcript from current interval only
-      const intervalTranscript = intervalTranscriptRef.current;
-      
-      if (intervalTranscript.length < 100) { // Lowered from 200 to 100
-        console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 100+)');
-        toast({
-          title: "⏭️ Auto-question skipped",
-          description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
-          duration: 3000,
-        });
-        
-        // Timer already reset by caller
-        return;
-      }
-      
       // Show pre-generation animation
       setVoiceCommandDetected(true);
       setTimeout(() => setVoiceCommandDetected(false), 2000);
       
-      toast({
-        title: "⏰ Auto-question triggered!",
-        description: "Generating question from recent content...",
-        duration: 3000,
-      });
+      if (!isManualTest) {
+        toast({
+          title: "⏰ Auto-question triggered!",
+          description: "Generating question from recent content...",
+          duration: 3000,
+        });
+      }
       
-      // Call new edge function
+      // Call edge function
       const { data, error } = await supabase.functions.invoke('generate-interval-question', {
         body: { 
           interval_transcript: intervalTranscript,
@@ -819,14 +805,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
         
         toast({
-          title: "⚠️ Auto-question skipped",
+          title: isManualTest ? "🧪 Test Failed" : "⚠️ Auto-question skipped",
           description: errorMessage,
           variant: "destructive",
           duration: 5000,
         });
         
-        // Don't clear the buffer - let it accumulate for next attempt
-        return;
+        return false;
       }
       
       console.log('✅ Auto-question generated:', data.question_text);
@@ -839,7 +824,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         suggested_type: data.suggested_type,
         confidence: data.confidence,
         extraction_method: 'auto_interval',
-        source: 'auto_interval'
+        source: isManualTest ? 'manual_test' : 'auto_interval'
       });
       
       console.log('✅ Auto-question send completed');
@@ -853,10 +838,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       console.log(`✅ Auto-question sent! Total this session: ${autoQuestionCount + 1}`);
       
+      if (isManualTest) {
+        toast({
+          title: "🧪 Test Successful!",
+          description: `Question sent: "${data.question_text.substring(0, 50)}..."`,
+          duration: 5000,
+        });
+      }
+      
+      return true;
+      
     } catch (error) {
       console.error('Auto-question error:', error);
       toast({
-        title: "❌ Auto-question error",
+        title: isManualTest ? "🧪 Test Error" : "❌ Auto-question error",
         description: "An error occurred while generating the auto-question",
         variant: "destructive",
         duration: 5000,
@@ -864,7 +859,63 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       // Clear interval transcript buffer even on error
       intervalTranscriptRef.current = "";
+      setIntervalTranscriptLength(0);
+      return false;
     }
+  };
+
+  // Handle auto-question generation (called by timer)
+  const handleAutoQuestionGeneration = async () => {
+    try {
+      console.log('⏰ Auto-question timer triggered');
+      
+      // Get transcript from current interval only
+      const intervalTranscript = intervalTranscriptRef.current;
+      
+      if (intervalTranscript.length < 100) {
+        console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 100+)');
+        toast({
+          title: "⏭️ Auto-question skipped",
+          description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
+          duration: 3000,
+        });
+        return;
+      }
+      
+      await generateAndSendAutoQuestion(intervalTranscript, false);
+      
+    } catch (error) {
+      console.error('Auto-question error:', error);
+    }
+  };
+
+  // Manual test function for debugging
+  const handleTestAutoQuestion = async () => {
+    const intervalTranscript = intervalTranscriptRef.current.trim();
+    
+    if (intervalTranscript.length < 100) {
+      toast({
+        title: "🧪 Cannot Test",
+        description: `Need at least 100 characters. Current: ${intervalTranscript.length}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isSendingQuestion) {
+      toast({
+        title: "⏳ Please Wait",
+        description: "A question is already being processed",
+      });
+      return;
+    }
+
+    toast({
+      title: "🧪 Testing Auto-Question",
+      description: "Generating question from current interval content...",
+    });
+
+    await generateAndSendAutoQuestion(intervalTranscript, true);
   };
 
   // Periodic system restart for resource cleanup
@@ -1643,6 +1694,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     </div>
                   </div>
                 )}
+                
+                {/* Manual Test Button */}
+                <Button
+                  onClick={handleTestAutoQuestion}
+                  disabled={intervalTranscriptLength < 100 || isSendingQuestion || isGeneratingAutoQuestionRef.current}
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3 bg-white dark:bg-gray-800"
+                >
+                  <Sparkles className="h-3 w-3 mr-2" />
+                  {intervalTranscriptLength < 100 
+                    ? `Test (Need ${100 - intervalTranscriptLength} more chars)` 
+                    : 'Test Auto-Question Now'}
+                </Button>
               </div>
             )}
 
