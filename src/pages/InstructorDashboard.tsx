@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Users } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import StrugglingStudentsCard from "@/components/instructor/StrugglingStudentsCard";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { CheatDetectionCard } from "@/components/instructor/CheatDetectionCard";
@@ -247,26 +246,6 @@ export default function InstructorDashboard() {
     setDialogOpen(true);
   };
 
-  const handleMessageStudent = (studentId: string) => {
-    setSelectedChatStudent(studentId);
-    // Scroll to chat card
-    setTimeout(() => {
-      chatCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-  };
-
-  const strugglingStudents = students
-    .filter(s => s.current_streak < 2 || (s.completedLessons / s.totalLessons) < 0.3)
-    .map(s => ({
-      id: s.id,
-      name: s.name,
-      issue: s.current_streak < 2 
-        ? "Low activity streak" 
-        : "Behind on lessons",
-      severity: (s.completedLessons / s.totalLessons) < 0.2 ? "high" as const : "medium" as const,
-      lastActive: "2 days ago",
-    }));
-
   const rankedStudents = [...students]
     .sort((a, b) => (b.average_grade || 0) - (a.average_grade || 0))
     .map((s, idx) => ({ ...s, rank: idx + 1 }));
@@ -426,11 +405,6 @@ export default function InstructorDashboard() {
             {currentUser && (
               <>
                 <CheatDetectionCard instructorId={currentUser.id} />
-                
-                <StrugglingStudentsCard 
-                  students={strugglingStudents}
-                  onMessageStudent={handleMessageStudent}
-                />
 
                 <StudentRankingCard 
                   students={rankedStudents}

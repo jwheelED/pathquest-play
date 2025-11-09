@@ -1,9 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock, Copy } from "lucide-react";
+import { AlertTriangle, Clock, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface FlaggedStudent {
   student_id: string;
@@ -34,6 +36,7 @@ interface CheatDetectionCardProps {
 export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) => {
   const [flaggedStudents, setFlaggedStudents] = useState<FlaggedStudent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     fetchFlaggedStudents();
@@ -433,33 +436,49 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
   const mediumSuspicionCount = flaggedStudents.filter(s => s.suspicion_level === 'MEDIUM').length;
 
   return (
-    <Card className="border-red-500/50 bg-red-50/50 dark:bg-red-950/20">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-          Cheat Detection - Original Work Warning
-        </CardTitle>
-        <CardDescription>
-          <div className="space-y-1 mt-2">
-            <p className="text-foreground font-medium">
-              {flaggedStudents.length} submission(s) flagged for lack of original work
-            </p>
-            <div className="flex gap-3 text-sm">
-              {highSuspicionCount > 0 && (
-                <span className="text-red-600 dark:text-red-400 font-medium">
-                  🚨 {highSuspicionCount} HIGH risk (likely copied from AI/external source)
-                </span>
-              )}
-              {mediumSuspicionCount > 0 && (
-                <span className="text-orange-600 dark:text-orange-400">
-                  ⚠️ {mediumSuspicionCount} MEDIUM risk (unusual patterns)
-                </span>
-              )}
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="border-red-500/50 bg-red-50/50 dark:bg-red-950/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                Cheat Detection - Original Work Warning
+              </CardTitle>
+              <CardDescription>
+                <div className="space-y-1 mt-2">
+                  <p className="text-foreground font-medium">
+                    {flaggedStudents.length} submission(s) flagged for lack of original work
+                  </p>
+                  <div className="flex gap-3 text-sm">
+                    {highSuspicionCount > 0 && (
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        🚨 {highSuspicionCount} HIGH risk (likely copied from AI/external source)
+                      </span>
+                    )}
+                    {mediumSuspicionCount > 0 && (
+                      <span className="text-orange-600 dark:text-orange-400">
+                        ⚠️ {mediumSuspicionCount} MEDIUM risk (unusual patterns)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </CardDescription>
             </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="ml-4">
+                {isOpen ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
           </div>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </CardHeader>
+        
+        <CollapsibleContent>
+          <CardContent>
         <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-800 rounded-lg">
           <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200 mb-2">
             ⚠️ How to identify lack of original work:
@@ -579,6 +598,8 @@ export const CheatDetectionCard = ({ instructorId }: CheatDetectionCardProps) =>
           ))}
         </div>
       </CardContent>
+      </CollapsibleContent>
     </Card>
+    </Collapsible>
   );
 };
