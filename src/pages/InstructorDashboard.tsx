@@ -20,10 +20,7 @@ import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
-import { LiveClassroomStatus } from "@/components/instructor/LiveClassroomStatus";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
-
-import { TeachingAnalytics } from "@/components/instructor/TeachingAnalytics";
 
 interface Student {
   id: string;
@@ -46,16 +43,10 @@ export default function InstructorDashboard() {
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [selectedChatStudent, setSelectedChatStudent] = useState<string | null>(null);
   const chatCardRef = useRef<HTMLDivElement>(null);
-  const [classroomStats, setClassroomStats] = useState({
-    totalStudents: 0,
-    activeCheckIns: 0,
-    completedResponses: 0
-  });
 
   useEffect(() => {
     checkAuth();
     fetchStudents();
-    fetchClassroomStats();
     
     // Show reminder about course materials once per day
     const lastReminderDate = localStorage.getItem('lastCourseMaterialsReminder');
@@ -87,7 +78,6 @@ export default function InstructorDashboard() {
           },
           (payload) => {
             console.log('📋 Assignment update:', payload);
-            fetchClassroomStats();
             fetchStudents(); // Refresh student list to show updated grades
           }
         )
@@ -154,37 +144,6 @@ export default function InstructorDashboard() {
 
     setCurrentUser(session.user);
     setInstructorCode(profile.instructor_code || "");
-  };
-
-  const fetchClassroomStats = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    // Get total students
-    const { count: totalStudents } = await supabase
-      .from("instructor_students")
-      .select("*", { count: 'exact', head: true })
-      .eq("instructor_id", user.id);
-
-    // Get active check-ins (last 2 hours)
-    const twoHoursAgo = new Date();
-    twoHoursAgo.setHours(twoHoursAgo.getHours() - 2);
-
-    const { data: activeAssignments } = await supabase
-      .from("student_assignments")
-      .select("id, completed")
-      .eq("instructor_id", user.id)
-      .eq("assignment_type", "lecture_checkin")
-      .gte("created_at", twoHoursAgo.toISOString());
-
-    const activeCheckIns = activeAssignments?.length || 0;
-    const completedResponses = activeAssignments?.filter(a => a.completed).length || 0;
-
-    setClassroomStats({
-      totalStudents: totalStudents || 0,
-      activeCheckIns,
-      completedResponses
-    });
   };
 
   const fetchStudents = async () => {
@@ -437,9 +396,10 @@ export default function InstructorDashboard() {
         {/* Settings visible regardless of student count */}
         {currentUser && (
           <div className="space-y-6">
-            <QuestionFormatSettings instructorId={currentUser.id} />
-            
-            <QuestionLimitSettings />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <QuestionFormatSettings instructorId={currentUser.id} />
+              <QuestionLimitSettings />
+            </div>
             
             <AutoQuestionSettings />
             
@@ -457,17 +417,9 @@ export default function InstructorDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            <LiveClassroomStatus 
-              totalStudents={classroomStats.totalStudents}
-              activeCheckIns={classroomStats.activeCheckIns}
-              completedResponses={classroomStats.completedResponses}
-            />
-
             <LectureCheckInResults />
 
             <AnswerReleaseCard instructorId={currentUser.id} />
-
-            <TeachingAnalytics instructorId={currentUser.id} />
 
             <LectureMaterialsUpload />
 
