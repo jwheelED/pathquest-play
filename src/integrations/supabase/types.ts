@@ -649,6 +649,9 @@ export type Database = {
           answers_released: boolean
           assignment_type: Database["public"]["Enums"]["assignment_type"]
           auto_delete_at: string | null
+          auto_release_at: string | null
+          auto_release_enabled: boolean | null
+          auto_release_minutes: number | null
           completed: boolean
           content: Json
           created_at: string
@@ -659,6 +662,7 @@ export type Database = {
           mode: Database["public"]["Enums"]["assignment_mode"]
           opened_at: string | null
           quiz_responses: Json | null
+          release_method: string | null
           response_time_seconds: number | null
           saved_by_student: boolean | null
           student_id: string
@@ -668,6 +672,9 @@ export type Database = {
           answers_released?: boolean
           assignment_type: Database["public"]["Enums"]["assignment_type"]
           auto_delete_at?: string | null
+          auto_release_at?: string | null
+          auto_release_enabled?: boolean | null
+          auto_release_minutes?: number | null
           completed?: boolean
           content: Json
           created_at?: string
@@ -678,6 +685,7 @@ export type Database = {
           mode: Database["public"]["Enums"]["assignment_mode"]
           opened_at?: string | null
           quiz_responses?: Json | null
+          release_method?: string | null
           response_time_seconds?: number | null
           saved_by_student?: boolean | null
           student_id: string
@@ -687,6 +695,9 @@ export type Database = {
           answers_released?: boolean
           assignment_type?: Database["public"]["Enums"]["assignment_type"]
           auto_delete_at?: string | null
+          auto_release_at?: string | null
+          auto_release_enabled?: boolean | null
+          auto_release_minutes?: number | null
           completed?: boolean
           content?: Json
           created_at?: string
@@ -697,6 +708,7 @@ export type Database = {
           mode?: Database["public"]["Enums"]["assignment_mode"]
           opened_at?: string | null
           quiz_responses?: Json | null
+          release_method?: string | null
           response_time_seconds?: number | null
           saved_by_student?: boolean | null
           student_id?: string
@@ -711,6 +723,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      student_paste_events: {
+        Row: {
+          assignment_id: string
+          assignment_title: string | null
+          created_at: string | null
+          id: string
+          pasted_at: string | null
+          pasted_text_length: number
+          student_id: string
+          student_name: string | null
+        }
+        Insert: {
+          assignment_id: string
+          assignment_title?: string | null
+          created_at?: string | null
+          id?: string
+          pasted_at?: string | null
+          pasted_text_length: number
+          student_id: string
+          student_name?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          assignment_title?: string | null
+          created_at?: string | null
+          id?: string
+          pasted_at?: string | null
+          pasted_text_length?: number
+          student_id?: string
+          student_name?: string | null
+        }
+        Relationships: []
       }
       user_achievements: {
         Row: {
@@ -871,6 +916,11 @@ export type Database = {
           p_user_id: string
         }
         Returns: boolean
+      }
+      auto_release_expired_answers: { Args: never; Returns: number }
+      calculate_auto_release_time: {
+        Args: { p_created_at: string; p_minutes: number }
+        Returns: string
       }
       calculate_mastery_threshold: {
         Args: { p_lesson_id: string; p_user_id: string }
