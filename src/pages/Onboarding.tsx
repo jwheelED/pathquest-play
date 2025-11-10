@@ -1,14 +1,54 @@
 "use client"
 
 import { supabase } from "@/integrations/supabase/client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast, Toaster } from "sonner"
+import { Button } from "@/components/ui/button"
 
 export default function OnboardingPage() {
   const [classCode, setClassCode] = useState("")
   const [loading, setLoading] = useState(false)
+  const [hasExistingClass, setHasExistingClass] = useState(false)
+  const [existingClassInfo, setExistingClassInfo] = useState<{ code: string; title: string } | null>(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    checkExistingConnection()
+  }, [])
+
+  const checkExistingConnection = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Check if student has existing instructor connection
+      const { data: connection } = await supabase
+        .from("instructor_students")
+        .select("instructor_id")
+        .eq("student_id", user.id)
+        .maybeSingle()
+
+      if (connection?.instructor_id) {
+        // Fetch instructor details
+        const { data: instructor } = await supabase
+          .from("profiles")
+          .select("instructor_code, course_title")
+          .eq("id", connection.instructor_id)
+          .single()
+
+        if (instructor) {
+          setHasExistingClass(true)
+          setExistingClassInfo({
+            code: instructor.instructor_code || "N/A",
+            title: instructor.course_title || "Unknown Course"
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error checking existing connection:", error)
+    }
+  }
 
   const handleJoinClass = async () => {
     if (!classCode.trim()) {
@@ -33,7 +73,7 @@ export default function OnboardingPage() {
         return
       }
 
-      // Check if already connected
+      // Check if already connected to this instructor
       const { data: existing } = await supabase
         .from("instructor_students")
         .select("id")
@@ -55,7 +95,22 @@ export default function OnboardingPage() {
         return
       }
 
-      // Connect to instructor
+      // If student has existing connection to different instructor, remove it first
+      const { data: oldConnection } = await supabase
+        .from("instructor_students")
+        .select("id, instructor_id")
+        .eq("student_id", user.id)
+        .maybeSingle()
+
+      if (oldConnection && oldConnection.instructor_id !== instructorId) {
+        toast.info("Switching to new class...")
+        await supabase
+          .from("instructor_students")
+          .delete()
+          .eq("id", oldConnection.id)
+      }
+
+      // Connect to new instructor
       const { error: connectionError } = await supabase
         .from("instructor_students")
         .insert({
@@ -117,13 +172,41 @@ export default function OnboardingPage() {
         </div>
 
         <div className="bg-card p-8 shadow-xl rounded-2xl border-2 border-primary/20 space-y-6">
+          {hasExistingClass && existingClassInfo && (
+            <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg space-y-2">
+              <p className="text-sm font-semibold text-foreground">
+                Currently enrolled in:
+              </p>
+              <p className="text-base text-foreground font-medium">
+                {existingClassInfo.title}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Class code: <code className="font-mono">{existingClassInfo.code}</code>
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  localStorage.setItem("edvana_onboarded", "true")
+                  navigate("/dashboard")
+                }}
+                className="mt-2 w-full"
+              >
+                Return to Dashboard
+              </Button>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                Join Your Class
+                {hasExistingClass ? "Switch Class" : "Join Your Class"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Enter the class code provided by your instructor to get started
+                {hasExistingClass 
+                  ? "Enter a new class code to switch to a different class"
+                  : "Enter the class code provided by your instructor to get started"
+                }
               </p>
             </div>
 

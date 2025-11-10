@@ -88,20 +88,37 @@ export default function Dashboard() {
     if (!user?.id) return;
     
     // Always check database - cache is unreliable after instructor re-onboarding
-    const { data } = await supabase
+    const { data: profile } = await supabase
       .from("profiles")
       .select("onboarded")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!data?.onboarded) {
+    if (!profile?.onboarded) {
       // Clear stale cache
       localStorage.removeItem("edvana_onboarded");
       navigate("/onboarding");
-    } else {
-      // Update cache
-      localStorage.setItem("edvana_onboarded", "true");
+      return;
     }
+
+    // Check if student has a valid instructor connection
+    const { data: connection } = await supabase
+      .from("instructor_students")
+      .select("instructor_id")
+      .eq("student_id", user.id)
+      .maybeSingle();
+
+    if (!connection) {
+      // Student is onboarded but has no instructor connection - allow re-onboarding
+      logger.warn("Student has no instructor connection, redirecting to onboarding");
+      localStorage.removeItem("edvana_onboarded");
+      toast.error("Your class connection is missing. Please re-enter your class code.");
+      navigate("/onboarding");
+      return;
+    }
+
+    // Update cache
+    localStorage.setItem("edvana_onboarded", "true");
   };
 
   const fetchCourseContext = async () => {
@@ -184,6 +201,16 @@ export default function Dashboard() {
               <span className="text-sm text-muted-foreground">
                 {user?.email || "User"}
               </span>
+              <Button 
+                onClick={() => {
+                  localStorage.removeItem("edvana_onboarded");
+                  navigate("/onboarding");
+                }} 
+                variant="outline" 
+                size="sm"
+              >
+                Switch Class
+              </Button>
               <Button onClick={handleLogout} variant="destructive" size="sm">
                 Logout
               </Button>
