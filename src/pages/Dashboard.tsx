@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AchievementSystem from "@/components/AchievementSystem";
 import { BadgesButton } from "@/components/student/BadgesButton";
-import JoinClassCard from "@/components/JoinClassCard";
 import InstructorChatCard from "@/components/InstructorChatCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
@@ -50,13 +49,16 @@ export default function Dashboard() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const [hasCheckedOnboarding, setHasCheckedOnboarding] = useState(false);
+
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && !hasCheckedOnboarding) {
+      setHasCheckedOnboarding(true);
       checkOnboarding();
       fetchCourseContext();
       fetchUserProfile();
     }
-  }, [user]);
+  }, [user, hasCheckedOnboarding]);
 
   const fetchUserProfile = async () => {
     if (!user?.id) return;
@@ -85,14 +87,24 @@ export default function Dashboard() {
   const checkOnboarding = async () => {
     if (!user?.id) return;
     
-    const { data, error } = await supabase
+    // Check localStorage first (instant)
+    const cachedOnboarded = localStorage.getItem("edvana_onboarded");
+    if (cachedOnboarded === "true") {
+      return; // Already onboarded, skip database check
+    }
+
+    // Only query database if not cached
+    const { data } = await supabase
       .from("profiles")
       .select("onboarded")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (error || !data?.onboarded) {
+    if (!data?.onboarded) {
       navigate("/onboarding");
+    } else {
+      // Cache for future
+      localStorage.setItem("edvana_onboarded", "true");
     }
   };
 
@@ -129,59 +141,14 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
+    // Clear onboarding cache
+    localStorage.removeItem("edvana_onboarded");
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
     navigate("/");
   };
 
-  const handleJoinClass = async (classCode: string) => {
-    if (!user?.id || !classCode.trim()) return;
-    
-    try {
-      // Use secure RPC function to validate instructor code
-      const { data: instructorId, error: instructorError } = await supabase
-        .rpc("validate_instructor_code", { code: classCode.trim() });
-
-      if (instructorError || !instructorId) {
-        toast.error("Invalid class code. Please check and try again.");
-        return;
-      }
-
-      const { data: existing } = await supabase
-        .from("instructor_students")
-        .select("id")
-        .eq("instructor_id", instructorId)
-        .eq("student_id", user.id)
-        .maybeSingle();
-
-      if (existing) {
-        toast.info("You're already connected to this instructor.");
-        return;
-      }
-
-      const { error: connectionError } = await supabase
-        .from("instructor_students")
-        .insert({
-          instructor_id: instructorId,
-          student_id: user.id,
-        });
-
-      if (connectionError) {
-        toast.error("Failed to connect to instructor.");
-        logger.error("Connection error:", connectionError);
-        return;
-      }
-
-      toast.success("Successfully connected to your instructor!");
-      // Trigger refresh of InstructorChatCard and course context
-      setRefreshKey(prev => prev + 1);
-      fetchCourseContext();
-    } catch (err) {
-      logger.error("Error joining class:", err);
-      toast.error("An error occurred. Please try again.");
-    }
-  };
 
   if (!session || !user) {
     return (
@@ -240,10 +207,6 @@ export default function Dashboard() {
         )}
         
         <div className="space-y-4 md:space-y-6">
-          {!courseContext.courseTitle && (
-            <JoinClassCard onJoinClass={handleJoinClass} />
-          )}
-          
           {courseContext.courseTitle && (
             <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
               <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3 md:mb-4 flex items-center gap-2">

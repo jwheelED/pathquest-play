@@ -48,6 +48,9 @@ export default function OnboardingPage() {
           .from("profiles")
           .update({ onboarded: true })
           .eq("id", user.id)
+        
+        // Cache onboarding status
+        localStorage.setItem("edvana_onboarded", "true")
         navigate("/dashboard")
         return
       }
@@ -72,8 +75,24 @@ export default function OnboardingPage() {
         .update({ onboarded: true })
         .eq("id", user.id)
 
-      toast.success("Successfully joined class! Welcome to your learning journey.")
-      navigate("/dashboard")
+      // Wait for database consistency
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Verify the update
+      const { data: verification } = await supabase
+        .from("profiles")
+        .select("onboarded")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (verification?.onboarded) {
+        // Cache onboarding status in localStorage
+        localStorage.setItem("edvana_onboarded", "true")
+        toast.success("Successfully joined class! Welcome to your learning journey.")
+        navigate("/dashboard")
+      } else {
+        toast.error("Failed to complete onboarding. Please try again.")
+      }
     } catch (err) {
       console.error("Error joining class:", err)
       toast.error("An error occurred. Please try again.")
