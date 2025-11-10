@@ -137,6 +137,7 @@ export const AutoQuestionSettings = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="5">Every 5 minutes (experimental - may skip if quality is low)</SelectItem>
                   <SelectItem value="10">Every 10 minutes</SelectItem>
                   <SelectItem value="15">Every 15 minutes (recommended)</SelectItem>
                   <SelectItem value="20">Every 20 minutes</SelectItem>

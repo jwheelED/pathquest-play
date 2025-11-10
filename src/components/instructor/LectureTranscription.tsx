@@ -1032,8 +1032,30 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return false;
       }
       
-      // Adjust threshold based on content length (more lenient for longer content)
-      const densityThreshold = actualWordCount > 500 ? 0.30 : 0.35;
+      // Adaptive quality thresholds based on interval length
+      // 5-minute intervals: more lenient (0.25) + minimum 400 words
+      // 10+ minute intervals: standard thresholds
+      let densityThreshold: number;
+      let minWordCount: number;
+      
+      if (autoQuestionInterval <= 5) {
+        densityThreshold = 0.25; // Lower threshold for short intervals
+        minWordCount = 400; // Minimum ~2.5 min of solid content at 150 WPM
+      } else {
+        densityThreshold = actualWordCount > 500 ? 0.30 : 0.35;
+        minWordCount = 0; // No minimum for longer intervals
+      }
+      
+      // Check minimum word count for 5-minute intervals
+      if (minWordCount > 0 && actualWordCount < minWordCount) {
+        console.log('⚠️ Not enough words for 5-min interval:', actualWordCount, `(need ${minWordCount}+)`);
+        toast({
+          title: "⏭️ Auto-question skipped",
+          description: `Need ${minWordCount - actualWordCount} more words for quality question`,
+          duration: 3000,
+        });
+        return false;
+      }
       
       if (qualityMetrics.contentDensity < densityThreshold) {
         console.log('⚠️ Content density too low:', qualityMetrics.contentDensity);
