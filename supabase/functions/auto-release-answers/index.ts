@@ -28,7 +28,20 @@ Deno.serve(async (req) => {
     }
 
     const releasedCount = data || 0;
-    console.log(`Auto-released ${releasedCount} assignment(s)`);
+
+    // Enhanced logging: fetch details of what was just released
+    if (releasedCount > 0) {
+      const { data: releasedAssignments } = await supabase
+        .from('student_assignments')
+        .select('id, title, instructor_id, student_id')
+        .eq('release_method', 'auto')
+        .eq('answers_released', true)
+        .gte('updated_at', new Date(Date.now() - 120000).toISOString()); // Last 2 minutes
+
+      console.log(`✅ Released ${releasedCount} assignment(s):`, releasedAssignments);
+    } else {
+      console.log('⏳ No assignments ready for auto-release');
+    }
 
     return new Response(
       JSON.stringify({ 

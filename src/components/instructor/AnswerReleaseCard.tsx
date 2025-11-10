@@ -56,6 +56,7 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   const [showAll, setShowAll] = useState(false);
   const [releasingAll, setReleasingAll] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [cronHealthy, setCronHealthy] = useState<boolean | null>(null);
 
   useEffect(() => {
     fetchAssignments();
@@ -65,25 +66,50 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
       setCurrentTime(new Date());
     }, 1000);
 
-    // Real-time updates
+    // Real-time updates with auto-release notifications
     const channel = supabase
       .channel('assignment-releases')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'student_assignments',
           filter: `instructor_id=eq.${instructorId}`
         },
-        () => {
+        (payload: any) => {
+          // Detect auto-release completion
+          if (
+            payload.new?.answers_released === true && 
+            payload.new?.release_method === 'auto' &&
+            payload.old?.answers_released === false
+          ) {
+            toast.success(
+              `🎉 Auto-release completed for "${payload.new.title}"`,
+              { duration: 5000 }
+            );
+          }
           fetchAssignments();
         }
       )
       .subscribe();
 
+    // Check cron health on mount and every 5 minutes
+    const checkCronHealth = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('auto-release-answers');
+        setCronHealthy(!error && data?.success === true);
+      } catch {
+        setCronHealthy(false);
+      }
+    };
+
+    checkCronHealth();
+    const healthCheck = setInterval(checkCronHealth, 5 * 60 * 1000);
+
     return () => {
       clearInterval(timeInterval);
+      clearInterval(healthCheck);
       supabase.removeChannel(channel);
     };
   }, [instructorId]);
@@ -180,16 +206,11 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   };
 
   const handleSetAutoRelease = async (assignmentIds: string[], minutes: number, title: string) => {
-    const autoReleaseAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-
-    const { error } = await supabase
-      .from('student_assignments')
-      .update({
-        auto_release_enabled: true,
-        auto_release_minutes: minutes,
-        auto_release_at: autoReleaseAt
-      })
-      .in('id', assignmentIds);
+    // Use server-side RPC to avoid timezone mismatches
+    const { error } = await supabase.rpc('set_auto_release_timer', {
+      p_assignment_ids: assignmentIds,
+      p_minutes: minutes
+    });
 
     if (error) {
       toast.error('Failed to set auto-release timer');
@@ -293,12 +314,22 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
               <Unlock className="h-5 w-5" />
               Answer Release Control
             </CardTitle>
-            <CardDescription>
-              Control when students can see correct answers - manually or on a timer
+            <CardDescription className="flex items-center gap-2 flex-wrap">
+              <span>Control when students can see correct answers - manually or on a timer</span>
               {pendingReleases.length > 0 && (
-                <span className="ml-2 font-semibold text-primary">
+                <span className="font-semibold text-primary">
                   ({pendingReleases.length} pending)
                 </span>
+              )}
+              {cronHealthy === false && (
+                <Badge variant="destructive" className="text-xs">
+                  Auto-release offline
+                </Badge>
+              )}
+              {cronHealthy === true && (
+                <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                  ● Auto-release active
+                </Badge>
               )}
             </CardDescription>
           </div>
@@ -385,15 +416,34 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
                   </div>
 
                   {/* Timer Display */}
-                  {assignment.auto_release_enabled && !timeRemaining.isExpired && (
+                  {assignment.auto_release_enabled && (
                     <div className="space-y-2 p-3 bg-muted/50 rounded-md">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Releasing in:</span>
-                        <span className={`font-mono font-bold text-lg ${timerColor}`}>
-                          {timeRemaining.minutes}:{timeRemaining.seconds.toString().padStart(2, '0')}
-                        </span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
+                      {timeRemaining.isExpired ? (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Timer expired, checking...</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              toast.info('Triggering auto-release check...');
+                              await supabase.functions.invoke('auto-release-answers');
+                              setTimeout(fetchAssignments, 2000);
+                            }}
+                          >
+                            Check Now
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Releasing in:</span>
+                            <span className={`font-mono font-bold text-lg ${timerColor}`}>
+                              {timeRemaining.minutes}:{timeRemaining.seconds.toString().padStart(2, '0')}
+                            </span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -489,6 +539,8 @@ const TimerSetupDialog = ({
   const [open, setOpen] = useState(false);
   const [timerMode, setTimerMode] = useState<string>("5");
   const [customMinutes, setCustomMinutes] = useState<string>("30");
+  
+  const hasSubmissions = assignment.completed_count > 0;
 
   const handleSetTimer = () => {
     const minutes = timerMode === "custom" ? parseInt(customMinutes) : parseInt(timerMode);
@@ -503,19 +555,33 @@ const TimerSetupDialog = ({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button size="sm" variant="outline">
+        <Button size="sm" variant="outline" disabled={!hasSubmissions}>
           <Timer className="h-3 w-3 mr-1" />
           Set Timer
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Set Auto-Release Timer</AlertDialogTitle>
-          <AlertDialogDescription>
-            Choose when to automatically release answers for "{assignment.title}"
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="space-y-4 py-4">
+        {!hasSubmissions ? (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>No Submissions Yet</AlertDialogTitle>
+              <AlertDialogDescription>
+                No students have submitted "{assignment.title}" yet. You can set a timer once submissions come in.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Close</AlertDialogCancel>
+            </AlertDialogFooter>
+          </>
+        ) : (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Set Auto-Release Timer</AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose when to automatically release answers for "{assignment.title}"
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Release Timer</Label>
             <Select value={timerMode} onValueChange={setTimerMode}>
@@ -554,13 +620,15 @@ const TimerSetupDialog = ({
               You can cancel or override this at any time.
             </p>
           </div>
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleSetTimer}>
-            Set Timer
-          </AlertDialogAction>
-        </AlertDialogFooter>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSetTimer}>
+                Set Timer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </>
+        )}
       </AlertDialogContent>
     </AlertDialog>
   );

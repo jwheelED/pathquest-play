@@ -1078,6 +1078,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      set_auto_release_timer: {
+        Args: { p_assignment_ids: string[]; p_minutes: number }
+        Returns: undefined
+      }
       submit_quiz: {
         Args: { p_assignment_id: string; p_user_answers: Json }
         Returns: Json
