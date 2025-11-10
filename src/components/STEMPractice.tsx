@@ -151,7 +151,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
           // Try to load one of the due problems
           const problemIds = dueProblems.map(p => p.problem_id);
           const { data: dueProblemsData } = await supabase
-            .from("stem_problems")
+            .from("stem_problems_student_view")
             .select("*")
             .in("id", problemIds)
             .limit(1);
@@ -171,9 +171,9 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         }
       }
 
-      // Fallback to general problems from stem_problems table
+      // Fallback to general problems from stem_problems_student_view
       const { data: newProblems, error: newError } = await supabase
-        .from("stem_problems")
+        .from("stem_problems_student_view")
         .select("*")
         .limit(20);
       

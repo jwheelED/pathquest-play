@@ -471,6 +471,13 @@ export type Database = {
             foreignKeyName: "problem_attempts_problem_id_fkey"
             columns: ["problem_id"]
             isOneToOne: false
+            referencedRelation: "stem_problems_student_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
             referencedRelation: "student_problems"
             referencedColumns: ["id"]
           },
@@ -651,6 +658,13 @@ export type Database = {
             columns: ["problem_id"]
             isOneToOne: false
             referencedRelation: "stem_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaced_repetition_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems_student_view"
             referencedColumns: ["id"]
           },
           {
@@ -953,6 +967,36 @@ export type Database = {
       }
     }
     Views: {
+      stem_problems_student_view: {
+        Row: {
+          created_at: string | null
+          difficulty: string | null
+          id: string | null
+          options: Json | null
+          points_reward: number | null
+          problem_text: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
       student_problems: {
         Row: {
           created_at: string | null
