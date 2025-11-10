@@ -135,11 +135,20 @@ export default function InstructorDashboard() {
       .eq("id", session.user.id)
       .single();
 
-    // Check if instructor has completed the new onboarding with course details
-    if (!profile?.onboarded || !profile?.course_title || !profile.course_schedule || !profile.course_topics || profile.course_topics.length === 0) {
+    // Only require re-onboarding if NEVER onboarded before
+    // Don't force if just one field is missing
+    if (!profile?.onboarded) {
       toast.info("Please complete your instructor onboarding");
       navigate("/instructor/onboarding");
       return;
+    }
+
+    // Warn about missing fields but don't block access
+    if (!profile?.course_title || !profile.course_schedule || 
+        !profile.course_topics || profile.course_topics.length === 0) {
+      toast.warning("⚠️ Your course details are incomplete. Please update them in onboarding.", {
+        duration: 5000,
+      });
     }
 
     setCurrentUser(session.user);
@@ -238,6 +247,9 @@ export default function InstructorDashboard() {
   };
 
   const handleLogout = async () => {
+    // Clear ALL cached data
+    localStorage.removeItem("edvana_onboarded");
+    localStorage.removeItem("lastCourseMaterialsReminder");
     await supabase.auth.signOut();
     navigate("/instructor/auth");
   };

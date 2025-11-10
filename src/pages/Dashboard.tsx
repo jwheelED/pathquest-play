@@ -87,13 +87,7 @@ export default function Dashboard() {
   const checkOnboarding = async () => {
     if (!user?.id) return;
     
-    // Check localStorage first (instant)
-    const cachedOnboarded = localStorage.getItem("edvana_onboarded");
-    if (cachedOnboarded === "true") {
-      return; // Already onboarded, skip database check
-    }
-
-    // Only query database if not cached
+    // Always check database - cache is unreliable after instructor re-onboarding
     const { data } = await supabase
       .from("profiles")
       .select("onboarded")
@@ -101,9 +95,11 @@ export default function Dashboard() {
       .maybeSingle();
 
     if (!data?.onboarded) {
+      // Clear stale cache
+      localStorage.removeItem("edvana_onboarded");
       navigate("/onboarding");
     } else {
-      // Cache for future
+      // Update cache
       localStorage.setItem("edvana_onboarded", "true");
     }
   };
@@ -141,8 +137,9 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-    // Clear onboarding cache
+    // Clear ALL cached onboarding data
     localStorage.removeItem("edvana_onboarded");
+    localStorage.removeItem("lastCourseMaterialsReminder");
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);

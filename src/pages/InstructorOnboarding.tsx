@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Mic, CheckCircle } from "lucide-react";
+import { Upload, Mic, CheckCircle, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -17,8 +17,28 @@ export default function InstructorOnboarding() {
   const [topics, setTopics] = useState("");
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [audioPermission, setAudioPermission] = useState(false);
+  const [existingCode, setExistingCode] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchExistingCode = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('profiles')
+        .select('instructor_code')
+        .eq('id', user.id)
+        .single();
+      
+      if (data?.instructor_code) {
+        setExistingCode(data.instructor_code);
+      }
+    };
+    
+    fetchExistingCode();
+  }, []);
 
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
@@ -114,6 +134,32 @@ export default function InstructorOnboarding() {
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
+          {existingCode && (
+            <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
+              <p className="text-sm text-foreground mb-2">
+                <strong>Your current class code:</strong>
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="text-lg font-bold text-primary bg-background px-3 py-1 rounded">
+                  {existingCode}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(existingCode);
+                    toast({ title: "Code copied to clipboard!" });
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                This code will remain the same after updating your course details.
+              </p>
+            </div>
+          )}
+
           {step === 1 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Course Information</h3>
