@@ -29,25 +29,69 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   "explanation": "Why this is correct and others are wrong"
 }`;
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [
-        { role: 'system', content: 'You are an educational AI that creates high-quality multiple choice questions.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    }),
-  });
+  // Add timeout handling (30 seconds)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  const aiResponse = await response.json();
-  return JSON.parse(aiResponse.choices[0].message.content);
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are an educational AI that creates high-quality multiple choice questions. Return ONLY valid JSON, no markdown formatting.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status === 429) {
+        throw new Error('AI service rate limit exceeded. Please try again in a moment.');
+      }
+      if (response.status === 402) {
+        throw new Error('AI service quota exceeded. Please add credits to your workspace.');
+      }
+      throw new Error(`AI API error: ${response.status} - ${errorText}`);
+    }
+
+    const aiResponse = await response.json();
+    let content = aiResponse.choices[0].message.content;
+    
+    // Enhanced JSON parsing with markdown cleanup
+    content = content
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+    
+    try {
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.error('JSON parse failed, content:', content);
+      // Fallback: try to extract JSON from text
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      throw new Error('Failed to parse AI response as JSON');
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('AI request timed out after 30 seconds. Please try again.');
+    }
+    throw error;
+  }
 };
 
 const generateCodingQuestion = async (questionText: string, context: string) => {
@@ -72,25 +116,69 @@ Return JSON:
   "hints": ["hint1", "hint2"]
 }`;
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [
-        { role: 'system', content: 'You are an educational AI that creates coding challenges for students.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    }),
-  });
+  // Add timeout handling (30 seconds)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  const aiResponse = await response.json();
-  return JSON.parse(aiResponse.choices[0].message.content);
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are an educational AI that creates coding challenges for students. Return ONLY valid JSON, no markdown formatting.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      if (response.status === 429) {
+        throw new Error('AI service rate limit exceeded. Please try again in a moment.');
+      }
+      if (response.status === 402) {
+        throw new Error('AI service quota exceeded. Please add credits to your workspace.');
+      }
+      throw new Error(`AI API error: ${response.status} - ${errorText}`);
+    }
+
+    const aiResponse = await response.json();
+    let content = aiResponse.choices[0].message.content;
+    
+    // Enhanced JSON parsing with markdown cleanup
+    content = content
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+    
+    try {
+      return JSON.parse(content);
+    } catch (parseError) {
+      console.error('JSON parse failed, content:', content);
+      // Fallback: try to extract JSON from text
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      throw new Error('Failed to parse AI response as JSON');
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('AI request timed out after 30 seconds. Please try again.');
+    }
+    throw error;
+  }
 };
 
 serve(async (req) => {
@@ -407,8 +495,33 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in format-and-send-question:', error);
+    
+    // User-friendly error messages
+    let userMessage = 'Unknown error occurred';
+    let errorType = 'server_error';
+    
+    if (error instanceof Error) {
+      if (error.message.includes('rate limit')) {
+        userMessage = 'AI service is busy. Please wait a moment and try again.';
+        errorType = 'rate_limit';
+      } else if (error.message.includes('quota exceeded') || error.message.includes('402')) {
+        userMessage = 'AI service quota exceeded. Please add credits to your Lovable workspace.';
+        errorType = 'quota_exceeded';
+      } else if (error.message.includes('timed out')) {
+        userMessage = 'Request timed out. The AI service took too long to respond.';
+        errorType = 'timeout';
+      } else if (error.message.includes('parse') || error.message.includes('JSON')) {
+        userMessage = 'Failed to process AI response. Please try again.';
+        errorType = 'parse_error';
+      } else {
+        userMessage = error.message;
+      }
+    }
+    
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: userMessage,
+      error_type: errorType,
+      technical_details: error instanceof Error ? error.message : 'Unknown error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

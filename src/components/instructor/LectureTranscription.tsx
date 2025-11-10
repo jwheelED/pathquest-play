@@ -6,6 +6,8 @@ import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, 
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuthRefresh } from "@/hooks/useAuthRefresh";
+import { Progress } from "@/components/ui/progress";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -17,16 +19,21 @@ const KEEP_RECENT_SIZE = 40000; // Keep 40K most recent
 const RESTART_INTERVAL = 15 * 60 * 1000; // 15 minutes
 const TOKEN_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes
 const MAX_RECORDING_CYCLES = 50; // Force restart after 50 cycles (~8.5 min)
-const MAX_CONSECUTIVE_FAILURES = 3;
+const MAX_CONSECUTIVE_FAILURES = 5; // Increased from 3 to 5
 const RECORDING_CHUNK_DURATION = 8000; // 8 seconds for better sentence completion
 const MIN_CHUNK_LENGTH = 30; // Minimum characters to analyze
+const CIRCUIT_BREAKER_BACKOFF = [30000, 60000, 120000, 300000]; // 30s, 60s, 120s, 300s
 
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
+  // Proactive token refresh
+  useAuthRefresh(true);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
   const [failureCount, setFailureCount] = useState(0);
   const [isCircuitOpen, setIsCircuitOpen] = useState(false);
+  const [circuitBreakerRetryAt, setCircuitBreakerRetryAt] = useState<number>(0);
+  const [circuitBreakerCountdown, setCircuitBreakerCountdown] = useState<number>(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(true);
@@ -132,6 +139,31 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     const healthy = failureCount < MAX_CONSECUTIVE_FAILURES && !isCircuitOpen;
     setSystemHealthy(healthy);
   }, [failureCount, isCircuitOpen]);
+
+  // Circuit breaker countdown
+  useEffect(() => {
+    if (isCircuitOpen && circuitBreakerRetryAt > Date.now()) {
+      const interval = setInterval(() => {
+        const secondsLeft = Math.ceil((circuitBreakerRetryAt - Date.now()) / 1000);
+        if (secondsLeft > 0) {
+          setCircuitBreakerCountdown(secondsLeft);
+        } else {
+          setIsCircuitOpen(false);
+          setCircuitBreakerCountdown(0);
+          setCircuitBreakerRetryAt(0);
+          setFailureCount(0);
+          toast({
+            title: "🔄 System recovered",
+            description: "Attempting to resume normal operation",
+          });
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setCircuitBreakerCountdown(0);
+    }
+  }, [isCircuitOpen, circuitBreakerRetryAt, toast]);
 
   // Countdown timer for rate limit
   useEffect(() => {
@@ -645,12 +677,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (error) {
         console.error('❌ Edge function error:', error);
         
+        // Enhanced error handling with user-friendly messages
+        let errorMessage = error.message || "An unexpected error occurred";
+        let errorType = 'unknown';
+        
+        // Parse error from response data if available
+        if (data?.error) {
+          errorMessage = data.error;
+          errorType = data.error_type || 'unknown';
+        }
+        
         // Handle 429 Rate Limit - distinguish between cooldown and daily limit
-        if (error.message?.includes('429') || error.status === 429) {
-          const errorData = data?.error || error.context || {};
+        if (error.message?.includes('429') || error.status === 429 || errorType === 'cooldown' || errorType === 'daily_limit') {
+          const errorData = data || {};
           
           // Check if this is daily limit or cooldown
-          if (errorData.error_type === 'daily_limit' || errorData.quota_reset) {
+          if (errorType === 'daily_limit' || errorData.quota_reset) {
             const hoursLeft = errorData.hours_until_reset || 0;
             const minutesLeft = errorData.minutes_until_reset || 0;
             const currentCount = errorData.current_count || dailyQuestionCount;
@@ -664,7 +706,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             });
           } else {
             // Regular cooldown
-            const retryAfter = errorData.retry_after || 60;
+            const retryAfter = errorData.retry_after || 15;
             const nextAllowed = Date.now() + (retryAfter * 1000);
             setNextQuestionAllowedAt(nextAllowed);
             
@@ -680,7 +722,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
         
         // Handle 401 authentication errors
-        if (error.status === 401) {
+        if (error.status === 401 || errorMessage.includes('Session expired') || errorMessage.includes('Unauthorized')) {
           toast({
             title: "🔐 Session expired",
             description: "Please refresh the page to continue",
@@ -691,10 +733,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
         
         // Handle 400 bad request
-        if (error.status === 400) {
+        if (error.status === 400 || errorMessage.includes('Invalid')) {
           toast({
             title: "❌ Invalid question",
-            description: error.message || "The question format was invalid",
+            description: errorMessage,
+            variant: "destructive",
+            duration: 5000,
+          });
+          throw error;
+        }
+        
+        // Handle AI-specific errors
+        if (errorMessage.includes('AI service') || errorMessage.includes('rate limit') || errorMessage.includes('quota')) {
+          toast({
+            title: "⚠️ AI Service Issue",
+            description: errorMessage,
+            variant: "destructive",
+            duration: 7000,
+          });
+          throw error;
+        }
+        
+        // Handle timeout errors
+        if (errorMessage.includes('timed out') || errorMessage.includes('timeout')) {
+          toast({
+            title: "⏱️ Request timed out",
+            description: "The AI service took too long to respond. Please try again.",
             variant: "destructive",
             duration: 5000,
           });
@@ -702,10 +766,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
         
         // Handle 500 server errors
-        if (error.status === 500) {
+        if (error.status === 500 || error.status === 504) {
           toast({
-            title: "❌ Server error",
-            description: "There was a problem on the server. Please try again.",
+            title: "❌ Server busy",
+            description: "The server is experiencing high load. Retrying in 3...2...1...",
             variant: "destructive",
             duration: 5000,
           });
@@ -715,7 +779,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Handle network errors
         if (error.message?.includes('fetch') || error.message?.includes('network')) {
           toast({
-            title: "🌐 Network error",
+            title: "🌐 Connection issue",
             description: "Please check your internet connection and try again",
             variant: "destructive",
             duration: 5000,
@@ -723,7 +787,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           throw error;
         }
         
-        // Generic error handling
+        // Generic error handling with technical details hidden
+        toast({
+          title: "❌ Unable to send question",
+          description: errorMessage.substring(0, 100),
+          variant: "destructive",
+          duration: 5000,
+        });
+        
         throw error;
       }
 
@@ -1611,30 +1682,47 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 </p>
               </div>
 
-              {/* Next Question Available */}
-              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Next Question</p>
-                <p className="text-sm font-bold">
+              {/* Next Question with Progress Bar */}
+              <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Next Question</p>
+                <p className="text-sm font-bold mb-2">
                   {rateLimitSecondsLeft > 0 ? (
                     <span className="text-amber-600 dark:text-amber-400">⏱️ {rateLimitSecondsLeft}s</span>
                   ) : (
                     <span className="text-green-600 dark:text-green-400">✅ Ready</span>
                   )}
                 </p>
+                {rateLimitSecondsLeft > 0 && (
+                  <Progress 
+                    value={100 - ((rateLimitSecondsLeft / 15) * 100)} 
+                    className="h-2 bg-amber-100 dark:bg-amber-950"
+                  />
+                )}
               </div>
 
-              {/* Daily Quota */}
-              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Daily Quota</p>
-                <p className="text-sm font-bold">
+              {/* Daily Quota with Progress Bar */}
+              <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground">Daily Quota</p>
+                  {dailyQuestionCount >= dailyQuotaLimit * 0.8 && (
+                    <Badge variant={dailyQuestionCount >= dailyQuotaLimit ? "destructive" : "default"} className="text-[10px] px-1.5 py-0.5">
+                      {dailyQuestionCount >= dailyQuotaLimit ? '🚫 FULL' : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? '⚠️ 90%' : '⚠️ 80%'}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm font-bold mb-2">
                   {dailyQuestionCount >= dailyQuotaLimit ? (
-                    <span className="text-red-600 dark:text-red-400">🚫 {dailyQuestionCount}/{dailyQuotaLimit}</span>
+                    <span className="text-red-600 dark:text-red-400">{dailyQuestionCount}/{dailyQuotaLimit}</span>
                   ) : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? (
-                    <span className="text-amber-600 dark:text-amber-400">⚠️ {dailyQuestionCount}/{dailyQuotaLimit}</span>
+                    <span className="text-amber-600 dark:text-amber-400">{dailyQuestionCount}/{dailyQuotaLimit}</span>
                   ) : (
-                    <span className="text-green-600 dark:text-green-400">📊 {dailyQuestionCount}/{dailyQuotaLimit}</span>
+                    <span className="text-green-600 dark:text-green-400">{dailyQuestionCount}/{dailyQuotaLimit}</span>
                   )}
                 </p>
+                <Progress 
+                  value={(dailyQuestionCount / dailyQuotaLimit) * 100} 
+                  className="h-2"
+                />
               </div>
             </div>
 

@@ -88,31 +88,61 @@ Return JSON:
   "reasoning": "why this question tests the key concept"
 }`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are an educational AI that generates high-quality lecture check-in questions.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" }
-      }),
-    });
+    // Add timeout handling (30 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    let response;
+    try {
+      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: 'You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+          response_format: { type: "json_object" }
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'AI request timed out after 30 seconds' 
+        }), {
+          status: 504,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw fetchError;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('AI API error:', response.status, errorText);
+      
+      let errorMessage = 'Failed to generate question from AI';
+      if (response.status === 429) {
+        errorMessage = 'AI service rate limit exceeded. Please try again in a moment.';
+      } else if (response.status === 402) {
+        errorMessage = 'AI service quota exceeded. Please add credits to your workspace.';
+      }
+      
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Failed to generate question from AI' 
+        error: errorMessage,
+        status_code: response.status
       }), {
-        status: 500,
+        status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -120,16 +150,37 @@ Return JSON:
     const aiResponse = await response.json();
     let content = aiResponse.choices[0].message.content;
     
-    // Strip markdown code fences if present
-    content = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    // Enhanced JSON parsing with markdown cleanup
+    content = content
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
     
-    const result = JSON.parse(content);
+    let result;
+    try {
+      result = JSON.parse(content);
+    } catch (parseError) {
+      console.error('JSON parse failed, content:', content);
+      // Fallback: try to extract JSON from text
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Failed to parse AI response'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     console.log('✅ Auto-question generated:', result.question_text);
     console.log('📊 Confidence:', result.confidence, '| Reasoning:', result.reasoning);
 
-    // Only return questions with reasonable confidence (lowered from 0.5 to 0.4)
-    if (result.confidence < 0.4) { // Changed from 0.5
+    // Only return questions with reasonable confidence (lowered from 0.5 to 0.3)
+    if (result.confidence < 0.3) { // Lowered threshold for better question generation
       console.log('⚠️ Confidence too low, skipping auto-question');
       console.log('   Question was:', result.question_text);
       console.log('   Confidence:', result.confidence);
