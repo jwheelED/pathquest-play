@@ -127,17 +127,26 @@ export const LectureCheckInResults = () => {
       return;
     }
 
-    // Get student names in batches if needed (efficient for 40+ students)
+    // Get student names from both users and profiles tables (efficient for 40+ students)
     const studentIds = [...new Set(assignments?.map((a) => a.student_id) || [])];
-    const { data: students } = await supabase.from("users").select("id, name").in("id", studentIds);
+    const [usersResult, profilesResult] = await Promise.all([
+      supabase.from("users").select("id, name").in("id", studentIds),
+      supabase.from("profiles").select("id, full_name").in("id", studentIds)
+    ]);
 
-    const studentMap = new Map(students?.map((s) => [s.id, s.name]) || []);
+    // Build name map with fallback logic: users.name -> profiles.full_name -> "Unknown"
+    const studentMap = new Map<string, string>();
+    studentIds.forEach(id => {
+      const userName = usersResult.data?.find(u => u.id === id)?.name;
+      const profileName = profilesResult.data?.find(p => p.id === id)?.full_name;
+      studentMap.set(id, userName || profileName || "Unknown Student");
+    });
 
     // Add student names to assignments
     const assignmentsWithNames =
       assignments?.map((a) => ({
         ...a,
-        student_name: studentMap.get(a.student_id) || "Unknown",
+        student_name: studentMap.get(a.student_id) || "Unknown Student",
       })) || [];
 
     // Group by timestamp (within 5 minutes)
@@ -241,17 +250,29 @@ export const LectureCheckInResults = () => {
       return assignmentQuestions.some((q: any) => q.question === question.question);
     });
 
+    // DEDUPLICATION: Keep only latest submission per student (same logic as UI)
+    const uniqueStudents = new Map<string, Assignment>();
+    questionAssignments.forEach((assignment) => {
+      const existing = uniqueStudents.get(assignment.student_id);
+      if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+        uniqueStudents.set(assignment.student_id, assignment);
+      }
+    });
+
+    // Calculate stats from deduplicated list
+    const uniqueAssignments = Array.from(uniqueStudents.values());
+
     // For short answer questions requiring manual grading, don't calculate correct/incorrect stats
     const isManualGradeShortAnswer = question.type === 'short_answer' && 
       (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
     
-    const completed = questionAssignments.filter((a) => a.completed);
+    const completed = uniqueAssignments.filter((a) => a.completed);
     
     // Use overridden answer if it exists, otherwise use original correctAnswer
     const correctAnswer = question.overriddenAnswer || question.correctAnswer;
     const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
-      // Always use index 0 since each assignment has only 1 question
-      const response = a.quiz_responses?.[0];
+      // quiz_responses is an object with string keys like {"0": "B"}
+      const response = a.quiz_responses?.["0"] || a.quiz_responses?.[0];
       return response === correctAnswer;
     });
 
@@ -265,7 +286,7 @@ export const LectureCheckInResults = () => {
       : null;
 
     return {
-      total: questionAssignments.length,
+      total: uniqueAssignments.length,
       completed: completed.length,
       correct: correct.length,
       percentage: isManualGradeShortAnswer ? null : (completed.length > 0 ? (correct.length / completed.length) * 100 : 0),
@@ -305,7 +326,8 @@ export const LectureCheckInResults = () => {
         // Calculate correct count using overridden answers where applicable
         let correctCount = 0;
         mcQuestions.forEach((q: any, idx: number) => {
-          const userAnswer = assignment.quiz_responses?.[idx];
+          // quiz_responses is an object with string keys like {"0": "B"}
+          const userAnswer = assignment.quiz_responses?.[idx.toString()] || assignment.quiz_responses?.[idx];
           const rightAnswer = q.overriddenAnswer || q.correctAnswer;
           if (userAnswer === rightAnswer) {
             correctCount++;
@@ -396,7 +418,8 @@ export const LectureCheckInResults = () => {
         group.assignments.forEach((assignment) => {
           group.questions.forEach((question, qIdx) => {
             const correctAnswer = question.overriddenAnswer || question.correctAnswer;
-            const studentAnswer = assignment.quiz_responses?.[qIdx] || 'No Answer';
+            // quiz_responses is an object with string keys like {"0": "B"}
+            const studentAnswer = assignment.quiz_responses?.[qIdx.toString()] || assignment.quiz_responses?.[qIdx] || 'No Answer';
             const isCorrect = studentAnswer === correctAnswer;
             const questionNum = qIdx + 1;
             
@@ -660,8 +683,8 @@ export const LectureCheckInResults = () => {
                             });
                             
                             return Array.from(uniqueStudents.values()).map((assignment) => {
-                              // Always use index 0 since each assignment has only 1 question
-                              const studentAnswer = assignment.quiz_responses?.[0];
+                              // quiz_responses is an object with string keys like {"0": "B"}
+                              const studentAnswer = assignment.quiz_responses?.["0"] || assignment.quiz_responses?.[0];
                               const isCompleted = assignment.completed;
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
@@ -741,9 +764,9 @@ export const LectureCheckInResults = () => {
                                   return assignmentQuestions.some((q: any) => q.question === question.question);
                                 });
 
-                                // Always use index 0 since each assignment has only 1 question
+                                // quiz_responses is an object with string keys like {"0": "B"}
                                 const count = questionAssignments.filter(
-                                  (a) => a.completed && a.quiz_responses?.[0] === optionLetter,
+                                  (a) => a.completed && (a.quiz_responses?.["0"] || a.quiz_responses?.[0]) === optionLetter,
                                 ).length;
                                 const total = questionAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
@@ -797,8 +820,8 @@ export const LectureCheckInResults = () => {
                                 });
                                 
                                 return Array.from(uniqueStudents.values()).map((assignment) => {
-                                  // Always use index 0 since each assignment has only 1 question
-                                  const studentAnswer = assignment.quiz_responses?.[0];
+                                  // quiz_responses is an object with string keys like {"0": "B"}
+                                  const studentAnswer = assignment.quiz_responses?.["0"] || assignment.quiz_responses?.[0];
                                   const isCompleted = assignment.completed;
                                   const currentGrade = assignment.grade;
 
