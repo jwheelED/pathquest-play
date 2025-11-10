@@ -933,9 +933,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Update state
       setAutoQuestionCount(prev => prev + 1);
       
-      // Clear interval transcript buffer
+      // Clear interval transcript buffer and reset quality
       intervalTranscriptRef.current = "";
       setIntervalTranscriptLength(0);
+      setContentQualityScore(0);
       
       console.log(`✅ Auto-question sent! Total this session: ${autoQuestionCount + 1}`);
       
@@ -958,9 +959,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         duration: 5000,
       });
       
-      // Clear interval transcript buffer even on error
-      intervalTranscriptRef.current = "";
-      setIntervalTranscriptLength(0);
+      // Don't clear transcript on errors - let it keep building up
+      console.log('⏭️ Keeping transcript for retry (length:', intervalTranscriptRef.current.length, ')');
       return false;
     }
   };
@@ -972,6 +972,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       // Get transcript from current interval only
       const intervalTranscript = intervalTranscriptRef.current;
+      
+      console.log('📝 Interval transcript:', {
+        length: intervalTranscript.length,
+        wordCount: intervalTranscript.split(/\s+/).length,
+        preview: intervalTranscript.substring(0, 100) + '...'
+      });
       
       // Enhanced content quality check
       const qualityMetrics = analyzeContentQuality(intervalTranscript, autoQuestionInterval * 60);
@@ -1495,8 +1501,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             // Update interval transcript length state for UI
             setIntervalTranscriptLength(intervalTranscriptRef.current.length);
             
-            // Calculate and update quality score for UI display
-            if (intervalTranscriptRef.current.length >= 30) {  // MIN_CHUNK_LENGTH
+            // Calculate and update quality score for UI display (no minimum check)
+            try {
               const qualityMetrics = analyzeContentQuality(
                 intervalTranscriptRef.current, 
                 autoQuestionInterval * 60
@@ -1504,10 +1510,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               setContentQualityScore(qualityMetrics.contentDensity);
               
               console.log('📊 Quality updated:', {
-                length: intervalTranscriptRef.current.length,
-                density: qualityMetrics.contentDensity.toFixed(2),
-                isQuality: qualityMetrics.isQualityContent
+                transcriptLength: intervalTranscriptRef.current.length,
+                wordCount: qualityMetrics.wordCount,
+                density: (qualityMetrics.contentDensity * 100).toFixed(1) + '%',
+                isQuality: qualityMetrics.isQualityContent,
+                wpm: qualityMetrics.wordsPerMinute
               });
+            } catch (qualityError) {
+              console.error('❌ Quality calculation error:', qualityError);
             }
 
             // Implement sliding window for memory management
