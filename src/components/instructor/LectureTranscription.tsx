@@ -69,6 +69,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const lastDetectedChunkIndexRef = useRef<number>(-1);
   const lastQuestionSentTimeRef = useRef<number>(0);
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
+  const intervalStartTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
   // Client-side cooldown: 10 seconds minimum between detection attempts
@@ -935,6 +936,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       // Clear interval transcript buffer and reset quality
       intervalTranscriptRef.current = "";
+      intervalStartTimeRef.current = Date.now();  // Reset start time
       setIntervalTranscriptLength(0);
       setContentQualityScore(0);
       
@@ -973,21 +975,40 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Get transcript from current interval only
       const intervalTranscript = intervalTranscriptRef.current;
       
+      // Calculate actual elapsed time since interval started
+      const actualElapsedSeconds = intervalStartTimeRef.current > 0 
+        ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
+        : autoQuestionInterval * 60;
+      
+      // Use sliding window if transcript is too long
+      const expectedWords = autoQuestionInterval * 150; // ~150 WPM average
+      const actualWordCount = intervalTranscript.split(/\s+/).length;
+      let transcriptToAnalyze = intervalTranscript;
+      
+      if (actualWordCount > expectedWords * 2) {
+        // Take only the most recent portion
+        const words = intervalTranscript.split(/\s+/);
+        const recentWords = words.slice(-expectedWords);
+        transcriptToAnalyze = recentWords.join(' ');
+        console.log(`📐 Using sliding window: ${recentWords.length}/${words.length} words`);
+      }
+      
       console.log('📝 Interval transcript:', {
         length: intervalTranscript.length,
-        wordCount: intervalTranscript.split(/\s+/).length,
+        wordCount: actualWordCount,
+        actualElapsedSeconds,
         preview: intervalTranscript.substring(0, 100) + '...'
       });
       
-      // Enhanced content quality check
-      const qualityMetrics = analyzeContentQuality(intervalTranscript, autoQuestionInterval * 60);
+      // Enhanced content quality check with ACTUAL elapsed time
+      const qualityMetrics = analyzeContentQuality(transcriptToAnalyze, actualElapsedSeconds);
       
       console.log('📊 Content quality metrics:', {
         wordCount: qualityMetrics.wordCount,
-        density: qualityMetrics.contentDensity.toFixed(2),
+        density: (qualityMetrics.contentDensity * 100).toFixed(1) + '%',
         isQuality: qualityMetrics.isQualityContent,
         isPause: qualityMetrics.isPause,
-        wpm: qualityMetrics.wordsPerMinute
+        wpm: qualityMetrics.wordsPerMinute.toFixed(0)
       });
       
       if (intervalTranscript.length < 100) {
@@ -1011,11 +1032,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return false;
       }
       
-      if (qualityMetrics.contentDensity < 0.35) {
+      // Adjust threshold based on content length (more lenient for longer content)
+      const densityThreshold = actualWordCount > 500 ? 0.30 : 0.35;
+      
+      if (qualityMetrics.contentDensity < densityThreshold) {
         console.log('⚠️ Content density too low:', qualityMetrics.contentDensity);
         toast({
           title: "⏭️ Auto-question skipped",
-          description: `Content quality too low (${(qualityMetrics.contentDensity * 100).toFixed(0)}%). Speak more clearly about the topic.`,
+          description: `Content quality: ${(qualityMetrics.contentDensity * 100).toFixed(0)}%. Threshold: ${(densityThreshold * 100).toFixed(0)}%`,
           duration: 3000,
         });
         return false;
@@ -1118,7 +1142,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     
     // Initialize timer on first recording start
     if (lastAutoQuestionTime === 0) {
-      setLastAutoQuestionTime(Date.now());
+      const now = Date.now();
+      setLastAutoQuestionTime(now);
+      intervalStartTimeRef.current = now;  // Track actual start time
       setAutoQuestionCount(0);
       console.log(`⏰ Auto-questions initialized: every ${autoQuestionInterval} minutes`);
     }
@@ -1151,6 +1177,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             if (success) {
               const newTime = Date.now();
               setLastAutoQuestionTime(newTime);
+              intervalStartTimeRef.current = newTime;  // Reset start time
               console.log('✅ Timer reset after successful send');
             } else {
               // If quality check failed, keep trying on next check (1 second later)
@@ -1501,11 +1528,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             // Update interval transcript length state for UI
             setIntervalTranscriptLength(intervalTranscriptRef.current.length);
             
-            // Calculate and update quality score for UI display (no minimum check)
+            // Calculate and update quality score for UI display with ACTUAL elapsed time
             try {
+              const actualElapsedSeconds = intervalStartTimeRef.current > 0 
+                ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
+                : autoQuestionInterval * 60;
+              
+              // Use sliding window for long transcripts
+              const expectedWords = autoQuestionInterval * 150;
+              const currentWordCount = intervalTranscriptRef.current.split(/\s+/).length;
+              let transcriptToAnalyze = intervalTranscriptRef.current;
+              
+              if (currentWordCount > expectedWords * 2) {
+                const words = intervalTranscriptRef.current.split(/\s+/);
+                const recentWords = words.slice(-expectedWords);
+                transcriptToAnalyze = recentWords.join(' ');
+              }
+              
               const qualityMetrics = analyzeContentQuality(
-                intervalTranscriptRef.current, 
-                autoQuestionInterval * 60
+                transcriptToAnalyze, 
+                actualElapsedSeconds
               );
               setContentQualityScore(qualityMetrics.contentDensity);
               
@@ -1514,7 +1556,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 wordCount: qualityMetrics.wordCount,
                 density: (qualityMetrics.contentDensity * 100).toFixed(1) + '%',
                 isQuality: qualityMetrics.isQualityContent,
-                wpm: qualityMetrics.wordsPerMinute
+                wpm: qualityMetrics.wordsPerMinute.toFixed(0),
+                actualElapsedSeconds: actualElapsedSeconds.toFixed(0)
               });
             } catch (qualityError) {
               console.error('❌ Quality calculation error:', qualityError);
