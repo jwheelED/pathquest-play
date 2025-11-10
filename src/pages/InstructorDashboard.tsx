@@ -17,6 +17,7 @@ import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSe
 import { QuestionLimitSettings } from "@/components/instructor/QuestionLimitSettings";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
+import { QuestionReliabilityDashboard } from "@/components/instructor/QuestionReliabilityDashboard";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
@@ -379,6 +380,9 @@ export default function InstructorDashboard() {
               <QuestionFormatSettings instructorId={currentUser.id} />
               <QuestionLimitSettings />
             </div>
+            
+            {/* System Reliability Dashboard */}
+            <QuestionReliabilityDashboard />
             
             <AutoQuestionSettings />
             

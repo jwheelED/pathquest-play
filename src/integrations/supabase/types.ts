@@ -533,6 +533,60 @@ export type Database = {
         }
         Relationships: []
       }
+      question_send_logs: {
+        Row: {
+          ai_confidence: number | null
+          batch_count: number | null
+          created_at: string | null
+          error_message: string | null
+          error_type: string | null
+          failed_sends: number
+          id: string
+          instructor_id: string
+          processing_time_ms: number | null
+          question_text: string
+          question_type: string
+          source: string
+          student_count: number
+          success: boolean
+          successful_sends: number
+        }
+        Insert: {
+          ai_confidence?: number | null
+          batch_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          failed_sends?: number
+          id?: string
+          instructor_id: string
+          processing_time_ms?: number | null
+          question_text: string
+          question_type: string
+          source: string
+          student_count: number
+          success: boolean
+          successful_sends?: number
+        }
+        Update: {
+          ai_confidence?: number | null
+          batch_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          failed_sends?: number
+          id?: string
+          instructor_id?: string
+          processing_time_ms?: number | null
+          question_text?: string
+          question_type?: string
+          source?: string
+          student_count?: number
+          success?: boolean
+          successful_sends?: number
+        }
+        Relationships: []
+      }
       rate_limits: {
         Row: {
           count: number
@@ -723,6 +777,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      student_connection_health: {
+        Row: {
+          checked_at: string | null
+          id: string
+          instructor_id: string
+          student_count: number
+        }
+        Insert: {
+          checked_at?: string | null
+          id?: string
+          instructor_id: string
+          student_count: number
+        }
+        Update: {
+          checked_at?: string | null
+          id?: string
+          instructor_id?: string
+          student_count?: number
+        }
+        Relationships: []
       }
       student_paste_events: {
         Row: {
@@ -930,6 +1005,7 @@ export type Database = {
         Args: { _target_user_id: string; _viewer_id: string }
         Returns: boolean
       }
+      cleanup_old_question_logs: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: number }
       cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
       generate_instructor_code: { Args: never; Returns: string }
@@ -938,6 +1014,17 @@ export type Database = {
         Returns: {
           correct_answer: string
           explanation: string
+        }[]
+      }
+      get_question_success_rate: {
+        Args: { p_days?: number; p_instructor_id: string }
+        Returns: {
+          avg_processing_time_ms: number
+          failed_questions: number
+          most_common_error: string
+          success_rate: number
+          successful_questions: number
+          total_questions: number
         }[]
       }
       has_role: {

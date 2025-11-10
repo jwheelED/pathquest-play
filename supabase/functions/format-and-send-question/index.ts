@@ -380,9 +380,11 @@ serve(async (req) => {
     }
 
     console.log('👥 Sending to', studentLinks.length, 'students');
+    
+    const startTime = Date.now();
 
-    // Chunked batch processing for better reliability with large classrooms
-    const BATCH_SIZE = 15; // Process 15 students at a time
+    // Improved batch processing - smaller batches for better reliability
+    const BATCH_SIZE = 10; // Reduced from 15 to 10 for better reliability
     const studentIds = studentLinks.map(link => link.student_id);
     const batches: string[][] = [];
     
@@ -390,14 +392,19 @@ serve(async (req) => {
       batches.push(studentIds.slice(i, i + BATCH_SIZE));
     }
 
-    console.log(`📦 Processing ${batches.length} batches of up to ${BATCH_SIZE} students`);
+    console.log(`📦 Processing ${batches.length} batches of ${BATCH_SIZE} students each`);
 
     let successCount = 0;
     let failedStudents: string[] = [];
+    
+    // Generate idempotency key to prevent duplicates
+    const idempotencyKey = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     // Process batches sequentially to avoid overwhelming the database
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
+      
+      console.log(`📤 Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} students)...`);
       
       const assignments = batch.map(studentId => ({
         instructor_id: user.id,
@@ -409,7 +416,8 @@ serve(async (req) => {
           questions: [formattedQuestion],
           isLive: true,
           detectedAutomatically: true,
-          source: source // 'voice_command', 'auto_interval', or 'manual_button'
+          source: source, // 'voice_command', 'auto_interval', or 'manual_button'
+          idempotency_key: idempotencyKey // Prevent duplicates
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString()
@@ -466,7 +474,33 @@ serve(async (req) => {
       }
     }
 
-    console.log(`✅ Questions sent: ${successCount}/${studentIds.length} students`);
+    const processingTime = Date.now() - startTime;
+    const wasSuccessful = successCount > 0;
+    
+    console.log(`✅ Questions sent: ${successCount}/${studentIds.length} students in ${processingTime}ms`);
+
+    // Log to question_send_logs for monitoring
+    try {
+      await supabase
+        .from('question_send_logs')
+        .insert({
+          instructor_id: user.id,
+          question_text: question_text,
+          question_type: finalType,
+          source: source,
+          success: wasSuccessful,
+          error_message: failedStudents.length > 0 ? `${failedStudents.length} students failed` : null,
+          error_type: failedStudents.length > 0 ? 'partial_failure' : null,
+          student_count: studentIds.length,
+          successful_sends: successCount,
+          failed_sends: failedStudents.length,
+          batch_count: batches.length,
+          processing_time_ms: processingTime
+        });
+    } catch (logError) {
+      console.error('Failed to log question send:', logError);
+      // Don't fail the request if logging fails
+    }
 
     // Broadcast notification via Supabase Realtime for instant delivery
     const broadcastChannel = supabase.channel(`instructor-${user.id}-questions`);
@@ -488,7 +522,8 @@ serve(async (req) => {
       failed_count: failedStudents.length,
       question_type: finalType,
       question: formattedQuestion,
-      batches_processed: batches.length
+      batches_processed: batches.length,
+      processing_time_ms: processingTime
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -516,6 +551,31 @@ serve(async (req) => {
       } else {
         userMessage = error.message;
       }
+    }
+    
+    // Log failure to question_send_logs
+    try {
+      const supabaseForLogging = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+      
+      await supabaseForLogging
+        .from('question_send_logs')
+        .insert({
+          instructor_id: (error as any).user_id || 'unknown',
+          question_text: (error as any).question_text || 'unknown',
+          question_type: 'unknown',
+          source: 'unknown',
+          success: false,
+          error_message: userMessage,
+          error_type: errorType,
+          student_count: 0,
+          successful_sends: 0,
+          failed_sends: 0
+        });
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
     }
     
     return new Response(JSON.stringify({ 

@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
+import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -51,6 +52,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState<number>(0);
   const [autoQuestionCount, setAutoQuestionCount] = useState<number>(0);
   const [intervalTranscriptLength, setIntervalTranscriptLength] = useState<number>(0);
+  const [contentQualityScore, setContentQualityScore] = useState<number>(0);
+  const [batchProgress, setBatchProgress] = useState<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -659,7 +662,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Provide richer context for better question formatting
       const fullContext = transcriptBufferRef.current.slice(-1500);
 
-      // Retry logic for transient failures
+      // Retry logic for transient failures with progress tracking
       const { data, error } = await retryWithBackoff(async () => {
         return await supabase.functions.invoke('format-and-send-question', {
           body: {
@@ -673,6 +676,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
 
       console.log('📥 Edge function response:', { data, error });
+      
+      // Show batch progress if available
+      if (data?.batches_processed && data?.total_students) {
+        setBatchProgress(`Sending to ${data.total_students} students in ${data.batches_processed} batches...`);
+        setTimeout(() => setBatchProgress(""), 3000);
+      }
 
       if (error) {
         console.error('❌ Edge function error:', error);
@@ -943,11 +952,43 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Get transcript from current interval only
       const intervalTranscript = intervalTranscriptRef.current;
       
+      // Enhanced content quality check
+      const qualityMetrics = analyzeContentQuality(intervalTranscript, autoQuestionInterval * 60);
+      
+      console.log('📊 Content quality metrics:', {
+        wordCount: qualityMetrics.wordCount,
+        density: qualityMetrics.contentDensity.toFixed(2),
+        isQuality: qualityMetrics.isQualityContent,
+        isPause: qualityMetrics.isPause,
+        wpm: qualityMetrics.wordsPerMinute
+      });
+      
       if (intervalTranscript.length < 100) {
         console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 100+)');
         toast({
           title: "⏭️ Auto-question skipped",
           description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
+          duration: 3000,
+        });
+        return;
+      }
+      
+      // Skip if content quality is too low
+      if (qualityMetrics.isPause) {
+        console.log('⚠️ Content appears to be a pause or low quality, skipping auto-question');
+        toast({
+          title: "⏭️ Auto-question skipped",
+          description: "Low content quality detected (pause or filler words). Continue teaching for better questions.",
+          duration: 3000,
+        });
+        return;
+      }
+      
+      if (qualityMetrics.contentDensity < 0.35) {
+        console.log('⚠️ Content density too low:', qualityMetrics.contentDensity);
+        toast({
+          title: "⏭️ Auto-question skipped",
+          description: `Content quality too low (${(qualityMetrics.contentDensity * 100).toFixed(0)}%). Speak more clearly about the topic.`,
           duration: 3000,
         });
         return;
@@ -1093,6 +1134,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setNextAutoQuestionIn(0);
       setAutoQuestionCount(0);
       setIntervalTranscriptLength(0);
+      setContentQualityScore(0);
       intervalTranscriptRef.current = "";
       isGeneratingAutoQuestionRef.current = false;
     }
@@ -1741,34 +1783,48 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   </Badge>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-3 gap-3 text-sm">
                   <div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">Interval Content:</span>
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">Content Size:</span>
                     <div className={`font-bold ${intervalTranscriptLength >= 100 ? 'text-green-600 dark:text-green-400' : 'text-orange-500 dark:text-orange-400'}`}>
-                      {intervalTranscriptLength}/100 chars
+                      {intervalTranscriptLength}/100
                     </div>
                   </div>
                   
                   <div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">Next In:</span>
-                    <div className="font-bold text-blue-700 dark:text-blue-300">
-                      {Math.floor(nextAutoQuestionIn / 60)}:{(nextAutoQuestionIn % 60).toString().padStart(2, '0')}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">Sent This Session:</span>
-                    <div className="font-bold text-blue-700 dark:text-blue-300">
-                      {autoQuestionCount}
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">Quality:</span>
+                    <div className="flex items-center gap-1">
+                      <div className={`font-bold ${
+                        contentQualityScore >= 0.5 ? 'text-green-600 dark:text-green-400' : 
+                        contentQualityScore >= 0.35 ? 'text-amber-600 dark:text-amber-400' : 
+                        'text-red-600 dark:text-red-400'
+                      }`}>
+                        {(contentQualityScore * 100).toFixed(0)}%
+                      </div>
+                      {contentQualityScore >= 0.5 ? '✅' : contentQualityScore >= 0.35 ? '⚠️' : '❌'}
                     </div>
                   </div>
                   
                   <div>
                     <span className="text-blue-600 dark:text-blue-400 text-xs">Status:</span>
-                    <div className="font-bold text-green-600 dark:text-green-400">
-                      {intervalTranscriptLength >= 100 ? '✅ Ready' : '⏳ Building'}
+                    <div className="font-bold">
+                      {intervalTranscriptLength >= 100 && contentQualityScore >= 0.35 ? (
+                        <span className="text-green-600 dark:text-green-400">✅ Ready</span>
+                      ) : (
+                        <span className="text-orange-500 dark:text-orange-400">⏳ Building</span>
+                      )}
                     </div>
                   </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                  <span>Next Auto-Question:</span>
+                  <span className="font-bold">{Math.floor(nextAutoQuestionIn / 60)}:{(nextAutoQuestionIn % 60).toString().padStart(2, '0')}</span>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-blue-600 dark:text-blue-400">
+                  <span>Questions Sent:</span>
+                  <span className="font-bold">{autoQuestionCount}</span>
                 </div>
                 
                 {/* 10-second countdown animation */}
@@ -1786,14 +1842,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 {/* Manual Test Button */}
                 <Button
                   onClick={handleTestAutoQuestion}
-                  disabled={intervalTranscriptLength < 100 || isSendingQuestion || isGeneratingAutoQuestionRef.current}
+                  disabled={intervalTranscriptLength < 100 || contentQualityScore < 0.35 || isSendingQuestion || isGeneratingAutoQuestionRef.current}
                   variant="outline"
                   size="sm"
                   className="w-full mt-3 bg-white dark:bg-gray-800"
                 >
                   <Sparkles className="h-3 w-3 mr-2" />
                   {intervalTranscriptLength < 100 
-                    ? `Test (Need ${100 - intervalTranscriptLength} more chars)` 
+                    ? `Test (Need ${100 - intervalTranscriptLength} chars)` 
+                    : contentQualityScore < 0.35
+                    ? `Test (Quality: ${(contentQualityScore * 100).toFixed(0)}%, need 35%+)`
                     : 'Test Auto-Question Now'}
                 </Button>
               </div>
