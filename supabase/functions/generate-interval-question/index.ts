@@ -49,7 +49,7 @@ serve(async (req) => {
       });
     }
 
-    const { interval_transcript, interval_minutes } = await req.json();
+    const { interval_transcript, interval_minutes, format_preference } = await req.json();
 
     if (!interval_transcript || interval_transcript.length < 100) {
       return new Response(JSON.stringify({ 
@@ -61,8 +61,49 @@ serve(async (req) => {
     }
 
     console.log(`📝 Generating auto-question from ${interval_minutes}-minute interval (${interval_transcript.length} chars)`);
+    console.log(`🎯 Format preference: ${format_preference || 'multiple_choice'}`);
 
-    const prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
+    // Different prompts based on format preference
+    let prompt: string;
+    
+    if (format_preference === 'coding') {
+      // LeetCode-style coding problem generation
+      prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
+
+RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
+"${interval_transcript}"
+
+TASK: Generate ONE LeetCode-style coding problem based on the MOST IMPORTANT concept from this lecture segment.
+
+REQUIREMENTS:
+1. Create a practical coding challenge that tests the key concept taught
+2. Include proper problem structure with constraints and complexity requirements
+3. Match the programming language being taught in the lecture
+4. Make it solvable based on what was just covered
+5. Appropriate difficulty for a lecture check-in (Easy to Medium level)
+
+Return JSON:
+{
+  "question_text": "Brief problem title (e.g., 'Character Frequency Counter')",
+  "problemStatement": "Clear description of what to implement (2-4 sentences)",
+  "functionSignature": "def function_name(params) -> return_type: or equivalent in detected language",
+  "language": "python" | "javascript" | "java" | "cpp" | "c",
+  "constraints": ["1 <= n <= 10^4", "Time: O(n)", "Space: O(1)", "Input contains only..."],
+  "examples": [
+    {"input": "example input", "output": "expected output", "explanation": "why this output"},
+    {"input": "edge case input", "output": "expected output"}
+  ],
+  "hints": ["Hint 1 related to lecture content", "Hint 2 about approach"],
+  "difficulty": "Easy" | "Medium",
+  "suggested_type": "coding",
+  "confidence": 0.0-1.0,
+  "reasoning": "why this problem tests the key concept from lecture"
+}
+
+IMPORTANT: The problem should directly relate to concepts taught in the lecture segment. Extract the programming language from the lecture content.`;
+    } else {
+      // Original prompt for multiple choice / short answer
+      prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
 
 RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
 "${interval_transcript}"
@@ -87,6 +128,7 @@ Return JSON:
   "confidence": 0.0-1.0,
   "reasoning": "why this question tests the key concept"
 }`;
+    }
 
     // Add timeout handling (30 seconds)
     const controller = new AbortController();
@@ -196,15 +238,30 @@ Return JSON:
       });
     }
 
-    return new Response(JSON.stringify({ 
-      success: true,
-      question_text: result.question_text,
-      suggested_type: result.suggested_type,
-      confidence: result.confidence,
-      reasoning: result.reasoning
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Return appropriate structure based on format
+    if (format_preference === 'coding') {
+      // Return full structured coding problem
+      return new Response(JSON.stringify({ 
+        success: true,
+        question_text: result, // Pass entire structured object
+        suggested_type: 'coding',
+        confidence: result.confidence,
+        reasoning: result.reasoning
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } else {
+      // Return simple question for MCQ/short answer
+      return new Response(JSON.stringify({ 
+        success: true,
+        question_text: result.question_text,
+        suggested_type: result.suggested_type,
+        confidence: result.confidence,
+        reasoning: result.reasoning
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
   } catch (error) {
     console.error('Error in generate-interval-question:', error);

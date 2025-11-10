@@ -863,11 +863,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
       }
       
-      // Call edge function
+      // Fetch instructor's format preference before generating
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "❌ Authentication error",
+          description: "Please refresh the page and try again",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('question_format_preference')
+        .eq('id', user.id)
+        .single();
+
+      const formatPreference = profile?.question_format_preference || 'multiple_choice';
+      console.log('🎯 Using format preference:', formatPreference);
+      
+      // Call edge function with format preference
       const { data, error } = await supabase.functions.invoke('generate-interval-question', {
         body: { 
           interval_transcript: intervalTranscript,
-          interval_minutes: autoQuestionInterval
+          interval_minutes: autoQuestionInterval,
+          format_preference: formatPreference
         }
       });
       

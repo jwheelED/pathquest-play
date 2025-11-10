@@ -95,26 +95,58 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
 };
 
 const generateCodingQuestion = async (questionText: string, context: string) => {
-  const prompt = `The professor asked: "${questionText}"
+  const prompt = `Based on the lecture content, create a LeetCode-style coding problem.
 
-Context from lecture: "${context}"
+PROFESSOR'S QUESTION/TOPIC: "${questionText}"
 
-Create a coding question with:
-1. Clear problem statement
-2. Function signature/starter code
-3. Test cases (input/output examples)
-4. Hints if needed
+LECTURE CONTEXT:
+"${context}"
 
-Detect the programming language from context (Python, JavaScript, Java, C++, etc.)
+Generate a professional coding challenge with this EXACT JSON structure:
 
-Return JSON:
 {
-  "question": "problem statement",
-  "language": "python" | "javascript" | "java" | etc,
-  "starterCode": "function/class template",
-  "testCases": [{"input": "...", "expectedOutput": "..."}],
-  "hints": ["hint1", "hint2"]
-}`;
+  "title": "Brief descriptive title (2-4 words)",
+  "difficulty": "Easy" | "Medium" | "Hard",
+  "problemStatement": "Clear, comprehensive description of the problem (3-5 sentences). Explain what needs to be implemented and any important details.",
+  "functionSignature": "def function_name(param1: type1, param2: type2) -> return_type:",
+  "language": "python" | "javascript" | "java" | "cpp" | "c",
+  "constraints": [
+    "1 <= n <= 10^4",
+    "Array contains only integers",
+    "Time Complexity: O(n)",
+    "Space Complexity: O(1)"
+  ],
+  "examples": [
+    {
+      "input": "concrete example input",
+      "output": "expected output",
+      "explanation": "step-by-step why this is the answer"
+    },
+    {
+      "input": "edge case example",
+      "output": "expected output"
+    }
+  ],
+  "hints": [
+    "Consider using a specific data structure from lecture",
+    "Think about the algorithm discussed in class"
+  ],
+  "starterCode": "# Function template with parameters and docstring\\ndef function_name(params):\\n    \\"\\"\\"\\n    Write your solution here\\n    \\"\\"\\"\\n    pass",
+  "testCases": [
+    {"input": "test input 1", "expectedOutput": "output 1"},
+    {"input": "test input 2", "expectedOutput": "output 2"},
+    {"input": "edge case", "expectedOutput": "edge output"}
+  ]
+}
+
+CRITICAL REQUIREMENTS:
+1. Detect the programming language from the lecture context
+2. Match the difficulty to what was just taught (usually Easy or Medium for lecture check-ins)
+3. Make constraints realistic and include Big-O complexity expectations
+4. Provide at least 2 examples with clear explanations
+5. Include 2-3 hints that reference lecture concepts
+6. Starter code should match the detected language syntax
+7. Problem should be solvable based on lecture content`;
 
   // Add timeout handling (30 seconds)
   const controller = new AbortController();
@@ -327,20 +359,59 @@ serve(async (req) => {
       });
     }
 
-    console.log('📝 Formatting question as:', finalType, '-', question_text.substring(0, 50));
+    // Handle logging for both string and object question_text
+    const questionPreview = typeof question_text === 'string' 
+      ? question_text.substring(0, 50)
+      : (question_text.question_text || question_text.title || 'Structured problem');
+    
+    console.log('📝 Formatting question as:', finalType, '-', questionPreview);
 
     let formattedQuestion: any;
 
     // Format based on instructor preference
     if (finalType === 'coding') {
-      // Use exact transcribed question for coding - always manual grade
-      formattedQuestion = {
-        question: question_text,
-        type: 'coding',
-        language: 'python',  // default language
-        expectedAnswer: '',
-        gradingMode: 'manual_grade'
-      };
+      // For coding questions, check if we have structured problem data
+      if (question_text && typeof question_text === 'object' && 
+          'problemStatement' in question_text && 'constraints' in question_text) {
+        // Structured LeetCode-style problem from generate-interval-question
+        const codingProblem = question_text as any;
+        formattedQuestion = {
+          title: codingProblem.title || codingProblem.question_text,
+          question: codingProblem.problemStatement,
+          type: 'coding',
+          language: codingProblem.language || 'python',
+          difficulty: codingProblem.difficulty || 'Medium',
+          functionSignature: codingProblem.functionSignature,
+          constraints: codingProblem.constraints || [],
+          examples: codingProblem.examples || [],
+          hints: codingProblem.hints || [],
+          starterCode: codingProblem.starterCode || '',
+          testCases: codingProblem.testCases || [],
+          expectedAnswer: '',
+          gradingMode: 'manual_grade'
+        };
+      } else {
+        // Fallback: Generate structured problem from simple question text
+        const codingProblem = await generateCodingQuestion(
+          typeof question_text === 'string' ? question_text : JSON.stringify(question_text), 
+          context || ''
+        );
+        formattedQuestion = {
+          title: codingProblem.title || question_text,
+          question: codingProblem.problemStatement || codingProblem.question,
+          type: 'coding',
+          language: codingProblem.language || 'python',
+          difficulty: codingProblem.difficulty || 'Medium',
+          functionSignature: codingProblem.functionSignature,
+          constraints: codingProblem.constraints || [],
+          examples: codingProblem.examples || [],
+          hints: codingProblem.hints || [],
+          starterCode: codingProblem.starterCode || '',
+          testCases: codingProblem.testCases || [],
+          expectedAnswer: '',
+          gradingMode: 'manual_grade'
+        };
+      }
     } else if (finalType === 'multiple_choice') {
       const mcq = await generateMCQ(question_text, context || '');
       formattedQuestion = {
@@ -481,11 +552,16 @@ serve(async (req) => {
 
     // Log to question_send_logs for monitoring
     try {
+      // Convert question_text to string for logging if it's an object
+      const questionTextForLog = typeof question_text === 'string' 
+        ? question_text 
+        : (question_text.question_text || question_text.title || JSON.stringify(question_text).substring(0, 200));
+      
       await supabase
         .from('question_send_logs')
         .insert({
           instructor_id: user.id,
-          question_text: question_text,
+          question_text: questionTextForLog,
           question_type: finalType,
           source: source,
           success: wasSuccessful,
