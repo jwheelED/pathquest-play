@@ -966,7 +966,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   // Handle auto-question generation (called by timer)
-  const handleAutoQuestionGeneration = async () => {
+  const handleAutoQuestionGeneration = async (): Promise<boolean> => {
     try {
       console.log('⏰ Auto-question timer triggered');
       
@@ -991,7 +991,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
           duration: 3000,
         });
-        return;
+        return false;
       }
       
       // Skip if content quality is too low
@@ -1002,7 +1002,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           description: "Low content quality detected (pause or filler words). Continue teaching for better questions.",
           duration: 3000,
         });
-        return;
+        return false;
       }
       
       if (qualityMetrics.contentDensity < 0.35) {
@@ -1012,13 +1012,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           description: `Content quality too low (${(qualityMetrics.contentDensity * 100).toFixed(0)}%). Speak more clearly about the topic.`,
           duration: 3000,
         });
-        return;
+        return false;
       }
       
-      await generateAndSendAutoQuestion(intervalTranscript, false);
+      return await generateAndSendAutoQuestion(intervalTranscript, false);
       
     } catch (error) {
       console.error('Auto-question error:', error);
+      return false;
     }
   };
 
@@ -1134,14 +1135,25 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Set lock IMMEDIATELY before any async work
         isGeneratingAutoQuestionRef.current = true;
         
-        // Update timer IMMEDIATELY to prevent re-trigger
-        const newTime = Date.now();
-        setLastAutoQuestionTime(newTime);
+        // DON'T reset timer yet - wait for quality checks to pass
+        console.log('⏰ Auto-question interval reached, checking quality...');
         
-        // Call async function (won't be called again due to updated lastAutoQuestionTime)
-        handleAutoQuestionGeneration().finally(() => {
-          isGeneratingAutoQuestionRef.current = false;
-        });
+        // Call async function
+        handleAutoQuestionGeneration()
+          .then((success) => {
+            // Only reset timer if question was actually sent
+            if (success) {
+              const newTime = Date.now();
+              setLastAutoQuestionTime(newTime);
+              console.log('✅ Timer reset after successful send');
+            } else {
+              // If quality check failed, keep trying on next check (1 second later)
+              console.log('⏭️ Quality check failed, will retry on next interval check');
+            }
+          })
+          .finally(() => {
+            isGeneratingAutoQuestionRef.current = false;
+          });
       }
     }, 1000);
     
@@ -1482,6 +1494,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             
             // Update interval transcript length state for UI
             setIntervalTranscriptLength(intervalTranscriptRef.current.length);
+            
+            // Calculate and update quality score for UI display
+            if (intervalTranscriptRef.current.length >= 30) {  // MIN_CHUNK_LENGTH
+              const qualityMetrics = analyzeContentQuality(
+                intervalTranscriptRef.current, 
+                autoQuestionInterval * 60
+              );
+              setContentQualityScore(qualityMetrics.contentDensity);
+              
+              console.log('📊 Quality updated:', {
+                length: intervalTranscriptRef.current.length,
+                density: qualityMetrics.contentDensity.toFixed(2),
+                isQuality: qualityMetrics.isQualityContent
+              });
+            }
 
             // Implement sliding window for memory management
             if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
