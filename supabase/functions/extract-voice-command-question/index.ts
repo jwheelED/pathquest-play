@@ -36,8 +36,9 @@ CRITICAL RULES - VIOLATIONS RESULT IN FAILURE:
 1. Return THE ENTIRE QUESTION - from the first word to the final punctuation
 2. DO NOT truncate, shorten, or cut off ANY words
 3. DO NOT paraphrase or modify ANY words
-4. The question MUST end with "?" or "!" or "."
+4. The question MUST end with "?" or "!" or "." - ADD PUNCTUATION if missing but question is complete
 5. The question MUST make complete grammatical sense when read alone
+6. If the question is a question (contains what/how/why/which/who), ADD "?" at the end if missing
 
 COMMON FAILURE PATTERNS TO AVOID:
 ❌ "what does the death" → WRONG (truncated)
@@ -45,6 +46,10 @@ COMMON FAILURE PATTERNS TO AVOID:
 
 ❌ "explain the concept of" → WRONG (truncated)  
 ✅ "explain the concept of neural networks" → CORRECT (complete)
+
+PUNCTUATION FIXES:
+✅ "which detective would you want investigating a case for you" → "which detective would you want investigating a case for you?"
+✅ "what is the capital of France" → "what is the capital of France?"
 
 If you cannot find a COMPLETE question, respond with exactly: NO_QUESTION_FOUND`;
 
@@ -160,14 +165,21 @@ Return ONLY the complete question text, nothing else.`;
     // Remove any potential trailing ellipsis or incomplete endings
     let cleanedQuestion = extractedQuestion;
     if (cleanedQuestion) {
-      // If it ends with incomplete word indicators, log a warning
-      if (cleanedQuestion.endsWith('...') || 
-          !cleanedQuestion.endsWith('?') && !cleanedQuestion.endsWith('.')) {
-        console.warn('⚠️ Extracted question may be incomplete:', cleanedQuestion);
-      }
-      
       // Trim any trailing ellipsis
       cleanedQuestion = cleanedQuestion.replace(/\.\.\.+$/, '').trim();
+      
+      // Auto-fix: Add question mark if question word present but no punctuation
+      if (!cleanedQuestion.endsWith('?') && !cleanedQuestion.endsWith('.') && !cleanedQuestion.endsWith('!')) {
+        const lowerQ = cleanedQuestion.toLowerCase();
+        const hasQuestionWord = ['what', 'how', 'why', 'which', 'who', 'when', 'where', 'can', 'could', 'would', 'should', 'is', 'are', 'do', 'does'].some(word => 
+          lowerQ.startsWith(word + ' ')
+        );
+        
+        if (hasQuestionWord) {
+          console.log('🔧 Auto-adding question mark to complete question');
+          cleanedQuestion = cleanedQuestion + '?';
+        }
+      }
     }
 
     if (!cleanedQuestion || cleanedQuestion === 'NO_QUESTION_FOUND') {
