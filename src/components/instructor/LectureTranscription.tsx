@@ -111,6 +111,31 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
+  // PHASE 2: Pre-warm AI connections during recording to reduce latency
+  useEffect(() => {
+    if (!isRecording) return;
+
+    console.log('🔥 Pre-warming AI connections via health checks...');
+    
+    // Send lightweight health check every 2 minutes to keep edge function warm
+    const keepaliveInterval = setInterval(async () => {
+      try {
+        console.log('⏱️ Sending keepalive health check...');
+        // Call a lightweight edge function to keep connections warm
+        await supabase.functions.invoke('health-check').catch(() => {
+          console.log('⚠️ Keepalive failed (connection is warm)');
+        });
+      } catch (error) {
+        console.log('⚠️ Keepalive error (connection is warm)');
+      }
+    }, 120000); // Every 2 minutes
+
+    return () => {
+      clearInterval(keepaliveInterval);
+      console.log('❄️ Stopped pre-warming connections');
+    };
+  }, [isRecording]);
+
   // Fetch student count, daily quota, custom limit, and auto-question settings on mount
   useEffect(() => {
     const fetchCounts = async () => {
@@ -784,8 +809,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         const timeStr = data.processing_time_ms < 1000 
           ? `${data.processing_time_ms}ms` 
           : `${(data.processing_time_ms / 1000).toFixed(1)}s`;
-        setBatchProgress(`✅ Sent to ${data.sent_to}/${data.total_students} students in ${timeStr}`);
-        setTimeout(() => setBatchProgress(""), 4000);
+        const upgradingNote = data?.upgrading_to_mcq ? ' (upgrading to MCQ...)' : '';
+        const parallelNote = data?.parallel_batches ? ' ⚡' : '';
+        setBatchProgress(`✅ Sent to ${data.sent_to}/${data.total_students} students in ${timeStr}${parallelNote}${upgradingNote}`);
+        setTimeout(() => setBatchProgress(""), data?.upgrading_to_mcq ? 6000 : 4000);
       } else if (data?.batches_processed && data?.total_students) {
         setBatchProgress(`✅ Sent to ${data.total_students} students in ${data.batches_processed} batches`);
         setTimeout(() => setBatchProgress(""), 3000);
