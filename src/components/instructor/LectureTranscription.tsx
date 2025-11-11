@@ -898,7 +898,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.error('❌ Error data:', data);
         
         let errorMessage = "Could not generate question from recent content.";
-        if (data?.error?.includes('Not enough content')) {
+        
+        // Parse specific error types
+        if (data?.error?.includes('Rate limit') || data?.error_type === 'cooldown') {
+          errorMessage = `⏳ Rate limit: Wait ${data?.retry_after || 15}s before next question`;
+          // Don't fail completely - this is a temporary error, keep the transcript
+          console.log('⏳ Rate limit hit, keeping transcript for retry');
+        } else if (data?.error?.includes('Daily limit') || data?.error_type === 'daily_limit') {
+          errorMessage = `🚫 Daily limit reached (${data?.current_count}/${data?.daily_limit}). Resets in ${data?.hours_until_reset}h ${data?.minutes_until_reset}m`;
+        } else if (data?.error?.includes('Not enough content')) {
           errorMessage = `Need ${100 - intervalTranscript.length} more characters of lecture content.`;
         } else if (data?.error?.includes('confidence threshold')) {
           errorMessage = `AI confidence too low (${(data.confidence * 100)?.toFixed(0) || '?'}%). Keep teaching for better questions.`;
@@ -909,7 +917,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         toast({
           title: isManualTest ? "🧪 Test Failed" : "⚠️ Auto-question skipped",
           description: errorMessage,
-          variant: "destructive",
+          variant: data?.error_type === 'daily_limit' ? "destructive" : "default",
           duration: 5000,
         });
         
@@ -1032,23 +1040,29 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return false;
       }
       
-      // Adaptive quality thresholds based on interval length
-      // 5-minute intervals: more lenient (0.25) + minimum 400 words
-      // 10+ minute intervals: standard thresholds
+      // Adaptive quality thresholds based on ACTUAL ELAPSED TIME
+      // The longer content accumulates, the more lenient we need to be with density
       let densityThreshold: number;
       let minWordCount: number;
       
-      if (autoQuestionInterval <= 5) {
-        densityThreshold = 0.25; // Lower threshold for short intervals
-        minWordCount = 400; // Minimum ~2.5 min of solid content at 150 WPM
+      const elapsedMinutes = actualElapsedSeconds / 60;
+      
+      if (elapsedMinutes <= 5) {
+        densityThreshold = 0.25; // Lenient for short intervals
+        minWordCount = 300; // Reduced from 400
+      } else if (elapsedMinutes <= 10) {
+        densityThreshold = 0.22; // More lenient for accumulated content
+        minWordCount = 0;
       } else {
-        densityThreshold = actualWordCount > 500 ? 0.30 : 0.35;
-        minWordCount = 0; // No minimum for longer intervals
+        densityThreshold = 0.20; // Very lenient for long accumulated content
+        minWordCount = 0;
       }
       
-      // Check minimum word count for 5-minute intervals
+      console.log(`📐 Quality thresholds: ${(densityThreshold * 100).toFixed(0)}% density, ${minWordCount} min words (elapsed: ${elapsedMinutes.toFixed(1)}m)`);
+      
+      // Check minimum word count
       if (minWordCount > 0 && actualWordCount < minWordCount) {
-        console.log('⚠️ Not enough words for 5-min interval:', actualWordCount, `(need ${minWordCount}+)`);
+        console.log('⚠️ Not enough words:', actualWordCount, `(need ${minWordCount}+)`);
         toast({
           title: "⏭️ Auto-question skipped",
           description: `Need ${minWordCount - actualWordCount} more words for quality question`,
@@ -1059,6 +1073,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       if (qualityMetrics.contentDensity < densityThreshold) {
         console.log('⚠️ Content density too low:', qualityMetrics.contentDensity);
+        
+        // Trim transcript to prevent infinite accumulation
+        const words = intervalTranscript.split(/\s+/);
+        if (words.length > expectedWords * 1.5) {
+          // Keep only the most recent portion
+          const trimmedWords = words.slice(-expectedWords);
+          intervalTranscriptRef.current = trimmedWords.join(' ');
+          console.log(`✂️ Trimmed transcript from ${words.length} to ${trimmedWords.length} words`);
+        }
+        
         toast({
           title: "⏭️ Auto-question skipped",
           description: `Content quality: ${(qualityMetrics.contentDensity * 100).toFixed(0)}%. Threshold: ${(densityThreshold * 100).toFixed(0)}%`,
@@ -1067,7 +1091,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return false;
       }
       
-      return await generateAndSendAutoQuestion(intervalTranscript, false);
+      console.log('📊 Quality Check Summary:', {
+        elapsedTime: `${elapsedMinutes.toFixed(1)}m`,
+        wordCount: actualWordCount,
+        expectedWords: expectedWords,
+        density: `${(qualityMetrics.contentDensity * 100).toFixed(1)}%`,
+        threshold: `${(densityThreshold * 100).toFixed(1)}%`,
+        passed: true,
+        transcriptLength: intervalTranscript.length
+      });
+      
+      // Use the sliding window content for generation (same as we analyzed)
+      return await generateAndSendAutoQuestion(transcriptToAnalyze, false);
       
     } catch (error) {
       console.error('Auto-question error:', error);
@@ -1192,18 +1227,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // DON'T reset timer yet - wait for quality checks to pass
         console.log('⏰ Auto-question interval reached, checking quality...');
         
-        // Call async function
+        // Call async function with smart retry logic
         handleAutoQuestionGeneration()
           .then((success) => {
-            // Only reset timer if question was actually sent
             if (success) {
+              // Question sent successfully - reset timer
               const newTime = Date.now();
               setLastAutoQuestionTime(newTime);
-              intervalStartTimeRef.current = newTime;  // Reset start time
+              intervalStartTimeRef.current = newTime;
               console.log('✅ Timer reset after successful send');
             } else {
-              // If quality check failed, keep trying on next check (1 second later)
-              console.log('⏭️ Quality check failed, will retry on next interval check');
+              // Quality check failed - reset timer with 30-second delay
+              // This prevents checking every second while still retrying reasonably
+              const retryTime = Date.now() - (intervalMs - 30000); // Reset to 30s before next interval
+              setLastAutoQuestionTime(retryTime);
+              console.log('⏭️ Quality check failed, will retry in 30 seconds');
             }
           })
           .finally(() => {
@@ -1545,6 +1583,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               intervalTranscriptRef.current += " " + newText;
             } else {
               intervalTranscriptRef.current = newText;
+            }
+            
+            // Hard cap to prevent runaway transcript growth
+            const MAX_TRANSCRIPT_LENGTH = autoQuestionInterval * 200; // 200 words per minute max
+            const currentWords = intervalTranscriptRef.current.split(/\s+/);
+            
+            if (currentWords.length > MAX_TRANSCRIPT_LENGTH) {
+              // Force trim to most recent content
+              const trimmedWords = currentWords.slice(-Math.floor(MAX_TRANSCRIPT_LENGTH * 0.75));
+              intervalTranscriptRef.current = trimmedWords.join(' ');
+              console.log(`⚠️ Transcript exceeded max length, trimmed from ${currentWords.length} to ${trimmedWords.length} words`);
             }
             
             // Update interval transcript length state for UI
