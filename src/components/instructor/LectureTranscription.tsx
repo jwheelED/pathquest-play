@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
+import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -54,6 +55,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [intervalTranscriptLength, setIntervalTranscriptLength] = useState<number>(0);
   const [contentQualityScore, setContentQualityScore] = useState<number>(0);
   const [batchProgress, setBatchProgress] = useState<string>("");
+  const [autoQuestionMetrics, setAutoQuestionMetrics] = useState<AutoQuestionMetrics>({
+    questionsSent: 0,
+    questionsSkipped: 0,
+    averageQuality: 0,
+    skipReasons: []
+  });
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -958,6 +965,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       console.log('✅ Auto-question send completed');
       
+      // Track success metrics
+      setAutoQuestionMetrics(prev => {
+        const totalQuality = prev.averageQuality * prev.questionsSent + data.confidence;
+        const newCount = prev.questionsSent + 1;
+        return {
+          ...prev,
+          questionsSent: newCount,
+          averageQuality: totalQuality / newCount
+        };
+      });
+      
       // Update state
       setAutoQuestionCount(prev => prev + 1);
       
@@ -1040,6 +1058,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       if (intervalTranscript.length < 100) {
         console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 100+)');
+        
+        // Track skip reason
+        const skipReason: SkipReason = {
+          timestamp: new Date(),
+          reason: 'Insufficient content',
+          details: `${intervalTranscript.length}/100 chars`
+        };
+        setAutoQuestionMetrics(prev => ({
+          ...prev,
+          questionsSkipped: prev.questionsSkipped + 1,
+          skipReasons: [...prev.skipReasons, skipReason]
+        }));
+        
         toast({
           title: "⏭️ Auto-question skipped",
           description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
@@ -1051,6 +1082,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Skip if content quality is too low
       if (qualityMetrics.isPause) {
         console.log('⚠️ Content appears to be a pause or low quality, skipping auto-question');
+        
+        // Track skip reason
+        const skipReason: SkipReason = {
+          timestamp: new Date(),
+          reason: 'Pause detected',
+          details: 'Low content quality (pause/filler words)'
+        };
+        setAutoQuestionMetrics(prev => ({
+          ...prev,
+          questionsSkipped: prev.questionsSkipped + 1,
+          skipReasons: [...prev.skipReasons, skipReason]
+        }));
+        
         toast({
           title: "⏭️ Auto-question skipped",
           description: "Low content quality detected (pause or filler words). Continue teaching for better questions.",
@@ -1082,6 +1126,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Check minimum word count
       if (minWordCount > 0 && actualWordCount < minWordCount) {
         console.log('⚠️ Not enough words:', actualWordCount, `(need ${minWordCount}+)`);
+        
+        // Track skip reason
+        const skipReason: SkipReason = {
+          timestamp: new Date(),
+          reason: 'Word count too low',
+          details: `${actualWordCount}/${minWordCount} words`
+        };
+        setAutoQuestionMetrics(prev => ({
+          ...prev,
+          questionsSkipped: prev.questionsSkipped + 1,
+          skipReasons: [...prev.skipReasons, skipReason]
+        }));
+        
         toast({
           title: "⏭️ Auto-question skipped",
           description: `Need ${minWordCount - actualWordCount} more words for quality question`,
@@ -1092,6 +1149,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       if (qualityMetrics.contentDensity < densityThreshold) {
         console.log('⚠️ Content density too low:', qualityMetrics.contentDensity);
+        
+        // Track skip reason
+        const skipReason: SkipReason = {
+          timestamp: new Date(),
+          reason: 'Quality too low',
+          details: `${(qualityMetrics.contentDensity * 100).toFixed(0)}% (need ${(densityThreshold * 100).toFixed(0)}%+)`
+        };
+        setAutoQuestionMetrics(prev => ({
+          ...prev,
+          questionsSkipped: prev.questionsSkipped + 1,
+          skipReasons: [...prev.skipReasons, skipReason]
+        }));
         
         // Trim transcript to prevent infinite accumulation
         const words = intervalTranscript.split(/\s+/);
@@ -1959,76 +2028,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               </div>
             </div>
 
-            {/* Auto-Question Status */}
+            {/* Auto-Question Dashboard */}
             {autoQuestionEnabled && (
-              <div className="mt-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium text-blue-900 dark:text-blue-200">
-                      Auto-Questions Active
-                    </span>
-                  </div>
-                  <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900">
-                    Every {autoQuestionInterval} min
-                  </Badge>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">Content Size:</span>
-                    <div className={`font-bold ${intervalTranscriptLength >= 100 ? 'text-green-600 dark:text-green-400' : 'text-orange-500 dark:text-orange-400'}`}>
-                      {intervalTranscriptLength}/100
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">Quality:</span>
-                    <div className="flex items-center gap-1">
-                      <div className={`font-bold ${
-                        contentQualityScore >= 0.5 ? 'text-green-600 dark:text-green-400' : 
-                        contentQualityScore >= 0.35 ? 'text-amber-600 dark:text-amber-400' : 
-                        'text-red-600 dark:text-red-400'
-                      }`}>
-                        {(contentQualityScore * 100).toFixed(0)}%
-                      </div>
-                      {contentQualityScore >= 0.5 ? '✅' : contentQualityScore >= 0.35 ? '⚠️' : '❌'}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs">Status:</span>
-                    <div className="font-bold">
-                      {intervalTranscriptLength >= 100 && contentQualityScore >= 0.35 ? (
-                        <span className="text-green-600 dark:text-green-400">✅ Ready</span>
-                      ) : (
-                        <span className="text-orange-500 dark:text-orange-400">⏳ Building</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between text-xs text-blue-600 dark:text-blue-400 mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                  <span>Next Auto-Question:</span>
-                  <span className="font-bold">{Math.floor(nextAutoQuestionIn / 60)}:{(nextAutoQuestionIn % 60).toString().padStart(2, '0')}</span>
-                </div>
-                
-                <div className="flex items-center justify-between text-xs text-blue-600 dark:text-blue-400">
-                  <span>Questions Sent:</span>
-                  <span className="font-bold">{autoQuestionCount}</span>
-                </div>
-                
-                {/* 10-second countdown animation */}
-                {nextAutoQuestionIn <= 10 && nextAutoQuestionIn > 0 && (
-                  <div className="animate-pulse bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mt-2">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-yellow-600 animate-bounce" />
-                      <span className="font-bold text-yellow-900 dark:text-yellow-200">
-                        Auto-question in {nextAutoQuestionIn}s...
-                      </span>
-                    </div>
-                  </div>
-                )}
+              <div className="mt-3">
+                <AutoQuestionDashboard
+                  isRecording={isRecording}
+                  autoQuestionEnabled={autoQuestionEnabled}
+                  autoQuestionInterval={autoQuestionInterval}
+                  studentCount={studentCount}
+                  nextAutoQuestionIn={nextAutoQuestionIn}
+                  intervalTranscriptLength={intervalTranscriptLength}
+                  contentQualityScore={contentQualityScore}
+                  metrics={autoQuestionMetrics}
+                  rateLimitSecondsLeft={rateLimitSecondsLeft}
+                  dailyQuestionCount={dailyQuestionCount}
+                  dailyQuotaLimit={dailyQuotaLimit}
+                />
                 
                 {/* Manual Test Button */}
                 <Button
@@ -2036,7 +2051,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   disabled={intervalTranscriptLength < 100 || contentQualityScore < 0.35 || isSendingQuestion || isGeneratingAutoQuestionRef.current}
                   variant="outline"
                   size="sm"
-                  className="w-full mt-3 bg-white dark:bg-gray-800"
+                  className="w-full mt-3"
                 >
                   <Sparkles className="h-3 w-3 mr-2" />
                   {intervalTranscriptLength < 100 
