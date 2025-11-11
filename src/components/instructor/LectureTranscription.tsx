@@ -926,6 +926,25 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       console.log('✅ Auto-question generated:', data.question_text);
       console.log('📋 Confidence:', data.confidence);
+
+      // Client-side validation of question completeness
+      if (typeof data.question_text === 'string') {
+        const question = data.question_text.trim();
+        
+        // Check for obvious truncation
+        if (question.length < 10 || 
+            (question.split(' ').length > 3 && !question.endsWith('?') && !question.endsWith('.'))) {
+          console.error('⚠️ Received potentially truncated question:', question);
+          toast({
+            title: "⚠️ Question may be incomplete",
+            description: `"${question.substring(0, 50)}..." - Skipping to avoid sending incomplete question`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          return false;
+        }
+      }
+
       console.log('📝 Sending via handleQuestionSend...');
       
       // Send the question using existing flow

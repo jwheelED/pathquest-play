@@ -145,10 +145,11 @@ Return JSON:
         body: JSON.stringify({
           model: 'google/gemini-2.5-flash',
           messages: [
-            { role: 'system', content: 'You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting.' },
+            { role: 'system', content: 'You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting. NEVER truncate questions mid-sentence.' },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
+          max_tokens: 2000, // Increased from default to ensure complete JSON
           response_format: { type: "json_object" }
         }),
         signal: controller.signal
@@ -220,6 +221,38 @@ Return JSON:
 
     console.log('✅ Auto-question generated:', result.question_text);
     console.log('📊 Confidence:', result.confidence, '| Reasoning:', result.reasoning);
+
+    // Validate question completeness before checking confidence
+    if (typeof result.question_text === 'string') {
+      const questionLength = result.question_text.trim().length;
+      const endsWithQuestionMark = result.question_text.trim().endsWith('?');
+      const wordCount = result.question_text.trim().split(/\s+/).length;
+      
+      console.log('📏 Question stats:', {
+        length: questionLength,
+        wordCount: wordCount,
+        endsWithQuestionMark: endsWithQuestionMark,
+        lastWord: result.question_text.split(/\s+/).pop(),
+        firstWords: result.question_text.split(/\s+/).slice(0, 5).join(' ')
+      });
+      
+      // Red flags for truncation
+      if (questionLength < 10) {
+        console.log('⚠️ Question too short (likely truncated)');
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Generated question is too short (possible truncation)',
+          question_text: result.question_text
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (wordCount >= 4 && !endsWithQuestionMark && !result.question_text.endsWith('.')) {
+        console.log('⚠️ Question missing proper ending (likely truncated)');
+        console.log('   Question:', result.question_text);
+      }
+    }
 
     // Only return questions with reasonable confidence (lowered from 0.5 to 0.3)
     if (result.confidence < 0.3) { // Lowered threshold for better question generation
