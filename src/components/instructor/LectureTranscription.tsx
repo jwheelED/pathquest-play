@@ -443,9 +443,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         duration: 3000,
       });
 
-      // Get last ~45-60 seconds of transcript (before the voice command)
+      // Get last ~60-90 seconds of transcript (increased for better context)
       // Ensure we don't cut off mid-word
-      let recentTranscript = transcriptBufferRef.current.slice(-2000); // Increased from 1500
+      let recentTranscript = transcriptBufferRef.current.slice(-3000); // Increased from 2000 for more context
 
       // Trim to nearest word boundary at the start to avoid partial words
       const firstSpaceIndex = recentTranscript.indexOf(' ');
@@ -454,6 +454,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       console.log('📝 Extracting question from transcript:', recentTranscript.length, 'chars');
+      console.log('🔍 Last 200 chars:', recentTranscript.slice(-200));
 
       const { data, error } = await supabase.functions.invoke('extract-voice-command-question', {
         body: { recentTranscript }
