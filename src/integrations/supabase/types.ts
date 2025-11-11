@@ -1086,6 +1086,10 @@ export type Database = {
         Args: { p_assignment_id: string; p_user_answers: Json }
         Returns: Json
       }
+      update_assignment_grade: {
+        Args: { p_assignment_id: string; p_short_answer_grades: Json }
+        Returns: Json
+      }
       validate_instructor_code: { Args: { code: string }; Returns: string }
     }
     Enums: {

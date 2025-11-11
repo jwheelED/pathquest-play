@@ -471,27 +471,28 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
           }
         }
 
-        // Calculate combined grade (MC + short answer average)
-        const shortAnswerAvg = shortAnswerCount > 0 ? totalShortAnswerGrade / shortAnswerCount : 0;
-        const mcGrade = result.grade || 0;
-        const combinedGrade = result.total > 0 
-          ? ((mcGrade * result.total) + (shortAnswerAvg * shortAnswerCount)) / (result.total + shortAnswerCount)
-          : shortAnswerAvg;
-
         if (isAutoGrade) {
-          // Update assignment with combined grade for auto-grade mode
-          const { error: updateError } = await supabase
-            .from('student_assignments')
-            .update({ grade: combinedGrade })
-            .eq('id', assignment.id);
+          // Use secure RPC to update grade server-side (prevents grade manipulation)
+          const { data: gradeResult, error: gradeError } = await supabase
+            .rpc('update_assignment_grade', {
+              p_assignment_id: assignment.id,
+              p_short_answer_grades: recommendedGrades
+            });
 
-          if (updateError) {
-            console.error('Failed to update grade:', updateError);
+          if (gradeError) {
+            console.error('Failed to update grade:', gradeError);
+            toast({ 
+              title: "Error updating grade",
+              description: "Please try again or contact your instructor.",
+              variant: "destructive"
+            });
+            return;
           }
 
+          const finalGrade = (gradeResult as any)?.grade;
           toast({ 
             title: "✅ Quiz Submitted Successfully!",
-            description: "Your answers have been submitted for review."
+            description: finalGrade ? `Final grade: ${finalGrade.toFixed(1)}%` : "Your answers have been submitted."
           });
         } else {
           // For manual_grade mode, store recommended grades in quiz_responses
