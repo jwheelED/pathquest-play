@@ -193,9 +193,36 @@ serve(async (req) => {
         audioSize: bytes.length
       });
       
+      // Parse error details for specific handling
+      let errorType = 'transcription_failed';
+      let errorMessage = 'Failed to transcribe audio. Please try again.';
+      
+      try {
+        const errorData = JSON.parse(error);
+        if (errorData.error) {
+          if (errorData.error.type === 'insufficient_quota') {
+            errorType = 'quota_exceeded';
+            errorMessage = 'OpenAI API quota exceeded. Please check your billing settings.';
+          } else if (errorData.error.code === 'invalid_api_key') {
+            errorType = 'invalid_api_key';
+            errorMessage = 'OpenAI API key is invalid. Please check configuration.';
+          }
+        }
+      } catch (parseError) {
+        console.error('Could not parse error details:', parseError);
+      }
+      
+      // Return status code and error details
       return new Response(
-        JSON.stringify({ error: 'Failed to transcribe audio. Please try again with a clear recording.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: errorMessage,
+          error_type: errorType,
+          status: response.status
+        }),
+        { 
+          status: response.status, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
 

@@ -1633,11 +1633,40 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               return;
             }
             
-            // Only show toast for critical errors, not for empty responses
+            // Handle specific error types
+            if (data?.error_type === 'quota_exceeded' || data?.status === 429 || error.message?.includes('quota')) {
+              toast({
+                title: "API Quota Exceeded",
+                description: "OpenAI API quota has been exceeded. Please check your billing settings or wait for quota reset.",
+                variant: "destructive",
+                duration: 8000,
+              });
+              setFailureCount(prev => prev + 1);
+              return;
+            }
+            
+            if (data?.error_type === 'invalid_api_key' || error.message?.includes('API key')) {
+              toast({
+                title: "API Configuration Error",
+                description: "OpenAI API key is invalid. Please check your configuration.",
+                variant: "destructive",
+                duration: 8000,
+              });
+              return;
+            }
+            
+            // Timeout errors
+            if (data?.status === 408 || error.message?.includes('timeout')) {
+              console.log('⏱️ Transcription timeout, will retry on next chunk');
+              return;
+            }
+            
+            // Only show generic error for critical errors, not for empty responses
             if (error.message && !error.message.includes("too small")) {
+              const errorDesc = data?.error || error.message || "Please ensure your microphone is working properly.";
               toast({
                 title: "Transcription error",
-                description: "Please ensure your microphone is working properly.",
+                description: errorDesc,
                 variant: "destructive",
               });
             }
