@@ -25,6 +25,9 @@ const MAX_CONSECUTIVE_FAILURES = 5; // Increased from 3 to 5
 const RECORDING_CHUNK_DURATION = 8000; // 8 seconds for better sentence completion
 const MIN_CHUNK_LENGTH = 30; // Minimum characters to analyze
 const CIRCUIT_BREAKER_BACKOFF = [30000, 60000, 120000, 300000]; // 30s, 60s, 120s, 300s
+// Quota-specific circuit breaker
+const QUOTA_CIRCUIT_BREAKER_THRESHOLD = 3; // Trigger after 3 consecutive quota errors
+const QUOTA_PAUSE_DURATION = 5 * 60 * 1000; // 5 minutes pause
 
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
   // Proactive token refresh
@@ -61,6 +64,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     averageQuality: 0,
     skipReasons: []
   });
+  const [quotaErrorActive, setQuotaErrorActive] = useState(false);
+  const [quotaConsecutiveErrors, setQuotaConsecutiveErrors] = useState(0);
+  const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
+  const [quotaCircuitBreakerCountdown, setQuotaCircuitBreakerCountdown] = useState<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -175,6 +182,31 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setCircuitBreakerCountdown(0);
     }
   }, [isCircuitOpen, circuitBreakerRetryAt, toast]);
+
+  // Quota circuit breaker countdown
+  useEffect(() => {
+    if (quotaErrorActive && quotaCircuitBreakerRetryAt > Date.now()) {
+      const interval = setInterval(() => {
+        const secondsLeft = Math.ceil((quotaCircuitBreakerRetryAt - Date.now()) / 1000);
+        if (secondsLeft > 0) {
+          setQuotaCircuitBreakerCountdown(secondsLeft);
+        } else {
+          setQuotaErrorActive(false);
+          setQuotaCircuitBreakerCountdown(0);
+          setQuotaCircuitBreakerRetryAt(0);
+          setQuotaConsecutiveErrors(0);
+          toast({
+            title: "✅ API Quota May Be Available",
+            description: "You can try resuming recording now",
+          });
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setQuotaCircuitBreakerCountdown(0);
+    }
+  }, [quotaErrorActive, quotaCircuitBreakerRetryAt, toast]);
 
   // Countdown timer for rate limit
   useEffect(() => {
@@ -1633,16 +1665,48 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               return;
             }
             
-            // Handle specific error types
+            // Handle specific error types - Quota errors with circuit breaker
             if (data?.error_type === 'quota_exceeded' || data?.status === 429 || error.message?.includes('quota')) {
-              toast({
-                title: "API Quota Exceeded",
-                description: "OpenAI API quota has been exceeded. Please check your billing settings or wait for quota reset.",
-                variant: "destructive",
-                duration: 8000,
-              });
+              const newQuotaErrorCount = quotaConsecutiveErrors + 1;
+              setQuotaConsecutiveErrors(newQuotaErrorCount);
+              
+              console.error(`⚠️ API Quota Error (${newQuotaErrorCount}/${QUOTA_CIRCUIT_BREAKER_THRESHOLD})`);
+              
+              // Trigger circuit breaker after 3 consecutive quota errors
+              if (newQuotaErrorCount >= QUOTA_CIRCUIT_BREAKER_THRESHOLD) {
+                setQuotaErrorActive(true);
+                const retryAt = Date.now() + QUOTA_PAUSE_DURATION;
+                setQuotaCircuitBreakerRetryAt(retryAt);
+                
+                // Auto-pause recording
+                if (isRecording) {
+                  stopRecording();
+                  console.log('🛑 Auto-paused recording due to quota exhaustion');
+                }
+                
+                toast({
+                  title: "🚫 API Quota Exhausted",
+                  description: "Recording paused for 5 minutes. Check your OpenAI billing settings.",
+                  variant: "destructive",
+                  duration: 10000,
+                });
+              } else {
+                // Show warning toast for first 2 errors
+                toast({
+                  title: "⚠️ API Quota Warning",
+                  description: `Quota error ${newQuotaErrorCount}/${QUOTA_CIRCUIT_BREAKER_THRESHOLD}. Check your OpenAI billing.`,
+                  variant: "destructive",
+                  duration: 6000,
+                });
+              }
+              
               setFailureCount(prev => prev + 1);
               return;
+            }
+            
+            // Reset quota error count on successful transcription or non-quota errors
+            if (quotaConsecutiveErrors > 0) {
+              setQuotaConsecutiveErrors(0);
             }
             
             if (data?.error_type === 'invalid_api_key' || error.message?.includes('API key')) {
@@ -1674,6 +1738,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           }
 
           if (data?.text && data.text.trim()) {
+            // Reset quota error count on successful transcription
+            if (quotaConsecutiveErrors > 0) {
+              setQuotaConsecutiveErrors(0);
+            }
+            
             const newText = data.text.trim();
             const wordCount = newText.split(/\s+/).length;
             console.log("✅ Transcribed:", wordCount, "words -", newText.substring(0, 120));
@@ -1963,8 +2032,80 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     toast({ title: "Transcript cleared" });
   };
 
+  // Handle manual resume from quota error
+  const handleResumeFromQuotaError = () => {
+    setQuotaErrorActive(false);
+    setQuotaCircuitBreakerRetryAt(0);
+    setQuotaCircuitBreakerCountdown(0);
+    setQuotaConsecutiveErrors(0);
+    toast({
+      title: "Ready to Resume",
+      description: "You can now start recording again",
+    });
+  };
+
   return (
     <>
+      {/* Persistent Quota Error Alert Banner */}
+      {quotaErrorActive && (
+        <Card className="mb-4 border-destructive bg-destructive/10">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div>
+                  <h3 className="font-semibold text-destructive mb-1">
+                    🚫 API Quota Exhausted - Recording Paused
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    OpenAI API quota has been exceeded after {QUOTA_CIRCUIT_BREAKER_THRESHOLD} consecutive errors. 
+                    Recording has been automatically paused to prevent further failures.
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">
+                      {quotaCircuitBreakerCountdown > 60 
+                        ? `${Math.ceil(quotaCircuitBreakerCountdown / 60)} min ${quotaCircuitBreakerCountdown % 60}s remaining`
+                        : `${quotaCircuitBreakerCountdown}s remaining`
+                      }
+                    </span>
+                  </div>
+                  <Progress 
+                    value={100 - ((quotaCircuitBreakerCountdown / (QUOTA_PAUSE_DURATION / 1000)) * 100)} 
+                    className="flex-1 h-2"
+                  />
+                </div>
+
+                <div className="pt-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>What to do:</strong>
+                  </p>
+                  <ul className="text-xs text-muted-foreground space-y-1 ml-4">
+                    <li>• Check your OpenAI billing settings and add credits if needed</li>
+                    <li>• Wait for the automatic retry timer to complete</li>
+                    <li>• Or manually resume recording once you've resolved the quota issue</li>
+                  </ul>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={handleResumeFromQuotaError}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      Resume Now
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* System Status Monitoring Dashboard */}
       {isRecording && (
         <Card className="mb-4 border-primary/30">
