@@ -12,6 +12,7 @@ import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
 import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { SystemHealthCheck } from "./SystemHealthCheck";
+import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -89,6 +90,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [showExtractionDialog, setShowExtractionDialog] = useState(false);
   const [partialQuestion, setPartialQuestion] = useState("");
   const [editedQuestion, setEditedQuestion] = useState("");
+  
+  // Debug dashboard state
+  const [lastAutoQuestionError, setLastAutoQuestionError] = useState<string | null>(null);
+  const [lastAutoQuestionErrorTime, setLastAutoQuestionErrorTime] = useState<Date | null>(null);
+  const [retryAttempts, setRetryAttempts] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -991,9 +997,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  // Core auto-question generation logic (extracted for reuse)
+  // Core auto-question generation logic (extracted for reuse) with enhanced logging
   const generateAndSendAutoQuestion = async (intervalTranscript: string, isManualTest = false) => {
+    const startTime = Date.now();
+    
     try {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🎯 STARTING AUTO-QUESTION GENERATION');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📊 Input Parameters:');
+      console.log('  - Transcript length:', intervalTranscript.length, 'chars');
+      console.log('  - Interval:', autoQuestionInterval, 'minutes');
+      console.log('  - Manual test:', isManualTest);
+      console.log('  - Is sending:', isSendingQuestion);
+      console.log('  - Recording:', isRecording);
+      console.log('  - Transcript preview:', intervalTranscript.substring(0, 150) + '...');
+      console.log('  - Transcript ending:', '...' + intervalTranscript.substring(Math.max(0, intervalTranscript.length - 150)));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       // Show pre-generation animation
       setVoiceCommandDetected(true);
       setTimeout(() => setVoiceCommandDetected(false), 2000);
@@ -1007,8 +1028,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
       
       // Fetch instructor's format preference before generating
+      console.log('🔍 Fetching user authentication...');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        console.error('❌ No authenticated user found');
         toast({
           title: "❌ Authentication error",
           description: "Please refresh the page and try again",
@@ -1016,7 +1039,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
         return false;
       }
+      console.log('✅ User authenticated:', user.id);
 
+      console.log('🔍 Fetching format preference...');
       const { data: profile } = await supabase
         .from('profiles')
         .select('question_format_preference')
@@ -1024,9 +1049,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         .single();
 
       const formatPreference = profile?.question_format_preference || 'multiple_choice';
-      console.log('🎯 Using format preference:', formatPreference);
+      console.log('✅ Format preference:', formatPreference);
       
       // Call edge function with format preference
+      console.log('📡 Invoking generate-interval-question edge function...');
+      console.log('🔗 Payload:', {
+        interval_transcript_length: intervalTranscript.length,
+        interval_minutes: autoQuestionInterval,
+        format_preference: formatPreference
+      });
+      
+      const invokeStartTime = Date.now();
       const { data, error } = await supabase.functions.invoke('generate-interval-question', {
         body: { 
           interval_transcript: intervalTranscript,
@@ -1034,17 +1067,32 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           format_preference: formatPreference
         }
       });
+      const invokeTime = Date.now() - invokeStartTime;
+      
+      console.log(`⏱️ Edge function completed in ${invokeTime}ms`);
+      console.log('📥 Response:', { 
+        hasData: !!data, 
+        hasError: !!error,
+        success: data?.success,
+        dataKeys: data ? Object.keys(data) : [],
+        errorMessage: error?.message
+      });
       
       if (error || !data?.success) {
-        console.error('❌ Auto-question generation failed:', error);
-        console.error('❌ Error data:', data);
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('❌ EDGE FUNCTION ERROR');
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('  Has error:', !!error);
+        console.error('  Success flag:', data?.success);
+        console.error('  Error object:', JSON.stringify(error, null, 2));
+        console.error('  Data object:', JSON.stringify(data, null, 2));
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
         let errorMessage = "Could not generate question from recent content.";
         
         // Parse specific error types
         if (data?.error?.includes('Rate limit') || data?.error_type === 'cooldown') {
           errorMessage = `⏳ Rate limit: Wait ${data?.retry_after || 15}s before next question`;
-          // Don't fail completely - this is a temporary error, keep the transcript
           console.log('⏳ Rate limit hit, keeping transcript for retry');
         } else if (data?.error?.includes('Daily limit') || data?.error_type === 'daily_limit') {
           errorMessage = `🚫 Daily limit reached (${data?.current_count}/${data?.daily_limit}). Resets in ${data?.hours_until_reset}h ${data?.minutes_until_reset}m`;
@@ -1054,7 +1102,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           errorMessage = `AI confidence too low (${(data.confidence * 100)?.toFixed(0) || '?'}%). Keep teaching for better questions.`;
         } else if (data?.error) {
           errorMessage = data.error;
+        } else if (error?.message) {
+          errorMessage = error.message;
         }
+        
+        setLastAutoQuestionError(errorMessage);
+        setLastAutoQuestionErrorTime(new Date());
         
         toast({
           title: isManualTest ? "🧪 Test Failed" : "⚠️ Auto-question skipped",
@@ -1066,8 +1119,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return false;
       }
       
-      console.log('✅ Auto-question generated:', data.question_text);
-      console.log('📋 Confidence:', data.confidence);
+      console.log('✅ Question generated successfully');
+      console.log('  Question text:', data.question_text.substring(0, 100) + '...');
+      console.log('  Type:', data.suggested_type);
+      console.log('  Confidence:', data.confidence);
 
       // Client-side validation of question completeness
       if (typeof data.question_text === 'string') {
@@ -1098,7 +1153,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         source: isManualTest ? 'manual_test' : 'auto_interval'
       });
       
-      console.log('✅ Auto-question send completed');
+      const totalTime = Date.now() - startTime;
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ AUTO-QUESTION COMPLETED SUCCESSFULLY');
+      console.log('  Total time:', totalTime + 'ms');
+      console.log('  Question sent:', data.question_text.substring(0, 60) + '...');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // Clear error state on success
+      setLastAutoQuestionError(null);
+      setRetryAttempts(0);
       
       // Track success metrics
       setAutoQuestionMetrics(prev => {
@@ -1120,7 +1184,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setIntervalTranscriptLength(0);
       setContentQualityScore(0);
       
-      console.log(`✅ Auto-question sent! Total this session: ${autoQuestionCount + 1}`);
+      console.log(`✅ Auto-question complete! Session total: ${autoQuestionCount + 1}`);
       
       if (isManualTest) {
         toast({
@@ -1132,11 +1196,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       return true;
       
-    } catch (error) {
-      console.error('Auto-question error:', error);
+    } catch (error: any) {
+      const totalTime = Date.now() - startTime;
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ AUTO-QUESTION GENERATION EXCEPTION');
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('  Error type:', typeof error);
+      console.error('  Error message:', error?.message);
+      console.error('  Error name:', error?.name);
+      console.error('  Error details:', JSON.stringify(error, null, 2));
+      console.error('  Time elapsed:', totalTime + 'ms');
+      console.error('  Stack trace:', error?.stack);
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      const errorMsg = error?.message || 'Unknown error during auto-question generation';
+      setLastAutoQuestionError(errorMsg);
+      setLastAutoQuestionErrorTime(new Date());
+      
       toast({
         title: isManualTest ? "🧪 Test Error" : "❌ Auto-question error",
-        description: "An error occurred while generating the auto-question",
+        description: errorMsg.substring(0, 100),
         variant: "destructive",
         duration: 5000,
       });
@@ -1144,6 +1223,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Don't clear transcript on errors - let it keep building up
       console.log('⏭️ Keeping transcript for retry (length:', intervalTranscriptRef.current.length, ')');
       return false;
+    } finally {
+      setIsSendingQuestion(false);
     }
   };
 
@@ -1333,11 +1414,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  // Manual test function for debugging
+  // Manual test function for debugging with detailed logging
   const handleTestAutoQuestion = async () => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🧪 MANUAL TEST AUTO-QUESTION TRIGGERED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     const intervalTranscript = intervalTranscriptRef.current.trim();
     
+    console.log('📊 Test Pre-checks:');
+    console.log('  - Transcript length:', intervalTranscript.length);
+    console.log('  - Is sending:', isSendingQuestion);
+    console.log('  - Is recording:', isRecording);
+    console.log('  - Auto-enabled:', autoQuestionEnabled);
+    
     if (intervalTranscript.length < 100) {
+      console.log('❌ Test blocked: insufficient transcript');
       toast({
         title: "🧪 Cannot Test",
         description: `Need at least 100 characters. Current: ${intervalTranscript.length}`,
@@ -1347,6 +1439,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
 
     if (isSendingQuestion) {
+      console.log('❌ Test blocked: already sending a question');
       toast({
         title: "⏳ Please Wait",
         description: "A question is already being processed",
@@ -1354,12 +1447,56 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
+    console.log('✅ All pre-checks passed, starting test...');
     toast({
       title: "🧪 Testing Auto-Question",
       description: "Generating question from current interval content...",
     });
 
     await generateAndSendAutoQuestion(intervalTranscript, true);
+  };
+
+  // Toggle auto-question enabled state
+  const handleToggleAutoQuestion = async () => {
+    const newState = !autoQuestionEnabled;
+    console.log(`🔄 Toggling auto-questions: ${autoQuestionEnabled} → ${newState}`);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ auto_question_enabled: newState })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setAutoQuestionEnabled(newState);
+      
+      // Reset timer when enabling
+      if (newState) {
+        setLastAutoQuestionTime(0);
+        setRetryAttempts(0);
+        setLastAutoQuestionError(null);
+      }
+      
+      toast({
+        title: newState ? "✅ Auto-Questions Enabled" : "⏸️ Auto-Questions Disabled",
+        description: newState 
+          ? `Questions will be generated every ${autoQuestionInterval} minutes`
+          : "Auto-question generation has been paused",
+      });
+      
+      console.log('✅ Auto-question state updated successfully');
+    } catch (error) {
+      console.error('Failed to toggle auto-question:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update auto-question setting",
+        variant: "destructive",
+      });
+    }
   };
 
   // Periodic system restart for resource cleanup
@@ -1414,9 +1551,30 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     return () => clearInterval(refreshTimer);
   }, [isRecording]);
 
-  // Auto-question timer logic
+  // Auto-question timer logic with comprehensive logging
   useEffect(() => {
-    if (!isRecording || !autoQuestionEnabled || isSendingQuestion) return;
+    console.log('🔍 Auto-question timer effect triggered:', {
+      isRecording,
+      autoQuestionEnabled,
+      isSendingQuestion,
+      lastAutoQuestionTime,
+      autoQuestionInterval
+    });
+
+    if (!isRecording) {
+      console.log('⏸️ Timer paused: not recording');
+      return;
+    }
+    
+    if (!autoQuestionEnabled) {
+      console.log('⏸️ Timer paused: auto-questions disabled');
+      return;
+    }
+    
+    if (isSendingQuestion) {
+      console.log('⏸️ Timer paused: already sending a question');
+      return;
+    }
     
     const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
     
@@ -1426,14 +1584,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setLastAutoQuestionTime(now);
       intervalStartTimeRef.current = now;  // Track actual start time
       setAutoQuestionCount(0);
-      console.log(`⏰ Auto-questions initialized: every ${autoQuestionInterval} minutes`);
+      console.log(`🟢 Auto-questions initialized: every ${autoQuestionInterval} minutes (${intervalMs}ms)`);
+      console.log('🕐 First question will trigger at:', new Date(now + intervalMs).toLocaleTimeString());
     }
     
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
-      if (isSendingQuestion) return; // Don't trigger during send
-      if (isGeneratingAutoQuestionRef.current) return; // Guard against concurrent calls
-      if (isProcessing) return; // Don't trigger during audio processing
+      if (isSendingQuestion) {
+        console.log('⏸️ Skipping check: already sending a question');
+        return;
+      }
+      if (isGeneratingAutoQuestionRef.current) {
+        console.log('⏸️ Skipping check: generation in progress');
+        return;
+      }
+      if (isProcessing) {
+        console.log('⏸️ Skipping check: audio processing');
+        return;
+      }
       
       const now = Date.now();
       const elapsed = now - lastAutoQuestionTime;
@@ -1442,15 +1610,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       setNextAutoQuestionIn(secondsLeft);
       
+      // Log countdown at key intervals
+      if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {
+        console.log(`⏰ Auto-question in ${secondsLeft} seconds`);
+      }
+      
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
         // Set lock IMMEDIATELY before any async work
         isGeneratingAutoQuestionRef.current = true;
         
-        // DON'T reset timer yet - wait for quality checks to pass
-        console.log('⏰ Auto-question interval reached, checking quality...');
+        console.log('🚀 AUTO-QUESTION INTERVAL REACHED');
+        console.log('📊 Timer State:', {
+          elapsed: `${(elapsed / 1000).toFixed(0)}s`,
+          intervalMs: `${(intervalMs / 1000).toFixed(0)}s`,
+          transcriptLength: intervalTranscriptRef.current.length,
+          lastAutoQuestionTime: new Date(lastAutoQuestionTime).toLocaleTimeString(),
+          now: new Date(now).toLocaleTimeString()
+        });
         
-        // Call async function with smart retry logic
+        // Call async function with enhanced error handling and retry logic
         handleAutoQuestionGeneration()
           .then((success) => {
             if (success) {
@@ -1458,23 +1637,55 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               const newTime = Date.now();
               setLastAutoQuestionTime(newTime);
               intervalStartTimeRef.current = newTime;
+              setRetryAttempts(0);
+              setLastAutoQuestionError(null);
               console.log('✅ Timer reset after successful send');
+              console.log('🕐 Next question at:', new Date(newTime + intervalMs).toLocaleTimeString());
             } else {
               // Quality check failed - reset timer with 30-second delay
-              // This prevents checking every second while still retrying reasonably
-              const retryTime = Date.now() - (intervalMs - 30000); // Reset to 30s before next interval
+              const retryTime = Date.now() - (intervalMs - 30000);
               setLastAutoQuestionTime(retryTime);
               console.log('⏭️ Quality check failed, will retry in 30 seconds');
             }
           })
+          .catch((error) => {
+            console.error('❌ Auto-question generation failed:', error);
+            const errorMsg = error?.message || 'Unknown error';
+            setLastAutoQuestionError(errorMsg);
+            setLastAutoQuestionErrorTime(new Date());
+            
+            // Retry logic: wait 5 seconds then try again
+            if (retryAttempts < 1) {
+              console.log('🔄 Will retry in 5 seconds...');
+              setRetryAttempts(prev => prev + 1);
+              setTimeout(() => {
+                console.log('🔄 Retrying auto-question generation...');
+                const retryTime = Date.now() - (intervalMs - 5000); // Retry in 5s
+                setLastAutoQuestionTime(retryTime);
+                isGeneratingAutoQuestionRef.current = false;
+              }, 5000);
+            } else {
+              console.log('❌ Max retries reached, resetting timer');
+              setRetryAttempts(0);
+              const retryTime = Date.now() - (intervalMs - 60000); // Retry in 1 minute
+              setLastAutoQuestionTime(retryTime);
+            }
+          })
           .finally(() => {
+            if (retryAttempts >= 1) {
+              // Don't unlock if we're about to retry
+              return;
+            }
             isGeneratingAutoQuestionRef.current = false;
           });
       }
     }, 1000);
     
-    return () => clearInterval(checkInterval);
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion]);
+    return () => {
+      console.log('🧹 Cleaning up auto-question timer');
+      clearInterval(checkInterval);
+    };
+  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, retryAttempts]);
 
   // Reset auto-question state when recording stops
   useEffect(() => {
@@ -2391,7 +2602,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
             {/* Auto-Question Dashboard */}
             {autoQuestionEnabled && (
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
+                {/* Debug Dashboard */}
+                <AutoQuestionDebugDashboard
+                  isEnabled={autoQuestionEnabled}
+                  isRecording={isRecording}
+                  nextQuestionIn={nextAutoQuestionIn}
+                  intervalMinutes={autoQuestionInterval}
+                  transcriptLength={intervalTranscriptLength}
+                  lastError={lastAutoQuestionError}
+                  lastErrorTime={lastAutoQuestionErrorTime}
+                  autoQuestionCount={autoQuestionCount}
+                  isSendingQuestion={isSendingQuestion}
+                  onTestNow={handleTestAutoQuestion}
+                  onToggleEnabled={handleToggleAutoQuestion}
+                />
+                
+                {/* Regular Dashboard */}
                 <AutoQuestionDashboard
                   isRecording={isRecording}
                   autoQuestionEnabled={autoQuestionEnabled}
@@ -2405,22 +2632,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   dailyQuestionCount={dailyQuestionCount}
                   dailyQuotaLimit={dailyQuotaLimit}
                 />
-                
-                {/* Manual Test Button */}
-                <Button
-                  onClick={handleTestAutoQuestion}
-                  disabled={intervalTranscriptLength < 100 || contentQualityScore < 0.35 || isSendingQuestion || isGeneratingAutoQuestionRef.current}
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-3"
-                >
-                  <Sparkles className="h-3 w-3 mr-2" />
-                  {intervalTranscriptLength < 100 
-                    ? `Test (Need ${100 - intervalTranscriptLength} chars)` 
-                    : contentQualityScore < 0.35
-                    ? `Test (Quality: ${(contentQualityScore * 100).toFixed(0)}%, need 35%+)`
-                    : 'Test Auto-Question Now'}
-                </Button>
               </div>
             )}
 
