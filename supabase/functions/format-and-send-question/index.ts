@@ -368,6 +368,10 @@ serve(async (req) => {
 
     let formattedQuestion: any;
 
+    // Performance logging: Track formatting time
+    let formatStartTime = Date.now();
+    console.log('⏱️ Starting question formatting...');
+    
     // Format based on instructor preference
     if (finalType === 'coding') {
       // For coding questions, check if we have structured problem data
@@ -431,6 +435,10 @@ serve(async (req) => {
       };
     }
 
+    // Performance logging: Formatting complete
+    const formatEndTime = Date.now();
+    console.log(`⏱️ Question formatted in ${formatEndTime - formatStartTime}ms`);
+    
     // Fetch students linked to this instructor
     const { data: studentLinks, error: linkError } = await supabase
       .from('instructor_students')
@@ -454,8 +462,8 @@ serve(async (req) => {
     
     const startTime = Date.now();
 
-    // Improved batch processing - smaller batches for better reliability
-    const BATCH_SIZE = 10; // Reduced from 15 to 10 for better reliability
+    // Optimized batch processing - increased batch size for faster delivery
+    const BATCH_SIZE = 25; // Increased from 10 to 25 for Phase 1 optimization
     const studentIds = studentLinks.map(link => link.student_id);
     const batches: string[][] = [];
     
@@ -470,6 +478,10 @@ serve(async (req) => {
     
     // Generate idempotency key to prevent duplicates
     const idempotencyKey = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+    // Performance logging: Start batch processing
+    const batchStartTime = Date.now();
+    console.log('⏱️ Starting batch distribution to students...');
 
     // Process batches sequentially to avoid overwhelming the database
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
@@ -545,8 +557,17 @@ serve(async (req) => {
       }
     }
 
-    const processingTime = Date.now() - startTime;
+    const batchEndTime = Date.now();
+    const batchTime = batchEndTime - batchStartTime;
+    const processingTime = batchEndTime - startTime;
     const wasSuccessful = successCount > 0;
+    
+    // Performance logging: Complete breakdown
+    console.log(`⏱️ Performance breakdown:
+      - Formatting: ${formatEndTime - formatStartTime}ms
+      - Batch distribution: ${batchTime}ms
+      - Total: ${processingTime}ms
+      - Success rate: ${successCount}/${studentIds.length} students (${Math.round(successCount/studentIds.length*100)}%)`);
     
     console.log(`✅ Questions sent: ${successCount}/${studentIds.length} students in ${processingTime}ms`);
 

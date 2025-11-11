@@ -439,11 +439,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         duration: 3000,
       });
 
-      // CRITICAL: Wait 1.5 seconds for:
+      // CRITICAL: Wait 2.5 seconds for:
       // 1. User to finish speaking any remaining words
       // 2. Transcription service to process final audio chunks
-      console.log('⏳ Waiting 1.5s for transcription to complete...');
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 3. Network latency and slower speakers
+      console.log('⏳ Waiting 2.5s for transcription to complete...');
+      
+      // Visual countdown for instructor feedback
+      for (let i = 25; i >= 0; i--) {
+        setBatchProgress(`⏱️ Capturing speech... ${(i / 10).toFixed(1)}s`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      setBatchProgress("");
 
       // Get last ~60-90 seconds of transcript (increased for better context)
       // Ensure we don't cut off mid-word
@@ -747,10 +754,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         description: `"${detectionData.question_text.substring(0, 60)}..." - Sending to students...`,
       });
 
+      // Show progress indicator immediately
+      setBatchProgress("📝 Extracting and formatting question...");
+
       // Provide richer context for better question formatting
       const fullContext = transcriptBufferRef.current.slice(-1500);
 
       // Retry logic for transient failures with progress tracking
+      const sendStartTime = Date.now();
       const { data, error } = await retryWithBackoff(async () => {
         return await supabase.functions.invoke('format-and-send-question', {
           body: {
@@ -762,12 +773,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           }
         });
       });
+      
+      const totalTime = Date.now() - sendStartTime;
+      console.log(`⏱️ Total send time: ${totalTime}ms`);
 
       console.log('📥 Edge function response:', { data, error });
       
-      // Show batch progress if available
-      if (data?.batches_processed && data?.total_students) {
-        setBatchProgress(`Sending to ${data.total_students} students in ${data.batches_processed} batches...`);
+      // Show detailed progress if available
+      if (data?.processing_time_ms) {
+        const timeStr = data.processing_time_ms < 1000 
+          ? `${data.processing_time_ms}ms` 
+          : `${(data.processing_time_ms / 1000).toFixed(1)}s`;
+        setBatchProgress(`✅ Sent to ${data.sent_to}/${data.total_students} students in ${timeStr}`);
+        setTimeout(() => setBatchProgress(""), 4000);
+      } else if (data?.batches_processed && data?.total_students) {
+        setBatchProgress(`✅ Sent to ${data.total_students} students in ${data.batches_processed} batches`);
         setTimeout(() => setBatchProgress(""), 3000);
       }
 
