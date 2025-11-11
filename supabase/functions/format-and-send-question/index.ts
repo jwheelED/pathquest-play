@@ -622,6 +622,34 @@ serve(async (req) => {
       // Don't fail the request if logging fails
     }
 
+    // CRITICAL: Verify delivery immediately after sending
+    console.log('🔍 Verifying delivery for students:', studentIds.slice(0, 3), '...');
+    const { data: deliveryCheck, error: deliveryError } = await supabase
+      .from('student_assignments')
+      .select('id, student_id')
+      .eq('instructor_id', user.id)
+      .contains('content', { idempotency_key: idempotencyKey })
+      .in('student_id', studentIds.slice(0, 10)); // Check first 10 students
+    
+    if (deliveryError) {
+      console.error('❌ Delivery verification failed:', deliveryError);
+    } else {
+      console.log('✅ Delivery verified:', {
+        expected: Math.min(10, studentIds.length),
+        actual: deliveryCheck?.length || 0,
+        student_ids: deliveryCheck?.map(d => d.student_id).slice(0, 5)
+      });
+      
+      // Log any discrepancies
+      if (deliveryCheck && deliveryCheck.length < Math.min(10, studentIds.length)) {
+        console.warn('⚠️ Delivery mismatch:', {
+          expected_students: studentIds.slice(0, 10),
+          delivered_to: deliveryCheck.map(d => d.student_id),
+          missing_count: Math.min(10, studentIds.length) - deliveryCheck.length
+        });
+      }
+    }
+
     // Broadcast notification via Supabase Realtime for instant delivery
     const broadcastChannel = supabase.channel(`instructor-${user.id}-questions`);
     await broadcastChannel.send({

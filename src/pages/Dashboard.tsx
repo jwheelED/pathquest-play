@@ -8,6 +8,7 @@ import AchievementSystem from "@/components/AchievementSystem";
 import { BadgesButton } from "@/components/student/BadgesButton";
 import InstructorChatCard from "@/components/InstructorChatCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
+import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { toast } from "sonner";
@@ -48,6 +49,32 @@ export default function Dashboard() {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Auto-verify session every 5 minutes
+  useEffect(() => {
+    const verifySession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        logger.error("Session verification failed:", error);
+        toast.error("Your session has expired. Please login again.", {
+          duration: 10000,
+          action: {
+            label: "Logout",
+            onClick: handleLogout
+          }
+        });
+      }
+    };
+
+    // Initial check
+    verifySession();
+    
+    // Check every 5 minutes
+    const interval = setInterval(verifySession, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const [hasCheckedOnboarding, setHasCheckedOnboarding] = useState(false);
 
@@ -259,6 +286,9 @@ export default function Dashboard() {
           {user?.id && <InstructorChatCard key={refreshKey} userId={user.id} />}
         </div>
       </div>
+
+      {/* Connection Debug Panel */}
+      {user?.id && <ConnectionDebugPanel userId={user.id} />}
 
       {/* Mobile Bottom Navigation */}
       <BottomNav role="student" />
