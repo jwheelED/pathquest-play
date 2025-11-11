@@ -407,12 +407,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       lastDetectionTimeRef.current = now;
       lastDetectedChunkIndexRef.current = currentChunkIndex;
       
-      // Clear the command phrase from buffer to prevent re-detection
-      // Remove last ~25 characters (the "send question now" phrase)
-      if (transcriptBufferRef.current.length > 25) {
-        transcriptBufferRef.current = transcriptBufferRef.current.slice(0, -25);
-        console.log('🧹 Cleared command phrase from buffer');
-      }
+      // DON'T clear the buffer here - we need the full question for extraction
+      // The command phrase will be filtered by the AI during extraction
       
       handleVoiceCommandQuestion();
       return true;
@@ -439,9 +435,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       toast({
         title: "🎤 Voice command detected!",
-        description: "Extracting question from recent speech...",
+        description: "Capturing final speech...",
         duration: 3000,
       });
+
+      // CRITICAL: Wait 1.5 seconds for:
+      // 1. User to finish speaking any remaining words
+      // 2. Transcription service to process final audio chunks
+      console.log('⏳ Waiting 1.5s for transcription to complete...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Get last ~60-90 seconds of transcript (increased for better context)
       // Ensure we don't cut off mid-word
