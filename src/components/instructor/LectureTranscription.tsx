@@ -2575,8 +2575,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         )}
         </CardContent>
       </Card>
-      </CardContent>
-    </Card>
+    </CardContent>
+  </Card>
     
     {/* Extraction Error Dialog */}
     <AlertDialog open={showExtractionDialog} onOpenChange={setShowExtractionDialog}>
