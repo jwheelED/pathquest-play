@@ -65,12 +65,12 @@ Return ONLY the complete question text, nothing else.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-5', // More capable model for accurate extraction
+        model: 'google/gemini-2.5-pro', // Most capable Gemini model for accurate extraction
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_completion_tokens: 500 // Claude 4+ uses max_completion_tokens
+        max_completion_tokens: 500
       }),
     });
 
