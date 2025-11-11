@@ -130,7 +130,7 @@ Return ONLY the complete question text, nothing else.`;
       
       // Check word count - very short questions are suspicious
       const wordCount = question.split(/\s+/).length;
-      if (wordCount < 4 && question.includes('what') || question.includes('how')) {
+      if (wordCount < 4 && (question.includes('what') || question.includes('how'))) {
         return { isValid: false, reason: `Question too short (${wordCount} words) for question word` };
       }
       
