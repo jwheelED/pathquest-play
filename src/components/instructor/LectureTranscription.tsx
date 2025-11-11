@@ -13,6 +13,7 @@ import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
+import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2603,6 +2604,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             {/* Auto-Question Dashboard */}
             {autoQuestionEnabled && (
               <div className="mt-3 space-y-3">
+                {/* System Health Check */}
+                <EdgeFunctionHealthCheck />
+                
                 {/* Debug Dashboard */}
                 <AutoQuestionDebugDashboard
                   isEnabled={autoQuestionEnabled}
