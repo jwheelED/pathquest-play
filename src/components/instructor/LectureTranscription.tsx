@@ -10,6 +10,19 @@ import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
 import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
+import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
+import { SystemHealthCheck } from "./SystemHealthCheck";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -68,6 +81,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [quotaConsecutiveErrors, setQuotaConsecutiveErrors] = useState(0);
   const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
   const [quotaCircuitBreakerCountdown, setQuotaCircuitBreakerCountdown] = useState<number>(0);
+  
+  // Error history tracking
+  const [errorHistory, setErrorHistory] = useState<ErrorRecord[]>([]);
+  
+  // Extraction error dialog
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false);
+  const [partialQuestion, setPartialQuestion] = useState("");
+  const [editedQuestion, setEditedQuestion] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -444,10 +465,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       if (!data?.success || !data?.question_text) {
+        // Check if we have a partial question to show user
+        if (data?.partial_question && data?.retryable) {
+          setPartialQuestion(data.partial_question);
+          setEditedQuestion(data.partial_question);
+          setShowExtractionDialog(true);
+          
+          addError(
+            'warning',
+            'extraction',
+            'Question extraction incomplete',
+            `${data.error || 'Validation failed'} - Partial: "${data.partial_question}"`,
+            true
+          );
+          return;
+        }
+        
         // SUPPRESS ERROR: This is likely a false positive detection
         // Log it silently instead of showing error toast to user
         console.log('⚠️ No question found in transcript - likely false positive detection');
         console.log('Transcript analyzed:', recentTranscript.slice(-200));
+        
+        addError(
+          'info',
+          'extraction',
+          'No question found in transcript',
+          'Likely false positive detection',
+          false
+        );
         return;
       }
 
@@ -882,6 +927,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             variant: "destructive",
             duration: 5000,
           });
+          
+          addError(
+            'critical',
+            'question_send',
+            'Failed to send question',
+            error.message || "An unexpected error occurred",
+            true
+          );
         }
       }
       throw error;
@@ -2044,6 +2097,69 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     });
   };
 
+  // Error history management
+  const addError = (
+    severity: ErrorRecord['severity'],
+    category: ErrorRecord['category'],
+    message: string,
+    details?: string,
+    retryable?: boolean
+  ) => {
+    const error: ErrorRecord = {
+      id: `error-${Date.now()}-${Math.random()}`,
+      timestamp: new Date(),
+      severity,
+      category,
+      message,
+      details,
+      retryable
+    };
+    
+    setErrorHistory(prev => [error, ...prev].slice(0, 50)); // Keep last 50 errors
+  };
+
+  const handleDismissError = (errorId: string) => {
+    setErrorHistory(prev => prev.filter(e => e.id !== errorId));
+  };
+
+  const handleClearAllErrors = () => {
+    setErrorHistory([]);
+  };
+
+  // Handle extraction dialog actions
+  const handleRetryExtraction = () => {
+    setShowExtractionDialog(false);
+    setPartialQuestion("");
+    setEditedQuestion("");
+    // Voice command will automatically retry on next detection
+  };
+
+  const handleManualSend = async () => {
+    const questionToSend = editedQuestion.trim();
+    if (!questionToSend) {
+      toast({
+        title: "Invalid Question",
+        description: "Please enter a question to send",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setShowExtractionDialog(false);
+    
+    // Send the manually edited question
+    await handleQuestionSend({
+      question_text: questionToSend,
+      suggested_type: 'multiple_choice',
+      confidence: 1.0,
+      extraction_method: 'manual_edit',
+      source: 'voice_command_corrected'
+    });
+    
+    setPartialQuestion("");
+    setEditedQuestion("");
+  };
+
   return (
     <>
       {/* Persistent Quota Error Alert Banner */}
@@ -2106,8 +2222,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         </Card>
       )}
 
-      {/* System Status Monitoring Dashboard */}
-      {isRecording && (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mic className="h-5 w-5" />
+            Live Lecture Capture
+          </CardTitle>
+          <CardDescription>
+            Record your lecture and send questions to students in real-time
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* System Health Check */}
+          {!isRecording && (
+            <SystemHealthCheck />
+          )}
+          
+          {/* Error History Panel */}
+          {errorHistory.length > 0 && (
+            <ErrorHistoryPanel
+              errors={errorHistory}
+              onDismiss={handleDismissError}
+              onClearAll={handleClearAllErrors}
+            />
+          )}
+
+          {/* System Status Monitoring Dashboard */}
+          {isRecording && (
         <Card className="mb-4 border-primary/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -2296,9 +2437,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             </CardContent>
           </CollapsibleContent>
         </Card>
-      </Collapsible>
+        </Collapsible>
 
-      <Card className="relative overflow-hidden">
+        <Card className="relative overflow-hidden">
         {/* Voice Command Flash Overlay */}
         {voiceCommandDetected && (
           <div className="absolute inset-0 z-50 pointer-events-none">
@@ -2322,7 +2463,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               : "Start recording - use the 'Send Question' button or say 'send question now' to send questions to students"}
           </CardDescription>
         </CardHeader>
-      <CardContent className="space-y-3">
+        <CardContent className="space-y-3">
         <div className="space-y-2">
           <div className="flex gap-2">
             <Button
@@ -2432,8 +2573,50 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             ))}
           </div>
         )}
+        </CardContent>
+      </Card>
       </CardContent>
     </Card>
+    
+    {/* Extraction Error Dialog */}
+    <AlertDialog open={showExtractionDialog} onOpenChange={setShowExtractionDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Question Extraction Incomplete</AlertDialogTitle>
+          <AlertDialogDescription>
+            The voice command detected a partial question. You can edit it and send, or retry the extraction.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium mb-2">Detected (partial):</p>
+            <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
+              "{partialQuestion}"
+            </p>
+          </div>
+          
+          <div>
+            <p className="text-sm font-medium mb-2">Edit and send:</p>
+            <Textarea
+              value={editedQuestion}
+              onChange={(e) => setEditedQuestion(e.target.value)}
+              placeholder="Complete the question..."
+              rows={3}
+            />
+          </div>
+        </div>
+        
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleRetryExtraction}>
+            Retry Extraction
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleManualSend}>
+            Send Question
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 };

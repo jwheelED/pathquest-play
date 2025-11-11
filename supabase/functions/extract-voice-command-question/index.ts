@@ -129,7 +129,9 @@ Return ONLY the complete question text, nothing else. Do not add explanations or
         JSON.stringify({ 
           success: false,
           error: `Question extraction incomplete: ${validation.reason}. Please try again.`,
-          debug: { extracted: extractedQuestion }
+          partial_question: extractedQuestion, // Return partial for user review
+          validation_failure: validation.reason,
+          retryable: true
         }), 
         { 
           status: 422, // Unprocessable Entity
