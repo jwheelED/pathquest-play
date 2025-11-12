@@ -23,9 +23,49 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
   const timeRef = useRef(0);
   const pulseScaleRef = useRef(1);
   const rippleRef = useRef({ active: false, progress: 0, radius: 0 });
+  const colorsRef = useRef({ primary: '', destructive: '' });
   
   const [streak, setStreak] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
+
+  // Get CSS variable colors and convert to canvas-compatible format
+  const getCSSColor = useCallback((hslString: string, opacity: number = 1): string => {
+    // Parse HSL string like "240 5.9% 10%" to rgb
+    const [h, s, l] = hslString.split(' ').map(v => parseFloat(v));
+    
+    // Convert HSL to RGB for canvas
+    const sNorm = s / 100;
+    const lNorm = l / 100;
+    
+    const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = lNorm - c / 2;
+    
+    let r = 0, g = 0, b = 0;
+    if (h >= 0 && h < 60) { r = c; g = x; b = 0; }
+    else if (h >= 60 && h < 120) { r = x; g = c; b = 0; }
+    else if (h >= 120 && h < 180) { r = 0; g = c; b = x; }
+    else if (h >= 180 && h < 240) { r = 0; g = x; b = c; }
+    else if (h >= 240 && h < 300) { r = x; g = 0; b = c; }
+    else if (h >= 300 && h < 360) { r = c; g = 0; b = x; }
+    
+    const rFinal = Math.round((r + m) * 255);
+    const gFinal = Math.round((g + m) * 255);
+    const bFinal = Math.round((b + m) * 255);
+    
+    return `rgba(${rFinal}, ${gFinal}, ${bFinal}, ${opacity})`;
+  }, []);
+
+  // Initialize colors from CSS variables
+  useEffect(() => {
+    const root = document.documentElement;
+    const styles = getComputedStyle(root);
+    
+    colorsRef.current = {
+      primary: styles.getPropertyValue('--primary').trim(),
+      destructive: styles.getPropertyValue('--destructive').trim()
+    };
+  }, []);
 
   // Initialize particles
   const initParticles = useCallback((width: number, height: number) => {
@@ -81,9 +121,9 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       height / 2,
       Math.max(width, height) * 0.7
     );
-    gradient.addColorStop(0, 'hsl(var(--primary) / 0.2)');
-    gradient.addColorStop(0.5, 'hsl(var(--primary) / 0.1)');
-    gradient.addColorStop(1, 'hsl(var(--primary) / 0.05)');
+    gradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.2));
+    gradient.addColorStop(0.5, getCSSColor(colorsRef.current.primary, 0.1));
+    gradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0.05));
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
@@ -111,7 +151,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
         }
       }
 
-      ctx.strokeStyle = `hsl(var(--primary) / ${opacity})`;
+      ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity);
       ctx.lineWidth = 2 + i;
       ctx.stroke();
     }
@@ -146,14 +186,14 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       particle.y += particle.vy;
 
       // Draw particle
-      const gradient = ctx.createRadialGradient(
+      const particleGradient = ctx.createRadialGradient(
         particle.x, particle.y, 0,
         particle.x, particle.y, 8
       );
-      gradient.addColorStop(0, `hsl(var(--primary) / 0.6)`);
-      gradient.addColorStop(1, `hsl(var(--primary) / 0)`);
+      particleGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.6));
+      particleGradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0));
       
-      ctx.fillStyle = gradient;
+      ctx.fillStyle = particleGradient;
       ctx.beginPath();
       ctx.arc(particle.x, particle.y, 8, 0, Math.PI * 2);
       ctx.fill();
@@ -165,7 +205,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       rippleRef.current.radius += 8;
       
       const opacity = Math.max(0, 1 - rippleRef.current.progress);
-      ctx.strokeStyle = `hsl(var(--destructive) / ${opacity * 0.4})`;
+      ctx.strokeStyle = getCSSColor(colorsRef.current.destructive, opacity * 0.4);
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(width / 2, height / 2, rippleRef.current.radius, 0, Math.PI * 2);
