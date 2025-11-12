@@ -243,13 +243,22 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
       }
       
       const rect = textareaRef.current.getBoundingClientRect();
-      window.dispatchEvent(new CustomEvent('flowstate:typing', {
+      const typingEvent = new CustomEvent('flowstate:typing', {
         detail: {
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2,
           speed: typingSpeed // 0-10+ characters per second
         }
-      }));
+      });
+      
+      console.log('🎨 [VersionTracker] Dispatching typing event:', {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        speed: typingSpeed,
+        lengthDiff
+      });
+      
+      window.dispatchEvent(typingEvent);
     }
 
     // Detect typing vs pasting based on speed and volume

@@ -344,6 +344,8 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
 
   // Expose methods to parent via window event listeners
   useEffect(() => {
+    console.log('🎨 [FlowStateCard] Setting up event listeners');
+    
     const handleAnswerResult = (event: CustomEvent) => {
       const { isCorrect } = event.detail;
       if (isCorrect) {
@@ -354,15 +356,22 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
     };
 
     const handleTyping = (event: CustomEvent) => {
+      console.log('🎨 [FlowStateCard] Received typing event:', event.detail);
+      
       const { x, y, speed = 0 } = event.detail;
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) {
+        console.log('⚠️ [FlowStateCard] No canvas ref');
+        return;
+      }
 
       const canvasRect = canvas.getBoundingClientRect();
       
       // Convert screen coordinates to canvas coordinates
       const canvasX = x - canvasRect.left;
       const canvasY = y - canvasRect.top;
+      
+      console.log('🎨 [FlowStateCard] Canvas coordinates:', { canvasX, canvasY, speed });
       
       // Calculate intensity based on typing speed
       // Speed ranges: 0-2 CPS = slow, 2-5 CPS = medium, 5+ CPS = fast
@@ -382,12 +391,17 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
         radius: 10 + (intensity * 15), // 10-25 initial radius
         intensity: intensity
       });
+      
+      console.log('✅ [FlowStateCard] Added ripple, total:', typingRipplesRef.current.length);
     };
 
     window.addEventListener('flowstate:answer' as any, handleAnswerResult);
     window.addEventListener('flowstate:typing' as any, handleTyping);
     
+    console.log('✅ [FlowStateCard] Event listeners registered');
+    
     return () => {
+      console.log('🔌 [FlowStateCard] Removing event listeners');
       window.removeEventListener('flowstate:answer' as any, handleAnswerResult);
       window.removeEventListener('flowstate:typing' as any, handleTyping);
     };
