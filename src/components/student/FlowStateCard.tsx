@@ -23,6 +23,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
   const timeRef = useRef(0);
   const pulseScaleRef = useRef(1);
   const rippleRef = useRef({ active: false, progress: 0, radius: 0 });
+  const typingRipplesRef = useRef<Array<{ x: number; y: number; progress: number; radius: number }>>([]);
   const colorsRef = useRef({ primary: '', destructive: '' });
   
   const [streak, setStreak] = useState(0);
@@ -218,6 +219,30 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       }
     }
 
+    // Draw typing ripples (very faint)
+    typingRipplesRef.current = typingRipplesRef.current.filter(ripple => {
+      ripple.progress += 0.03;
+      ripple.radius += 3;
+      
+      const opacity = Math.max(0, 0.15 * (1 - ripple.progress)); // Very faint: max 0.15 opacity
+      
+      if (opacity > 0) {
+        ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Second ripple ring for water effect
+        ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity * 0.5);
+        ctx.beginPath();
+        ctx.arc(ripple.x, ripple.y, ripple.radius + 5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      
+      return ripple.progress < 1;
+    });
+
     // Pulse animation (baseline + success boost)
     if (pulseScaleRef.current > 1) {
       pulseScaleRef.current = Math.max(1, pulseScaleRef.current - 0.02);
@@ -262,10 +287,32 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       }
     };
 
+    const handleTyping = (event: CustomEvent) => {
+      const { x, y } = event.detail;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      // Convert screen coordinates to canvas coordinates
+      const canvasX = x - canvasRect.left;
+      const canvasY = y - canvasRect.top;
+      
+      // Add a new typing ripple
+      typingRipplesRef.current.push({
+        x: canvasX,
+        y: canvasY,
+        progress: 0,
+        radius: 10
+      });
+    };
+
     window.addEventListener('flowstate:answer' as any, handleAnswerResult);
+    window.addEventListener('flowstate:typing' as any, handleTyping);
     
     return () => {
       window.removeEventListener('flowstate:answer' as any, handleAnswerResult);
+      window.removeEventListener('flowstate:typing' as any, handleTyping);
     };
   }, [triggerSuccessPulse, triggerErrorRipple]);
 
