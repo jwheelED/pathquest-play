@@ -28,7 +28,12 @@ interface Assignment {
   answers_released?: boolean;
 }
 
-export const AssignedContent = ({ userId }: { userId: string }) => {
+interface AssignedContentProps {
+  userId: string;
+  onAnswerResult?: (isCorrect: boolean, grade: number) => void;
+}
+
+export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
@@ -328,6 +333,12 @@ export const AssignedContent = ({ userId }: { userId: string }) => {
       }
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
+      
+      // Emit answer result for flow state visualization
+      if (onAnswerResult && result.grade !== null) {
+        const isCorrect = result.grade >= 80;
+        onAnswerResult(isCorrect, result.grade);
+      }
       
       // Save version history for cheat detection
       // For short answers and MCQ, check for version history data from any question

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AchievementSystem from "@/components/AchievementSystem";
 import { BadgesButton } from "@/components/student/BadgesButton";
-import InstructorChatCard from "@/components/InstructorChatCard";
+import { FlowStateCard } from "@/components/student/FlowStateCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
@@ -32,6 +32,14 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("");
   const [userStats, setUserStats] = useState({ level: 1, streak: 0 });
   const navigate = useNavigate();
+
+  // Handle answer results for flow state visualization
+  const handleAnswerResult = (isCorrect: boolean, grade: number) => {
+    // Dispatch custom event for FlowStateCard
+    window.dispatchEvent(new CustomEvent('flowstate:answer', {
+      detail: { isCorrect, grade }
+    }));
+  };
 
   useEffect(() => {
     checkSession();
@@ -281,9 +289,10 @@ export default function Dashboard() {
           )}
           
           {/* Live Lecture Check-ins - Most Important Section */}
-          {user?.id && <AssignedContent userId={user.id} />}
+          {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
 
-          {user?.id && <InstructorChatCard key={refreshKey} userId={user.id} />}
+          {/* Flow State Visualization */}
+          {user?.id && <FlowStateCard userId={user.id} />}
         </div>
       </div>
 
