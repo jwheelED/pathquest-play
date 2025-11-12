@@ -224,41 +224,51 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
     const timeDiff = currentTime - lastTimestampRef.current;
     const lengthDiff = newValue.length - lastValueRef.current.length;
 
-    // Emit typing event for flow state visualization with speed
-    if (lengthDiff > 0 && textareaRef.current) {
-      // Track keystroke timestamps for speed calculation
-      keystrokeTimestampsRef.current.push(currentTime);
+    console.log('⌨️  [VersionTracker] handleChange called:', { lengthDiff, hasTextareaRef: !!textareaRef.current });
+
+    // Emit typing event for flow state visualization with speed (for additions only)
+    if (lengthDiff > 0) {
+      console.log('🎨 [VersionTracker] Length increased, preparing to dispatch');
       
-      // Keep only last 5 keystrokes
-      if (keystrokeTimestampsRef.current.length > 5) {
-        keystrokeTimestampsRef.current.shift();
-      }
-      
-      // Calculate typing speed (characters per second)
-      let typingSpeed = 0;
-      if (keystrokeTimestampsRef.current.length >= 2) {
-        const timeSpan = currentTime - keystrokeTimestampsRef.current[0];
-        const keystrokes = keystrokeTimestampsRef.current.length;
-        typingSpeed = (keystrokes / timeSpan) * 1000; // Convert to per second
-      }
-      
-      const rect = textareaRef.current.getBoundingClientRect();
-      const typingEvent = new CustomEvent('flowstate:typing', {
-        detail: {
+      if (textareaRef.current) {
+        // Track keystroke timestamps for speed calculation
+        keystrokeTimestampsRef.current.push(currentTime);
+        
+        // Keep only last 5 keystrokes
+        if (keystrokeTimestampsRef.current.length > 5) {
+          keystrokeTimestampsRef.current.shift();
+        }
+        
+        // Calculate typing speed (characters per second)
+        let typingSpeed = 0;
+        if (keystrokeTimestampsRef.current.length >= 2) {
+          const timeSpan = currentTime - keystrokeTimestampsRef.current[0];
+          const keystrokes = keystrokeTimestampsRef.current.length;
+          typingSpeed = (keystrokes / timeSpan) * 1000; // Convert to per second
+        }
+        
+        const rect = textareaRef.current.getBoundingClientRect();
+        const typingEvent = new CustomEvent('flowstate:typing', {
+          detail: {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+            speed: typingSpeed // 0-10+ characters per second
+          }
+        });
+        
+        console.log('🎨 [VersionTracker] Dispatching typing event:', {
           x: rect.left + rect.width / 2,
           y: rect.top + rect.height / 2,
-          speed: typingSpeed // 0-10+ characters per second
-        }
-      });
-      
-      console.log('🎨 [VersionTracker] Dispatching typing event:', {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-        speed: typingSpeed,
-        lengthDiff
-      });
-      
-      window.dispatchEvent(typingEvent);
+          speed: typingSpeed,
+          lengthDiff,
+          rectValid: rect.width > 0 && rect.height > 0
+        });
+        
+        window.dispatchEvent(typingEvent);
+        console.log('✅ [VersionTracker] Event dispatched');
+      } else {
+        console.warn('⚠️ [VersionTracker] textareaRef.current is null!');
+      }
     }
 
     // Detect typing vs pasting based on speed and volume
