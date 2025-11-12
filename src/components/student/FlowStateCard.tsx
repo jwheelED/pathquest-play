@@ -25,6 +25,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
   const rippleRef = useRef({ active: false, progress: 0, radius: 0 });
   const typingRipplesRef = useRef<Array<{ x: number; y: number; progress: number; radius: number; intensity: number }>>([]);
   const colorsRef = useRef({ primary: '', destructive: '' });
+  const cursorTrailRef = useRef<Array<{ x: number; y: number; age: number }>>([]);
   
   const [streak, setStreak] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
@@ -259,6 +260,55 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       return ripple.progress < 1;
     });
 
+    // Draw cursor glow and trail
+    if (mouse.isOver) {
+      // Update cursor trail
+      cursorTrailRef.current.forEach(trail => {
+        trail.age += 0.1;
+      });
+      cursorTrailRef.current = cursorTrailRef.current.filter(trail => trail.age < 1);
+
+      // Draw cursor trail particles
+      cursorTrailRef.current.forEach(trail => {
+        const opacity = (1 - trail.age) * 0.4;
+        const size = 12 * (1 - trail.age * 0.5);
+        
+        const trailGradient = ctx.createRadialGradient(
+          trail.x, trail.y, 0,
+          trail.x, trail.y, size
+        );
+        trailGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, opacity * 0.8));
+        trailGradient.addColorStop(0.5, getCSSColor(colorsRef.current.primary, opacity * 0.4));
+        trailGradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0));
+        
+        ctx.fillStyle = trailGradient;
+        ctx.beginPath();
+        ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Draw main cursor glow
+      const glowSize = 20 + Math.sin(timeRef.current * 3) * 3;
+      const cursorGradient = ctx.createRadialGradient(
+        mouse.x, mouse.y, 0,
+        mouse.x, mouse.y, glowSize
+      );
+      cursorGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.5));
+      cursorGradient.addColorStop(0.4, getCSSColor(colorsRef.current.primary, 0.3));
+      cursorGradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0));
+      
+      ctx.fillStyle = cursorGradient;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw cursor core
+      ctx.fillStyle = getCSSColor(colorsRef.current.primary, 0.8);
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Pulse animation (baseline + success boost)
     if (pulseScaleRef.current > 1) {
       pulseScaleRef.current = Math.max(1, pulseScaleRef.current - 0.02);
@@ -388,11 +438,25 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
+    const newX = e.clientX - rect.left;
+    const newY = e.clientY - rect.top;
+    
     mouseRef.current = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: newX,
+      y: newY,
       isOver: true
     };
+
+    // Add to cursor trail (throttle to every few pixels of movement)
+    const lastTrail = cursorTrailRef.current[cursorTrailRef.current.length - 1];
+    if (!lastTrail || Math.hypot(newX - lastTrail.x, newY - lastTrail.y) > 8) {
+      cursorTrailRef.current.push({ x: newX, y: newY, age: 0 });
+      
+      // Keep trail at reasonable length
+      if (cursorTrailRef.current.length > 15) {
+        cursorTrailRef.current.shift();
+      }
+    }
   }, []);
 
   const handleMouseEnter = useCallback(() => {
