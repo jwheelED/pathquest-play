@@ -1273,14 +1273,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         wpm: qualityMetrics.wordsPerMinute.toFixed(0)
       });
       
-      if (intervalTranscript.length < 100) {
-        console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 100+)');
+      // Minimal character check - just ensure there's some content to work with
+      if (intervalTranscript.length < 50) {
+        console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 50+)');
         
         // Track skip reason
         const skipReason: SkipReason = {
           timestamp: new Date(),
           reason: 'Insufficient content',
-          details: `${intervalTranscript.length}/100 chars`
+          details: `${intervalTranscript.length}/50 chars`
         };
         setAutoQuestionMetrics(prev => ({
           ...prev,
@@ -1290,119 +1291,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         
         toast({
           title: "⏭️ Auto-question skipped",
-          description: `Need ${100 - intervalTranscript.length} more characters of lecture content`,
+          description: `Need ${50 - intervalTranscript.length} more characters of lecture content`,
           duration: 3000,
         });
         return false;
       }
       
-      // Skip if content quality is too low
-      if (qualityMetrics.isPause) {
-        console.log('⚠️ Content appears to be a pause or low quality, skipping auto-question');
-        
-        // Track skip reason
-        const skipReason: SkipReason = {
-          timestamp: new Date(),
-          reason: 'Pause detected',
-          details: 'Low content quality (pause/filler words)'
-        };
-        setAutoQuestionMetrics(prev => ({
-          ...prev,
-          questionsSkipped: prev.questionsSkipped + 1,
-          skipReasons: [...prev.skipReasons, skipReason]
-        }));
-        
-        toast({
-          title: "⏭️ Auto-question skipped",
-          description: "Low content quality detected (pause or filler words). Continue teaching for better questions.",
-          duration: 3000,
-        });
-        return false;
-      }
-      
-      // Adaptive quality thresholds based on ACTUAL ELAPSED TIME
-      // The longer content accumulates, the more lenient we need to be with density
-      let densityThreshold: number;
-      let minWordCount: number;
-      
-      const elapsedMinutes = actualElapsedSeconds / 60;
-      
-      if (elapsedMinutes <= 5) {
-        densityThreshold = 0.25; // Lenient for short intervals
-        minWordCount = 300; // Reduced from 400
-      } else if (elapsedMinutes <= 10) {
-        densityThreshold = 0.22; // More lenient for accumulated content
-        minWordCount = 0;
-      } else {
-        densityThreshold = 0.20; // Very lenient for long accumulated content
-        minWordCount = 0;
-      }
-      
-      console.log(`📐 Quality thresholds: ${(densityThreshold * 100).toFixed(0)}% density, ${minWordCount} min words (elapsed: ${elapsedMinutes.toFixed(1)}m)`);
-      
-      // Check minimum word count
-      if (minWordCount > 0 && actualWordCount < minWordCount) {
-        console.log('⚠️ Not enough words:', actualWordCount, `(need ${minWordCount}+)`);
-        
-        // Track skip reason
-        const skipReason: SkipReason = {
-          timestamp: new Date(),
-          reason: 'Word count too low',
-          details: `${actualWordCount}/${minWordCount} words`
-        };
-        setAutoQuestionMetrics(prev => ({
-          ...prev,
-          questionsSkipped: prev.questionsSkipped + 1,
-          skipReasons: [...prev.skipReasons, skipReason]
-        }));
-        
-        toast({
-          title: "⏭️ Auto-question skipped",
-          description: `Need ${minWordCount - actualWordCount} more words for quality question`,
-          duration: 3000,
-        });
-        return false;
-      }
-      
-      if (qualityMetrics.contentDensity < densityThreshold) {
-        console.log('⚠️ Content density too low:', qualityMetrics.contentDensity);
-        
-        // Track skip reason
-        const skipReason: SkipReason = {
-          timestamp: new Date(),
-          reason: 'Quality too low',
-          details: `${(qualityMetrics.contentDensity * 100).toFixed(0)}% (need ${(densityThreshold * 100).toFixed(0)}%+)`
-        };
-        setAutoQuestionMetrics(prev => ({
-          ...prev,
-          questionsSkipped: prev.questionsSkipped + 1,
-          skipReasons: [...prev.skipReasons, skipReason]
-        }));
-        
-        // Trim transcript to prevent infinite accumulation
-        const words = intervalTranscript.split(/\s+/);
-        if (words.length > expectedWords * 1.5) {
-          // Keep only the most recent portion
-          const trimmedWords = words.slice(-expectedWords);
-          intervalTranscriptRef.current = trimmedWords.join(' ');
-          console.log(`✂️ Trimmed transcript from ${words.length} to ${trimmedWords.length} words`);
-        }
-        
-        toast({
-          title: "⏭️ Auto-question skipped",
-          description: `Content quality: ${(qualityMetrics.contentDensity * 100).toFixed(0)}%. Threshold: ${(densityThreshold * 100).toFixed(0)}%`,
-          duration: 3000,
-        });
-        return false;
-      }
-      
-      console.log('📊 Quality Check Summary:', {
-        elapsedTime: `${elapsedMinutes.toFixed(1)}m`,
+      // Quality metrics for debugging only - NOT used for blocking
+      console.log('📊 Content Metrics (informational only):', {
         wordCount: actualWordCount,
-        expectedWords: expectedWords,
         density: `${(qualityMetrics.contentDensity * 100).toFixed(1)}%`,
-        threshold: `${(densityThreshold * 100).toFixed(1)}%`,
-        passed: true,
+        isPause: qualityMetrics.isPause,
+        wpm: qualityMetrics.wordsPerMinute.toFixed(0),
         transcriptLength: intervalTranscript.length
       });
       
