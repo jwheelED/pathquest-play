@@ -61,6 +61,7 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
   const [answerCopyEvents, setAnswerCopyEvents] = useState<{ timestamp: string; selectedText: string }[]>([]);
   const lastValueRef = useRef(value);
   const lastTimestampRef = useRef(Date.now());
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Component initialization logging
   useEffect(() => {
@@ -222,6 +223,17 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
     const timeDiff = currentTime - lastTimestampRef.current;
     const lengthDiff = newValue.length - lastValueRef.current.length;
 
+    // Emit typing event for flow state visualization
+    if (lengthDiff > 0 && textareaRef.current) {
+      const rect = textareaRef.current.getBoundingClientRect();
+      window.dispatchEvent(new CustomEvent('flowstate:typing', {
+        detail: {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        }
+      }));
+    }
+
     // Detect typing vs pasting based on speed and volume
     if (lengthDiff > 10 && timeDiff < 100) {
       // Large change in short time = likely paste
@@ -261,6 +273,7 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
       )}
       
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={handleChange}
         onPaste={handlePaste}
