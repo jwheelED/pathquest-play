@@ -62,6 +62,7 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
   const lastValueRef = useRef(value);
   const lastTimestampRef = useRef(Date.now());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const keystrokeTimestampsRef = useRef<number[]>([]);
 
   // Component initialization logging
   useEffect(() => {
@@ -223,13 +224,30 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
     const timeDiff = currentTime - lastTimestampRef.current;
     const lengthDiff = newValue.length - lastValueRef.current.length;
 
-    // Emit typing event for flow state visualization
+    // Emit typing event for flow state visualization with speed
     if (lengthDiff > 0 && textareaRef.current) {
+      // Track keystroke timestamps for speed calculation
+      keystrokeTimestampsRef.current.push(currentTime);
+      
+      // Keep only last 5 keystrokes
+      if (keystrokeTimestampsRef.current.length > 5) {
+        keystrokeTimestampsRef.current.shift();
+      }
+      
+      // Calculate typing speed (characters per second)
+      let typingSpeed = 0;
+      if (keystrokeTimestampsRef.current.length >= 2) {
+        const timeSpan = currentTime - keystrokeTimestampsRef.current[0];
+        const keystrokes = keystrokeTimestampsRef.current.length;
+        typingSpeed = (keystrokes / timeSpan) * 1000; // Convert to per second
+      }
+      
       const rect = textareaRef.current.getBoundingClientRect();
       window.dispatchEvent(new CustomEvent('flowstate:typing', {
         detail: {
           x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2
+          y: rect.top + rect.height / 2,
+          speed: typingSpeed // 0-10+ characters per second
         }
       }));
     }

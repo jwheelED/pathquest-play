@@ -23,7 +23,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
   const timeRef = useRef(0);
   const pulseScaleRef = useRef(1);
   const rippleRef = useRef({ active: false, progress: 0, radius: 0 });
-  const typingRipplesRef = useRef<Array<{ x: number; y: number; progress: number; radius: number }>>([]);
+  const typingRipplesRef = useRef<Array<{ x: number; y: number; progress: number; radius: number; intensity: number }>>([]);
   const colorsRef = useRef({ primary: '', destructive: '' });
   
   const [streak, setStreak] = useState(0);
@@ -219,25 +219,41 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       }
     }
 
-    // Draw typing ripples (very faint)
+    // Draw typing ripples with variable intensity
     typingRipplesRef.current = typingRipplesRef.current.filter(ripple => {
-      ripple.progress += 0.03;
-      ripple.radius += 3;
+      // Adjust growth rate based on intensity
+      const growthRate = 0.03 + (ripple.intensity * 0.02); // 0.03-0.05
+      const radiusGrowth = 3 + (ripple.intensity * 2); // 3-5 pixels per frame
       
-      const opacity = Math.max(0, 0.15 * (1 - ripple.progress)); // Very faint: max 0.15 opacity
+      ripple.progress += growthRate;
+      ripple.radius += radiusGrowth;
+      
+      // Adjust opacity based on intensity
+      const baseOpacity = 0.15 + (ripple.intensity * 0.1); // 0.15-0.25 max opacity
+      const opacity = Math.max(0, baseOpacity * (1 - ripple.progress));
       
       if (opacity > 0) {
+        // Main ripple ring
         ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity);
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 + (ripple.intensity * 0.5); // 1-1.5 line width
         ctx.beginPath();
         ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
         ctx.stroke();
         
-        // Second ripple ring for water effect
+        // Second ripple ring with adjusted spacing
+        const ringSpacing = 5 + (ripple.intensity * 3); // 5-8 pixels
         ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity * 0.5);
         ctx.beginPath();
-        ctx.arc(ripple.x, ripple.y, ripple.radius + 5, 0, Math.PI * 2);
+        ctx.arc(ripple.x, ripple.y, ripple.radius + ringSpacing, 0, Math.PI * 2);
         ctx.stroke();
+        
+        // Optional: Add third ring for very fast typing
+        if (ripple.intensity > 0.7) {
+          ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity * 0.3);
+          ctx.beginPath();
+          ctx.arc(ripple.x, ripple.y, ripple.radius + ringSpacing * 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
       
       return ripple.progress < 1;
@@ -288,7 +304,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
     };
 
     const handleTyping = (event: CustomEvent) => {
-      const { x, y } = event.detail;
+      const { x, y, speed = 0 } = event.detail;
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -298,12 +314,23 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
       const canvasX = x - canvasRect.left;
       const canvasY = y - canvasRect.top;
       
-      // Add a new typing ripple
+      // Calculate intensity based on typing speed
+      // Speed ranges: 0-2 CPS = slow, 2-5 CPS = medium, 5+ CPS = fast
+      const normalizedSpeed = Math.min(speed / 5, 1); // Clamp to 0-1
+      const intensity = 0.3 + (normalizedSpeed * 0.7); // Range: 0.3-1.0
+      
+      // Performance limit: keep only 20 most recent ripples
+      if (typingRipplesRef.current.length > 20) {
+        typingRipplesRef.current.shift();
+      }
+      
+      // Add new typing ripple with intensity
       typingRipplesRef.current.push({
         x: canvasX,
         y: canvasY,
         progress: 0,
-        radius: 10
+        radius: 10 + (intensity * 15), // 10-25 initial radius
+        intensity: intensity
       });
     };
 
