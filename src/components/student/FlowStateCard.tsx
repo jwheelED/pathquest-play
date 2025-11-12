@@ -404,7 +404,7 @@ export function FlowStateCard({ userId }: FlowStateCardProps) {
   }, []);
 
   return (
-    <Card className="pixel-corners overflow-hidden bg-card/50 backdrop-blur-sm">
+    <Card className="pixel-corners overflow-hidden bg-card border-2 border-primary/30">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-primary" />
