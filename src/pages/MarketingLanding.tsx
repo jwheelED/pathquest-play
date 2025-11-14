@@ -37,7 +37,7 @@ const MarketingLanding = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
             <Button 
               size="lg" 
-              onClick={() => navigate("/instructor-auth")}
+              onClick={() => navigate("/instructor/auth")}
               className="w-full sm:w-auto min-w-[200px]"
             >
               Get Started as Instructor
