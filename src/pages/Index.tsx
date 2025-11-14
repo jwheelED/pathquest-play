@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import edvanaLogo from "@/assets/edvana-logo.png";
 
 const Index = () => {
   const [session, setSession] = useState(null);
@@ -21,12 +20,12 @@ const Index = () => {
           .eq("user_id", session.user.id)
           .eq("role", "admin")
           .maybeSingle();
-
+        
         if (adminRole) {
           navigate("/admin/dashboard");
           return;
         }
-
+        
         // Check for instructor role
         const { data: instructorRole } = await supabase
           .from("user_roles")
@@ -34,12 +33,12 @@ const Index = () => {
           .eq("user_id", session.user.id)
           .eq("role", "instructor")
           .maybeSingle();
-
+        
         if (instructorRole) {
           navigate("/instructor/dashboard");
           return;
         }
-
+        
         // Default to student dashboard
         navigate("/dashboard");
       }
@@ -50,16 +49,16 @@ const Index = () => {
       checkSessionAndRedirect(session);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      if (session) {
-        setTimeout(() => {
-          checkSessionAndRedirect(session);
-        }, 0);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        if (session) {
+          setTimeout(() => {
+            checkSessionAndRedirect(session);
+          }, 0);
+        }
       }
-    });
+    );
 
     return () => subscription.unsubscribe();
   }, [navigate]);
@@ -68,13 +67,22 @@ const Index = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <div className="space-y-4">
-          <img src={edvanaLogo} alt="Edvana" className="h-40 mx-auto" />
-          <p className="text-2xl font-semibold text-primary">Live Lecture Capture & Learning Platform</p>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Real-time lecture transcription, AI-powered check-ins, and intelligent content generation to enhance
-            classroom engagement and learning outcomes.
+          <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
+            🎤 Edvana
+          </h1>
+          <p className="text-2xl font-semibold text-primary">
+            Live Lecture Capture & Learning Platform
           </p>
-          <Button onClick={() => navigate("/learn-more")} variant="retro" size="lg" className="mt-4">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Real-time lecture transcription, AI-powered check-ins, and intelligent content generation 
+            to enhance classroom engagement and learning outcomes.
+          </p>
+          <Button 
+            onClick={() => navigate("/learn-more")}
+            variant="retro"
+            size="lg"
+            className="mt-4"
+          >
             Learn More About Edvana
           </Button>
         </div>
@@ -87,17 +95,23 @@ const Index = () => {
                 <div className="text-5xl">📚</div>
                 <h2 className="text-2xl font-bold text-foreground">I'm a Student</h2>
                 <p className="text-sm text-muted-foreground">
-                  Engage with live lecture check-ins, receive instant feedback, and track your progress with AI-powered
-                  assessments.
+                  Engage with live lecture check-ins, receive instant feedback, and track your progress with AI-powered assessments.
                 </p>
               </div>
-
+              
               <div className="space-y-3">
-                <Button onClick={() => navigate("/auth")} variant="retro" size="lg" className="w-full">
+                <Button 
+                  onClick={() => navigate("/auth")}
+                  variant="retro"
+                  size="lg"
+                  className="w-full"
+                >
                   📖 Start Learning
                 </Button>
-
-                <p className="text-xs text-muted-foreground">Sign up and complete onboarding to begin your quest!</p>
+                
+                <p className="text-xs text-muted-foreground">
+                  Sign up and complete onboarding to begin your quest!
+                </p>
               </div>
             </div>
           </Card>
@@ -109,13 +123,12 @@ const Index = () => {
                 <div className="text-5xl">👨‍🏫</div>
                 <h2 className="text-2xl font-bold text-foreground">I'm an Instructor</h2>
                 <p className="text-sm text-muted-foreground">
-                  Capture live lectures, generate real-time check-ins, monitor student engagement, and detect academic
-                  integrity concerns with AI-powered tools.
+                  Capture live lectures, generate real-time check-ins, monitor student engagement, and detect academic integrity concerns with AI-powered tools.
                 </p>
               </div>
-
+              
               <div className="space-y-3">
-                <Button
+                <Button 
                   onClick={() => navigate("/instructor/auth")}
                   variant="retro"
                   size="lg"
@@ -123,8 +136,10 @@ const Index = () => {
                 >
                   📊 Instructor Portal
                 </Button>
-
-                <p className="text-xs text-muted-foreground">Sign in to access your instructor dashboard</p>
+                
+                <p className="text-xs text-muted-foreground">
+                  Sign in to access your instructor dashboard
+                </p>
               </div>
             </div>
           </Card>
@@ -139,9 +154,9 @@ const Index = () => {
                   Access school-wide analytics, ROI metrics, exportable reports, and comprehensive engagement data.
                 </p>
               </div>
-
+              
               <div className="space-y-3">
-                <Button
+                <Button 
                   onClick={() => navigate("/admin/auth")}
                   variant="retro"
                   size="lg"
@@ -149,8 +164,10 @@ const Index = () => {
                 >
                   📈 Admin Portal
                 </Button>
-
-                <p className="text-xs text-muted-foreground">Sign in to access analytics and reports</p>
+                
+                <p className="text-xs text-muted-foreground">
+                  Sign in to access analytics and reports
+                </p>
               </div>
             </div>
           </Card>
@@ -162,13 +179,13 @@ const Index = () => {
             <h3 className="font-semibold text-secondary-foreground">Live Lecture Capture</h3>
             <p className="text-sm text-secondary-foreground/80">Real-time audio transcription</p>
           </Card>
-
+          
           <Card className="p-4 bg-gradient-achievement border border-achievement-glow">
             <div className="text-2xl mb-2">✅</div>
             <h3 className="font-semibold text-achievement-foreground">Smart Check-Ins</h3>
             <p className="text-sm text-achievement-foreground/80">AI-powered comprehension questions</p>
           </Card>
-
+          
           <Card className="p-4 bg-gradient-energy border border-energy-glow">
             <div className="text-2xl mb-2">🔍</div>
             <h3 className="font-semibold text-energy-foreground">Cheat Detection</h3>
