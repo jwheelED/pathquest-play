@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, Brain, BarChart3 } from "lucide-react";
-import edvanaLogo from "@/assets/edvana-logo.png";
+import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
 const MarketingLanding = () => {
   const navigate = useNavigate();
