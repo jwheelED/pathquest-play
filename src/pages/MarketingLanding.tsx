@@ -103,6 +103,31 @@ const MarketingLanding = () => {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="py-12 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="border-primary/20">
+              <CardContent className="pt-6">
+                <p className="text-foreground italic mb-4">
+                  "I demoed this. It has tremendous promise for student engagement."
+                </p>
+                <p className="text-sm text-muted-foreground">— Professor</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20">
+              <CardContent className="pt-6">
+                <p className="text-foreground italic mb-4">
+                  "It was quite refreshing to have quick questions about what was said a few minutes ago"
+                </p>
+                <p className="text-sm text-muted-foreground">— Student</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-6 px-4 border-t border-border">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
