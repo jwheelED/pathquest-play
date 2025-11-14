@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, Brain, BarChart3 } from "lucide-react";
+import edvanaLogo from "@/assets/edvana-logo.png";
 
 const MarketingLanding = () => {
   const navigate = useNavigate();
@@ -11,9 +12,7 @@ const MarketingLanding = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Edvana
-          </h1>
+          <img src={edvanaLogo} alt="Edvana" className="h-8" />
           <Button onClick={() => navigate("/")} variant="ghost" size="sm">
             Back to Home
           </Button>
