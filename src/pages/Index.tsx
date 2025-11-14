@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import edvanaLogo from "@/assets/edvana-logo.png";
 
 const Index = () => {
   const [session, setSession] = useState(null);
@@ -67,9 +68,11 @@ const Index = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <div className="space-y-4">
-          <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-            🎤 Edvana
-          </h1>
+          <img 
+            src={edvanaLogo} 
+            alt="Edvana" 
+            className="h-20 mx-auto animate-pulse-glow"
+          />
           <p className="text-2xl font-semibold text-primary">
             Live Lecture Capture & Learning Platform
           </p>
