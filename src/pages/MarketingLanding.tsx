@@ -66,7 +66,7 @@ const MarketingLanding = () => {
               </CardHeader>
               <CardContent>
                 <CardDescription>
-                  Automatically transcribe lectures in real-time so students never miss important content.
+                  Capture every teaching moment automatically, so your students never fall behind.
                 </CardDescription>
               </CardContent>
             </Card>
