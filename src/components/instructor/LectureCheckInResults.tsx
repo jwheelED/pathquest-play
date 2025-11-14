@@ -44,8 +44,6 @@ export const LectureCheckInResults = () => {
     let channel: any;
 
     const setupRealtimeSubscription = async () => {
-      await fetchResults();
-
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -60,22 +58,23 @@ export const LectureCheckInResults = () => {
             event: "*",
             schema: "public",
             table: "student_assignments",
-            filter: `instructor_id=eq.${user.id}`,
+            filter: `instructor_id=eq.${user.id},assignment_type=eq.lecture_checkin`,
           },
           (payload) => {
-            // Only process lecture check-ins
-            const newData = payload.new as any;
-            if (newData?.assignment_type === 'lecture_checkin') {
-              console.log("Check-in result updated:", payload);
-              // Debounce to handle multiple rapid updates from 40+ students
-              clearTimeout(debounceTimer);
-              debounceTimer = setTimeout(() => {
-                fetchResults();
-              }, 300); // Reduced to 300ms for faster updates
-            }
+            console.log("Check-in result updated:", payload);
+            // Debounce to handle multiple rapid updates from 40+ students
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              fetchResults();
+            }, 300); // Reduced to 300ms for faster updates
           },
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log("Check-in subscription status:", status);
+        });
+
+      // Initial fetch after subscription is set up
+      await fetchResults();
     };
 
     setupRealtimeSubscription();
