@@ -68,7 +68,7 @@ const Index = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <div className="space-y-4">
-          <img src={edvanaLogo} alt="Edvana" className="h-40 w-20 mx-auto" />
+          <img src={edvanaLogo} alt="Edvana" className="h-40 mx-auto" />
           <p className="text-2xl font-semibold text-primary">Live Lecture Capture & Learning Platform</p>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Real-time lecture transcription, AI-powered check-ins, and intelligent content generation to enhance
