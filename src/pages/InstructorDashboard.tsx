@@ -43,6 +43,7 @@ export default function InstructorDashboard() {
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [selectedChatStudent, setSelectedChatStudent] = useState<string | null>(null);
   const chatCardRef = useRef<HTMLDivElement>(null);
+  const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -71,6 +72,20 @@ export default function InstructorDashboard() {
         .on(
           'postgres_changes',
           {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'instructor_students',
+            filter: `instructor_id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('👥 New student joined:', payload);
+            fetchStudents(); // Refresh student list immediately
+            toast.success('New student joined the class!', { duration: 3000 });
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
             event: '*',
             schema: 'public',
             table: 'student_assignments',
@@ -78,7 +93,14 @@ export default function InstructorDashboard() {
           },
           (payload) => {
             console.log('📋 Assignment update:', payload);
-            fetchStudents(); // Refresh student list to show updated grades
+            
+            // Debounce to handle multiple rapid updates
+            if (fetchDebounceTimer.current) {
+              clearTimeout(fetchDebounceTimer.current);
+            }
+            fetchDebounceTimer.current = setTimeout(() => {
+              fetchStudents();
+            }, 500);
           }
         )
         .on(
@@ -90,10 +112,22 @@ export default function InstructorDashboard() {
           },
           (payload) => {
             console.log('📊 Student stats updated:', payload);
-            fetchStudents(); // Refresh to show updated student stats
+            
+            // Debounce to handle multiple rapid updates
+            if (fetchDebounceTimer.current) {
+              clearTimeout(fetchDebounceTimer.current);
+            }
+            fetchDebounceTimer.current = setTimeout(() => {
+              fetchStudents();
+            }, 500);
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('Realtime subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to realtime updates');
+          }
+        });
 
       return channel;
     };
