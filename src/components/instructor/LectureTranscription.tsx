@@ -45,6 +45,21 @@ const QUOTA_CIRCUIT_BREAKER_THRESHOLD = 3; // Trigger after 3 consecutive quota 
 const QUOTA_PAUSE_DURATION = 5 * 60 * 1000; // 5 minutes pause
 
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
+  // Helper function to safely extract displayable text from question_text (string or object)
+  const getQuestionPreview = (questionText: any, maxLength: number = 60): string => {
+    if (typeof questionText === 'string') {
+      return questionText.substring(0, maxLength);
+    }
+    // For coding questions (object format)
+    if (questionText?.title) {
+      return `[Coding] ${questionText.title}`;
+    }
+    if (questionText?.problemStatement) {
+      return questionText.problemStatement.substring(0, maxLength);
+    }
+    return 'Question';
+  };
+
   // Proactive token refresh
   useAuthRefresh(true);
   const [isRecording, setIsRecording] = useState(false);
@@ -783,7 +798,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       
       toast({
         title: "🎯 Question detected!",
-        description: `"${detectionData.question_text.substring(0, 60)}..." - Sending to students...`,
+        description: `"${getQuestionPreview(detectionData.question_text, 60)}..." - Sending to students...`,
       });
 
       // Show progress indicator immediately
@@ -1121,7 +1136,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
       
       console.log('✅ Question generated successfully');
-      console.log('  Question text:', data.question_text.substring(0, 100) + '...');
+      console.log('  Question text:', getQuestionPreview(data.question_text, 100) + '...');
       console.log('  Type:', data.suggested_type);
       console.log('  Confidence:', data.confidence);
 
@@ -1141,6 +1156,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           return false;
         }
+      } else if (typeof data.question_text === 'object' && data.question_text?.title) {
+        // Coding questions are valid as objects
+        console.log('✅ Coding question validated');
       }
 
       console.log('📝 Sending via handleQuestionSend...');
@@ -1158,7 +1176,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('✅ AUTO-QUESTION COMPLETED SUCCESSFULLY');
       console.log('  Total time:', totalTime + 'ms');
-      console.log('  Question sent:', data.question_text.substring(0, 60) + '...');
+      console.log('  Question sent:', getQuestionPreview(data.question_text, 60) + '...');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // Clear error state on success
@@ -1190,7 +1208,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (isManualTest) {
         toast({
           title: "🧪 Test Successful!",
-          description: `Question sent: "${data.question_text.substring(0, 50)}..."`,
+          description: `Question sent: "${getQuestionPreview(data.question_text, 50)}..."`,
           duration: 5000,
         });
       }
