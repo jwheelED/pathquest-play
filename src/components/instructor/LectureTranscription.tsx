@@ -82,6 +82,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [dailyQuotaLimit, setDailyQuotaLimit] = useState<number>(200);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
   const [autoQuestionInterval, setAutoQuestionInterval] = useState<number>(15);
+  const [autoQuestionForceSend, setAutoQuestionForceSend] = useState(false);
   const [lastAutoQuestionTime, setLastAutoQuestionTime] = useState<number>(0);
   const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState<number>(0);
   const [autoQuestionCount, setAutoQuestionCount] = useState<number>(0);
@@ -178,7 +179,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from('profiles')
-          .select('daily_question_limit, auto_question_enabled, auto_question_interval')
+          .select('daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send')
           .eq('id', user.id)
           .single();
 
@@ -189,6 +190,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         if (profile) {
           setAutoQuestionEnabled(profile.auto_question_enabled || false);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
+          setAutoQuestionForceSend(profile.auto_question_force_send || false);
         }
 
         // Fetch today's question count
@@ -1072,7 +1074,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log('🔗 Payload:', {
         interval_transcript_length: intervalTranscript.length,
         interval_minutes: autoQuestionInterval,
-        format_preference: formatPreference
+        format_preference: formatPreference,
+        force_send: autoQuestionForceSend
       });
       
       const invokeStartTime = Date.now();
@@ -1080,7 +1083,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         body: { 
           interval_transcript: intervalTranscript,
           interval_minutes: autoQuestionInterval,
-          format_preference: formatPreference
+          format_preference: formatPreference,
+          force_send: autoQuestionForceSend
         }
       });
       const invokeTime = Date.now() - invokeStartTime;
@@ -1292,7 +1296,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       });
       
       // Minimal character check - just ensure there's some content to work with
-      if (intervalTranscript.length < 50) {
+      // Skip this check if force send mode is enabled
+      if (!autoQuestionForceSend && intervalTranscript.length < 50) {
         console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 50+)');
         
         // Track skip reason
@@ -1313,6 +1318,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           duration: 3000,
         });
         return false;
+      }
+      
+      if (autoQuestionForceSend && intervalTranscript.length < 50) {
+        console.log('🔥 Force send mode: Bypassing 50-char minimum check');
       }
       
       // Quality metrics for debugging only - NOT used for blocking
