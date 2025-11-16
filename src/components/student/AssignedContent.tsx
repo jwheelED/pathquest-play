@@ -920,6 +920,7 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                                   }}
                                   questionText={q.question}
                                   isCodeEditor={true}
+                                  language={q.language}
                                 />
                               </div>
                                {isSubmitted && (
