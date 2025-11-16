@@ -279,7 +279,7 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
     // Combine both answer types
     const allAnswers: Record<number, string> = {};
     questions.forEach((q: any, idx: number) => {
-      if (q.type === 'short_answer') {
+      if (q.type === 'short_answer' || q.type === 'coding') {
         allAnswers[idx] = textAns[idx] || '';
       } else {
         allAnswers[idx] = mcAnswers[idx] || '';
