@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
@@ -894,18 +896,137 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                         if (q.type === 'coding') {
                           const codeAnswer = textAnswers[assignment.id]?.[idx] || '';
                           
+                          // Difficulty color mapping
+                          const difficultyColors = {
+                            easy: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+                            medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+                            hard: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
+                          };
+                          
                           return (
-                            <div key={idx} className="border rounded-lg p-4 space-y-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                            <div key={idx} className="border rounded-lg p-6 space-y-4">
+                              {/* Header with Difficulty and Language */}
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-semibold text-lg">Question {idx + 1}</h4>
+                                  {q.difficulty && (
+                                    <Badge variant="outline" className={`capitalize ${difficultyColors[q.difficulty.toLowerCase()] || 'bg-muted'}`}>
+                                      {q.difficulty}
+                                    </Badge>
+                                  )}
+                                </div>
                                 {q.language && (
                                   <Badge variant="secondary" className="shrink-0">
+                                    <Code2 className="w-3 h-3 mr-1" />
                                     {q.language}
                                   </Badge>
                                 )}
                               </div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Your Code:</label>
+
+                              <ScrollArea className="max-h-[600px] pr-4">
+                                <div className="space-y-4">
+                                  {/* Problem Statement */}
+                                  <div className="space-y-2">
+                                    <h5 className="font-medium text-foreground">Problem Statement</h5>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{q.question}</p>
+                                  </div>
+
+                                  {/* Constraints */}
+                                  {q.constraints && q.constraints.length > 0 && (
+                                    <div className="space-y-2 bg-muted/30 p-3 rounded-lg">
+                                      <h5 className="font-medium text-foreground flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" />
+                                        Constraints
+                                      </h5>
+                                      <ul className="space-y-1.5 text-sm">
+                                        {q.constraints.map((constraint: string, cIdx: number) => {
+                                          const isTimeComplexity = constraint.toLowerCase().includes('time complexity');
+                                          const isSpaceComplexity = constraint.toLowerCase().includes('space complexity');
+                                          
+                                          return (
+                                            <li key={cIdx} className="flex items-start gap-2">
+                                              {isTimeComplexity && <Clock className="w-4 h-4 mt-0.5 text-primary shrink-0" />}
+                                              {isSpaceComplexity && <Database className="w-4 h-4 mt-0.5 text-primary shrink-0" />}
+                                              {!isTimeComplexity && !isSpaceComplexity && <span className="text-muted-foreground">•</span>}
+                                              <span className={`${(isTimeComplexity || isSpaceComplexity) ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                                {constraint}
+                                              </span>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {/* Examples */}
+                                  {q.examples && q.examples.length > 0 && (
+                                    <div className="space-y-3">
+                                      <h5 className="font-medium text-foreground flex items-center gap-2">
+                                        <BookOpen className="w-4 h-4" />
+                                        Examples
+                                      </h5>
+                                      {q.examples.map((example: any, eIdx: number) => (
+                                        <div key={eIdx} className="bg-muted/30 p-3 rounded-lg space-y-2 text-sm">
+                                          <p className="font-medium text-foreground">Example {eIdx + 1}:</p>
+                                          <div className="space-y-1">
+                                            <div>
+                                              <span className="font-medium text-muted-foreground">Input: </span>
+                                              <code className="bg-background px-2 py-1 rounded text-xs">{example.input}</code>
+                                            </div>
+                                            <div>
+                                              <span className="font-medium text-muted-foreground">Output: </span>
+                                              <code className="bg-background px-2 py-1 rounded text-xs">{example.output}</code>
+                                            </div>
+                                            {example.explanation && (
+                                              <div>
+                                                <span className="font-medium text-muted-foreground">Explanation: </span>
+                                                <span className="text-muted-foreground">{example.explanation}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Hints (Collapsible) */}
+                                  {q.hints && q.hints.length > 0 && (
+                                    <Collapsible className="space-y-2">
+                                      <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                                        <Lightbulb className="w-4 h-4" />
+                                        Show Hints ({q.hints.length})
+                                        <ChevronDown className="w-4 h-4" />
+                                      </CollapsibleTrigger>
+                                      <CollapsibleContent className="space-y-2">
+                                        {q.hints.map((hint: string, hIdx: number) => (
+                                          <div key={hIdx} className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                                            <p className="text-sm text-blue-900 dark:text-blue-200">
+                                              <span className="font-medium">💡 Hint {hIdx + 1}:</span> {hint}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </CollapsibleContent>
+                                    </Collapsible>
+                                  )}
+
+                                  {/* Function Signature */}
+                                  {q.functionSignature && (
+                                    <div className="space-y-2">
+                                      <h5 className="font-medium text-foreground">Function Signature</h5>
+                                      <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
+                                        <code>{q.functionSignature}</code>
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </ScrollArea>
+
+                              {/* Code Editor */}
+                              <div className="space-y-2 pt-2 border-t">
+                                <label className="text-sm font-medium flex items-center gap-2">
+                                  <Code2 className="w-4 h-4" />
+                                  Your Solution:
+                                </label>
                                 <VersionHistoryTracker
                                   value={codeAnswer}
                                   onChange={(value) => handleTextAnswerChange(assignment.id, idx, value)}
