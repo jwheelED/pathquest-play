@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MB
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
@@ -77,6 +78,16 @@ export default defineConfig(({ mode }) => ({
       }
     })
   ].filter(Boolean),
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'codemirror-core': ['@uiw/react-codemirror', '@codemirror/view', '@codemirror/autocomplete', '@codemirror/language'],
+          'codemirror-langs': ['@codemirror/lang-javascript', '@codemirror/lang-python', '@codemirror/lang-java', '@codemirror/lang-cpp'],
+        }
+      }
+    }
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
