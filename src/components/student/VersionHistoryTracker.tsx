@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { CodeEditor } from "@/components/ui/code-editor";
+import { Textarea } from "@/components/ui/textarea";
 
 interface VersionEvent {
   timestamp: Date;
@@ -44,9 +46,10 @@ interface VersionHistoryTrackerProps {
   onChange: (value: string) => void;
   questionText?: string;
   isCodeEditor?: boolean;
+  language?: string;
 }
 
-export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questionText, isCodeEditor = false }: VersionHistoryTrackerProps) => {
+export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questionText, isCodeEditor = false, language }: VersionHistoryTrackerProps) => {
   const [versionHistory, setVersionHistory] = useState<VersionEvent[]>([]);
   const [isPasteDetected, setIsPasteDetected] = useState(false);
   const [questionCopied, setQuestionCopied] = useState(false);
@@ -309,20 +312,32 @@ export const VersionHistoryTracker = ({ onVersionChange, value, onChange, questi
         </div>
       )}
       
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleChange}
-        onPaste={handlePaste}
-        onCopy={handleAnswerCopy}
-        className={`w-full p-4 border rounded-lg text-sm resize-y ${
-          isCodeEditor 
-            ? 'font-mono bg-slate-950 text-slate-100 dark:bg-slate-900 min-h-[300px] leading-relaxed' 
-            : 'font-mono min-h-[200px]'
-        }`}
-        placeholder={isCodeEditor ? "# Write your code here...\n\ndef solution():\n    pass" : "Type your answer here..."}
-        spellCheck={!isCodeEditor}
-      />
+      {isCodeEditor ? (
+        <CodeEditor
+          ref={textareaRef as any}
+          value={value}
+          onChange={(newValue) => {
+            const event = {
+              target: { value: newValue }
+            } as React.ChangeEvent<HTMLTextAreaElement>;
+            handleChange(event);
+          }}
+          onPaste={handlePaste as any}
+          onCopy={handleAnswerCopy as any}
+          language={language}
+          placeholder="// Write your code here..."
+        />
+      ) : (
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onPaste={handlePaste}
+          onCopy={handleAnswerCopy}
+          className="font-mono min-h-[200px]"
+          placeholder="Type your answer here..."
+        />
+      )}
 
       <Card>
         <CardHeader>
