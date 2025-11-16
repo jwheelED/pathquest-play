@@ -6,7 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown } from "lucide-react";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown, Play, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
@@ -41,6 +41,8 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
+  const [codeExecutionResults, setCodeExecutionResults] = useState<Record<string, any>>({});
+  const [executingCode, setExecutingCode] = useState<Record<string, boolean>>({});
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
   const [openedTimes, setOpenedTimes] = useState<Record<string, number>>({});
   const [activeAssignmentId, setActiveAssignmentId] = useState<string | null>(null);
@@ -271,6 +273,35 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
         [questionIndex]: answer
       }
     }));
+  };
+
+  const handleRunCode = async (assignmentId: string, questionIndex: number, code: string, language: string, testCases: any[]) => {
+    const executionKey = `${assignmentId}-${questionIndex}`;
+    setExecutingCode(prev => ({ ...prev, [executionKey]: true }));
+
+    try {
+      const { data, error } = await supabase.functions.invoke('execute-code', {
+        body: { code, language, testCases }
+      });
+
+      if (error) throw error;
+
+      setCodeExecutionResults(prev => ({
+        ...prev,
+        [executionKey]: data
+      }));
+
+      if (data.allPassed) {
+        sonnerToast.success(`All ${data.totalCount} test cases passed! 🎉`);
+      } else {
+        sonnerToast.error(`${data.passedCount}/${data.totalCount} test cases passed`);
+      }
+    } catch (error: any) {
+      console.error('Code execution error:', error);
+      sonnerToast.error(error.message || 'Failed to execute code');
+    } finally {
+      setExecutingCode(prev => ({ ...prev, [executionKey]: false }));
+    }
   };
 
   const handleSubmitQuiz = async (assignment: Assignment) => {
@@ -895,6 +926,9 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                         // Handle coding questions
                         if (q.type === 'coding') {
                           const codeAnswer = textAnswers[assignment.id]?.[idx] || '';
+                          const executionKey = `${assignment.id}-${idx}`;
+                          const executionResult = codeExecutionResults[executionKey];
+                          const isExecuting = executingCode[executionKey];
                           
                           // Difficulty color mapping
                           const difficultyColors = {
@@ -1043,6 +1077,80 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                                   isCodeEditor={true}
                                   language={q.language}
                                 />
+
+                                {/* Run Code Button */}
+                                {!isSubmitted && q.testCases && q.testCases.length > 0 && (
+                                  <Button
+                                    onClick={() => handleRunCode(assignment.id, idx, codeAnswer, q.language || 'python', q.testCases)}
+                                    disabled={isExecuting || !codeAnswer.trim()}
+                                    className="w-full"
+                                    variant="outline"
+                                  >
+                                    {isExecuting ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Running Tests...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Run Code
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+
+                                {/* Test Results */}
+                                {executionResult && (
+                                  <div className="space-y-3 border-t pt-4">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="font-medium text-foreground">Test Results</h5>
+                                      <Badge variant={executionResult.allPassed ? "default" : "destructive"}>
+                                        {executionResult.passedCount}/{executionResult.totalCount} Passed
+                                      </Badge>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                      {executionResult.results.map((result: any, testIdx: number) => (
+                                        <div
+                                          key={testIdx}
+                                          className={`p-3 rounded-lg border ${
+                                            result.passed
+                                              ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800'
+                                              : 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800'
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-2">
+                                            {result.passed ? (
+                                              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                                            ) : (
+                                              <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                                            )}
+                                            <div className="flex-1 space-y-1 text-sm">
+                                              <div className="font-medium">Test Case {testIdx + 1}</div>
+                                              <div className="text-muted-foreground">
+                                                <span className="font-medium">Input:</span> {result.input}
+                                              </div>
+                                              <div className="text-muted-foreground">
+                                                <span className="font-medium">Expected:</span> {result.expectedOutput}
+                                              </div>
+                                              {result.actualOutput && (
+                                                <div className={result.passed ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
+                                                  <span className="font-medium">Actual:</span> {result.actualOutput}
+                                                </div>
+                                              )}
+                                              {result.error && (
+                                                <div className="text-red-700 dark:text-red-400 font-mono text-xs mt-1 p-2 bg-red-100 dark:bg-red-900/20 rounded">
+                                                  {result.error}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                                {isSubmitted && (
                                 <div className="space-y-2">
