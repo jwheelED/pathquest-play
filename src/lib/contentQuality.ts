@@ -71,13 +71,13 @@ export const isPauseDetected = (text: string, durationSeconds: number): boolean 
   const wpm = calculateWordsPerMinute(text, durationSeconds);
   const density = calculateContentDensity(text);
   
-  // Pause indicators:
-  // - Very slow speech (< 60 WPM)
+  // Pause indicators (adjusted for teaching context):
+  // - Very slow speech (< 50 WPM) - teachers pause for emphasis
   // - Low content density (< 0.3)
   // - Very short content (< 5 words)
   const wordCount = text.trim().split(/\s+/).length;
   
-  return wpm < 60 || density < 0.3 || wordCount < 5;
+  return wpm < 50 || density < 0.3 || wordCount < 5;
 };
 
 /**
@@ -116,16 +116,16 @@ export const analyzeContentQuality = (
   
   const avgWordsPerSentence = sentenceCount > 0 ? wordCount / sentenceCount : 0;
   
-  // Quality criteria:
+  // Quality criteria (adjusted for teaching context):
   // - Not a pause
-  // - Density > 0.4
-  // - At least 30 words
-  // - WPM between 100-200 (normal lecture pace)
+  // - Density > 0.4 (substantive educational content)
+  // - At least 25 words (allow slightly shorter teaching segments)
+  // - WPM between 80-250 (teaching pace is slower for clarity)
   const isQuality = 
     !pause &&
     density > 0.4 &&
-    wordCount >= 30 &&
-    wpm >= 100 &&
+    wordCount >= 25 &&
+    wpm >= 80 &&
     wpm <= 250;
   
   return {
@@ -154,11 +154,11 @@ export const findBestQuestionWindow = (
   transcriptWindows.forEach((window, index) => {
     const metrics = analyzeContentQuality(window, windowDurationSeconds);
     
-    // Score based on multiple factors
+    // Score based on multiple factors (weighted for lecture context)
     const score =
       (metrics.isQualityContent ? 1.0 : 0) +
       (metrics.contentDensity * 0.5) +
-      (metrics.hasQuestionWords ? 0.3 : 0) +
+      (metrics.hasQuestionWords ? 0.4 : 0) + // Higher weight - questions are key in lectures
       (metrics.wordCount > 50 ? 0.2 : 0);
     
     if (score > bestScore) {
