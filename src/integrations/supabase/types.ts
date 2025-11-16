@@ -486,6 +486,7 @@ export type Database = {
       profiles: {
         Row: {
           auto_question_enabled: boolean | null
+          auto_question_force_send: boolean | null
           auto_question_interval: number | null
           course_schedule: string | null
           course_title: string | null
@@ -504,6 +505,7 @@ export type Database = {
         }
         Insert: {
           auto_question_enabled?: boolean | null
+          auto_question_force_send?: boolean | null
           auto_question_interval?: number | null
           course_schedule?: string | null
           course_title?: string | null
@@ -522,6 +524,7 @@ export type Database = {
         }
         Update: {
           auto_question_enabled?: boolean | null
+          auto_question_force_send?: boolean | null
           auto_question_interval?: number | null
           course_schedule?: string | null
           course_title?: string | null

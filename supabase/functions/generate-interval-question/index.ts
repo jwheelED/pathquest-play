@@ -49,15 +49,23 @@ serve(async (req) => {
       });
     }
 
-    const { interval_transcript, interval_minutes, format_preference } = await req.json();
+    const { interval_transcript, interval_minutes, format_preference, force_send } = await req.json();
 
-    if (!interval_transcript || interval_transcript.length < 100) {
+    // Adjust minimum content requirement based on force_send mode
+    const minContentLength = force_send ? 25 : 100;
+    
+    if (!interval_transcript || interval_transcript.length < minContentLength) {
+      console.log(`⚠️ Not enough content: ${interval_transcript?.length || 0}/${minContentLength} chars (force_send: ${force_send})`);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Not enough content in interval' 
+        error: `Not enough content in interval (need ${minContentLength}+ chars)` 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+    
+    if (force_send) {
+      console.log('🔥 Force send mode enabled - lowering quality thresholds');
     }
 
     console.log(`📝 Generating auto-question from ${interval_minutes}-minute interval (${interval_transcript.length} chars)`);
@@ -254,11 +262,12 @@ Return JSON:
       }
     }
 
-    // Only return questions with reasonable confidence (lowered from 0.5 to 0.3)
-    if (result.confidence < 0.3) { // Lowered threshold for better question generation
-      console.log('⚠️ Confidence too low, skipping auto-question');
+    // Only return questions with reasonable confidence
+    // Lower threshold when force_send is enabled
+    const confidenceThreshold = force_send ? 0.1 : 0.3;
+    if (result.confidence < confidenceThreshold) {
+      console.log(`⚠️ Confidence too low (${result.confidence} < ${confidenceThreshold}), skipping auto-question`);
       console.log('   Question was:', result.question_text);
-      console.log('   Confidence:', result.confidence);
       console.log('   Reasoning:', result.reasoning);
       return new Response(JSON.stringify({ 
         success: false, 
@@ -269,6 +278,10 @@ Return JSON:
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+    
+    if (force_send && result.confidence < 0.3) {
+      console.log(`🔥 Force send: Accepting low confidence question (${result.confidence})`);
     }
 
     // Return appropriate structure based on format
