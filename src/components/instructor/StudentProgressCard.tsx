@@ -27,7 +27,20 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: 'INSERT',
+          schema: 'public',
+          table: 'instructor_students',
+          filter: `instructor_id=eq.${instructorId}`
+        },
+        (payload) => {
+          console.log('👥 New student in progress card:', payload);
+          fetchStudents();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
           schema: 'public',
           table: 'student_assignments',
           filter: `instructor_id=eq.${instructorId}`
@@ -51,7 +64,12 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
           fetchStudents();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Student progress realtime status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Student progress subscribed to realtime');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
