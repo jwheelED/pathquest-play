@@ -17,6 +17,7 @@ import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSe
 import { QuestionLimitSettings } from "@/components/instructor/QuestionLimitSettings";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
+import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionReliabilityDashboard } from "@/components/instructor/QuestionReliabilityDashboard";
 
 import StudentChatCard from "@/components/instructor/StudentChatCard";
@@ -422,8 +423,9 @@ export default function InstructorDashboard() {
         {/* Settings visible regardless of student count */}
         {currentUser && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <QuestionFormatSettings instructorId={currentUser.id} />
+              <AutoGradeSettings />
               <QuestionLimitSettings />
             </div>
             

@@ -467,12 +467,15 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
       setActiveAssignmentId(null);
       resetTracking();
       
-      // If there are short answers, get AI grades (for auto-grading or recommendations)
-      if (result.has_short_answer) {
+      // If there are short answers or coding questions, handle auto-grading or recommendations
+      const hasCodingQuestions = questions.some((q: any) => q.type === 'coding');
+      const needsGrading = result.has_short_answer || hasCodingQuestions;
+      
+      if (needsGrading) {
         const isAutoGrade = result.assignment_mode === 'auto_grade';
         
         toast({
-          title: isAutoGrade ? "Auto-grading short answers..." : "Getting AI recommendations...",
+          title: isAutoGrade ? "Auto-grading your answers..." : "Getting AI recommendations...",
           description: isAutoGrade ? "Please wait while we grade your responses" : "Generating recommended grades for instructor review"
         });
 
@@ -480,6 +483,7 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
         let shortAnswerCount = 0;
         const recommendedGrades: Record<number, { grade: number; feedback: string }> = {};
 
+        // Process short answer questions
         for (let idx = 0; idx < questions.length; idx++) {
           const q = questions[idx];
           if (q.type === 'short_answer') {
@@ -511,6 +515,29 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
             } catch (gradeErr) {
               console.error('Failed to auto-grade question', idx, gradeErr);
               // Continue with other questions even if one fails
+            }
+          }
+        }
+
+        // Process coding questions if auto-grading is enabled
+        if (isAutoGrade && hasCodingQuestions) {
+          for (let idx = 0; idx < questions.length; idx++) {
+            const q = questions[idx];
+            if (q.type === 'coding') {
+              const executionKey = `${assignment.id}-${idx}`;
+              const executionResult = codeExecutionResults[executionKey];
+              
+              if (executionResult && executionResult.allPassed) {
+                recommendedGrades[idx] = {
+                  grade: 100,
+                  feedback: `All ${executionResult.totalCount} test cases passed! ✅`
+                };
+              } else if (executionResult) {
+                recommendedGrades[idx] = {
+                  grade: 0,
+                  feedback: `${executionResult.passedCount}/${executionResult.totalCount} test cases passed. Needs review.`
+                };
+              }
             }
           }
         }

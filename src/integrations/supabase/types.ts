@@ -485,6 +485,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          auto_grade_coding: boolean | null
+          auto_grade_mcq: boolean | null
+          auto_grade_short_answer: boolean | null
           auto_question_enabled: boolean | null
           auto_question_force_send: boolean | null
           auto_question_interval: number | null
@@ -504,6 +507,9 @@ export type Database = {
           study_days: string[] | null
         }
         Insert: {
+          auto_grade_coding?: boolean | null
+          auto_grade_mcq?: boolean | null
+          auto_grade_short_answer?: boolean | null
           auto_question_enabled?: boolean | null
           auto_question_force_send?: boolean | null
           auto_question_interval?: number | null
@@ -523,6 +529,9 @@ export type Database = {
           study_days?: string[] | null
         }
         Update: {
+          auto_grade_coding?: boolean | null
+          auto_grade_mcq?: boolean | null
+          auto_grade_short_answer?: boolean | null
           auto_question_enabled?: boolean | null
           auto_question_force_send?: boolean | null
           auto_question_interval?: number | null
