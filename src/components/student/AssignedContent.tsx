@@ -527,15 +527,15 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
               const executionKey = `${assignment.id}-${idx}`;
               const executionResult = codeExecutionResults[executionKey];
               
-              if (executionResult && executionResult.allPassed) {
+              if (executionResult) {
+                const passRate = (executionResult.passedCount / executionResult.totalCount) * 100;
+                const grade = Math.round(passRate);
+                
                 recommendedGrades[idx] = {
-                  grade: 100,
-                  feedback: `All ${executionResult.totalCount} test cases passed! ✅`
-                };
-              } else if (executionResult) {
-                recommendedGrades[idx] = {
-                  grade: 0,
-                  feedback: `${executionResult.passedCount}/${executionResult.totalCount} test cases passed. Needs review.`
+                  grade,
+                  feedback: executionResult.allPassed 
+                    ? `All ${executionResult.totalCount} test cases passed! ✅`
+                    : `${executionResult.passedCount}/${executionResult.totalCount} test cases passed (${grade}%)`
                 };
               }
             }
