@@ -50,6 +50,8 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'error'>('connecting');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [questionIncoming, setQuestionIncoming] = useState(false);
+  const [aiExplanations, setAiExplanations] = useState<Record<string, Record<number, string>>>({});
+  const [loadingExplanations, setLoadingExplanations] = useState<Record<string, Record<number, boolean>>>({});
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
@@ -273,6 +275,76 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
         [questionIndex]: answer
       }
     }));
+  };
+
+  const handleGetAiExplanation = async (assignment: Assignment, question: any, questionIdx: number) => {
+    // Set loading state
+    setLoadingExplanations(prev => ({
+      ...prev,
+      [assignment.id]: {
+        ...(prev[assignment.id] || {}),
+        [questionIdx]: true
+      }
+    }));
+
+    try {
+      // Get student's answer and correct answer
+      const studentAnswer = assignment.quiz_responses?.[questionIdx];
+      const correctAnswer = question.correctAnswer;
+      
+      // Find the full text of both answers
+      const studentAnswerText = question.options?.find((opt: string) => 
+        opt.trim().charAt(0).toUpperCase() === studentAnswer
+      ) || studentAnswer;
+      
+      const correctAnswerText = question.options?.find((opt: string) => 
+        opt.trim().charAt(0).toUpperCase() === correctAnswer
+      ) || correctAnswer;
+
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke('generate-detailed-explanation', {
+        body: {
+          problemText: question.question,
+          correctAnswer: correctAnswerText,
+          userAnswer: studentAnswerText,
+          wasCorrect: false,
+          courseContext: assignment.title || ''
+        }
+      });
+
+      if (error) throw error;
+
+      // Store the explanation
+      setAiExplanations(prev => ({
+        ...prev,
+        [assignment.id]: {
+          ...(prev[assignment.id] || {}),
+          [questionIdx]: data.detailedExplanation
+        }
+      }));
+
+      toast({
+        title: "✨ Explanation Generated",
+        description: "AI has analyzed why your answer was incorrect."
+      });
+
+    } catch (error: any) {
+      console.error('Error generating AI explanation:', error);
+      toast({
+        title: "⚠️ Error",
+        description: error.message || "Failed to generate explanation. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Clear loading state
+      setLoadingExplanations(prev => ({
+        ...prev,
+        [assignment.id]: {
+          ...(prev[assignment.id] || {}),
+          [questionIdx]: false
+        }
+      }));
+    }
   };
 
   const handleRunCode = async (assignmentId: string, questionIndex: number, code: string, language: string, testCases: any[]) => {
@@ -1320,6 +1392,14 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                                 const normalizedSelected = selectedAnswer?.trim().toUpperCase();
                                 const isSelected = normalizedSelected === optionLetter;
                                 
+                                // After submission and answer release, show correct/incorrect indicators
+                                const studentAnswer = assignment.quiz_responses?.[idx];
+                                const correctAnswer = q.correctAnswer;
+                                const isCorrect = studentAnswer === correctAnswer;
+                                const isThisOptionCorrect = optionLetter === correctAnswer;
+                                const isStudentChoice = optionLetter === studentAnswer;
+                                const showFeedback = isSubmitted && assignment.answers_released;
+                                
                                 return (
                                   <button
                                     key={`${idx}-${i}`}
@@ -1329,21 +1409,95 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                                       handleAnswerSelect(assignment.id, idx, optionLetter);
                                     }}
                                     className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                                      isSelected && !isSubmitted ? 'border-primary bg-primary/5' :
-                                      'border-border hover:border-primary/50'
+                                      showFeedback && isThisOptionCorrect
+                                        ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
+                                        : showFeedback && isStudentChoice && !isCorrect
+                                        ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+                                        : isSelected && !isSubmitted 
+                                        ? 'border-primary bg-primary/5' 
+                                        : 'border-border hover:border-primary/50'
                                     } ${isSubmitted ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                                   >
-                                    <span className="text-sm">{opt}</span>
+                                    <div className="flex items-start justify-between gap-2">
+                                      <span className="text-sm flex-1">{opt}</span>
+                                      {showFeedback && isThisOptionCorrect && (
+                                        <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+                                      )}
+                                      {showFeedback && isStudentChoice && !isCorrect && (
+                                        <XCircle className="w-5 h-5 text-red-600 shrink-0" />
+                                      )}
+                                    </div>
                                   </button>
                                 );
                               })}
                             </div>
                             
-                            {isSubmitted && (
+                            {isSubmitted && !assignment.answers_released && (
                               <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
                                 <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                                  ✓ Submitted - {assignment.answers_released ? 'Answers Released' : 'Awaiting answer release'}
+                                  ✓ Submitted - Awaiting answer release
                                 </p>
+                              </div>
+                            )}
+                            
+                            {isSubmitted && assignment.answers_released && (
+                              <div className="space-y-3">
+                                <div className={`p-3 rounded border-2 ${
+                                  (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                    ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                    : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                                }`}>
+                                  <p className={`text-sm font-medium ${
+                                    (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                      ? 'text-green-900 dark:text-green-200'
+                                      : 'text-red-900 dark:text-red-200'
+                                  }`}>
+                                    {(assignment.quiz_responses?.[idx] === q.correctAnswer) 
+                                      ? '✓ Correct Answer' 
+                                      : '✗ Incorrect Answer'}
+                                  </p>
+                                </div>
+                                
+                                {(assignment.quiz_responses?.[idx] !== q.correctAnswer) && (
+                                  <div className="space-y-3">
+                                    {!aiExplanations[assignment.id]?.[idx] ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleGetAiExplanation(assignment, q, idx);
+                                        }}
+                                        disabled={loadingExplanations[assignment.id]?.[idx]}
+                                        className="w-full"
+                                      >
+                                        {loadingExplanations[assignment.id]?.[idx] ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Generating explanation...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Lightbulb className="w-4 h-4 mr-2" />
+                                            Why is my answer wrong? (AI Explanation)
+                                          </>
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <div className="flex items-start gap-2 mb-2">
+                                          <Lightbulb className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                                          <p className="font-semibold text-blue-900 dark:text-blue-200 text-sm">
+                                            AI Explanation
+                                          </p>
+                                        </div>
+                                        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
+                                          {aiExplanations[assignment.id][idx]}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                             
