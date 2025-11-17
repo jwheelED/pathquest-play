@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LogOut, Users } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LogOut, Users, Code, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
@@ -43,8 +44,11 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [selectedChatStudent, setSelectedChatStudent] = useState<string | null>(null);
+  const [instructorProfile, setInstructorProfile] = useState<any>(null);
   const chatCardRef = useRef<HTMLDivElement>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  const professorType = instructorProfile?.professor_type;
 
   useEffect(() => {
     checkAuth();
@@ -166,9 +170,11 @@ export default function InstructorDashboard() {
     // Fetch profile details
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics, onboarded")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type")
       .eq("id", session.user.id)
       .single();
+    
+    setInstructorProfile(profile);
 
     // Only require re-onboarding if NEVER onboarded before
     // Don't force if just one field is missing
@@ -425,7 +431,35 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <QuestionFormatSettings instructorId={currentUser.id} />
-              <AutoGradeSettings />
+            <AutoGradeSettings />
+            
+            {professorType === "stem" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Code className="h-5 w-5" />
+                    STEM Features
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  <p>Enhanced coding question generation and test case auto-grading enabled.</p>
+                </CardContent>
+              </Card>
+            )}
+            
+            {professorType === "humanities" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    Humanities Features
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  <p>Essay analysis, discussion prompts, and enhanced short-answer grading enabled.</p>
+                </CardContent>
+              </Card>
+            )}
               <QuestionLimitSettings />
             </div>
             

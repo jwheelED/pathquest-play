@@ -40,7 +40,7 @@ export default function InstructorOnboarding() {
     fetchExistingCode();
   }, []);
 
-  const totalSteps = 3;
+  const totalSteps = 4;
   const progress = (step / totalSteps) * 100;
 
   const handleSyllabusUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -194,7 +194,7 @@ export default function InstructorOnboarding() {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Syllabus & Outline (Optional)</h3>
               <p className="text-sm text-muted-foreground">
@@ -224,7 +224,7 @@ export default function InstructorOnboarding() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Audio Setup</h3>
               <p className="text-sm text-muted-foreground">
