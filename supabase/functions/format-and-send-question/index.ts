@@ -339,15 +339,30 @@ serve(async (req) => {
 
     const { question_text, suggested_type, context, source = 'manual_button' } = await req.json();
     
-    // Fetch instructor's question format preference
+    // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
       .from('profiles')
-      .select('question_format_preference')
+      .select('question_format_preference, auto_grade_short_answer, auto_grade_coding, auto_grade_mcq')
       .eq('id', user.id)
       .single();
     
     const instructorPreference = profileData?.question_format_preference || 'multiple_choice';
     console.log('📋 Instructor preference:', instructorPreference);
+    
+    // Auto-grading preferences
+    const autoGradePrefs = {
+      short_answer: profileData?.auto_grade_short_answer || false,
+      coding: profileData?.auto_grade_coding || false,
+      mcq: profileData?.auto_grade_mcq !== false // Default to true
+    };
+    
+    // Determine assignment mode based on question type and preferences
+    const getAssignmentMode = (questionType: string): string => {
+      if (questionType === 'multiple_choice' && autoGradePrefs.mcq) return 'auto_grade';
+      if (questionType === 'short_answer' && autoGradePrefs.short_answer) return 'auto_grade';
+      if (questionType === 'coding' && autoGradePrefs.coding) return 'auto_grade';
+      return 'manual_grade';
+    };
     
     // PHASE 2 OPTIMIZATION: Send plain text first, upgrade to MCQ in background
     // This reduces preprocessing time from ~4s to ~0.5s
@@ -500,11 +515,14 @@ serve(async (req) => {
     const batchPromises = batches.map(async (batch, batchIndex) => {
       console.log(`📤 Starting batch ${batchIndex + 1}/${batches.length} (${batch.length} students)...`);
       
+      // Determine mode based on question type and instructor preferences
+      const assignmentMode = getAssignmentMode(finalType);
+      
       const assignments = batch.map(studentId => ({
         instructor_id: user.id,
         student_id: studentId,
         assignment_type: 'lecture_checkin',
-        mode: 'manual_grade',
+        mode: assignmentMode,
         title: '🎯 Live Lecture Question',
         content: { 
           questions: [formattedQuestion],
@@ -551,11 +569,14 @@ serve(async (req) => {
     if (failedStudents.length > 0 && failedStudents.length < studentIds.length) {
       console.log(`🔄 Retrying ${failedStudents.length} failed students...`);
       
+      // Calculate mode again for retry assignments
+      const retryMode = getAssignmentMode(finalType);
+      
       const retryAssignments = failedStudents.map(studentId => ({
         instructor_id: user.id,
         student_id: studentId,
         assignment_type: 'lecture_checkin',
-        mode: 'manual_grade',
+        mode: retryMode,
         title: '🎯 Live Lecture Question',
         content: { 
           questions: [formattedQuestion],
