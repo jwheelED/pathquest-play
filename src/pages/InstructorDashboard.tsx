@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
-import { CheatDetectionCard } from "@/components/instructor/CheatDetectionCard";
+import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
 // LEGACY: Content Generator replaced by Lecture Transcription
 // import { ContentGenerator } from "@/components/instructor/ContentGenerator";
 // import { ReviewQueue } from "@/components/instructor/ReviewQueue";
@@ -454,7 +454,7 @@ export default function InstructorDashboard() {
 
             {currentUser && (
               <>
-                <CheatDetectionCard instructorId={currentUser.id} />
+                <AcademicIntegrityInsights instructorId={currentUser.id} />
 
                 <StudentRankingCard 
                   students={rankedStudents}
