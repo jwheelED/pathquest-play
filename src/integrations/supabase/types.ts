@@ -503,6 +503,7 @@ export type Database = {
           instructor_code: string | null
           last_auto_question_at: string | null
           onboarded: boolean | null
+          professor_type: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference: string | null
           study_days: string[] | null
         }
@@ -525,6 +526,7 @@ export type Database = {
           instructor_code?: string | null
           last_auto_question_at?: string | null
           onboarded?: boolean | null
+          professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference?: string | null
           study_days?: string[] | null
         }
@@ -547,6 +549,7 @@ export type Database = {
           instructor_code?: string | null
           last_auto_question_at?: string | null
           onboarded?: boolean | null
+          professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference?: string | null
           study_days?: string[] | null
         }
@@ -1113,6 +1116,7 @@ export type Database = {
         | "manual_grade"
       assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
       draft_status: "draft" | "approved" | "published"
+      professor_type: "stem" | "humanities"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1249,6 +1253,7 @@ export const Constants = {
       ],
       assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
       draft_status: ["draft", "approved", "published"],
+      professor_type: ["stem", "humanities"],
     },
   },
 } as const
