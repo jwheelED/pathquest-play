@@ -11,6 +11,7 @@ import EngagementChart from "@/components/admin/EngagementChart";
 import SchoolProgressCard from "@/components/admin/SchoolProgressCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
+import DefaultOrgInfo from "@/components/admin/DefaultOrgInfo";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -227,6 +228,9 @@ export default function AdminDashboard() {
       // Add Organization Management tab to admin dashboard
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-6">
+          {/* Default Org Info */}
+          <DefaultOrgInfo />
+          
           {/* Organization Setup Section */}
           <div className="mb-8">
             <OrganizationSetup />
