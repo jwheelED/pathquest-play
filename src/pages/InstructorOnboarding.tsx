@@ -95,6 +95,13 @@ export default function InstructorOnboarding() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Get user's org_id to include in profile update
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
       // Update instructor profile with course info
       const { error } = await supabase
         .from('profiles')
