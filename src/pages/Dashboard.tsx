@@ -14,6 +14,7 @@ import { BottomNav } from "@/components/mobile/BottomNav";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
+import ClassConnectionCard from "@/components/student/ClassConnectionCard";
 
 interface User {
   id: string;
@@ -236,16 +237,6 @@ export default function Dashboard() {
               <span className="text-sm text-muted-foreground">
                 {user?.email || "User"}
               </span>
-              <Button 
-                onClick={() => {
-                  localStorage.removeItem("edvana_onboarded");
-                  navigate("/onboarding");
-                }} 
-                variant="outline" 
-                size="sm"
-              >
-                Switch Class
-              </Button>
               <Button onClick={handleLogout} variant="destructive" size="sm">
                 Logout
               </Button>
@@ -266,6 +257,9 @@ export default function Dashboard() {
         )}
         
         <div className="space-y-4 md:space-y-6">
+          {/* Class Connection Card */}
+          {user?.id && <ClassConnectionCard />}
+          
           {courseContext.courseTitle && (
             <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
               <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3 md:mb-4 flex items-center gap-2">
