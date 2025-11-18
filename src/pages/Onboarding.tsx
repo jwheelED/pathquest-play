@@ -111,7 +111,7 @@ export default function OnboardingPage() {
           .eq("id", oldConnection.id)
       }
 
-      // Get instructor's org_id
+      // Get instructor's org_id for the connection (trigger will sync to student profile)
       const { data: instructorProfile } = await supabase
         .from("profiles")
         .select("org_id")
@@ -120,13 +120,12 @@ export default function OnboardingPage() {
 
       const instructorOrgId = instructorProfile?.org_id
 
-      // Connect to new instructor
+      // Connect to new instructor (trigger will automatically sync org_id to student's profile)
       const { error: connectionError } = await supabase
         .from("instructor_students")
         .insert({
           instructor_id: instructorId,
-          student_id: user.id,
-          org_id: instructorOrgId,
+          student_id: user.id
         })
 
       if (connectionError) {
@@ -135,13 +134,10 @@ export default function OnboardingPage() {
         return
       }
 
-      // Mark as onboarded and set org_id
+      // Mark as onboarded (org_id is automatically set by trigger)
       await supabase
         .from("profiles")
-        .update({ 
-          onboarded: true,
-          org_id: instructorOrgId
-        })
+        .update({ onboarded: true })
         .eq("id", user.id)
 
       // Wait for database consistency

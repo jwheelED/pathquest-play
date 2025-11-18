@@ -98,22 +98,12 @@ export default function ClassConnectionCard() {
         .delete()
         .eq("student_id", user.id);
 
-      // Get new instructor's org_id
-      const { data: instructorProfile } = await supabase
-        .from("profiles")
-        .select("org_id")
-        .eq("id", newInstructorId)
-        .single();
-
-      const instructorOrgId = instructorProfile?.org_id;
-
-      // Create new connection
+      // Create new connection (trigger will automatically sync org_id to both tables)
       const { error: insertError } = await supabase
         .from("instructor_students")
         .insert({
           instructor_id: newInstructorId,
-          student_id: user.id,
-          org_id: instructorOrgId
+          student_id: user.id
         });
 
       if (insertError) {
@@ -122,35 +112,11 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      // Update student's org_id and ensure onboarded stays true
-      const { error: updateError } = await supabase
+      // Ensure onboarded status is maintained
+      await supabase
         .from("profiles")
-        .update({ 
-          org_id: instructorOrgId,
-          onboarded: true 
-        })
+        .update({ onboarded: true })
         .eq("id", user.id);
-
-      if (updateError) {
-        toast.error("Failed to update profile");
-        console.error("Profile update error:", updateError);
-        return;
-      }
-
-      // Wait for database consistency
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Verify the update
-      const { data: verification } = await supabase
-        .from("profiles")
-        .select("onboarded")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!verification?.onboarded) {
-        toast.error("Profile update verification failed");
-        return;
-      }
 
       // Update localStorage to maintain onboarded status
       localStorage.setItem("edvana_onboarded", "true");
