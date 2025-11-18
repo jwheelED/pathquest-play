@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getOrgId } from "@/hooks/useOrgId";
 
 interface ContentGeneratorProps {
   onGenerated: () => void;
@@ -36,11 +37,13 @@ export const ContentGenerator = ({ onGenerated }: ContentGeneratorProps) => {
       if (functionError) throw functionError;
 
       const content = functionData.content;
+      const orgId = await getOrgId(user.id);
       
       const { error: insertError } = await supabase
         .from('content_drafts')
         .insert([{
           instructor_id: user.id,
+          org_id: orgId,
           topic,
           assignment_type: assignmentType,
           slide_text: content.title || topic,

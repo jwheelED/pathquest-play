@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getOrgId } from "@/hooks/useOrgId";
 
 interface UserStatsProps {
   userId: string;
@@ -79,9 +80,10 @@ export default function UserStats({ userId, onStatsUpdate }: UserStatsProps) {
 
       if (error && error.code === 'PGRST116') {
         // User stats don't exist, create them
+        const orgId = await getOrgId(userId);
         const { data: newStats, error: insertError } = await supabase
           .from("user_stats")
-          .insert([{ user_id: userId }])
+          .insert([{ user_id: userId, org_id: orgId }])
           .select()
           .single();
 
