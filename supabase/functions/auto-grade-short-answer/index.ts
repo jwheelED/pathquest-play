@@ -37,16 +37,6 @@ serve(async (req) => {
 
     const { studentAnswer, expectedAnswer, question } = await req.json();
     
-    // Fetch instructor's grading model preference
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('auto_grade_model')
-      .eq('id', user.id)
-      .single();
-    
-    const modelPreference = profile?.auto_grade_model || 'flash';
-    const model = modelPreference === 'pro' ? 'google/gemini-2.5-pro' : 'google/gemini-2.5-flash';
-    
     // Input validation for security
     if (!studentAnswer || typeof studentAnswer !== 'string') {
       return new Response(
@@ -176,7 +166,7 @@ Grade this answer from 0-100 and provide constructive feedback that:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: model,
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }

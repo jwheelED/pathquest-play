@@ -19,7 +19,6 @@ import { QuestionLimitSettings } from "@/components/instructor/QuestionLimitSett
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
-import AutoGradeModelSettings from "@/components/instructor/AutoGradeModelSettings";
 import { QuestionReliabilityDashboard } from "@/components/instructor/QuestionReliabilityDashboard";
 
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
@@ -429,8 +428,7 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <QuestionFormatSettings instructorId={currentUser.id} />
-              <AutoGradeSettings />
-              <AutoGradeModelSettings />
+            <AutoGradeSettings />
             
             {professorType === "stem" && (
               <Card>
