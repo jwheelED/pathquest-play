@@ -675,6 +675,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          admin_code: string | null
           auto_grade_coding: boolean | null
           auto_grade_mcq: boolean | null
           auto_grade_model: string
@@ -700,6 +701,7 @@ export type Database = {
           study_days: string[] | null
         }
         Insert: {
+          admin_code?: string | null
           auto_grade_coding?: boolean | null
           auto_grade_mcq?: boolean | null
           auto_grade_model?: string
@@ -725,6 +727,7 @@ export type Database = {
           study_days?: string[] | null
         }
         Update: {
+          admin_code?: string | null
           auto_grade_coding?: boolean | null
           auto_grade_mcq?: boolean | null
           auto_grade_model?: string
@@ -1282,10 +1285,6 @@ export type Database = {
       }
     }
     Functions: {
-      add_instructor_for_admin: {
-        Args: { _instructor_code: string }
-        Returns: string
-      }
       assign_oauth_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -1309,6 +1308,10 @@ export type Database = {
       cleanup_old_question_logs: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: number }
       cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
+      connect_instructor_to_admin: {
+        Args: { _admin_code: string }
+        Returns: string
+      }
       generate_admin_code: { Args: never; Returns: string }
       generate_instructor_code: { Args: never; Returns: string }
       generate_org_invite_code: { Args: never; Returns: string }

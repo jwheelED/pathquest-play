@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Building2, Users, Key } from "lucide-react";
+import { Copy, Building2, Users, Key, Shield } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
 interface Organization {
@@ -23,6 +24,7 @@ export default function OrganizationSetup() {
   const [creating, setCreating] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
+  const [adminCode, setAdminCode] = useState("");
 
   useEffect(() => {
     fetchOrganization();
@@ -33,12 +35,16 @@ export default function OrganizationSetup() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get user's org_id from profile
+      // Get user's org_id and admin_code from profile
       const { data: profile } = await supabase
         .from("profiles")
-        .select("org_id")
+        .select("org_id, admin_code")
         .eq("id", user.id)
         .single();
+
+      if (profile?.admin_code) {
+        setAdminCode(profile.admin_code);
+      }
 
       if (profile?.org_id) {
         // Fetch organization details
@@ -163,78 +169,91 @@ export default function OrganizationSetup() {
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5" />
-            {organization.name}
-          </CardTitle>
-          <CardDescription>Organization Details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Building2 className="w-5 h-5" />
+          {organization.name}
+        </CardTitle>
+        <CardDescription>Organization Management & Codes</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Admin's Personal Code - Primary */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-primary" />
+            <Label className="text-base font-semibold">Your Admin Code</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="default" className="text-lg py-2 px-4 font-mono">
+              {adminCode}
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => copyToClipboard(adminCode, "Admin code")}
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Share this code with instructors so they can connect to you and join your organization
+          </p>
+        </div>
+
+        <Separator />
+
+        {/* Organization Details */}
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">Organization Slug</Label>
+          <code className="block p-2 bg-muted rounded text-sm">
+            {organization.slug}
+          </code>
+        </div>
+
+        <Separator />
+
+        {/* Alternative Codes - Secondary */}
+        <div className="space-y-4 opacity-75">
           <div className="space-y-2">
-            <Label>Organization Slug</Label>
+            <Label className="text-sm text-muted-foreground flex items-center gap-2">
+              <Key className="w-3 h-3" />
+              Organization Admin Code (Alternative)
+            </Label>
             <div className="flex items-center gap-2">
-              <code className="flex-1 p-2 bg-muted rounded text-sm">
-                {organization.slug}
-              </code>
+              <Badge variant="outline" className="text-sm py-1 px-3">
+                {organization.admin_code}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => copyToClipboard(organization.admin_code, "Org admin code")}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="w-5 h-5" />
-            Admin Code
-          </CardTitle>
-          <CardDescription>
-            Share this code with other administrators to give them access
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-lg py-2 px-4">
-              {organization.admin_code}
-            </Badge>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => copyToClipboard(organization.admin_code, "Admin code")}
-            >
-              <Copy className="w-4 h-4" />
-            </Button>
+          <div className="space-y-2">
+            <Label className="text-sm text-muted-foreground flex items-center gap-2">
+              <Users className="w-3 h-3" />
+              Instructor Invite Code (Alternative)
+            </Label>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-sm py-1 px-3">
+                {organization.instructor_invite_code}
+              </Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => copyToClipboard(organization.instructor_invite_code, "Invite code")}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Instructor Invite Code
-          </CardTitle>
-          <CardDescription>
-            Share this code with instructors to invite them to your organization
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-lg py-2 px-4">
-              {organization.instructor_invite_code}
-            </Badge>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => copyToClipboard(organization.instructor_invite_code, "Invite code")}
-            >
-              <Copy className="w-4 h-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
