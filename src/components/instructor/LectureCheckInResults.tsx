@@ -49,6 +49,7 @@ export const LectureCheckInResults = () => {
     summary: string;
     trend: string;
     loading: boolean;
+    responseCount?: number;
   }>>({});
 
   useEffect(() => {
@@ -127,7 +128,8 @@ export const LectureCheckInResults = () => {
         grade,
         completed,
         created_at,
-        response_time_seconds
+        response_time_seconds,
+        ai_summary
       `,
       )
       .eq("instructor_id", user.id)
@@ -215,6 +217,41 @@ export const LectureCheckInResults = () => {
     setGroupedResults(groups);
     setLoading(false);
   };
+
+  // Load existing AI summaries from database
+  useEffect(() => {
+    if (!groupedResults.length) return;
+
+    const loadedSummaries: Record<string, any> = {};
+
+    groupedResults.forEach((group, groupIdx) => {
+      // Find first assignment with ai_summary data
+      const assignmentWithSummary = group.assignments.find((a: any) => a.ai_summary);
+      
+      if (assignmentWithSummary) {
+        const aiSummary = (assignmentWithSummary as any).ai_summary;
+        
+        // Load summaries for each question in this group
+        group.questions.forEach((question, qIdx) => {
+          const summaryKey = qIdx.toString();
+          if (aiSummary && aiSummary[summaryKey]) {
+            const summaryData = aiSummary[summaryKey];
+            const key = `${groupIdx}-${qIdx}`;
+            loadedSummaries[key] = {
+              summary: summaryData.summary,
+              trend: summaryData.trend,
+              loading: false,
+              responseCount: summaryData.response_count,
+            };
+          }
+        });
+      }
+    });
+
+    if (Object.keys(loadedSummaries).length > 0) {
+      setQuestionSummaries(prev => ({ ...prev, ...loadedSummaries }));
+    }
+  }, [groupedResults]);
 
   const handleDeleteGroup = async (group: GroupedAssignment) => {
     try {
@@ -360,9 +397,35 @@ export const LectureCheckInResults = () => {
         [key]: {
           summary: data.summary,
           trend: data.trend,
-          loading: false
+          loading: false,
+          responseCount: stats.completed
         }
       }));
+
+      // Save to database for persistence
+      const summaryData = {
+        summary: data.summary,
+        trend: data.trend,
+        generated_at: new Date().toISOString(),
+        response_count: stats.completed,
+      };
+
+      // Update all assignments in this group with the summary
+      const assignmentIds = assignments.map((a) => a.id);
+      
+      // For each assignment, fetch current ai_summary, merge, and update
+      for (const assignment of assignments) {
+        const currentSummary = (assignment as any).ai_summary || {};
+        const updatedSummary = {
+          ...currentSummary,
+          [qIdx]: summaryData
+        };
+        
+        await supabase
+          .from("student_assignments")
+          .update({ ai_summary: updatedSummary })
+          .eq("id", assignment.id);
+      }
 
       toast.success('AI summary generated!');
     } catch (error) {
@@ -792,10 +855,19 @@ export const LectureCheckInResults = () => {
                             size="sm"
                             onClick={() => generateSummary(groupIdx, qIdx, question, group.assignments)}
                             disabled={questionSummaries[`${groupIdx}-${qIdx}`]?.loading}
-                            className="gap-2"
+                            className="gap-2 shrink-0"
                           >
                             <Sparkles className="h-4 w-4" />
-                            {questionSummaries[`${groupIdx}-${qIdx}`] ? 'Refresh' : 'Generate'} Summary
+                            {(() => {
+                              const summary = questionSummaries[`${groupIdx}-${qIdx}`];
+                              if (!summary) return 'Generate';
+                              
+                              // Check if summary is stale (response count changed)
+                              const stats = calculateQuestionStats(group.assignments, qIdx, question);
+                              const isStale = summary.responseCount && summary.responseCount !== stats.completed;
+                              
+                              return isStale ? 'Update' : 'Refresh';
+                            })()} Summary
                           </Button>
                         </div>
                       </div>
