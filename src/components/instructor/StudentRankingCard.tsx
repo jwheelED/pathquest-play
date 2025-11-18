@@ -1,6 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Medal, Trophy, Award } from "lucide-react";
+import { Medal, Trophy, Award, RefreshCw, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface StudentRankingCardProps {
   students: Array<{
@@ -10,9 +12,12 @@ interface StudentRankingCardProps {
     rank: number;
   }>;
   onStudentClick: (studentId: string) => void;
+  onRefresh?: () => Promise<void>;
 }
 
-export default function StudentRankingCard({ students, onStudentClick }: StudentRankingCardProps) {
+export default function StudentRankingCard({ students, onStudentClick, onRefresh }: StudentRankingCardProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1: return <Trophy className="w-5 h-5 text-warning" />;
@@ -22,17 +27,46 @@ export default function StudentRankingCard({ students, onStudentClick }: Student
     }
   };
 
+  const handleRefresh = async () => {
+    if (!onRefresh) return;
+    setIsRefreshing(true);
+    await onRefresh();
+    setIsRefreshing(false);
+  };
+
   return (
     <Card className="pixel-corners">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-primary" />
-          Student Rankings
-        </CardTitle>
-        <CardDescription>Ranked by overall check-in quiz performance</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-primary" />
+              Student Rankings
+            </CardTitle>
+            <CardDescription>Ranked by overall check-in quiz performance</CardDescription>
+          </div>
+          {onRefresh && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-2">
-        {students.map((student) => (
+        {students.length === 0 ? (
+          <div className="text-center py-8">
+            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              No students have joined yet
+            </p>
+          </div>
+        ) : (
+          students.map((student) => (
           <div
             key={student.id}
             onClick={() => onStudentClick(student.id)}
@@ -55,7 +89,8 @@ export default function StudentRankingCard({ students, onStudentClick }: Student
               </p>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </CardContent>
     </Card>
   );

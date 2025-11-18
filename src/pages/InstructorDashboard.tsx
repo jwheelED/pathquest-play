@@ -488,13 +488,19 @@ export default function InstructorDashboard() {
             {currentUser && (
               <>
                 <AcademicIntegrityInsights instructorId={currentUser.id} />
-
-                <StudentRankingCard 
-                  students={rankedStudents}
-                  onStudentClick={handleStudentClick}
-                />
               </>
             )}
+          </div>
+        )}
+
+        {/* Always show Student Rankings with empty state support */}
+        {currentUser && (
+          <div className="mt-6">
+            <StudentRankingCard 
+              students={rankedStudents}
+              onStudentClick={handleStudentClick}
+              onRefresh={fetchStudents}
+            />
           </div>
         )}
       </main>
