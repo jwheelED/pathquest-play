@@ -53,6 +53,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_explanation_cache: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          explanation: string
+          id: string
+          last_used_at: string
+          question_hash: string
+          usage_count: number
+          wrong_answer: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          explanation: string
+          id?: string
+          last_used_at?: string
+          question_hash: string
+          usage_count?: number
+          wrong_answer: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          explanation?: string
+          id?: string
+          last_used_at?: string
+          question_hash?: string
+          usage_count?: number
+          wrong_answer?: string
+        }
+        Relationships: []
+      }
       ai_quality_ratings: {
         Row: {
           comment: string | null

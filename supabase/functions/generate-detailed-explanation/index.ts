@@ -1,9 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Simple hash function for cache key generation
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -43,6 +55,53 @@ serve(async (req) => {
       );
     }
 
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Generate cache key
+    const questionHash = simpleHash(problemText.toLowerCase().trim());
+    const normalizedWrongAnswer = (userAnswer || '').toLowerCase().trim();
+    const normalizedCorrectAnswer = correctAnswer.toLowerCase().trim();
+
+    console.log('Cache lookup for:', { questionHash, wrongAnswer: normalizedWrongAnswer });
+
+    // Check cache first
+    const { data: cachedExplanation, error: cacheError } = await supabase
+      .from('ai_explanation_cache')
+      .select('explanation, id, usage_count')
+      .eq('question_hash', questionHash)
+      .eq('wrong_answer', normalizedWrongAnswer)
+      .eq('correct_answer', normalizedCorrectAnswer)
+      .maybeSingle();
+
+    if (cachedExplanation) {
+      console.log('✅ Cache hit! Returning cached explanation (usage:', cachedExplanation.usage_count + 1, ')');
+      
+      // Update usage stats
+      await supabase
+        .from('ai_explanation_cache')
+        .update({ 
+          usage_count: cachedExplanation.usage_count + 1,
+          last_used_at: new Date().toISOString()
+        })
+        .eq('id', cachedExplanation.id);
+
+      return new Response(
+        JSON.stringify({ 
+          explanation: cachedExplanation.explanation,
+          cached: true
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('❌ Cache miss. Generating new explanation...');
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -68,8 +127,6 @@ Please provide a comprehensive explanation (200-300 words) that includes:
 5. **Common Pitfalls**: Highlight typical mistakes students make with this type of question
 
 Make the explanation engaging, educational, and appropriate for the student's level. Use clear language and examples where helpful.`;
-
-    console.log('Generating detailed explanation for:', problemText.substring(0, 50) + '...');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -103,37 +160,66 @@ Make the explanation engaging, educational, and appropriate for the student's le
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'Payment required. Please add credits to your Lovable AI workspace.' }),
+          JSON.stringify({ error: 'AI service quota exceeded. Please contact support.' }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate explanation' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('AI API error:', response.status, errorText);
+      throw new Error(`AI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const detailedExplanation = data.choices?.[0]?.message?.content;
+    const explanation = data.choices?.[0]?.message?.content;
 
-    if (!detailedExplanation) {
+    if (!explanation) {
       throw new Error('No explanation generated');
     }
 
-    console.log('Successfully generated detailed explanation');
+    console.log('✨ Generated explanation (length:', explanation.length, 'chars)');
+
+    // Store in cache for future use
+    const { error: insertError } = await supabase
+      .from('ai_explanation_cache')
+      .insert({
+        question_hash: questionHash,
+        wrong_answer: normalizedWrongAnswer,
+        correct_answer: normalizedCorrectAnswer,
+        explanation: explanation
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('⚠️ Cache insert error:', insertError);
+      // Don't fail the request if cache insert fails
+    } else {
+      console.log('💾 Explanation cached successfully');
+    }
 
     return new Response(
-      JSON.stringify({ detailedExplanation }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        explanation,
+        cached: false
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
 
-  } catch (error) {
-    console.error('Error in generate-detailed-explanation:', error);
+  } catch (error: unknown) {
+    console.error('Error generating explanation:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate explanation';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: errorMessage,
+        details: 'An unexpected error occurred while processing your request.'
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
