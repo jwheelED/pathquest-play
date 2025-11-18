@@ -5,6 +5,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { studentSignUpSchema, signInSchema } from "@/lib/validation";
+import { getOrgId } from "@/hooks/useOrgId";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -75,8 +76,10 @@ export default function AuthPage() {
         });
 
         // Create user stats for gamification
+        const orgId = await getOrgId(user.id);
         const { error: statsError } = await supabase.from("user_stats").insert({
           user_id: user.id,
+          org_id: orgId,
         });
 
         if (insertError) {
@@ -93,11 +96,13 @@ export default function AuthPage() {
             .rpc("validate_instructor_code", { code: validData.instructorCode });
 
           if (instructorId) {
+            const orgId = await getOrgId(user.id);
             const { error: linkError } = await supabase
               .from("instructor_students")
               .insert({
                 instructor_id: instructorId,
                 student_id: user.id,
+                org_id: orgId,
               });
 
             if (linkError) {
@@ -225,8 +230,10 @@ export default function AuthPage() {
           } else {
             // For new OAuth signups, create user stats
             if (session.user.app_metadata.provider === 'google') {
+              const orgId = await getOrgId(session.user.id);
               await supabase.from("user_stats").insert({
                 user_id: session.user.id,
+                org_id: orgId,
               }).then(() => {
                 // Errors are OK here - record might already exist
               });

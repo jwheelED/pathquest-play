@@ -14,6 +14,7 @@ import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
+import { getOrgId } from "@/hooks/useOrgId";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2231,9 +2232,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("✅ Received questions:", functionData.questions.length, "sets");
 
       // Save to review queue with full context snippet
+      const orgId = await getOrgId(user.id);
       const { error: insertError } = await supabase.from("lecture_questions").insert([
         {
           instructor_id: user.id,
+          org_id: orgId,
           transcript_snippet: fullTranscript.slice(-1000),
           questions: functionData.questions,
           status: "pending",

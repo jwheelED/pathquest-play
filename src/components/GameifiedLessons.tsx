@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import LessonViewer from "./LessonViewer";
+import { getOrgId } from "@/hooks/useOrgId";
 
 interface GameifiedLessonsProps {
   userId?: string;
@@ -143,9 +144,10 @@ export default function GameifiedLessons({ userId, onProgressChange, onLessonCom
 
       if (isMastered) {
         // Mark as complete only when mastered
+        const orgId = await getOrgId(userId);
         const { error } = await supabase
           .from("lesson_progress")
-          .insert({ user_id: userId, lesson_id: lessonId, completed: true });
+          .insert({ user_id: userId, lesson_id: lessonId, completed: true, org_id: orgId });
 
         if (!error) {
           const updated = [...completedLessons, lessonId];

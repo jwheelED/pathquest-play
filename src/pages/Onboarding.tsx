@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast, Toaster } from "sonner"
 import { Button } from "@/components/ui/button"
+import { getOrgId } from "@/hooks/useOrgId"
 
 export default function OnboardingPage() {
   const [classCode, setClassCode] = useState("")
@@ -111,11 +112,13 @@ export default function OnboardingPage() {
       }
 
       // Connect to new instructor
+      const orgId = await getOrgId(user.id);
       const { error: connectionError } = await supabase
         .from("instructor_students")
         .insert({
           instructor_id: instructorId,
           student_id: user.id,
+          org_id: orgId,
         })
 
       if (connectionError) {

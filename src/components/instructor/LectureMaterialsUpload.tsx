@@ -8,6 +8,7 @@ import { Upload, FileText, Trash2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getOrgId } from "@/hooks/useOrgId";
 
 interface LectureMaterial {
   id: string;
@@ -63,10 +64,12 @@ export function LectureMaterialsUpload() {
 
       if (uploadError) throw uploadError;
 
+      const orgId = await getOrgId(user.id);
       const { error: dbError } = await supabase
         .from("lecture_materials")
         .insert({
           instructor_id: user.id,
+          org_id: orgId,
           file_name: selectedFile.name,
           file_path: filePath,
           file_type: selectedFile.type,

@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageCircle, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getOrgId } from "@/hooks/useOrgId";
 
 interface Message {
   id: string;
@@ -90,10 +91,12 @@ export default function StudentChatCard({ students, currentUserId, selectedStude
     if (!newMessage.trim() || !selectedStudent) return;
 
     setLoading(true);
+    const orgId = await getOrgId(currentUserId);
     const { error } = await supabase.from("messages").insert({
       sender_id: currentUserId,
       recipient_id: selectedStudent,
       content: newMessage.trim(),
+      org_id: orgId,
     });
 
     if (error) {

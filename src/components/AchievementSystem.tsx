@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { getOrgId } from "@/hooks/useOrgId";
 
 interface AchievementSystemProps {
   userId?: string;
@@ -153,11 +154,13 @@ export default function AchievementSystem({ userId }: AchievementSystemProps) {
 
         if (shouldUnlock) {
           // Unlock achievement
+          const orgId = await getOrgId(userId);
           const { error } = await supabase
             .from("user_achievements")
             .insert([{
               user_id: userId,
               achievement_id: achievement.id,
+              org_id: orgId,
             }]);
 
           if (!error) {
