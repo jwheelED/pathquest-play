@@ -550,6 +550,7 @@ export type Database = {
         Row: {
           auto_grade_coding: boolean | null
           auto_grade_mcq: boolean | null
+          auto_grade_model: string
           auto_grade_short_answer: boolean | null
           auto_question_enabled: boolean | null
           auto_question_force_send: boolean | null
@@ -573,6 +574,7 @@ export type Database = {
         Insert: {
           auto_grade_coding?: boolean | null
           auto_grade_mcq?: boolean | null
+          auto_grade_model?: string
           auto_grade_short_answer?: boolean | null
           auto_question_enabled?: boolean | null
           auto_question_force_send?: boolean | null
@@ -596,6 +598,7 @@ export type Database = {
         Update: {
           auto_grade_coding?: boolean | null
           auto_grade_mcq?: boolean | null
+          auto_grade_model?: string
           auto_grade_short_answer?: boolean | null
           auto_question_enabled?: boolean | null
           auto_question_force_send?: boolean | null
