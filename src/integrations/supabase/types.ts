@@ -53,6 +53,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_quality_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          rating: string
+          rating_type: string
+          reference_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: string
+          rating_type: string
+          reference_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: string
+          rating_type?: string
+          reference_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       answer_version_history: {
         Row: {
           answer_copied: boolean | null
