@@ -22,6 +22,7 @@ import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionReliabilityDashboard } from "@/components/instructor/QuestionReliabilityDashboard";
 
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
+import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
 
 interface Student {
   id: string;
@@ -400,6 +401,11 @@ export default function InstructorDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Organization and Admin Connection Info */}
+        <div className="mb-6">
+          <InstructorConnectionCard />
+        </div>
+
         {instructorCode && (
           <div className="mb-6 p-6 bg-card border rounded-lg shadow-sm">
             <h3 className="text-lg font-semibold mb-2">Your Instructor Code</h3>
