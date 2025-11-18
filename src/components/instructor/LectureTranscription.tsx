@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, Clock, Sparkles } from "lucide-react";
+import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, Clock, Sparkles, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +79,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [studentCount, setStudentCount] = useState<number>(0);
   const [systemHealthy, setSystemHealthy] = useState<boolean>(true);
   const [dailyQuestionCount, setDailyQuestionCount] = useState<number>(0);
+  const [transcriptionRating, setTranscriptionRating] = useState<string | null>(null);
+  const [sessionId] = useState<string>(() => crypto.randomUUID());
   const [dailyQuotaLimit, setDailyQuotaLimit] = useState<number>(200);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
   const [autoQuestionInterval, setAutoQuestionInterval] = useState<number>(15);
@@ -2755,14 +2757,62 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         )}
 
         {transcriptChunks.length > 0 && (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            <p className="text-sm font-medium">Transcript Chunks:</p>
-            {transcriptChunks.map((chunk, index) => (
-              <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Transcript Chunks:</p>
+              {/* Transcription Quality Rating */}
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Accuracy:</p>
+                {['excellent', 'good', 'poor'].map((rating) => (
+                  <Button
+                    key={rating}
+                    variant={transcriptionRating === rating ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+
+                        const { error } = await supabase
+                          .from('ai_quality_ratings')
+                          .insert({
+                            user_id: user.id,
+                            rating_type: 'transcription',
+                            reference_id: sessionId,
+                            rating: rating
+                          });
+
+                        if (error) throw error;
+
+                        setTranscriptionRating(rating);
+                        toast({
+                          title: "Thank you for your feedback!",
+                          description: "Your rating helps us improve transcription quality.",
+                        });
+                      } catch (error) {
+                        console.error('Error saving rating:', error);
+                        toast({
+                          title: "Failed to save rating",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    className="gap-1 h-7 text-xs"
+                  >
+                    <Star className={`h-3 w-3 ${transcriptionRating === rating ? 'fill-current' : ''}`} />
+                    {rating.charAt(0).toUpperCase() + rating.slice(1)}
+                  </Button>
+                ))}
               </div>
-            ))}
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {transcriptChunks.map((chunk, index) => (
+                <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         </CardContent>

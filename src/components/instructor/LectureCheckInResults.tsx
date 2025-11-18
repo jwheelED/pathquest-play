@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -38,6 +38,7 @@ export const LectureCheckInResults = () => {
     newAnswer: string;
     group: GroupedAssignment;
   } | null>(null);
+  const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
@@ -299,6 +300,30 @@ export const LectureCheckInResults = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  const handleRateQuestion = async (questionId: string, rating: 'helpful' | 'not_helpful') => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('ai_quality_ratings')
+        .insert({
+          user_id: user.id,
+          rating_type: 'question_generation',
+          reference_id: questionId,
+          rating: rating
+        });
+
+      if (error) throw error;
+
+      setQuestionRatings(prev => ({ ...prev, [questionId]: rating }));
+      toast.success('Thank you for your feedback!');
+    } catch (error) {
+      console.error('Error saving rating:', error);
+      toast.error('Failed to save rating');
+    }
   };
 
   const handleInitiateOverride = (groupIdx: number, questionIdx: number, currentAnswer: string) => {
@@ -658,6 +683,31 @@ export const LectureCheckInResults = () => {
                               Override Answer
                             </Button>
                           )}
+                        </div>
+                      </div>
+
+                      {/* Question Quality Rating */}
+                      <div className="mt-3 pt-3 border-t flex items-center justify-between bg-muted/20 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground">Was this AI-generated question relevant?</p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant={questionRatings[`${groupIdx}-${qIdx}`] === 'helpful' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => handleRateQuestion(`${groupIdx}-${qIdx}`, 'helpful')}
+                            className="gap-1"
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                            Yes
+                          </Button>
+                          <Button
+                            variant={questionRatings[`${groupIdx}-${qIdx}`] === 'not_helpful' ? 'destructive' : 'outline'}
+                            size="sm"
+                            onClick={() => handleRateQuestion(`${groupIdx}-${qIdx}`, 'not_helpful')}
+                            className="gap-1"
+                          >
+                            <ThumbsDown className="h-3 w-3" />
+                            No
+                          </Button>
                         </div>
                       </div>
 
