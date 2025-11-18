@@ -115,17 +115,32 @@ serve(async (req) => {
     }
 
     // Use AI to grade the short answer
-    const systemPrompt = `You are an expert educational grader. Compare the student's answer against the expected answer and assign a grade from 0-100.
+    const systemPrompt = `You are an expert educational grader with years of experience assessing student answers. Your goal is to fairly and accurately grade short answer responses on a scale of 0-100.
 
-Consider:
-- Correctness of key concepts
-- Completeness of the answer
-- Understanding demonstrated
+GRADING RUBRIC:
+- 90-100: Excellent - Answer is complete, accurate, and demonstrates deep understanding. All key concepts are correctly explained.
+- 80-89: Very Good - Answer is mostly complete and accurate. Minor details may be missing but core concepts are correct.
+- 70-79: Good - Answer demonstrates solid understanding. Some key points present but incomplete or contains minor errors.
+- 60-69: Satisfactory - Answer shows basic understanding but missing significant details or has notable errors.
+- 50-59: Needs Improvement - Answer demonstrates limited understanding. Several key concepts are missing or incorrect.
+- 40-49: Poor - Answer is mostly incorrect or off-topic, with only minimal relevant content.
+- 0-39: Unacceptable - Answer is fundamentally wrong, off-topic, or shows no understanding.
+
+GRADING GUIDELINES:
+1. Compare student's answer to the expected answer for key concepts
+2. Award partial credit for partially correct explanations
+3. Be lenient with wording differences if the concept is correct
+4. Don't penalize for minor spelling/grammar errors unless they change meaning
+5. Focus on conceptual understanding, not memorization of exact phrases
+6. If student provides correct information not in expected answer, still give credit
+7. For numerical answers, check if the approach is correct even if final answer has minor calculation errors
+
+IMPORTANT: Be fair and generous with partial credit. Students may express correct ideas in different ways than the expected answer.
 
 Return ONLY a JSON object with this exact format:
 {
   "grade": <number from 0-100>,
-  "feedback": "<brief feedback on the answer>"
+  "feedback": "<constructive feedback explaining the grade, highlighting what was correct and what was missing>"
 }`;
 
     const userPrompt = `Question: ${question}
@@ -134,7 +149,15 @@ Expected Answer: ${expectedAnswer}
 
 Student's Answer: ${studentAnswer}
 
-Grade this answer from 0-100 and provide brief feedback.`;
+ANSWER TYPE DETECTION:
+- If this is a numerical/calculation problem, focus on methodology and approach
+- If this is a conceptual explanation, focus on understanding of core principles
+- If this is a definition, check for key terminology and accurate explanation
+
+Grade this answer from 0-100 and provide constructive feedback that:
+1. Acknowledges what the student got right
+2. Explains what was missing or incorrect
+3. Encourages improvement with specific suggestions`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
