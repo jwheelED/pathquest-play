@@ -40,6 +40,7 @@ export const LectureCheckInResults = () => {
     group: GroupedAssignment;
   } | null>(null);
   const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
+  const [showCharts, setShowCharts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
@@ -687,13 +688,31 @@ export const LectureCheckInResults = () => {
                         </div>
                       </div>
 
+                      {/* Toggle Analytics Button */}
+                      <div className="pt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowCharts(prev => ({
+                            ...prev,
+                            [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
+                          }))}
+                          className="gap-2"
+                        >
+                          <TrendingUp className="h-4 w-4" />
+                          {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide' : 'Show'} Analytics
+                        </Button>
+                      </div>
+
                       {/* Visual Analytics Chart */}
-                      <QuestionAnalyticsChart
-                        question={question}
-                        assignments={group.assignments}
-                        questionIndex={qIdx}
-                        stats={stats}
-                      />
+                      {showCharts[`${groupIdx}-${qIdx}`] && (
+                        <QuestionAnalyticsChart
+                          question={question}
+                          assignments={group.assignments}
+                          questionIndex={qIdx}
+                          stats={stats}
+                        />
+                      )}
 
                       {/* Question Quality Rating */}
                       <div className="mt-3 pt-3 border-t flex items-center justify-between bg-muted/20 rounded-lg p-3">
