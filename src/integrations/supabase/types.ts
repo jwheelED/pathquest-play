@@ -53,6 +53,38 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_instructors: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          instructor_id: string
+          org_id: string | null
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_instructors_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_explanation_cache: {
         Row: {
           correct_answer: string
@@ -1250,6 +1282,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_instructor_for_admin: {
+        Args: { _instructor_code: string }
+        Returns: string
+      }
       assign_oauth_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]

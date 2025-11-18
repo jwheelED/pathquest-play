@@ -11,6 +11,7 @@ import EngagementChart from "@/components/admin/EngagementChart";
 import SchoolProgressCard from "@/components/admin/SchoolProgressCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
+import { AddInstructorCard } from "@/components/admin/AddInstructorCard";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -90,13 +91,38 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Fetch students in the organization through profiles
-      const { data: orgProfiles } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", userOrgId);
+      // Get connected instructors for this admin
+      const { data: connectedInstructors } = await supabase
+        .from('admin_instructors')
+        .select('instructor_id')
+        .eq('admin_id', user.id);
 
-      const studentIds = orgProfiles?.map(p => p.id) || [];
+      const instructorIds = connectedInstructors?.map(ci => ci.instructor_id) || [];
+
+      // If no instructors connected, show empty state
+      if (instructorIds.length === 0) {
+        setStats({
+          totalStudents: 0,
+          activeStudents: 0,
+          totalLessonsCompleted: 0,
+          totalAchievementsUnlocked: 0,
+          avgCompletionRate: 0,
+          avgTimeSpent: 0,
+          engagementScore: 0,
+        });
+        setWeeklyData([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get student IDs only from connected instructors
+      const { data: studentRelations } = await supabase
+        .from('instructor_students')
+        .select('student_id')
+        .in('instructor_id', instructorIds)
+        .eq('org_id', userOrgId);
+
+      const studentIds = studentRelations?.map(sr => sr.student_id) || [];
 
       // Count students with student role in this org
       const { count: totalStudents } = await supabase
@@ -228,8 +254,9 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-6">
           {/* Organization Setup Section */}
-          <div className="mb-8">
+          <div className="grid gap-6 md:grid-cols-2 mb-8">
             <OrganizationSetup />
+            <AddInstructorCard />
           </div>
 
           {/* Top Row: ROI and School Progress */}
