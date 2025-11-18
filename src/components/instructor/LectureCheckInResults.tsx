@@ -40,7 +40,14 @@ export const LectureCheckInResults = () => {
     group: GroupedAssignment;
   } | null>(null);
   const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
-  const [showCharts, setShowCharts] = useState<Record<string, boolean>>({});
+  const [showCharts, setShowCharts] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('lectureCheckInChartsVisibility');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
+  }, [showCharts]);
 
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
