@@ -795,6 +795,7 @@ export type Database = {
       }
       student_assignments: {
         Row: {
+          ai_summary: Json | null
           answers_released: boolean
           assignment_type: Database["public"]["Enums"]["assignment_type"]
           auto_delete_at: string | null
@@ -818,6 +819,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          ai_summary?: Json | null
           answers_released?: boolean
           assignment_type: Database["public"]["Enums"]["assignment_type"]
           auto_delete_at?: string | null
@@ -841,6 +843,7 @@ export type Database = {
           title: string
         }
         Update: {
+          ai_summary?: Json | null
           answers_released?: boolean
           assignment_type?: Database["public"]["Enums"]["assignment_type"]
           auto_delete_at?: string | null
