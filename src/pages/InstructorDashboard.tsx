@@ -21,7 +21,6 @@ import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettin
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionReliabilityDashboard } from "@/components/instructor/QuestionReliabilityDashboard";
 
-import StudentChatCard from "@/components/instructor/StudentChatCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 
 interface Student {
@@ -43,9 +42,7 @@ export default function InstructorDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshQueue, setRefreshQueue] = useState(0);
-  const [selectedChatStudent, setSelectedChatStudent] = useState<string | null>(null);
   const [instructorProfile, setInstructorProfile] = useState<any>(null);
-  const chatCardRef = useRef<HTMLDivElement>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   
   const professorType = instructorProfile?.professor_type;
@@ -496,14 +493,6 @@ export default function InstructorDashboard() {
                   students={rankedStudents}
                   onStudentClick={handleStudentClick}
                 />
-
-                <div ref={chatCardRef}>
-                  <StudentChatCard 
-                    students={students.map(s => ({ id: s.id, name: s.name }))}
-                    currentUserId={currentUser.id}
-                    selectedStudentId={selectedChatStudent}
-                  />
-                </div>
               </>
             )}
           </div>
