@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
 
 interface Assignment {
   id: string;
@@ -685,6 +686,14 @@ export const LectureCheckInResults = () => {
                           )}
                         </div>
                       </div>
+
+                      {/* Visual Analytics Chart */}
+                      <QuestionAnalyticsChart
+                        question={question}
+                        assignments={group.assignments}
+                        questionIndex={qIdx}
+                        stats={stats}
+                      />
 
                       {/* Question Quality Rating */}
                       <div className="mt-3 pt-3 border-t flex items-center justify-between bg-muted/20 rounded-lg p-3">
