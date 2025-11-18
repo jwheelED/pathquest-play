@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Assignment {
   id: string;
@@ -44,6 +45,11 @@ export const LectureCheckInResults = () => {
     const saved = localStorage.getItem('lectureCheckInChartsVisibility');
     return saved ? JSON.parse(saved) : {};
   });
+  const [questionSummaries, setQuestionSummaries] = useState<Record<string, {
+    summary: string;
+    trend: string;
+    loading: boolean;
+  }>>({});
 
   useEffect(() => {
     localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
@@ -309,6 +315,68 @@ export const LectureCheckInResults = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  const generateSummary = async (
+    groupIdx: number, 
+    qIdx: number, 
+    question: any, 
+    assignments: Assignment[]
+  ) => {
+    const key = `${groupIdx}-${qIdx}`;
+    
+    setQuestionSummaries(prev => ({
+      ...prev,
+      [key]: { ...prev[key], summary: '', trend: '', loading: true }
+    }));
+
+    try {
+      const stats = calculateQuestionStats(assignments, qIdx, question);
+      const studentResponses = assignments
+        .filter(a => a.completed)
+        .map(a => ({
+          answer: a.quiz_responses?.[qIdx.toString()] || a.quiz_responses?.[qIdx],
+          isCorrect: (a.quiz_responses?.[qIdx.toString()] || a.quiz_responses?.[qIdx]) === 
+                     (question.overriddenAnswer || question.correctAnswer),
+          grade: a.grade
+        }));
+
+      const { data, error } = await supabase.functions.invoke('generate-question-summary', {
+        body: {
+          question: question.question,
+          questionType: question.type || 'multiple_choice',
+          correctAnswer: question.overriddenAnswer || question.correctAnswer,
+          options: question.options,
+          studentResponses,
+          totalStudents: stats.total,
+          completedCount: stats.completed
+        }
+      });
+
+      if (error) throw error;
+
+      setQuestionSummaries(prev => ({
+        ...prev,
+        [key]: {
+          summary: data.summary,
+          trend: data.trend,
+          loading: false
+        }
+      }));
+
+      toast.success('AI summary generated!');
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      setQuestionSummaries(prev => ({
+        ...prev,
+        [key]: {
+          summary: 'Summary: Unable to generate AI summary.',
+          trend: 'Trend: Please try again or review manually.',
+          loading: false
+        }
+      }));
+      toast.error('Failed to generate summary');
+    }
   };
 
   const handleRateQuestion = async (questionId: string, rating: 'helpful' | 'not_helpful') => {
@@ -692,6 +760,43 @@ export const LectureCheckInResults = () => {
                               Override Answer
                             </Button>
                           )}
+                        </div>
+                      </div>
+
+                      {/* AI Summary Section */}
+                      <div className="my-3 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            {questionSummaries[`${groupIdx}-${qIdx}`]?.loading ? (
+                              <div className="space-y-2">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-3/4" />
+                              </div>
+                            ) : questionSummaries[`${groupIdx}-${qIdx}`] ? (
+                              <div className="text-sm space-y-1">
+                                <p className="font-medium text-primary">
+                                  {questionSummaries[`${groupIdx}-${qIdx}`].summary}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  {questionSummaries[`${groupIdx}-${qIdx}`].trend}
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground">
+                                No AI summary generated yet
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateSummary(groupIdx, qIdx, question, group.assignments)}
+                            disabled={questionSummaries[`${groupIdx}-${qIdx}`]?.loading}
+                            className="gap-2"
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            {questionSummaries[`${groupIdx}-${qIdx}`] ? 'Refresh' : 'Generate'} Summary
+                          </Button>
                         </div>
                       </div>
 
