@@ -11,7 +11,6 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [instructorCode, setInstructorCode] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -36,7 +35,7 @@ export default function AuthPage() {
         email: email.trim(),
         password,
         name: name.trim(),
-        instructorCode: instructorCode.trim().toUpperCase() || undefined
+        instructorCode: '' // Not used, just for schema compatibility
       });
 
       if (!validationResult.success) {
@@ -75,11 +74,10 @@ export default function AuthPage() {
           email: validData.email,
         });
 
-        // Create user stats for gamification
-        const orgId = await getOrgId(user.id);
+        // Create user stats for gamification (no org_id yet - will be set during onboarding)
         const { error: statsError } = await supabase.from("user_stats").insert({
           user_id: user.id,
-          org_id: orgId,
+          org_id: null,
         });
 
         if (insertError) {
@@ -87,32 +85,6 @@ export default function AuthPage() {
         }
         if (statsError) {
           toast.error("Error creating user stats");
-        }
-
-        // Link to instructor if code provided
-        if (validData.instructorCode) {
-          // Use validate_instructor_code RPC function
-          const { data: instructorId, error: validateError } = await supabase
-            .rpc("validate_instructor_code", { code: validData.instructorCode });
-
-          if (instructorId) {
-            const orgId = await getOrgId(user.id);
-            const { error: linkError } = await supabase
-              .from("instructor_students")
-              .insert({
-                instructor_id: instructorId,
-                student_id: user.id,
-                org_id: orgId,
-              });
-
-            if (linkError) {
-              toast.error("Valid code, but failed to link to instructor");
-            } else {
-              toast.success("Successfully linked to instructor!");
-            }
-          } else {
-            toast.error("Invalid instructor code");
-          }
         }
         
         setSuccess("Account created! Please check your email to confirm your account.");
@@ -273,24 +245,14 @@ export default function AuthPage() {
             {success && <p className="text-primary mb-4 text-sm">{success}</p>}
 
             {!isResetMode && isSignUp && (
-              <>
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <input
-                  type="text"
-                  placeholder="Instructor Code (Optional)"
-                  value={instructorCode}
-                  onChange={(e) => setInstructorCode(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </>
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             )}
 
             <input
