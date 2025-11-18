@@ -35,7 +35,18 @@ export default function AdminAuth() {
           .maybeSingle();
         
         if (roleData) {
-          navigate("/admin/dashboard");
+          // Check if admin has org_id set
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("org_id, onboarded")
+            .eq("id", session.user.id)
+            .single();
+          
+          if (profileData?.org_id && profileData?.onboarded) {
+            navigate("/admin/dashboard");
+          } else {
+            navigate("/admin/onboarding");
+          }
         } else {
           // Check if this is a new OAuth signup (only has student role)
           const { data: studentRole } = await supabase
@@ -55,7 +66,7 @@ export default function AdminAuth() {
             
             if (success) {
               toast.success("Admin account created!");
-              navigate("/admin/dashboard");
+              navigate("/admin/onboarding");
             }
           }
         }
@@ -126,7 +137,7 @@ export default function AdminAuth() {
             setIsSignUp(false);
           } else if (data.session) {
             toast.success("Account created successfully!");
-            navigate("/admin/dashboard");
+            navigate("/admin/onboarding");
           } else {
             toast.success("Account created! Please check your email to confirm your account before signing in.");
             setIsSignUp(false);

@@ -243,6 +243,7 @@ export type Database = {
           demo_snippets: Json | null
           id: string
           instructor_id: string
+          org_id: string | null
           slide_text: string
           status: Database["public"]["Enums"]["draft_status"]
           topic: string
@@ -255,6 +256,7 @@ export type Database = {
           demo_snippets?: Json | null
           id?: string
           instructor_id: string
+          org_id?: string | null
           slide_text: string
           status?: Database["public"]["Enums"]["draft_status"]
           topic: string
@@ -267,33 +269,53 @@ export type Database = {
           demo_snippets?: Json | null
           id?: string
           instructor_id?: string
+          org_id?: string | null
           slide_text?: string
           status?: Database["public"]["Enums"]["draft_status"]
           topic?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "content_drafts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       instructor_students: {
         Row: {
           created_at: string | null
           id: string
           instructor_id: string
+          org_id: string | null
           student_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
           instructor_id: string
+          org_id?: string | null
           student_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
           instructor_id?: string
+          org_id?: string | null
           student_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "instructor_students_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lecture_materials: {
         Row: {
@@ -305,6 +327,7 @@ export type Database = {
           file_type: string
           id: string
           instructor_id: string
+          org_id: string | null
           title: string
           updated_at: string
         }
@@ -317,6 +340,7 @@ export type Database = {
           file_type: string
           id?: string
           instructor_id: string
+          org_id?: string | null
           title: string
           updated_at?: string
         }
@@ -329,16 +353,26 @@ export type Database = {
           file_type?: string
           id?: string
           instructor_id?: string
+          org_id?: string | null
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lecture_materials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lecture_questions: {
         Row: {
           created_at: string
           id: string
           instructor_id: string
+          org_id: string | null
           questions: Json
           status: string
           transcript_snippet: string
@@ -348,6 +382,7 @@ export type Database = {
           created_at?: string
           id?: string
           instructor_id: string
+          org_id?: string | null
           questions: Json
           status?: string
           transcript_snippet: string
@@ -357,12 +392,21 @@ export type Database = {
           created_at?: string
           id?: string
           instructor_id?: string
+          org_id?: string | null
           questions?: Json
           status?: string
           transcript_snippet?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lecture_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lesson_mastery: {
         Row: {
@@ -414,6 +458,7 @@ export type Database = {
           created_at: string | null
           id: string
           lesson_id: string
+          org_id: string | null
           user_id: string
         }
         Insert: {
@@ -421,6 +466,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           lesson_id: string
+          org_id?: string | null
           user_id: string
         }
         Update: {
@@ -428,6 +474,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           lesson_id?: string
+          org_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -436,6 +483,13 @@ export type Database = {
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -475,6 +529,7 @@ export type Database = {
           content: string
           created_at: string | null
           id: string
+          org_id: string | null
           read: boolean | null
           recipient_id: string
           sender_id: string
@@ -483,6 +538,7 @@ export type Database = {
           content: string
           created_at?: string | null
           id?: string
+          org_id?: string | null
           read?: boolean | null
           recipient_id: string
           sender_id: string
@@ -491,9 +547,48 @@ export type Database = {
           content?: string
           created_at?: string | null
           id?: string
+          org_id?: string | null
           read?: boolean | null
           recipient_id?: string
           sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          admin_code: string
+          created_at: string | null
+          id: string
+          instructor_invite_code: string
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_code: string
+          created_at?: string | null
+          id?: string
+          instructor_invite_code: string
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_code?: string
+          created_at?: string | null
+          id?: string
+          instructor_invite_code?: string
+          name?: string
+          slug?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -567,6 +662,7 @@ export type Database = {
           instructor_code: string | null
           last_auto_question_at: string | null
           onboarded: boolean | null
+          org_id: string | null
           professor_type: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference: string | null
           study_days: string[] | null
@@ -591,6 +687,7 @@ export type Database = {
           instructor_code?: string | null
           last_auto_question_at?: string | null
           onboarded?: boolean | null
+          org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference?: string | null
           study_days?: string[] | null
@@ -615,11 +712,20 @@ export type Database = {
           instructor_code?: string | null
           last_auto_question_at?: string | null
           onboarded?: boolean | null
+          org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference?: string | null
           study_days?: string[] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       question_send_logs: {
         Row: {
@@ -811,6 +917,7 @@ export type Database = {
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
           opened_at: string | null
+          org_id: string | null
           quiz_responses: Json | null
           release_method: string | null
           response_time_seconds: number | null
@@ -835,6 +942,7 @@ export type Database = {
           instructor_id: string
           mode: Database["public"]["Enums"]["assignment_mode"]
           opened_at?: string | null
+          org_id?: string | null
           quiz_responses?: Json | null
           release_method?: string | null
           response_time_seconds?: number | null
@@ -859,6 +967,7 @@ export type Database = {
           instructor_id?: string
           mode?: Database["public"]["Enums"]["assignment_mode"]
           opened_at?: string | null
+          org_id?: string | null
           quiz_responses?: Json | null
           release_method?: string | null
           response_time_seconds?: number | null
@@ -872,6 +981,13 @@ export type Database = {
             columns: ["draft_id"]
             isOneToOne: false
             referencedRelation: "content_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_assignments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -935,18 +1051,21 @@ export type Database = {
           achievement_id: string
           earned_at: string
           id: string
+          org_id: string | null
           user_id: string
         }
         Insert: {
           achievement_id: string
           earned_at?: string
           id?: string
+          org_id?: string | null
           user_id: string
         }
         Update: {
           achievement_id?: string
           earned_at?: string
           id?: string
+          org_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -955,6 +1074,13 @@ export type Database = {
             columns: ["achievement_id"]
             isOneToOne: false
             referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -990,6 +1116,7 @@ export type Database = {
           last_activity_date: string | null
           level: number
           longest_streak: number
+          org_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1002,6 +1129,7 @@ export type Database = {
           last_activity_date?: string | null
           level?: number
           longest_streak?: number
+          org_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1014,10 +1142,19 @@ export type Database = {
           last_activity_date?: string | null
           level?: number
           longest_streak?: number
+          org_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_stats_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
@@ -1136,7 +1273,9 @@ export type Database = {
       cleanup_old_question_logs: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: number }
       cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
+      generate_admin_code: { Args: never; Returns: string }
       generate_instructor_code: { Args: never; Returns: string }
+      generate_org_invite_code: { Args: never; Returns: string }
       get_problem_answer: {
         Args: { problem_id: string }
         Returns: {
@@ -1155,6 +1294,7 @@ export type Database = {
           total_questions: number
         }[]
       }
+      get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1174,7 +1314,9 @@ export type Database = {
         Args: { p_assignment_id: string; p_short_answer_grades: Json }
         Returns: Json
       }
+      validate_admin_code: { Args: { _code: string }; Returns: string }
       validate_instructor_code: { Args: { code: string }; Returns: string }
+      validate_org_invite_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "instructor" | "student"

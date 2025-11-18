@@ -10,6 +10,7 @@ import ROIMetricsCard from "@/components/admin/ROIMetricsCard";
 import EngagementChart from "@/components/admin/EngagementChart";
 import SchoolProgressCard from "@/components/admin/SchoolProgressCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
+import OrganizationSetup from "@/components/admin/OrganizationSetup";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -73,11 +74,36 @@ export default function AdminDashboard() {
     setLoading(true);
     
     try {
-      // Fetch total students by counting from user_roles table
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get user's org_id
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("id", user.id)
+        .single();
+
+      const userOrgId = profile?.org_id;
+      if (!userOrgId) {
+        toast.error("No organization assigned");
+        return;
+      }
+
+      // Fetch students in the organization through profiles
+      const { data: orgProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", userOrgId);
+
+      const studentIds = orgProfiles?.map(p => p.id) || [];
+
+      // Count students with student role in this org
       const { count: totalStudents } = await supabase
         .from("user_roles")
         .select("*", { count: 'exact', head: true })
-        .eq("role", "student");
+        .eq("role", "student")
+        .in("user_id", studentIds);
 
       // Fetch active students (activity in last 7 days)
       const sevenDaysAgo = new Date();
@@ -86,22 +112,26 @@ export default function AdminDashboard() {
       const { count: activeStudents } = await supabase
         .from("user_stats")
         .select("*", { count: 'exact', head: true })
+        .eq("org_id", userOrgId)
         .gte("last_activity_date", sevenDaysAgo.toISOString().split('T')[0]);
 
-      // Fetch lesson progress
+      // Fetch lesson progress for org
       const { data: lessonData } = await supabase
         .from("lesson_progress")
-        .select("*");
+        .select("*")
+        .eq("org_id", userOrgId);
 
-      // Fetch achievements
+      // Fetch achievements for org
       const { data: achievementData } = await supabase
         .from("user_achievements")
-        .select("*");
+        .select("*")
+        .eq("org_id", userOrgId);
 
-      // Fetch user stats for calculations
+      // Fetch user stats for calculations (org-scoped)
       const { data: userStats } = await supabase
         .from("user_stats")
-        .select("*");
+        .select("*")
+        .eq("org_id", userOrgId);
 
       // Calculate metrics
       const avgTimeSpent = userStats && userStats.length > 0
@@ -194,9 +224,14 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
+      // Add Organization Management tab to admin dashboard
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-6">
+          {/* Organization Setup Section */}
+          <div className="mb-8">
+            <OrganizationSetup />
+          </div>
+
           {/* Top Row: ROI and School Progress */}
           <div className="grid lg:grid-cols-2 gap-6">
             <ROIMetricsCard

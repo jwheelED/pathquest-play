@@ -10,8 +10,10 @@ import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import InstructorAuth from "./pages/InstructorAuth";
 import InstructorOnboarding from "./pages/InstructorOnboarding";
+import InstructorOrgOnboarding from "./pages/InstructorOrgOnboarding";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import AdminAuth from "./pages/AdminAuth";
+import AdminOnboarding from "./pages/AdminOnboarding";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -39,6 +41,11 @@ const App = () => (
             </ProtectedRoute>
           } />
           <Route path="/instructor/auth" element={<InstructorAuth />} />
+          <Route path="/instructor/org-onboarding" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <InstructorOrgOnboarding />
+            </ProtectedRoute>
+          } />
           <Route path="/instructor/onboarding" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <InstructorOnboarding />
@@ -50,6 +57,11 @@ const App = () => (
             </ProtectedRoute>
           } />
           <Route path="/admin/auth" element={<AdminAuth />} />
+          <Route path="/admin/onboarding" element={
+            <ProtectedRoute requiredRole="admin" redirectTo="/admin/auth">
+              <AdminOnboarding />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/dashboard" element={
             <ProtectedRoute requiredRole="admin" redirectTo="/admin/auth">
               <AdminDashboard />

@@ -35,14 +35,17 @@ export default function InstructorAuth() {
           .maybeSingle();
         
         if (roleData) {
-          // Check if user has completed onboarding
+          // Check if user has completed org onboarding and regular onboarding
           const { data: profile } = await supabase
             .from('profiles')
-            .select('onboarded, course_title, course_schedule, course_topics')
+            .select('org_id, onboarded, course_title, course_schedule, course_topics')
             .eq('id', session.user.id)
             .single();
           
-          if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+          // First check if they have an organization
+          if (!profile?.org_id) {
+            navigate("/instructor/org-onboarding");
+          } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
             navigate("/instructor/onboarding");
           } else {
             navigate("/instructor/dashboard");
@@ -66,7 +69,7 @@ export default function InstructorAuth() {
             
             if (success) {
               toast.success("Instructor account created!");
-              navigate("/instructor/onboarding");
+              navigate("/instructor/org-onboarding");
             }
           }
         }
@@ -137,9 +140,9 @@ export default function InstructorAuth() {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);
           } else if (data.session) {
-            // User is auto-confirmed, redirect to onboarding
+            // User is auto-confirmed, redirect to org onboarding
             toast.success("Account created successfully!");
-            navigate("/instructor/onboarding");
+            navigate("/instructor/org-onboarding");
           } else {
             // Email confirmation required
             toast.success("Account created! Please check your email to confirm your account before signing in.");
