@@ -42,9 +42,6 @@ verify_jwt = true
 [functions.generate-interval-question]
 verify_jwt = true
 
-[functions.auto-release-answers]
-verify_jwt = false
-
 [functions.execute-code]
 verify_jwt = true
 
