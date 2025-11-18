@@ -50,7 +50,7 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
   const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'connecting' | 'error'>('connecting');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [questionIncoming, setQuestionIncoming] = useState(false);
-  const [aiExplanations, setAiExplanations] = useState<Record<string, Record<number, string>>>({});
+  const [aiExplanations, setAiExplanations] = useState<Record<string, Record<number, { explanation: string; cached: boolean }>>>({});
   const [loadingExplanations, setLoadingExplanations] = useState<Record<string, Record<number, boolean>>>({});
   const { toast } = useToast();
   
@@ -314,19 +314,30 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
 
       if (error) throw error;
 
-      // Store the explanation
+      // Store the explanation with cache status
       setAiExplanations(prev => ({
         ...prev,
         [assignment.id]: {
           ...(prev[assignment.id] || {}),
-          [questionIdx]: data.detailedExplanation
+          [questionIdx]: {
+            explanation: data.explanation || data.detailedExplanation,
+            cached: data.cached || false
+          }
         }
       }));
 
-      toast({
-        title: "✨ Explanation Generated",
-        description: "AI has analyzed why your answer was incorrect."
-      });
+      // Show different toast based on cache status
+      if (data.cached) {
+        toast({
+          title: "⚡ Instant Explanation",
+          description: "Retrieved from cache - no AI generation needed!"
+        });
+      } else {
+        toast({
+          title: "✨ Explanation Generated",
+          description: "AI has analyzed why your answer was incorrect."
+        });
+      }
 
     } catch (error: any) {
       console.error('Error generating AI explanation:', error);
@@ -1492,8 +1503,13 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
                                           </p>
                                         </div>
                                         <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
-                                          {aiExplanations[assignment.id][idx]}
+                                          {aiExplanations[assignment.id][idx].explanation}
                                         </div>
+                                        {aiExplanations[assignment.id][idx].cached && (
+                                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                                            ⚡ Instant response from cache
+                                          </p>
+                                        )}
                                       </div>
                                     )}
                                   </div>
