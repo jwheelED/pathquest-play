@@ -122,20 +122,47 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      // Update student's org_id
-      await supabase
+      // Update student's org_id and ensure onboarded stays true
+      const { error: updateError } = await supabase
         .from("profiles")
-        .update({ org_id: instructorOrgId })
+        .update({ 
+          org_id: instructorOrgId,
+          onboarded: true 
+        })
         .eq("id", user.id);
+
+      if (updateError) {
+        toast.error("Failed to update profile");
+        console.error("Profile update error:", updateError);
+        return;
+      }
+
+      // Wait for database consistency
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify the update
+      const { data: verification } = await supabase
+        .from("profiles")
+        .select("onboarded")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!verification?.onboarded) {
+        toast.error("Profile update verification failed");
+        return;
+      }
+
+      // Update localStorage to maintain onboarded status
+      localStorage.setItem("edvana_onboarded", "true");
 
       toast.success("Successfully switched to new class!");
       setShowSwitchDialog(false);
       setNewClassCode("");
       
       // Refresh class info
-      fetchClassInfo();
+      await fetchClassInfo();
       
-      // Refresh the page to update all components
+      // Refresh the page to update all components after a delay
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error switching class:", error);
