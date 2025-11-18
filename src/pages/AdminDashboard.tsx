@@ -11,7 +11,6 @@ import EngagementChart from "@/components/admin/EngagementChart";
 import SchoolProgressCard from "@/components/admin/SchoolProgressCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
-import { AddInstructorCard } from "@/components/admin/AddInstructorCard";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -254,9 +253,8 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="space-y-6">
           {/* Organization Setup Section */}
-          <div className="grid gap-6 md:grid-cols-2 mb-8">
+          <div className="mb-8">
             <OrganizationSetup />
-            <AddInstructorCard />
           </div>
 
           {/* Top Row: ROI and School Progress */}
