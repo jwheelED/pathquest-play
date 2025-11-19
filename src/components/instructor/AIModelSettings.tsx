@@ -64,7 +64,6 @@ const AI_MODELS: ModelOption[] = [
 export const AIModelSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("google/gemini-2.5-flash");
   const [autoGradeMCQ, setAutoGradeMCQ] = useState(true);
   const [autoGradeShortAnswer, setAutoGradeShortAnswer] = useState(true);
   const [autoGradeCoding, setAutoGradeCoding] = useState(false);
@@ -91,7 +90,6 @@ export const AIModelSettings = () => {
       if (error) throw error;
 
       if (data) {
-        setSelectedModel(data.auto_grade_model || "google/gemini-2.5-flash");
         setAutoGradeMCQ(data.auto_grade_mcq ?? true);
         setAutoGradeShortAnswer(data.auto_grade_short_answer ?? true);
         setAutoGradeCoding(data.auto_grade_coding ?? false);
@@ -117,7 +115,7 @@ export const AIModelSettings = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          auto_grade_model: selectedModel,
+          auto_grade_model: 'google/gemini-2.5-pro',
           auto_grade_mcq: autoGradeMCQ,
           auto_grade_short_answer: autoGradeShortAnswer,
           auto_grade_coding: autoGradeCoding,
@@ -166,7 +164,7 @@ export const AIModelSettings = () => {
     return <Badge variant="secondary" className={colors[quality as keyof typeof colors]}>{quality}</Badge>;
   };
 
-  const currentModel = AI_MODELS.find(m => m.value === selectedModel);
+  const currentModel = AI_MODELS.find(m => m.value === 'google/gemini-2.5-pro');
 
   if (loading) {
     return (
@@ -199,34 +197,12 @@ export const AIModelSettings = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-6 space-y-6">
-        {/* Model Selection */}
+        {/* Auto-Grade Model Info (Fixed) */}
         <div className="space-y-3">
-          <Label htmlFor="model-select" className="text-base font-semibold flex items-center gap-2">
+          <Label className="text-base font-semibold flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            AI Model
+            Auto-Grade Model (Fixed)
           </Label>
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger id="model-select" className="h-auto">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AI_MODELS.map((model) => (
-                <SelectItem key={model.value} value={model.value} className="py-3">
-                  <div className="flex flex-col gap-1">
-                    <div className="font-medium">{model.label}</div>
-                    <div className="text-xs text-muted-foreground">{model.description}</div>
-                    <div className="flex gap-2 mt-1">
-                      {getSpeedBadge(model.speed)}
-                      {getCostBadge(model.cost)}
-                      {getQualityBadge(model.quality)}
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Current Model Info */}
           {currentModel && (
             <div className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-lg">
               <div className="flex items-start gap-3">
