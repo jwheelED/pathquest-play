@@ -20,6 +20,7 @@ import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionReliabilityDashboard } from "@/components/instructor/QuestionReliabilityDashboard";
+import { AIModelSettings } from "@/components/instructor/AIModelSettings";
 
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
@@ -432,6 +433,9 @@ export default function InstructorDashboard() {
         {/* Settings visible regardless of student count */}
         {currentUser && (
           <div className="space-y-6">
+            {/* AI Model Configuration - Full Width */}
+            <AIModelSettings />
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <QuestionFormatSettings instructorId={currentUser.id} />
             <AutoGradeSettings />
