@@ -70,7 +70,7 @@ Return ONLY the complete question text, nothing else.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro', // Most capable Gemini model for accurate extraction
+        model: 'google/gemini-2.5-flash', // Balanced speed and accuracy for question extraction
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
