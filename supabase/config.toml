@@ -3,6 +3,9 @@ project_id = "otsmjgrhyteyvpufkwdh"
 [auth]
 site_url = "http://localhost:5173"
 
+[functions.deepgram-streaming]
+verify_jwt = true
+
 [functions.generate-path]
 verify_jwt = true
 
