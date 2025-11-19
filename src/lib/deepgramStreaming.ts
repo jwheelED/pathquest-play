@@ -1,3 +1,6 @@
+import { logger } from "./logger";
+import { validateDeepgramApiKey, getValidationErrorMessage } from "./deepgramValidation";
+
 export interface DeepgramTranscript {
   text: string;
   isFinal: boolean;
@@ -48,6 +51,20 @@ export class DeepgramStreamingClient {
     this.isConnecting = true;
 
     try {
+      // Validate API key before attempting to connect
+      console.log("🔍 Validating Deepgram API key...");
+      const validation = await validateDeepgramApiKey();
+      
+      if (!validation.valid) {
+        const errorMessage = getValidationErrorMessage(validation);
+        console.error("❌ API key validation failed:", errorMessage);
+        this.isConnecting = false;
+        this.config.onError(errorMessage);
+        return;
+      }
+      
+      console.log("✅ Deepgram API key validated successfully");
+
       // Connect to relay edge function via WebSocket
       const wsUrl = `wss://${this.config.projectRef}.functions.supabase.co/deepgram-streaming`;
       console.log("🔗 Connecting to streaming relay:", wsUrl);
