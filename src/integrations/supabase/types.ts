@@ -688,17 +688,21 @@ export type Database = {
           course_topics: string[] | null
           created_at: string | null
           daily_question_limit: number | null
+          detection_model: string
           experience_level: string | null
           full_name: string | null
+          generation_model: string
           goals: string[] | null
           id: string
           instructor_code: string | null
+          interval_question_model: string
           last_auto_question_at: string | null
           onboarded: boolean | null
           org_id: string | null
           professor_type: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference: string | null
           study_days: string[] | null
+          transcription_model: string
         }
         Insert: {
           admin_code?: string | null
@@ -714,17 +718,21 @@ export type Database = {
           course_topics?: string[] | null
           created_at?: string | null
           daily_question_limit?: number | null
+          detection_model?: string
           experience_level?: string | null
           full_name?: string | null
+          generation_model?: string
           goals?: string[] | null
           id: string
           instructor_code?: string | null
+          interval_question_model?: string
           last_auto_question_at?: string | null
           onboarded?: boolean | null
           org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference?: string | null
           study_days?: string[] | null
+          transcription_model?: string
         }
         Update: {
           admin_code?: string | null
@@ -740,17 +748,21 @@ export type Database = {
           course_topics?: string[] | null
           created_at?: string | null
           daily_question_limit?: number | null
+          detection_model?: string
           experience_level?: string | null
           full_name?: string | null
+          generation_model?: string
           goals?: string[] | null
           id?: string
           instructor_code?: string | null
+          interval_question_model?: string
           last_auto_question_at?: string | null
           onboarded?: boolean | null
           org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_format_preference?: string | null
           study_days?: string[] | null
+          transcription_model?: string
         }
         Relationships: [
           {

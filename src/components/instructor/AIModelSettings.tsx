@@ -68,6 +68,10 @@ export const AIModelSettings = () => {
   const [autoGradeMCQ, setAutoGradeMCQ] = useState(true);
   const [autoGradeShortAnswer, setAutoGradeShortAnswer] = useState(true);
   const [autoGradeCoding, setAutoGradeCoding] = useState(false);
+  const [detectionModel, setDetectionModel] = useState("google/gemini-2.5-flash");
+  const [transcriptionModel, setTranscriptionModel] = useState("google/gemini-2.5-flash");
+  const [generationModel, setGenerationModel] = useState("google/gemini-2.5-flash");
+  const [intervalQuestionModel, setIntervalQuestionModel] = useState("google/gemini-2.5-flash");
 
   useEffect(() => {
     fetchSettings();
@@ -80,7 +84,7 @@ export const AIModelSettings = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('auto_grade_model, auto_grade_mcq, auto_grade_short_answer, auto_grade_coding')
+        .select('auto_grade_model, auto_grade_mcq, auto_grade_short_answer, auto_grade_coding, detection_model, transcription_model, generation_model, interval_question_model')
         .eq('id', user.id)
         .single();
 
@@ -91,6 +95,10 @@ export const AIModelSettings = () => {
         setAutoGradeMCQ(data.auto_grade_mcq ?? true);
         setAutoGradeShortAnswer(data.auto_grade_short_answer ?? true);
         setAutoGradeCoding(data.auto_grade_coding ?? false);
+        setDetectionModel(data.detection_model || "google/gemini-2.5-flash");
+        setTranscriptionModel(data.transcription_model || "google/gemini-2.5-flash");
+        setGenerationModel(data.generation_model || "google/gemini-2.5-flash");
+        setIntervalQuestionModel(data.interval_question_model || "google/gemini-2.5-flash");
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -112,7 +120,11 @@ export const AIModelSettings = () => {
           auto_grade_model: selectedModel,
           auto_grade_mcq: autoGradeMCQ,
           auto_grade_short_answer: autoGradeShortAnswer,
-          auto_grade_coding: autoGradeCoding
+          auto_grade_coding: autoGradeCoding,
+          detection_model: detectionModel,
+          transcription_model: transcriptionModel,
+          generation_model: generationModel,
+          interval_question_model: intervalQuestionModel
         })
         .eq('id', user.id);
 
@@ -286,6 +298,75 @@ export const AIModelSettings = () => {
               checked={autoGradeCoding}
               onCheckedChange={setAutoGradeCoding}
             />
+          </div>
+        </div>
+
+        {/* Additional Model Configurations */}
+        <div className="space-y-4 pt-4 border-t">
+          <Label className="text-base font-semibold">Other AI Model Configurations</Label>
+          
+          <div className="space-y-3">
+            <Label htmlFor="detection-model">Detection Model</Label>
+            <Select value={detectionModel} onValueChange={setDetectionModel}>
+              <SelectTrigger id="detection-model">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <Label htmlFor="transcription-model">Transcription Model</Label>
+            <Select value={transcriptionModel} onValueChange={setTranscriptionModel}>
+              <SelectTrigger id="transcription-model">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <Label htmlFor="generation-model">Generation Model</Label>
+            <Select value={generationModel} onValueChange={setGenerationModel}>
+              <SelectTrigger id="generation-model">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <Label htmlFor="interval-question-model">Interval Question Model</Label>
+            <Select value={intervalQuestionModel} onValueChange={setIntervalQuestionModel}>
+              <SelectTrigger id="interval-question-model">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
