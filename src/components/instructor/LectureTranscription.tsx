@@ -15,6 +15,7 @@ import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import { getOrgId } from "@/hooks/useOrgId";
+import { DeepgramStreamingClient, type DeepgramTranscript } from "@/lib/deepgramStreaming";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -115,6 +116,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [lastAutoQuestionError, setLastAutoQuestionError] = useState<string | null>(null);
   const [lastAutoQuestionErrorTime, setLastAutoQuestionErrorTime] = useState<Date | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
+  
+  // Streaming client state
+  const [streamingClient, setStreamingClient] = useState<DeepgramStreamingClient | null>(null);
+  const [interimTranscript, setInterimTranscript] = useState<string>("");
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1683,6 +1689,79 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     };
   }, []);
 
+  // Handle streaming transcripts from Deepgram
+  const handleStreamingTranscript = (data: DeepgramTranscript) => {
+    if (data.isFinal) {
+      // Final transcript - add to buffer and check for voice commands
+      const fullText = data.text.trim();
+      
+      if (fullText.length > 0) {
+        console.log("📝 FINAL transcript:", fullText);
+        
+        // Add to transcript buffer
+        transcriptBufferRef.current += fullText + " ";
+        setTranscriptChunks(prev => [...prev, fullText]);
+        setLastTranscript(fullText);
+        
+        // Buffer management - trim if getting too large
+        if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
+          console.log("🗑️ Trimming transcript buffer");
+          transcriptBufferRef.current = transcriptBufferRef.current.slice(-KEEP_RECENT_SIZE);
+        }
+        
+        // Check for voice command in final transcript
+        checkForVoiceCommand(fullText, transcriptChunks.length);
+        
+        // Update content quality score
+        const quality = analyzeContentQuality(transcriptBufferRef.current, 60);
+        setContentQualityScore(quality.contentDensity * 100);
+      }
+      
+      // Clear interim display
+      setInterimTranscript("");
+    } else {
+      // Interim transcript - show for better UX
+      setInterimTranscript(data.text);
+    }
+  };
+
+  // Handle streaming errors
+  const handleStreamingError = (error: string) => {
+    console.error("❌ Streaming error:", error);
+    
+    setFailureCount(prev => prev + 1);
+    
+    // Add to error history
+    setErrorHistory(prev => [...prev, {
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+      severity: 'critical',
+      category: 'transcription',
+      message: error,
+      details: 'Real-time transcription error',
+      retryable: true
+    }]);
+    
+    toast({
+      title: "Transcription Error",
+      description: error,
+      variant: "destructive",
+    });
+    
+    // Circuit breaker logic
+    if (failureCount >= MAX_CONSECUTIVE_FAILURES - 1) {
+      const backoffTime = CIRCUIT_BREAKER_BACKOFF[Math.min(failureCount, CIRCUIT_BREAKER_BACKOFF.length - 1)];
+      setIsCircuitOpen(true);
+      setCircuitBreakerRetryAt(Date.now() + backoffTime);
+      
+      toast({
+        title: "Recording paused",
+        description: "Multiple errors detected. System will retry automatically.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const startRecording = async () => {
     try {
       // Check circuit breaker
@@ -1695,39 +1774,64 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return;
       }
 
+      // Check quota circuit breaker
+      if (quotaErrorActive) {
+        toast({
+          title: "API Quota Exhausted",
+          description: `Please wait ${Math.ceil(quotaCircuitBreakerCountdown / 60)} more minutes or check your OpenAI billing.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Reset state for fresh recording session
       hasTriggeredRef.current = false;
       setTranscriptChunks([]);
       transcriptBufferRef.current = "";
-      recordingCycleCountRef.current = 0;
       setFailureCount(0);
       setIsCircuitOpen(false);
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
+      setInterimTranscript("");
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
+      // Create streaming client
+      const client = new DeepgramStreamingClient({
+        projectRef: "otsmjgrhyteyvpufkwdh",
+        onTranscript: handleStreamingTranscript,
+        onError: handleStreamingError,
+        onReady: () => {
+          console.log("✅ Real-time transcription active");
+          toast({
+            title: "🎙️ Real-time transcription started",
+            description: "AI will detect questions as you speak",
+          });
         },
+        onClose: () => {
+          console.log("🔌 Transcription service disconnected");
+          if (isRecording) {
+            toast({
+              title: "Connection lost",
+              description: "Transcription service disconnected",
+              variant: "destructive",
+            });
+            stopRecording();
+          }
+        }
       });
 
-      streamRef.current = stream;
+      await client.connect();
+      setStreamingClient(client);
       isRecordingRef.current = true;
       setIsRecording(true);
 
-      toast({
-        title: "🎙️ Recording started",
-        description: "AI will automatically detect when you ask questions to students",
-      });
-
-      // Start the continuous recording cycle
-      startRecordingCycle();
     } catch (error) {
       console.error("Error starting recording:", error);
-      toast({ title: "Failed to start recording", variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to start recording";
+      toast({ 
+        title: "Failed to start recording", 
+        description: errorMessage,
+        variant: "destructive" 
+      });
     }
   };
 
@@ -1844,15 +1948,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const stopRecording = () => {
     isRecordingRef.current = false;
     setIsRecording(false);
-    recordingCycleCountRef.current = 0;
+    setInterimTranscript("");
 
-    // Clear interval
+    // Disconnect streaming client
+    if (streamingClient) {
+      streamingClient.disconnect();
+      setStreamingClient(null);
+      console.log("🛑 Streaming client disconnected");
+    }
+
+    // Legacy cleanup (for backwards compatibility)
     if (recordingIntervalRef.current) {
       clearTimeout(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
     }
 
-    // Stop current recorder with cleanup
     if (mediaRecorderRef.current) {
       if (mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
@@ -1862,7 +1972,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       mediaRecorderRef.current = null;
     }
 
-    // Stop stream with proper cleanup
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
         track.stop();
@@ -2656,8 +2765,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </CardTitle>
           <CardDescription className="text-sm">
             {isRecording
-              ? "🎙️ Recording • Click 'Send Question' button or say 'send question now' to send your most recent question to students"
-              : "Start recording - use the 'Send Question' button or say 'send question now' to send questions to students"}
+              ? "🎙️ Real-time streaming active • Say 'send question now' or click 'Send Question' to send your most recent question to students"
+              : "Start recording with Deepgram real-time transcription - use voice commands or the 'Send Question' button to send questions"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -2718,7 +2827,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             <div className="flex gap-2">
               <Badge variant="outline" className="flex-1 justify-center py-1.5">
                 <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
-                Live
+                Streaming
               </Badge>
               <Badge variant="secondary" className="flex-1 justify-center py-1.5">
                 {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
@@ -2815,6 +2924,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
                 </div>
               ))}
+              {interimTranscript && (
+                <div className="border rounded-lg p-2.5 bg-primary/5 border-primary/20 animate-pulse">
+                  <p className="text-xs font-medium text-primary mb-1">🎙️ Live (interim)</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">{interimTranscript}</p>
+                </div>
+              )}
             </div>
           </div>
         )}
