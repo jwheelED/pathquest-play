@@ -442,23 +442,45 @@ export const LectureCheckInResults = () => {
     }
   };
 
-  const handleRateQuestion = async (questionId: string, rating: 'helpful' | 'not_helpful') => {
+  // Generate a stable UUID from question content for rating reference
+  const generateQuestionRatingId = async (question: any, instructorId: string): Promise<string> => {
+    const questionData = JSON.stringify({
+      question: question.question,
+      type: question.type,
+      instructor: instructorId
+    });
+    
+    const encoder = new TextEncoder();
+    const data = encoder.encode(questionData);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    
+    // Convert to UUID format (using first 16 bytes)
+    const hex = hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  };
+
+  const handleRateQuestion = async (question: any, groupIdx: number, qIdx: number, rating: 'helpful' | 'not_helpful') => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Generate a stable UUID for this question
+      const referenceId = await generateQuestionRatingId(question, user.id);
+      const ratingKey = `${groupIdx}-${qIdx}`;
 
       const { error } = await supabase
         .from('ai_quality_ratings')
         .insert({
           user_id: user.id,
           rating_type: 'question_generation',
-          reference_id: questionId,
+          reference_id: referenceId,
           rating: rating
         });
 
       if (error) throw error;
 
-      setQuestionRatings(prev => ({ ...prev, [questionId]: rating }));
+      setQuestionRatings(prev => ({ ...prev, [ratingKey]: rating }));
       toast.success('Thank you for your feedback!');
     } catch (error) {
       console.error('Error saving rating:', error);
@@ -915,7 +937,7 @@ export const LectureCheckInResults = () => {
                           <Button
                             variant={questionRatings[`${groupIdx}-${qIdx}`] === 'helpful' ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => handleRateQuestion(`${groupIdx}-${qIdx}`, 'helpful')}
+                            onClick={() => handleRateQuestion(question, groupIdx, qIdx, 'helpful')}
                             className="gap-1"
                           >
                             <ThumbsUp className="h-3 w-3" />
@@ -924,7 +946,7 @@ export const LectureCheckInResults = () => {
                           <Button
                             variant={questionRatings[`${groupIdx}-${qIdx}`] === 'not_helpful' ? 'destructive' : 'outline'}
                             size="sm"
-                            onClick={() => handleRateQuestion(`${groupIdx}-${qIdx}`, 'not_helpful')}
+                            onClick={() => handleRateQuestion(question, groupIdx, qIdx, 'not_helpful')}
                             className="gap-1"
                           >
                             <ThumbsDown className="h-3 w-3" />
