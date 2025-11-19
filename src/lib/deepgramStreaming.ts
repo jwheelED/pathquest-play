@@ -48,8 +48,8 @@ export class DeepgramStreamingClient {
     this.isConnecting = true;
 
     try {
-      // Connect to relay edge function
-      const wsUrl = `wss://${this.config.projectRef}.supabase.co/functions/v1/deepgram-streaming`;
+      // Connect to relay edge function via WebSocket
+      const wsUrl = `wss://${this.config.projectRef}.functions.supabase.co/deepgram-streaming`;
       console.log("🔗 Connecting to streaming relay:", wsUrl);
 
       this.ws = new WebSocket(wsUrl);
