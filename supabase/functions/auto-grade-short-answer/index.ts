@@ -114,50 +114,70 @@ serve(async (req) => {
       );
     }
 
-    // Use AI to grade the short answer
-    const systemPrompt = `You are an expert educational grader with years of experience assessing student answers. Your goal is to fairly and accurately grade short answer responses on a scale of 0-100.
+    // Use AI to grade the short answer with component-based scoring
+    const systemPrompt = `You are an expert educational grader with years of experience assessing student answers. Your goal is to fairly and accurately grade short answer responses using a structured component-based approach.
 
-GRADING RUBRIC:
-- 90-100: Excellent - Answer is complete, accurate, and demonstrates deep understanding. All key concepts are correctly explained.
-- 80-89: Very Good - Answer is mostly complete and accurate. Minor details may be missing but core concepts are correct.
-- 70-79: Good - Answer demonstrates solid understanding. Some key points present but incomplete or contains minor errors.
-- 60-69: Satisfactory - Answer shows basic understanding but missing significant details or has notable errors.
-- 50-59: Needs Improvement - Answer demonstrates limited understanding. Several key concepts are missing or incorrect.
-- 40-49: Poor - Answer is mostly incorrect or off-topic, with only minimal relevant content.
-- 0-39: Unacceptable - Answer is fundamentally wrong, off-topic, or shows no understanding.
+COMPONENT-BASED GRADING RUBRIC:
+
+You will evaluate the answer across 4 components, each worth 0-25 points:
+
+1. CONCEPTUAL UNDERSTANDING (0-25 points):
+   - 22-25: Deep understanding of core concepts, can explain reasoning
+   - 17-21: Solid grasp of main concepts with minor gaps
+   - 12-16: Basic understanding but missing key connections
+   - 7-11: Partial understanding with significant gaps
+   - 0-6: Minimal or no understanding of concepts
+
+2. ACCURACY (0-25 points):
+   - 22-25: All information is correct and precise
+   - 17-21: Mostly correct with minor inaccuracies
+   - 12-16: Several correct points but notable errors
+   - 7-11: More errors than correct information
+   - 0-6: Mostly or entirely incorrect
+
+3. COMPLETENESS (0-25 points):
+   - 22-25: Addresses all key aspects of the question thoroughly
+   - 17-21: Covers most key points with minor omissions
+   - 12-16: Addresses some key points but missing several
+   - 7-11: Incomplete coverage, missing major elements
+   - 0-6: Barely addresses the question
+
+4. APPLICATION (0-25 points):
+   - 22-25: Excellent application of knowledge, clear reasoning
+   - 17-21: Good application with minor logical gaps
+   - 12-16: Basic application but lacks depth
+   - 7-11: Weak application or flawed reasoning
+   - 0-6: No meaningful application of concepts
 
 GRADING GUIDELINES:
-1. Compare student's answer to the expected answer for key concepts
-2. Award partial credit for partially correct explanations
-3. Be lenient with wording differences if the concept is correct
-4. Don't penalize for minor spelling/grammar errors unless they change meaning
-5. Focus on conceptual understanding, not memorization of exact phrases
-6. If student provides correct information not in expected answer, still give credit
-7. For numerical answers, check if the approach is correct even if final answer has minor calculation errors
+1. Evaluate each component independently and justify your scoring
+2. Award generous partial credit for partially correct work
+3. Accept different wording if the concept is conveyed correctly
+4. Don't penalize spelling/grammar unless it changes meaning
+5. For numerical answers, credit correct methodology even with calculation errors
+6. Recognize correct information not in expected answer
+7. Focus on understanding over memorization
 
-IMPORTANT: Be fair and generous with partial credit. Students may express correct ideas in different ways than the expected answer.
+TOTAL GRADE: Sum of all 4 components (0-100)
 
-Return ONLY a JSON object with this exact format:
-{
-  "grade": <number from 0-100>,
-  "feedback": "<constructive feedback explaining the grade, highlighting what was correct and what was missing>"
-}`;
+IMPORTANT: Be thorough and fair. Students deserve detailed feedback on each component.`;
 
-    const userPrompt = `Question: ${question}
+    const userPrompt = `Question: ${question || 'Not provided'}
 
 Expected Answer: ${expectedAnswer}
 
 Student's Answer: ${studentAnswer}
 
-ANSWER TYPE DETECTION:
-- If this is a numerical/calculation problem, focus on methodology and approach
-- If this is a conceptual explanation, focus on understanding of core principles
-- If this is a definition, check for key terminology and accurate explanation
+TASK: Evaluate this answer using the component-based rubric.
 
-Grade this answer from 0-100 and provide constructive feedback that:
-1. Acknowledges what the student got right
-2. Explains what was missing or incorrect
-3. Encourages improvement with specific suggestions`;
+For each component, provide:
+- A score (0-25)
+- Brief justification for that score
+
+Then provide overall constructive feedback that:
+1. Acknowledges what the student demonstrated well in each component
+2. Explains specific gaps or errors by component
+3. Offers actionable suggestions for improvement`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -166,12 +186,62 @@ Grade this answer from 0-100 and provide constructive feedback that:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        response_format: { type: "json_object" },
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "grade_answer",
+              description: "Grade a student's short answer response using component-based scoring",
+              parameters: {
+                type: "object",
+                properties: {
+                  conceptual_understanding: {
+                    type: "number",
+                    description: "Score for conceptual understanding (0-25)",
+                    minimum: 0,
+                    maximum: 25
+                  },
+                  accuracy: {
+                    type: "number",
+                    description: "Score for accuracy of information (0-25)",
+                    minimum: 0,
+                    maximum: 25
+                  },
+                  completeness: {
+                    type: "number",
+                    description: "Score for completeness of answer (0-25)",
+                    minimum: 0,
+                    maximum: 25
+                  },
+                  application: {
+                    type: "number",
+                    description: "Score for application of knowledge (0-25)",
+                    minimum: 0,
+                    maximum: 25
+                  },
+                  total_grade: {
+                    type: "number",
+                    description: "Total grade (sum of all components, 0-100)",
+                    minimum: 0,
+                    maximum: 100
+                  },
+                  feedback: {
+                    type: "string",
+                    description: "Constructive feedback explaining each component score and overall performance"
+                  }
+                },
+                required: ["conceptual_understanding", "accuracy", "completeness", "application", "total_grade", "feedback"],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: "function", function: { name: "grade_answer" } },
         temperature: 0.3
       }),
     });
@@ -198,10 +268,10 @@ Grade this answer from 0-100 and provide constructive feedback that:
     }
 
     const result = await response.json();
-    const content = result.choices?.[0]?.message?.content;
+    const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (!content) {
-      console.error('No content in AI response');
+    if (!toolCall || toolCall.function.name !== 'grade_answer') {
+      console.error('No tool call in AI response:', result);
       return new Response(
         JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -210,28 +280,59 @@ Grade this answer from 0-100 and provide constructive feedback that:
     
     let gradingResult;
     try {
-      gradingResult = JSON.parse(content);
+      gradingResult = JSON.parse(toolCall.function.arguments);
     } catch (e) {
-      console.error('Failed to parse AI response:', content);
+      console.error('Failed to parse tool call arguments:', toolCall.function.arguments);
       return new Response(
         JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate grade is between 0-100
-    if (typeof gradingResult.grade !== 'number' || gradingResult.grade < 0 || gradingResult.grade > 100) {
-      console.error('Invalid grade value:', gradingResult.grade);
+    // Validate all component scores
+    const components = ['conceptual_understanding', 'accuracy', 'completeness', 'application'];
+    for (const component of components) {
+      const score = gradingResult[component];
+      if (typeof score !== 'number' || score < 0 || score > 25) {
+        console.error(`Invalid ${component} score:`, score);
+        return new Response(
+          JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Validate total grade is between 0-100
+    if (typeof gradingResult.total_grade !== 'number' || gradingResult.total_grade < 0 || gradingResult.total_grade > 100) {
+      console.error('Invalid total_grade value:', gradingResult.total_grade);
       return new Response(
         JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('✅ Auto-graded answer:', gradingResult.grade);
+    console.log('✅ Auto-graded answer with components:', {
+      total: gradingResult.total_grade,
+      conceptual: gradingResult.conceptual_understanding,
+      accuracy: gradingResult.accuracy,
+      completeness: gradingResult.completeness,
+      application: gradingResult.application
+    });
+
+    // Return with backward-compatible 'grade' field plus new component scores
+    const responseData = {
+      grade: gradingResult.total_grade,
+      feedback: gradingResult.feedback,
+      components: {
+        conceptual_understanding: gradingResult.conceptual_understanding,
+        accuracy: gradingResult.accuracy,
+        completeness: gradingResult.completeness,
+        application: gradingResult.application
+      }
+    };
 
     return new Response(
-      JSON.stringify(gradingResult),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
