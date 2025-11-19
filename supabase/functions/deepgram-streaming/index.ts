@@ -48,9 +48,8 @@ serve(async (req) => {
       deepgramURL.searchParams.set("punctuate", "true");
       deepgramURL.searchParams.set("diarize", "true"); // Speaker detection
       
-      // Audio format settings
-      deepgramURL.searchParams.set("encoding", "linear16");
-      deepgramURL.searchParams.set("sample_rate", "16000");
+      // Audio format settings - match browser MediaRecorder (Opus in WebM/OGG)
+      deepgramURL.searchParams.set("encoding", "opus");
       deepgramURL.searchParams.set("channels", "1");
       
       // Utterance detection (helps with final transcripts)
