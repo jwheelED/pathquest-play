@@ -30,9 +30,14 @@ export default function InstructorOrgOnboarding() {
       .eq("id", user.id)
       .single();
 
-    if (profile?.org_id && profile?.onboarded) {
+    if (profile?.onboarded) {
       navigate("/instructor/onboarding");
     }
+  };
+
+  const handleSkip = () => {
+    toast.info("Skipping organization setup");
+    navigate("/instructor/onboarding");
   };
 
   const handleJoinOrganization = async () => {
@@ -73,7 +78,7 @@ export default function InstructorOrgOnboarding() {
             Connect to Administrator
           </CardTitle>
           <CardDescription>
-            Enter the admin code provided by your administrator
+            Enter the admin code provided by your administrator, or skip to continue independently
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -90,17 +95,30 @@ export default function InstructorOrgOnboarding() {
               This code connects you to your administrator's organization
             </p>
           </div>
-          <Button
-            onClick={handleJoinOrganization}
-            disabled={loading || !orgCode.trim()}
-            className="w-full"
-          >
-            {loading ? "Joining..." : (
-              <>
-                Continue <ArrowRight className="w-4 h-4 ml-2" />
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={handleJoinOrganization}
+              disabled={loading || !orgCode.trim()}
+              className="w-full"
+            >
+              {loading ? "Joining..." : (
+                <>
+                  Join Organization <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleSkip}
+              disabled={loading}
+              variant="outline"
+              className="w-full"
+            >
+              Skip for now
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            You can connect to an administrator later from your dashboard
+          </p>
         </CardContent>
       </Card>
     </div>
