@@ -661,15 +661,15 @@ export const LectureCheckInResults = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="shadow-lg border-2">
+      <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <TrendingUp className="h-6 w-6 text-primary" />
               Live Lecture Check-In Results
             </CardTitle>
-            <CardDescription>Auto-graded student performance on lecture questions</CardDescription>
+            <CardDescription className="mt-1">Auto-graded student performance on lecture questions</CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
@@ -701,11 +701,11 @@ export const LectureCheckInResults = () => {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <Accordion type="single" collapsible className="space-y-2" defaultValue="group-0">
+      <CardContent className="pt-6">
+        <Accordion type="single" collapsible className="space-y-4" defaultValue="group-0">
           {groupedResults.map((group, groupIdx) => (
-            <AccordionItem key={groupIdx} value={`group-${groupIdx}`} className="border rounded-lg px-4">
-              <AccordionTrigger className="hover:no-underline">
+            <AccordionItem key={groupIdx} value={`group-${groupIdx}`} className="border-2 rounded-lg px-4 shadow-sm bg-card">
+              <AccordionTrigger className="hover:no-underline py-4">
                 <div className="flex items-center justify-between w-full pr-4">
                   <div className="flex items-center gap-3">
                     <Badge variant="outline">{new Date(group.timestamp).toLocaleString()}</Badge>
@@ -753,14 +753,14 @@ export const LectureCheckInResults = () => {
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-4">
+              <AccordionContent className="space-y-5 pt-5 pb-4">
                 {group.questions.map((question, qIdx) => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
                   const isOverridden = !!question.overriddenAnswer;
 
                   return (
-                    <div key={qIdx} className={`border rounded-lg p-4 space-y-3 ${isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
+                    <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card ${isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
                       {isOverridden && (
                         <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-400 text-sm">
                           <AlertTriangle className="h-4 w-4" />
@@ -827,7 +827,11 @@ export const LectureCheckInResults = () => {
                       </div>
 
                       {/* AI Summary Section */}
-                      <div className="my-3 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                      <div className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-lg shadow-sm">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          <h4 className="text-sm font-semibold">AI Insights</h4>
+                        </div>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
                             {questionSummaries[`${groupIdx}-${qIdx}`]?.loading ? (
@@ -873,9 +877,16 @@ export const LectureCheckInResults = () => {
                       </div>
 
                       {/* Toggle Analytics Button */}
-                      <div className="pt-2">
+                      <div className="pt-3 flex items-center justify-between border-t">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Visual Analytics</span>
+                          {showCharts[`${groupIdx}-${qIdx}`] && (
+                            <Badge variant="secondary" className="text-xs">Visible</Badge>
+                          )}
+                        </div>
                         <Button
-                          variant="ghost"
+                          variant={showCharts[`${groupIdx}-${qIdx}`] ? "secondary" : "outline"}
                           size="sm"
                           onClick={() => setShowCharts(prev => ({
                             ...prev,
@@ -883,8 +894,7 @@ export const LectureCheckInResults = () => {
                           }))}
                           className="gap-2"
                         >
-                          <TrendingUp className="h-4 w-4" />
-                          {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide' : 'Show'} Analytics
+                          {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
                         </Button>
                       </div>
 
@@ -899,7 +909,7 @@ export const LectureCheckInResults = () => {
                       )}
 
                       {/* Question Quality Rating */}
-                      <div className="mt-3 pt-3 border-t flex items-center justify-between bg-muted/20 rounded-lg p-3">
+                      <div className="pt-3 border-t flex items-center justify-between bg-muted/30 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground">Was this AI-generated question relevant?</p>
                         <div className="flex gap-2">
                           <Button
@@ -923,8 +933,11 @@ export const LectureCheckInResults = () => {
                         </div>
                       </div>
 
-                      <div className="border-t pt-3">
-                        <p className="text-sm font-medium mb-2">Student Responses:</p>
+                      <div className="border-t pt-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <p className="text-sm font-semibold">Student Responses</p>
+                          <Badge variant="outline" className="text-xs">{stats.completed} total</Badge>
+                        </div>
                         <div className="space-y-2">
                           {(() => {
                             // Filter assignments to only those containing this specific question
