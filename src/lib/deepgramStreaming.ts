@@ -81,6 +81,7 @@ export class DeepgramStreamingClient {
         try {
           const data = JSON.parse(event.data);
           
+          // Handle control messages from relay
           if (data.type === "ready") {
             console.log("✅ Deepgram ready, starting audio capture");
             this.isDeepgramReady = true;
@@ -101,8 +102,14 @@ export class DeepgramStreamingClient {
             console.log("🔌 Deepgram closed:", data.message);
             this.config.onClose?.();
           } else {
-            // Transcript data from Deepgram
-            this.handleTranscript(data);
+            // Check if this is transcript data from Deepgram
+            // Deepgram Results events have "channel" or "is_final" fields
+            if (data.channel || data.is_final !== undefined) {
+              this.handleTranscript(data);
+            } else if (data.type) {
+              // Log other Deepgram events for debugging
+              console.log("📡 Deepgram event:", data.type);
+            }
           }
         } catch (error) {
           console.error("❌ Error parsing WebSocket message:", error);
