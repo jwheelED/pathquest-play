@@ -11,7 +11,6 @@ import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
 import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
-import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import { getOrgId } from "@/hooks/useOrgId";
@@ -2536,11 +2535,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* System Health Check */}
-          {!isRecording && (
-            <SystemHealthCheck />
-          )}
-          
           {/* Error History Panel */}
           {errorHistory.length > 0 && (
             <ErrorHistoryPanel
