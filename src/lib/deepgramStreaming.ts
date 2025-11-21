@@ -5,8 +5,8 @@ export interface DeepgramTranscript {
   text: string;
   isFinal: boolean;
   confidence: number;
-  speakers: Array<{ 
-    id: number; 
+  speakers: Array<{
+    id: number;
     text: string;
     confidence: number;
   }>;
@@ -39,9 +39,7 @@ export class DeepgramStreamingClient {
   private reconnectDelay: number = 2000;
   private audioChunksQueue: Blob[] = [];
   private isDeepgramReady: boolean = false;
-  private connectionStartTime: number = 0;
-  private lastActivityTime: number = 0;
-  private activityMonitor: number | null = null;
+  private shouldReconnect: boolean = true;
 
   constructor(private config: DeepgramStreamingConfig) {}
 
@@ -51,13 +49,15 @@ export class DeepgramStreamingClient {
       return;
     }
 
+    // Each fresh connect indicates we should try to keep the stream alive
+    this.shouldReconnect = true;
     this.isConnecting = true;
 
     try {
       // Validate API key before attempting to connect
       console.log("🔍 Validating Deepgram API key...");
       const validation = await validateDeepgramApiKey();
-      
+
       if (!validation.valid) {
         const errorMessage = getValidationErrorMessage(validation);
         console.error("❌ API key validation failed:", errorMessage);
@@ -65,7 +65,7 @@ export class DeepgramStreamingClient {
         this.config.onError(errorMessage);
         return;
       }
-      
+
       console.log("✅ Deepgram API key validated successfully");
 
       // Connect to relay edge function via WebSocket
@@ -78,31 +78,25 @@ export class DeepgramStreamingClient {
         console.log("✅ WebSocket connected to relay");
         this.isConnecting = false;
         this.reconnectAttempts = 0;
-        this.connectionStartTime = Date.now();
-        this.lastActivityTime = Date.now();
-        
-        // Monitor connection activity
-        this.startActivityMonitor();
       };
 
       this.ws.onmessage = (event) => {
         try {
-          this.lastActivityTime = Date.now();
           const data = JSON.parse(event.data);
-          
+
           // Handle control messages from relay
           if (data.type === "ready") {
             console.log("✅ Deepgram ready, starting audio capture");
             this.isDeepgramReady = true;
             this.startAudioCapture();
             this.config.onReady?.();
-            
+
             // Flush any queued audio chunks
             this.flushAudioQueue();
           } else if (data.type === "error") {
             console.error("❌ Deepgram error:", data.message);
             this.config.onError(data.message);
-            
+
             // Attempt reconnect on certain errors
             if (data.canRetry) {
               this.handleReconnect();
@@ -129,25 +123,33 @@ export class DeepgramStreamingClient {
         console.error("❌ WebSocket error:", error);
         this.isConnecting = false;
         this.config.onError("WebSocket connection error");
+
+        // Proactively close and attempt a reconnect for transient WebSocket failures
+        if (this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+          try {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+              this.ws.close(1011, "Client-side WebSocket error");
+            }
+          } catch (closeError) {
+            console.error("❌ Error while closing WebSocket after error:", closeError);
+          }
+          this.handleReconnect();
+        }
       };
 
       this.ws.onclose = (event) => {
-        const duration = this.connectionStartTime > 0 ? (Date.now() - this.connectionStartTime) / 1000 : 0;
-        console.log(`🔌 WebSocket closed after ${duration.toFixed(1)}s: code=${event.code}, reason="${event.reason}"`);
-        
-        this.stopActivityMonitor();
+        console.log("🔌 WebSocket closed:", event.code, event.reason);
         this.isConnecting = false;
         this.isDeepgramReady = false;
         this.stopAudioCapture();
 
-        // Attempt reconnect if not a clean close
-        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+        // Attempt reconnect on any unexpected close while we still want streaming
+        if (this.shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
           this.handleReconnect();
         } else {
           this.config.onClose?.();
         }
       };
-
     } catch (error) {
       this.isConnecting = false;
       this.config.onError(error instanceof Error ? error.message : "Connection failed");
@@ -171,13 +173,9 @@ export class DeepgramStreamingClient {
       console.log("🎙️ Microphone access granted");
 
       // Create MediaRecorder with appropriate MIME type
-      const mimeTypes = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-      ];
+      const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
 
-      let selectedMimeType = '';
+      let selectedMimeType = "";
       for (const mimeType of mimeTypes) {
         if (MediaRecorder.isTypeSupported(mimeType)) {
           selectedMimeType = mimeType;
@@ -216,17 +214,16 @@ export class DeepgramStreamingClient {
       // Send audio in 250ms chunks for real-time streaming
       this.mediaRecorder.start(250);
       console.log("🎙️ Audio capture started (250ms chunks)");
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("❌ Failed to start audio capture:", errorMessage);
-      
+
       if (errorMessage.includes("Permission denied") || errorMessage.includes("NotAllowedError")) {
         this.config.onError("Microphone access denied. Please allow microphone permissions.");
       } else {
         this.config.onError("Failed to access microphone: " + errorMessage);
       }
-      
+
       throw error;
     }
   }
@@ -234,13 +231,13 @@ export class DeepgramStreamingClient {
   private flushAudioQueue(): void {
     if (this.audioChunksQueue.length > 0) {
       console.log(`📤 Flushing ${this.audioChunksQueue.length} queued audio chunks`);
-      
-      this.audioChunksQueue.forEach(chunk => {
+
+      this.audioChunksQueue.forEach((chunk) => {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(chunk);
         }
       });
-      
+
       this.audioChunksQueue = [];
     }
   }
@@ -261,16 +258,16 @@ export class DeepgramStreamingClient {
 
     // Extract speaker information from words
     const words: DeepgramWord[] = alternative.words || [];
-    const speakerMap = new Map<number, { words: string[], confidence: number[] }>();
-    
+    const speakerMap = new Map<number, { words: string[]; confidence: number[] }>();
+
     words.forEach((word) => {
       const speaker = word.speaker ?? 0;
       const wordText = word.punctuated_word || word.word;
-      
+
       if (!speakerMap.has(speaker)) {
         speakerMap.set(speaker, { words: [], confidence: [] });
       }
-      
+
       const speakerData = speakerMap.get(speaker)!;
       speakerData.words.push(wordText);
       speakerData.confidence.push(word.confidence);
@@ -285,12 +282,13 @@ export class DeepgramStreamingClient {
 
     // Log transcript for debugging
     const logPrefix = isFinal ? "📝 FINAL" : "📝 interim";
-    const speakerInfo = speakers.length > 1 
-      ? ` [${speakers.length} speakers]` 
-      : speakers[0]?.id !== undefined 
-        ? ` [Speaker ${speakers[0].id}]` 
-        : "";
-    
+    const speakerInfo =
+      speakers.length > 1
+        ? ` [${speakers.length} speakers]`
+        : speakers[0]?.id !== undefined
+          ? ` [Speaker ${speakers[0].id}]`
+          : "";
+
     console.log(`${logPrefix}${speakerInfo}:`, transcript.substring(0, 100));
 
     // Call the transcript handler
@@ -311,11 +309,11 @@ export class DeepgramStreamingClient {
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    
+
     console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
     setTimeout(() => {
-      this.connect().catch(error => {
+      this.connect().catch((error) => {
         console.error("❌ Reconnection failed:", error);
       });
     }, delay);
@@ -331,7 +329,7 @@ export class DeepgramStreamingClient {
     }
 
     if (this.stream) {
-      this.stream.getTracks().forEach(track => {
+      this.stream.getTracks().forEach((track) => {
         track.stop();
         track.enabled = false;
       });
@@ -343,35 +341,11 @@ export class DeepgramStreamingClient {
     this.audioChunksQueue = [];
   }
 
-  private startActivityMonitor(): void {
-    this.stopActivityMonitor();
-    
-    // Check connection health every 10 seconds
-    this.activityMonitor = window.setInterval(() => {
-      const now = Date.now();
-      const timeSinceActivity = now - this.lastActivityTime;
-      const timeSinceStart = now - this.connectionStartTime;
-      
-      console.log(`📊 Connection health: ${(timeSinceStart / 1000).toFixed(0)}s total, ${(timeSinceActivity / 1000).toFixed(0)}s since activity`);
-      
-      // Warn if no activity for 30 seconds
-      if (timeSinceActivity > 30000) {
-        console.warn(`⚠️ No WebSocket activity for ${(timeSinceActivity / 1000).toFixed(0)}s`);
-      }
-    }, 10000);
-  }
-
-  private stopActivityMonitor(): void {
-    if (this.activityMonitor !== null) {
-      window.clearInterval(this.activityMonitor);
-      this.activityMonitor = null;
-    }
-  }
-
   disconnect(): void {
     console.log("🔌 Disconnecting streaming client");
-    
-    this.stopActivityMonitor();
+
+    // Mark this as an intentional shutdown so we don't auto-reconnect
+    this.shouldReconnect = false;
     this.stopAudioCapture();
     this.isDeepgramReady = false;
 
@@ -397,7 +371,7 @@ export class DeepgramStreamingClient {
 
   getConnectionState(): string {
     if (!this.ws) return "disconnected";
-    
+
     switch (this.ws.readyState) {
       case WebSocket.CONNECTING:
         return "connecting";
