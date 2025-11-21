@@ -1604,8 +1604,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           elapsed: `${(elapsed / 1000).toFixed(0)}s`,
           intervalMs: `${(intervalMs / 1000).toFixed(0)}s`,
           transcriptLength: intervalTranscriptRef.current.length,
+          transcriptWords: intervalTranscriptRef.current.split(/\s+/).length,
           lastAutoQuestionTime: new Date(lastAutoQuestionTime).toLocaleTimeString(),
+          intervalStartTime: new Date(intervalStartTimeRef.current).toLocaleTimeString(),
           now: new Date(now).toLocaleTimeString(),
+          autoQuestionEnabled,
+          isSendingQuestion,
         });
 
         // Call async function with enhanced error handling and retry logic
@@ -1665,6 +1669,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       clearInterval(checkInterval);
     };
   }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, retryAttempts]);
+
+  // Initialize timer when auto-questions are toggled on during recording
+  useEffect(() => {
+    if (autoQuestionEnabled && isRecording && lastAutoQuestionTime === 0) {
+      const now = Date.now();
+      setLastAutoQuestionTime(now);
+      intervalStartTimeRef.current = now;
+      setAutoQuestionCount(0);
+      console.log("⏰ Auto-question timer started mid-recording, first question in", autoQuestionInterval, "minutes");
+    }
+  }, [autoQuestionEnabled, isRecording, lastAutoQuestionTime, autoQuestionInterval]);
 
   // Reset auto-question state when recording stops
   useEffect(() => {
@@ -1777,6 +1792,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setIsCircuitOpen(false);
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
+
+      // Initialize auto-question timer for this session
+      if (autoQuestionEnabled) {
+        const now = Date.now();
+        setLastAutoQuestionTime(now);
+        intervalStartTimeRef.current = now;
+        setAutoQuestionCount(0);
+        console.log("⏰ Auto-question timer initialized, first question in", autoQuestionInterval, "minutes");
+      }
 
       // Start chunk-based recording cycle
       startRecordingCycle();
