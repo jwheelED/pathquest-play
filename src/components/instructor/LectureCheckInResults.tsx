@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -694,6 +694,10 @@ export const LectureCheckInResults = () => {
             <CardDescription className="mt-1">Auto-graded student performance on lecture questions</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Button onClick={fetchResults} variant="outline" size="sm" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
             <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
               <Download className="h-4 w-4" />
               Export CSV
