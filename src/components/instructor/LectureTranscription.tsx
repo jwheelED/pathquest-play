@@ -213,7 +213,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         if (profile) {
           setAutoQuestionEnabled(profile.auto_question_enabled || false);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
-          setAutoQuestionForceSend(profile.auto_question_force_send || false);
+          // Default to true if not explicitly set to false
+          setAutoQuestionForceSend(profile.auto_question_force_send !== false);
         }
 
         // Fetch today's question count
@@ -1744,23 +1745,71 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (fullText.length > 0) {
         console.log("📝 FINAL transcript:", fullText);
 
-        // Add to transcript buffer
+        // Add to global transcript buffer for voice commands
         transcriptBufferRef.current += fullText + " ";
         setTranscriptChunks((prev) => [...prev, fullText]);
         setLastTranscript(fullText);
 
-        // Buffer management - trim if getting too large
+        // === Wire into interval buffer for auto-questions ===
+        if (intervalTranscriptRef.current) {
+          intervalTranscriptRef.current += " " + fullText;
+        } else {
+          intervalTranscriptRef.current = fullText;
+        }
+
+        // Hard cap words in interval buffer
+        const MAX_TRANSCRIPT_WORDS = autoQuestionInterval * 200; // 200 words/min
+        const words = intervalTranscriptRef.current.split(/\s+/);
+        if (words.length > MAX_TRANSCRIPT_WORDS) {
+          const trimmedWords = words.slice(-Math.floor(MAX_TRANSCRIPT_WORDS * 0.75));
+          intervalTranscriptRef.current = trimmedWords.join(" ");
+          console.log(
+            `⚠️ Interval transcript trimmed from ${words.length} → ${trimmedWords.length} words`
+          );
+        }
+
+        // Update length for Auto-Question Monitor UI
+        setIntervalTranscriptLength(intervalTranscriptRef.current.length);
+
+        // Quality score based on interval buffer and actual elapsed time
+        try {
+          const actualElapsedSeconds =
+            intervalStartTimeRef.current > 0
+              ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
+              : autoQuestionInterval * 60;
+
+          // Sliding window for quality analysis
+          const expectedWords = autoQuestionInterval * 150;
+          const currentWordCount = intervalTranscriptRef.current.split(/\s+/).length;
+          let transcriptToAnalyze = intervalTranscriptRef.current;
+
+          if (currentWordCount > expectedWords * 2) {
+            const recentWords = intervalTranscriptRef.current.split(/\s+/).slice(-expectedWords);
+            transcriptToAnalyze = recentWords.join(" ");
+          }
+
+          const qualityMetrics = analyzeContentQuality(transcriptToAnalyze, actualElapsedSeconds);
+          // Keep contentQualityScore in 0-1 range (not percent)
+          setContentQualityScore(qualityMetrics.contentDensity);
+
+          console.log("📊 Interval quality updated:", {
+            length: intervalTranscriptRef.current.length,
+            wordCount: qualityMetrics.wordCount,
+            density: (qualityMetrics.contentDensity * 100).toFixed(1) + "%",
+            wpm: qualityMetrics.wordsPerMinute.toFixed(0),
+          });
+        } catch (err) {
+          console.error("❌ Quality calculation error (streaming):", err);
+        }
+
+        // Buffer management for global transcript - trim if getting too large
         if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
-          console.log("🗑️ Trimming transcript buffer");
+          console.log("🗑️ Trimming global transcript buffer");
           transcriptBufferRef.current = transcriptBufferRef.current.slice(-KEEP_RECENT_SIZE);
         }
 
         // Check for voice command in final transcript
         checkForVoiceCommand(fullText, transcriptChunks.length);
-
-        // Update content quality score
-        const quality = analyzeContentQuality(transcriptBufferRef.current, 60);
-        setContentQualityScore(quality.contentDensity * 100);
       }
 
       // Clear interim display
