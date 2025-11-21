@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 export const AutoQuestionSettings = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [interval, setInterval] = useState<number>(15);
-  const [forceSend, setForceSend] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const { toast } = useToast();
@@ -28,7 +27,7 @@ export const AutoQuestionSettings = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('auto_question_enabled, auto_question_interval, auto_question_force_send')
+        .select('auto_question_enabled, auto_question_interval, auto_question_force_send, daily_question_limit')
         .eq('id', user.id)
         .single();
 
@@ -37,7 +36,21 @@ export const AutoQuestionSettings = () => {
       if (data) {
         setIsEnabled(data.auto_question_enabled || false);
         setInterval(data.auto_question_interval || 15);
-        setForceSend(data.auto_question_force_send || false);
+        
+        // Set force_send to true if not already set, and daily_question_limit to 300 if not set
+        if (data.auto_question_force_send === null || data.auto_question_force_send === undefined) {
+          await supabase
+            .from('profiles')
+            .update({ auto_question_force_send: true })
+            .eq('id', user.id);
+        }
+        
+        if (data.daily_question_limit === null || data.daily_question_limit === undefined) {
+          await supabase
+            .from('profiles')
+            .update({ daily_question_limit: 300 })
+            .eq('id', user.id);
+        }
       }
     } catch (error) {
       console.error('Error fetching auto-question settings:', error);
@@ -55,7 +68,7 @@ export const AutoQuestionSettings = () => {
         .update({
           auto_question_enabled: isEnabled,
           auto_question_interval: interval,
-          auto_question_force_send: forceSend
+          auto_question_force_send: true
         })
         .eq('id', user.id);
 
@@ -88,11 +101,6 @@ export const AutoQuestionSettings = () => {
 
   const handleIntervalChange = (value: string) => {
     setInterval(parseInt(value));
-    setHasChanges(true);
-  };
-
-  const handleForceSendToggle = (checked: boolean) => {
-    setForceSend(checked);
     setHasChanges(true);
   };
 
@@ -145,7 +153,7 @@ export const AutoQuestionSettings = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="5">Every 5 minutes (experimental - may skip if quality is low)</SelectItem>
+                  <SelectItem value="5">Every 5 minutes</SelectItem>
                   <SelectItem value="10">Every 10 minutes</SelectItem>
                   <SelectItem value="15">Every 15 minutes (recommended)</SelectItem>
                   <SelectItem value="20">Every 20 minutes</SelectItem>
@@ -155,32 +163,6 @@ export const AutoQuestionSettings = () => {
               <p className="text-xs text-muted-foreground">
                 Questions will be generated from the content covered in each interval
               </p>
-            </div>
-
-            {/* Force Send Toggle */}
-            <div className="space-y-3 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="force-send-toggle" className="text-base">
-                    Force Send Mode
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Send questions regardless of content quality
-                  </p>
-                </div>
-                <Switch
-                  id="force-send-toggle"
-                  checked={forceSend}
-                  onCheckedChange={handleForceSendToggle}
-                />
-              </div>
-              {forceSend && (
-                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                  <p className="text-xs text-amber-900 dark:text-amber-200">
-                    ⚠️ Questions will be sent at every interval, even if content quality is low. Minimal safeguards remain to prevent completely broken questions.
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Info Box */}

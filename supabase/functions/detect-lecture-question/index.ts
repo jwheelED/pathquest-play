@@ -162,7 +162,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-flash-lite',
         messages: [
           { role: 'system', content: INTENT_DETECTION_PROMPT },
           { role: 'user', content: `RECENT SPEECH (last 20-60 seconds):\n"${recentChunk}"\n\nBROADER CONTEXT (last 90 seconds):\n"${context}"\n\nAnalyze if the professor is asking a REAL question for students to answer. Consider the full context to determine if they answer their own question.` }
