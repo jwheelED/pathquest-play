@@ -1702,6 +1702,27 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         setTranscriptChunks(prev => [...prev, fullText]);
         setLastTranscript(fullText);
         
+        // CRITICAL: Also accumulate in interval transcript for auto-questions
+        if (intervalTranscriptRef.current) {
+          intervalTranscriptRef.current += " " + fullText;
+        } else {
+          intervalTranscriptRef.current = fullText;
+        }
+        
+        // Hard cap to prevent runaway transcript growth
+        const MAX_TRANSCRIPT_LENGTH = autoQuestionInterval * 200; // 200 words per minute max
+        const currentWords = intervalTranscriptRef.current.split(/\s+/);
+        
+        if (currentWords.length > MAX_TRANSCRIPT_LENGTH) {
+          // Force trim to most recent content
+          const trimmedWords = currentWords.slice(-Math.floor(MAX_TRANSCRIPT_LENGTH * 0.75));
+          intervalTranscriptRef.current = trimmedWords.join(' ');
+          console.log(`⚠️ Transcript exceeded max length, trimmed from ${currentWords.length} to ${trimmedWords.length} words`);
+        }
+        
+        // Update interval transcript length state for UI
+        setIntervalTranscriptLength(intervalTranscriptRef.current.length);
+        
         // Buffer management - trim if getting too large
         if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
           console.log("🗑️ Trimming transcript buffer");
@@ -1711,9 +1732,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Check for voice command in final transcript
         checkForVoiceCommand(fullText, transcriptChunks.length);
         
-        // Update content quality score
-        const quality = analyzeContentQuality(transcriptBufferRef.current, 60);
+        // Calculate and update quality score for UI display with ACTUAL elapsed time
+        const actualElapsedSeconds = intervalStartTimeRef.current > 0 
+          ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
+          : autoQuestionInterval * 60;
+        const quality = analyzeContentQuality(intervalTranscriptRef.current, actualElapsedSeconds);
         setContentQualityScore(quality.contentDensity * 100);
+        
+        console.log(`📊 Interval transcript: ${intervalTranscriptRef.current.length} chars, quality: ${(quality.contentDensity * 100).toFixed(1)}%`);
       }
       
       // Clear interim display

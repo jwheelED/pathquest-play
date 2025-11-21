@@ -39,6 +39,9 @@ export class DeepgramStreamingClient {
   private reconnectDelay: number = 2000;
   private audioChunksQueue: Blob[] = [];
   private isDeepgramReady: boolean = false;
+  private connectionStartTime: number = 0;
+  private lastActivityTime: number = 0;
+  private activityMonitor: number | null = null;
 
   constructor(private config: DeepgramStreamingConfig) {}
 
@@ -75,10 +78,16 @@ export class DeepgramStreamingClient {
         console.log("✅ WebSocket connected to relay");
         this.isConnecting = false;
         this.reconnectAttempts = 0;
+        this.connectionStartTime = Date.now();
+        this.lastActivityTime = Date.now();
+        
+        // Monitor connection activity
+        this.startActivityMonitor();
       };
 
       this.ws.onmessage = (event) => {
         try {
+          this.lastActivityTime = Date.now();
           const data = JSON.parse(event.data);
           
           // Handle control messages from relay
@@ -123,7 +132,10 @@ export class DeepgramStreamingClient {
       };
 
       this.ws.onclose = (event) => {
-        console.log("🔌 WebSocket closed:", event.code, event.reason);
+        const duration = this.connectionStartTime > 0 ? (Date.now() - this.connectionStartTime) / 1000 : 0;
+        console.log(`🔌 WebSocket closed after ${duration.toFixed(1)}s: code=${event.code}, reason="${event.reason}"`);
+        
+        this.stopActivityMonitor();
         this.isConnecting = false;
         this.isDeepgramReady = false;
         this.stopAudioCapture();
@@ -331,9 +343,35 @@ export class DeepgramStreamingClient {
     this.audioChunksQueue = [];
   }
 
+  private startActivityMonitor(): void {
+    this.stopActivityMonitor();
+    
+    // Check connection health every 10 seconds
+    this.activityMonitor = window.setInterval(() => {
+      const now = Date.now();
+      const timeSinceActivity = now - this.lastActivityTime;
+      const timeSinceStart = now - this.connectionStartTime;
+      
+      console.log(`📊 Connection health: ${(timeSinceStart / 1000).toFixed(0)}s total, ${(timeSinceActivity / 1000).toFixed(0)}s since activity`);
+      
+      // Warn if no activity for 30 seconds
+      if (timeSinceActivity > 30000) {
+        console.warn(`⚠️ No WebSocket activity for ${(timeSinceActivity / 1000).toFixed(0)}s`);
+      }
+    }, 10000);
+  }
+
+  private stopActivityMonitor(): void {
+    if (this.activityMonitor !== null) {
+      window.clearInterval(this.activityMonitor);
+      this.activityMonitor = null;
+    }
+  }
+
   disconnect(): void {
     console.log("🔌 Disconnecting streaming client");
     
+    this.stopActivityMonitor();
     this.stopAudioCapture();
     this.isDeepgramReady = false;
 
