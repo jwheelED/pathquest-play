@@ -27,7 +27,6 @@ import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import { getOrgId } from "@/hooks/useOrgId";
-import { DeepgramStreamingClient, type DeepgramTranscript } from "@/lib/deepgramStreaming";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -128,10 +127,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [lastAutoQuestionError, setLastAutoQuestionError] = useState<string | null>(null);
   const [lastAutoQuestionErrorTime, setLastAutoQuestionErrorTime] = useState<Date | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
-
-  // Streaming client state
-  const [streamingClient, setStreamingClient] = useState<DeepgramStreamingClient | null>(null);
-  const [interimTranscript, setInterimTranscript] = useState<string>("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -1737,146 +1732,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, []);
 
   // Handle streaming transcripts from Deepgram
-  const handleStreamingTranscript = (data: DeepgramTranscript) => {
-    if (data.isFinal) {
-      // Final transcript - add to buffer and check for voice commands
-      const fullText = data.text.trim();
-
-      if (fullText.length > 0) {
-        console.log("📝 FINAL transcript:", fullText);
-
-        // Add to global transcript buffer for voice commands
-        transcriptBufferRef.current += fullText + " ";
-        setTranscriptChunks((prev) => [...prev, fullText]);
-        setLastTranscript(fullText);
-
-        // === Wire into interval buffer for auto-questions ===
-        if (intervalTranscriptRef.current) {
-          intervalTranscriptRef.current += " " + fullText;
-        } else {
-          intervalTranscriptRef.current = fullText;
-        }
-
-        // Hard cap words in interval buffer
-        const MAX_TRANSCRIPT_WORDS = autoQuestionInterval * 200; // 200 words/min
-        const words = intervalTranscriptRef.current.split(/\s+/);
-        if (words.length > MAX_TRANSCRIPT_WORDS) {
-          const trimmedWords = words.slice(-Math.floor(MAX_TRANSCRIPT_WORDS * 0.75));
-          intervalTranscriptRef.current = trimmedWords.join(" ");
-          console.log(
-            `⚠️ Interval transcript trimmed from ${words.length} → ${trimmedWords.length} words`
-          );
-        }
-
-        // Update length for Auto-Question Monitor UI
-        setIntervalTranscriptLength(intervalTranscriptRef.current.length);
-
-        // Quality score based on interval buffer and actual elapsed time
-        try {
-          const actualElapsedSeconds =
-            intervalStartTimeRef.current > 0
-              ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
-              : autoQuestionInterval * 60;
-
-          // Sliding window for quality analysis
-          const expectedWords = autoQuestionInterval * 150;
-          const currentWordCount = intervalTranscriptRef.current.split(/\s+/).length;
-          let transcriptToAnalyze = intervalTranscriptRef.current;
-
-          if (currentWordCount > expectedWords * 2) {
-            const recentWords = intervalTranscriptRef.current.split(/\s+/).slice(-expectedWords);
-            transcriptToAnalyze = recentWords.join(" ");
-          }
-
-          const qualityMetrics = analyzeContentQuality(transcriptToAnalyze, actualElapsedSeconds);
-          // Keep contentQualityScore in 0-1 range (not percent)
-          setContentQualityScore(qualityMetrics.contentDensity);
-
-          console.log("📊 Interval quality updated:", {
-            length: intervalTranscriptRef.current.length,
-            wordCount: qualityMetrics.wordCount,
-            density: (qualityMetrics.contentDensity * 100).toFixed(1) + "%",
-            wpm: qualityMetrics.wordsPerMinute.toFixed(0),
-          });
-        } catch (err) {
-          console.error("❌ Quality calculation error (streaming):", err);
-        }
-
-        // Buffer management for global transcript - trim if getting too large
-        if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
-          console.log("🗑️ Trimming global transcript buffer");
-          transcriptBufferRef.current = transcriptBufferRef.current.slice(-KEEP_RECENT_SIZE);
-        }
-
-        // Check for voice command in final transcript
-        checkForVoiceCommand(fullText, transcriptChunks.length);
-      }
-
-      // Clear interim display
-      setInterimTranscript("");
-    } else {
-      // Interim transcript - show for better UX
-      setInterimTranscript(data.text);
-    }
-  };
-
-  // Handle streaming errors from the Deepgram WebSocket client
-  const handleStreamingError = (error: string) => {
-    console.error("❌ Streaming error:", error);
-
-    const normalized = error.toLowerCase();
-    const isWebSocketError = normalized.includes("websocket") || normalized.includes("connection error");
-
-    // Track in error history for the debug panel
-    setErrorHistory((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        timestamp: new Date(),
-        severity: "critical",
-        category: "transcription",
-        message: error,
-        details: "Real-time transcription error",
-        retryable: true,
-      },
-    ]);
-
-    // Use functional update so circuit-breaker logic uses the fresh counter
-    setFailureCount((prev) => {
-      const next = prev + 1;
-
-      // For transient WebSocket hiccups, show a softer message while auto-reconnect runs
-      if (isWebSocketError && next < MAX_CONSECUTIVE_FAILURES) {
-        toast({
-          title: "Transcription connection interrupted",
-          description: "Attempting to reconnect to the transcription service...",
-        });
-      } else {
-        // Non-WebSocket or repeated failures are treated as hard errors
-        toast({
-          title: "Transcription Error",
-          description: error,
-          variant: "destructive",
-        });
-      }
-
-      // Circuit breaker logic – after too many consecutive failures, pause recording
-      if (next >= MAX_CONSECUTIVE_FAILURES) {
-        const backoffTime = CIRCUIT_BREAKER_BACKOFF[Math.min(next - 1, CIRCUIT_BREAKER_BACKOFF.length - 1)];
-        setIsCircuitOpen(true);
-        setCircuitBreakerRetryAt(Date.now() + backoffTime);
-
-        toast({
-          title: "Recording paused",
-          description: "Multiple transcription errors detected. System will retry automatically.",
-          variant: "destructive",
-        });
-      }
-
-      return next;
-    });
-  };
-
   const startRecording = async () => {
     try {
       // Check circuit breaker
@@ -1889,55 +1744,47 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return;
       }
 
-      // Check quota circuit breaker
       if (quotaErrorActive) {
         toast({
-          title: "API Quota Exhausted",
-          description: `Please wait ${Math.ceil(quotaCircuitBreakerCountdown / 60)} more minutes or check your OpenAI billing.`,
+          title: "⏳ Quota Paused",
+          description: "Recording is temporarily paused due to quota. See banner for details.",
           variant: "destructive",
         });
         return;
       }
 
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      streamRef.current = stream;
+      isRecordingRef.current = true;
+      setIsRecording(true);
+
       // Reset state for fresh recording session
       hasTriggeredRef.current = false;
       setTranscriptChunks([]);
       transcriptBufferRef.current = "";
+      intervalTranscriptRef.current = "";
       setFailureCount(0);
       setIsCircuitOpen(false);
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
-      setInterimTranscript("");
 
-      // Create streaming client
-      const client = new DeepgramStreamingClient({
-        projectRef: "otsmjgrhyteyvpufkwdh",
-        onTranscript: handleStreamingTranscript,
-        onError: handleStreamingError,
-        onReady: () => {
-          console.log("✅ Real-time transcription active");
-          toast({
-            title: "🎙️ Real-time transcription started",
-            description: "AI will detect questions as you speak",
-          });
-        },
-        onClose: () => {
-          console.log("🔌 Transcription service disconnected");
-          if (isRecording) {
-            toast({
-              title: "Connection lost",
-              description: "Transcription service disconnected",
-              variant: "destructive",
-            });
-            stopRecording();
-          }
-        },
+      // Start chunk-based recording cycle
+      startRecordingCycle();
+
+      toast({
+        title: "🎙️ Recording started",
+        description: "Transcripts will appear every 8 seconds",
       });
-
-      await client.connect();
-      setStreamingClient(client);
-      isRecordingRef.current = true;
-      setIsRecording(true);
     } catch (error) {
       console.error("Error starting recording:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to start recording";
@@ -2062,16 +1909,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const stopRecording = () => {
     isRecordingRef.current = false;
     setIsRecording(false);
-    setInterimTranscript("");
 
-    // Disconnect streaming client
-    if (streamingClient) {
-      streamingClient.disconnect();
-      setStreamingClient(null);
-      console.log("🛑 Streaming client disconnected");
-    }
-
-    // Legacy cleanup (for backwards compatibility)
+    // Clean up recording interval
     if (recordingIntervalRef.current) {
       clearTimeout(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
@@ -3036,12 +2875,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                         <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
                       </div>
                     ))}
-                    {interimTranscript && (
-                      <div className="border rounded-lg p-2.5 bg-primary/5 border-primary/20 animate-pulse">
-                        <p className="text-xs font-medium text-primary mb-1">🎙️ Live (interim)</p>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">{interimTranscript}</p>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
