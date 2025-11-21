@@ -45,6 +45,7 @@ export class DeepgramStreamingClient {
   private connectionStartTime: number = 0;
   private connectionDurationLimit: number = 60000; // 60 seconds - safely before edge function timeout
   private proactiveReconnectTimer: number | null = null;
+  private isProactiveReconnect: boolean = false;
 
   constructor(private config: DeepgramStreamingConfig) {}
 
@@ -165,6 +166,12 @@ export class DeepgramStreamingClient {
         if (this.proactiveReconnectTimer !== null) {
           clearInterval(this.proactiveReconnectTimer);
           this.proactiveReconnectTimer = null;
+        }
+        
+        // Skip audio capture cleanup during proactive reconnect
+        if (this.isProactiveReconnect) {
+          console.log("ℹ️ WebSocket closed as part of proactive reconnect, keeping audio capture alive");
+          return;
         }
         
         this.stopAudioCapture();
@@ -339,6 +346,9 @@ export class DeepgramStreamingClient {
     const currentAttempts = this.reconnectAttempts;
     this.reconnectAttempts = 0;
     
+    // Mark that this close is intentional and part of proactive flow
+    this.isProactiveReconnect = true;
+    
     // Close current connection gracefully (but keep audio recording active)
     if (this.ws?.readyState === WebSocket.OPEN) {
       try {
@@ -361,6 +371,9 @@ export class DeepgramStreamingClient {
       // Restore attempt counter if reconnection fails
       this.reconnectAttempts = currentAttempts;
       this.handleReconnect();
+    } finally {
+      // Once new connection is up (or retries are scheduled), clear the flag
+      this.isProactiveReconnect = false;
     }
   }
 
