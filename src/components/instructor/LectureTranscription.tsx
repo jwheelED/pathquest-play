@@ -2,7 +2,19 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Radio, Loader2, AlertCircle, Zap, ChevronDown, ChevronUp, Clock, Sparkles, Star } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Radio,
+  Loader2,
+  AlertCircle,
+  Zap,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +23,7 @@ import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
 import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
+import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import { getOrgId } from "@/hooks/useOrgId";
@@ -48,7 +61,7 @@ const QUOTA_PAUSE_DURATION = 5 * 60 * 1000; // 5 minutes pause
 export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
   // Helper function to safely extract displayable text from question_text (string or object)
   const getQuestionPreview = (questionText: any, maxLength: number = 60): string => {
-    if (typeof questionText === 'string') {
+    if (typeof questionText === "string") {
       return questionText.substring(0, maxLength);
     }
     // For coding questions (object format)
@@ -58,7 +71,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (questionText?.problemStatement) {
       return questionText.problemStatement.substring(0, maxLength);
     }
-    return 'Question';
+    return "Question";
   };
 
   // Proactive token refresh
@@ -96,30 +109,30 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     questionsSent: 0,
     questionsSkipped: 0,
     averageQuality: 0,
-    skipReasons: []
+    skipReasons: [],
   });
   const [quotaErrorActive, setQuotaErrorActive] = useState(false);
   const [quotaConsecutiveErrors, setQuotaConsecutiveErrors] = useState(0);
   const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
   const [quotaCircuitBreakerCountdown, setQuotaCircuitBreakerCountdown] = useState<number>(0);
-  
+
   // Error history tracking
   const [errorHistory, setErrorHistory] = useState<ErrorRecord[]>([]);
-  
+
   // Extraction error dialog
   const [showExtractionDialog, setShowExtractionDialog] = useState(false);
   const [partialQuestion, setPartialQuestion] = useState("");
   const [editedQuestion, setEditedQuestion] = useState("");
-  
+
   // Debug dashboard state
   const [lastAutoQuestionError, setLastAutoQuestionError] = useState<string | null>(null);
   const [lastAutoQuestionErrorTime, setLastAutoQuestionErrorTime] = useState<Date | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
-  
+
   // Streaming client state
   const [streamingClient, setStreamingClient] = useState<DeepgramStreamingClient | null>(null);
   const [interimTranscript, setInterimTranscript] = useState<string>("");
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -146,24 +159,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useEffect(() => {
     if (!isRecording) return;
 
-    console.log('🔥 Pre-warming AI connections via health checks...');
-    
+    console.log("🔥 Pre-warming AI connections via health checks...");
+
     // Send lightweight health check every 2 minutes to keep edge function warm
     const keepaliveInterval = setInterval(async () => {
       try {
-        console.log('⏱️ Sending keepalive health check...');
+        console.log("⏱️ Sending keepalive health check...");
         // Call a lightweight edge function to keep connections warm
-        await supabase.functions.invoke('health-check').catch(() => {
-          console.log('⚠️ Keepalive failed (connection is warm)');
+        await supabase.functions.invoke("health-check").catch(() => {
+          console.log("⚠️ Keepalive failed (connection is warm)");
         });
       } catch (error) {
-        console.log('⚠️ Keepalive error (connection is warm)');
+        console.log("⚠️ Keepalive error (connection is warm)");
       }
     }, 120000); // Every 2 minutes
 
     return () => {
       clearInterval(keepaliveInterval);
-      console.log('❄️ Stopped pre-warming connections');
+      console.log("❄️ Stopped pre-warming connections");
     };
   }, [isRecording]);
 
@@ -171,14 +184,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) return;
 
         // Fetch student count
         const { data: students, error } = await supabase
-          .from('instructor_students')
-          .select('student_id')
-          .eq('instructor_id', user.id);
+          .from("instructor_students")
+          .select("student_id")
+          .eq("instructor_id", user.id);
 
         if (!error && students) {
           setStudentCount(students.length);
@@ -186,15 +201,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
-          .from('profiles')
-          .select('daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send')
-          .eq('id', user.id)
+          .from("profiles")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send")
+          .eq("id", user.id)
           .single();
 
         if (profile?.daily_question_limit) {
           setDailyQuotaLimit(profile.daily_question_limit);
         }
-        
+
         if (profile) {
           setAutoQuestionEnabled(profile.auto_question_enabled || false);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
@@ -202,24 +217,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
 
         // Fetch today's question count
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString().split("T")[0];
         const { count } = await supabase
-          .from('student_assignments')
-          .select('id', { count: 'exact', head: true })
-          .eq('instructor_id', user.id)
-          .eq('assignment_type', 'lecture_checkin')
-          .gte('created_at', today);
+          .from("student_assignments")
+          .select("id", { count: "exact", head: true })
+          .eq("instructor_id", user.id)
+          .eq("assignment_type", "lecture_checkin")
+          .gte("created_at", today);
 
         if (count !== null) {
           setDailyQuestionCount(count);
         }
       } catch (error) {
-        console.error('Error fetching counts:', error);
+        console.error("Error fetching counts:", error);
       }
     };
 
     fetchCounts();
-    
+
     // Refresh counts every 30 seconds when recording
     const interval = setInterval(() => {
       if (isRecording) {
@@ -335,7 +350,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (!isRecording || transcriptChunks.length === 0) return;
 
     const currentChunkIndex = transcriptChunks.length - 1;
-    
+
     // Prevent re-checking the same chunks we already processed
     if (currentChunkIndex <= lastDetectedChunkIndexRef.current) {
       return;
@@ -345,10 +360,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     const windowSize = Math.min(3, transcriptChunks.length);
     const recentChunks = transcriptChunks.slice(-windowSize);
     const slidingWindow = recentChunks.join(" ");
-    
+
     // Update visual feedback with the most recent chunk
     setLastTranscript(transcriptChunks[transcriptChunks.length - 1]);
-    
+
     // Only check if we have substantial content
     if (slidingWindow.length < MIN_CHUNK_LENGTH) return;
 
@@ -359,60 +374,79 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const checkForVoiceCommand = (text: string, currentChunkIndex: number): boolean => {
     // Prevent detection while already sending a question
     if (isSendingQuestion) {
-      console.log('🚫 Already sending a question, skipping detection');
+      console.log("🚫 Already sending a question, skipping detection");
       return false;
     }
 
     // Check if we're in a rate limit window
     const now = Date.now();
     if (now < nextQuestionAllowedAt) {
-      console.log('⏱️ Rate limit active, skipping detection');
+      console.log("⏱️ Rate limit active, skipping detection");
       return false;
     }
 
     // Cooldown check - prevent duplicate triggers
     if (now - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) {
-      console.log('⏱️ Cooldown active, skipping detection');
+      console.log("⏱️ Cooldown active, skipping detection");
       return false;
     }
 
     // CONTEXT WINDOW VALIDATION: Only check last 100 characters for commands
     // Commands should be at the END of speech, not buried in middle
     const contextWindow = text.slice(-100);
-    
+
     // PRE-VALIDATION: Check if there's actually a question before triggering
-    const hasQuestionMark = text.includes('?');
-    const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'whose', 'whom', 'can', 'could', 'would', 'should', 'is', 'are', 'do', 'does'];
+    const hasQuestionMark = text.includes("?");
+    const questionWords = [
+      "what",
+      "how",
+      "why",
+      "when",
+      "where",
+      "who",
+      "which",
+      "whose",
+      "whom",
+      "can",
+      "could",
+      "would",
+      "should",
+      "is",
+      "are",
+      "do",
+      "does",
+    ];
     const lowerText = text.toLowerCase();
-    const hasQuestionWords = questionWords.some(word => {
+    const hasQuestionWords = questionWords.some((word) => {
       // Check for word boundaries to avoid false matches
-      const regex = new RegExp(`\\b${word}\\b`, 'i');
+      const regex = new RegExp(`\\b${word}\\b`, "i");
       return regex.test(lowerText);
     });
-    
+
     // Method 1: Tightened regex patterns - require "question" + send verb close together
     const commandPatterns = [
       // Core patterns with optional words
       /send\s+(the\s+|a\s+|this\s+|that\s+)?question(\s+now)?(\s+please)?[!.]?/i,
       /send\s+it(\s+now)?(\s+please)?[!.]?/i,
       /send\s+out\s+(the\s+)?question[!.]?/i,
-      
+
       // Alternative verbs
       /push\s+(the\s+|this\s+)?question[!.]?/i,
       /submit\s+(the\s+|this\s+)?question[!.]?/i,
       // REMOVED: /ask\s+(the\s+)?question(\s+now)?[!.]?/i - too broad
-      
+
       // Direct commands
       /question\s+now[!.]?/i,
       /post\s+(the\s+)?question[!.]?/i,
     ];
 
-    const hasRegexMatch = commandPatterns.some(pattern => pattern.test(contextWindow));
+    const hasRegexMatch = commandPatterns.some((pattern) => pattern.test(contextWindow));
 
     // Method 2: Keyword-based detection (just needs "send" + "question")
     const lowerContext = contextWindow.toLowerCase();
-    const hasKeywords = (lowerContext.includes('send') || lowerContext.includes('submit') || lowerContext.includes('push')) && 
-                        lowerContext.includes('question');
+    const hasKeywords =
+      (lowerContext.includes("send") || lowerContext.includes("submit") || lowerContext.includes("push")) &&
+      lowerContext.includes("question");
 
     // Method 3: Fuzzy matching for common command phrases with INCREASED threshold
     const targetPhrases = [
@@ -420,16 +454,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       "send the question",
       "send question",
       "question now",
-      "submit question"
+      "submit question",
     ];
-    
-    const hasFuzzyMatch = targetPhrases.some(phrase => {
+
+    const hasFuzzyMatch = targetPhrases.some((phrase) => {
       // Check if phrase appears in context window with high similarity
       const words = lowerContext.split(/\s+/);
-      for (let i = 0; i <= words.length - phrase.split(' ').length; i++) {
-        const segment = words.slice(i, i + phrase.split(' ').length).join(' ');
+      for (let i = 0; i <= words.length - phrase.split(" ").length; i++) {
+        const segment = words.slice(i, i + phrase.split(" ").length).join(" ");
         const similarity = calculateSimilarity(segment, phrase);
-        if (similarity >= 0.85) { // INCREASED from 0.75 to 0.85 (85% similarity)
+        if (similarity >= 0.85) {
+          // INCREASED from 0.75 to 0.85 (85% similarity)
           console.log(`🎯 Fuzzy match: "${segment}" ≈ "${phrase}" (${Math.round(similarity * 100)}%)`);
           return true;
         }
@@ -440,33 +475,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     // Trigger if ANY method detects the command AND there's evidence of a question
     const commandDetected = hasRegexMatch || hasKeywords || hasFuzzyMatch;
     const hasQuestionEvidence = hasQuestionMark || hasQuestionWords;
-    
+
     // PRE-VALIDATION: Only proceed if we have both command and question evidence
     if (commandDetected && !hasQuestionEvidence) {
-      console.log('⚠️ Command detected but no question evidence - likely false positive');
+      console.log("⚠️ Command detected but no question evidence - likely false positive");
       return false;
     }
-    
+
     const isDetected = commandDetected && hasQuestionEvidence;
 
     if (isDetected) {
-      console.log('🎤 VOICE COMMAND DETECTED:', {
+      console.log("🎤 VOICE COMMAND DETECTED:", {
         contextWindow: contextWindow,
         hasQuestionMark,
         hasQuestionWords,
         regexMatch: hasRegexMatch,
         keywordMatch: hasKeywords,
         fuzzyMatch: hasFuzzyMatch,
-        chunkIndex: currentChunkIndex
+        chunkIndex: currentChunkIndex,
       });
-      
+
       // CRITICAL: Set cooldown IMMEDIATELY to prevent re-detection
       lastDetectionTimeRef.current = now;
       lastDetectedChunkIndexRef.current = currentChunkIndex;
-      
+
       // DON'T clear the buffer here - we need the full question for extraction
       // The command phrase will be filtered by the AI during extraction
-      
+
       handleVoiceCommandQuestion();
       return true;
     }
@@ -477,18 +512,18 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const handleVoiceCommandQuestion = async () => {
     // Prevent multiple simultaneous sends
     if (isSendingQuestion) {
-      console.log('🚫 Already processing a question, ignoring duplicate trigger');
+      console.log("🚫 Already processing a question, ignoring duplicate trigger");
       return;
     }
 
     try {
       setIsSendingQuestion(true);
-      
+
       // Trigger visual feedback immediately
       setVoiceCommandDetected(true);
       setTimeout(() => setVoiceCommandDetected(false), 2000);
 
-      console.log('🎤 Voice command triggered! Processing...');
+      console.log("🎤 Voice command triggered! Processing...");
 
       toast({
         title: "🎤 Voice command detected!",
@@ -500,12 +535,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // 1. User to finish speaking any remaining words
       // 2. Transcription service to process final audio chunks
       // 3. Network latency and slower speakers
-      console.log('⏳ Waiting 2.5s for transcription to complete...');
-      
+      console.log("⏳ Waiting 2.5s for transcription to complete...");
+
       // Visual countdown for instructor feedback
       for (let i = 25; i >= 0; i--) {
         setBatchProgress(`⏱️ Capturing speech... ${(i / 10).toFixed(1)}s`);
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
       setBatchProgress("");
 
@@ -514,20 +549,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       let recentTranscript = transcriptBufferRef.current.slice(-3000); // Increased from 2000 for more context
 
       // Trim to nearest word boundary at the start to avoid partial words
-      const firstSpaceIndex = recentTranscript.indexOf(' ');
+      const firstSpaceIndex = recentTranscript.indexOf(" ");
       if (firstSpaceIndex > 0 && firstSpaceIndex < 100) {
         recentTranscript = recentTranscript.slice(firstSpaceIndex + 1);
       }
 
-      console.log('📝 Extracting question from transcript:', recentTranscript.length, 'chars');
-      console.log('🔍 Last 200 chars:', recentTranscript.slice(-200));
+      console.log("📝 Extracting question from transcript:", recentTranscript.length, "chars");
+      console.log("🔍 Last 200 chars:", recentTranscript.slice(-200));
 
-      const { data, error } = await supabase.functions.invoke('extract-voice-command-question', {
-        body: { recentTranscript }
+      const { data, error } = await supabase.functions.invoke("extract-voice-command-question", {
+        body: { recentTranscript },
       });
 
       if (error) {
-        console.error('Extract error:', error);
+        console.error("Extract error:", error);
         throw error;
       }
 
@@ -537,59 +572,52 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setPartialQuestion(data.partial_question);
           setEditedQuestion(data.partial_question);
           setShowExtractionDialog(true);
-          
+
           addError(
-            'warning',
-            'extraction',
-            'Question extraction incomplete',
-            `${data.error || 'Validation failed'} - Partial: "${data.partial_question}"`,
-            true
+            "warning",
+            "extraction",
+            "Question extraction incomplete",
+            `${data.error || "Validation failed"} - Partial: "${data.partial_question}"`,
+            true,
           );
           return;
         }
-        
+
         // SUPPRESS ERROR: This is likely a false positive detection
         // Log it silently instead of showing error toast to user
-        console.log('⚠️ No question found in transcript - likely false positive detection');
-        console.log('Transcript analyzed:', recentTranscript.slice(-200));
-        
-        addError(
-          'info',
-          'extraction',
-          'No question found in transcript',
-          'Likely false positive detection',
-          false
-        );
+        console.log("⚠️ No question found in transcript - likely false positive detection");
+        console.log("Transcript analyzed:", recentTranscript.slice(-200));
+
+        addError("info", "extraction", "No question found in transcript", "Likely false positive detection", false);
         return;
       }
 
-      console.log('✅ Question extracted via voice command:', data.question_text);
+      console.log("✅ Question extracted via voice command:", data.question_text);
 
       // Send immediately without confidence threshold
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: 1.0, // Voice command = maximum confidence
-        extraction_method: 'voice_command',
-        source: 'voice_command'
+        extraction_method: "voice_command",
+        source: "voice_command",
       });
-      
+
       // Reset auto-question timer after voice command
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
-        console.log('🔄 Auto-question timer reset after voice command');
+        console.log("🔄 Auto-question timer reset after voice command");
       }
-
     } catch (error: any) {
-      console.error('Voice command error:', error);
-      
+      console.error("Voice command error:", error);
+
       // Check if this is a rate limit error (don't show as "failed")
-      if (error.message?.includes('wait') || error.message?.includes('seconds between')) {
+      if (error.message?.includes("wait") || error.message?.includes("seconds between")) {
         // Rate limit error is already handled by handleQuestionSend
         // Just log it, don't show duplicate error
-        console.log('ℹ️ Rate limit applied, countdown shown to user');
+        console.log("ℹ️ Rate limit applied, countdown shown to user");
       } else {
         // Show error only for actual failures (auth, network, etc.)
         toast({
@@ -608,7 +636,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const handleManualQuestionSend = async () => {
     // Prevent multiple simultaneous sends
     if (isSendingQuestion) {
-      console.log('🚫 Already processing a question');
+      console.log("🚫 Already processing a question");
       return;
     }
 
@@ -632,10 +660,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Get last 45 seconds of transcript
       const recentTranscript = transcriptBufferRef.current.slice(-1500);
 
-      console.log('📝 Manual send - extracting question from transcript:', recentTranscript.length, 'chars');
+      console.log("📝 Manual send - extracting question from transcript:", recentTranscript.length, "chars");
 
-      const { data, error } = await supabase.functions.invoke('extract-voice-command-question', {
-        body: { recentTranscript }
+      const { data, error } = await supabase.functions.invoke("extract-voice-command-question", {
+        body: { recentTranscript },
       });
 
       if (error) {
@@ -651,27 +679,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return;
       }
 
-      console.log('✅ Question extracted via manual send:', data.question_text);
+      console.log("✅ Question extracted via manual send:", data.question_text);
 
       // Send immediately
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: 1.0,
-        extraction_method: 'manual_button',
-        source: 'manual_button'
+        extraction_method: "manual_button",
+        source: "manual_button",
       });
-      
+
       // Reset auto-question timer after manual send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
-        console.log('🔄 Auto-question timer reset after manual send');
+        console.log("🔄 Auto-question timer reset after manual send");
       }
-
     } catch (error: any) {
-      console.error('Manual send error:', error);
+      console.error("Manual send error:", error);
       toast({
         title: "Failed to send question",
         description: error.message || "Could not process request",
@@ -690,109 +717,109 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       const now = Date.now();
       if (!isAutoQuestion && now < nextQuestionAllowedAt) {
         const secondsLeft = Math.ceil((nextQuestionAllowedAt - now) / 1000);
-        return { 
-          valid: false, 
-          error: `⏱️ Please wait ${secondsLeft} seconds before sending another question` 
+        return {
+          valid: false,
+          error: `⏱️ Please wait ${secondsLeft} seconds before sending another question`,
         };
       }
 
       // Check if user is authenticated
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
-        return { 
-          valid: false, 
-          error: "🔐 Session expired - please refresh the page" 
+        return {
+          valid: false,
+          error: "🔐 Session expired - please refresh the page",
         };
       }
 
       // Check if students are connected
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        return { 
-          valid: false, 
-          error: "🔐 Authentication required - please refresh the page" 
+        return {
+          valid: false,
+          error: "🔐 Authentication required - please refresh the page",
         };
       }
 
       const { data: students, error: studentsError } = await supabase
-        .from('instructor_students')
-        .select('student_id')
-        .eq('instructor_id', user.id);
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id);
 
       if (studentsError) {
-        console.error('Error checking students:', studentsError);
-        return { 
-          valid: false, 
-          error: "❌ Could not verify student connections" 
+        console.error("Error checking students:", studentsError);
+        return {
+          valid: false,
+          error: "❌ Could not verify student connections",
         };
       }
 
       if (!students || students.length === 0) {
-        return { 
-          valid: false, 
-          error: "👥 No students connected - please share your instructor code with students" 
+        return {
+          valid: false,
+          error: "👥 No students connected - please share your instructor code with students",
         };
       }
 
       // Check if there's enough transcript content (skip for auto-questions - already checked)
       if (!isAutoQuestion && (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30)) {
-        return { 
-          valid: false, 
-          error: "📝 Not enough lecture content - continue speaking for a few more seconds" 
+        return {
+          valid: false,
+          error: "📝 Not enough lecture content - continue speaking for a few more seconds",
         };
       }
 
       return { valid: true };
     } catch (error: any) {
-      console.error('Validation error:', error);
-      return { 
-        valid: false, 
-        error: "❌ Validation failed - please try again" 
+      console.error("Validation error:", error);
+      return {
+        valid: false,
+        error: "❌ Validation failed - please try again",
       };
     }
   };
 
   // Retry logic with exponential backoff
-  const retryWithBackoff = async <T,>(
-    fn: () => Promise<T>,
-    maxRetries = 3,
-    baseDelay = 1000
-  ): Promise<T> => {
+  const retryWithBackoff = async <T,>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> => {
     let lastError: any;
-    
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await fn();
       } catch (error: any) {
         lastError = error;
-        
+
         // Don't retry on specific errors
         if (error.status === 429 || error.status === 400 || error.status === 401) {
           throw error;
         }
-        
+
         if (attempt < maxRetries - 1) {
           const delay = baseDelay * Math.pow(2, attempt);
           console.log(`⏳ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
-    
+
     throw lastError;
   };
 
   const handleQuestionSend = async (detectionData: any) => {
     try {
-      console.log('📤 Sending question to students:', detectionData);
-      
+      console.log("📤 Sending question to students:", detectionData);
+
       // Pre-validation (pass true for auto-questions to skip rate limit check)
-      const validation = await validateBeforeSend(detectionData.source === 'auto_interval');
+      const validation = await validateBeforeSend(detectionData.source === "auto_interval");
       if (!validation.valid) {
-        console.error('❌ Pre-validation failed:', validation.error);
-        console.error('❌ Source:', detectionData.source || 'unknown');
-        console.error('❌ Question:', detectionData.question_text?.substring(0, 100));
-        
+        console.error("❌ Pre-validation failed:", validation.error);
+        console.error("❌ Source:", detectionData.source || "unknown");
+        console.error("❌ Question:", detectionData.question_text?.substring(0, 100));
+
         toast({
           title: "Cannot send question",
           description: validation.error,
@@ -803,9 +830,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       // Refresh token before critical operation
-      console.log('🔑 Refreshing auth token before send');
+      console.log("🔑 Refreshing auth token before send");
       await supabase.auth.refreshSession();
-      
+
       toast({
         title: "🎯 Question detected!",
         description: `"${getQuestionPreview(detectionData.question_text, 60)}..." - Sending to students...`,
@@ -820,30 +847,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Retry logic for transient failures with progress tracking
       const sendStartTime = Date.now();
       const { data, error } = await retryWithBackoff(async () => {
-        return await supabase.functions.invoke('format-and-send-question', {
+        return await supabase.functions.invoke("format-and-send-question", {
           body: {
             question_text: detectionData.question_text,
             suggested_type: detectionData.suggested_type,
             context: fullContext,
             confidence: detectionData.confidence,
-            source: detectionData.source || 'manual_button'
-          }
+            source: detectionData.source || "manual_button",
+          },
         });
       });
-      
+
       const totalTime = Date.now() - sendStartTime;
       console.log(`⏱️ Total send time: ${totalTime}ms`);
 
-      console.log('📥 Edge function response:', { data, error });
-      
+      console.log("📥 Edge function response:", { data, error });
+
       // Show detailed progress if available
       if (data?.processing_time_ms) {
-        const timeStr = data.processing_time_ms < 1000 
-          ? `${data.processing_time_ms}ms` 
-          : `${(data.processing_time_ms / 1000).toFixed(1)}s`;
-        const upgradingNote = data?.upgrading_to_mcq ? ' (upgrading to MCQ...)' : '';
-        const parallelNote = data?.parallel_batches ? ' ⚡' : '';
-        setBatchProgress(`✅ Sent to ${data.sent_to}/${data.total_students} students in ${timeStr}${parallelNote}${upgradingNote}`);
+        const timeStr =
+          data.processing_time_ms < 1000
+            ? `${data.processing_time_ms}ms`
+            : `${(data.processing_time_ms / 1000).toFixed(1)}s`;
+        const upgradingNote = data?.upgrading_to_mcq ? " (upgrading to MCQ...)" : "";
+        const parallelNote = data?.parallel_batches ? " ⚡" : "";
+        setBatchProgress(
+          `✅ Sent to ${data.sent_to}/${data.total_students} students in ${timeStr}${parallelNote}${upgradingNote}`,
+        );
         setTimeout(() => setBatchProgress(""), data?.upgrading_to_mcq ? 6000 : 4000);
       } else if (data?.batches_processed && data?.total_students) {
         setBatchProgress(`✅ Sent to ${data.total_students} students in ${data.batches_processed} batches`);
@@ -851,29 +881,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       if (error) {
-        console.error('❌ Edge function error:', error);
-        
+        console.error("❌ Edge function error:", error);
+
         // Enhanced error handling with user-friendly messages
         let errorMessage = error.message || "An unexpected error occurred";
-        let errorType = 'unknown';
-        
+        let errorType = "unknown";
+
         // Parse error from response data if available
         if (data?.error) {
           errorMessage = data.error;
-          errorType = data.error_type || 'unknown';
+          errorType = data.error_type || "unknown";
         }
-        
+
         // Handle 429 Rate Limit - distinguish between cooldown and daily limit
-        if (error.message?.includes('429') || error.status === 429 || errorType === 'cooldown' || errorType === 'daily_limit') {
+        if (
+          error.message?.includes("429") ||
+          error.status === 429 ||
+          errorType === "cooldown" ||
+          errorType === "daily_limit"
+        ) {
           const errorData = data || {};
-          
+
           // Check if this is daily limit or cooldown
-          if (errorType === 'daily_limit' || errorData.quota_reset) {
+          if (errorType === "daily_limit" || errorData.quota_reset) {
             const hoursLeft = errorData.hours_until_reset || 0;
             const minutesLeft = errorData.minutes_until_reset || 0;
             const currentCount = errorData.current_count || dailyQuestionCount;
             const limit = errorData.daily_limit || dailyQuotaLimit;
-            
+
             toast({
               title: "🚫 Daily question limit reached",
               description: `You've sent ${currentCount}/${limit} questions today. Resets in ${hoursLeft}h ${minutesLeft}m at midnight UTC.`,
@@ -883,22 +918,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           } else {
             // Regular cooldown
             const retryAfter = errorData.retry_after || 15;
-            const nextAllowed = Date.now() + (retryAfter * 1000);
+            const nextAllowed = Date.now() + retryAfter * 1000;
             setNextQuestionAllowedAt(nextAllowed);
-            
+
             toast({
               title: "✅ Question sent!",
               description: `Next question available in ${retryAfter}s (prevents accidental duplicates)`,
               duration: Math.min(retryAfter * 1000, 5000),
             });
           }
-          
+
           // Don't throw - this is expected behavior, not an error
           return;
         }
-        
+
         // Handle 401 authentication errors
-        if (error.status === 401 || errorMessage.includes('Session expired') || errorMessage.includes('Unauthorized')) {
+        if (error.status === 401 || errorMessage.includes("Session expired") || errorMessage.includes("Unauthorized")) {
           toast({
             title: "🔐 Session expired",
             description: "Please refresh the page to continue",
@@ -907,9 +942,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           throw error;
         }
-        
+
         // Handle 400 bad request
-        if (error.status === 400 || errorMessage.includes('Invalid')) {
+        if (error.status === 400 || errorMessage.includes("Invalid")) {
           toast({
             title: "❌ Invalid question",
             description: errorMessage,
@@ -918,9 +953,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           throw error;
         }
-        
+
         // Handle AI-specific errors
-        if (errorMessage.includes('AI service') || errorMessage.includes('rate limit') || errorMessage.includes('quota')) {
+        if (
+          errorMessage.includes("AI service") ||
+          errorMessage.includes("rate limit") ||
+          errorMessage.includes("quota")
+        ) {
           toast({
             title: "⚠️ AI Service Issue",
             description: errorMessage,
@@ -929,9 +968,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           throw error;
         }
-        
+
         // Handle timeout errors
-        if (errorMessage.includes('timed out') || errorMessage.includes('timeout')) {
+        if (errorMessage.includes("timed out") || errorMessage.includes("timeout")) {
           toast({
             title: "⏱️ Request timed out",
             description: "The AI service took too long to respond. Please try again.",
@@ -940,7 +979,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           throw error;
         }
-        
+
         // Handle 500 server errors
         if (error.status === 500 || error.status === 504) {
           toast({
@@ -951,9 +990,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           throw error;
         }
-        
+
         // Handle network errors
-        if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        if (error.message?.includes("fetch") || error.message?.includes("network")) {
           toast({
             title: "🌐 Connection issue",
             description: "Please check your internet connection and try again",
@@ -962,7 +1001,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           throw error;
         }
-        
+
         // Generic error handling with technical details hidden
         toast({
           title: "❌ Unable to send question",
@@ -970,37 +1009,40 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           variant: "destructive",
           duration: 5000,
         });
-        
+
         throw error;
       }
 
       if (data?.success) {
-        console.log('✅ Question successfully sent!');
-        
+        console.log("✅ Question successfully sent!");
+
         // Update daily count
-        setDailyQuestionCount(prev => prev + 1);
-        
+        setDailyQuestionCount((prev) => prev + 1);
+
         toast({
           title: "✅ Question sent!",
           description: `${data.question_type} question sent to ${data.sent_to} students`,
           duration: 5000,
         });
         onQuestionGenerated();
-        
+
         // After successful send, extend the cooldown and record send time
         lastDetectionTimeRef.current = Date.now();
         lastQuestionSentTimeRef.current = Date.now();
       } else {
-        console.error('❌ Question send failed:', data);
-        throw new Error(data?.message || 'Failed to send question');
+        console.error("❌ Question send failed:", data);
+        throw new Error(data?.message || "Failed to send question");
       }
     } catch (error: any) {
-      console.error('❌ Failed to send question:', error);
-      
+      console.error("❌ Failed to send question:", error);
+
       // Don't show duplicate toasts if already handled above
-      if (!error.status || (error.status !== 429 && error.status !== 400 && error.status !== 401 && error.status !== 500)) {
+      if (
+        !error.status ||
+        (error.status !== 429 && error.status !== 400 && error.status !== 401 && error.status !== 500)
+      ) {
         // Check if it's a network error
-        if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        if (error.message?.includes("fetch") || error.message?.includes("network")) {
           // Already handled above
         } else {
           toast({
@@ -1009,13 +1051,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             variant: "destructive",
             duration: 5000,
           });
-          
+
           addError(
-            'critical',
-            'question_send',
-            'Failed to send question',
+            "critical",
+            "question_send",
+            "Failed to send question",
             error.message || "An unexpected error occurred",
-            true
+            true,
           );
         }
       }
@@ -1026,25 +1068,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Core auto-question generation logic (extracted for reuse) with enhanced logging
   const generateAndSendAutoQuestion = async (intervalTranscript: string, isManualTest = false) => {
     const startTime = Date.now();
-    
+
     try {
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🎯 STARTING AUTO-QUESTION GENERATION');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('📊 Input Parameters:');
-      console.log('  - Transcript length:', intervalTranscript.length, 'chars');
-      console.log('  - Interval:', autoQuestionInterval, 'minutes');
-      console.log('  - Manual test:', isManualTest);
-      console.log('  - Is sending:', isSendingQuestion);
-      console.log('  - Recording:', isRecording);
-      console.log('  - Transcript preview:', intervalTranscript.substring(0, 150) + '...');
-      console.log('  - Transcript ending:', '...' + intervalTranscript.substring(Math.max(0, intervalTranscript.length - 150)));
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("🎯 STARTING AUTO-QUESTION GENERATION");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("📊 Input Parameters:");
+      console.log("  - Transcript length:", intervalTranscript.length, "chars");
+      console.log("  - Interval:", autoQuestionInterval, "minutes");
+      console.log("  - Manual test:", isManualTest);
+      console.log("  - Is sending:", isSendingQuestion);
+      console.log("  - Recording:", isRecording);
+      console.log("  - Transcript preview:", intervalTranscript.substring(0, 150) + "...");
+      console.log(
+        "  - Transcript ending:",
+        "..." + intervalTranscript.substring(Math.max(0, intervalTranscript.length - 150)),
+      );
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
       // Show pre-generation animation
       setVoiceCommandDetected(true);
       setTimeout(() => setVoiceCommandDetected(false), 2000);
-      
+
       if (!isManualTest) {
         toast({
           title: "⏰ Auto-question triggered!",
@@ -1052,12 +1097,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           duration: 3000,
         });
       }
-      
+
       // Fetch instructor's format preference before generating
-      console.log('🔍 Fetching user authentication...');
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log("🔍 Fetching user authentication...");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        console.error('❌ No authenticated user found');
+        console.error("❌ No authenticated user found");
         toast({
           title: "❌ Authentication error",
           description: "Please refresh the page and try again",
@@ -1065,101 +1112,103 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
         return false;
       }
-      console.log('✅ User authenticated:', user.id);
+      console.log("✅ User authenticated:", user.id);
 
-      console.log('🔍 Fetching format preference...');
+      console.log("🔍 Fetching format preference...");
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('question_format_preference')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("question_format_preference")
+        .eq("id", user.id)
         .single();
 
-      const formatPreference = profile?.question_format_preference || 'multiple_choice';
-      console.log('✅ Format preference:', formatPreference);
-      
+      const formatPreference = profile?.question_format_preference || "multiple_choice";
+      console.log("✅ Format preference:", formatPreference);
+
       // Call edge function with format preference
-      console.log('📡 Invoking generate-interval-question edge function...');
-      console.log('🔗 Payload:', {
+      console.log("📡 Invoking generate-interval-question edge function...");
+      console.log("🔗 Payload:", {
         interval_transcript_length: intervalTranscript.length,
         interval_minutes: autoQuestionInterval,
         format_preference: formatPreference,
-        force_send: autoQuestionForceSend
+        force_send: autoQuestionForceSend,
       });
-      
+
       const invokeStartTime = Date.now();
-      const { data, error } = await supabase.functions.invoke('generate-interval-question', {
-        body: { 
+      const { data, error } = await supabase.functions.invoke("generate-interval-question", {
+        body: {
           interval_transcript: intervalTranscript,
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
-          force_send: autoQuestionForceSend
-        }
+          force_send: autoQuestionForceSend,
+        },
       });
       const invokeTime = Date.now() - invokeStartTime;
-      
+
       console.log(`⏱️ Edge function completed in ${invokeTime}ms`);
-      console.log('📥 Response:', { 
-        hasData: !!data, 
+      console.log("📥 Response:", {
+        hasData: !!data,
         hasError: !!error,
         success: data?.success,
         dataKeys: data ? Object.keys(data) : [],
-        errorMessage: error?.message
+        errorMessage: error?.message,
       });
-      
+
       if (error || !data?.success) {
-        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.error('❌ EDGE FUNCTION ERROR');
-        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.error('  Has error:', !!error);
-        console.error('  Success flag:', data?.success);
-        console.error('  Error object:', JSON.stringify(error, null, 2));
-        console.error('  Data object:', JSON.stringify(data, null, 2));
-        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        
+        console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.error("❌ EDGE FUNCTION ERROR");
+        console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.error("  Has error:", !!error);
+        console.error("  Success flag:", data?.success);
+        console.error("  Error object:", JSON.stringify(error, null, 2));
+        console.error("  Data object:", JSON.stringify(data, null, 2));
+        console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
         let errorMessage = "Could not generate question from recent content.";
-        
+
         // Parse specific error types
-        if (data?.error?.includes('Rate limit') || data?.error_type === 'cooldown') {
+        if (data?.error?.includes("Rate limit") || data?.error_type === "cooldown") {
           errorMessage = `⏳ Rate limit: Wait ${data?.retry_after || 15}s before next question`;
-          console.log('⏳ Rate limit hit, keeping transcript for retry');
-        } else if (data?.error?.includes('Daily limit') || data?.error_type === 'daily_limit') {
+          console.log("⏳ Rate limit hit, keeping transcript for retry");
+        } else if (data?.error?.includes("Daily limit") || data?.error_type === "daily_limit") {
           errorMessage = `🚫 Daily limit reached (${data?.current_count}/${data?.daily_limit}). Resets in ${data?.hours_until_reset}h ${data?.minutes_until_reset}m`;
-        } else if (data?.error?.includes('Not enough content')) {
+        } else if (data?.error?.includes("Not enough content")) {
           errorMessage = `Need ${100 - intervalTranscript.length} more characters of lecture content.`;
-        } else if (data?.error?.includes('confidence threshold')) {
-          errorMessage = `AI confidence too low (${(data.confidence * 100)?.toFixed(0) || '?'}%). Keep teaching for better questions.`;
+        } else if (data?.error?.includes("confidence threshold")) {
+          errorMessage = `AI confidence too low (${(data.confidence * 100)?.toFixed(0) || "?"}%). Keep teaching for better questions.`;
         } else if (data?.error) {
           errorMessage = data.error;
         } else if (error?.message) {
           errorMessage = error.message;
         }
-        
+
         setLastAutoQuestionError(errorMessage);
         setLastAutoQuestionErrorTime(new Date());
-        
+
         toast({
           title: isManualTest ? "🧪 Test Failed" : "⚠️ Auto-question skipped",
           description: errorMessage,
-          variant: data?.error_type === 'daily_limit' ? "destructive" : "default",
+          variant: data?.error_type === "daily_limit" ? "destructive" : "default",
           duration: 5000,
         });
-        
+
         return false;
       }
-      
-      console.log('✅ Question generated successfully');
-      console.log('  Question text:', getQuestionPreview(data.question_text, 100) + '...');
-      console.log('  Type:', data.suggested_type);
-      console.log('  Confidence:', data.confidence);
+
+      console.log("✅ Question generated successfully");
+      console.log("  Question text:", getQuestionPreview(data.question_text, 100) + "...");
+      console.log("  Type:", data.suggested_type);
+      console.log("  Confidence:", data.confidence);
 
       // Client-side validation of question completeness
-      if (typeof data.question_text === 'string') {
+      if (typeof data.question_text === "string") {
         const question = data.question_text.trim();
-        
+
         // Check for obvious truncation
-        if (question.length < 10 || 
-            (question.split(' ').length > 3 && !question.endsWith('?') && !question.endsWith('.'))) {
-          console.error('⚠️ Received potentially truncated question:', question);
+        if (
+          question.length < 10 ||
+          (question.split(" ").length > 3 && !question.endsWith("?") && !question.endsWith("."))
+        ) {
+          console.error("⚠️ Received potentially truncated question:", question);
           toast({
             title: "⚠️ Question may be incomplete",
             description: `"${question.substring(0, 50)}..." - Skipping to avoid sending incomplete question`,
@@ -1168,55 +1217,55 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
           return false;
         }
-      } else if (typeof data.question_text === 'object' && data.question_text?.title) {
+      } else if (typeof data.question_text === "object" && data.question_text?.title) {
         // Coding questions are valid as objects
-        console.log('✅ Coding question validated');
+        console.log("✅ Coding question validated");
       }
 
-      console.log('📝 Sending via handleQuestionSend...');
-      
+      console.log("📝 Sending via handleQuestionSend...");
+
       // Send the question using existing flow
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
-        extraction_method: 'auto_interval',
-        source: isManualTest ? 'manual_test' : 'auto_interval'
+        extraction_method: "auto_interval",
+        source: isManualTest ? "manual_test" : "auto_interval",
       });
-      
+
       const totalTime = Date.now() - startTime;
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('✅ AUTO-QUESTION COMPLETED SUCCESSFULLY');
-      console.log('  Total time:', totalTime + 'ms');
-      console.log('  Question sent:', getQuestionPreview(data.question_text, 60) + '...');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("✅ AUTO-QUESTION COMPLETED SUCCESSFULLY");
+      console.log("  Total time:", totalTime + "ms");
+      console.log("  Question sent:", getQuestionPreview(data.question_text, 60) + "...");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
       // Clear error state on success
       setLastAutoQuestionError(null);
       setRetryAttempts(0);
-      
+
       // Track success metrics
-      setAutoQuestionMetrics(prev => {
+      setAutoQuestionMetrics((prev) => {
         const totalQuality = prev.averageQuality * prev.questionsSent + data.confidence;
         const newCount = prev.questionsSent + 1;
         return {
           ...prev,
           questionsSent: newCount,
-          averageQuality: totalQuality / newCount
+          averageQuality: totalQuality / newCount,
         };
       });
-      
+
       // Update state
-      setAutoQuestionCount(prev => prev + 1);
-      
+      setAutoQuestionCount((prev) => prev + 1);
+
       // Clear interval transcript buffer and reset quality
       intervalTranscriptRef.current = "";
-      intervalStartTimeRef.current = Date.now();  // Reset start time
+      intervalStartTimeRef.current = Date.now(); // Reset start time
       setIntervalTranscriptLength(0);
       setContentQualityScore(0);
-      
+
       console.log(`✅ Auto-question complete! Session total: ${autoQuestionCount + 1}`);
-      
+
       if (isManualTest) {
         toast({
           title: "🧪 Test Successful!",
@@ -1224,35 +1273,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           duration: 5000,
         });
       }
-      
+
       return true;
-      
     } catch (error: any) {
       const totalTime = Date.now() - startTime;
-      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.error('❌ AUTO-QUESTION GENERATION EXCEPTION');
-      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.error('  Error type:', typeof error);
-      console.error('  Error message:', error?.message);
-      console.error('  Error name:', error?.name);
-      console.error('  Error details:', JSON.stringify(error, null, 2));
-      console.error('  Time elapsed:', totalTime + 'ms');
-      console.error('  Stack trace:', error?.stack);
-      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
-      const errorMsg = error?.message || 'Unknown error during auto-question generation';
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.error("❌ AUTO-QUESTION GENERATION EXCEPTION");
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.error("  Error type:", typeof error);
+      console.error("  Error message:", error?.message);
+      console.error("  Error name:", error?.name);
+      console.error("  Error details:", JSON.stringify(error, null, 2));
+      console.error("  Time elapsed:", totalTime + "ms");
+      console.error("  Stack trace:", error?.stack);
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+      const errorMsg = error?.message || "Unknown error during auto-question generation";
       setLastAutoQuestionError(errorMsg);
       setLastAutoQuestionErrorTime(new Date());
-      
+
       toast({
         title: isManualTest ? "🧪 Test Error" : "❌ Auto-question error",
         description: errorMsg.substring(0, 100),
         variant: "destructive",
         duration: 5000,
       });
-      
+
       // Don't clear transcript on errors - let it keep building up
-      console.log('⏭️ Keeping transcript for retry (length:', intervalTranscriptRef.current.length, ')');
+      console.log("⏭️ Keeping transcript for retry (length:", intervalTranscriptRef.current.length, ")");
       return false;
     } finally {
       setIsSendingQuestion(false);
@@ -1262,64 +1310,65 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Handle auto-question generation (called by timer)
   const handleAutoQuestionGeneration = async (): Promise<boolean> => {
     try {
-      console.log('⏰ Auto-question timer triggered');
-      
+      console.log("⏰ Auto-question timer triggered");
+
       // Get transcript from current interval only
       const intervalTranscript = intervalTranscriptRef.current;
-      
+
       // Calculate actual elapsed time since interval started
-      const actualElapsedSeconds = intervalStartTimeRef.current > 0 
-        ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
-        : autoQuestionInterval * 60;
-      
+      const actualElapsedSeconds =
+        intervalStartTimeRef.current > 0
+          ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
+          : autoQuestionInterval * 60;
+
       // Use sliding window if transcript is too long
       const expectedWords = autoQuestionInterval * 150; // ~150 WPM average
       const actualWordCount = intervalTranscript.split(/\s+/).length;
       let transcriptToAnalyze = intervalTranscript;
-      
+
       if (actualWordCount > expectedWords * 2) {
         // Take only the most recent portion
         const words = intervalTranscript.split(/\s+/);
         const recentWords = words.slice(-expectedWords);
-        transcriptToAnalyze = recentWords.join(' ');
+        transcriptToAnalyze = recentWords.join(" ");
         console.log(`📐 Using sliding window: ${recentWords.length}/${words.length} words`);
       }
-      
-      console.log('📝 Interval transcript:', {
+
+      console.log("📝 Interval transcript:", {
         length: intervalTranscript.length,
         wordCount: actualWordCount,
         actualElapsedSeconds,
-        preview: intervalTranscript.substring(0, 100) + '...'
+        preview: intervalTranscript.substring(0, 100) + "...",
       });
-      
+
       // Enhanced content quality check with ACTUAL elapsed time
       const qualityMetrics = analyzeContentQuality(transcriptToAnalyze, actualElapsedSeconds);
-      
-      console.log('📊 Content quality metrics:', {
+
+      console.log("📊 Content quality metrics:", {
         wordCount: qualityMetrics.wordCount,
-        density: (qualityMetrics.contentDensity * 100).toFixed(1) + '%',
+        density: (qualityMetrics.contentDensity * 100).toFixed(1) + "%",
         isQuality: qualityMetrics.isQualityContent,
         isPause: qualityMetrics.isPause,
-        wpm: qualityMetrics.wordsPerMinute.toFixed(0)
+        wpm: qualityMetrics.wordsPerMinute.toFixed(0),
       });
-      
+
       // Minimal character check - just ensure there's some content to work with
       // Skip this check if force send mode is enabled
       if (!autoQuestionForceSend && intervalTranscript.length < 50) {
-        console.log('⚠️ Not enough content in interval:', intervalTranscript.length, 'chars (need 50+)');
-        
+        console.log("⚠️ Not enough content in interval:", intervalTranscript.length, "chars (need 50+)");
+
         // Track skip reason
         const skipReason: SkipReason = {
           timestamp: new Date(),
-          reason: 'Insufficient content',
-          details: `${intervalTranscript.length}/50 chars`
+          reason: "Insufficient content",
+          details: `${intervalTranscript.length}/50 chars`,
         };
-        setAutoQuestionMetrics(prev => ({
+        setAutoQuestionMetrics((prev) => ({
           ...prev,
           questionsSkipped: prev.questionsSkipped + 1,
-          skipReasons: [...prev.skipReasons, skipReason]
+          skipReasons: [...prev.skipReasons, skipReason],
         }));
-        
+
         toast({
           title: "⏭️ Auto-question skipped",
           description: `Need ${50 - intervalTranscript.length} more characters of lecture content`,
@@ -1327,45 +1376,44 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
         return false;
       }
-      
+
       if (autoQuestionForceSend && intervalTranscript.length < 50) {
-        console.log('🔥 Force send mode: Bypassing 50-char minimum check');
+        console.log("🔥 Force send mode: Bypassing 50-char minimum check");
       }
-      
+
       // Quality metrics for debugging only - NOT used for blocking
-      console.log('📊 Content Metrics (informational only):', {
+      console.log("📊 Content Metrics (informational only):", {
         wordCount: actualWordCount,
         density: `${(qualityMetrics.contentDensity * 100).toFixed(1)}%`,
         isPause: qualityMetrics.isPause,
         wpm: qualityMetrics.wordsPerMinute.toFixed(0),
-        transcriptLength: intervalTranscript.length
+        transcriptLength: intervalTranscript.length,
       });
-      
+
       // Use the sliding window content for generation (same as we analyzed)
       return await generateAndSendAutoQuestion(transcriptToAnalyze, false);
-      
     } catch (error) {
-      console.error('Auto-question error:', error);
+      console.error("Auto-question error:", error);
       return false;
     }
   };
 
   // Manual test function for debugging with detailed logging
   const handleTestAutoQuestion = async () => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🧪 MANUAL TEST AUTO-QUESTION TRIGGERED');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🧪 MANUAL TEST AUTO-QUESTION TRIGGERED");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
     const intervalTranscript = intervalTranscriptRef.current.trim();
-    
-    console.log('📊 Test Pre-checks:');
-    console.log('  - Transcript length:', intervalTranscript.length);
-    console.log('  - Is sending:', isSendingQuestion);
-    console.log('  - Is recording:', isRecording);
-    console.log('  - Auto-enabled:', autoQuestionEnabled);
-    
+
+    console.log("📊 Test Pre-checks:");
+    console.log("  - Transcript length:", intervalTranscript.length);
+    console.log("  - Is sending:", isSendingQuestion);
+    console.log("  - Is recording:", isRecording);
+    console.log("  - Auto-enabled:", autoQuestionEnabled);
+
     if (intervalTranscript.length < 100) {
-      console.log('❌ Test blocked: insufficient transcript');
+      console.log("❌ Test blocked: insufficient transcript");
       toast({
         title: "🧪 Cannot Test",
         description: `Need at least 100 characters. Current: ${intervalTranscript.length}`,
@@ -1375,7 +1423,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
 
     if (isSendingQuestion) {
-      console.log('❌ Test blocked: already sending a question');
+      console.log("❌ Test blocked: already sending a question");
       toast({
         title: "⏳ Please Wait",
         description: "A question is already being processed",
@@ -1383,7 +1431,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
-    console.log('✅ All pre-checks passed, starting test...');
+    console.log("✅ All pre-checks passed, starting test...");
     toast({
       title: "🧪 Testing Auto-Question",
       description: "Generating question from current interval content...",
@@ -1396,37 +1444,36 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const handleToggleAutoQuestion = async () => {
     const newState = !autoQuestionEnabled;
     console.log(`🔄 Toggling auto-questions: ${autoQuestionEnabled} → ${newState}`);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ auto_question_enabled: newState })
-        .eq('id', user.id);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase.from("profiles").update({ auto_question_enabled: newState }).eq("id", user.id);
 
       if (error) throw error;
 
       setAutoQuestionEnabled(newState);
-      
+
       // Reset timer when enabling
       if (newState) {
         setLastAutoQuestionTime(0);
         setRetryAttempts(0);
         setLastAutoQuestionError(null);
       }
-      
+
       toast({
         title: newState ? "✅ Auto-Questions Enabled" : "⏸️ Auto-Questions Disabled",
-        description: newState 
+        description: newState
           ? `Questions will be generated every ${autoQuestionInterval} minutes`
           : "Auto-question generation has been paused",
       });
-      
-      console.log('✅ Auto-question state updated successfully');
+
+      console.log("✅ Auto-question state updated successfully");
     } catch (error) {
-      console.error('Failed to toggle auto-question:', error);
+      console.error("Failed to toggle auto-question:", error);
       toast({
         title: "Error",
         description: "Failed to update auto-question setting",
@@ -1449,7 +1496,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           return;
         }
       }
-      
+
       console.log("🔄 Performing periodic restart for resource cleanup");
       toast({
         title: "System refresh",
@@ -1489,82 +1536,82 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Auto-question timer logic with comprehensive logging
   useEffect(() => {
-    console.log('🔍 Auto-question timer effect triggered:', {
+    console.log("🔍 Auto-question timer effect triggered:", {
       isRecording,
       autoQuestionEnabled,
       isSendingQuestion,
       lastAutoQuestionTime,
-      autoQuestionInterval
+      autoQuestionInterval,
     });
 
     if (!isRecording) {
-      console.log('⏸️ Timer paused: not recording');
+      console.log("⏸️ Timer paused: not recording");
       return;
     }
-    
+
     if (!autoQuestionEnabled) {
-      console.log('⏸️ Timer paused: auto-questions disabled');
+      console.log("⏸️ Timer paused: auto-questions disabled");
       return;
     }
-    
+
     if (isSendingQuestion) {
-      console.log('⏸️ Timer paused: already sending a question');
+      console.log("⏸️ Timer paused: already sending a question");
       return;
     }
-    
+
     const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
-    
+
     // Initialize timer on first recording start
     if (lastAutoQuestionTime === 0) {
       const now = Date.now();
       setLastAutoQuestionTime(now);
-      intervalStartTimeRef.current = now;  // Track actual start time
+      intervalStartTimeRef.current = now; // Track actual start time
       setAutoQuestionCount(0);
       console.log(`🟢 Auto-questions initialized: every ${autoQuestionInterval} minutes (${intervalMs}ms)`);
-      console.log('🕐 First question will trigger at:', new Date(now + intervalMs).toLocaleTimeString());
+      console.log("🕐 First question will trigger at:", new Date(now + intervalMs).toLocaleTimeString());
     }
-    
+
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
       if (isSendingQuestion) {
-        console.log('⏸️ Skipping check: already sending a question');
+        console.log("⏸️ Skipping check: already sending a question");
         return;
       }
       if (isGeneratingAutoQuestionRef.current) {
-        console.log('⏸️ Skipping check: generation in progress');
+        console.log("⏸️ Skipping check: generation in progress");
         return;
       }
       if (isProcessing) {
-        console.log('⏸️ Skipping check: audio processing');
+        console.log("⏸️ Skipping check: audio processing");
         return;
       }
-      
+
       const now = Date.now();
       const elapsed = now - lastAutoQuestionTime;
       const timeLeft = intervalMs - elapsed;
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
-      
+
       setNextAutoQuestionIn(secondsLeft);
-      
+
       // Log countdown at key intervals
       if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {
         console.log(`⏰ Auto-question in ${secondsLeft} seconds`);
       }
-      
+
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
         // Set lock IMMEDIATELY before any async work
         isGeneratingAutoQuestionRef.current = true;
-        
-        console.log('🚀 AUTO-QUESTION INTERVAL REACHED');
-        console.log('📊 Timer State:', {
+
+        console.log("🚀 AUTO-QUESTION INTERVAL REACHED");
+        console.log("📊 Timer State:", {
           elapsed: `${(elapsed / 1000).toFixed(0)}s`,
           intervalMs: `${(intervalMs / 1000).toFixed(0)}s`,
           transcriptLength: intervalTranscriptRef.current.length,
           lastAutoQuestionTime: new Date(lastAutoQuestionTime).toLocaleTimeString(),
-          now: new Date(now).toLocaleTimeString()
+          now: new Date(now).toLocaleTimeString(),
         });
-        
+
         // Call async function with enhanced error handling and retry logic
         handleAutoQuestionGeneration()
           .then((success) => {
@@ -1575,33 +1622,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               intervalStartTimeRef.current = newTime;
               setRetryAttempts(0);
               setLastAutoQuestionError(null);
-              console.log('✅ Timer reset after successful send');
-              console.log('🕐 Next question at:', new Date(newTime + intervalMs).toLocaleTimeString());
+              console.log("✅ Timer reset after successful send");
+              console.log("🕐 Next question at:", new Date(newTime + intervalMs).toLocaleTimeString());
             } else {
               // Quality check failed - reset timer with 30-second delay
               const retryTime = Date.now() - (intervalMs - 30000);
               setLastAutoQuestionTime(retryTime);
-              console.log('⏭️ Quality check failed, will retry in 30 seconds');
+              console.log("⏭️ Quality check failed, will retry in 30 seconds");
             }
           })
           .catch((error) => {
-            console.error('❌ Auto-question generation failed:', error);
-            const errorMsg = error?.message || 'Unknown error';
+            console.error("❌ Auto-question generation failed:", error);
+            const errorMsg = error?.message || "Unknown error";
             setLastAutoQuestionError(errorMsg);
             setLastAutoQuestionErrorTime(new Date());
-            
+
             // Retry logic: wait 5 seconds then try again
             if (retryAttempts < 1) {
-              console.log('🔄 Will retry in 5 seconds...');
-              setRetryAttempts(prev => prev + 1);
+              console.log("🔄 Will retry in 5 seconds...");
+              setRetryAttempts((prev) => prev + 1);
               setTimeout(() => {
-                console.log('🔄 Retrying auto-question generation...');
+                console.log("🔄 Retrying auto-question generation...");
                 const retryTime = Date.now() - (intervalMs - 5000); // Retry in 5s
                 setLastAutoQuestionTime(retryTime);
                 isGeneratingAutoQuestionRef.current = false;
               }, 5000);
             } else {
-              console.log('❌ Max retries reached, resetting timer');
+              console.log("❌ Max retries reached, resetting timer");
               setRetryAttempts(0);
               const retryTime = Date.now() - (intervalMs - 60000); // Retry in 1 minute
               setLastAutoQuestionTime(retryTime);
@@ -1616,9 +1663,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           });
       }
     }, 1000);
-    
+
     return () => {
-      console.log('🧹 Cleaning up auto-question timer');
+      console.log("🧹 Cleaning up auto-question timer");
       clearInterval(checkInterval);
     };
   }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, retryAttempts]);
@@ -1646,7 +1693,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     const startTime = Date.now();
     durationTimerRef.current = setInterval(() => {
       setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
-      
+
       // Update rate limit countdown
       const now = Date.now();
       if (now < nextQuestionAllowedAt) {
@@ -1693,55 +1740,29 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     if (data.isFinal) {
       // Final transcript - add to buffer and check for voice commands
       const fullText = data.text.trim();
-      
+
       if (fullText.length > 0) {
         console.log("📝 FINAL transcript:", fullText);
-        
+
         // Add to transcript buffer
         transcriptBufferRef.current += fullText + " ";
-        setTranscriptChunks(prev => [...prev, fullText]);
+        setTranscriptChunks((prev) => [...prev, fullText]);
         setLastTranscript(fullText);
-        
-        // CRITICAL: Also accumulate in interval transcript for auto-questions
-        if (intervalTranscriptRef.current) {
-          intervalTranscriptRef.current += " " + fullText;
-        } else {
-          intervalTranscriptRef.current = fullText;
-        }
-        
-        // Hard cap to prevent runaway transcript growth
-        const MAX_TRANSCRIPT_LENGTH = autoQuestionInterval * 200; // 200 words per minute max
-        const currentWords = intervalTranscriptRef.current.split(/\s+/);
-        
-        if (currentWords.length > MAX_TRANSCRIPT_LENGTH) {
-          // Force trim to most recent content
-          const trimmedWords = currentWords.slice(-Math.floor(MAX_TRANSCRIPT_LENGTH * 0.75));
-          intervalTranscriptRef.current = trimmedWords.join(' ');
-          console.log(`⚠️ Transcript exceeded max length, trimmed from ${currentWords.length} to ${trimmedWords.length} words`);
-        }
-        
-        // Update interval transcript length state for UI
-        setIntervalTranscriptLength(intervalTranscriptRef.current.length);
-        
+
         // Buffer management - trim if getting too large
         if (transcriptBufferRef.current.length > MAX_BUFFER_SIZE) {
           console.log("🗑️ Trimming transcript buffer");
           transcriptBufferRef.current = transcriptBufferRef.current.slice(-KEEP_RECENT_SIZE);
         }
-        
+
         // Check for voice command in final transcript
         checkForVoiceCommand(fullText, transcriptChunks.length);
-        
-        // Calculate and update quality score for UI display with ACTUAL elapsed time
-        const actualElapsedSeconds = intervalStartTimeRef.current > 0 
-          ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
-          : autoQuestionInterval * 60;
-        const quality = analyzeContentQuality(intervalTranscriptRef.current, actualElapsedSeconds);
+
+        // Update content quality score
+        const quality = analyzeContentQuality(transcriptBufferRef.current, 60);
         setContentQualityScore(quality.contentDensity * 100);
-        
-        console.log(`📊 Interval transcript: ${intervalTranscriptRef.current.length} chars, quality: ${(quality.contentDensity * 100).toFixed(1)}%`);
       }
-      
+
       // Clear interim display
       setInterimTranscript("");
     } else {
@@ -1750,41 +1771,61 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  // Handle streaming errors
+  // Handle streaming errors from the Deepgram WebSocket client
   const handleStreamingError = (error: string) => {
     console.error("❌ Streaming error:", error);
-    
-    setFailureCount(prev => prev + 1);
-    
-    // Add to error history
-    setErrorHistory(prev => [...prev, {
-      id: crypto.randomUUID(),
-      timestamp: new Date(),
-      severity: 'critical',
-      category: 'transcription',
-      message: error,
-      details: 'Real-time transcription error',
-      retryable: true
-    }]);
-    
-    toast({
-      title: "Transcription Error",
-      description: error,
-      variant: "destructive",
+
+    const normalized = error.toLowerCase();
+    const isWebSocketError = normalized.includes("websocket") || normalized.includes("connection error");
+
+    // Track in error history for the debug panel
+    setErrorHistory((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        timestamp: new Date(),
+        severity: "critical",
+        category: "transcription",
+        message: error,
+        details: "Real-time transcription error",
+        retryable: true,
+      },
+    ]);
+
+    // Use functional update so circuit-breaker logic uses the fresh counter
+    setFailureCount((prev) => {
+      const next = prev + 1;
+
+      // For transient WebSocket hiccups, show a softer message while auto-reconnect runs
+      if (isWebSocketError && next < MAX_CONSECUTIVE_FAILURES) {
+        toast({
+          title: "Transcription connection interrupted",
+          description: "Attempting to reconnect to the transcription service...",
+        });
+      } else {
+        // Non-WebSocket or repeated failures are treated as hard errors
+        toast({
+          title: "Transcription Error",
+          description: error,
+          variant: "destructive",
+        });
+      }
+
+      // Circuit breaker logic – after too many consecutive failures, pause recording
+      if (next >= MAX_CONSECUTIVE_FAILURES) {
+        const backoffTime = CIRCUIT_BREAKER_BACKOFF[Math.min(next - 1, CIRCUIT_BREAKER_BACKOFF.length - 1)];
+        setIsCircuitOpen(true);
+        setCircuitBreakerRetryAt(Date.now() + backoffTime);
+
+        toast({
+          title: "Recording paused",
+          description: "Multiple transcription errors detected. System will retry automatically.",
+          variant: "destructive",
+        });
+      }
+
+      return next;
     });
-    
-    // Circuit breaker logic
-    if (failureCount >= MAX_CONSECUTIVE_FAILURES - 1) {
-      const backoffTime = CIRCUIT_BREAKER_BACKOFF[Math.min(failureCount, CIRCUIT_BREAKER_BACKOFF.length - 1)];
-      setIsCircuitOpen(true);
-      setCircuitBreakerRetryAt(Date.now() + backoffTime);
-      
-      toast({
-        title: "Recording paused",
-        description: "Multiple errors detected. System will retry automatically.",
-        variant: "destructive",
-      });
-    }
   };
 
   const startRecording = async () => {
@@ -1841,21 +1882,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             });
             stopRecording();
           }
-        }
+        },
       });
 
       await client.connect();
       setStreamingClient(client);
       isRecordingRef.current = true;
       setIsRecording(true);
-
     } catch (error) {
       console.error("Error starting recording:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to start recording";
-      toast({ 
-        title: "Failed to start recording", 
+      toast({
+        title: "Failed to start recording",
         description: errorMessage,
-        variant: "destructive" 
+        variant: "destructive",
       });
     }
   };
@@ -2034,35 +2074,35 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
           if (error) {
             console.error("Transcription error:", error);
-            
+
             // Suppress errors shortly after sending a question (pending requests may fail)
             const timeSinceLastSend = Date.now() - lastQuestionSentTimeRef.current;
             const shouldSuppressError = timeSinceLastSend < SUPPRESS_ERRORS_AFTER_SEND;
-            
+
             if (shouldSuppressError) {
-              console.log('🔇 Suppressing transcription error (question just sent)');
+              console.log("🔇 Suppressing transcription error (question just sent)");
               return;
             }
-            
+
             // Handle specific error types - Quota errors with circuit breaker
-            if (data?.error_type === 'quota_exceeded' || data?.status === 429 || error.message?.includes('quota')) {
+            if (data?.error_type === "quota_exceeded" || data?.status === 429 || error.message?.includes("quota")) {
               const newQuotaErrorCount = quotaConsecutiveErrors + 1;
               setQuotaConsecutiveErrors(newQuotaErrorCount);
-              
+
               console.error(`⚠️ API Quota Error (${newQuotaErrorCount}/${QUOTA_CIRCUIT_BREAKER_THRESHOLD})`);
-              
+
               // Trigger circuit breaker after 3 consecutive quota errors
               if (newQuotaErrorCount >= QUOTA_CIRCUIT_BREAKER_THRESHOLD) {
                 setQuotaErrorActive(true);
                 const retryAt = Date.now() + QUOTA_PAUSE_DURATION;
                 setQuotaCircuitBreakerRetryAt(retryAt);
-                
+
                 // Auto-pause recording
                 if (isRecording) {
                   stopRecording();
-                  console.log('🛑 Auto-paused recording due to quota exhaustion');
+                  console.log("🛑 Auto-paused recording due to quota exhaustion");
                 }
-                
+
                 toast({
                   title: "🚫 API Quota Exhausted",
                   description: "Recording paused for 5 minutes. Check your OpenAI billing settings.",
@@ -2078,17 +2118,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   duration: 6000,
                 });
               }
-              
-              setFailureCount(prev => prev + 1);
+
+              setFailureCount((prev) => prev + 1);
               return;
             }
-            
+
             // Reset quota error count on successful transcription or non-quota errors
             if (quotaConsecutiveErrors > 0) {
               setQuotaConsecutiveErrors(0);
             }
-            
-            if (data?.error_type === 'invalid_api_key' || error.message?.includes('API key')) {
+
+            if (data?.error_type === "invalid_api_key" || error.message?.includes("API key")) {
               toast({
                 title: "API Configuration Error",
                 description: "OpenAI API key is invalid. Please check your configuration.",
@@ -2097,13 +2137,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               });
               return;
             }
-            
+
             // Timeout errors
-            if (data?.status === 408 || error.message?.includes('timeout')) {
-              console.log('⏱️ Transcription timeout, will retry on next chunk');
+            if (data?.status === 408 || error.message?.includes("timeout")) {
+              console.log("⏱️ Transcription timeout, will retry on next chunk");
               return;
             }
-            
+
             // Only show generic error for critical errors, not for empty responses
             if (error.message && !error.message.includes("too small")) {
               const errorDesc = data?.error || error.message || "Please ensure your microphone is working properly.";
@@ -2121,7 +2161,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             if (quotaConsecutiveErrors > 0) {
               setQuotaConsecutiveErrors(0);
             }
-            
+
             const newText = data.text.trim();
             const wordCount = newText.split(/\s+/).length;
             console.log("✅ Transcribed:", wordCount, "words -", newText.substring(0, 120));
@@ -2142,61 +2182,61 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             } else {
               transcriptBufferRef.current = newText;
             }
-            
+
             // Also accumulate in interval transcript for auto-questions
             if (intervalTranscriptRef.current) {
               intervalTranscriptRef.current += " " + newText;
             } else {
               intervalTranscriptRef.current = newText;
             }
-            
+
             // Hard cap to prevent runaway transcript growth
             const MAX_TRANSCRIPT_LENGTH = autoQuestionInterval * 200; // 200 words per minute max
             const currentWords = intervalTranscriptRef.current.split(/\s+/);
-            
+
             if (currentWords.length > MAX_TRANSCRIPT_LENGTH) {
               // Force trim to most recent content
               const trimmedWords = currentWords.slice(-Math.floor(MAX_TRANSCRIPT_LENGTH * 0.75));
-              intervalTranscriptRef.current = trimmedWords.join(' ');
-              console.log(`⚠️ Transcript exceeded max length, trimmed from ${currentWords.length} to ${trimmedWords.length} words`);
+              intervalTranscriptRef.current = trimmedWords.join(" ");
+              console.log(
+                `⚠️ Transcript exceeded max length, trimmed from ${currentWords.length} to ${trimmedWords.length} words`,
+              );
             }
-            
+
             // Update interval transcript length state for UI
             setIntervalTranscriptLength(intervalTranscriptRef.current.length);
-            
+
             // Calculate and update quality score for UI display with ACTUAL elapsed time
             try {
-              const actualElapsedSeconds = intervalStartTimeRef.current > 0 
-                ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
-                : autoQuestionInterval * 60;
-              
+              const actualElapsedSeconds =
+                intervalStartTimeRef.current > 0
+                  ? Math.max(1, (Date.now() - intervalStartTimeRef.current) / 1000)
+                  : autoQuestionInterval * 60;
+
               // Use sliding window for long transcripts
               const expectedWords = autoQuestionInterval * 150;
               const currentWordCount = intervalTranscriptRef.current.split(/\s+/).length;
               let transcriptToAnalyze = intervalTranscriptRef.current;
-              
+
               if (currentWordCount > expectedWords * 2) {
                 const words = intervalTranscriptRef.current.split(/\s+/);
                 const recentWords = words.slice(-expectedWords);
-                transcriptToAnalyze = recentWords.join(' ');
+                transcriptToAnalyze = recentWords.join(" ");
               }
-              
-              const qualityMetrics = analyzeContentQuality(
-                transcriptToAnalyze, 
-                actualElapsedSeconds
-              );
+
+              const qualityMetrics = analyzeContentQuality(transcriptToAnalyze, actualElapsedSeconds);
               setContentQualityScore(qualityMetrics.contentDensity);
-              
-              console.log('📊 Quality updated:', {
+
+              console.log("📊 Quality updated:", {
                 transcriptLength: intervalTranscriptRef.current.length,
                 wordCount: qualityMetrics.wordCount,
-                density: (qualityMetrics.contentDensity * 100).toFixed(1) + '%',
+                density: (qualityMetrics.contentDensity * 100).toFixed(1) + "%",
                 isQuality: qualityMetrics.isQualityContent,
                 wpm: qualityMetrics.wordsPerMinute.toFixed(0),
-                actualElapsedSeconds: actualElapsedSeconds.toFixed(0)
+                actualElapsedSeconds: actualElapsedSeconds.toFixed(0),
               });
             } catch (qualityError) {
-              console.error('❌ Quality calculation error:', qualityError);
+              console.error("❌ Quality calculation error:", qualityError);
             }
 
             // Implement sliding window for memory management
@@ -2427,11 +2467,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Error history management
   const addError = (
-    severity: ErrorRecord['severity'],
-    category: ErrorRecord['category'],
+    severity: ErrorRecord["severity"],
+    category: ErrorRecord["category"],
     message: string,
     details?: string,
-    retryable?: boolean
+    retryable?: boolean,
   ) => {
     const error: ErrorRecord = {
       id: `error-${Date.now()}-${Math.random()}`,
@@ -2440,14 +2480,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       category,
       message,
       details,
-      retryable
+      retryable,
     };
-    
-    setErrorHistory(prev => [error, ...prev].slice(0, 50)); // Keep last 50 errors
+
+    setErrorHistory((prev) => [error, ...prev].slice(0, 50)); // Keep last 50 errors
   };
 
   const handleDismissError = (errorId: string) => {
-    setErrorHistory(prev => prev.filter(e => e.id !== errorId));
+    setErrorHistory((prev) => prev.filter((e) => e.id !== errorId));
   };
 
   const handleClearAllErrors = () => {
@@ -2468,22 +2508,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       toast({
         title: "Invalid Question",
         description: "Please enter a question to send",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     setShowExtractionDialog(false);
-    
+
     // Send the manually edited question
     await handleQuestionSend({
       question_text: questionToSend,
-      suggested_type: 'multiple_choice',
+      suggested_type: "multiple_choice",
       confidence: 1.0,
-      extraction_method: 'manual_edit',
-      source: 'voice_command_corrected'
+      extraction_method: "manual_edit",
+      source: "voice_command_corrected",
     });
-    
+
     setPartialQuestion("");
     setEditedQuestion("");
   };
@@ -2498,27 +2538,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
               <div className="flex-1 space-y-2">
                 <div>
-                  <h3 className="font-semibold text-destructive mb-1">
-                    🚫 API Quota Exhausted - Recording Paused
-                  </h3>
+                  <h3 className="font-semibold text-destructive mb-1">🚫 API Quota Exhausted - Recording Paused</h3>
                   <p className="text-sm text-muted-foreground">
-                    OpenAI API quota has been exceeded after {QUOTA_CIRCUIT_BREAKER_THRESHOLD} consecutive errors. 
+                    OpenAI API quota has been exceeded after {QUOTA_CIRCUIT_BREAKER_THRESHOLD} consecutive errors.
                     Recording has been automatically paused to prevent further failures.
                   </p>
                 </div>
-                
+
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">
-                      {quotaCircuitBreakerCountdown > 60 
+                      {quotaCircuitBreakerCountdown > 60
                         ? `${Math.ceil(quotaCircuitBreakerCountdown / 60)} min ${quotaCircuitBreakerCountdown % 60}s remaining`
-                        : `${quotaCircuitBreakerCountdown}s remaining`
-                      }
+                        : `${quotaCircuitBreakerCountdown}s remaining`}
                     </span>
                   </div>
-                  <Progress 
-                    value={100 - ((quotaCircuitBreakerCountdown / (QUOTA_PAUSE_DURATION / 1000)) * 100)} 
+                  <Progress
+                    value={100 - (quotaCircuitBreakerCountdown / (QUOTA_PAUSE_DURATION / 1000)) * 100}
                     className="flex-1 h-2"
                   />
                 </div>
@@ -2532,14 +2569,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     <li>• Wait for the automatic retry timer to complete</li>
                     <li>• Or manually resume recording once you've resolved the quota issue</li>
                   </ul>
-                  
+
                   <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={handleResumeFromQuotaError}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                    >
+                    <Button onClick={handleResumeFromQuotaError} variant="outline" size="sm" className="text-xs">
                       Resume Now
                     </Button>
                   </div>
@@ -2556,447 +2588,452 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             <Mic className="h-5 w-5" />
             Live Lecture Capture
           </CardTitle>
-          <CardDescription>
-            Record your lecture and send questions to students in real-time
-          </CardDescription>
+          <CardDescription>Record your lecture and send questions to students in real-time</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* System Health Check */}
+          {!isRecording && <SystemHealthCheck />}
+
           {/* Error History Panel */}
           {errorHistory.length > 0 && (
-            <ErrorHistoryPanel
-              errors={errorHistory}
-              onDismiss={handleDismissError}
-              onClearAll={handleClearAllErrors}
-            />
+            <ErrorHistoryPanel errors={errorHistory} onDismiss={handleDismissError} onClearAll={handleClearAllErrors} />
           )}
 
           {/* System Status Monitoring Dashboard */}
           {isRecording && (
-        <Card className="mb-4 border-primary/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              📊 System Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {/* Transcription Status */}
-              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
-                <div className="flex items-center gap-2 mb-1">
-                  {systemHealthy ? (
-                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  ) : (
-                    <div className="h-2 w-2 rounded-full bg-red-500" />
-                  )}
-                  <p className="text-xs font-medium text-muted-foreground">Transcription</p>
+            <Card className="mb-4 border-primary/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">📊 System Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {/* Transcription Status */}
+                  <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-1">
+                      {systemHealthy ? (
+                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                      ) : (
+                        <div className="h-2 w-2 rounded-full bg-red-500" />
+                      )}
+                      <p className="text-xs font-medium text-muted-foreground">Transcription</p>
+                    </div>
+                    <p className="text-sm font-bold">{systemHealthy ? "✅ Active" : "❌ Error"}</p>
+                  </div>
+
+                  {/* Question Detection Status */}
+                  <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Radio className="h-3 w-3 text-primary animate-pulse" />
+                      <p className="text-xs font-medium text-muted-foreground">Detection</p>
+                    </div>
+                    <p className="text-sm font-bold">{isSendingQuestion ? "🔄 Sending" : "👂 Listening"}</p>
+                  </div>
+
+                  {/* Students Connected */}
+                  <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Students</p>
+                    <p className="text-sm font-bold">
+                      {studentCount === 0 ? (
+                        <span className="text-amber-600 dark:text-amber-400">👥 {studentCount}</span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-400">✅ {studentCount}</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Next Question with Progress Bar */}
+                  <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Next Question</p>
+                    <p className="text-sm font-bold mb-2">
+                      {rateLimitSecondsLeft > 0 ? (
+                        <span className="text-amber-600 dark:text-amber-400">⏱️ {rateLimitSecondsLeft}s</span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-400">✅ Ready</span>
+                      )}
+                    </p>
+                    {rateLimitSecondsLeft > 0 && (
+                      <Progress
+                        value={100 - (rateLimitSecondsLeft / 15) * 100}
+                        className="h-2 bg-amber-100 dark:bg-amber-950"
+                      />
+                    )}
+                  </div>
+
+                  {/* Daily Quota with Progress Bar */}
+                  <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-muted-foreground">Daily Quota</p>
+                      {dailyQuestionCount >= dailyQuotaLimit * 0.8 && (
+                        <Badge
+                          variant={dailyQuestionCount >= dailyQuotaLimit ? "destructive" : "default"}
+                          className="text-[10px] px-1.5 py-0.5"
+                        >
+                          {dailyQuestionCount >= dailyQuotaLimit
+                            ? "🚫 FULL"
+                            : dailyQuestionCount >= dailyQuotaLimit * 0.9
+                              ? "⚠️ 90%"
+                              : "⚠️ 80%"}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm font-bold mb-2">
+                      {dailyQuestionCount >= dailyQuotaLimit ? (
+                        <span className="text-red-600 dark:text-red-400">
+                          {dailyQuestionCount}/{dailyQuotaLimit}
+                        </span>
+                      ) : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? (
+                        <span className="text-amber-600 dark:text-amber-400">
+                          {dailyQuestionCount}/{dailyQuotaLimit}
+                        </span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-400">
+                          {dailyQuestionCount}/{dailyQuotaLimit}
+                        </span>
+                      )}
+                    </p>
+                    <Progress value={(dailyQuestionCount / dailyQuotaLimit) * 100} className="h-2" />
+                  </div>
                 </div>
-                <p className="text-sm font-bold">
-                  {systemHealthy ? '✅ Active' : '❌ Error'}
-                </p>
-              </div>
 
-              {/* Question Detection Status */}
-              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
-                <div className="flex items-center gap-2 mb-1">
-                  <Radio className="h-3 w-3 text-primary animate-pulse" />
-                  <p className="text-xs font-medium text-muted-foreground">Detection</p>
+                {/* Auto-Question Dashboard */}
+                {autoQuestionEnabled && (
+                  <div className="mt-3 space-y-3">
+                    {/* System Health Check */}
+                    <EdgeFunctionHealthCheck />
+
+                    {/* Debug Dashboard */}
+                    <AutoQuestionDebugDashboard
+                      isEnabled={autoQuestionEnabled}
+                      isRecording={isRecording}
+                      nextQuestionIn={nextAutoQuestionIn}
+                      intervalMinutes={autoQuestionInterval}
+                      transcriptLength={intervalTranscriptLength}
+                      lastError={lastAutoQuestionError}
+                      lastErrorTime={lastAutoQuestionErrorTime}
+                      autoQuestionCount={autoQuestionCount}
+                      isSendingQuestion={isSendingQuestion}
+                      onTestNow={handleTestAutoQuestion}
+                      onToggleEnabled={handleToggleAutoQuestion}
+                    />
+
+                    {/* Regular Dashboard */}
+                    <AutoQuestionDashboard
+                      isRecording={isRecording}
+                      autoQuestionEnabled={autoQuestionEnabled}
+                      autoQuestionInterval={autoQuestionInterval}
+                      studentCount={studentCount}
+                      nextAutoQuestionIn={nextAutoQuestionIn}
+                      intervalTranscriptLength={intervalTranscriptLength}
+                      contentQualityScore={contentQualityScore}
+                      metrics={autoQuestionMetrics}
+                      rateLimitSecondsLeft={rateLimitSecondsLeft}
+                      dailyQuestionCount={dailyQuestionCount}
+                      dailyQuotaLimit={dailyQuotaLimit}
+                    />
+                  </div>
+                )}
+
+                {/* Warning messages */}
+                {studentCount === 0 && (
+                  <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800">
+                    <p className="text-xs text-amber-900 dark:text-amber-200">
+                      ⚠️ No students connected. Share your instructor code with students to enable question sending.
+                    </p>
+                  </div>
+                )}
+                {!systemHealthy && (
+                  <div className="mt-3 p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800">
+                    <p className="text-xs text-red-900 dark:text-red-200">
+                      ❌ System experiencing issues. Try stopping and restarting the recording.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tutorial Section */}
+          <Collapsible open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
+            <Card className="mb-4 bg-muted/50 border-primary/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-primary" />
+                    How to Use Live Lecture Capture
+                  </CardTitle>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      {isTutorialOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      <span className="sr-only">Toggle tutorial</span>
+                    </Button>
+                  </CollapsibleTrigger>
                 </div>
-                <p className="text-sm font-bold">
-                  {isSendingQuestion ? '🔄 Sending' : '👂 Listening'}
-                </p>
-              </div>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="shrink-0">
+                        Step 1
+                      </Badge>
+                      <p>Click "Start Recording" to begin capturing your lecture audio in real-time.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="shrink-0">
+                        Step 2
+                      </Badge>
+                      <p>Ask your question naturally during the lecture.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="shrink-0">
+                        Step 3
+                      </Badge>
+                      <p>
+                        Either click the <strong>"Send Question"</strong> button below, or say{" "}
+                        <strong>"send question now"</strong> to instantly send it to students.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="shrink-0">
+                        Step 4
+                      </Badge>
+                      <p>
+                        The system will extract the most recent question from your speech and send it to all students.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-              {/* Students Connected */}
-              <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Students</p>
-                <p className="text-sm font-bold">
-                  {studentCount === 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400">👥 {studentCount}</span>
-                  ) : (
-                    <span className="text-green-600 dark:text-green-400">✅ {studentCount}</span>
-                  )}
-                </p>
+          <Card className="relative overflow-hidden">
+            {/* Voice Command Flash Overlay */}
+            {voiceCommandDetected && (
+              <div className="absolute inset-0 z-50 pointer-events-none">
+                <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
+                    <Zap className="h-12 w-12 animate-pulse" />
+                  </div>
+                </div>
               </div>
+            )}
 
-              {/* Next Question with Progress Bar */}
-              <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Next Question</p>
-                <p className="text-sm font-bold mb-2">
-                  {rateLimitSecondsLeft > 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400">⏱️ {rateLimitSecondsLeft}s</span>
-                  ) : (
-                    <span className="text-green-600 dark:text-green-400">✅ Ready</span>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
+                Live Lecture Capture
+              </CardTitle>
+              <CardDescription className="text-sm">
+                {isRecording
+                  ? "🎙️ Real-time streaming active • Say 'send question now' or click 'Send Question' to send your most recent question to students"
+                  : "Start recording with Deepgram real-time transcription - use voice commands or the 'Send Question' button to send questions"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    variant={isRecording ? "destructive" : "default"}
+                    className="flex-1"
+                  >
+                    {isRecording ? (
+                      <>
+                        <MicOff className="mr-2 h-4 w-4" />
+                        Stop Recording
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="mr-2 h-4 w-4" />
+                        Start Recording
+                      </>
+                    )}
+                  </Button>
+                  {transcriptChunks.length > 0 && (
+                    <Button onClick={clearTranscript} variant="outline" size="sm">
+                      Clear
+                    </Button>
                   )}
-                </p>
-                {rateLimitSecondsLeft > 0 && (
-                  <Progress 
-                    value={100 - ((rateLimitSecondsLeft / 15) * 100)} 
-                    className="h-2 bg-amber-100 dark:bg-amber-950"
-                  />
+                </div>
+
+                {isRecording && transcriptChunks.length > 0 && (
+                  <Button
+                    onClick={handleManualQuestionSend}
+                    variant="default"
+                    className="w-full"
+                    disabled={isSendingQuestion || rateLimitSecondsLeft > 0}
+                  >
+                    {isSendingQuestion ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : rateLimitSecondsLeft > 0 ? (
+                      <>⏱️ Wait {rateLimitSecondsLeft}s</>
+                    ) : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        Send Question
+                      </>
+                    )}
+                  </Button>
                 )}
               </div>
 
-              {/* Daily Quota with Progress Bar */}
-              <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-medium text-muted-foreground">Daily Quota</p>
-                  {dailyQuestionCount >= dailyQuotaLimit * 0.8 && (
-                    <Badge variant={dailyQuestionCount >= dailyQuotaLimit ? "destructive" : "default"} className="text-[10px] px-1.5 py-0.5">
-                      {dailyQuestionCount >= dailyQuotaLimit ? '🚫 FULL' : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? '⚠️ 90%' : '⚠️ 80%'}
+              {isRecording && (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="flex-1 justify-center py-1.5">
+                      <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
+                      Streaming
+                    </Badge>
+                    <Badge variant="secondary" className="flex-1 justify-center py-1.5">
+                      {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
+                    </Badge>
+                  </div>
+
+                  {/* Rate limit indicator */}
+                  {rateLimitSecondsLeft > 0 && (
+                    <Badge
+                      variant="default"
+                      className="w-full justify-center py-1.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                    >
+                      ⏱️ Rate limit: Next question in {rateLimitSecondsLeft}s
                     </Badge>
                   )}
-                </div>
-                <p className="text-sm font-bold mb-2">
-                  {dailyQuestionCount >= dailyQuotaLimit ? (
-                    <span className="text-red-600 dark:text-red-400">{dailyQuestionCount}/{dailyQuotaLimit}</span>
-                  ) : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? (
-                    <span className="text-amber-600 dark:text-amber-400">{dailyQuestionCount}/{dailyQuotaLimit}</span>
-                  ) : (
-                    <span className="text-green-600 dark:text-green-400">{dailyQuestionCount}/{dailyQuotaLimit}</span>
+
+                  {failureCount > 0 && (
+                    <Badge variant="destructive" className="w-full justify-center py-1.5">
+                      <AlertCircle className="mr-2 h-3 w-3" />
+                      {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
+                    </Badge>
                   )}
-                </p>
-                <Progress 
-                  value={(dailyQuestionCount / dailyQuotaLimit) * 100} 
-                  className="h-2"
-                />
-              </div>
-            </div>
 
-            {/* Auto-Question Dashboard */}
-            {autoQuestionEnabled && (
-              <div className="mt-3 space-y-3">
-                {/* System Health Check */}
-                <EdgeFunctionHealthCheck />
-                
-                {/* Debug Dashboard */}
-                <AutoQuestionDebugDashboard
-                  isEnabled={autoQuestionEnabled}
-                  isRecording={isRecording}
-                  nextQuestionIn={nextAutoQuestionIn}
-                  intervalMinutes={autoQuestionInterval}
-                  transcriptLength={intervalTranscriptLength}
-                  lastError={lastAutoQuestionError}
-                  lastErrorTime={lastAutoQuestionErrorTime}
-                  autoQuestionCount={autoQuestionCount}
-                  isSendingQuestion={isSendingQuestion}
-                  onTestNow={handleTestAutoQuestion}
-                  onToggleEnabled={handleToggleAutoQuestion}
-                />
-                
-                {/* Regular Dashboard */}
-                <AutoQuestionDashboard
-                  isRecording={isRecording}
-                  autoQuestionEnabled={autoQuestionEnabled}
-                  autoQuestionInterval={autoQuestionInterval}
-                  studentCount={studentCount}
-                  nextAutoQuestionIn={nextAutoQuestionIn}
-                  intervalTranscriptLength={intervalTranscriptLength}
-                  contentQualityScore={contentQualityScore}
-                  metrics={autoQuestionMetrics}
-                  rateLimitSecondsLeft={rateLimitSecondsLeft}
-                  dailyQuestionCount={dailyQuestionCount}
-                  dailyQuotaLimit={dailyQuotaLimit}
-                />
-              </div>
-            )}
-
-            {/* Warning messages */}
-            {studentCount === 0 && (
-              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800">
-                <p className="text-xs text-amber-900 dark:text-amber-200">
-                  ⚠️ No students connected. Share your instructor code with students to enable question sending.
-                </p>
-              </div>
-            )}
-            {!systemHealthy && (
-              <div className="mt-3 p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800">
-                <p className="text-xs text-red-900 dark:text-red-200">
-                  ❌ System experiencing issues. Try stopping and restarting the recording.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tutorial Section */}
-      <Collapsible open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
-        <Card className="mb-4 bg-muted/50 border-primary/20">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-primary" />
-                How to Use Live Lecture Capture
-              </CardTitle>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  {isTutorialOpen ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
+                  {rateLimitSecondsLeft === 0 && (
+                    <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
+                      <p className="text-xs font-medium text-center">
+                        ✅ Ready • Click "Send Question" or say "send question now"
+                      </p>
+                    </div>
                   )}
-                  <span className="sr-only">Toggle tutorial</span>
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-          </CardHeader>
-          <CollapsibleContent>
-            <CardContent className="space-y-3">
-              <div className="space-y-2 text-sm">
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="shrink-0">Step 1</Badge>
-                  <p>Click "Start Recording" to begin capturing your lecture audio in real-time.</p>
+
+                  {lastTranscript && (
+                    <div className="bg-muted border border-border rounded-lg p-3 space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                        <Radio className="h-3 w-3" />
+                        Last Transcribed:
+                      </p>
+                      <p className="text-sm text-foreground">{lastTranscript}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="shrink-0">Step 2</Badge>
-                  <p>Ask your question naturally during the lecture.</p>
+              )}
+
+              {transcriptChunks.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Transcript Chunks:</p>
+                    {/* Transcription Quality Rating */}
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">Accuracy:</p>
+                      {["excellent", "good", "poor"].map((rating) => (
+                        <Button
+                          key={rating}
+                          variant={transcriptionRating === rating ? "default" : "outline"}
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const {
+                                data: { user },
+                              } = await supabase.auth.getUser();
+                              if (!user) return;
+
+                              const { error } = await supabase.from("ai_quality_ratings").insert({
+                                user_id: user.id,
+                                rating_type: "transcription",
+                                reference_id: sessionId,
+                                rating: rating,
+                              });
+
+                              if (error) throw error;
+
+                              setTranscriptionRating(rating);
+                              toast({
+                                title: "Thank you for your feedback!",
+                                description: "Your rating helps us improve transcription quality.",
+                              });
+                            } catch (error) {
+                              console.error("Error saving rating:", error);
+                              toast({
+                                title: "Failed to save rating",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="gap-1 h-7 text-xs"
+                        >
+                          <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
+                          {rating.charAt(0).toUpperCase() + rating.slice(1)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {transcriptChunks.map((chunk, index) => (
+                      <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                      </div>
+                    ))}
+                    {interimTranscript && (
+                      <div className="border rounded-lg p-2.5 bg-primary/5 border-primary/20 animate-pulse">
+                        <p className="text-xs font-medium text-primary mb-1">🎙️ Live (interim)</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">{interimTranscript}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="shrink-0">Step 3</Badge>
-                  <p>Either click the <strong>"Send Question"</strong> button below, or say <strong>"send question now"</strong> to instantly send it to students.</p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="outline" className="shrink-0">Step 4</Badge>
-                  <p>The system will extract the most recent question from your speech and send it to all students.</p>
-                </div>
-              </div>
+              )}
             </CardContent>
-          </CollapsibleContent>
-        </Card>
-        </Collapsible>
-
-        <Card className="relative overflow-hidden">
-        {/* Voice Command Flash Overlay */}
-        {voiceCommandDetected && (
-          <div className="absolute inset-0 z-50 pointer-events-none">
-            <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
-                <Zap className="h-12 w-12 animate-pulse" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-xl">
-            {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
-            Live Lecture Capture
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {isRecording
-              ? "🎙️ Real-time streaming active • Say 'send question now' or click 'Send Question' to send your most recent question to students"
-              : "Start recording with Deepgram real-time transcription - use voice commands or the 'Send Question' button to send questions"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <Button
-              onClick={isRecording ? stopRecording : startRecording}
-              variant={isRecording ? "destructive" : "default"}
-              className="flex-1"
-            >
-              {isRecording ? (
-                <>
-                  <MicOff className="mr-2 h-4 w-4" />
-                  Stop Recording
-                </>
-              ) : (
-                <>
-                  <Mic className="mr-2 h-4 w-4" />
-                  Start Recording
-                </>
-              )}
-            </Button>
-            {transcriptChunks.length > 0 && (
-              <Button onClick={clearTranscript} variant="outline" size="sm">
-                Clear
-              </Button>
-            )}
-          </div>
-          
-          {isRecording && transcriptChunks.length > 0 && (
-            <Button 
-              onClick={handleManualQuestionSend} 
-              variant="default"
-              className="w-full"
-              disabled={isSendingQuestion || rateLimitSecondsLeft > 0}
-            >
-              {isSendingQuestion ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : rateLimitSecondsLeft > 0 ? (
-                <>
-                  ⏱️ Wait {rateLimitSecondsLeft}s
-                </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Send Question
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-
-        {isRecording && (
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Badge variant="outline" className="flex-1 justify-center py-1.5">
-                <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
-                Streaming
-              </Badge>
-              <Badge variant="secondary" className="flex-1 justify-center py-1.5">
-                {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
-              </Badge>
-            </div>
-            
-            {/* Rate limit indicator */}
-            {rateLimitSecondsLeft > 0 && (
-              <Badge variant="default" className="w-full justify-center py-1.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30">
-                ⏱️ Rate limit: Next question in {rateLimitSecondsLeft}s
-              </Badge>
-            )}
-            
-            {failureCount > 0 && (
-              <Badge variant="destructive" className="w-full justify-center py-1.5">
-                <AlertCircle className="mr-2 h-3 w-3" />
-                {failureCount} transcription {failureCount === 1 ? "failure" : "failures"}
-              </Badge>
-            )}
-            
-            {rateLimitSecondsLeft === 0 && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
-                <p className="text-xs font-medium text-center">
-                  ✅ Ready • Click "Send Question" or say "send question now"
-                </p>
-              </div>
-            )}
-            
-            {lastTranscript && (
-              <div className="bg-muted border border-border rounded-lg p-3 space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                  <Radio className="h-3 w-3" />
-                  Last Transcribed:
-                </p>
-                <p className="text-sm text-foreground">{lastTranscript}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {transcriptChunks.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Transcript Chunks:</p>
-              {/* Transcription Quality Rating */}
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Accuracy:</p>
-                {['excellent', 'good', 'poor'].map((rating) => (
-                  <Button
-                    key={rating}
-                    variant={transcriptionRating === rating ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (!user) return;
-
-                        const { error } = await supabase
-                          .from('ai_quality_ratings')
-                          .insert({
-                            user_id: user.id,
-                            rating_type: 'transcription',
-                            reference_id: sessionId,
-                            rating: rating
-                          });
-
-                        if (error) throw error;
-
-                        setTranscriptionRating(rating);
-                        toast({
-                          title: "Thank you for your feedback!",
-                          description: "Your rating helps us improve transcription quality.",
-                        });
-                      } catch (error) {
-                        console.error('Error saving rating:', error);
-                        toast({
-                          title: "Failed to save rating",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    className="gap-1 h-7 text-xs"
-                  >
-                    <Star className={`h-3 w-3 ${transcriptionRating === rating ? 'fill-current' : ''}`} />
-                    {rating.charAt(0).toUpperCase() + rating.slice(1)}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {transcriptChunks.map((chunk, index) => (
-                <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
-                </div>
-              ))}
-              {interimTranscript && (
-                <div className="border rounded-lg p-2.5 bg-primary/5 border-primary/20 animate-pulse">
-                  <p className="text-xs font-medium text-primary mb-1">🎙️ Live (interim)</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">{interimTranscript}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          </Card>
         </CardContent>
       </Card>
-    </CardContent>
-  </Card>
-    
-    {/* Extraction Error Dialog */}
-    <AlertDialog open={showExtractionDialog} onOpenChange={setShowExtractionDialog}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Question Extraction Incomplete</AlertDialogTitle>
-          <AlertDialogDescription>
-            The voice command detected a partial question. You can edit it and send, or retry the extraction.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm font-medium mb-2">Detected (partial):</p>
-            <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
-              "{partialQuestion}"
-            </p>
+
+      {/* Extraction Error Dialog */}
+      <AlertDialog open={showExtractionDialog} onOpenChange={setShowExtractionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Question Extraction Incomplete</AlertDialogTitle>
+            <AlertDialogDescription>
+              The voice command detected a partial question. You can edit it and send, or retry the extraction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium mb-2">Detected (partial):</p>
+              <p className="text-sm text-muted-foreground bg-muted p-2 rounded">"{partialQuestion}"</p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-2">Edit and send:</p>
+              <Textarea
+                value={editedQuestion}
+                onChange={(e) => setEditedQuestion(e.target.value)}
+                placeholder="Complete the question..."
+                rows={3}
+              />
+            </div>
           </div>
-          
-          <div>
-            <p className="text-sm font-medium mb-2">Edit and send:</p>
-            <Textarea
-              value={editedQuestion}
-              onChange={(e) => setEditedQuestion(e.target.value)}
-              placeholder="Complete the question..."
-              rows={3}
-            />
-          </div>
-        </div>
-        
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleRetryExtraction}>
-            Retry Extraction
-          </AlertDialogCancel>
-          <AlertDialogAction onClick={handleManualSend}>
-            Send Question
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleRetryExtraction}>Retry Extraction</AlertDialogCancel>
+            <AlertDialogAction onClick={handleManualSend}>Send Question</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
