@@ -324,7 +324,7 @@ export const LectureCheckInResults = () => {
     const correctAnswer = question.overriddenAnswer || question.correctAnswer;
     const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
       // quiz_responses is an object with string keys like {"0": "B"}
-      const response = a.quiz_responses?.["0"] || a.quiz_responses?.[0];
+      const response = a.quiz_responses?.[questionIndex.toString()] || a.quiz_responses?.[questionIndex];
       return response === correctAnswer;
     });
 
@@ -980,7 +980,7 @@ export const LectureCheckInResults = () => {
                             
                             return Array.from(uniqueStudents.values()).map((assignment) => {
                               // quiz_responses is an object with string keys like {"0": "B"}
-                              const studentAnswer = assignment.quiz_responses?.["0"] || assignment.quiz_responses?.[0];
+                              const studentAnswer = assignment.quiz_responses?.[qIdx.toString()] || assignment.quiz_responses?.[qIdx];
                               const isCompleted = assignment.completed;
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
@@ -1062,7 +1062,7 @@ export const LectureCheckInResults = () => {
 
                                 // quiz_responses is an object with string keys like {"0": "B"}
                                 const count = questionAssignments.filter(
-                                  (a) => a.completed && (a.quiz_responses?.["0"] || a.quiz_responses?.[0]) === optionLetter,
+                                  (a) => a.completed && (a.quiz_responses?.[qIdx.toString()] || a.quiz_responses?.[qIdx]) === optionLetter,
                                 ).length;
                                 const total = questionAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
@@ -1117,7 +1117,7 @@ export const LectureCheckInResults = () => {
                                 
                                 return Array.from(uniqueStudents.values()).map((assignment) => {
                                   // quiz_responses is an object with string keys like {"0": "B"}
-                                  const studentAnswer = assignment.quiz_responses?.["0"] || assignment.quiz_responses?.[0];
+                                  const studentAnswer = assignment.quiz_responses?.[qIdx.toString()] || assignment.quiz_responses?.[qIdx];
                                   const isCompleted = assignment.completed;
                                   const currentGrade = assignment.grade;
 
