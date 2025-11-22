@@ -391,6 +391,9 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     // Update user stats with gambling metrics
     await updateUserStatsWithGambling(xpEarned, coinsEarned, correct, confidenceLevel);
     await updateSpacedRepetition(currentProblem.id, correct);
+    
+    // Update daily challenges and practice goals
+    await updateChallengesAndGoals(correct, confidenceLevel);
 
     // Show animated feedback
     if (correct) {
@@ -541,6 +544,135 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         confidence_accuracy: confidenceAccuracy,
       })
       .eq("user_id", userId);
+  };
+
+  const updateChallengesAndGoals = async (correct: boolean, confidenceLevel: ConfidenceLevel) => {
+    if (!userId) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      // Fetch all today's challenges
+      const { data: challenges } = await supabase
+        .from('daily_challenges')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('challenge_date', today);
+
+      if (challenges) {
+        for (const challenge of challenges) {
+          let shouldUpdate = false;
+          let newProgress = challenge.current_progress;
+
+          // Update based on challenge type
+          if (challenge.challenge_type === 'practice_count') {
+            shouldUpdate = true;
+            newProgress = challenge.current_progress + 1;
+          } else if (
+            challenge.challenge_type === 'confidence_win' &&
+            correct &&
+            (confidenceLevel === 'high' || confidenceLevel === 'very_high')
+          ) {
+            shouldUpdate = true;
+            newProgress = challenge.current_progress + 1;
+          } else if (challenge.challenge_type === 'streak' && correct) {
+            // Check current streak from user_stats
+            const { data: stats } = await supabase
+              .from('user_stats')
+              .select('current_streak')
+              .eq('user_id', userId)
+              .single();
+            
+            if (stats && stats.current_streak >= challenge.target_value) {
+              shouldUpdate = true;
+              newProgress = challenge.target_value; // Mark as complete
+            }
+          }
+
+          if (shouldUpdate && newProgress <= challenge.target_value) {
+            const isCompleted = newProgress >= challenge.target_value;
+
+            await supabase
+              .from('daily_challenges')
+              .update({
+                current_progress: newProgress,
+                completed: isCompleted,
+                completed_at: isCompleted ? new Date().toISOString() : null,
+              })
+              .eq('id', challenge.id);
+
+            // Award XP and coins if challenge just completed
+            if (isCompleted && !challenge.completed) {
+              const { data: stats } = await supabase
+                .from('user_stats')
+                .select('experience_points, coins')
+                .eq('user_id', userId)
+                .single();
+
+              if (stats) {
+                await supabase
+                  .from('user_stats')
+                  .update({
+                    experience_points: stats.experience_points + challenge.xp_reward,
+                    coins: stats.coins + challenge.coins_reward,
+                  })
+                  .eq('user_id', userId);
+
+                toast.success(`🎊 Challenge Complete! +${challenge.xp_reward} XP`, { duration: 5000 });
+              }
+            }
+          }
+        }
+      }
+
+      // Update weekly_wins practice goal
+      if (correct) {
+        const { data: goals } = await supabase
+          .from('practice_goals')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('goal_type', 'weekly_wins')
+          .eq('completed', false)
+          .gte('deadline', today);
+
+        for (const goal of goals || []) {
+          if (goal.current_progress < goal.target_value) {
+            const newProgress = goal.current_progress + 1;
+            const isCompleted = newProgress >= goal.target_value;
+
+            await supabase
+              .from('practice_goals')
+              .update({
+                current_progress: newProgress,
+                completed: isCompleted,
+              })
+              .eq('id', goal.id);
+
+            if (isCompleted) {
+              const { data: stats } = await supabase
+                .from('user_stats')
+                .select('experience_points')
+                .eq('user_id', userId)
+                .single();
+
+              if (stats) {
+                await supabase
+                  .from('user_stats')
+                  .update({
+                    experience_points: stats.experience_points + goal.xp_reward,
+                  })
+                  .eq('user_id', userId);
+
+                toast.success(`🏆 Goal Achieved! +${goal.xp_reward} XP`, { duration: 5000 });
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error updating challenges/goals:', error);
+      // Don't show error to user - this is non-critical
+    }
   };
 
   const loadDetailedExplanation = async () => {

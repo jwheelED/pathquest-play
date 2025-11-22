@@ -317,6 +317,59 @@ export type Database = {
           },
         ]
       }
+      daily_challenges: {
+        Row: {
+          challenge_date: string
+          challenge_type: string
+          coins_reward: number
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          current_progress: number
+          id: string
+          org_id: string | null
+          target_value: number
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          challenge_date?: string
+          challenge_type: string
+          coins_reward?: number
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_progress?: number
+          id?: string
+          org_id?: string | null
+          target_value: number
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          challenge_date?: string
+          challenge_type?: string
+          coins_reward?: number
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_progress?: number
+          id?: string
+          org_id?: string | null
+          target_value?: number
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_challenges_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_students: {
         Row: {
           created_at: string | null
@@ -692,6 +745,56 @@ export type Database = {
             columns: ["source_material_id"]
             isOneToOne: false
             referencedRelation: "student_study_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      practice_goals: {
+        Row: {
+          completed: boolean
+          created_at: string
+          current_progress: number
+          deadline: string
+          goal_type: string
+          id: string
+          org_id: string | null
+          target_value: number
+          updated_at: string
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          current_progress?: number
+          deadline: string
+          goal_type: string
+          id?: string
+          org_id?: string | null
+          target_value: number
+          updated_at?: string
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          current_progress?: number
+          deadline?: string
+          goal_type?: string
+          id?: string
+          org_id?: string | null
+          target_value?: number
+          updated_at?: string
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_goals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
