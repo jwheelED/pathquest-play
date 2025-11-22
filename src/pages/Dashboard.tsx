@@ -11,6 +11,7 @@ import { AssignedContent } from "@/components/student/AssignedContent";
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
+import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
@@ -284,6 +285,9 @@ export default function Dashboard() {
           
           {/* Live Lecture Check-ins - Most Important Section */}
           {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
+
+          {/* Confidence Gambling Analytics */}
+          {user?.id && <ConfidenceAnalytics userId={user.id} />}
 
           {/* Flow State Visualization */}
           {user?.id && <FlowStateCard userId={user.id} />}
