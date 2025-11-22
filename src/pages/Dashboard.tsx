@@ -18,6 +18,7 @@ import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStat
 import { DailyChallenges } from "@/components/student/DailyChallenges";
 import { PracticeGoals } from "@/components/student/PracticeGoals";
 import { Leaderboard } from "@/components/student/Leaderboard";
+import STEMPractice from "@/components/STEMPractice";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
@@ -301,7 +302,24 @@ export default function Dashboard() {
             </Card>
           )}
           
-          {/* Live Lecture Check-ins - Most Important Section */}
+          {/* AI-Powered Practice Section - Featured */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              🎯 Practice with AI-Generated Questions
+            </h2>
+            {user?.id && (
+              <STEMPractice 
+                userId={user.id}
+                courseContext={courseContext}
+                onPointsEarned={(points) => {
+                  // Trigger stats refresh
+                  setRefreshKey(prev => prev + 1);
+                }}
+              />
+            )}
+          </div>
+
+          {/* Live Lecture Check-ins */}
           {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
 
           {/* Study Materials Section */}
