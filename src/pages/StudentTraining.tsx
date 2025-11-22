@@ -15,10 +15,18 @@ import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStat
 import { ClassSelector } from "@/components/student/ClassSelector";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Filter } from "lucide-react";
 
 interface User {
   id: string;
   email?: string;
+}
+
+interface ClassOption {
+  instructorId: string;
+  courseTitle: string;
+  instructorName: string;
 }
 
 export default function StudentTraining() {
@@ -26,6 +34,8 @@ export default function StudentTraining() {
   const [userName, setUserName] = useState("");
   const [userStats, setUserStats] = useState({ level: 1, streak: 0 });
   const [materialRefreshKey, setMaterialRefreshKey] = useState(0);
+  const [selectedMaterialClass, setSelectedMaterialClass] = useState<string>("all");
+  const [classes, setClasses] = useState<ClassOption[]>([]);
   const [courseContext, setCourseContext] = useState<{
     courseTitle?: string;
     courseTopics?: string[];
@@ -45,6 +55,42 @@ export default function StudentTraining() {
       setUser(session.user);
       fetchUserProfile(session.user.id);
       fetchCourseContext(session.user.id);
+      fetchUserClasses(session.user.id);
+    }
+  };
+
+  const fetchUserClasses = async (userId: string) => {
+    try {
+      const { data: connections, error } = await supabase
+        .from("instructor_students")
+        .select("instructor_id")
+        .eq("student_id", userId);
+
+      if (error) throw error;
+
+      if (!connections || connections.length === 0) {
+        setClasses([]);
+        return;
+      }
+
+      const classPromises = connections.map(async (conn) => {
+        const { data: instructor } = await supabase
+          .from("profiles")
+          .select("full_name, course_title")
+          .eq("id", conn.instructor_id)
+          .single();
+
+        return {
+          instructorId: conn.instructor_id,
+          courseTitle: instructor?.course_title || "Unknown Course",
+          instructorName: instructor?.full_name || "Unknown Instructor",
+        };
+      });
+
+      const classData = await Promise.all(classPromises);
+      setClasses(classData);
+    } catch (error: any) {
+      logger.error("Error fetching classes:", error);
     }
   };
 
@@ -162,18 +208,43 @@ export default function StudentTraining() {
 
           {/* Study Materials Section */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              📚 My Study Materials
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                📚 My Study Materials
+              </h2>
+              {classes.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <Select value={selectedMaterialClass} onValueChange={setSelectedMaterialClass}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Classes</SelectItem>
+                      {classes.map((classOption) => (
+                        <SelectItem key={classOption.instructorId} value={classOption.instructorId}>
+                          {classOption.courseTitle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
             {user?.id && (
               <>
                 <StudyMaterialUpload 
                   userId={user.id} 
                   onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
                 />
-                <StudyMaterialLibrary userId={user.id} refreshKey={materialRefreshKey} />
+                <StudyMaterialLibrary 
+                  userId={user.id} 
+                  instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
+                  refreshKey={materialRefreshKey} 
+                />
                 <MaterialQuestionStats 
                   userId={user.id}
+                  instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
                   onGenerateQuestions={() => setMaterialRefreshKey(prev => prev + 1)}
                 />
               </>
