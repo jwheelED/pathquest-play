@@ -50,3 +50,9 @@ verify_jwt = true
 
 [functions.generate-question-summary]
 verify_jwt = true
+
+[functions.parse-student-material]
+verify_jwt = true
+
+[functions.generate-personalized-questions]
+verify_jwt = true

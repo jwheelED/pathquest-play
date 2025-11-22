@@ -14,6 +14,7 @@ import { BottomNav } from "@/components/mobile/BottomNav";
 import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
 import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
 import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary";
+import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStats";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
@@ -301,6 +302,10 @@ export default function Dashboard() {
                   onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
                 />
                 <StudyMaterialLibrary userId={user.id} refreshKey={materialRefreshKey} />
+                <MaterialQuestionStats 
+                  userId={user.id}
+                  onGenerateQuestions={() => setMaterialRefreshKey(prev => prev + 1)}
+                />
               </>
             )}
           </div>
