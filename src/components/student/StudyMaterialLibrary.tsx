@@ -32,6 +32,11 @@ interface Material {
   questions_generated: number;
   created_at: string;
   last_used_at: string | null;
+  instructor_id: string | null;
+}
+
+interface InstructorInfo {
+  [key: string]: { name: string; courseTitle: string };
 }
 
 interface StudyMaterialLibraryProps {
@@ -48,6 +53,7 @@ export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibrar
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
+  const [instructorInfo, setInstructorInfo] = useState<InstructorInfo>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -68,7 +74,30 @@ export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibrar
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMaterials(data || []);
+      
+      const materialsData = data || [];
+      setMaterials(materialsData);
+      
+      // Fetch instructor info for materials that have instructor_id
+      const instructorIds = [...new Set(materialsData
+        .filter(m => m.instructor_id)
+        .map(m => m.instructor_id))] as string[];
+      
+      if (instructorIds.length > 0) {
+        const { data: instructors } = await supabase
+          .from('profiles')
+          .select('id, full_name, course_title')
+          .in('id', instructorIds);
+        
+        const instructorMap: InstructorInfo = {};
+        instructors?.forEach(instructor => {
+          instructorMap[instructor.id] = {
+            name: instructor.full_name || 'Unknown Instructor',
+            courseTitle: instructor.course_title || 'Unknown Course'
+          };
+        });
+        setInstructorInfo(instructorMap);
+      }
     } catch (error: any) {
       toast({
         title: "Error loading materials",
@@ -274,11 +303,16 @@ export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibrar
                   <Card key={material.id} className="p-4 hover:shadow-lg transition-shadow">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Icon className="w-5 h-5 text-primary" />
                           <Badge variant="secondary" className="text-xs">
                             {material.material_type}
                           </Badge>
+                          {material.instructor_id && instructorInfo[material.instructor_id] && (
+                            <Badge variant="outline" className="text-xs bg-primary/10">
+                              {instructorInfo[material.instructor_id].courseTitle}
+                            </Badge>
+                          )}
                         </div>
                         {material.questions_generated > 0 && (
                           <Badge variant="outline" className="text-xs gap-1">
@@ -358,10 +392,15 @@ export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibrar
                         <h4 className="font-semibold text-foreground truncate">
                           {material.title}
                         </h4>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="secondary" className="text-xs">
                             {material.material_type}
                           </Badge>
+                          {material.instructor_id && instructorInfo[material.instructor_id] && (
+                            <Badge variant="outline" className="text-xs bg-primary/10">
+                              {instructorInfo[material.instructor_id].courseTitle}
+                            </Badge>
+                          )}
                           {material.questions_generated > 0 && (
                             <Badge variant="outline" className="text-xs gap-1">
                               <Sparkles className="w-3 h-3" />

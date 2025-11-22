@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileText, Image, Video, Music, X, Loader2 } from "lucide-react";
+import { Upload, FileText, Image, Video, Music, X, Loader2, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface StudyMaterialUploadProps {
@@ -15,6 +16,12 @@ interface StudyMaterialUploadProps {
 }
 
 type MaterialType = 'note' | 'image' | 'video' | 'pdf' | 'audio';
+
+interface ClassOption {
+  instructorId: string;
+  courseTitle: string;
+  instructorName: string;
+}
 
 export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialUploadProps) {
   const [materialType, setMaterialType] = useState<MaterialType>('note');
@@ -26,7 +33,58 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [loadingClasses, setLoadingClasses] = useState(true);
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchUserClasses();
+  }, [userId]);
+
+  const fetchUserClasses = async () => {
+    try {
+      setLoadingClasses(true);
+      const { data: connections, error } = await supabase
+        .from("instructor_students")
+        .select("instructor_id")
+        .eq("student_id", userId);
+
+      if (error) throw error;
+
+      if (!connections || connections.length === 0) {
+        setClasses([]);
+        setLoadingClasses(false);
+        return;
+      }
+
+      const classPromises = connections.map(async (conn) => {
+        const { data: instructor } = await supabase
+          .from("profiles")
+          .select("full_name, course_title")
+          .eq("id", conn.instructor_id)
+          .single();
+
+        return {
+          instructorId: conn.instructor_id,
+          courseTitle: instructor?.course_title || "Unknown Course",
+          instructorName: instructor?.full_name || "Unknown Instructor",
+        };
+      });
+
+      const classData = await Promise.all(classPromises);
+      setClasses(classData);
+      
+      // Auto-select first class if available
+      if (classData.length > 0) {
+        setSelectedClass(classData[0].instructorId);
+      }
+    } catch (error: any) {
+      console.error("Error fetching classes:", error);
+    } finally {
+      setLoadingClasses(false);
+    }
+  };
 
   const materialTypes = [
     { value: 'note', label: 'Text Note', icon: FileText, accept: '' },
@@ -64,6 +122,15 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
   };
 
   const handleUpload = async () => {
+    if (classes.length > 0 && !selectedClass) {
+      toast({
+        title: "Class required",
+        description: "Please select which class this material is for",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!title.trim()) {
       toast({
         title: "Title required",
@@ -131,6 +198,7 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
         .insert({
           user_id: userId,
           org_id: profileData?.org_id || null,
+          instructor_id: selectedClass || null,
           title: title.trim(),
           description: description.trim() || null,
           material_type: materialType,
@@ -178,6 +246,40 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
           <Upload className="w-5 h-5 text-primary" />
           <h3 className="text-lg font-bold text-foreground">Upload Study Material</h3>
         </div>
+
+        {/* Class Selector */}
+        {classes.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="class-select" className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Select Class *
+            </Label>
+            <Select value={selectedClass} onValueChange={setSelectedClass} disabled={loadingClasses}>
+              <SelectTrigger id="class-select">
+                <SelectValue placeholder="Choose a class for this material" />
+              </SelectTrigger>
+              <SelectContent>
+                {classes.map((classOption) => (
+                  <SelectItem key={classOption.instructorId} value={classOption.instructorId}>
+                    {classOption.courseTitle} - {classOption.instructorName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              This helps organize your materials and generate relevant practice questions
+            </p>
+          </div>
+        )}
+
+        {classes.length === 0 && !loadingClasses && (
+          <div className="p-4 border-2 border-dashed border-border rounded-lg text-center">
+            <BookOpen className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Join a class to organize your study materials by course
+            </p>
+          </div>
+        )}
 
         {/* Material Type Selector */}
         <div className="space-y-2">

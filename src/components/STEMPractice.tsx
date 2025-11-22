@@ -3,8 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
+import { BookOpen } from "lucide-react";
 
 interface STEMPracticeProps {
   userId?: string;
@@ -14,6 +17,12 @@ interface STEMPracticeProps {
     courseTopics?: string[];
     courseSchedule?: string;
   };
+}
+
+interface ClassOption {
+  instructorId: string;
+  courseTitle: string;
+  instructorName: string;
 }
 
 interface STEMProblem {
@@ -42,6 +51,12 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const [showDetailedExplanation, setShowDetailedExplanation] = useState(false);
   const [loadingDetailedExplanation, setLoadingDetailedExplanation] = useState(false);
   
+  // Class selection state
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [selectedClass, setSelectedClass] = useState<string>("");
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [showClassSelector, setShowClassSelector] = useState(false);
+  
   // Confidence gambling state
   const [showConfidenceSelector, setShowConfidenceSelector] = useState(false);
   const [selectedConfidence, setSelectedConfidence] = useState<{ level: ConfidenceLevel; multiplier: number } | null>(null);
@@ -50,15 +65,54 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   useEffect(() => {
     if (userId) {
       fetchDailyProgress();
-      
-      // If we have course context, generate course-specific questions
-      if (courseContext?.courseTitle) {
-        generateCourseQuestions();
-      } else {
-        loadNextProblem();
-      }
+      fetchUserClasses();
     }
-  }, [userId, courseContext?.courseTitle]);
+  }, [userId]);
+
+  const fetchUserClasses = async () => {
+    if (!userId) return;
+    
+    try {
+      setLoadingClasses(true);
+      const { data: connections, error } = await supabase
+        .from("instructor_students")
+        .select("instructor_id")
+        .eq("student_id", userId);
+
+      if (error) throw error;
+
+      if (!connections || connections.length === 0) {
+        setClasses([]);
+        setShowClassSelector(false);
+        // Load generic questions if no classes
+        loadNextProblem();
+        return;
+      }
+
+      const classPromises = connections.map(async (conn) => {
+        const { data: instructor } = await supabase
+          .from("profiles")
+          .select("full_name, course_title")
+          .eq("id", conn.instructor_id)
+          .single();
+
+        return {
+          instructorId: conn.instructor_id,
+          courseTitle: instructor?.course_title || "Unknown Course",
+          instructorName: instructor?.full_name || "Unknown Instructor",
+        };
+      });
+
+      const classData = await Promise.all(classPromises);
+      setClasses(classData);
+      setShowClassSelector(true);
+    } catch (error: any) {
+      console.error("Error fetching classes:", error);
+      loadNextProblem(); // Fallback to generic questions
+    } finally {
+      setLoadingClasses(false);
+    }
+  };
 
   const fetchDailyProgress = async () => {
     if (!userId) return;
@@ -81,8 +135,29 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     }
   };
 
-  const generateCourseQuestions = async () => {
-    if (!courseContext?.courseTitle || generatingQuestions) return;
+  const generateCourseQuestions = async (instructorId?: string) => {
+    if (generatingQuestions) return;
+    
+    // Get course context from selected class if provided
+    let contextToUse = courseContext;
+    if (instructorId) {
+      const classInfo = classes.find(c => c.instructorId === instructorId);
+      if (classInfo) {
+        const { data: instructor } = await supabase
+          .from("profiles")
+          .select("course_title, course_topics")
+          .eq("id", instructorId)
+          .single();
+        
+        contextToUse = {
+          courseTitle: instructor?.course_title || classInfo.courseTitle,
+          courseTopics: instructor?.course_topics || [],
+          courseSchedule: "",
+        };
+      }
+    }
+
+    if (!contextToUse?.courseTitle) return;
     
     setGeneratingQuestions(true);
     setLoading(true);
@@ -90,8 +165,8 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     try {
       const { data, error } = await supabase.functions.invoke('generate-course-questions', {
         body: {
-          courseTitle: courseContext.courseTitle,
-          courseTopics: courseContext.courseTopics || [],
+          courseTitle: contextToUse.courseTitle,
+          courseTopics: contextToUse.courseTopics || [],
           difficulty: 'intermediate'
         }
       });
@@ -141,12 +216,19 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      // Priority 2: Personalized questions from user materials
+      // Priority 2: Personalized questions from user materials (filtered by selected class)
       if (userId) {
-        const { data: personalizedQuestions, error: pqError } = await supabase
+        let query = supabase
           .from("personalized_questions")
           .select("*")
-          .eq("user_id", userId)
+          .eq("user_id", userId);
+        
+        // Filter by instructor if class is selected
+        if (selectedClass) {
+          query = query.eq("instructor_id", selectedClass);
+        }
+        
+        const { data: personalizedQuestions, error: pqError } = await query
           .order('created_at', { ascending: false })
           .limit(10);
 
@@ -719,10 +801,58 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     loadNextProblem();
   };
 
-  if (loading) {
+  if (loading || loadingClasses) {
     return (
       <Card className="p-6 animate-pulse">
         <div className="h-40 bg-muted rounded"></div>
+      </Card>
+    );
+  }
+
+  // Show class selector if user has classes and hasn't selected one yet
+  if (showClassSelector && !selectedClass && !currentProblem) {
+    return (
+      <Card className="p-6 border-2 border-primary/40 bg-gradient-to-br from-card to-primary/10">
+        <div className="text-center space-y-6">
+          <div>
+            <BookOpen className="w-12 h-12 mx-auto mb-4 text-primary" />
+            <h3 className="text-xl font-bold mb-2">Choose a Class for Practice</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Select which class you'd like to practice questions for
+            </p>
+          </div>
+
+          <div className="space-y-2 max-w-md mx-auto">
+            <Label htmlFor="practice-class">Select Class</Label>
+            <Select value={selectedClass} onValueChange={(value) => {
+              setSelectedClass(value);
+              generateCourseQuestions(value);
+            }}>
+              <SelectTrigger id="practice-class" className="w-full">
+                <SelectValue placeholder="Choose a class..." />
+              </SelectTrigger>
+              <SelectContent>
+                {classes.map((classOption) => (
+                  <SelectItem key={classOption.instructorId} value={classOption.instructorId}>
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{classOption.courseTitle}</span>
+                      <span className="text-xs text-muted-foreground">{classOption.instructorName}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => {
+              setShowClassSelector(false);
+              loadNextProblem();
+            }}>
+              Skip - Practice Generic Questions
+            </Button>
+          </div>
+        </div>
       </Card>
     );
   }
@@ -731,22 +861,39 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     return (
       <Card className="p-6 text-center">
         <p className="text-muted-foreground mb-4">No problems available</p>
-        <Button onClick={loadNextProblem} variant="retro">
+        <Button onClick={() => selectedClass ? generateCourseQuestions(selectedClass) : loadNextProblem()} variant="retro">
           Load Problem
         </Button>
       </Card>
     );
   }
 
-  const practiceTitle = courseContext?.courseTitle 
-    ? `${courseContext.courseTitle} Practice`
-    : "Practice Problems";
+  const practiceTitle = selectedClass 
+    ? classes.find(c => c.instructorId === selectedClass)?.courseTitle + " Practice" 
+    : courseContext?.courseTitle 
+      ? `${courseContext.courseTitle} Practice`
+      : "Practice Problems";
 
   return (
     <Card className="p-6 border-2 border-secondary-glow bg-gradient-to-br from-card to-secondary/10">
-      <h2 className="text-xl font-bold mb-4 text-foreground flex items-center gap-2">
-        🧪 {practiceTitle}
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+          🧪 {practiceTitle}
+        </h2>
+        {selectedClass && classes.length > 1 && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              setSelectedClass("");
+              setCurrentProblem(null);
+              setShowClassSelector(true);
+            }}
+          >
+            Change Class
+          </Button>
+        )}
+      </div>
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
