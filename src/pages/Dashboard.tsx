@@ -15,6 +15,9 @@ import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
 import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
 import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary";
 import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStats";
+import { DailyChallenges } from "@/components/student/DailyChallenges";
+import { PracticeGoals } from "@/components/student/PracticeGoals";
+import { Leaderboard } from "@/components/student/Leaderboard";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
@@ -264,6 +267,17 @@ export default function Dashboard() {
         <div className="space-y-4 md:space-y-6">
           {/* Class Connection Card */}
           {user?.id && <ClassConnectionCard />}
+
+          {/* Gamification Section - Desktop: 2 columns, Mobile: stacked */}
+          {user?.id && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <DailyChallenges userId={user.id} />
+              <PracticeGoals userId={user.id} />
+            </div>
+          )}
+
+          {/* Leaderboard - Full width */}
+          {user?.id && <Leaderboard userId={user.id} />}
           
           {courseContext.courseTitle && (
             <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
