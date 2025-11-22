@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 
 interface STEMPracticeProps {
   userId?: string;
@@ -40,6 +41,11 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const [detailedExplanation, setDetailedExplanation] = useState<string>("");
   const [showDetailedExplanation, setShowDetailedExplanation] = useState(false);
   const [loadingDetailedExplanation, setLoadingDetailedExplanation] = useState(false);
+  
+  // Confidence gambling state
+  const [showConfidenceSelector, setShowConfidenceSelector] = useState(false);
+  const [selectedConfidence, setSelectedConfidence] = useState<{ level: ConfidenceLevel; multiplier: number } | null>(null);
+  const [submissionStartTime, setSubmissionStartTime] = useState<number>(0);
 
   useEffect(() => {
     if (userId) {
@@ -217,41 +223,26 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     setLoading(false);
   };
 
-  const submitAnswer = async () => {
+  const handleAnswerSelected = () => {
+    if (!selectedAnswer) return;
+    setSubmissionStartTime(Date.now());
+    setShowConfidenceSelector(true);
+  };
+
+  const handleConfidenceSelected = async (level: ConfidenceLevel, multiplier: number) => {
+    setSelectedConfidence({ level, multiplier });
+    await submitAnswerWithConfidence(level, multiplier);
+  };
+
+  const submitAnswerWithConfidence = async (confidenceLevel: ConfidenceLevel, multiplier: number) => {
     if (!currentProblem || !selectedAnswer || !userId) return;
+
+    const timeSpent = Math.floor((Date.now() - submissionStartTime) / 1000);
 
     // For course-generated questions, we already have the answer
     if (currentProblem.correct_answer) {
       const correct = selectedAnswer === currentProblem.correct_answer;
-      setIsCorrect(correct);
-      setShowResult(true);
-
-      // Record attempt (no need to fetch answer)
-      await supabase
-        .from("problem_attempts")
-        .insert([{
-          user_id: userId,
-          problem_id: currentProblem.id,
-          is_correct: correct,
-        }]);
-
-      if (correct) {
-        await updateSpacedRepetition(currentProblem.id, correct);
-        await updateUserStats(currentProblem.points_reward);
-        
-        toast.success(`Correct! +${currentProblem.points_reward} XP`, {
-          description: currentProblem.explanation,
-        });
-        
-        onPointsEarned?.(currentProblem.points_reward);
-      } else {
-        await updateSpacedRepetition(currentProblem.id, correct);
-        toast.error("Incorrect answer", {
-          description: currentProblem.explanation,
-        });
-      }
-
-      setProblemsToday(prev => prev + 1);
+      await processAnswer(correct, currentProblem.correct_answer, currentProblem.explanation, confidenceLevel, multiplier, timeSpent);
       return;
     }
 
@@ -281,31 +272,109 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
       explanation,
     });
 
+    await processAnswer(correct, correct_answer, explanation, confidenceLevel, multiplier, timeSpent);
+  };
+
+  const processAnswer = async (
+    correct: boolean, 
+    correctAnswer: string, 
+    explanation: string, 
+    confidenceLevel: ConfidenceLevel,
+    multiplier: number,
+    timeSpent: number
+  ) => {
+    if (!currentProblem || !userId) return;
+
     setIsCorrect(correct);
     setShowResult(true);
 
-    await supabase
-      .from("problem_attempts")
-      .update({ is_correct: correct })
-      .eq("user_id", userId)
-      .eq("problem_id", currentProblem.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    // Calculate rewards/penalties
+    const baseReward = currentProblem.points_reward;
+    let xpEarned = 0;
+    let coinsEarned = 0;
 
     if (correct) {
-      await updateSpacedRepetition(currentProblem.id, correct);
-      await updateUserStats(currentProblem.points_reward);
-      
-      toast.success(`Correct! +${currentProblem.points_reward} XP`, {
-        description: explanation,
-      });
-      
-      onPointsEarned?.(currentProblem.points_reward);
+      // Win: Apply multiplier
+      xpEarned = Math.round(baseReward * multiplier);
+      coinsEarned = Math.round((baseReward * multiplier) / 2);
     } else {
-      await updateSpacedRepetition(currentProblem.id, correct);
-      toast.error("Incorrect answer", {
-        description: explanation,
-      });
+      // Loss: Penalty based on confidence level
+      if (confidenceLevel === 'low') {
+        xpEarned = -Math.round(baseReward * 0.25); // Small penalty
+        coinsEarned = -Math.round((baseReward * 0.25) / 2);
+      } else if (confidenceLevel === 'medium') {
+        xpEarned = 0; // No penalty for medium confidence
+        coinsEarned = 0;
+      } else {
+        // High or very high confidence: bigger penalty
+        xpEarned = -Math.round(baseReward * multiplier * 0.5);
+        coinsEarned = -Math.round((baseReward * multiplier * 0.5) / 2);
+      }
+    }
+
+    // Record practice session with confidence data
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', userId)
+      .single();
+
+    await supabase
+      .from("practice_sessions")
+      .insert([{
+        user_id: userId,
+        problem_id: currentProblem.id,
+        problem_text: currentProblem.problem_text,
+        confidence_level: confidenceLevel,
+        confidence_multiplier: multiplier,
+        is_correct: correct,
+        xp_earned: xpEarned,
+        coins_earned: coinsEarned,
+        time_spent_seconds: timeSpent,
+        org_id: profileData?.org_id || null,
+      }]);
+
+    // Record attempt
+    await supabase
+      .from("problem_attempts")
+      .insert([{
+        user_id: userId,
+        problem_id: currentProblem.id,
+        is_correct: correct,
+        time_spent_seconds: timeSpent,
+      }]);
+
+    // Update user stats with gambling metrics
+    await updateUserStatsWithGambling(xpEarned, coinsEarned, correct, confidenceLevel);
+    await updateSpacedRepetition(currentProblem.id, correct);
+
+    // Show animated feedback
+    if (correct) {
+      if (multiplier >= 2) {
+        toast.success(
+          `🎉 ${multiplier === 3 ? 'JACKPOT!' : 'BIG WIN!'} +${xpEarned} XP`, 
+          { 
+            description: `${multiplier}x multiplier! ${explanation}`,
+            duration: 4000,
+          }
+        );
+      } else {
+        toast.success(`✅ Correct! +${xpEarned} XP`, {
+          description: explanation,
+        });
+      }
+      onPointsEarned?.(xpEarned);
+    } else {
+      if (xpEarned < 0) {
+        toast.error(`💔 Lost ${Math.abs(xpEarned)} XP`, {
+          description: `Better luck next time! ${explanation}`,
+          duration: 4000,
+        });
+      } else {
+        toast.error("❌ Incorrect", {
+          description: explanation,
+        });
+      }
     }
 
     setProblemsToday(prev => prev + 1);
@@ -380,7 +449,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     }
   };
 
-  const updateUserStats = async (points: number) => {
+  const updateUserStatsWithGambling = async (xpEarned: number, coinsEarned: number, correct: boolean, confidenceLevel: ConfidenceLevel) => {
     if (!userId) return;
 
     const { data: stats } = await supabase
@@ -389,9 +458,28 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
       .eq("user_id", userId)
       .single();
 
-    const newXP = (stats?.experience_points || 0) + points;
+    const newXP = Math.max(0, (stats?.experience_points || 0) + xpEarned);
     const newLevel = Math.floor(newXP / 100) + 1;
-    const newCoins = (stats?.coins || 0) + Math.floor(points / 2);
+    const newCoins = Math.max(0, (stats?.coins || 0) + coinsEarned);
+
+    // Update confidence accuracy
+    const confidenceAccuracy = (stats?.confidence_accuracy as any) || {
+      low: { correct: 0, total: 0 },
+      medium: { correct: 0, total: 0 },
+      high: { correct: 0, total: 0 },
+      very_high: { correct: 0, total: 0 },
+    };
+
+    confidenceAccuracy[confidenceLevel].total += 1;
+    if (correct) {
+      confidenceAccuracy[confidenceLevel].correct += 1;
+    }
+
+    // Update gambling stats
+    const totalGambles = (stats?.total_gambles || 0) + 1;
+    const successfulGambles = (stats?.successful_gambles || 0) + (correct ? 1 : 0);
+    const biggestWin = Math.max(stats?.biggest_win || 0, correct ? xpEarned : 0);
+    const biggestLoss = Math.max(stats?.biggest_loss || 0, !correct ? Math.abs(xpEarned) : 0);
 
     await supabase
       .from("user_stats")
@@ -399,9 +487,14 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         experience_points: newXP,
         level: newLevel,
         coins: newCoins,
-        current_streak: streak + 1,
-        longest_streak: Math.max(stats?.longest_streak || 0, streak + 1),
+        current_streak: correct ? streak + 1 : 0,
+        longest_streak: Math.max(stats?.longest_streak || 0, correct ? streak + 1 : 0),
         last_activity_date: new Date().toISOString().split('T')[0],
+        total_gambles: totalGambles,
+        successful_gambles: successfulGambles,
+        biggest_win: biggestWin,
+        biggest_loss: biggestLoss,
+        confidence_accuracy: confidenceAccuracy,
       })
       .eq("user_id", userId);
   };
@@ -444,6 +537,9 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const handleNextProblem = () => {
     setDetailedExplanation("");
     setShowDetailedExplanation(false);
+    setShowConfidenceSelector(false);
+    setSelectedConfidence(null);
+    setSubmissionStartTime(0);
     loadNextProblem();
   };
 
@@ -526,10 +622,21 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
             ))}
           </div>
 
+          {/* Confidence Selector */}
+          {showConfidenceSelector && !showResult && (
+            <div className="mt-4">
+              <ConfidenceSelector
+                baseReward={currentProblem.points_reward}
+                onSelect={handleConfidenceSelected}
+                disabled={false}
+              />
+            </div>
+          )}
+
           {/* Action Buttons */}
-          {!showResult ? (
+          {!showConfidenceSelector && !showResult && (
             <Button 
-              onClick={submitAnswer}
+              onClick={handleAnswerSelected}
               disabled={!selectedAnswer}
               variant="retro"
               size="lg"
@@ -537,7 +644,9 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
             >
               Submit Answer (+{currentProblem.points_reward} XP)
             </Button>
-          ) : (
+          )}
+          
+          {showResult && (
             <div className="space-y-4">
               <div className={`p-4 rounded-lg border-2 ${
                 isCorrect 

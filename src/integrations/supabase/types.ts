@@ -624,6 +624,59 @@ export type Database = {
         }
         Relationships: []
       }
+      practice_sessions: {
+        Row: {
+          coins_earned: number
+          confidence_level: string
+          confidence_multiplier: number
+          created_at: string | null
+          id: string
+          is_correct: boolean
+          org_id: string | null
+          problem_id: string
+          problem_text: string
+          time_spent_seconds: number | null
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          coins_earned: number
+          confidence_level: string
+          confidence_multiplier: number
+          created_at?: string | null
+          id?: string
+          is_correct: boolean
+          org_id?: string | null
+          problem_id: string
+          problem_text: string
+          time_spent_seconds?: number | null
+          user_id: string
+          xp_earned: number
+        }
+        Update: {
+          coins_earned?: number
+          confidence_level?: string
+          confidence_multiplier?: number
+          created_at?: string | null
+          id?: string
+          is_correct?: boolean
+          org_id?: string | null
+          problem_id?: string
+          problem_text?: string
+          time_spent_seconds?: number | null
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_sessions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       problem_attempts: {
         Row: {
           created_at: string
@@ -1155,7 +1208,10 @@ export type Database = {
       }
       user_stats: {
         Row: {
+          biggest_loss: number | null
+          biggest_win: number | null
           coins: number
+          confidence_accuracy: Json | null
           created_at: string
           current_streak: number
           experience_points: number
@@ -1164,11 +1220,16 @@ export type Database = {
           level: number
           longest_streak: number
           org_id: string | null
+          successful_gambles: number | null
+          total_gambles: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          biggest_loss?: number | null
+          biggest_win?: number | null
           coins?: number
+          confidence_accuracy?: Json | null
           created_at?: string
           current_streak?: number
           experience_points?: number
@@ -1177,11 +1238,16 @@ export type Database = {
           level?: number
           longest_streak?: number
           org_id?: string | null
+          successful_gambles?: number | null
+          total_gambles?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          biggest_loss?: number | null
+          biggest_win?: number | null
           coins?: number
+          confidence_accuracy?: Json | null
           created_at?: string
           current_streak?: number
           experience_points?: number
@@ -1190,6 +1256,8 @@ export type Database = {
           level?: number
           longest_streak?: number
           org_id?: string | null
+          successful_gambles?: number | null
+          total_gambles?: number | null
           updated_at?: string
           user_id?: string
         }
