@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import MarketingLanding from "./pages/MarketingLanding";
 import Dashboard from "./pages/Dashboard";
+import StudentTraining from "./pages/StudentTraining";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import InstructorAuth from "./pages/InstructorAuth";
@@ -38,6 +39,11 @@ const App = () => (
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="student" redirectTo="/auth">
               <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/training" element={
+            <ProtectedRoute requiredRole="student" redirectTo="/auth">
+              <StudentTraining />
             </ProtectedRoute>
           } />
           <Route path="/instructor/auth" element={<InstructorAuth />} />
