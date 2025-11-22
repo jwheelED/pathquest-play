@@ -167,9 +167,14 @@ export default function StudentTraining() {
                 🎯 Edvana Training
               </h1>
             </div>
-            <span className="text-sm text-muted-foreground">
-              {user?.email || "User"}
-            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                {user?.email || "User"}
+              </span>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
