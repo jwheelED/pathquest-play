@@ -41,10 +41,11 @@ interface InstructorInfo {
 
 interface StudyMaterialLibraryProps {
   userId: string;
+  instructorId?: string;
   refreshKey?: number;
 }
 
-export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibraryProps) {
+export function StudyMaterialLibrary({ userId, instructorId, refreshKey }: StudyMaterialLibraryProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,7 @@ export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibrar
 
   useEffect(() => {
     fetchMaterials();
-  }, [userId, refreshKey]);
+  }, [userId, instructorId, refreshKey]);
 
   useEffect(() => {
     filterMaterials();
@@ -67,11 +68,17 @@ export function StudyMaterialLibrary({ userId, refreshKey }: StudyMaterialLibrar
   const fetchMaterials = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('student_study_materials')
         .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+        .eq('user_id', userId);
+      
+      // Filter by instructor if specified
+      if (instructorId) {
+        query = query.eq('instructor_id', instructorId);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       

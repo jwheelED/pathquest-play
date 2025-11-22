@@ -21,10 +21,11 @@ interface MaterialStats {
 
 interface MaterialQuestionStatsProps {
   userId: string;
+  instructorId?: string;
   onGenerateQuestions?: (materialId: string) => void;
 }
 
-export function MaterialQuestionStats({ userId, onGenerateQuestions }: MaterialQuestionStatsProps) {
+export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestions }: MaterialQuestionStatsProps) {
   const [stats, setStats] = useState<MaterialStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
@@ -32,17 +33,24 @@ export function MaterialQuestionStats({ userId, onGenerateQuestions }: MaterialQ
 
   useEffect(() => {
     fetchStats();
-  }, [userId]);
+  }, [userId, instructorId]);
 
   const fetchStats = async () => {
     try {
       setLoading(true);
 
       // Fetch materials with their question counts
-      const { data: materials, error: materialsError } = await supabase
+      let query = supabase
         .from('student_study_materials')
         .select('id, title, material_type, questions_generated, instructor_id')
-        .eq('user_id', userId)
+        .eq('user_id', userId);
+      
+      // Filter by instructor if specified
+      if (instructorId) {
+        query = query.eq('instructor_id', instructorId);
+      }
+      
+      const { data: materials, error: materialsError } = await query
         .order('questions_generated', { ascending: false });
 
       if (materialsError) throw materialsError;
