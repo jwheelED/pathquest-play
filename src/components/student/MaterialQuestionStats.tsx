@@ -15,6 +15,8 @@ interface MaterialStats {
   questionsAttempted: number;
   questionsCorrect: number;
   successRate: number;
+  instructorId: string | null;
+  courseTitle?: string;
 }
 
 interface MaterialQuestionStatsProps {
@@ -39,11 +41,26 @@ export function MaterialQuestionStats({ userId, onGenerateQuestions }: MaterialQ
       // Fetch materials with their question counts
       const { data: materials, error: materialsError } = await supabase
         .from('student_study_materials')
-        .select('id, title, material_type, questions_generated')
+        .select('id, title, material_type, questions_generated, instructor_id')
         .eq('user_id', userId)
         .order('questions_generated', { ascending: false });
 
       if (materialsError) throw materialsError;
+
+      // Fetch instructor info for materials
+      const instructorIds = [...new Set(materials?.filter(m => m.instructor_id).map(m => m.instructor_id))] as string[];
+      let instructorMap: Record<string, string> = {};
+      
+      if (instructorIds.length > 0) {
+        const { data: instructors } = await supabase
+          .from('profiles')
+          .select('id, course_title')
+          .in('id', instructorIds);
+        
+        instructors?.forEach(instructor => {
+          instructorMap[instructor.id] = instructor.course_title || 'Unknown Course';
+        });
+      }
 
       // Fetch question performance for each material
       const statsPromises = materials?.map(async (material) => {
@@ -64,6 +81,8 @@ export function MaterialQuestionStats({ userId, onGenerateQuestions }: MaterialQ
           questionsAttempted: totalAttempted,
           questionsCorrect: totalCorrect,
           successRate,
+          instructorId: material.instructor_id,
+          courseTitle: material.instructor_id ? instructorMap[material.instructor_id] : undefined,
         };
       }) || [];
 
@@ -162,10 +181,15 @@ export function MaterialQuestionStats({ userId, onGenerateQuestions }: MaterialQ
                     <h4 className="font-semibold text-foreground truncate">
                       {stat.materialTitle}
                     </h4>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <Badge variant="secondary" className="text-xs">
                         {stat.materialType}
                       </Badge>
+                      {stat.courseTitle && (
+                        <Badge variant="outline" className="text-xs bg-primary/10">
+                          {stat.courseTitle}
+                        </Badge>
+                      )}
                       <Badge variant="outline" className="text-xs gap-1">
                         <Sparkles className="w-3 h-3" />
                         {stat.questionsGenerated} questions

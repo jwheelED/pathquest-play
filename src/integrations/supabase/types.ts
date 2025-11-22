@@ -684,6 +684,7 @@ export type Database = {
           difficulty: string
           explanation: string
           id: string
+          instructor_id: string | null
           options: Json | null
           org_id: string | null
           points_reward: number
@@ -702,6 +703,7 @@ export type Database = {
           difficulty: string
           explanation: string
           id?: string
+          instructor_id?: string | null
           options?: Json | null
           org_id?: string | null
           points_reward?: number
@@ -720,6 +722,7 @@ export type Database = {
           difficulty?: string
           explanation?: string
           id?: string
+          instructor_id?: string | null
           options?: Json | null
           org_id?: string | null
           points_reward?: number
@@ -733,6 +736,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "personalized_questions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "personalized_questions_org_id_fkey"
             columns: ["org_id"]
@@ -1328,6 +1338,7 @@ export type Database = {
           description: string | null
           file_path: string | null
           id: string
+          instructor_id: string | null
           last_used_at: string | null
           material_type: string
           org_id: string | null
@@ -1344,6 +1355,7 @@ export type Database = {
           description?: string | null
           file_path?: string | null
           id?: string
+          instructor_id?: string | null
           last_used_at?: string | null
           material_type: string
           org_id?: string | null
@@ -1360,6 +1372,7 @@ export type Database = {
           description?: string | null
           file_path?: string | null
           id?: string
+          instructor_id?: string | null
           last_used_at?: string | null
           material_type?: string
           org_id?: string | null
@@ -1371,6 +1384,13 @@ export type Database = {
           video_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "student_study_materials_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "student_study_materials_org_id_fkey"
             columns: ["org_id"]

@@ -46,7 +46,7 @@ serve(async (req) => {
     // Fetch material details for context
     const { data: material, error: materialError } = await supabase
       .from('student_study_materials')
-      .select('title, description, subject_tags, questions_generated')
+      .select('title, description, subject_tags, questions_generated, instructor_id')
       .eq('id', materialId)
       .single();
 
@@ -159,6 +159,7 @@ Generate ${questionCount} questions based on this material.`;
       user_id: userId,
       source_material_id: materialId,
       org_id: profileData?.org_id || null,
+      instructor_id: material.instructor_id || null,
       question_text: q.question,
       question_type: 'multiple_choice',
       options: q.options,
