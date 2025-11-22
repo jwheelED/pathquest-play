@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import MarketingLanding from "./pages/MarketingLanding";
-import Dashboard from "./pages/Dashboard";
 import StudentTraining from "./pages/StudentTraining";
+import ClassDashboard from "./pages/ClassDashboard";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
 import InstructorAuth from "./pages/InstructorAuth";
@@ -38,12 +38,12 @@ const App = () => (
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="student" redirectTo="/auth">
-              <Dashboard />
+              <StudentTraining />
             </ProtectedRoute>
           } />
-          <Route path="/training" element={
+          <Route path="/class/:instructorId" element={
             <ProtectedRoute requiredRole="student" redirectTo="/auth">
-              <StudentTraining />
+              <ClassDashboard />
             </ProtectedRoute>
           } />
           <Route path="/instructor/auth" element={<InstructorAuth />} />

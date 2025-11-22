@@ -66,30 +66,28 @@ export default function AuthPage() {
 
       const user = data.user;
       if (user) {
-        // Create user profile
-        const { error: insertError } = await supabase.from("users").insert({
+        // Create user profile with onboarded set to true
+        const { error: profileError } = await supabase.from("profiles").upsert({
           id: user.id,
-          user_id: user.id,
-          name: validData.name,
-          email: validData.email,
+          full_name: validData.name,
+          onboarded: true, // Student is onboarded immediately
         });
 
-        // Create user stats for gamification (no org_id yet - will be set during onboarding)
+        // Create user stats for gamification (no org_id initially)
         const { error: statsError } = await supabase.from("user_stats").insert({
           user_id: user.id,
           org_id: null,
         });
 
-        if (insertError) {
-          toast.error("Error creating user profile");
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
         }
         if (statsError) {
-          toast.error("Error creating user stats");
+          console.error("Stats creation error:", statsError);
         }
         
         setSuccess("Account created! Please check your email to confirm your account.");
         toast.success("Account created! Check your email to confirm before signing in.");
-        // Don't navigate yet - let them confirm email first
         setIsSignUp(false); // Switch to sign-in mode
       }
     } else {
@@ -127,21 +125,8 @@ export default function AuthPage() {
         }
       } else {
         setSuccess("Signed in successfully!");
-        // Check if user has completed onboarding
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("onboarded")
-            .eq("id", user.id)
-            .single();
-          
-          if (profile?.onboarded) {
-            navigate("/dashboard");
-          } else {
-            navigate("/onboarding");
-          }
-        }
+        // All students go directly to dashboard (training page)
+        navigate("/dashboard");
       }
     }
   };
@@ -186,35 +171,42 @@ export default function AuthPage() {
     fetchSession();
 
     const {data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      
       setSession(session);
 
       if (session) {
-        const checkOnboarding = async () => {
+        const initializeUser = async () => {
+          // Ensure profile exists with onboarded true
           const { data: profile } = await supabase
             .from("profiles")
-            .select("onboarded")
+            .select("id, onboarded")
             .eq("id", session.user.id)
             .maybeSingle();
 
-          if (profile?.onboarded) {
-            navigate("/dashboard");
-          } else {
-            // For new OAuth signups, create user stats
-            if (session.user.app_metadata.provider === 'google') {
-              const orgId = await getOrgId(session.user.id);
-              await supabase.from("user_stats").insert({
-                user_id: session.user.id,
-                org_id: orgId,
-              }).then(() => {
-                // Errors are OK here - record might already exist
-              });
-            }
-            navigate("/onboarding");
+          if (!profile) {
+            // Create profile for OAuth users
+            await supabase.from("profiles").upsert({
+              id: session.user.id,
+              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
+              onboarded: true, // All students are onboarded immediately
+            });
+
+            // Create user stats
+            await supabase.from("user_stats").insert({
+              user_id: session.user.id,
+              org_id: null,
+            }).then(() => {
+              // Errors are OK here - record might already exist
+            });
+          } else if (!profile.onboarded) {
+            // Mark existing users as onboarded
+            await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
           }
+
+          // Navigate to dashboard (training page)
+          navigate("/dashboard");
         };
 
-        checkOnboarding();
+        initializeUser();
       }
     });
 

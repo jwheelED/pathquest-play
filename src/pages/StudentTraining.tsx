@@ -12,6 +12,7 @@ import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
 import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
 import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary";
 import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStats";
+import { ClassSelector } from "@/components/student/ClassSelector";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
 
@@ -115,18 +116,9 @@ export default function StudentTraining() {
       <header className="hidden md:block border-b-2 border-primary bg-gradient-to-r from-card to-primary/5 shadow-glow">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/dashboard")}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
+            <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-                🎯 Train with Edvana
+                🎯 Edvana Training
               </h1>
             </div>
             <span className="text-sm text-muted-foreground">
@@ -138,6 +130,9 @@ export default function StudentTraining() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
         <div className="space-y-4 md:space-y-6">
+          {/* Class Selector */}
+          {user?.id && <ClassSelector userId={user.id} />}
+
           {/* Gamification Section */}
           {user?.id && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
