@@ -1146,6 +1146,65 @@ export type Database = {
         }
         Relationships: []
       }
+      student_study_materials: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          description: string | null
+          file_path: string | null
+          id: string
+          last_used_at: string | null
+          material_type: string
+          org_id: string | null
+          questions_generated: number | null
+          subject_tags: string[] | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          last_used_at?: string | null
+          material_type: string
+          org_id?: string | null
+          questions_generated?: number | null
+          subject_tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          last_used_at?: string | null
+          material_type?: string
+          org_id?: string | null
+          questions_generated?: number | null
+          subject_tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_study_materials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_achievements: {
         Row: {
           achievement_id: string
