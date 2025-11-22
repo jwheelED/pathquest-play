@@ -12,6 +12,8 @@ import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel"
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
+import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
+import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
@@ -26,6 +28,7 @@ export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [materialRefreshKey, setMaterialRefreshKey] = useState(0);
   const [courseContext, setCourseContext] = useState<{
     courseTitle?: string;
     courseTopics?: string[];
@@ -285,6 +288,22 @@ export default function Dashboard() {
           
           {/* Live Lecture Check-ins - Most Important Section */}
           {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
+
+          {/* Study Materials Section */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              📚 My Study Materials
+            </h2>
+            {user?.id && (
+              <>
+                <StudyMaterialUpload 
+                  userId={user.id} 
+                  onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
+                />
+                <StudyMaterialLibrary userId={user.id} refreshKey={materialRefreshKey} />
+              </>
+            )}
+          </div>
 
           {/* Confidence Gambling Analytics */}
           {user?.id && <ConfidenceAnalytics userId={user.id} />}
