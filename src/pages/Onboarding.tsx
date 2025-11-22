@@ -210,12 +210,12 @@ export default function OnboardingPage() {
           <div className="space-y-4">
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                {hasExistingClass ? "Switch Class" : "Join Your Class"}
+                {hasExistingClass ? "Switch Class" : "Join Your Class (Optional)"}
               </h2>
               <p className="text-sm text-muted-foreground">
                 {hasExistingClass 
                   ? "Enter a new class code to switch to a different class"
-                  : "Enter the class code provided by your instructor to get started"
+                  : "Have a class code from your instructor? Enter it here. Or skip to start training on your own."
                 }
               </p>
             </div>
@@ -242,11 +242,31 @@ export default function OnboardingPage() {
             >
               {loading ? "Joining..." : "Join Class"}
             </button>
+
+            {!hasExistingClass && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={async () => {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    await supabase.from("profiles").update({ onboarded: true }).eq("id", user.id);
+                    localStorage.setItem("edvana_onboarded", "true");
+                    navigate("/dashboard");
+                  }
+                }}
+              >
+                Skip for Now - Start Training
+              </Button>
+            )}
           </div>
 
           <div className="pt-4 border-t border-border">
             <p className="text-xs text-muted-foreground text-center">
-              Don't have a class code? Contact your instructor to get one.
+              {hasExistingClass 
+                ? "You can add more classes later from your dashboard"
+                : "You can join a class later from your training dashboard"
+              }
             </p>
           </div>
         </div>

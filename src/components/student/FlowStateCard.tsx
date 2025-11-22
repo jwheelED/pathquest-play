@@ -4,6 +4,7 @@ import { Zap } from "lucide-react";
 
 interface FlowStateCardProps {
   userId: string;
+  instructorId?: string; // Optional: for class-specific context
 }
 
 interface Particle {
@@ -15,7 +16,7 @@ interface Particle {
   baseY: number;
 }
 
-export function FlowStateCard({ userId }: FlowStateCardProps) {
+export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
   const mouseRef = useRef({ x: 0, y: 0, isOver: false });

@@ -32,10 +32,11 @@ interface Assignment {
 
 interface AssignedContentProps {
   userId: string;
+  instructorId?: string; // Optional: filter by instructor
   onAnswerResult?: (isCorrect: boolean, grade: number) => void;
 }
 
-export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps) => {
+export const AssignedContent = ({ userId, instructorId, onAnswerResult }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
@@ -231,11 +232,18 @@ export const AssignedContent = ({ userId, onAnswerResult }: AssignedContentProps
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('student_assignments')
         .select('*')
         .eq('student_id', userId)
-        .gte('created_at', today.toISOString())
+        .gte('created_at', today.toISOString());
+
+      // Filter by instructor if provided
+      if (instructorId) {
+        query = query.eq('instructor_id', instructorId);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(30);
 
