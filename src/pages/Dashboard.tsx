@@ -11,14 +11,6 @@ import { AssignedContent } from "@/components/student/AssignedContent";
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
-import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
-import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
-import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary";
-import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStats";
-import { DailyChallenges } from "@/components/student/DailyChallenges";
-import { PracticeGoals } from "@/components/student/PracticeGoals";
-import { Leaderboard } from "@/components/student/Leaderboard";
-import STEMPractice from "@/components/STEMPractice";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
@@ -33,7 +25,6 @@ export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [materialRefreshKey, setMaterialRefreshKey] = useState(0);
   const [courseContext, setCourseContext] = useState<{
     courseTitle?: string;
     courseTopics?: string[];
@@ -269,16 +260,26 @@ export default function Dashboard() {
           {/* Class Connection Card */}
           {user?.id && <ClassConnectionCard />}
 
-          {/* Gamification Section - Desktop: 2 columns, Mobile: stacked */}
-          {user?.id && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <DailyChallenges userId={user.id} />
-              <PracticeGoals userId={user.id} />
+          {/* Train with Edvana - Prominent CTA */}
+          <Card className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 border-2 border-primary shadow-glow">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 flex items-center justify-center md:justify-start gap-2">
+                  🎯 Train with Edvana
+                </h2>
+                <p className="text-muted-foreground text-sm md:text-base">
+                  Practice with AI-generated questions, track your progress, compete on leaderboards, and master your subjects
+                </p>
+              </div>
+              <Button 
+                size="lg" 
+                className="text-lg px-8 py-6 shadow-xl hover:shadow-2xl transition-all"
+                onClick={() => navigate("/training")}
+              >
+                Start Training →
+              </Button>
             </div>
-          )}
-
-          {/* Leaderboard - Full width */}
-          {user?.id && <Leaderboard userId={user.id} />}
+          </Card>
           
           {courseContext.courseTitle && (
             <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
@@ -301,49 +302,9 @@ export default function Dashboard() {
               )}
             </Card>
           )}
-          
-          {/* AI-Powered Practice Section - Featured */}
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              🎯 Practice with AI-Generated Questions
-            </h2>
-            {user?.id && (
-              <STEMPractice 
-                userId={user.id}
-                courseContext={courseContext}
-                onPointsEarned={(points) => {
-                  // Trigger stats refresh
-                  setRefreshKey(prev => prev + 1);
-                }}
-              />
-            )}
-          </div>
 
           {/* Live Lecture Check-ins */}
           {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
-
-          {/* Study Materials Section */}
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              📚 My Study Materials
-            </h2>
-            {user?.id && (
-              <>
-                <StudyMaterialUpload 
-                  userId={user.id} 
-                  onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
-                />
-                <StudyMaterialLibrary userId={user.id} refreshKey={materialRefreshKey} />
-                <MaterialQuestionStats 
-                  userId={user.id}
-                  onGenerateQuestions={() => setMaterialRefreshKey(prev => prev + 1)}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Confidence Gambling Analytics */}
-          {user?.id && <ConfidenceAnalytics userId={user.id} />}
 
           {/* Flow State Visualization */}
           {user?.id && <FlowStateCard userId={user.id} />}
