@@ -624,6 +624,78 @@ export type Database = {
         }
         Relationships: []
       }
+      personalized_questions: {
+        Row: {
+          correct_answer: string
+          created_at: string | null
+          difficulty: string
+          explanation: string
+          id: string
+          options: Json | null
+          org_id: string | null
+          points_reward: number
+          question_text: string
+          question_type: string
+          source_material_id: string | null
+          times_attempted: number | null
+          times_correct: number | null
+          topic_tags: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string | null
+          difficulty: string
+          explanation: string
+          id?: string
+          options?: Json | null
+          org_id?: string | null
+          points_reward?: number
+          question_text: string
+          question_type: string
+          source_material_id?: string | null
+          times_attempted?: number | null
+          times_correct?: number | null
+          topic_tags?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string | null
+          difficulty?: string
+          explanation?: string
+          id?: string
+          options?: Json | null
+          org_id?: string | null
+          points_reward?: number
+          question_text?: string
+          question_type?: string
+          source_material_id?: string | null
+          times_attempted?: number | null
+          times_correct?: number | null
+          topic_tags?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personalized_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personalized_questions_source_material_id_fkey"
+            columns: ["source_material_id"]
+            isOneToOne: false
+            referencedRelation: "student_study_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       practice_sessions: {
         Row: {
           coins_earned: number

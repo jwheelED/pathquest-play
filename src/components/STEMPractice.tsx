@@ -127,14 +127,12 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const loadNextProblem = async () => {
     setLoading(true);
     try {
-      // If we have course-specific questions, use those
+      // Priority 1: Course-specific questions
       if (courseQuestions.length > 0) {
-        // Find the next unviewed question
         const nextQuestion = courseQuestions.find(q => q.id !== currentProblem?.id);
         if (nextQuestion) {
           setCurrentProblem(nextQuestion);
         } else {
-          // All questions viewed, regenerate
           await generateCourseQuestions();
         }
         setSelectedAnswer("");
@@ -143,7 +141,37 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      // Check for problems due for spaced repetition review
+      // Priority 2: Personalized questions from user materials
+      if (userId) {
+        const { data: personalizedQuestions, error: pqError } = await supabase
+          .from("personalized_questions")
+          .select("*")
+          .eq("user_id", userId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!pqError && personalizedQuestions && personalizedQuestions.length > 0) {
+          // Pick a random personalized question
+          const randomQuestion = personalizedQuestions[Math.floor(Math.random() * personalizedQuestions.length)];
+          const problem: STEMProblem = {
+            id: randomQuestion.id,
+            subject: randomQuestion.topic_tags?.[0] || 'General',
+            difficulty: randomQuestion.difficulty,
+            problem_text: randomQuestion.question_text,
+            options: randomQuestion.options as string[],
+            correct_answer: randomQuestion.correct_answer,
+            explanation: randomQuestion.explanation,
+            points_reward: randomQuestion.points_reward,
+          };
+          setCurrentProblem(problem);
+          setSelectedAnswer("");
+          setShowResult(false);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Priority 3: Spaced repetition review
       if (userId) {
         const today = new Date().toISOString().split('T')[0];
         const { data: dueProblems, error: srError } = await supabase
@@ -154,7 +182,6 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
           .limit(5);
 
         if (!srError && dueProblems && dueProblems.length > 0) {
-          // Try to load one of the due problems
           const problemIds = dueProblems.map(p => p.problem_id);
           const { data: dueProblemsData } = await supabase
             .from("stem_problems_student_view")
@@ -343,6 +370,23 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         is_correct: correct,
         time_spent_seconds: timeSpent,
       }]);
+
+    // Update personalized question stats if applicable
+    const { data: personalizedQuestion } = await supabase
+      .from("personalized_questions")
+      .select("times_attempted, times_correct")
+      .eq("id", currentProblem.id)
+      .maybeSingle();
+
+    if (personalizedQuestion) {
+      await supabase
+        .from("personalized_questions")
+        .update({
+          times_attempted: personalizedQuestion.times_attempted + 1,
+          times_correct: personalizedQuestion.times_correct + (correct ? 1 : 0),
+        })
+        .eq("id", currentProblem.id);
+    }
 
     // Update user stats with gambling metrics
     await updateUserStatsWithGambling(xpEarned, coinsEarned, correct, confidenceLevel);
