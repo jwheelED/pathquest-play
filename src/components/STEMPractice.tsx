@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 import { BookOpen } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface STEMPracticeProps {
   userId?: string;
@@ -1039,11 +1040,11 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
 
               {showDetailedExplanation && detailedExplanation && (
                 <div className="p-4 bg-primary/5 rounded-lg border-2 border-primary/20">
-                  <h4 className="font-semibold text-primary mb-2 flex items-center gap-2">
+                  <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
                     🎓 In-Depth Explanation
                   </h4>
-                  <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                    {detailedExplanation}
+                  <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-li:text-muted-foreground">
+                    <ReactMarkdown>{detailedExplanation}</ReactMarkdown>
                   </div>
                 </div>
               )}
