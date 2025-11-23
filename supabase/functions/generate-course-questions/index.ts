@@ -1,54 +1,53 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { courseTitle, courseTopics, difficulty = 'intermediate' } = await req.json();
-    
+    const { courseTitle, courseTopics, difficulty = "intermediate" } = await req.json();
+
     // Input validation
-    if (!courseTitle || typeof courseTitle !== 'string' || courseTitle.length > 200) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid course title' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!courseTitle || typeof courseTitle !== "string" || courseTitle.length > 200) {
+      return new Response(JSON.stringify({ error: "Invalid course title" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (courseTopics && (!Array.isArray(courseTopics) || courseTopics.length > 20)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid course topics' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid course topics" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const validDifficulties = ['beginner', 'intermediate', 'advanced'];
+    const validDifficulties = ["beginner", "intermediate", "advanced"];
     if (difficulty && !validDifficulties.includes(difficulty.toLowerCase())) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid difficulty level' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid difficulty level" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("LOVABLE_API_KEY not configured");
+      return new Response(JSON.stringify({ error: "AI service not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Build context about the course
-    const topicsContext = courseTopics && courseTopics.length > 0 
-      ? `The course covers these topics: ${courseTopics.join(', ')}.`
-      : '';
+    const topicsContext =
+      courseTopics && courseTopics.length > 0 ? `The course covers these topics: ${courseTopics.join(", ")}.` : "";
 
     const systemPrompt = `You are an expert educator creating practice questions for students. Generate multiple-choice questions that are directly relevant to the course material.
 
@@ -87,17 +86,17 @@ IMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no code bl
 
 Note: wrong_answer_explanations should only contain entries for incorrect options, NOT the correct answer.`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: "google/gemini-3-pro-preview",
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate 5 practice questions for ${courseTitle}. ${topicsContext}` }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Generate 5 practice questions for ${courseTitle}. ${topicsContext}` },
         ],
         temperature: 0.8,
       }),
@@ -105,52 +104,52 @@ Note: wrong_answer_explanations should only contain entries for incorrect option
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI Gateway error:', aiResponse.status, errorText);
-      
+      console.error("AI Gateway error:", aiResponse.status, errorText);
+
       if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'AI service requires payment. Please contact support.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate questions' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (aiResponse.status === 402) {
+        return new Response(JSON.stringify({ error: "AI service requires payment. Please contact support." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: "Failed to generate questions" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.error('No content in AI response');
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate questions' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("No content in AI response");
+      return new Response(JSON.stringify({ error: "Failed to generate questions" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Extract JSON from the response (handle markdown code blocks and clean up)
     let questionsJson = content.trim();
-    
+
     // Remove markdown code blocks if present
-    if (questionsJson.includes('```json')) {
-      questionsJson = questionsJson.split('```json')[1].split('```')[0].trim();
-    } else if (questionsJson.includes('```')) {
-      questionsJson = questionsJson.split('```')[1].split('```')[0].trim();
+    if (questionsJson.includes("```json")) {
+      questionsJson = questionsJson.split("```json")[1].split("```")[0].trim();
+    } else if (questionsJson.includes("```")) {
+      questionsJson = questionsJson.split("```")[1].split("```")[0].trim();
     }
-    
+
     // Remove any leading/trailing text that's not part of the JSON array
-    const arrayStart = questionsJson.indexOf('[');
-    const arrayEnd = questionsJson.lastIndexOf(']');
+    const arrayStart = questionsJson.indexOf("[");
+    const arrayEnd = questionsJson.lastIndexOf("]");
     if (arrayStart !== -1 && arrayEnd !== -1) {
       questionsJson = questionsJson.substring(arrayStart, arrayEnd + 1);
     }
@@ -159,25 +158,25 @@ Note: wrong_answer_explanations should only contain entries for incorrect option
     try {
       questions = JSON.parse(questionsJson);
     } catch (parseError) {
-      console.error('Failed to parse AI response. Raw content:', content);
-      console.error('Extracted JSON:', questionsJson);
-      console.error('Parse error:', parseError);
+      console.error("Failed to parse AI response. Raw content:", content);
+      console.error("Extracted JSON:", questionsJson);
+      console.error("Parse error:", parseError);
       return new Response(
-        JSON.stringify({ 
-          error: 'Failed to parse generated questions',
-          details: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+        JSON.stringify({
+          error: "Failed to parse generated questions",
+          details: parseError instanceof Error ? parseError.message : "Unknown parse error",
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     // Validate the questions structure
     if (!Array.isArray(questions) || questions.length === 0) {
-      console.error('Invalid questions format:', questions);
-      return new Response(
-        JSON.stringify({ error: 'Invalid questions format' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("Invalid questions format:", questions);
+      return new Response(JSON.stringify({ error: "Invalid questions format" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Add unique IDs to each question
@@ -190,16 +189,14 @@ Note: wrong_answer_explanations should only contain entries for incorrect option
 
     console.log(`Generated ${questionsWithIds.length} questions for ${courseTitle}`);
 
-    return new Response(
-      JSON.stringify({ questions: questionsWithIds }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(JSON.stringify({ questions: questionsWithIds }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error('Error in generate-course-questions:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in generate-course-questions:", error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
