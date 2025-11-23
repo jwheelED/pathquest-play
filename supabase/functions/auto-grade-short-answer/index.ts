@@ -3,115 +3,116 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { studentAnswer, expectedAnswer, question } = await req.json();
-    
+
     // Input validation for security
-    if (!studentAnswer || typeof studentAnswer !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'studentAnswer must be a non-empty string' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (!expectedAnswer || typeof expectedAnswer !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'expectedAnswer must be a non-empty string' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (question && typeof question !== 'string') {
-      return new Response(
-        JSON.stringify({ error: 'question must be a string' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Length validation to prevent resource exhaustion
-    if (studentAnswer.length > 5000) {
-      return new Response(
-        JSON.stringify({ error: 'studentAnswer exceeds maximum length of 5,000 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (expectedAnswer.length > 5000) {
-      return new Response(
-        JSON.stringify({ error: 'expectedAnswer exceeds maximum length of 5,000 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (question && question.length > 1000) {
-      return new Response(
-        JSON.stringify({ error: 'question exceeds maximum length of 1,000 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Check for control characters
-    const hasInvalidChars = (text: string) => /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
-    
-    if (hasInvalidChars(studentAnswer)) {
-      return new Response(
-        JSON.stringify({ error: 'studentAnswer contains invalid characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (hasInvalidChars(expectedAnswer)) {
-      return new Response(
-        JSON.stringify({ error: 'expectedAnswer contains invalid characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (question && hasInvalidChars(question)) {
-      return new Response(
-        JSON.stringify({ error: 'question contains invalid characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!studentAnswer || typeof studentAnswer !== "string") {
+      return new Response(JSON.stringify({ error: "studentAnswer must be a non-empty string" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!expectedAnswer || typeof expectedAnswer !== "string") {
+      return new Response(JSON.stringify({ error: "expectedAnswer must be a non-empty string" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (question && typeof question !== "string") {
+      return new Response(JSON.stringify({ error: "question must be a string" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Length validation to prevent resource exhaustion
+    if (studentAnswer.length > 5000) {
+      return new Response(JSON.stringify({ error: "studentAnswer exceeds maximum length of 5,000 characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (expectedAnswer.length > 5000) {
+      return new Response(JSON.stringify({ error: "expectedAnswer exceeds maximum length of 5,000 characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (question && question.length > 1000) {
+      return new Response(JSON.stringify({ error: "question exceeds maximum length of 1,000 characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check for control characters
+    const hasInvalidChars = (text: string) => /[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(text);
+
+    if (hasInvalidChars(studentAnswer)) {
+      return new Response(JSON.stringify({ error: "studentAnswer contains invalid characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (hasInvalidChars(expectedAnswer)) {
+      return new Response(JSON.stringify({ error: "expectedAnswer contains invalid characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (question && hasInvalidChars(question)) {
+      return new Response(JSON.stringify({ error: "question contains invalid characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ error: 'Grading service temporarily unavailable' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("LOVABLE_API_KEY not configured");
+      return new Response(JSON.stringify({ error: "Grading service temporarily unavailable" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Use AI to grade the short answer with component-based scoring
@@ -162,7 +163,7 @@ TOTAL GRADE: Sum of all 4 components (0-100)
 
 IMPORTANT: Be thorough and fair. Students deserve detailed feedback on each component.`;
 
-    const userPrompt = `Question: ${question || 'Not provided'}
+    const userPrompt = `Question: ${question || "Not provided"}
 
 Expected Answer: ${expectedAnswer}
 
@@ -179,17 +180,17 @@ Then provide overall constructive feedback that:
 2. Explains specific gaps or errors by component
 3. Offers actionable suggestions for improvement`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
+        model: "google/gemini-3-pro-preview",
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
         tools: [
           {
@@ -204,119 +205,130 @@ Then provide overall constructive feedback that:
                     type: "number",
                     description: "Score for conceptual understanding (0-25)",
                     minimum: 0,
-                    maximum: 25
+                    maximum: 25,
                   },
                   accuracy: {
                     type: "number",
                     description: "Score for accuracy of information (0-25)",
                     minimum: 0,
-                    maximum: 25
+                    maximum: 25,
                   },
                   completeness: {
                     type: "number",
                     description: "Score for completeness of answer (0-25)",
                     minimum: 0,
-                    maximum: 25
+                    maximum: 25,
                   },
                   application: {
                     type: "number",
                     description: "Score for application of knowledge (0-25)",
                     minimum: 0,
-                    maximum: 25
+                    maximum: 25,
                   },
                   total_grade: {
                     type: "number",
                     description: "Total grade (sum of all components, 0-100)",
                     minimum: 0,
-                    maximum: 100
+                    maximum: 100,
                   },
                   feedback: {
                     type: "string",
-                    description: "Constructive feedback explaining each component score and overall performance"
-                  }
+                    description: "Constructive feedback explaining each component score and overall performance",
+                  },
                 },
-                required: ["conceptual_understanding", "accuracy", "completeness", "application", "total_grade", "feedback"],
-                additionalProperties: false
-              }
-            }
-          }
+                required: [
+                  "conceptual_understanding",
+                  "accuracy",
+                  "completeness",
+                  "application",
+                  "total_grade",
+                  "feedback",
+                ],
+                additionalProperties: false,
+              },
+            },
+          },
         ],
         tool_choice: { type: "function", function: { name: "grade_answer" } },
-        temperature: 0.3
+        temperature: 0.3,
       }),
     });
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
           status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: 'Payment required' }), {
+        return new Response(JSON.stringify({ error: "Payment required" }), {
           status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errorText = await response.text();
-      console.error('AI API error:', errorText);
-      return new Response(
-        JSON.stringify({ error: 'Failed to grade answer. Please try again.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("AI API error:", errorText);
+      return new Response(JSON.stringify({ error: "Failed to grade answer. Please try again." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const result = await response.json();
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
-    
-    if (!toolCall || toolCall.function.name !== 'grade_answer') {
-      console.error('No tool call in AI response:', result);
-      return new Response(
-        JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+
+    if (!toolCall || toolCall.function.name !== "grade_answer") {
+      console.error("No tool call in AI response:", result);
+      return new Response(JSON.stringify({ error: "Invalid grading response. Please try again." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    
+
     let gradingResult;
     try {
       gradingResult = JSON.parse(toolCall.function.arguments);
     } catch (e) {
-      console.error('Failed to parse tool call arguments:', toolCall.function.arguments);
-      return new Response(
-        JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("Failed to parse tool call arguments:", toolCall.function.arguments);
+      return new Response(JSON.stringify({ error: "Invalid grading response. Please try again." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Validate all component scores
-    const components = ['conceptual_understanding', 'accuracy', 'completeness', 'application'];
+    const components = ["conceptual_understanding", "accuracy", "completeness", "application"];
     for (const component of components) {
       const score = gradingResult[component];
-      if (typeof score !== 'number' || score < 0 || score > 25) {
+      if (typeof score !== "number" || score < 0 || score > 25) {
         console.error(`Invalid ${component} score:`, score);
-        return new Response(
-          JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: "Invalid grading response. Please try again." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
     // Validate total grade is between 0-100
-    if (typeof gradingResult.total_grade !== 'number' || gradingResult.total_grade < 0 || gradingResult.total_grade > 100) {
-      console.error('Invalid total_grade value:', gradingResult.total_grade);
-      return new Response(
-        JSON.stringify({ error: 'Invalid grading response. Please try again.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (
+      typeof gradingResult.total_grade !== "number" ||
+      gradingResult.total_grade < 0 ||
+      gradingResult.total_grade > 100
+    ) {
+      console.error("Invalid total_grade value:", gradingResult.total_grade);
+      return new Response(JSON.stringify({ error: "Invalid grading response. Please try again." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    console.log('✅ Auto-graded answer with components:', {
+    console.log("✅ Auto-graded answer with components:", {
       total: gradingResult.total_grade,
       conceptual: gradingResult.conceptual_understanding,
       accuracy: gradingResult.accuracy,
       completeness: gradingResult.completeness,
-      application: gradingResult.application
+      application: gradingResult.application,
     });
 
     // Return with backward-compatible 'grade' field plus new component scores
@@ -327,23 +339,18 @@ Then provide overall constructive feedback that:
         conceptual_understanding: gradingResult.conceptual_understanding,
         accuracy: gradingResult.accuracy,
         completeness: gradingResult.completeness,
-        application: gradingResult.application
-      }
+        application: gradingResult.application,
+      },
     };
 
-    return new Response(
-      JSON.stringify(responseData),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(JSON.stringify(responseData), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error('Auto-grading error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to grade answer. Please try again.' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    console.error("Auto-grading error:", error);
+    return new Response(JSON.stringify({ error: "Failed to grade answer. Please try again." }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
