@@ -3,11 +3,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 const INTENT_DETECTION_PROMPT = `You are an expert AI system specialized in detecting questions in educational lectures.
 
@@ -77,132 +77,144 @@ OUTPUT FORMAT (JSON):
 }`;
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Verify authentication
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+      return new Response(JSON.stringify({ error: "No authorization header" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Rate limiting: max 10 detection calls per minute
     const rateLimitKey = `question_detection:${user.id}`;
     const windowStart = new Date(Date.now() - (Date.now() % 60000)); // Current minute window
-    
+
     const { data: rateLimitData, error: rateLimitError } = await supabase
-      .from('rate_limits')
-      .select('count')
-      .eq('key', rateLimitKey)
-      .eq('window_start', windowStart.toISOString())
+      .from("rate_limits")
+      .select("count")
+      .eq("key", rateLimitKey)
+      .eq("window_start", windowStart.toISOString())
       .single();
 
     if (rateLimitData && rateLimitData.count >= 10) {
-      console.log('🚫 Rate limit exceeded for user:', user.id);
-      return new Response(JSON.stringify({ 
-        error: 'Rate limit exceeded: max 10 detections per minute',
-        retry_after: 60 - Math.floor((Date.now() % 60000) / 1000)
-      }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.log("🚫 Rate limit exceeded for user:", user.id);
+      return new Response(
+        JSON.stringify({
+          error: "Rate limit exceeded: max 10 detections per minute",
+          retry_after: 60 - Math.floor((Date.now() % 60000) / 1000),
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Record this detection attempt
     if (rateLimitData) {
       await supabase
-        .from('rate_limits')
+        .from("rate_limits")
         .update({ count: rateLimitData.count + 1 })
-        .eq('key', rateLimitKey)
-        .eq('window_start', windowStart.toISOString());
+        .eq("key", rateLimitKey)
+        .eq("window_start", windowStart.toISOString());
     } else {
-      await supabase
-        .from('rate_limits')
-        .insert({
-          key: rateLimitKey,
-          window_start: windowStart.toISOString(),
-          count: 1
-        });
+      await supabase.from("rate_limits").insert({
+        key: rateLimitKey,
+        window_start: windowStart.toISOString(),
+        count: 1,
+      });
     }
 
     const { recentChunk, context } = await req.json();
 
     if (!recentChunk || !context) {
-      return new Response(JSON.stringify({ error: 'Missing recentChunk or context' }), {
+      return new Response(JSON.stringify({ error: "Missing recentChunk or context" }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log('🔍 Analyzing chunk for questions...');
-    console.log('Recent:', recentChunk.substring(0, 100));
+    console.log("🔍 Analyzing chunk for questions...");
+    console.log("Recent:", recentChunk.substring(0, 100));
 
     // Call Lovable AI for intent detection
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: "google/gemini-3-pro-preview",
         messages: [
-          { role: 'system', content: INTENT_DETECTION_PROMPT },
-          { role: 'user', content: `RECENT SPEECH (last 20-60 seconds):\n"${recentChunk}"\n\nBROADER CONTEXT (last 90 seconds):\n"${context}"\n\nAnalyze if the professor is asking a REAL question for students to answer. Consider the full context to determine if they answer their own question.` }
+          { role: "system", content: INTENT_DETECTION_PROMPT },
+          {
+            role: "user",
+            content: `RECENT SPEECH (last 20-60 seconds):\n"${recentChunk}"\n\nBROADER CONTEXT (last 90 seconds):\n"${context}"\n\nAnalyze if the professor is asking a REAL question for students to answer. Consider the full context to determine if they answer their own question.`,
+          },
         ],
         temperature: 0.2,
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
-      return new Response(JSON.stringify({ error: 'AI detection failed', details: errorText }), {
+      console.error("AI Gateway error:", response.status, errorText);
+      return new Response(JSON.stringify({ error: "AI detection failed", details: errorText }), {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const aiResponse = await response.json();
     const result = JSON.parse(aiResponse.choices[0].message.content);
 
-    console.log('✅ Detection result:', result);
+    console.log("✅ Detection result:", result);
 
-    return new Response(JSON.stringify({
-      is_question: result.is_question,
-      confidence: result.confidence,
-      question_text: result.question_text,
-      suggested_type: result.suggested_type,
-      reasoning: result.reasoning
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return new Response(
+      JSON.stringify({
+        is_question: result.is_question,
+        confidence: result.confidence,
+        question_text: result.question_text,
+        suggested_type: result.suggested_type,
+        reasoning: result.reasoning,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
-    console.error('Error in detect-lecture-question:', error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error in detect-lecture-question:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
