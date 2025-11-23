@@ -759,6 +759,12 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
 
   const loadDetailedExplanation = async () => {
     if (!currentProblem || !selectedAnswer) return;
+
+    // If explanation is already visible, toggle it off
+    if (showDetailedExplanation && detailedExplanation) {
+      setShowDetailedExplanation(false);
+      return;
+    }
     
     setLoadingDetailedExplanation(true);
     try {
@@ -780,9 +786,14 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      if (data?.detailedExplanation) {
-        setDetailedExplanation(data.detailedExplanation);
+      const explanationText = (data as any)?.explanation ?? (data as any)?.detailedExplanation ?? "";
+
+      if (explanationText) {
+        setDetailedExplanation(explanationText);
         setShowDetailedExplanation(true);
+      } else {
+        console.error('No explanation returned from edge function:', data);
+        toast.error('No explanation available for this question');
       }
     } catch (error) {
       console.error('Error:', error);
