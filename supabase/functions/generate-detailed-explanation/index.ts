@@ -139,7 +139,7 @@ Make the explanation engaging, educational, and appropriate for the student's le
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
@@ -157,6 +157,9 @@ Make the explanation engaging, educational, and appropriate for the student's le
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI API error:", { status: response.status, body: errorText });
+      
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
           status: 429,
@@ -169,9 +172,14 @@ Make the explanation engaging, educational, and appropriate for the student's le
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errorText = await response.text();
-      console.error("AI API error:", response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
+      
+      return new Response(
+        JSON.stringify({ error: `AI API error: ${response.status}`, details: errorText }), 
+        {
+          status: response.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const data = await response.json();
