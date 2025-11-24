@@ -1400,6 +1400,138 @@ export type Database = {
           },
         ]
       }
+      study_group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          org_id: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          org_id?: string | null
+          role?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          org_id?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "study_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_group_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_group_questions: {
+        Row: {
+          group_id: string
+          id: string
+          org_id: string | null
+          question_id: string
+          shared_at: string
+          shared_by: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          org_id?: string | null
+          question_id: string
+          shared_at?: string
+          shared_by: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          org_id?: string | null
+          question_id?: string
+          shared_at?: string
+          shared_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_group_questions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "study_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_group_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_group_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "personalized_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          invite_code: string
+          name: string
+          org_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          invite_code: string
+          name: string
+          org_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          invite_code?: string
+          name?: string
+          org_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_achievements: {
         Row: {
           achievement_id: string
@@ -1647,6 +1779,7 @@ export type Database = {
         Returns: string
       }
       generate_admin_code: { Args: never; Returns: string }
+      generate_group_invite_code: { Args: never; Returns: string }
       generate_instructor_code: { Args: never; Returns: string }
       generate_org_invite_code: { Args: never; Returns: string }
       get_problem_answer: {
@@ -1675,6 +1808,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      join_group_by_code: { Args: { _invite_code: string }; Returns: string }
       set_auto_release_timer: {
         Args: { p_assignment_ids: string[]; p_minutes: number }
         Returns: undefined

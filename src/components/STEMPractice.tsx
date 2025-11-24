@@ -38,6 +38,17 @@ interface STEMProblem {
   points_reward: number;
 }
 
+// Helper function to get user's group IDs
+async function getUserGroupIds(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("study_group_members")
+    .select("group_id")
+    .eq("user_id", userId);
+  
+  if (error || !data) return [];
+  return data.map(m => m.group_id);
+}
+
 export default function STEMPractice({ userId, onPointsEarned, courseContext }: STEMPracticeProps) {
   const [currentProblem, setCurrentProblem] = useState<STEMProblem | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
@@ -217,7 +228,44 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      // Priority 2: Personalized questions from user materials
+      // Priority 2: Study group shared questions (if user is in groups)
+      if (userId) {
+        const { data: groupQuestions, error: groupError } = await supabase
+          .from("study_group_questions")
+          .select(`
+            question_id,
+            personalized_questions (*)
+          `)
+          .in('group_id', await getUserGroupIds(userId))
+          .limit(20);
+
+        if (!groupError && groupQuestions && groupQuestions.length > 0) {
+          const validQuestions = groupQuestions
+            .map(gq => gq.personalized_questions)
+            .filter(q => q !== null);
+
+          if (validQuestions.length > 0) {
+            const randomQuestion = validQuestions[Math.floor(Math.random() * validQuestions.length)] as any;
+            const problem: STEMProblem = {
+              id: randomQuestion.id,
+              subject: randomQuestion.topic_tags?.[0] || 'Shared',
+              difficulty: randomQuestion.difficulty,
+              problem_text: randomQuestion.question_text,
+              options: randomQuestion.options as string[],
+              correct_answer: randomQuestion.correct_answer,
+              explanation: randomQuestion.explanation,
+              points_reward: randomQuestion.points_reward,
+            };
+            setCurrentProblem(problem);
+            setSelectedAnswer("");
+            setShowResult(false);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Priority 3: Personalized questions from user materials
       if (userId) {
         let query = supabase
           .from("personalized_questions")
@@ -295,7 +343,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         }
       }
 
-      // Priority 3: Spaced repetition review
+      // Priority 4: Spaced repetition review
       if (userId) {
         const today = new Date().toISOString().split('T')[0];
         const { data: dueProblems, error: srError } = await supabase

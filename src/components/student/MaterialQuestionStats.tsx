@@ -4,8 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, TrendingUp, BookOpen, Loader2 } from "lucide-react";
+import { Sparkles, TrendingUp, BookOpen, Loader2, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ShareQuestionsDialog } from "./ShareQuestionsDialog";
 
 interface MaterialStats {
   materialId: string;
@@ -29,6 +30,8 @@ export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestion
   const [stats, setStats] = useState<MaterialStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState<{ id: string; title: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -204,23 +207,39 @@ export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestion
                       </Badge>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleGenerateQuestions(stat.materialId)}
-                    disabled={generatingFor === stat.materialId}
-                  >
-                    {generatingFor === stat.materialId ? (
-                      <>
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        Generate More
-                      </>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleGenerateQuestions(stat.materialId)}
+                      disabled={generatingFor === stat.materialId}
+                    >
+                      {generatingFor === stat.materialId ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          Generate More
+                        </>
+                      )}
+                    </Button>
+                    
+                    {stat.questionsGenerated > 0 && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setSelectedMaterial({ id: stat.materialId, title: stat.materialTitle });
+                          setShareDialogOpen(true);
+                        }}
+                      >
+                        <Share2 className="w-3 h-3 mr-1" />
+                        Share
+                      </Button>
                     )}
-                  </Button>
+                  </div>
                 </div>
 
                 {stat.questionsAttempted > 0 && (
@@ -261,6 +280,15 @@ export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestion
           </p>
         </div>
       </div>
+
+      {/* Share Questions Dialog */}
+      <ShareQuestionsDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        userId={userId}
+        materialId={selectedMaterial?.id}
+        materialTitle={selectedMaterial?.title}
+      />
     </Card>
   );
 }
