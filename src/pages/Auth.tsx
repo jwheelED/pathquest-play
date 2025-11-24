@@ -11,6 +11,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [instructorCode, setInstructorCode] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -35,7 +36,7 @@ export default function AuthPage() {
         email: email.trim(),
         password,
         name: name.trim(),
-        instructorCode: '' // Not used, just for schema compatibility
+        instructorCode: instructorCode.trim()
       });
 
       if (!validationResult.success) {
@@ -50,6 +51,12 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signUp({
         email: validData.email,
         password: validData.password,
+        options: {
+          data: {
+            full_name: validData.name,
+            instructor_code: instructorCode.trim() || null
+          }
+        }
       });
 
       if (error) {
@@ -78,6 +85,25 @@ export default function AuthPage() {
           user_id: user.id,
           org_id: null,
         });
+
+        // Handle instructor code if provided
+        if (instructorCode.trim()) {
+          try {
+            const { data: instructorId, error: codeError } = await supabase
+              .rpc("validate_instructor_code", { code: instructorCode.trim() });
+
+            if (!codeError && instructorId) {
+              await supabase
+                .from("instructor_students")
+                .insert({
+                  instructor_id: instructorId,
+                  student_id: user.id
+                });
+            }
+          } catch (err) {
+            console.error("Error connecting to instructor:", err);
+          }
+        }
 
         if (profileError) {
           console.error("Profile creation error:", profileError);
@@ -197,6 +223,26 @@ export default function AuthPage() {
             }).then(() => {
               // Errors are OK here - record might already exist
             });
+
+            // Handle instructor code if provided in metadata
+            const instructorCodeFromMeta = session.user.user_metadata?.instructor_code;
+            if (instructorCodeFromMeta) {
+              try {
+                const { data: instructorId, error: codeError } = await supabase
+                  .rpc("validate_instructor_code", { code: instructorCodeFromMeta });
+
+                if (!codeError && instructorId) {
+                  await supabase
+                    .from("instructor_students")
+                    .insert({
+                      instructor_id: instructorId,
+                      student_id: session.user.id
+                    });
+                }
+              } catch (err) {
+                console.error("Error connecting to instructor:", err);
+              }
+            }
           } else if (!profile.onboarded) {
             // Mark existing users as onboarded
             await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
@@ -237,14 +283,28 @@ export default function AuthPage() {
             {success && <p className="text-primary mb-4 text-sm">{success}</p>}
 
             {!isResetMode && isSignUp && (
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <>
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <input
+                  type="text"
+                  placeholder="Class Code (Optional)"
+                  value={instructorCode}
+                  onChange={(e) => setInstructorCode(e.target.value.toUpperCase())}
+                  onKeyPress={handleKeyPress}
+                  maxLength={6}
+                  className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono tracking-wider uppercase"
+                />
+                <p className="text-xs text-muted-foreground mb-4 -mt-2">
+                  Have a 6-digit class code from your instructor? You can also join a class later.
+                </p>
+              </>
             )}
 
             <input
