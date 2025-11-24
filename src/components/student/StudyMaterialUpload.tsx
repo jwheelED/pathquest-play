@@ -193,7 +193,7 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
         .single();
 
       // Insert material record
-      const { error: insertError } = await supabase
+      const { data: materialData, error: insertError } = await supabase
         .from('student_study_materials')
         .insert({
           user_id: userId,
@@ -206,7 +206,9 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
           file_path: filePath,
           video_url: materialType === 'video' ? videoUrl.trim() : null,
           subject_tags: tags.length > 0 ? tags : null,
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
 
@@ -214,6 +216,42 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
         title: "Material uploaded!",
         description: "Your study material has been saved successfully",
       });
+
+      // Auto-generate questions from the uploaded material
+      if (materialData) {
+        toast({
+          title: "Generating practice questions...",
+          description: "Creating 5 questions from your material",
+        });
+
+        try {
+          const { error: generateError } = await supabase.functions.invoke('generate-personalized-questions', {
+            body: {
+              materialId: materialData.id,
+              userId: userId,
+              difficulty: 'intermediate',
+              questionCount: 5
+            }
+          });
+
+          if (generateError) {
+            console.error('Error generating questions:', generateError);
+            toast({
+              title: "Questions generation failed",
+              description: "You can generate them manually later",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Questions ready!",
+              description: "5 practice questions generated from your material",
+            });
+          }
+        } catch (error: any) {
+          console.error('Error calling generate function:', error);
+          // Don't show error - questions can be generated manually later
+        }
+      }
 
       // Reset form
       setTitle("");
