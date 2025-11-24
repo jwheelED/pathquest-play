@@ -53,6 +53,59 @@ export type Database = {
         }
         Relationships: []
       }
+      adaptive_difficulty: {
+        Row: {
+          consecutive_correct: number
+          consecutive_incorrect: number
+          created_at: string
+          current_difficulty: string
+          difficulty_history: Json | null
+          id: string
+          last_difficulty_change: string | null
+          org_id: string | null
+          success_rate_by_level: Json | null
+          total_questions_at_level: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consecutive_correct?: number
+          consecutive_incorrect?: number
+          created_at?: string
+          current_difficulty?: string
+          difficulty_history?: Json | null
+          id?: string
+          last_difficulty_change?: string | null
+          org_id?: string | null
+          success_rate_by_level?: Json | null
+          total_questions_at_level?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consecutive_correct?: number
+          consecutive_incorrect?: number
+          created_at?: string
+          current_difficulty?: string
+          difficulty_history?: Json | null
+          id?: string
+          last_difficulty_change?: string | null
+          org_id?: string | null
+          success_rate_by_level?: Json | null
+          total_questions_at_level?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_difficulty_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_instructors: {
         Row: {
           admin_id: string
@@ -1782,6 +1835,17 @@ export type Database = {
       generate_group_invite_code: { Args: never; Returns: string }
       generate_instructor_code: { Args: never; Returns: string }
       generate_org_invite_code: { Args: never; Returns: string }
+      get_adaptive_difficulty: {
+        Args: { p_user_id: string }
+        Returns: {
+          consecutive_correct: number
+          consecutive_incorrect: number
+          current_difficulty: string
+          difficulty_history: Json
+          success_rate_by_level: Json
+          total_questions_at_level: Json
+        }[]
+      }
       get_problem_answer: {
         Args: { problem_id: string }
         Returns: {
@@ -1816,6 +1880,14 @@ export type Database = {
       submit_quiz: {
         Args: { p_assignment_id: string; p_user_answers: Json }
         Returns: Json
+      }
+      update_adaptive_difficulty: {
+        Args: {
+          p_current_difficulty: string
+          p_user_id: string
+          p_was_correct: boolean
+        }
+        Returns: string
       }
       update_assignment_grade: {
         Args: { p_assignment_id: string; p_short_answer_grades: Json }

@@ -14,6 +14,8 @@ import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary"
 import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStats";
 import { ClassSelector } from "@/components/student/ClassSelector";
 import { StudyGroups } from "@/components/student/StudyGroups";
+import { AdaptiveDifficultyIndicator } from "@/components/student/AdaptiveDifficultyIndicator";
+import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,6 +45,9 @@ export default function StudentTraining() {
     courseSchedule?: string;
   }>({});
   const navigate = useNavigate();
+  
+  // Get adaptive difficulty for the user
+  const { currentDifficulty } = useAdaptiveDifficulty(user?.id);
 
   useEffect(() => {
     checkSession();
@@ -236,6 +241,12 @@ export default function StudentTraining() {
             <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
               🎯 Practice with AI-Generated Questions
             </h2>
+            
+            {/* Adaptive Difficulty Indicator */}
+            {user?.id && (
+              <AdaptiveDifficultyIndicator userId={user.id} />
+            )}
+            
             {user?.id && (
               <STEMPractice 
                 userId={user.id}
@@ -277,6 +288,7 @@ export default function StudentTraining() {
                 <StudyMaterialUpload 
                   userId={user.id} 
                   onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
+                  adaptiveDifficulty={currentDifficulty}
                 />
                 <StudyMaterialLibrary 
                   userId={user.id} 
@@ -287,6 +299,7 @@ export default function StudentTraining() {
                   userId={user.id}
                   instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
                   onGenerateQuestions={() => setMaterialRefreshKey(prev => prev + 1)}
+                  adaptiveDifficulty={currentDifficulty}
                 />
               </>
             )}
