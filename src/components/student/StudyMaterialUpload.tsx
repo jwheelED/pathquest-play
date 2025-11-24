@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 interface StudyMaterialUploadProps {
   userId: string;
   onUploadComplete?: () => void;
+  adaptiveDifficulty?: string;
 }
 
 type MaterialType = 'note' | 'image' | 'video' | 'pdf' | 'audio';
@@ -23,7 +24,7 @@ interface ClassOption {
   instructorName: string;
 }
 
-export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialUploadProps) {
+export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficulty = 'intermediate' }: StudyMaterialUploadProps) {
   const [materialType, setMaterialType] = useState<MaterialType>('note');
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -229,7 +230,7 @@ export function StudyMaterialUpload({ userId, onUploadComplete }: StudyMaterialU
             body: {
               materialId: materialData.id,
               userId: userId,
-              difficulty: 'intermediate',
+              difficulty: adaptiveDifficulty,
               questionCount: 5
             }
           });

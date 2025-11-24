@@ -24,9 +24,10 @@ interface MaterialQuestionStatsProps {
   userId: string;
   instructorId?: string;
   onGenerateQuestions?: (materialId: string) => void;
+  adaptiveDifficulty?: string;
 }
 
-export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestions }: MaterialQuestionStatsProps) {
+export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestions, adaptiveDifficulty = 'intermediate' }: MaterialQuestionStatsProps) {
   const [stats, setStats] = useState<MaterialStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
@@ -117,7 +118,7 @@ export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestion
         body: {
           materialId,
           userId,
-          difficulty: 'intermediate',
+          difficulty: adaptiveDifficulty,
           questionCount: 5,
         }
       });
@@ -126,7 +127,7 @@ export function MaterialQuestionStats({ userId, instructorId, onGenerateQuestion
 
       toast({
         title: "Questions generated!",
-        description: `Created ${data.count} new practice questions`,
+        description: `Created ${data.count} new ${adaptiveDifficulty} level questions`,
       });
 
       fetchStats();

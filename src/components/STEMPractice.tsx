@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
+import { AdaptiveDifficultyIndicator } from "@/components/student/AdaptiveDifficultyIndicator";
 import { BookOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -69,6 +70,11 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
   const [loadingClasses, setLoadingClasses] = useState(true);
   const [showClassSelector, setShowClassSelector] = useState(false);
   
+  // Adaptive difficulty state
+  const [currentDifficulty, setCurrentDifficulty] = useState<string>('beginner');
+  const [showDifficultyChange, setShowDifficultyChange] = useState(false);
+  const [lastDifficultyChange, setLastDifficultyChange] = useState<{ from: string; to: string } | null>(null);
+  
   // Confidence gambling state
   const [showConfidenceSelector, setShowConfidenceSelector] = useState(false);
   const [selectedConfidence, setSelectedConfidence] = useState<{ level: ConfidenceLevel; multiplier: number } | null>(null);
@@ -78,6 +84,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     if (userId) {
       fetchDailyProgress();
       fetchUserClasses();
+      fetchAdaptiveDifficulty();
     }
   }, [userId]);
 
@@ -144,6 +151,26 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
       // Calculate current streak
       const correctToday = data.filter(attempt => attempt.is_correct).length;
       setStreak(correctToday);
+    }
+  };
+
+  const fetchAdaptiveDifficulty = async () => {
+    if (!userId) return;
+
+    try {
+      const { data, error } = await supabase.rpc('get_adaptive_difficulty', {
+        p_user_id: userId
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setCurrentDifficulty(data[0].current_difficulty);
+      }
+    } catch (error: any) {
+      console.error("Error fetching adaptive difficulty:", error);
+      // Default to beginner if error
+      setCurrentDifficulty('beginner');
     }
   };
 
@@ -228,7 +255,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      // Priority 2: Study group shared questions (if user is in groups)
+      // Priority 2: Study group shared questions (if user is in groups) - filtered by difficulty
       if (userId) {
         const { data: groupQuestions, error: groupError } = await supabase
           .from("study_group_questions")
@@ -242,7 +269,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         if (!groupError && groupQuestions && groupQuestions.length > 0) {
           const validQuestions = groupQuestions
             .map(gq => gq.personalized_questions)
-            .filter(q => q !== null);
+            .filter(q => q !== null && (q as any).difficulty === currentDifficulty);
 
           if (validQuestions.length > 0) {
             const randomQuestion = validQuestions[Math.floor(Math.random() * validQuestions.length)] as any;
@@ -265,12 +292,13 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         }
       }
 
-      // Priority 3: Personalized questions from user materials
+      // Priority 3: Personalized questions from user materials - filtered by difficulty
       if (userId) {
         let query = supabase
           .from("personalized_questions")
           .select("*")
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .eq("difficulty", currentDifficulty);
         
         // Filter by instructor if class is selected
         if (selectedClass) {
@@ -325,7 +353,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
                 body: {
                   materialId: materialToUse.id,
                   userId: userId,
-                  difficulty: 'intermediate',
+                  difficulty: currentDifficulty,
                   questionCount: 5
                 }
               });
@@ -376,10 +404,11 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         }
       }
 
-      // Fallback to general problems from stem_problems_student_view
+      // Fallback to general problems from stem_problems_student_view - filtered by difficulty
       const { data: newProblems, error: newError } = await supabase
         .from("stem_problems_student_view")
         .select("*")
+        .eq("difficulty", currentDifficulty)
         .limit(20);
       
       if (!newError && newProblems && newProblems.length > 0) {
@@ -395,10 +424,11 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      // Last resort: try student_problems view
+      // Last resort: try student_problems view - filtered by difficulty
       const { data: studentProblems } = await supabase
         .from("student_problems")
         .select("*")
+        .eq("difficulty", currentDifficulty)
         .limit(20);
       
       if (studentProblems && studentProblems.length > 0) {
@@ -566,6 +596,38 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
     
     // Update daily challenges and practice goals
     await updateChallengesAndGoals(correct, confidenceLevel);
+
+    // Update adaptive difficulty
+    try {
+      const { data: newDifficulty, error: diffError } = await supabase.rpc('update_adaptive_difficulty', {
+        p_user_id: userId,
+        p_was_correct: correct,
+        p_current_difficulty: currentDifficulty
+      });
+
+      if (!diffError && newDifficulty && newDifficulty !== currentDifficulty) {
+        setLastDifficultyChange({ from: currentDifficulty, to: newDifficulty });
+        setCurrentDifficulty(newDifficulty);
+        setShowDifficultyChange(true);
+        
+        // Show notification
+        const isUpgrade = newDifficulty > currentDifficulty;
+        setTimeout(() => {
+          toast.success(
+            isUpgrade ? `🎓 Difficulty Increased to ${newDifficulty.toUpperCase()}!` : `📚 Difficulty Adjusted to ${newDifficulty.toUpperCase()}`,
+            {
+              description: isUpgrade 
+                ? "Great progress! Questions will be more challenging." 
+                : "Let's practice more at this level.",
+              duration: 4000,
+            }
+          );
+          setShowDifficultyChange(false);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error updating adaptive difficulty:', error);
+    }
 
     // Show animated feedback
     if (correct) {
@@ -977,10 +1039,25 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
 
   return (
     <Card className="p-6 border-2 border-secondary-glow bg-gradient-to-br from-card to-secondary/10">
+      {/* Difficulty Change Notification */}
+      {showDifficultyChange && lastDifficultyChange && (
+        <div className="mb-4 p-4 bg-primary/10 border-2 border-primary/30 rounded-lg animate-in fade-in slide-in-from-top">
+          <p className="text-center font-bold text-primary">
+            {lastDifficultyChange.to > lastDifficultyChange.from ? '🎓' : '📚'} 
+            Difficulty adjusted from {lastDifficultyChange.from} to {lastDifficultyChange.to}!
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-          🧪 {practiceTitle}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            🧪 {practiceTitle}
+          </h2>
+          <Badge variant="outline" className="font-semibold capitalize">
+            {currentDifficulty}
+          </Badge>
+        </div>
         {selectedClass && classes.length > 1 && (
           <Button 
             variant="outline" 
