@@ -13,6 +13,7 @@ import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
 import { StudyMaterialLibrary } from "@/components/student/StudyMaterialLibrary";
 import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStats";
 import { ClassSelector } from "@/components/student/ClassSelector";
+import { StudyGroups } from "@/components/student/StudyGroups";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -226,6 +227,9 @@ export default function StudentTraining() {
 
           {/* Leaderboard */}
           {user?.id && <Leaderboard userId={user.id} />}
+
+          {/* Study Groups Section */}
+          {user?.id && <StudyGroups userId={user.id} />}
 
           {/* AI-Powered Practice Section */}
           <div className="space-y-4">
