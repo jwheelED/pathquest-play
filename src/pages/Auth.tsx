@@ -52,6 +52,7 @@ export default function AuthPage() {
         email: validData.email,
         password: validData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
           data: {
             full_name: validData.name,
             instructor_code: instructorCode.trim() || null
