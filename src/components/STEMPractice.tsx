@@ -217,7 +217,7 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
         return;
       }
 
-      // Priority 2: Personalized questions from user materials (filtered by selected class)
+      // Priority 2: Personalized questions from user materials
       if (userId) {
         let query = supabase
           .from("personalized_questions")
@@ -251,6 +251,47 @@ export default function STEMPractice({ userId, onPointsEarned, courseContext }: 
           setShowResult(false);
           setLoading(false);
           return;
+        }
+
+        // Check if user has materials but no questions - auto-generate
+        const { data: materials, error: materialsError } = await supabase
+          .from("student_study_materials")
+          .select("id, title, questions_generated")
+          .eq("user_id", userId)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (!materialsError && materials && materials.length > 0) {
+          // Find material with fewest questions generated
+          const materialToUse = materials.reduce((min, current) => 
+            (current.questions_generated || 0) < (min.questions_generated || 0) ? current : min
+          );
+
+          if ((materialToUse.questions_generated || 0) < 10) {
+            toast.info("Generating questions from your study materials...", {
+              description: "This will only take a moment",
+            });
+
+            try {
+              const { data: generatedData, error: generateError } = await supabase.functions.invoke('generate-personalized-questions', {
+                body: {
+                  materialId: materialToUse.id,
+                  userId: userId,
+                  difficulty: 'intermediate',
+                  questionCount: 5
+                }
+              });
+
+              if (!generateError && generatedData?.questions) {
+                // Recursively load the newly generated questions
+                await loadNextProblem();
+                return;
+              }
+            } catch (error) {
+              console.error('Error auto-generating questions:', error);
+              // Continue to fallback
+            }
+          }
         }
       }
 

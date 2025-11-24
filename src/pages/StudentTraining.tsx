@@ -184,6 +184,38 @@ export default function StudentTraining() {
           {/* Class Selector */}
           {user?.id && <ClassSelector userId={user.id} />}
 
+          {/* Onboarding Card for Students Without Classes */}
+          {classes.length === 0 && (
+            <div className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-6 shadow-lg">
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-full bg-primary/10 border border-primary/20">
+                  <span className="text-3xl">📚</span>
+                </div>
+                <div className="flex-1 space-y-2">
+                  <h3 className="text-xl font-bold text-foreground">
+                    Get Personalized Practice Questions
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Upload your study materials (notes, PDFs, images) to automatically generate AI-powered practice questions tailored to your content. No class connection needed!
+                  </p>
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="default" 
+                      onClick={() => {
+                        document.getElementById('study-materials-section')?.scrollIntoView({ 
+                          behavior: 'smooth',
+                          block: 'start'
+                        });
+                      }}
+                    >
+                      Upload Materials Now
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Gamification Section */}
           {user?.id && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -212,7 +244,7 @@ export default function StudentTraining() {
           </div>
 
           {/* Study Materials Section */}
-          <div className="space-y-4">
+          <div id="study-materials-section" className="space-y-4 scroll-mt-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
                 📚 My Study Materials
