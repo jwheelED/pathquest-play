@@ -70,7 +70,7 @@ Return ONLY the complete question text, nothing else.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview", // Balanced speed and accuracy for question extraction
+        model: "google/gemini-2.5-flash", // Stable model with good instruction following
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -86,10 +86,32 @@ Return ONLY the complete question text, nothing else.`;
     }
 
     const data = await response.json();
-    const extractedQuestion = data.choices[0]?.message?.content?.trim();
+    let extractedQuestion = data.choices[0]?.message?.content?.trim();
 
     console.log("🔍 Raw extraction result:", extractedQuestion);
     console.log("📊 Extraction length:", extractedQuestion?.length, "characters");
+
+    // Apply auto-fixes BEFORE validation
+    if (extractedQuestion) {
+      // Trim any trailing ellipsis
+      extractedQuestion = extractedQuestion.replace(/\.\.\.+$/, "").trim();
+
+      // Auto-fix: Add question mark if question word present but no punctuation
+      if (!extractedQuestion.endsWith("?") && !extractedQuestion.endsWith(".") && !extractedQuestion.endsWith("!")) {
+        const lowerQ = extractedQuestion.toLowerCase();
+        const hasQuestionWord = [
+          "what", "how", "why", "which", "who", "when", "where",
+          "can", "could", "would", "should", "is", "are", "do", "does"
+        ].some((word) => lowerQ.startsWith(word + " "));
+
+        if (hasQuestionWord) {
+          console.log("🔧 Auto-adding question mark to complete question");
+          extractedQuestion = extractedQuestion + "?";
+        }
+      }
+    }
+
+    console.log("🔧 After auto-fix:", extractedQuestion);
 
     // Enhanced validation with more aggressive truncation detection
     const validateQuestionCompleteness = (question: string): { isValid: boolean; reason?: string } => {
@@ -150,51 +172,19 @@ Return ONLY the complete question text, nothing else.`;
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Question extraction incomplete: ${validation.reason}. Please try again.`,
-          partial_question: extractedQuestion, // Return partial for user review
+          error: `Question extraction incomplete: ${validation.reason}. Please try again with a clearer question.`,
+          partial_question: extractedQuestion,
           validation_failure: validation.reason,
           retryable: true,
         }),
         {
-          status: 422, // Unprocessable Entity
+          status: 422,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
 
-    // Remove any potential trailing ellipsis or incomplete endings
-    let cleanedQuestion = extractedQuestion;
-    if (cleanedQuestion) {
-      // Trim any trailing ellipsis
-      cleanedQuestion = cleanedQuestion.replace(/\.\.\.+$/, "").trim();
-
-      // Auto-fix: Add question mark if question word present but no punctuation
-      if (!cleanedQuestion.endsWith("?") && !cleanedQuestion.endsWith(".") && !cleanedQuestion.endsWith("!")) {
-        const lowerQ = cleanedQuestion.toLowerCase();
-        const hasQuestionWord = [
-          "what",
-          "how",
-          "why",
-          "which",
-          "who",
-          "when",
-          "where",
-          "can",
-          "could",
-          "would",
-          "should",
-          "is",
-          "are",
-          "do",
-          "does",
-        ].some((word) => lowerQ.startsWith(word + " "));
-
-        if (hasQuestionWord) {
-          console.log("🔧 Auto-adding question mark to complete question");
-          cleanedQuestion = cleanedQuestion + "?";
-        }
-      }
-    }
+    const cleanedQuestion = extractedQuestion;
 
     if (!cleanedQuestion || cleanedQuestion === "NO_QUESTION_FOUND") {
       return new Response(
