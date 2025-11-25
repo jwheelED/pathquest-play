@@ -28,6 +28,7 @@ import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import { getOrgId } from "@/hooks/useOrgId";
+import { playNotificationSound } from "@/lib/audioNotification";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1012,6 +1013,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       if (data?.success) {
         console.log("✅ Question successfully sent!");
+
+        // Play audio notification for instructor
+        playNotificationSound().catch(err => 
+          console.log('Could not play notification sound:', err)
+        );
 
         // Update daily count
         setDailyQuestionCount((prev) => prev + 1);
