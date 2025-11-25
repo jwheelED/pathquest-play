@@ -75,19 +75,28 @@ export const LectureCheckInResults = () => {
             event: "*",
             schema: "public",
             table: "student_assignments",
-            filter: `instructor_id=eq.${user.id},assignment_type=eq.lecture_checkin`,
+            filter: `instructor_id=eq.${user.id}`,
           },
           (payload) => {
-            console.log("Check-in result updated:", payload);
+            // Only process lecture_checkin assignments
+            const record = payload.new as any;
+            if (record?.assignment_type !== 'lecture_checkin') return;
+            
+            console.log("✅ Check-in result updated:", payload);
+            toast.info("Student response received", { duration: 2000 });
+            
             // Debounce to handle multiple rapid updates from 40+ students
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
               fetchResults();
-            }, 300); // Reduced to 300ms for faster updates
+            }, 300);
           },
         )
         .subscribe((status) => {
-          console.log("Check-in subscription status:", status);
+          console.log("📡 Check-in subscription status:", status);
+          if (status === 'SUBSCRIBED') {
+            console.log("✅ Now listening for live student responses");
+          }
         });
 
       // Initial fetch after subscription is set up
