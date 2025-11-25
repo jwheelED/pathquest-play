@@ -1129,13 +1129,50 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       const formatPreference = profile?.question_format_preference || "multiple_choice";
       console.log("✅ Format preference:", formatPreference);
 
-      // Call edge function with format preference
+      // Fetch and parse lecture materials for context
+      console.log("📚 Fetching lecture materials...");
+      const { data: materials } = await supabase
+        .from("lecture_materials")
+        .select("id, title, description, file_path, file_type")
+        .eq("instructor_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(3); // Get most recent 3 materials for auto-questions
+
+      let materialContext: any[] = [];
+      if (materials && materials.length > 0) {
+        console.log("📖 Parsing", materials.length, "materials...");
+        const parsePromises = materials.map(async (material) => {
+          try {
+            const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
+              body: { filePath: material.file_path },
+            });
+            if (error) {
+              console.warn("Failed to parse material:", material.title, error);
+              return null;
+            }
+            return {
+              title: material.title,
+              description: material.description,
+              content: data.text?.slice(0, 2000), // Limit to 2000 chars per material
+            };
+          } catch (error) {
+            console.warn("Error parsing material:", material.title, error);
+            return null;
+          }
+        });
+        const parsedMaterials = await Promise.all(parsePromises);
+        materialContext = parsedMaterials.filter((m) => m !== null);
+        console.log("✅ Successfully parsed", materialContext.length, "materials");
+      }
+
+      // Call edge function with format preference and materials
       console.log("📡 Invoking generate-interval-question edge function...");
       console.log("🔗 Payload:", {
         interval_transcript_length: intervalTranscript.length,
         interval_minutes: autoQuestionInterval,
         format_preference: formatPreference,
         force_send: autoQuestionForceSend,
+        materials_count: materialContext.length,
       });
 
       const invokeStartTime = Date.now();
@@ -1145,6 +1182,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
           force_send: autoQuestionForceSend,
+          materialContext: materialContext,
         },
       });
       const invokeTime = Date.now() - invokeStartTime;
