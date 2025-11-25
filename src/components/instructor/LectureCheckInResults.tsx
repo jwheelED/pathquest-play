@@ -144,19 +144,18 @@ export const LectureCheckInResults = () => {
       return;
     }
 
-    // Get student names from both users and profiles tables (efficient for 40+ students)
+    // Get student names from profiles table only (RLS-aware)
     const studentIds = [...new Set(assignments?.map((a) => a.student_id) || [])];
-    const [usersResult, profilesResult] = await Promise.all([
-      supabase.from("users").select("id, name").in("id", studentIds),
-      supabase.from("profiles").select("id, full_name").in("id", studentIds)
-    ]);
+    const { data: profilesResult } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", studentIds);
 
-    // Build name map with fallback logic: users.name -> profiles.full_name -> "Unknown"
+    // Build name map: profiles.full_name -> fallback "Unknown Student"
     const studentMap = new Map<string, string>();
-    studentIds.forEach(id => {
-      const userName = usersResult.data?.find(u => u.id === id)?.name;
-      const profileName = profilesResult.data?.find(p => p.id === id)?.full_name;
-      studentMap.set(id, userName || profileName || "Unknown Student");
+    studentIds.forEach((id) => {
+      const profileName = profilesResult?.find((p) => p.id === id)?.full_name;
+      studentMap.set(id, profileName || "Unknown Student");
     });
 
     // Add student names to assignments

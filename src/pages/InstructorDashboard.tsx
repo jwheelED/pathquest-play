@@ -212,12 +212,17 @@ export default function InstructorDashboard() {
       const studentIds = studentLinks.map(link => link.student_id);
 
       // Parallel queries for better performance with 40+ students
-      const [usersData, statsData, progressData, masteryData, gradesData] = await Promise.all([
-        supabase.from("users").select("id, name").in("id", studentIds),
+      const [profilesData, statsData, progressData, masteryData, gradesData] = await Promise.all([
+        supabase.from("profiles").select("id, full_name").in("id", studentIds),
         supabase.from("user_stats").select("*").in("user_id", studentIds),
         supabase.from("lesson_progress").select("user_id, completed").in("user_id", studentIds),
         supabase.from("lesson_mastery").select("user_id, attempt_count, is_mastered").in("user_id", studentIds),
-        supabase.from("student_assignments").select("student_id, grade").eq("assignment_type", "lecture_checkin").eq("instructor_id", user.id).in("student_id", studentIds)
+        supabase
+          .from("student_assignments")
+          .select("student_id, grade")
+          .eq("assignment_type", "lecture_checkin")
+          .eq("instructor_id", user.id)
+          .in("student_id", studentIds),
       ]);
 
       // Create lookup maps for O(1) access - much faster with 40+ students
@@ -253,26 +258,26 @@ export default function InstructorDashboard() {
         }
       });
 
-      const combinedStudents = usersData.data?.map(student => {
-        const stats = statsMap.get(student.id);
-        const completedLessons = progressMap.get(student.id) || 0;
-        const mastery = masteryMap.get(student.id);
+      const profileRows = profilesData.data || [];
+      const combinedStudents = profileRows.map((profile) => {
+        const stats = statsMap.get(profile.id);
+        const completedLessons = progressMap.get(profile.id) || 0;
+        const mastery = masteryMap.get(profile.id);
         const avgMasteryAttempts = mastery ? mastery.sum / mastery.total : undefined;
-        const grades = gradesMap.get(student.id) || [];
-        const average_grade = grades.length > 0 
-          ? grades.reduce((sum, g) => sum + g, 0) / grades.length 
-          : undefined;
+        const grades = gradesMap.get(profile.id) || [];
+        const average_grade =
+          grades.length > 0 ? grades.reduce((sum, g) => sum + g, 0) / grades.length : undefined;
 
         return {
-          id: student.id,
-          name: student.name || "Unknown",
+          id: profile.id,
+          name: profile.full_name || "Student",
           current_streak: stats?.current_streak || 0,
           completedLessons,
           totalLessons: 10,
           averageMasteryAttempts: avgMasteryAttempts,
           average_grade,
         };
-      }) || [];
+      });
 
       setStudents(combinedStudents);
     } catch (error) {
