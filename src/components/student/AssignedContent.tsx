@@ -273,9 +273,16 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
         new Map((data || []).map(a => [a.id, a])).values()
       );
       
+      const prevLength = assignments.length;
       setAssignments(uniqueAssignments);
       
-      console.log(`✅ Fetched ${uniqueAssignments.length} unique assignments`);
+      console.log(`✅ Fetched ${uniqueAssignments.length} unique assignments (had ${prevLength})`);
+      
+      // Notify if new assignments found on initial load or manual refresh
+      const newCount = uniqueAssignments.length - prevLength;
+      if (newCount > 0 && prevLength > 0) {
+        sonnerToast.info(`${newCount} new assignment${newCount > 1 ? 's' : ''} found!`);
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -932,22 +939,28 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             <CardDescription>{assignments.filter(a => !a.completed).length} active assignment(s)</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {/* Real-time connection status indicator */}
-            <div className="flex items-center gap-1.5 text-xs">
+            {/* Real-time connection status indicator - ENHANCED */}
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md ${
+              realtimeStatus === 'connected' 
+                ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800' 
+                : realtimeStatus === 'connecting'
+                ? 'bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800'
+                : 'bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800'
+            }`}>
               {realtimeStatus === 'connected' ? (
                 <>
-                  <Wifi className="h-3.5 w-3.5 text-green-600" />
-                  <span className="text-muted-foreground">Live</span>
+                  <Wifi className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <span className="text-xs font-medium text-green-700 dark:text-green-300">Connected</span>
                 </>
               ) : realtimeStatus === 'connecting' ? (
                 <>
-                  <Wifi className="h-3.5 w-3.5 text-yellow-600 animate-pulse" />
-                  <span className="text-muted-foreground">Connecting...</span>
+                  <Wifi className="h-4 w-4 text-yellow-600 dark:text-yellow-400 animate-pulse" />
+                  <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">Connecting...</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="h-3.5 w-3.5 text-red-600" />
-                  <span className="text-muted-foreground">Offline</span>
+                  <WifiOff className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  <span className="text-xs font-medium text-red-700 dark:text-red-300">Disconnected</span>
                 </>
               )}
             </div>
@@ -955,8 +968,12 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             <Button 
               variant="ghost" 
               size="sm"
-              onClick={fetchAssignments}
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered');
+                fetchAssignments();
+              }}
               disabled={isRefreshing}
+              title="Refresh assignments"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
