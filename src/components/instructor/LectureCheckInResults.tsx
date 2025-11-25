@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,8 @@ interface GroupedAssignment {
 export const LectureCheckInResults = () => {
   const [groupedResults, setGroupedResults] = useState<GroupedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
   const [selectedOverride, setSelectedOverride] = useState<{
     groupIdx: number;
@@ -56,73 +58,7 @@ export const LectureCheckInResults = () => {
     localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
   }, [showCharts]);
 
-  useEffect(() => {
-    let debounceTimer: NodeJS.Timeout;
-    let channel: any;
-
-    const setupRealtimeSubscription = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Set up real-time subscription for assignment updates - filtered by instructor
-      channel = supabase
-        .channel("instructor-checkin-results")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "student_assignments",
-            filter: `instructor_id=eq.${user.id}`,
-          },
-          (payload) => {
-            // Only process lecture_checkin assignments
-            const record = payload.new as any;
-            if (record?.assignment_type !== 'lecture_checkin') return;
-            
-            console.log("✅ Check-in result updated:", payload);
-            toast.info("Student response received", { duration: 2000 });
-            
-            // Debounce to handle multiple rapid updates from 40+ students
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-              fetchResults();
-            }, 300);
-          },
-        )
-        .subscribe((status) => {
-          console.log("📡 Check-in subscription status:", status);
-          if (status === 'SUBSCRIBED') {
-            console.log("✅ Now listening for live student responses");
-          }
-        });
-
-      // Initial fetch after subscription is set up
-      await fetchResults();
-    };
-
-    setupRealtimeSubscription();
-
-    return () => {
-      clearTimeout(debounceTimer);
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, []);
-
-  // Lightweight polling fallback so results always appear even if realtime misses an event
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchResults();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchResults = async () => {
+  const fetchResults = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -232,8 +168,82 @@ export const LectureCheckInResults = () => {
     });
 
     setGroupedResults(groups);
+    setLastUpdated(new Date());
     setLoading(false);
-  };
+    setRefreshing(false);
+  }, []);
+
+  useEffect(() => {
+    let debounceTimer: NodeJS.Timeout;
+    let channel: any;
+
+    const setupRealtimeSubscription = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Set up real-time subscription for assignment updates - filtered by instructor
+      channel = supabase
+        .channel("instructor-checkin-results")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "student_assignments",
+            filter: `instructor_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // Handle INSERT (new questions) and UPDATE (student answers)
+            const record = (payload.new || payload.old) as any;
+            if (!record || record.assignment_type !== 'lecture_checkin') return;
+            
+            console.log("✅ Check-in result updated:", payload.eventType, record);
+            toast.info("Student response received", { duration: 2000 });
+            
+            // Debounce to handle multiple rapid updates from 40+ students
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              fetchResults();
+            }, 300);
+          },
+        )
+        .subscribe((status) => {
+          console.log("📡 Check-in subscription status:", status);
+          if (status === 'SUBSCRIBED') {
+            console.log("✅ Now listening for live student responses");
+          }
+        });
+
+      // Initial fetch after subscription is set up
+      await fetchResults();
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      clearTimeout(debounceTimer);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [fetchResults]);
+
+  // Lightweight polling fallback using timeout chain to prevent stale closures
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const poll = async () => {
+      await fetchResults();
+      timeoutId = setTimeout(poll, 5000);
+    };
+    
+    // Start polling after 5 seconds
+    timeoutId = setTimeout(poll, 5000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [fetchResults]);
 
   // Load existing AI summaries from database
   useEffect(() => {
@@ -699,6 +709,21 @@ export const LectureCheckInResults = () => {
     );
   }
 
+  const formatLastUpdated = () => {
+    if (!lastUpdated) return 'Never';
+    const seconds = Math.floor((Date.now() - lastUpdated.getTime()) / 1000);
+    if (seconds < 5) return 'Just now';
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    return lastUpdated.toLocaleTimeString();
+  };
+
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    await fetchResults();
+  };
+
   return (
     <Card className="shadow-lg border-2">
       <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
@@ -708,12 +733,21 @@ export const LectureCheckInResults = () => {
               <TrendingUp className="h-6 w-6 text-primary" />
               Live Lecture Check-In Results
             </CardTitle>
-            <CardDescription className="mt-1">Auto-graded student performance on lecture questions</CardDescription>
+            <CardDescription className="mt-1 flex items-center gap-2">
+              Auto-graded student performance on lecture questions
+              <span className="text-xs">• Last synced: {formatLastUpdated()}</span>
+            </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={fetchResults} variant="outline" size="sm" className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Refresh
+            <Button 
+              onClick={handleManualRefresh} 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Syncing...' : 'Refresh'}
             </Button>
             <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
               <Download className="h-4 w-4" />
