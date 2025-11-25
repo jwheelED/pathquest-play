@@ -465,6 +465,8 @@ export default function InstructorDashboard() {
             
             <AutoQuestionSettings />
             
+            <LectureMaterialsUpload />
+            
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
           </div>
         )}
@@ -482,8 +484,6 @@ export default function InstructorDashboard() {
             <LectureCheckInResults />
 
             <AnswerReleaseCard instructorId={currentUser.id} />
-
-            <LectureMaterialsUpload />
 
             {currentUser && (
               <>
