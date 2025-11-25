@@ -113,6 +113,15 @@ export const LectureCheckInResults = () => {
     };
   }, []);
 
+  // Lightweight polling fallback so results always appear even if realtime misses an event
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchResults();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const fetchResults = async () => {
     const {
       data: { user },
