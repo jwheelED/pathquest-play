@@ -54,7 +54,12 @@ export function ShareQuestionsDialog({
         .select("group_id")
         .eq("user_id", userId);
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        // Log error but don't show toast for common cases
+        console.error("Error fetching group memberships:", memberError);
+        setGroups([]);
+        return;
+      }
 
       if (!memberData || memberData.length === 0) {
         setGroups([]);
@@ -69,7 +74,11 @@ export function ShareQuestionsDialog({
         .select("*")
         .in("id", groupIds);
 
-      if (groupsError) throw groupsError;
+      if (groupsError) {
+        console.error("Error fetching group details:", groupsError);
+        setGroups([]);
+        return;
+      }
 
       // Add member count to each group
       const groupsWithCounts = await Promise.all(
@@ -88,12 +97,9 @@ export function ShareQuestionsDialog({
 
       setGroups(groupsWithCounts);
     } catch (error: any) {
-      console.error("Error fetching groups:", error);
-      toast({
-        title: "Error loading groups",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Only show toast for unexpected errors
+      console.error("Unexpected error fetching groups:", error);
+      setGroups([]);
     } finally {
       setLoading(false);
     }
