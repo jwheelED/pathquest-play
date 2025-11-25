@@ -52,7 +52,7 @@ serve(async (req) => {
       });
     }
 
-    const { interval_transcript, interval_minutes, format_preference, force_send } = await req.json();
+    const { interval_transcript, interval_minutes, format_preference, force_send, materialContext = [] } = await req.json();
 
     // Adjust minimum content requirement based on force_send mode
     const minContentLength = force_send ? 25 : 100;
@@ -121,16 +121,30 @@ Return JSON:
 IMPORTANT: The problem should directly relate to concepts taught in the lecture segment. Extract the programming language from the lecture content.`;
     } else {
       // Original prompt for multiple choice / short answer
+      let materialsContext = "";
+      if (materialContext && materialContext.length > 0) {
+        materialsContext = "\n\nCOURSE MATERIALS FOR REFERENCE:\n";
+        materialContext.forEach((material: any) => {
+          materialsContext += `\n[${material.title}]\n`;
+          if (material.description) {
+            materialsContext += `Description: ${material.description}\n`;
+          }
+          materialsContext += `Content excerpt: ${material.content}\n`;
+        });
+        materialsContext += "\nUse these materials to provide additional context and ensure questions align with course content.\n";
+      }
+
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
 
 RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
 "${interval_transcript}"
-
+${materialsContext}
 TASK: Generate ONE high-quality question that:
 1. Tests the MOST IMPORTANT concept from this interval
 2. Is clearly answerable based on what was just taught
 3. Requires students to apply or recall key information
 4. Avoids trivial or overly specific details
+5. ${materialContext.length > 0 ? "Aligns with concepts from the uploaded course materials" : "Focus on the lecture content"}
 
 CRITERIA:
 - Focus on main concepts, not minor details
@@ -138,6 +152,7 @@ CRITERIA:
 - Appropriate difficulty for what was just covered
 - Avoid questions about examples unless they're core to understanding
 - The question should test comprehension, not just recall
+- ${materialContext.length > 0 ? "Reference course materials when relevant to reinforce key concepts" : "Base question solely on lecture content"}
 
 Return JSON:
 {
