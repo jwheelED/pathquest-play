@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
 import { toast as sonnerToast } from "sonner";
 import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
+import { playNotificationSound } from "@/lib/audioNotification";
 
 interface Assignment {
   id: string;
@@ -116,6 +117,11 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             if (newAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
               setQuestionIncoming(true);
+              
+              // Play audio notification
+              playNotificationSound().catch(err => 
+                console.log('Could not play notification sound:', err)
+              );
               
               // Show animation for 1.5 seconds before revealing question
               setTimeout(() => {
