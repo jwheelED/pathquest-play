@@ -16,6 +16,7 @@ import {
   Star,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
@@ -1015,11 +1016,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Update daily count
         setDailyQuestionCount((prev) => prev + 1);
 
+        // Enhanced success notification
         toast({
-          title: "✅ Question sent!",
-          description: `${data.question_type} question sent to ${data.sent_to} students`,
+          title: "✅ Question sent successfully!",
+          description: `${data.question_type} delivered to ${data.sent_to} student${data.sent_to !== 1 ? 's' : ''} in ${data.processing_time_ms < 1000 ? `${data.processing_time_ms}ms` : `${(data.processing_time_ms / 1000).toFixed(1)}s`}`,
+          duration: 6000,
+        });
+        
+        // Additional visual feedback
+        sonnerToast.success("Question Delivered!", {
+          description: `${data.sent_to} student${data.sent_to !== 1 ? 's' : ''} received your question`,
           duration: 5000,
         });
+        
         onQuestionGenerated();
 
         // After successful send, extend the cooldown and record send time
