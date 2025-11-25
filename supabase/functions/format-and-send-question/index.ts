@@ -317,11 +317,12 @@ serve(async (req) => {
     // Fetch instructor's custom daily limit
     const { data: instructorProfile } = await supabase
       .from("profiles")
-      .select("daily_question_limit")
+      .select("daily_question_limit, org_id")
       .eq("id", user.id)
       .single();
 
     const dailyLimit = instructorProfile?.daily_question_limit || 200;
+    const instructorOrgId = instructorProfile?.org_id || null;
     console.log(`📊 Daily limit for instructor: ${dailyLimit}`);
 
     // Check daily limit (custom per instructor)
@@ -557,6 +558,7 @@ serve(async (req) => {
       const assignments = batch.map((studentId) => ({
         instructor_id: user.id,
         student_id: studentId,
+        org_id: instructorOrgId,
         assignment_type: "lecture_checkin",
         mode: assignmentMode,
         title: "🎯 Live Lecture Question",
