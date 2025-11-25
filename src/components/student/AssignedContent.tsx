@@ -87,6 +87,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     
     let debounceTimer: NodeJS.Timeout;
     
+    console.log('🔌 Setting up realtime subscription for student:', userId);
+    
     // Optimized real-time subscription using postgres_changes for new assignments
     // This provides reliable delivery for each student
     const assignmentChannel = supabase
@@ -100,7 +102,13 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
           filter: `student_id=eq.${userId}`
         },
         (payload) => {
-          console.log('📬 New assignment received:', payload);
+          console.log('📬 New assignment received via realtime:', payload);
+          console.log('📊 Assignment details:', {
+            id: payload.new?.id,
+            title: payload.new?.title,
+            type: payload.new?.assignment_type,
+            student_id: payload.new?.student_id
+          });
           
           if (payload.new) {
             const newAssignment = payload.new as Assignment;
@@ -200,10 +208,18 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
         console.log('📡 Subscription status:', status);
         if (status === 'SUBSCRIBED') {
           setRealtimeStatus('connected');
-          console.log('✅ Real-time updates connected');
+          console.log('✅ Real-time updates connected for student:', userId);
+          sonnerToast.success('Ready for Questions', {
+            description: 'Listening for new questions from your instructor',
+            duration: 3000,
+          });
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           setRealtimeStatus('error');
           console.error('❌ Real-time connection error:', status);
+          sonnerToast.error('Connection Issue', {
+            description: 'Unable to receive live updates. Please refresh the page.',
+            duration: 5000,
+          });
           // Retry connection after 5 seconds
           setTimeout(() => {
             console.log('🔄 Retrying real-time connection...');
