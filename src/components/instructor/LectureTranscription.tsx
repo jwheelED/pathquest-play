@@ -22,11 +22,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
-import { AutoQuestionDashboard, type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
+import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
-import { SystemHealthCheck } from "./SystemHealthCheck";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
-import { EdgeFunctionHealthCheck } from "./EdgeFunctionHealthCheck";
 import { getOrgId } from "@/hooks/useOrgId";
 import { playNotificationSound } from "@/lib/audioNotification";
 import {
@@ -2556,9 +2554,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           <CardDescription>Record your lecture and send questions to students in real-time</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* System Health Check */}
-          {!isRecording && <SystemHealthCheck />}
-
           {/* Error History Panel */}
           {errorHistory.length > 0 && (
             <ErrorHistoryPanel errors={errorHistory} onDismiss={handleDismissError} onClearAll={handleClearAllErrors} />
@@ -2571,7 +2566,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">📊 System Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {/* Transcription Status */}
                   <div className="flex flex-col items-center p-3 bg-muted/50 rounded-lg border">
                     <div className="flex items-center gap-2 mb-1">
@@ -2623,77 +2618,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                       />
                     )}
                   </div>
-
-                  {/* Daily Quota with Progress Bar */}
-                  <div className="flex flex-col p-3 bg-muted/50 rounded-lg border">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-medium text-muted-foreground">Daily Quota</p>
-                      {dailyQuestionCount >= dailyQuotaLimit * 0.8 && (
-                        <Badge
-                          variant={dailyQuestionCount >= dailyQuotaLimit ? "destructive" : "default"}
-                          className="text-[10px] px-1.5 py-0.5"
-                        >
-                          {dailyQuestionCount >= dailyQuotaLimit
-                            ? "🚫 FULL"
-                            : dailyQuestionCount >= dailyQuotaLimit * 0.9
-                              ? "⚠️ 90%"
-                              : "⚠️ 80%"}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm font-bold mb-2">
-                      {dailyQuestionCount >= dailyQuotaLimit ? (
-                        <span className="text-red-600 dark:text-red-400">
-                          {dailyQuestionCount}/{dailyQuotaLimit}
-                        </span>
-                      ) : dailyQuestionCount >= dailyQuotaLimit * 0.9 ? (
-                        <span className="text-amber-600 dark:text-amber-400">
-                          {dailyQuestionCount}/{dailyQuotaLimit}
-                        </span>
-                      ) : (
-                        <span className="text-green-600 dark:text-green-400">
-                          {dailyQuestionCount}/{dailyQuotaLimit}
-                        </span>
-                      )}
-                    </p>
-                    <Progress value={(dailyQuestionCount / dailyQuotaLimit) * 100} className="h-2" />
-                  </div>
                 </div>
 
-                {/* Auto-Question Dashboard */}
+                {/* Auto-Question Monitor */}
                 {autoQuestionEnabled && (
-                  <div className="mt-3 space-y-3">
-                    {/* System Health Check */}
-                    <EdgeFunctionHealthCheck />
-
-                    {/* Debug Dashboard */}
+                  <div className="mt-3">
                     <AutoQuestionDebugDashboard
                       isEnabled={autoQuestionEnabled}
                       isRecording={isRecording}
                       nextQuestionIn={nextAutoQuestionIn}
                       intervalMinutes={autoQuestionInterval}
-                      transcriptLength={intervalTranscriptLength}
-                      lastError={lastAutoQuestionError}
-                      lastErrorTime={lastAutoQuestionErrorTime}
-                      autoQuestionCount={autoQuestionCount}
                       isSendingQuestion={isSendingQuestion}
                       onTestNow={handleTestAutoQuestion}
                       onToggleEnabled={handleToggleAutoQuestion}
-                    />
-
-                    {/* Regular Dashboard */}
-                    <AutoQuestionDashboard
-                      isRecording={isRecording}
-                      autoQuestionEnabled={autoQuestionEnabled}
-                      autoQuestionInterval={autoQuestionInterval}
-                      studentCount={studentCount}
-                      nextAutoQuestionIn={nextAutoQuestionIn}
-                      intervalTranscriptLength={intervalTranscriptLength}
-                      contentQualityScore={contentQualityScore}
-                      metrics={autoQuestionMetrics}
-                      rateLimitSecondsLeft={rateLimitSecondsLeft}
-                      dailyQuestionCount={dailyQuestionCount}
-                      dailyQuotaLimit={dailyQuotaLimit}
                     />
                   </div>
                 )}
