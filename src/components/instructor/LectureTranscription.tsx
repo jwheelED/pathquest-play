@@ -84,7 +84,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [circuitBreakerCountdown, setCircuitBreakerCountdown] = useState<number>(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
-  const [isTutorialOpen, setIsTutorialOpen] = useState(true);
   const [lastTranscript, setLastTranscript] = useState<string>("");
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
   const [nextQuestionAllowedAt, setNextQuestionAllowedAt] = useState<number>(0);
@@ -2653,61 +2652,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               </CardContent>
             </Card>
           )}
-
-          {/* Tutorial Section */}
-          <Collapsible open={isTutorialOpen} onOpenChange={setIsTutorialOpen}>
-            <Card className="mb-4 bg-muted/50 border-primary/20">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-primary" />
-                    How to Use Live Lecture Capture
-                  </CardTitle>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      {isTutorialOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      <span className="sr-only">Toggle tutorial</span>
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
-              </CardHeader>
-              <CollapsibleContent>
-                <CardContent className="space-y-3">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="shrink-0">
-                        Step 1
-                      </Badge>
-                      <p>Click "Start Recording" to begin capturing your lecture audio in real-time.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="shrink-0">
-                        Step 2
-                      </Badge>
-                      <p>Ask your question naturally during the lecture.</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="shrink-0">
-                        Step 3
-                      </Badge>
-                      <p>
-                        Either click the <strong>"Send Question"</strong> button below, or say{" "}
-                        <strong>"send question now"</strong> to instantly send it to students.
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="shrink-0">
-                        Step 4
-                      </Badge>
-                      <p>
-                        The system will extract the most recent question from your speech and send it to all students.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
 
           <Card className="relative overflow-hidden">
             {/* Voice Command Flash Overlay */}
