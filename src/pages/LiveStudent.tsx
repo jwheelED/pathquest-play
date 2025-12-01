@@ -32,6 +32,7 @@ const LiveStudent = () => {
   const [nickname, setNickname] = useState<string>("");
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
   const [showAccountPrompt, setShowAccountPrompt] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     const storedParticipantId = localStorage.getItem("participantId");
@@ -83,13 +84,16 @@ const LiveStudent = () => {
       if (result.questions && result.questions.length > 0) {
         const latestQuestion = result.questions[0];
         
-        // New question detected
+        // Only update if it's actually a new question AND user isn't typing
         if (!currentQuestion || currentQuestion.id !== latestQuestion.id) {
-          setCurrentQuestion(latestQuestion);
-          setSelectedAnswer("");
-          setHasAnswered(false);
-          setIsCorrect(null);
-          setQuestionStartTime(Date.now());
+          // Don't interrupt user if they're actively typing
+          if (!isTyping) {
+            setCurrentQuestion(latestQuestion);
+            setSelectedAnswer("");
+            setHasAnswered(false);
+            setIsCorrect(null);
+            setQuestionStartTime(Date.now());
+          }
         }
       }
     } catch (error) {
@@ -153,6 +157,20 @@ const LiveStudent = () => {
     );
   }
 
+  // Safeguard: ensure question_content exists before rendering
+  if (!currentQuestion?.question_content) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading question...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
       <div className="w-full max-w-2xl space-y-4">
@@ -198,6 +216,8 @@ const LiveStudent = () => {
                 <Textarea
                   value={selectedAnswer}
                   onChange={(e) => setSelectedAnswer(e.target.value)}
+                  onFocus={() => setIsTyping(true)}
+                  onBlur={() => setIsTyping(false)}
                   placeholder="Type your answer here..."
                   className="min-h-[120px]"
                 />
