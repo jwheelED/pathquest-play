@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Mic, CheckCircle, Copy } from "lucide-react";
+import { Upload, Mic, CheckCircle, Copy, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -131,10 +131,23 @@ export default function InstructorOnboarding() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-accent/5 to-secondary/10 p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Instructor Setup</CardTitle>
-          <CardDescription>
-            Configure your lecture capture and engagement system
-          </CardDescription>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle>Instructor Setup</CardTitle>
+              <CardDescription>
+                Configure your lecture capture and engagement system
+              </CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/instructor/dashboard')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Exit Setup
+            </Button>
+          </div>
           <Progress value={progress} className="mt-4" />
           <p className="text-sm text-muted-foreground mt-2">
             Step {step} of {totalSteps}
