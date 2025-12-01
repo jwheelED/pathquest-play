@@ -54,6 +54,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
   const [questionIncoming, setQuestionIncoming] = useState(false);
   const [aiExplanations, setAiExplanations] = useState<Record<string, Record<number, { explanation: string; cached: boolean }>>>({});
   const [loadingExplanations, setLoadingExplanations] = useState<Record<string, Record<number, boolean>>>({});
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
@@ -83,53 +84,91 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     prevLiveCheckInsLength.current = liveCheckIns.length;
   }, [liveCheckIns, accordionValue]);
 
+  // Polling fallback when realtime disconnected
   useEffect(() => {
-    fetchAssignments();
-    
+    if (realtimeStatus !== 'connected') {
+      const pollInterval = setInterval(() => {
+        console.log('📡 Polling fallback - fetching assignments...');
+        fetchAssignments();
+      }, 10000);
+      
+      return () => clearInterval(pollInterval);
+    }
+  }, [realtimeStatus]);
+
+  // Main realtime subscription with resilience improvements
+  useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
+    let assignmentChannel: any = null;
+    let isSubscribed = false;
     
-    console.log('🔌 Setting up realtime subscription for student:', userId);
-    
-    // Optimized real-time subscription using postgres_changes for new assignments
-    // This provides reliable delivery for each student
-    const assignmentChannel = supabase
-      .channel(`student-assignments-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'student_assignments',
-          filter: `student_id=eq.${userId}`
-        },
-        (payload) => {
-          console.log('📬 New assignment received via realtime:', payload);
-          console.log('📊 Assignment details:', {
-            id: payload.new?.id,
-            title: payload.new?.title,
-            type: payload.new?.assignment_type,
-            student_id: payload.new?.student_id
-          });
-          
-          if (payload.new) {
-            const newAssignment = payload.new as Assignment;
-            
-            if (newAssignment.assignment_type === 'lecture_checkin') {
-              // Trigger animation
-              setQuestionIncoming(true);
+    const setupRealtimeSubscription = async () => {
+      // Step 1: Verify authentication before subscribing
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.log('⚠️ No session found, skipping realtime setup');
+        setRealtimeStatus('error');
+        return;
+      }
+
+      console.log('🔌 Setting up realtime subscription for student:', userId);
+      setRealtimeStatus('connecting');
+      
+      // Step 2: Set up subscription WITHOUT server-side filter (filter client-side instead)
+      assignmentChannel = supabase
+        .channel(`student-assignments-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'student_assignments'
+            // No filter - RLS handles access, we filter client-side
+          },
+          (payload) => {
+            // Client-side filtering for this user's assignments
+            if (payload.new && (payload.new as any).student_id === userId) {
+              console.log('📬 New assignment received via realtime:', payload);
+              console.log('📊 Assignment details:', {
+                id: payload.new?.id,
+                title: (payload.new as any)?.title,
+                type: (payload.new as any)?.assignment_type,
+                student_id: (payload.new as any)?.student_id
+              });
               
-              // Play audio notification
-              playNotificationSound().catch(err => 
-                console.log('Could not play notification sound:', err)
-              );
+              const newAssignment = payload.new as Assignment;
               
-              // Show animation for 1.5 seconds before revealing question
-              setTimeout(() => {
-                setQuestionIncoming(false);
+              if (newAssignment.assignment_type === 'lecture_checkin') {
+                // Trigger animation
+                setQuestionIncoming(true);
                 
-                // Add assignment to state with proper deduplication
+                // Play audio notification
+                playNotificationSound().catch(err => 
+                  console.log('Could not play notification sound:', err)
+                );
+                
+                // Show animation for 1.5 seconds before revealing question
+                setTimeout(() => {
+                  setQuestionIncoming(false);
+                  
+                  // Add assignment to state with proper deduplication
+                  setAssignments(prev => {
+                    if (prev.some(a => a.id === newAssignment.id)) {
+                      console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                      return prev;
+                    }
+                    console.log('✅ Adding new assignment:', newAssignment.id);
+                    return [newAssignment, ...prev];
+                  });
+                  
+                  // Show notification
+                  sonnerToast.success("New Question!", {
+                    description: `"${newAssignment.title}" is ready`
+                  });
+                }, 1500);
+              } else {
+                // For non-lecture assignments, add immediately with deduplication
                 setAssignments(prev => {
-                  // Check if this exact assignment already exists
                   if (prev.some(a => a.id === newAssignment.id)) {
                     console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
                     return prev;
@@ -137,108 +176,115 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                   console.log('✅ Adding new assignment:', newAssignment.id);
                   return [newAssignment, ...prev];
                 });
+              }
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'student_assignments'
+            // No filter - RLS handles access, we filter client-side
+          },
+          (payload) => {
+            // Client-side filtering
+            if (payload.new && (payload.new as any).student_id === userId) {
+              console.log('📝 Assignment updated:', payload);
+              
+              const oldAssignment = payload.old as Assignment;
+              const updatedAssignment = payload.new as Assignment;
+              
+              // Immediate update for answers_released
+              if ('answers_released' in updatedAssignment) {
+                setAssignments(prev => 
+                  prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+                );
                 
-                // Show notification
-                sonnerToast.success("New Question!", {
-                  description: `"${newAssignment.title}" is ready`
-                });
-              }, 1500);
-            } else {
-              // For non-lecture assignments, add immediately with deduplication
-              setAssignments(prev => {
-                if (prev.some(a => a.id === newAssignment.id)) {
-                  console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
-                  return prev;
+                if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
+                  sonnerToast.success("Answers Released!", {
+                    description: `Answers for "${updatedAssignment.title}" are now available`
+                  });
                 }
-                console.log('✅ Adding new assignment:', newAssignment.id);
-                return [newAssignment, ...prev];
-              });
+              }
+              
+              // Show toast notification when grade is posted
+              if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
+                setAssignments(prev => 
+                  prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+                );
+                
+                sonnerToast.success("Grade Posted!", {
+                  description: `Your grade for "${updatedAssignment.title}": ${Math.round(updatedAssignment.grade)}%`
+                });
+              }
+              
+              // Debounced refresh for other updates
+              clearTimeout(debounceTimer);
+              debounceTimer = setTimeout(() => {
+                fetchAssignments();
+              }, 500);
             }
           }
-          
-          // NO debounced refresh for INSERT - realtime event handles it
-          // Only refresh is needed for initial load and UPDATE events
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'student_assignments',
-          filter: `student_id=eq.${userId}`
-        },
-        (payload) => {
-          console.log('📝 Assignment updated:', payload);
-          
-          const oldAssignment = payload.old as Assignment;
-          const updatedAssignment = payload.new as Assignment;
-          
-          // Immediate update for answers_released (no debounce for instant UI refresh)
-          if ('answers_released' in updatedAssignment) {
-            setAssignments(prev => 
-              prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
-            );
-            
-            // Show toast notification when answers are released
-            if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
-              sonnerToast.success("Answers Released!", {
-                description: `Answers for "${updatedAssignment.title}" are now available`
-              });
-            }
-          }
-          
-          // Show toast notification when grade is posted
-          if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
-            setAssignments(prev => 
-              prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
-            );
-            
-            sonnerToast.success("Grade Posted!", {
-              description: `Your grade for "${updatedAssignment.title}": ${Math.round(updatedAssignment.grade)}%`
+        )
+        .subscribe((status) => {
+          console.log('📡 Subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            isSubscribed = true;
+            setRealtimeStatus('connected');
+            setRetryCount(0); // Reset retry count on success
+            console.log('✅ Real-time updates connected for student:', userId);
+            sonnerToast.success('Ready for Questions', {
+              description: 'Listening for new questions from your instructor',
+              duration: 3000,
             });
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            setRealtimeStatus('error');
+            console.error('❌ Real-time connection error:', status);
+            
+            // Step 4: Exponential backoff retry
+            if (!isSubscribed && retryCount < 5) {
+              const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+              console.log(`🔄 Retrying connection in ${delay}ms (attempt ${retryCount + 1}/5)...`);
+              
+              setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+                setupRealtimeSubscription();
+              }, delay);
+            } else if (retryCount >= 5) {
+              sonnerToast.error('Connection Failed', {
+                description: 'Cannot establish live connection. Using backup polling.',
+                duration: 5000,
+              });
+            }
           }
-          
-          // Debounced refresh for other updates
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            fetchAssignments();
-          }, 500);
+        });
+    };
+    
+    // Initial setup
+    fetchAssignments();
+    setupRealtimeSubscription();
+
+    // Step 3: Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        console.log('🔄 Auth state changed, reconnecting realtime...', event);
+        if (assignmentChannel) {
+          supabase.removeChannel(assignmentChannel);
         }
-      )
-      .on('system', {}, (payload) => {
-        console.log('🔌 Realtime connection status:', payload);
-        // Handle connection status updates
-      })
-      .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          setRealtimeStatus('connected');
-          console.log('✅ Real-time updates connected for student:', userId);
-          sonnerToast.success('Ready for Questions', {
-            description: 'Listening for new questions from your instructor',
-            duration: 3000,
-          });
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          setRealtimeStatus('error');
-          console.error('❌ Real-time connection error:', status);
-          sonnerToast.error('Connection Issue', {
-            description: 'Unable to receive live updates. Please refresh the page.',
-            duration: 5000,
-          });
-          // Retry connection after 5 seconds
-          setTimeout(() => {
-            console.log('🔄 Retrying real-time connection...');
-            setRealtimeStatus('connecting');
-          }, 5000);
-        }
-      });
+        setupRealtimeSubscription();
+      }
+    });
 
     return () => {
       clearTimeout(debounceTimer);
-      supabase.removeChannel(assignmentChannel);
+      if (assignmentChannel) {
+        supabase.removeChannel(assignmentChannel);
+      }
+      subscription.unsubscribe();
     };
-  }, [userId]);
+  }, [userId, retryCount]);
 
   const fetchAssignments = async () => {
     setIsRefreshing(true);
