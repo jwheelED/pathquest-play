@@ -386,10 +386,8 @@ serve(async (req) => {
       return "manual_grade";
     };
 
-    // PHASE 2 OPTIMIZATION: Send plain text first, upgrade to MCQ in background
-    // This reduces preprocessing time from ~4s to ~0.5s
-    const shouldUpgradeToMCQ = instructorPreference === "multiple_choice";
-    const finalType = shouldUpgradeToMCQ ? "short_answer" : instructorPreference;
+    // Use instructor's actual format preference
+    const finalType = instructorPreference;
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -407,7 +405,6 @@ serve(async (req) => {
     console.log(
       "📝 Formatting question as:",
       finalType,
-      shouldUpgradeToMCQ ? "(will upgrade to MCQ in background)" : "",
       "-",
       questionPreview,
     );
@@ -418,18 +415,7 @@ serve(async (req) => {
     let formatStartTime = Date.now();
     console.log("⏱️ Starting question formatting...");
 
-    // PHASE 2: For MCQ preference, send as short_answer first, upgrade in background
-    if (shouldUpgradeToMCQ) {
-      formattedQuestion = {
-        question:
-          typeof question_text === "string" ? question_text : question_text.question_text || question_text.title,
-        type: "short_answer",
-        expectedAnswer: "",
-        gradingMode: "manual_grade",
-        upgrading_to_mcq: true, // Flag for background upgrade
-      };
-      console.log("⚡ Skipping MCQ generation - will upgrade in background after sending");
-    } else if (finalType === "coding") {
+    if (finalType === "coding") {
       // For coding questions, check if we have structured problem data
       if (
         question_text &&
@@ -797,70 +783,17 @@ serve(async (req) => {
     });
     await supabase.removeChannel(broadcastChannel);
 
-    // PHASE 2: Trigger background MCQ upgrade if needed
-    if (shouldUpgradeToMCQ && successCount > 0) {
-      console.log("🔄 Triggering background MCQ upgrade for assignments");
-
-      // Use background task to upgrade to MCQ without blocking response
-      const upgradePromise = (async () => {
-        try {
-          const mcq = await generateMCQ(
-            typeof question_text === "string" ? question_text : question_text.question_text || question_text.title,
-            context || "",
-          );
-
-          const mcqQuestion = {
-            question: mcq.question,
-            type: "multiple_choice",
-            options: mcq.options,
-            correctAnswer: mcq.correctAnswer,
-            explanation: mcq.explanation,
-          };
-
-          // Update all assignments with MCQ format
-          const { error: updateError } = await supabase
-            .from("student_assignments")
-            .update({
-              content: {
-                questions: [mcqQuestion],
-                isLive: true,
-                detectedAutomatically: true,
-                source: source,
-                idempotency_key: idempotencyKey,
-                upgraded_from_short_answer: true,
-              },
-            })
-            .eq("instructor_id", user.id)
-            .contains("content", { idempotency_key: idempotencyKey });
-
-          if (updateError) {
-            console.error("❌ Failed to upgrade to MCQ:", updateError);
-          } else {
-            console.log("✅ Successfully upgraded to MCQ in background");
-          }
-        } catch (error) {
-          console.error("❌ Background MCQ upgrade failed:", error);
-        }
-      })();
-
-      // Execute background upgrade (will continue after response is sent)
-      upgradePromise.catch((error) => {
-        console.error("❌ Background MCQ upgrade failed:", error);
-      });
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
         sent_to: successCount,
         total_students: studentIds.length,
         failed_count: failedStudents.length,
-        question_type: shouldUpgradeToMCQ ? "multiple_choice" : finalType,
+        question_type: finalType,
         question: formattedQuestion,
         batches_processed: batches.length,
         processing_time_ms: processingTime,
         parallel_batches: true,
-        upgrading_to_mcq: shouldUpgradeToMCQ,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

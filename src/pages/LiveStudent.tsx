@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,12 @@ const LiveStudent = () => {
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
   const [showAccountPrompt, setShowAccountPrompt] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const isTypingRef = useRef(false);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    isTypingRef.current = isTyping;
+  }, [isTyping]);
 
   useEffect(() => {
     const storedParticipantId = localStorage.getItem("participantId");
@@ -86,8 +92,8 @@ const LiveStudent = () => {
         
         // Only update if it's actually a new question AND user isn't typing
         if (!currentQuestion || currentQuestion.id !== latestQuestion.id) {
-          // Don't interrupt user if they're actively typing
-          if (!isTyping) {
+          // Check ref instead of state to avoid stale closure
+          if (!isTypingRef.current) {
             setCurrentQuestion(latestQuestion);
             setSelectedAnswer("");
             setHasAnswered(false);
