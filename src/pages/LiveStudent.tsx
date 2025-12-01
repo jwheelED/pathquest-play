@@ -34,6 +34,7 @@ const LiveStudent = () => {
   const [showAccountPrompt, setShowAccountPrompt] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const isTypingRef = useRef(false);
+  const answeredQuestionsRef = useRef<Set<string>>(new Set());
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -90,16 +91,17 @@ const LiveStudent = () => {
       if (result.questions && result.questions.length > 0) {
         const latestQuestion = result.questions[0];
         
-        // Only update if it's actually a new question AND user isn't typing
-        if (!currentQuestion || currentQuestion.id !== latestQuestion.id) {
-          // Check ref instead of state to avoid stale closure
-          if (!isTypingRef.current) {
-            setCurrentQuestion(latestQuestion);
-            setSelectedAnswer("");
-            setHasAnswered(false);
-            setIsCorrect(null);
-            setQuestionStartTime(Date.now());
-          }
+        // Check if this is a genuinely NEW question that hasn't been answered
+        const isNewQuestion = !currentQuestion || currentQuestion.id !== latestQuestion.id;
+        const hasBeenAnswered = answeredQuestionsRef.current.has(latestQuestion.id);
+        
+        // Only update if it's a new question that hasn't been answered AND user isn't typing
+        if (isNewQuestion && !hasBeenAnswered && !isTypingRef.current) {
+          setCurrentQuestion(latestQuestion);
+          setSelectedAnswer("");
+          setHasAnswered(false);
+          setIsCorrect(null);
+          setQuestionStartTime(Date.now());
         }
       }
     } catch (error) {
@@ -125,6 +127,9 @@ const LiveStudent = () => {
 
       if (error) throw error;
 
+      // Mark this question as answered to prevent re-prompting
+      answeredQuestionsRef.current.add(currentQuestion.id);
+      
       setHasAnswered(true);
       setIsCorrect(data.isCorrect);
       setShowAccountPrompt(true);
@@ -138,6 +143,8 @@ const LiveStudent = () => {
       console.error("Error submitting answer:", error);
       if (error.message?.includes("Already answered")) {
         toast.info("You already answered this question");
+        // Mark as answered even if backend says it was already answered
+        answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
         toast.error("Failed to submit answer");
