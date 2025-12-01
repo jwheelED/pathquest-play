@@ -499,6 +499,88 @@ serve(async (req) => {
     const formatEndTime = Date.now();
     console.log(`⏱️ Question formatted in ${formatEndTime - formatStartTime}ms`);
 
+    // Start timing for total processing
+    const startTime = Date.now();
+
+    // Check if instructor has an active live session
+    const { data: liveSession } = await supabase
+      .from("live_sessions")
+      .select("id, session_code")
+      .eq("instructor_id", user.id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    // If live session active, use live_questions instead of student_assignments
+    if (liveSession) {
+      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using broadcast mode`);
+
+      // Get question number for this session
+      const { count: questionCount } = await supabase
+        .from("live_questions")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", liveSession.id);
+
+      const questionNumber = (questionCount || 0) + 1;
+
+      // Insert single question row (1 write instead of N writes)
+      const { error: insertError } = await supabase
+        .from("live_questions")
+        .insert({
+          session_id: liveSession.id,
+          instructor_id: user.id,
+          question_content: formattedQuestion,
+          question_number: questionNumber,
+        });
+
+      if (insertError) {
+        console.error("❌ Failed to insert live question:", insertError);
+        throw new Error(`Failed to send live question: ${insertError.message}`);
+      }
+
+      // Get participant count for logging
+      const { count: participantCount } = await supabase
+        .from("live_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", liveSession.id);
+
+      const processingTime = Date.now() - startTime;
+
+      console.log(`✅ Live question sent to ${participantCount || 0} participants in ${processingTime}ms`);
+
+      // Log success
+      await supabase.from("question_send_logs").insert({
+        instructor_id: user.id,
+        success: true,
+        student_count: participantCount || 0,
+        successful_sends: participantCount || 0,
+        failed_sends: 0,
+        batch_count: 1,
+        processing_time_ms: processingTime,
+        question_text: questionPreview,
+        question_type: finalType,
+        source: source,
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          liveMode: true,
+          sessionCode: liveSession.session_code,
+          participantCount: participantCount || 0,
+          questionNumber,
+          processingTime,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // No live session - use traditional student_assignments (authenticated users)
+    console.log("📚 Standard mode - sending via student_assignments");
+
     // Fetch students linked to this instructor
     const { data: studentLinks, error: linkError } = await supabase
       .from("instructor_students")
@@ -522,8 +604,6 @@ serve(async (req) => {
     }
 
     console.log("👥 Sending to", studentLinks.length, "students");
-
-    const startTime = Date.now();
 
     // Optimized batch processing - increased batch size for faster delivery
     const BATCH_SIZE = 25; // Increased from 10 to 25 for Phase 1 optimization

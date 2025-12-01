@@ -21,6 +21,7 @@ import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
+import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 
 interface Student {
   id: string;
@@ -42,6 +43,7 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [instructorProfile, setInstructorProfile] = useState<any>(null);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   
   const professorType = instructorProfile?.professor_type;
@@ -469,6 +471,8 @@ export default function InstructorDashboard() {
             </div>
             
             <AutoQuestionSettings />
+            
+            <LiveSessionControls onSessionChange={setLiveSessionId} />
             
             <LectureMaterialsUpload />
             
