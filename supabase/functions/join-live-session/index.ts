@@ -18,6 +18,8 @@ Deno.serve(async (req) => {
 
     const { sessionCode, nickname } = await req.json();
 
+    console.log(`join-live-session: Attempting to join with code: ${sessionCode}, nickname: ${nickname}`);
+
     if (!sessionCode || !nickname) {
       return new Response(
         JSON.stringify({ error: 'Session code and nickname are required' }),
@@ -28,12 +30,15 @@ Deno.serve(async (req) => {
     // Validate session exists and is active
     const { data: session, error: sessionError } = await supabaseClient
       .from('live_sessions')
-      .select('id, is_active, ends_at')
+      .select('id, is_active, ends_at, session_code')
       .eq('session_code', sessionCode)
       .eq('is_active', true)
       .single();
 
+    console.log(`join-live-session: Query result - session:`, session, 'error:', sessionError);
+
     if (sessionError || !session) {
+      console.error(`join-live-session: Session not found or inactive for code: ${sessionCode}`);
       return new Response(
         JSON.stringify({ error: 'Invalid or inactive session code' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

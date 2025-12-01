@@ -73,14 +73,14 @@ serve(async (req) => {
       .single();
 
     if (sessionError) {
-      console.error('Error creating session:', sessionError);
+      console.error('create-live-session: Error creating session:', sessionError);
       return new Response(
         JSON.stringify({ error: 'Failed to create session' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Live session created: ${session.session_code} by ${user.id}`);
+    console.log(`create-live-session: Live session created - Code: ${session.session_code}, Active: ${session.is_active}, ID: ${session.id}`);
 
     return new Response(
       JSON.stringify({ session }),
