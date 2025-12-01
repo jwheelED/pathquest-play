@@ -260,6 +260,27 @@ export default function Dashboard() {
           {/* Class Connection Card */}
           {user?.id && <ClassConnectionCard />}
 
+          {/* Join Live Session - Prominent CTA */}
+          <Card className="p-6 md:p-8 bg-gradient-to-br from-green-500/20 via-green-500/10 to-emerald-500/20 border-2 border-green-500 shadow-glow">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 flex items-center justify-center md:justify-start gap-2">
+                  🎯 Join Live Session
+                </h2>
+                <p className="text-muted-foreground text-sm md:text-base">
+                  Enter a session code to participate in your instructor's live lecture Q&A
+                </p>
+              </div>
+              <Button 
+                size="lg" 
+                className="text-lg px-8 py-6 shadow-xl hover:shadow-2xl transition-all bg-green-600 hover:bg-green-700"
+                onClick={() => navigate("/join")}
+              >
+                Join Session →
+              </Button>
+            </div>
+          </Card>
+
           {/* Train with Edvana - Prominent CTA */}
           <Card className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 border-2 border-primary shadow-glow">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
