@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Question {
   id: string;
@@ -67,7 +68,15 @@ const LiveStudent = () => {
         },
       });
 
-      if (!response.ok) return;
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast.error("Session ended", {
+            description: "The live session has ended or is no longer active.",
+          });
+          setTimeout(() => navigate("/join"), 2000);
+        }
+        return;
+      }
 
       const result = await response.json();
       
@@ -170,18 +179,29 @@ const LiveStudent = () => {
         <CardContent className="space-y-6">
           {!hasAnswered ? (
             <>
-              <RadioGroup value={selectedAnswer} onValueChange={setSelectedAnswer}>
-                <div className="space-y-3">
-                  {currentQuestion.question_content.options.map((option, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
-                      <RadioGroupItem value={option} id={`option-${index}`} />
-                      <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
-                        {option}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </RadioGroup>
+              {currentQuestion.question_content.type === "multiple_choice" && currentQuestion.question_content.options && (
+                <RadioGroup value={selectedAnswer} onValueChange={setSelectedAnswer}>
+                  <div className="space-y-3">
+                    {currentQuestion.question_content.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
+                        <RadioGroupItem value={option} id={`option-${index}`} />
+                        <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
+                          {option}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </RadioGroup>
+              )}
+
+              {currentQuestion.question_content.type === "short_answer" && (
+                <Textarea
+                  value={selectedAnswer}
+                  onChange={(e) => setSelectedAnswer(e.target.value)}
+                  placeholder="Type your answer here..."
+                  className="min-h-[120px]"
+                />
+              )}
               <Button 
                 onClick={handleSubmit} 
                 className="w-full" 
