@@ -78,12 +78,12 @@ const Index = () => {
             to enhance classroom engagement and learning outcomes.
           </p>
           <Button 
-            onClick={() => navigate("/learn-more")}
+            onClick={() => navigate("/join")}
             variant="retro"
             size="lg"
             className="mt-4"
           >
-            Learn More About Edvana
+            🎯 Join Live Session
           </Button>
         </div>
 
