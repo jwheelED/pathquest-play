@@ -19,6 +19,22 @@ const JoinLive = () => {
     e.preventDefault();
     if (!sessionCode.trim()) return;
 
+    // Check if code is numeric (live session codes are 6 digits)
+    const isNumeric = /^\d{6}$/.test(sessionCode.trim());
+    if (!isNumeric) {
+      toast.error(
+        "Live session codes are 6 digits. Looking to join a class instead?",
+        {
+          description: "Go to your dashboard to enter an instructor class code",
+          action: {
+            label: "Go to Dashboard",
+            onClick: () => navigate("/auth"),
+          },
+        }
+      );
+      return;
+    }
+
     setIsLoading(true);
     
     // Validate session code exists
@@ -32,7 +48,9 @@ const JoinLive = () => {
     setIsLoading(false);
 
     if (error || !data) {
-      toast.error("Invalid session code");
+      toast.error("Invalid session code", {
+        description: "Make sure your instructor has started a live session and shared the 6-digit code",
+      });
       return;
     }
 
@@ -81,7 +99,7 @@ const JoinLive = () => {
           <CardTitle className="text-3xl font-bold">Join Live Session</CardTitle>
           <CardDescription>
             {step === "code" 
-              ? "Enter the session code to join" 
+              ? "Your instructor will display a 6-digit code when they start a live Q&A session" 
               : "Choose your nickname"}
           </CardDescription>
         </CardHeader>
@@ -92,13 +110,22 @@ const JoinLive = () => {
                 <Label htmlFor="code">Session Code</Label>
                 <Input
                   id="code"
-                  placeholder="Enter 6-digit code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="000000"
                   value={sessionCode}
-                  onChange={(e) => setSessionCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "");
+                    setSessionCode(value);
+                  }}
                   maxLength={6}
                   className="text-center text-2xl tracking-widest font-mono"
                   autoFocus
                 />
+                <p className="text-xs text-muted-foreground text-center">
+                  Live session codes are 6 digits (numbers only)
+                </p>
               </div>
               <Button 
                 type="submit" 
