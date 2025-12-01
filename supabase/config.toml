@@ -56,3 +56,15 @@ verify_jwt = true
 
 [functions.generate-personalized-questions]
 verify_jwt = true
+
+[functions.create-live-session]
+verify_jwt = true
+
+[functions.join-live-session]
+verify_jwt = false
+
+[functions.get-live-question]
+verify_jwt = false
+
+[functions.submit-live-response]
+verify_jwt = false
