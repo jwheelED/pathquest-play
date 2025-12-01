@@ -35,30 +35,7 @@ const JoinLive = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    // Validate session code exists
-    const { data, error } = await supabase
-      .from("live_sessions")
-      .select("id, is_active, ends_at")
-      .eq("session_code", sessionCode.toUpperCase())
-      .eq("is_active", true)
-      .single();
-
-    setIsLoading(false);
-
-    if (error || !data) {
-      toast.error("Invalid session code", {
-        description: "Make sure your instructor has started a live session and shared the 6-digit code",
-      });
-      return;
-    }
-
-    if (new Date(data.ends_at) < new Date()) {
-      toast.error("This session has expired");
-      return;
-    }
-
+    // Proceed to nickname step - validation happens in edge function
     setStep("nickname");
   };
 
