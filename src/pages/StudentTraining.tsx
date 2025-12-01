@@ -6,7 +6,6 @@ import { ArrowLeft } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { DailyChallenges } from "@/components/student/DailyChallenges";
-import { PracticeGoals } from "@/components/student/PracticeGoals";
 import { Leaderboard } from "@/components/student/Leaderboard";
 import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
 import { StudyMaterialUpload } from "@/components/student/StudyMaterialUpload";
@@ -223,12 +222,7 @@ export default function StudentTraining() {
           )}
 
           {/* Gamification Section */}
-          {user?.id && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <DailyChallenges userId={user.id} />
-              <PracticeGoals userId={user.id} />
-            </div>
-          )}
+          {user?.id && <DailyChallenges userId={user.id} />}
 
           {/* Leaderboard */}
           {user?.id && <Leaderboard userId={user.id} />}
