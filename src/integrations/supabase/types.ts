@@ -662,6 +662,159 @@ export type Database = {
         }
         Relationships: []
       }
+      live_participants: {
+        Row: {
+          id: string
+          joined_at: string
+          last_seen_at: string
+          nickname: string
+          session_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          last_seen_at?: string
+          nickname: string
+          session_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          last_seen_at?: string
+          nickname?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_questions: {
+        Row: {
+          id: string
+          instructor_id: string
+          question_content: Json
+          question_number: number
+          sent_at: string
+          session_id: string
+        }
+        Insert: {
+          id?: string
+          instructor_id: string
+          question_content: Json
+          question_number: number
+          sent_at?: string
+          session_id: string
+        }
+        Update: {
+          id?: string
+          instructor_id?: string
+          question_content?: Json
+          question_number?: number
+          sent_at?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_responses: {
+        Row: {
+          answer: string
+          id: string
+          is_correct: boolean
+          participant_id: string
+          question_id: string
+          responded_at: string
+          response_time_ms: number | null
+        }
+        Insert: {
+          answer: string
+          id?: string
+          is_correct: boolean
+          participant_id: string
+          question_id: string
+          responded_at?: string
+          response_time_ms?: number | null
+        }
+        Update: {
+          answer?: string
+          id?: string
+          is_correct?: boolean
+          participant_id?: string
+          question_id?: string
+          responded_at?: string
+          response_time_ms?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_responses_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "live_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_responses_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "live_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_sessions: {
+        Row: {
+          created_at: string
+          ends_at: string
+          id: string
+          instructor_id: string
+          is_active: boolean
+          org_id: string | null
+          session_code: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string
+          id?: string
+          instructor_id: string
+          is_active?: boolean
+          org_id?: string | null
+          session_code: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string
+          id?: string
+          instructor_id?: string
+          is_active?: boolean
+          org_id?: string | null
+          session_code?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sessions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -1835,6 +1988,7 @@ export type Database = {
       generate_group_invite_code: { Args: never; Returns: string }
       generate_instructor_code: { Args: never; Returns: string }
       generate_org_invite_code: { Args: never; Returns: string }
+      generate_session_code: { Args: never; Returns: string }
       get_adaptive_difficulty: {
         Args: { p_user_id: string }
         Returns: {

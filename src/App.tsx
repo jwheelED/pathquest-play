@@ -17,6 +17,8 @@ import AdminAuth from "./pages/AdminAuth";
 import AdminOnboarding from "./pages/AdminOnboarding";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import JoinLive from "./pages/JoinLive";
+import LiveStudent from "./pages/LiveStudent";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -73,6 +75,8 @@ const App = () => (
               <AdminDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/join" element={<JoinLive />} />
+          <Route path="/live/:sessionCode" element={<LiveStudent />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
