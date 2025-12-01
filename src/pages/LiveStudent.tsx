@@ -30,6 +30,7 @@ const LiveStudent = () => {
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string>("");
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
+  const [showAccountPrompt, setShowAccountPrompt] = useState(false);
 
   useEffect(() => {
     const storedParticipantId = localStorage.getItem("participantId");
@@ -107,6 +108,7 @@ const LiveStudent = () => {
 
       setHasAnswered(true);
       setIsCorrect(data.isCorrect);
+      setShowAccountPrompt(true);
       
       if (data.isCorrect) {
         toast.success("Correct! 🎉");
@@ -144,7 +146,24 @@ const LiveStudent = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
-      <Card className="w-full max-w-2xl">
+      <div className="w-full max-w-2xl space-y-4">
+        {showAccountPrompt && (
+          <Card className="bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary">
+            <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex-1 text-center md:text-left">
+                <p className="font-semibold text-lg mb-1">Want to track your progress?</p>
+                <p className="text-sm text-muted-foreground">Create an account to save your stats and compete on leaderboards</p>
+              </div>
+              <Button 
+                onClick={() => navigate("/auth")}
+                className="shrink-0"
+              >
+                Create Account
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-2xl">{currentQuestion.question_content.question}</CardTitle>
         </CardHeader>
@@ -202,6 +221,7 @@ const LiveStudent = () => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
