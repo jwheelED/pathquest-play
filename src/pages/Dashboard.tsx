@@ -268,7 +268,7 @@ export default function Dashboard() {
                   🎯 Join Live Session
                 </h2>
                 <p className="text-muted-foreground text-sm md:text-base">
-                  Enter a session code to participate in your instructor's live lecture Q&A
+                  Join when your instructor starts a live Q&A and shares a 6-digit code
                 </p>
               </div>
               <Button 
