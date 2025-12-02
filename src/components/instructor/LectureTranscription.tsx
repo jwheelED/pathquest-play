@@ -145,8 +145,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const intervalStartTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Client-side cooldown: 10 seconds minimum between detection attempts
-  const MIN_DETECTION_INTERVAL = 10000; // 10 seconds cooldown
+  // Client-side cooldown: 5 seconds minimum between detection attempts
+  const MIN_DETECTION_INTERVAL = 5000; // 5 seconds cooldown
   const SUPPRESS_ERRORS_AFTER_SEND = 8000; // 8 seconds after question sent
 
   // PHASE 2: Pre-warm AI connections during recording to reduce latency
