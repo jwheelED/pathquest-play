@@ -41,7 +41,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
@@ -296,13 +296,13 @@ serve(async (req) => {
 
     if (lastQuestion) {
       const timeSinceLastQuestion = Date.now() - new Date(lastQuestion.created_at).getTime();
-      if (timeSinceLastQuestion < 15000) {
-        // 15 seconds (reduced from 60)
-        const retryAfter = Math.ceil((15000 - timeSinceLastQuestion) / 1000);
+      if (timeSinceLastQuestion < 5000) {
+        // 5 seconds
+        const retryAfter = Math.ceil((5000 - timeSinceLastQuestion) / 1000);
         console.log(`⏳ Rate limit: ${retryAfter}s until next question`);
         return new Response(
           JSON.stringify({
-            error: "Please wait 15 seconds between questions",
+            error: "Please wait 5 seconds between questions",
             error_type: "cooldown",
             retry_after: retryAfter,
           }),
