@@ -732,27 +732,36 @@ export type Database = {
       live_responses: {
         Row: {
           answer: string
+          confidence_level: string | null
+          confidence_multiplier: number | null
           id: string
           is_correct: boolean
           participant_id: string
+          points_earned: number | null
           question_id: string
           responded_at: string
           response_time_ms: number | null
         }
         Insert: {
           answer: string
+          confidence_level?: string | null
+          confidence_multiplier?: number | null
           id?: string
           is_correct: boolean
           participant_id: string
+          points_earned?: number | null
           question_id: string
           responded_at?: string
           response_time_ms?: number | null
         }
         Update: {
           answer?: string
+          confidence_level?: string | null
+          confidence_multiplier?: number | null
           id?: string
           is_correct?: boolean
           participant_id?: string
+          points_earned?: number | null
           question_id?: string
           responded_at?: string
           response_time_ms?: number | null
