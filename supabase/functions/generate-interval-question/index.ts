@@ -9,6 +9,26 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+// Fallback questions when content is minimal
+const FALLBACK_QUESTIONS = [
+  {
+    question_text: "Based on what was just discussed, what is the main concept you should remember?",
+    suggested_type: "short_answer",
+  },
+  {
+    question_text: "What key term or definition was mentioned in the last few minutes?",
+    suggested_type: "short_answer",
+  },
+  {
+    question_text: "Can you summarize the main point from the recent lecture content?",
+    suggested_type: "short_answer",
+  },
+  {
+    question_text: "What question do you have about what was just explained?",
+    suggested_type: "short_answer",
+  },
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -52,14 +72,50 @@ serve(async (req) => {
       });
     }
 
-    const { interval_transcript, interval_minutes, format_preference, force_send, materialContext = [] } = await req.json();
+    const { 
+      interval_transcript, 
+      interval_minutes, 
+      format_preference, 
+      force_send, 
+      materialContext = [],
+      strict_mode = true,  // Default to strict mode
+      retry_context = null // Context from previously failed attempts
+    } = await req.json();
 
-    // Adjust minimum content requirement based on force_send mode
-    const minContentLength = force_send ? 25 : 100;
+    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}`);
 
-    if (!interval_transcript || interval_transcript.length < minContentLength) {
+    // In strict mode, use very low minimum content requirements
+    const minContentLength = strict_mode ? 10 : (force_send ? 25 : 100);
+
+    // Combine retry context with current transcript if available
+    let fullTranscript = interval_transcript || "";
+    if (retry_context && retry_context.length > 0) {
+      fullTranscript = retry_context.join("\n\n") + "\n\n" + fullTranscript;
+      console.log(`📎 Combined retry context: ${retry_context.length} previous attempts + current`);
+    }
+
+    if (!fullTranscript || fullTranscript.length < minContentLength) {
+      // In strict mode with minimal content, use a fallback question
+      if (strict_mode) {
+        console.log(`🔄 Strict mode: Using fallback question (content: ${fullTranscript?.length || 0} chars)`);
+        const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        return new Response(
+          JSON.stringify({
+            success: true,
+            question_text: fallback.question_text,
+            suggested_type: fallback.suggested_type,
+            confidence: 0.5,
+            reasoning: "Fallback question used due to minimal lecture content (strict mode)",
+            is_fallback: true,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
       console.log(
-        `⚠️ Not enough content: ${interval_transcript?.length || 0}/${minContentLength} chars (force_send: ${force_send})`,
+        `⚠️ Not enough content: ${fullTranscript?.length || 0}/${minContentLength} chars`,
       );
       return new Response(
         JSON.stringify({
@@ -72,12 +128,8 @@ serve(async (req) => {
       );
     }
 
-    if (force_send) {
-      console.log("🔥 Force send mode enabled - lowering quality thresholds");
-    }
-
     console.log(
-      `📝 Generating auto-question from ${interval_minutes}-minute interval (${interval_transcript.length} chars)`,
+      `📝 Generating auto-question from ${interval_minutes}-minute interval (${fullTranscript.length} chars)`,
     );
     console.log(`🎯 Format preference: ${format_preference || "multiple_choice"}`);
 
@@ -89,7 +141,7 @@ serve(async (req) => {
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
 
 RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
-"${interval_transcript}"
+"${fullTranscript}"
 
 TASK: Generate ONE LeetCode-style coding problem based on the MOST IMPORTANT concept from this lecture segment.
 
@@ -134,11 +186,16 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
         materialsContext += "\nUse these materials to provide additional context and ensure questions align with course content.\n";
       }
 
+      // Adjust prompt based on content quality
+      const contentQualityHint = fullTranscript.length < 200 
+        ? "\nNOTE: Limited lecture content available. Generate a general comprehension question that could apply to the topic being discussed."
+        : "";
+
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
 
 RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
-"${interval_transcript}"
-${materialsContext}
+"${fullTranscript}"
+${materialsContext}${contentQualityHint}
 TASK: Generate ONE high-quality question that:
 1. Tests the MOST IMPORTANT concept from this interval
 2. Is clearly answerable based on what was just taught
@@ -153,6 +210,7 @@ CRITERIA:
 - Avoid questions about examples unless they're core to understanding
 - The question should test comprehension, not just recall
 - ${materialContext.length > 0 ? "Reference course materials when relevant to reinforce key concepts" : "Base question solely on lecture content"}
+- MUST generate a valid question even if content seems limited
 
 Return JSON:
 {
@@ -176,17 +234,17 @@ Return JSON:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-pro-preview",
+          model: "google/gemini-2.5-flash",
           messages: [
             {
               role: "system",
               content:
-                "You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting. NEVER truncate questions mid-sentence.",
+                "You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting. NEVER truncate questions mid-sentence. Always generate a question even if content seems limited.",
             },
             { role: "user", content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 2000, // Increased from default to ensure complete JSON
+          max_tokens: 2000,
           response_format: { type: "json_object" },
         }),
         signal: controller.signal,
@@ -195,6 +253,24 @@ Return JSON:
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === "AbortError") {
+        // In strict mode, return fallback on timeout
+        if (strict_mode) {
+          console.log("⏱️ Timeout in strict mode - using fallback");
+          const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+          return new Response(
+            JSON.stringify({
+              success: true,
+              question_text: fallback.question_text,
+              suggested_type: fallback.suggested_type,
+              confidence: 0.4,
+              reasoning: "Fallback question used due to AI timeout (strict mode)",
+              is_fallback: true,
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
         return new Response(
           JSON.stringify({
             success: false,
@@ -212,6 +288,25 @@ Return JSON:
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI API error:", response.status, errorText);
+
+      // In strict mode, return fallback on API errors
+      if (strict_mode && (response.status === 429 || response.status >= 500)) {
+        console.log(`🔄 Strict mode: Using fallback due to API error ${response.status}`);
+        const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        return new Response(
+          JSON.stringify({
+            success: true,
+            question_text: fallback.question_text,
+            suggested_type: fallback.suggested_type,
+            confidence: 0.4,
+            reasoning: `Fallback question used due to API error (strict mode)`,
+            is_fallback: true,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
 
       let errorMessage = "Failed to generate question from AI";
       if (response.status === 429) {
@@ -252,6 +347,24 @@ Return JSON:
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
+        // In strict mode, use fallback on parse failure
+        if (strict_mode) {
+          console.log("🔄 Strict mode: Using fallback due to JSON parse error");
+          const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+          return new Response(
+            JSON.stringify({
+              success: true,
+              question_text: fallback.question_text,
+              suggested_type: fallback.suggested_type,
+              confidence: 0.4,
+              reasoning: "Fallback question used due to response parsing error (strict mode)",
+              is_fallback: true,
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
         return new Response(
           JSON.stringify({
             success: false,
@@ -278,12 +391,27 @@ Return JSON:
         length: questionLength,
         wordCount: wordCount,
         endsWithQuestionMark: endsWithQuestionMark,
-        lastWord: result.question_text.split(/\s+/).pop(),
-        firstWords: result.question_text.split(/\s+/).slice(0, 5).join(" "),
       });
 
-      // Red flags for truncation
+      // Red flags for truncation - but in strict mode, still try to send
       if (questionLength < 10) {
+        if (strict_mode) {
+          console.log("⚠️ Question too short in strict mode - using fallback");
+          const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+          return new Response(
+            JSON.stringify({
+              success: true,
+              question_text: fallback.question_text,
+              suggested_type: fallback.suggested_type,
+              confidence: 0.4,
+              reasoning: "Fallback question used due to truncated AI response (strict mode)",
+              is_fallback: true,
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
         console.log("⚠️ Question too short (likely truncated)");
         return new Response(
           JSON.stringify({
@@ -296,45 +424,36 @@ Return JSON:
           },
         );
       }
+    }
 
-      if (wordCount >= 4 && !endsWithQuestionMark && !result.question_text.endsWith(".")) {
-        console.log("⚠️ Question missing proper ending (likely truncated)");
-        console.log("   Question:", result.question_text);
+    // In strict mode, skip confidence threshold entirely
+    if (!strict_mode) {
+      const confidenceThreshold = force_send ? 0.1 : 0.3;
+      if (result.confidence < confidenceThreshold) {
+        console.log(`⚠️ Confidence too low (${result.confidence} < ${confidenceThreshold}), skipping auto-question`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Generated question did not meet confidence threshold",
+            confidence: result.confidence,
+            question_text: result.question_text,
+            reasoning: result.reasoning,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
-    }
-
-    // Only return questions with reasonable confidence
-    // Lower threshold when force_send is enabled
-    const confidenceThreshold = force_send ? 0.1 : 0.3;
-    if (result.confidence < confidenceThreshold) {
-      console.log(`⚠️ Confidence too low (${result.confidence} < ${confidenceThreshold}), skipping auto-question`);
-      console.log("   Question was:", result.question_text);
-      console.log("   Reasoning:", result.reasoning);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Generated question did not meet confidence threshold",
-          confidence: result.confidence,
-          question_text: result.question_text,
-          reasoning: result.reasoning,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    if (force_send && result.confidence < 0.3) {
-      console.log(`🔥 Force send: Accepting low confidence question (${result.confidence})`);
+    } else if (result.confidence < 0.3) {
+      console.log(`🔥 Strict mode: Accepting low confidence question (${result.confidence})`);
     }
 
     // Return appropriate structure based on format
     if (format_preference === "coding") {
-      // Return full structured coding problem
       return new Response(
         JSON.stringify({
           success: true,
-          question_text: result, // Pass entire structured object
+          question_text: result,
           suggested_type: "coding",
           confidence: result.confidence,
           reasoning: result.reasoning,
@@ -344,7 +463,6 @@ Return JSON:
         },
       );
     } else {
-      // Return simple question for MCQ/short answer
       return new Response(
         JSON.stringify({
           success: true,

@@ -15,6 +15,9 @@ export interface AutoQuestionMetrics {
   questionsSkipped: number;
   averageQuality: number;
   skipReasons: SkipReason[];
+  fallbacksUsed: number;
+  intervalsCompleted: number;
+  retryQueueSize: number;
 }
 
 interface AutoQuestionDashboardProps {
@@ -29,6 +32,7 @@ interface AutoQuestionDashboardProps {
   rateLimitSecondsLeft: number;
   dailyQuestionCount: number;
   dailyQuotaLimit: number;
+  strictModeEnabled?: boolean;
 }
 
 export const AutoQuestionDashboard = ({
@@ -43,6 +47,7 @@ export const AutoQuestionDashboard = ({
   rateLimitSecondsLeft,
   dailyQuestionCount,
   dailyQuotaLimit,
+  strictModeEnabled = true,
 }: AutoQuestionDashboardProps) => {
   // Calculate overall health status
   const getHealthStatus = (): { status: 'healthy' | 'warning' | 'blocked'; message: string; icon: JSX.Element } => {
@@ -78,7 +83,8 @@ export const AutoQuestionDashboard = ({
       };
     }
     
-    if (intervalTranscriptLength < 100) {
+    // In strict mode, content warnings are less critical
+    if (intervalTranscriptLength < 100 && !strictModeEnabled) {
       return { 
         status: 'warning', 
         message: 'Waiting for content', 
@@ -86,7 +92,7 @@ export const AutoQuestionDashboard = ({
       };
     }
     
-    if (contentQualityScore < 0.35) {
+    if (contentQualityScore < 0.35 && !strictModeEnabled) {
       return { 
         status: 'warning', 
         message: 'Content quality low', 
@@ -94,7 +100,7 @@ export const AutoQuestionDashboard = ({
       };
     }
     
-    return { 
+    return {
       status: 'healthy', 
       message: 'All systems operational', 
       icon: <CheckCircle className="h-4 w-4" /> 
@@ -196,9 +202,16 @@ export const AutoQuestionDashboard = ({
 
         {/* Success Metrics */}
         <div className="bg-background border rounded-lg p-3 space-y-2">
-          <div className="text-xs font-medium text-muted-foreground mb-2">Session Metrics</div>
+          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground mb-2">
+            <span>Session Metrics</span>
+            {strictModeEnabled && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                Strict Mode
+              </Badge>
+            )}
+          </div>
           
-          <div className="grid grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-4 gap-2 text-xs">
             <div>
               <div className="text-muted-foreground mb-1">Sent</div>
               <div className="text-lg font-bold text-green-600 dark:text-green-400">
@@ -214,12 +227,29 @@ export const AutoQuestionDashboard = ({
             </div>
             
             <div>
-              <div className="text-muted-foreground mb-1">Success Rate</div>
+              <div className="text-muted-foreground mb-1">Fallbacks</div>
+              <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                {metrics.fallbacksUsed || 0}
+              </div>
+            </div>
+            
+            <div>
+              <div className="text-muted-foreground mb-1">Success</div>
               <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                 {successRate}%
               </div>
             </div>
           </div>
+
+          {/* Retry queue indicator */}
+          {metrics.retryQueueSize > 0 && (
+            <div className="pt-2 border-t">
+              <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                <Clock className="h-3 w-3" />
+                <span>{metrics.retryQueueSize} failed attempt(s) queued for retry</span>
+              </div>
+            </div>
+          )}
 
           {metrics.averageQuality > 0 && (
             <div className="pt-2 border-t">

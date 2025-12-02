@@ -5,13 +5,14 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Info, Zap, Save } from "lucide-react";
+import { Clock, Info, Zap, Save, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 export const AutoQuestionSettings = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [interval, setInterval] = useState<number>(15);
+  const [strictMode, setStrictMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const { toast } = useToast();
@@ -27,7 +28,7 @@ export const AutoQuestionSettings = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('auto_question_enabled, auto_question_interval, auto_question_force_send, daily_question_limit')
+        .select('auto_question_enabled, auto_question_interval, auto_question_force_send, daily_question_limit, auto_question_strict_mode')
         .eq('id', user.id)
         .single();
 
@@ -36,6 +37,7 @@ export const AutoQuestionSettings = () => {
       if (data) {
         setIsEnabled(data.auto_question_enabled || false);
         setInterval(data.auto_question_interval || 15);
+        setStrictMode(data.auto_question_strict_mode !== false); // Default to true
         
         // Set force_send to true if not already set, and daily_question_limit to 300 if not set
         if (data.auto_question_force_send === null || data.auto_question_force_send === undefined) {
@@ -68,7 +70,8 @@ export const AutoQuestionSettings = () => {
         .update({
           auto_question_enabled: isEnabled,
           auto_question_interval: interval,
-          auto_question_force_send: true
+          auto_question_force_send: true,
+          auto_question_strict_mode: strictMode
         })
         .eq('id', user.id);
 
@@ -77,7 +80,7 @@ export const AutoQuestionSettings = () => {
       toast({
         title: "✅ Settings saved",
         description: isEnabled 
-          ? `Auto-questions will be sent every ${interval} minutes during recording`
+          ? `Auto-questions will be sent every ${interval} minutes${strictMode ? ' (strict mode)' : ''}`
           : "Auto-questions disabled",
       });
 
@@ -101,6 +104,11 @@ export const AutoQuestionSettings = () => {
 
   const handleIntervalChange = (value: string) => {
     setInterval(parseInt(value));
+    setHasChanges(true);
+  };
+
+  const handleStrictModeChange = (checked: boolean) => {
+    setStrictMode(checked);
     setHasChanges(true);
   };
 
@@ -168,6 +176,24 @@ export const AutoQuestionSettings = () => {
               </p>
             </div>
 
+            {/* Strict Interval Mode Toggle */}
+            <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="strict-mode-toggle" className="text-base flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-600" />
+                  Strict Interval Mode
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Guarantee a question is sent at every interval, even with minimal content
+                </p>
+              </div>
+              <Switch
+                id="strict-mode-toggle"
+                checked={strictMode}
+                onCheckedChange={handleStrictModeChange}
+              />
+            </div>
+
             {/* Info Box */}
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
               <div className="flex items-start gap-2">
@@ -178,7 +204,14 @@ export const AutoQuestionSettings = () => {
                     <li>Questions are generated from your lecture content at regular intervals</li>
                     <li>Voice commands ("send question now") take priority and reset the timer</li>
                     <li>A countdown will show you when the next auto-question is coming</li>
-                    <li>Same 60-second cooldown applies to all questions</li>
+                    {strictMode && (
+                      <li className="text-amber-700 dark:text-amber-300">
+                        <strong>Strict mode:</strong> Fallback questions will be used if content is insufficient
+                      </li>
+                    )}
+                    {!strictMode && (
+                      <li>Questions may be skipped if content quality is too low</li>
+                    )}
                   </ul>
                 </div>
               </div>

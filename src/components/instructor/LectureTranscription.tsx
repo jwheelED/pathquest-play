@@ -116,7 +116,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     questionsSkipped: 0,
     averageQuality: 0,
     skipReasons: [],
+    fallbacksUsed: 0,
+    intervalsCompleted: 0,
+    retryQueueSize: 0,
   });
+  const [strictModeEnabled, setStrictModeEnabled] = useState(true);
+  const [retryQueue, setRetryQueue] = useState<string[]>([]);
   const [quotaErrorActive, setQuotaErrorActive] = useState(false);
   const [quotaConsecutiveErrors, setQuotaConsecutiveErrors] = useState(0);
   const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
@@ -207,7 +212,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from("profiles")
-          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode")
           .eq("id", user.id)
           .single();
 
@@ -220,6 +225,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setAutoQuestionInterval(profile.auto_question_interval || 15);
           // Default to true if not explicitly set to false
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);
+          setStrictModeEnabled(profile.auto_question_strict_mode !== false);
         }
 
         // Fetch today's question count
@@ -1188,14 +1194,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.log("✅ Successfully parsed", materialContext.length, "materials");
       }
 
-      // Call edge function with format preference and materials
+      // Call edge function with format preference, materials, and strict mode
       console.log("📡 Invoking generate-interval-question edge function...");
       console.log("🔗 Payload:", {
         interval_transcript_length: intervalTranscript.length,
         interval_minutes: autoQuestionInterval,
         format_preference: formatPreference,
         force_send: autoQuestionForceSend,
+        strict_mode: strictModeEnabled,
         materials_count: materialContext.length,
+        retry_queue_size: retryQueue.length,
       });
 
       const invokeStartTime = Date.now();
@@ -1205,10 +1213,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
           force_send: autoQuestionForceSend,
+          strict_mode: strictModeEnabled,
           materialContext: materialContext,
+          retry_context: retryQueue.length > 0 ? retryQueue : null,
         },
       });
       const invokeTime = Date.now() - invokeStartTime;
+
+      // Clear retry queue on successful invocation attempt
+      if (retryQueue.length > 0) {
+        console.log("🧹 Clearing retry queue after attempt");
+        setRetryQueue([]);
+        setAutoQuestionMetrics(prev => ({ ...prev, retryQueueSize: 0 }));
+      }
 
       console.log(`⏱️ Edge function completed in ${invokeTime}ms`);
       console.log("📥 Response:", {
@@ -1310,7 +1327,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setLastAutoQuestionError(null);
       setRetryAttempts(0);
 
-      // Track success metrics
+      // Track success metrics (including fallbacks)
       setAutoQuestionMetrics((prev) => {
         const totalQuality = prev.averageQuality * prev.questionsSent + data.confidence;
         const newCount = prev.questionsSent + 1;
@@ -1318,8 +1335,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           ...prev,
           questionsSent: newCount,
           averageQuality: totalQuality / newCount,
+          intervalsCompleted: prev.intervalsCompleted + 1,
+          fallbacksUsed: data.is_fallback ? prev.fallbacksUsed + 1 : prev.fallbacksUsed,
         };
       });
+
+      // Log if fallback was used
+      if (data.is_fallback) {
+        console.log("📋 Fallback question used due to:", data.reasoning);
+      }
 
       // Update state
       setAutoQuestionCount((prev) => prev + 1);
@@ -1364,6 +1388,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         variant: "destructive",
         duration: 5000,
       });
+
+      // Add current transcript to retry queue for next attempt (only if we have content)
+      if (intervalTranscriptRef.current && intervalTranscriptRef.current.length > 50) {
+        setRetryQueue(prev => {
+          const newQueue = [...prev, intervalTranscriptRef.current].slice(-3); // Keep last 3
+          setAutoQuestionMetrics(prevMetrics => ({ ...prevMetrics, retryQueueSize: newQueue.length }));
+          console.log("📥 Added to retry queue, size:", newQueue.length);
+          return newQueue;
+        });
+      }
 
       // Don't clear transcript on errors - let it keep building up
       console.log("⏭️ Keeping transcript for retry (length:", intervalTranscriptRef.current.length, ")");
