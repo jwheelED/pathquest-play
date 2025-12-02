@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, TrendingUp, TrendingDown } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
+import ReactMarkdown from "react-markdown";
 
 interface Question {
   id: string;
@@ -46,6 +47,11 @@ const LiveStudent = () => {
   const [confidenceLevel, setConfidenceLevel] = useState<ConfidenceLevel | null>(null);
   const [confidenceMultiplier, setConfidenceMultiplier] = useState<number>(1);
   const [pointsEarned, setPointsEarned] = useState<number>(0);
+  
+  // AI Explanation state
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [explanation, setExplanation] = useState<string>("");
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -69,6 +75,9 @@ const LiveStudent = () => {
     setConfidenceLevel(null);
     setConfidenceMultiplier(1);
     setPointsEarned(0);
+    // Reset explanation state
+    setShowExplanation(false);
+    setExplanation("");
   }, [currentQuestion?.id]);
 
   useEffect(() => {
@@ -203,6 +212,42 @@ const LiveStudent = () => {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Load AI explanation on demand
+  const loadAiExplanation = async () => {
+    if (!currentQuestion || loadingExplanation) return;
+    
+    // Toggle off if already showing
+    if (showExplanation && explanation) {
+      setShowExplanation(false);
+      return;
+    }
+    
+    setLoadingExplanation(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-detailed-explanation', {
+        body: {
+          problemText: currentQuestion.question_content.question,
+          correctAnswer: currentQuestion.question_content.correctAnswer,
+          userAnswer: selectedAnswer,
+          wasCorrect: isCorrect,
+          courseContext: null
+        }
+      });
+      
+      if (error) throw error;
+      
+      setExplanation(data.explanation || "");
+      setShowExplanation(true);
+      
+      toast.success(data.cached ? "⚡ Instant explanation loaded!" : "✨ AI explanation generated!");
+    } catch (error) {
+      console.error('Error loading explanation:', error);
+      toast.error('Failed to load explanation');
+    } finally {
+      setLoadingExplanation(false);
     }
   };
 
@@ -393,7 +438,7 @@ const LiveStudent = () => {
                   <p className="text-muted-foreground">
                     Correct answer: {currentQuestion.question_content.correctAnswer}
                   </p>
-                  {pointsEarned < 0 && (
+              {pointsEarned < 0 && (
                     <div className="flex items-center justify-center gap-2 text-red-500">
                       <TrendingDown className="h-5 w-5" />
                       <span className="text-xl font-bold">{pointsEarned} XP</span>
@@ -401,6 +446,41 @@ const LiveStudent = () => {
                   )}
                 </>
               )}
+              
+              {/* AI Explanation Button */}
+              <Button
+                onClick={loadAiExplanation}
+                variant="outline"
+                className="w-full max-w-md mx-auto"
+                disabled={loadingExplanation}
+              >
+                {loadingExplanation ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating explanation...
+                  </>
+                ) : showExplanation ? (
+                  <>📚 Hide Explanation</>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Why? Get AI Explanation
+                  </>
+                )}
+              </Button>
+              
+              {/* AI Explanation Display */}
+              {showExplanation && explanation && (
+                <div className="text-left p-4 bg-primary/5 rounded-lg border-2 border-primary/20 max-w-2xl mx-auto mt-4">
+                  <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
+                    🎓 AI Explanation
+                  </h4>
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <ReactMarkdown>{explanation}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+              
               <p className="text-lg text-muted-foreground mt-4">
                 Waiting for next question...
               </p>
