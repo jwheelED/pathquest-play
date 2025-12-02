@@ -5,6 +5,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Calculate points based on correctness and confidence
+function calculatePoints(
+  isCorrect: boolean,
+  confidenceLevel: string | null,
+  confidenceMultiplier: number,
+  baseReward: number
+): number {
+  if (!confidenceLevel) {
+    // No confidence betting - just return base reward or 0
+    return isCorrect ? baseReward : 0;
+  }
+
+  if (isCorrect) {
+    // Correct answer: multiply base reward by confidence multiplier
+    return Math.round(baseReward * confidenceMultiplier);
+  } else {
+    // Wrong answer: penalty based on confidence level
+    switch (confidenceLevel) {
+      case 'low':
+        // Small penalty for playing it safe
+        return -Math.round(baseReward * 0.25);
+      case 'medium':
+        // No penalty for medium confidence
+        return 0;
+      case 'high':
+      case 'very_high':
+        // Bigger penalty for high confidence wrong answers
+        return -Math.round(baseReward * confidenceMultiplier * 0.5);
+      default:
+        return 0;
+    }
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -16,7 +50,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { questionId, participantId, answer, responseTimeMs } = await req.json();
+    const { 
+      questionId, 
+      participantId, 
+      answer, 
+      responseTimeMs,
+      confidenceLevel,
+      confidenceMultiplier,
+      baseReward 
+    } = await req.json();
 
     if (!questionId || !participantId || !answer) {
       return new Response(
@@ -69,10 +111,19 @@ Deno.serve(async (req) => {
     // Compare (now: "C" === "C" = TRUE!)
     const isCorrect = studentAnswer === correctAnswer;
     
+    // Calculate points earned based on confidence
+    const pointsEarned = calculatePoints(
+      isCorrect,
+      confidenceLevel || null,
+      confidenceMultiplier || 1,
+      baseReward || 10
+    );
+    
     // Add logging for debugging
     console.log(`Grading: student answered "${studentAnswer}", correct answer is "${correctAnswer}", result: ${isCorrect}`);
+    console.log(`Confidence: ${confidenceLevel}, multiplier: ${confidenceMultiplier}, points earned: ${pointsEarned}`);
 
-    // Submit response
+    // Submit response with confidence data
     const { data: response, error: responseError } = await supabaseClient
       .from('live_responses')
       .insert({
@@ -81,6 +132,9 @@ Deno.serve(async (req) => {
         answer,
         is_correct: isCorrect,
         response_time_ms: responseTimeMs,
+        confidence_level: confidenceLevel || null,
+        confidence_multiplier: confidenceMultiplier || 1.0,
+        points_earned: pointsEarned,
       })
       .select()
       .single();
@@ -94,7 +148,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ response, isCorrect }),
+      JSON.stringify({ response, isCorrect, pointsEarned }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

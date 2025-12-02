@@ -6,13 +6,16 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown, Play, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown, Play, CheckCircle2, XCircle, Loader2, TrendingUp, TrendingDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
 import { toast as sonnerToast } from "sonner";
 import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 import { playNotificationSound } from "@/lib/audioNotification";
+import { ConfidenceSelector, ConfidenceLevel } from "./ConfidenceSelector";
+
+const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
 interface Assignment {
   id: string;
@@ -37,6 +40,13 @@ interface AssignedContentProps {
   onAnswerResult?: (isCorrect: boolean, grade: number) => void;
 }
 
+// Confidence data for each assignment
+interface ConfidenceData {
+  level: ConfidenceLevel;
+  multiplier: number;
+  locked: boolean;
+}
+
 export const AssignedContent = ({ userId, instructorId, onAnswerResult }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
@@ -55,6 +65,10 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
   const [aiExplanations, setAiExplanations] = useState<Record<string, Record<number, { explanation: string; cached: boolean }>>>({});
   const [loadingExplanations, setLoadingExplanations] = useState<Record<string, Record<number, boolean>>>({});
   const [retryCount, setRetryCount] = useState(0);
+  // Confidence betting state per assignment
+  const [confidenceData, setConfidenceData] = useState<Record<string, ConfidenceData>>({});
+  const [showConfidenceSelector, setShowConfidenceSelector] = useState<Record<string, boolean>>({});
+  const [pointsEarned, setPointsEarned] = useState<Record<string, number>>({});
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
@@ -340,13 +354,32 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     }
   };
 
-  const handleAnswerSelect = (assignmentId: string, questionIndex: number, answer: string) => {
+  const handleAnswerSelect = (assignmentId: string, questionIndex: number, answer: string, assignment: Assignment) => {
     setSelectedAnswers(prev => ({
       ...prev,
       [assignmentId]: {
         ...(prev[assignmentId] || {}),
         [questionIndex]: answer
       }
+    }));
+    
+    // For lecture check-ins with MCQ, show confidence selector after selecting answer
+    if (assignment.assignment_type === 'lecture_checkin') {
+      const questions = assignment.content.questions || [];
+      const hasMCQ = questions.some((q: any) => q.type !== 'short_answer' && q.type !== 'coding');
+      if (hasMCQ) {
+        setShowConfidenceSelector(prev => ({
+          ...prev,
+          [assignmentId]: true
+        }));
+      }
+    }
+  };
+
+  const handleConfidenceSelect = (assignmentId: string, level: ConfidenceLevel, multiplier: number) => {
+    setConfidenceData(prev => ({
+      ...prev,
+      [assignmentId]: { level, multiplier, locked: true }
     }));
   };
 
@@ -1507,10 +1540,10 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                 return (
                                   <button
                                     key={`${idx}-${i}`}
-                                    disabled={isSubmitted}
+                                    disabled={isSubmitted || (showConfidenceSelector[assignment.id] && confidenceData[assignment.id]?.locked)}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleAnswerSelect(assignment.id, idx, optionLetter);
+                                      handleAnswerSelect(assignment.id, idx, optionLetter, assignment);
                                     }}
                                     className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                                       showFeedback && isThisOptionCorrect
@@ -1631,10 +1664,47 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                         );
                       })}
                       
+                      {/* Confidence Selector for lecture check-ins */}
+                      {!assignment.completed && assignment.assignment_type === 'lecture_checkin' && 
+                       showConfidenceSelector[assignment.id] && !confidenceData[assignment.id]?.locked && (
+                        <div className="border-t pt-4">
+                          <ConfidenceSelector
+                            baseReward={BASE_REWARD}
+                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier)}
+                          />
+                        </div>
+                      )}
+
                       {!assignment.completed && (
-                        <Button onClick={() => handleSubmitQuiz(assignment)} className="w-full">
-                          Submit Quiz
+                        <Button 
+                          onClick={() => handleSubmitQuiz(assignment)} 
+                          className="w-full"
+                          disabled={assignment.assignment_type === 'lecture_checkin' && 
+                            showConfidenceSelector[assignment.id] && !confidenceData[assignment.id]?.locked}
+                        >
+                          Submit {assignment.assignment_type === 'lecture_checkin' ? 'Answer' : 'Quiz'}
                         </Button>
+                      )}
+                      
+                      {/* Show points earned after submission for lecture check-ins */}
+                      {assignment.completed && pointsEarned[assignment.id] !== undefined && (
+                        <div className={`flex items-center justify-center gap-2 p-3 rounded-lg ${
+                          pointsEarned[assignment.id] >= 0 
+                            ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-300'
+                            : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300'
+                        }`}>
+                          {pointsEarned[assignment.id] >= 0 ? (
+                            <TrendingUp className="h-5 w-5" />
+                          ) : (
+                            <TrendingDown className="h-5 w-5" />
+                          )}
+                          <span className="font-bold">
+                            {pointsEarned[assignment.id] >= 0 ? '+' : ''}{pointsEarned[assignment.id]} XP
+                          </span>
+                          {confidenceData[assignment.id] && (
+                            <span className="text-sm">({confidenceData[assignment.id].multiplier}x)</span>
+                          )}
+                        </div>
                       )}
                       
                       {assignment.completed && (
