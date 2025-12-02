@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import JoinLive from "./pages/JoinLive";
 import LiveStudent from "./pages/LiveStudent";
+import PresenterView from "./pages/PresenterView";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -62,6 +63,11 @@ const App = () => (
           <Route path="/instructor/dashboard" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <InstructorDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/presenter" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <PresenterView />
             </ProtectedRoute>
           } />
           <Route path="/admin/auth" element={<AdminAuth />} />

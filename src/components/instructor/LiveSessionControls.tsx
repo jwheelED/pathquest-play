@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, Play, Square, Copy, QrCode } from "lucide-react";
+import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface LiveSession {
@@ -124,6 +124,16 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
     toast.success("Join link copied!");
   };
 
+  const openPresenterView = () => {
+    if (!activeSession) return;
+    window.open(
+      `/instructor/presenter?session=${activeSession.session_code}`,
+      'presenter-view',
+      'width=450,height=800,menubar=no,toolbar=no,location=no,status=no'
+    );
+    toast.success("Presenter view opened!");
+  };
+
   const joinUrl = `${window.location.origin}/join`;
 
   if (activeSession) {
@@ -149,6 +159,10 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
                 <p className="text-3xl font-mono font-bold">{activeSession.session_code}</p>
               </div>
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={openPresenterView}>
+                  <Monitor className="mr-2 h-4 w-4" />
+                  Presenter View
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowQR(true)}>
                   <QrCode className="h-4 w-4" />
                 </Button>
