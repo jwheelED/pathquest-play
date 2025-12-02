@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Mic, CheckCircle, Copy, X } from "lucide-react";
+import { Upload, Mic, CheckCircle, Copy, X, Code, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +15,7 @@ export default function InstructorOnboarding() {
   const [courseTitle, setCourseTitle] = useState("");
   const [schedule, setSchedule] = useState("");
   const [topics, setTopics] = useState("");
+  const [courseType, setCourseType] = useState<'stem' | 'humanities' | null>(null);
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [audioPermission, setAudioPermission] = useState(false);
   const [existingCode, setExistingCode] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export default function InstructorOnboarding() {
     fetchExistingCode();
   }, []);
 
-  const totalSteps = 4;
+  const totalSteps = 5;
   const progress = (step / totalSteps) * 100;
 
   const handleSyllabusUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,6 +81,12 @@ export default function InstructorOnboarding() {
         return;
       }
     }
+    if (step === 2) {
+      if (!courseType) {
+        toast({ title: "Please select a course category", variant: "destructive" });
+        return;
+      }
+    }
     if (step < totalSteps) {
       setStep(step + 1);
     }
@@ -109,6 +116,7 @@ export default function InstructorOnboarding() {
           course_title: courseTitle,
           course_schedule: schedule,
           course_topics: topics.split(',').map(t => t.trim()),
+          professor_type: courseType,
           onboarded: true,
         })
         .eq('id', user.id);
@@ -214,6 +222,87 @@ export default function InstructorOnboarding() {
             </div>
           )}
 
+          {step === 2 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Course Category</h3>
+              <p className="text-sm text-muted-foreground">
+                Select the category that best fits your course to personalize your dashboard
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card 
+                  className={`cursor-pointer transition-all hover:shadow-md ${courseType === 'stem' ? 'ring-2 ring-primary shadow-lg' : ''}`}
+                  onClick={() => setCourseType('stem')}
+                >
+                  <CardContent className="p-6">
+                    <div className="text-center space-y-4">
+                      <Code className="h-12 w-12 mx-auto text-blue-500" />
+                      <div>
+                        <h4 className="font-semibold text-lg">STEM / Technical</h4>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Computer Science, Engineering, Mathematics, Physics, etc.
+                        </p>
+                      </div>
+                      <ul className="text-xs text-left space-y-2 pt-4 border-t">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Multiple Choice Questions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Short Answer Questions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>LeetCode-style Coding Problems</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Code execution & testing</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card 
+                  className={`cursor-pointer transition-all hover:shadow-md ${courseType === 'humanities' ? 'ring-2 ring-primary shadow-lg' : ''}`}
+                  onClick={() => setCourseType('humanities')}
+                >
+                  <CardContent className="p-6">
+                    <div className="text-center space-y-4">
+                      <BookOpen className="h-12 w-12 mx-auto text-amber-500" />
+                      <div>
+                        <h4 className="font-semibold text-lg">Humanities / Liberal Arts</h4>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Literature, History, Philosophy, Art, Languages, etc.
+                        </p>
+                      </div>
+                      <ul className="text-xs text-left space-y-2 pt-4 border-t">
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Multiple Choice Questions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Short Answer Questions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Essay-style prompts</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                          <span>Discussion question generation</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
           {step === 3 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Syllabus & Outline (Optional)</h3>
@@ -245,6 +334,36 @@ export default function InstructorOnboarding() {
           )}
 
           {step === 4 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Syllabus & Outline (Optional)</h3>
+              <p className="text-sm text-muted-foreground">
+                Upload your syllabus to help generate more relevant questions
+              </p>
+              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <Label htmlFor="syllabusUpload" className="cursor-pointer">
+                  <Button variant="outline" asChild>
+                    <span>Choose File</span>
+                  </Button>
+                </Label>
+                <Input
+                  id="syllabusUpload"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={handleSyllabusUpload}
+                  className="hidden"
+                />
+                {syllabusFile && (
+                  <p className="text-sm text-green-600 mt-4 flex items-center justify-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    {syllabusFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === 5 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Audio Setup</h3>
               <p className="text-sm text-muted-foreground">
