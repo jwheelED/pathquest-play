@@ -55,7 +55,22 @@ Deno.serve(async (req) => {
     }
 
     const correctAnswer = question.question_content.correctAnswer || question.question_content.correct_answer;
-    const isCorrect = answer === correctAnswer;
+    
+    // For MCQ: Extract letter prefix from answer (e.g., "A. Some text" → "A")
+    let studentAnswer = answer;
+    if (question.question_content.type === "multiple_choice" && typeof answer === "string") {
+      // Extract just the letter if answer starts with "A.", "B.", "C.", or "D."
+      const letterMatch = answer.match(/^([A-D])\./);
+      if (letterMatch) {
+        studentAnswer = letterMatch[1]; // Just the letter
+      }
+    }
+    
+    // Compare (now: "C" === "C" = TRUE!)
+    const isCorrect = studentAnswer === correctAnswer;
+    
+    // Add logging for debugging
+    console.log(`Grading: student answered "${studentAnswer}", correct answer is "${correctAnswer}", result: ${isCorrect}`);
 
     // Submit response
     const { data: response, error: responseError } = await supabaseClient
