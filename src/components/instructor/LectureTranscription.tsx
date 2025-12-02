@@ -158,8 +158,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const intervalStartTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Presenter broadcast channel
+  // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
+
+  // Supabase Realtime channel for broadcasting timer to students
+  const studentTimerChannelRef = useRef<any>(null);
 
   // Client-side cooldown: 5 seconds minimum between detection attempts
   const MIN_DETECTION_INTERVAL = 5000; // 5 seconds cooldown
@@ -187,6 +190,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     return () => {
       clearInterval(keepaliveInterval);
       console.log("❄️ Stopped pre-warming connections");
+    };
+  }, [isRecording]);
+
+  // Setup Supabase Realtime channel to broadcast timer to students
+  useEffect(() => {
+    const setupStudentTimerChannel = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !isRecording) return;
+
+      const channelName = `lecture-timer-${user.id}`;
+      console.log('📡 Setting up student timer broadcast channel:', channelName);
+      
+      studentTimerChannelRef.current = supabase.channel(channelName);
+      await studentTimerChannelRef.current.subscribe((status: string) => {
+        console.log('📡 Student timer channel status:', status);
+      });
+    };
+
+    if (isRecording) {
+      setupStudentTimerChannel();
+    }
+
+    return () => {
+      if (studentTimerChannelRef.current) {
+        console.log('📡 Closing student timer broadcast channel');
+        supabase.removeChannel(studentTimerChannelRef.current);
+        studentTimerChannelRef.current = null;
+      }
     };
   }, [isRecording]);
 
@@ -845,7 +876,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🔑 Refreshing auth token before send");
       await supabase.auth.refreshSession();
 
-      // Broadcast question sent event
+      // Broadcast question sent event to presenter popup (BroadcastChannel)
       broadcast('question_sent', {
         lastQuestionSent: {
           question: getQuestionPreview(detectionData.question_text, 100),
@@ -853,6 +884,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           timestamp: new Date().toISOString(),
         },
       });
+
+      // Broadcast to students via Supabase Realtime - reset their timers
+      if (studentTimerChannelRef.current) {
+        studentTimerChannelRef.current.send({
+          type: 'broadcast',
+          event: 'question_sent',
+          payload: { timestamp: new Date().toISOString() }
+        });
+      }
 
       toast({
         title: "🎯 Question detected!",
@@ -1693,7 +1733,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       setNextAutoQuestionIn(secondsLeft);
 
-      // Broadcast countdown tick
+      // Broadcast countdown tick to presenter popup (BroadcastChannel)
       broadcast('countdown_tick', {
         nextAutoQuestionIn: secondsLeft,
         autoQuestionEnabled,
@@ -1702,6 +1742,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         studentCount,
         recordingDuration,
       });
+
+      // Broadcast to students via Supabase Realtime (every 5 seconds or when urgent)
+      if (studentTimerChannelRef.current && (secondsLeft % 5 === 0 || secondsLeft <= 10)) {
+        studentTimerChannelRef.current.send({
+          type: 'broadcast',
+          event: 'timer_update',
+          payload: {
+            nextQuestionIn: secondsLeft,
+            intervalMinutes: autoQuestionInterval,
+            autoQuestionEnabled,
+            isRecording,
+          }
+        });
+      }
 
       // Log countdown at key intervals
       if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {

@@ -15,6 +15,7 @@ import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 import { playNotificationSound } from "@/lib/audioNotification";
 import { ConfidenceSelector, ConfidenceLevel } from "./ConfidenceSelector";
 import ReactMarkdown from "react-markdown";
+import { LectureCountdownTimer } from "./LectureCountdownTimer";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
@@ -988,6 +989,13 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
 
   return (
     <>
+      {/* Lecture Countdown Timer - shows when instructor has auto-questions enabled */}
+      {instructorId && (
+        <div className="mb-4">
+          <LectureCountdownTimer instructorId={instructorId} />
+        </div>
+      )}
+
       {/* Question Incoming Animation Overlay */}
       {questionIncoming && (
         <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
