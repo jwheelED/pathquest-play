@@ -498,9 +498,10 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    // If live session active, use live_questions instead of student_assignments
+    // If live session active, send to BOTH live_questions AND student_assignments
+    // This ensures anonymous participants AND registered students both receive questions
     if (liveSession) {
-      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using broadcast mode`);
+      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using hybrid mode`);
 
       // Get question number for this session
       const { count: questionCount } = await supabase
@@ -510,8 +511,8 @@ serve(async (req) => {
 
       const questionNumber = (questionCount || 0) + 1;
 
-      // Insert single question row (1 write instead of N writes)
-      const { error: insertError } = await supabase
+      // Insert into live_questions for anonymous participants
+      const { error: liveInsertError } = await supabase
         .from("live_questions")
         .insert({
           session_id: liveSession.id,
@@ -520,9 +521,9 @@ serve(async (req) => {
           question_number: questionNumber,
         });
 
-      if (insertError) {
-        console.error("❌ Failed to insert live question:", insertError);
-        throw new Error(`Failed to send live question: ${insertError.message}`);
+      if (liveInsertError) {
+        console.error("❌ Failed to insert live question:", liveInsertError);
+        // Continue anyway - try to send to registered students
       }
 
       // Get participant count for logging
@@ -531,16 +532,56 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("session_id", liveSession.id);
 
-      const processingTime = Date.now() - startTime;
+      console.log(`✅ Live question sent to ${participantCount || 0} anonymous participants`);
 
-      console.log(`✅ Live question sent to ${participantCount || 0} participants in ${processingTime}ms`);
+      // ALSO send to registered students via student_assignments
+      const { data: studentLinks } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id);
+
+      let registeredStudentCount = 0;
+      if (studentLinks && studentLinks.length > 0) {
+        console.log(`📚 Also sending to ${studentLinks.length} registered students`);
+        
+        const assignmentMode = getAssignmentMode(finalType);
+        const assignments = studentLinks.map((link) => ({
+          instructor_id: user.id,
+          student_id: link.student_id,
+          org_id: instructorOrgId,
+          assignment_type: "lecture_checkin",
+          mode: assignmentMode,
+          title: "🎯 Live Lecture Question",
+          content: {
+            questions: [formattedQuestion],
+            isLive: true,
+            detectedAutomatically: true,
+            source: source,
+          },
+          completed: false,
+          auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        }));
+
+        const { error: assignmentError } = await supabase
+          .from("student_assignments")
+          .insert(assignments);
+
+        if (assignmentError) {
+          console.error("❌ Failed to send to registered students:", assignmentError.message);
+        } else {
+          registeredStudentCount = studentLinks.length;
+          console.log(`✅ Sent to ${registeredStudentCount} registered students`);
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
 
       // Log success
       await supabase.from("question_send_logs").insert({
         instructor_id: user.id,
         success: true,
-        student_count: participantCount || 0,
-        successful_sends: participantCount || 0,
+        student_count: (participantCount || 0) + registeredStudentCount,
+        successful_sends: (participantCount || 0) + registeredStudentCount,
         failed_sends: 0,
         batch_count: 1,
         processing_time_ms: processingTime,
@@ -555,6 +596,7 @@ serve(async (req) => {
           liveMode: true,
           sessionCode: liveSession.session_code,
           participantCount: participantCount || 0,
+          registeredStudentCount,
           questionNumber,
           processingTime,
         }),
