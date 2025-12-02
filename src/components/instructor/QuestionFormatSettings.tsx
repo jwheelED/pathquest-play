@@ -6,7 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "lucide-react";
 
-export const QuestionFormatSettings = ({ instructorId }: { instructorId: string }) => {
+interface QuestionFormatSettingsProps {
+  instructorId: string;
+  professorType?: 'stem' | 'humanities' | null;
+}
+
+export const QuestionFormatSettings = ({ instructorId, professorType }: QuestionFormatSettingsProps) => {
   const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding'>('multiple_choice');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -102,17 +107,19 @@ export const QuestionFormatSettings = ({ instructorId }: { instructorId: string 
             </div>
           </div>
 
-          <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
-            <RadioGroupItem value="coding" id="coding" />
-            <div className="space-y-1 leading-none flex-1">
-              <Label htmlFor="coding" className="font-semibold cursor-pointer">
-                Coding Questions
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Students write code in an IDE-style editor. Requires manual grading by you.
-              </p>
+          {professorType !== 'humanities' && (
+            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
+              <RadioGroupItem value="coding" id="coding" />
+              <div className="space-y-1 leading-none flex-1">
+                <Label htmlFor="coding" className="font-semibold cursor-pointer">
+                  Coding Questions
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Students write code in an IDE-style editor. Requires manual grading by you.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </RadioGroup>
       </CardContent>
     </Card>
