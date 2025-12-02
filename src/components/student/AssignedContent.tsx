@@ -6,7 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown, Play, CheckCircle2, XCircle, Loader2, TrendingUp, TrendingDown } from "lucide-react";
+import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw, Wifi, WifiOff, Clock, Database, Lightbulb, Code2, ChevronDown, Play, CheckCircle2, XCircle, Loader2, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
@@ -14,6 +14,7 @@ import { toast as sonnerToast } from "sonner";
 import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 import { playNotificationSound } from "@/lib/audioNotification";
 import { ConfidenceSelector, ConfidenceLevel } from "./ConfidenceSelector";
+import ReactMarkdown from "react-markdown";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
@@ -407,6 +408,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
       // Get student's answer and correct answer
       const studentAnswer = assignment.quiz_responses?.[questionIdx];
       const correctAnswer = question.correctAnswer;
+      const wasCorrect = studentAnswer === correctAnswer;
       
       // Find the full text of both answers
       const studentAnswerText = question.options?.find((opt: string) => 
@@ -423,7 +425,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
           problemText: question.question,
           correctAnswer: correctAnswerText,
           userAnswer: studentAnswerText,
-          wasCorrect: false,
+          wasCorrect,
           courseContext: assignment.title || ''
         }
       });
@@ -444,15 +446,9 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
 
       // Show different toast based on cache status
       if (data.cached) {
-        toast({
-          title: "⚡ Instant Explanation",
-          description: "Retrieved from cache - no AI generation needed!"
-        });
+        sonnerToast.success("⚡ Instant explanation loaded!");
       } else {
-        toast({
-          title: "✨ Explanation Generated",
-          description: "AI has analyzed why your answer was incorrect."
-        });
+        sonnerToast.success("✨ AI explanation generated!");
       }
 
     } catch (error: any) {
@@ -1595,51 +1591,50 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                   </p>
                                 </div>
                                 
-                                {(assignment.quiz_responses?.[idx] !== q.correctAnswer) && (
-                                  <div className="space-y-3">
-                                    {!aiExplanations[assignment.id]?.[idx] ? (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleGetAiExplanation(assignment, q, idx);
-                                        }}
-                                        disabled={loadingExplanations[assignment.id]?.[idx]}
-                                        className="w-full"
-                                      >
-                                        {loadingExplanations[assignment.id]?.[idx] ? (
-                                          <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Generating explanation...
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Lightbulb className="w-4 h-4 mr-2" />
-                                            Why is my answer wrong? (AI Explanation)
-                                          </>
-                                        )}
-                                      </Button>
-                                    ) : (
-                                      <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                                        <div className="flex items-start gap-2 mb-2">
-                                          <Lightbulb className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                                          <p className="font-semibold text-blue-900 dark:text-blue-200 text-sm">
-                                            AI Explanation
-                                          </p>
-                                        </div>
-                                        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
-                                          {aiExplanations[assignment.id][idx].explanation}
-                                        </div>
-                                        {aiExplanations[assignment.id][idx].cached && (
-                                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                                            ⚡ Instant response from cache
-                                          </p>
-                                        )}
+                                {/* AI Explanation for both correct and incorrect answers */}
+                                <div className="space-y-3 mt-3">
+                                  {!aiExplanations[assignment.id]?.[idx] ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleGetAiExplanation(assignment, q, idx);
+                                      }}
+                                      disabled={loadingExplanations[assignment.id]?.[idx]}
+                                      className="w-full"
+                                    >
+                                      {loadingExplanations[assignment.id]?.[idx] ? (
+                                        <>
+                                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                          Generating explanation...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-4 h-4 mr-2" />
+                                          Why? Get AI Explanation
+                                        </>
+                                      )}
+                                    </Button>
+                                  ) : (
+                                    <div className="bg-primary/5 p-4 rounded-lg border-2 border-primary/20">
+                                      <div className="flex items-start gap-2 mb-2">
+                                        <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                                        <p className="font-semibold text-primary text-sm">
+                                          🎓 AI Explanation
+                                        </p>
                                       </div>
-                                    )}
-                                  </div>
-                                )}
+                                      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
+                                        <ReactMarkdown>{aiExplanations[assignment.id][idx].explanation}</ReactMarkdown>
+                                      </div>
+                                      {aiExplanations[assignment.id][idx].cached && (
+                                        <p className="text-xs text-primary/70 mt-2">
+                                          ⚡ Instant response from cache
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                             
