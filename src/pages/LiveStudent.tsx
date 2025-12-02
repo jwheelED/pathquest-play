@@ -35,11 +35,28 @@ const LiveStudent = () => {
   const [isTyping, setIsTyping] = useState(false);
   const isTypingRef = useRef(false);
   const answeredQuestionsRef = useRef<Set<string>>(new Set());
+  const currentQuestionIdRef = useRef<string | null>(null);
+  const hasStartedAnsweringRef = useRef(false);
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   useEffect(() => {
     isTypingRef.current = isTyping;
   }, [isTyping]);
+
+  useEffect(() => {
+    currentQuestionIdRef.current = currentQuestion?.id || null;
+  }, [currentQuestion]);
+
+  useEffect(() => {
+    if (selectedAnswer && selectedAnswer.length > 0) {
+      hasStartedAnsweringRef.current = true;
+    }
+  }, [selectedAnswer]);
+
+  // Reset "started answering" flag when question changes
+  useEffect(() => {
+    hasStartedAnsweringRef.current = false;
+  }, [currentQuestion?.id]);
 
   useEffect(() => {
     const storedParticipantId = localStorage.getItem("participantId");
@@ -91,12 +108,13 @@ const LiveStudent = () => {
       if (result.questions && result.questions.length > 0) {
         const latestQuestion = result.questions[0];
         
-        // Check if this is a genuinely NEW question that hasn't been answered
-        const isNewQuestion = !currentQuestion || currentQuestion.id !== latestQuestion.id;
+        // Use REFS instead of state (always current, no stale closure)
+        const isNewQuestion = currentQuestionIdRef.current !== latestQuestion.id;
         const hasBeenAnswered = answeredQuestionsRef.current.has(latestQuestion.id);
+        const userIsInteracting = hasStartedAnsweringRef.current || isTypingRef.current;
         
-        // Only update if it's a new question that hasn't been answered AND user isn't typing
-        if (isNewQuestion && !hasBeenAnswered && !isTypingRef.current) {
+        // Only update if: 1) NEW question 2) Not answered 3) User not interacting
+        if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
           setCurrentQuestion(latestQuestion);
           setSelectedAnswer("");
           setHasAnswered(false);
