@@ -39,6 +39,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { usePresenterBroadcast } from "@/hooks/useLecturePresenterChannel";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -145,6 +152,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const intervalStartTimeRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Presenter broadcast channel
+  const { broadcast } = usePresenterBroadcast();
 
   // Client-side cooldown: 5 seconds minimum between detection attempts
   const MIN_DETECTION_INTERVAL = 5000; // 5 seconds cooldown
@@ -828,6 +838,15 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Refresh token before critical operation
       console.log("🔑 Refreshing auth token before send");
       await supabase.auth.refreshSession();
+
+      // Broadcast question sent event
+      broadcast('question_sent', {
+        lastQuestionSent: {
+          question: getQuestionPreview(detectionData.question_text, 100),
+          type: detectionData.suggested_type || 'multiple_choice',
+          timestamp: new Date().toISOString(),
+        },
+      });
 
       toast({
         title: "🎯 Question detected!",
@@ -1640,6 +1659,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       setNextAutoQuestionIn(secondsLeft);
 
+      // Broadcast countdown tick
+      broadcast('countdown_tick', {
+        nextAutoQuestionIn: secondsLeft,
+        autoQuestionEnabled,
+        autoQuestionInterval,
+        isRecording,
+        studentCount,
+        recordingDuration,
+      });
+
       // Log countdown at key intervals
       if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {
         console.log(`⏰ Auto-question in ${secondsLeft} seconds`);
@@ -1745,7 +1774,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   }, [isRecording]);
 
-  // Recording duration timer + Rate limit countdown
+  // Recording duration timer + broadcast
   useEffect(() => {
     if (!isRecording) {
       setRecordingDuration(0);
@@ -1754,7 +1783,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     const startTime = Date.now();
     durationTimerRef.current = setInterval(() => {
-      setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
+      const newDuration = Math.floor((Date.now() - startTime) / 1000);
+      setRecordingDuration(newDuration);
+      
+      // Broadcast state update every second
+      broadcast('state_update', {
+        isRecording: true,
+        recordingDuration: newDuration,
+        autoQuestionEnabled,
+        autoQuestionInterval,
+        studentCount,
+        transcriptLength: transcriptBufferRef.current.length,
+        contentQualityScore,
+      });
 
       // Update rate limit countdown
       const now = Date.now();
@@ -1770,7 +1811,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         clearInterval(durationTimerRef.current);
       }
     };
-  }, [isRecording, nextQuestionAllowedAt]);
+  }, [isRecording, nextQuestionAllowedAt, autoQuestionEnabled, autoQuestionInterval, studentCount, contentQualityScore, broadcast]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -2704,19 +2745,38 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     </Button>
                   )}
                   {(isRecording || transcriptChunks.length > 0) && (
-                    <Button
-                      onClick={() => {
-                        window.open(
-                          '/instructor/lecture-presenter',
-                          'lecture-presenter-view',
-                          'width=450,height=750,menubar=no,toolbar=no,location=no,status=no'
-                        );
-                      }}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      <Monitor className="h-4 w-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="secondary" size="sm">
+                          <Monitor className="h-4 w-4 mr-2" />
+                          Presenter
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            window.open(
+                              '/instructor/lecture-presenter',
+                              'lecture-presenter-full',
+                              'width=450,height=750,menubar=no,toolbar=no,location=no,status=no'
+                            );
+                          }}
+                        >
+                          📊 Full View (Stats + History)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            window.open(
+                              '/instructor/lecture-presenter?mini=true',
+                              'lecture-presenter-mini',
+                              'width=320,height=200,menubar=no,toolbar=no,location=no,status=no'
+                            );
+                          }}
+                        >
+                          ⏱️ Mini Timer (Compact)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 
