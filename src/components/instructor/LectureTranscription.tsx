@@ -14,6 +14,7 @@ import {
   Clock,
   Sparkles,
   Star,
+  Monitor,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -2700,6 +2701,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">
                       Clear
+                    </Button>
+                  )}
+                  {(isRecording || transcriptChunks.length > 0) && (
+                    <Button
+                      onClick={() => {
+                        window.open(
+                          '/instructor/lecture-presenter',
+                          'lecture-presenter-view',
+                          'width=450,height=750,menubar=no,toolbar=no,location=no,status=no'
+                        );
+                      }}
+                      variant="secondary"
+                      size="sm"
+                    >
+                      <Monitor className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
