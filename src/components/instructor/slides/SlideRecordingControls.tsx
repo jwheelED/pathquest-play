@@ -238,8 +238,7 @@ export function SlideRecordingControls({
           <Button
             onClick={onManualSend}
             disabled={isSendingQuestion}
-            variant="outline"
-            className="w-full border-slate-600 text-white hover:bg-slate-700"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white border-0"
           >
             <Send className="w-4 h-4 mr-2" />
             {isSendingQuestion ? 'Sending...' : 'Send Question Now'}

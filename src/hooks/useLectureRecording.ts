@@ -60,7 +60,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const [autoQuestionInterval, setAutoQuestionInterval] = useState(15);
   const [autoQuestionForceSend, setAutoQuestionForceSend] = useState(true);
   const [strictModeEnabled, setStrictModeEnabled] = useState(true);
-  const [lastAutoQuestionTime, setLastAutoQuestionTime] = useState(0);
   const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState(0);
 
   // Refs
@@ -188,23 +187,24 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     };
   }, [isRecording, autoQuestionEnabled, autoQuestionInterval, studentCount, broadcast]);
 
-  // Auto-question timer
+  // Auto-question timer - use ref for start time to avoid stale closure issues
+  const lastAutoQuestionTimeRef = useRef<number>(0);
+  
   useEffect(() => {
-    if (!isRecording || !autoQuestionEnabled || isSendingQuestion) return;
+    if (!isRecording || !autoQuestionEnabled) return;
 
     const intervalMs = autoQuestionInterval * 60 * 1000;
 
-    if (lastAutoQuestionTime === 0) {
-      const now = Date.now();
-      setLastAutoQuestionTime(now);
-      intervalStartTimeRef.current = now;
+    // Initialize start time when recording begins with auto-question enabled
+    if (lastAutoQuestionTimeRef.current === 0) {
+      lastAutoQuestionTimeRef.current = Date.now();
     }
 
     const checkInterval = setInterval(() => {
-      if (isSendingQuestion || isGeneratingAutoQuestionRef.current) return;
+      if (isGeneratingAutoQuestionRef.current) return;
 
       const now = Date.now();
-      const elapsed = now - lastAutoQuestionTime;
+      const elapsed = now - lastAutoQuestionTimeRef.current;
       const timeLeft = intervalMs - elapsed;
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
 
@@ -212,27 +212,24 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
       broadcast('countdown_tick', {
         nextAutoQuestionIn: secondsLeft,
-        autoQuestionEnabled,
-        isRecording,
+        autoQuestionEnabled: true,
+        isRecording: true,
         studentCount,
-        recordingDuration,
       });
 
       if (studentTimerChannelRef.current && (secondsLeft % 5 === 0 || secondsLeft <= 10)) {
         studentTimerChannelRef.current.send({
           type: 'broadcast',
           event: 'timer_update',
-          payload: { nextQuestionIn: secondsLeft, intervalMinutes: autoQuestionInterval, autoQuestionEnabled, isRecording }
+          payload: { nextQuestionIn: secondsLeft, intervalMinutes: autoQuestionInterval, autoQuestionEnabled: true, isRecording: true }
         });
       }
 
-      if (elapsed >= intervalMs) {
+      if (elapsed >= intervalMs && !isGeneratingAutoQuestionRef.current) {
         isGeneratingAutoQuestionRef.current = true;
         handleAutoQuestionGeneration()
           .then((success) => {
-            const newTime = Date.now();
-            setLastAutoQuestionTime(newTime);
-            intervalStartTimeRef.current = newTime;
+            lastAutoQuestionTimeRef.current = Date.now();
             if (success) {
               intervalTranscriptRef.current = '';
             }
@@ -244,12 +241,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }, 1000);
 
     return () => clearInterval(checkInterval);
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, recordingDuration, studentCount, broadcast]);
+  }, [isRecording, autoQuestionEnabled, autoQuestionInterval, studentCount, broadcast]);
 
   // Reset state when recording stops
   useEffect(() => {
     if (!isRecording) {
-      setLastAutoQuestionTime(0);
+      lastAutoQuestionTimeRef.current = 0;
       setNextAutoQuestionIn(0);
       intervalTranscriptRef.current = '';
       isGeneratingAutoQuestionRef.current = false;
@@ -539,9 +536,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       setFailureCount(0);
 
       if (autoQuestionEnabled) {
-        const now = Date.now();
-        setLastAutoQuestionTime(now);
-        intervalStartTimeRef.current = now;
+        lastAutoQuestionTimeRef.current = Date.now();
       }
 
       startRecordingCycle();
@@ -636,7 +631,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       });
 
       if (autoQuestionEnabled) {
-        setLastAutoQuestionTime(Date.now());
+        lastAutoQuestionTimeRef.current = Date.now();
         intervalTranscriptRef.current = '';
       }
     } catch (error: any) {
@@ -737,8 +732,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       setAutoQuestionEnabled(newState);
 
       if (newState && isRecording) {
-        setLastAutoQuestionTime(Date.now());
-        intervalStartTimeRef.current = Date.now();
+        lastAutoQuestionTimeRef.current = Date.now();
       }
 
       toast({
