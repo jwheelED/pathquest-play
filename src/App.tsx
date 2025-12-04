@@ -21,6 +21,7 @@ import JoinLive from "./pages/JoinLive";
 import LiveStudent from "./pages/LiveStudent";
 import PresenterView from "./pages/PresenterView";
 import LecturePresenterView from "./pages/LecturePresenterView";
+import SlidePresenter from "./pages/SlidePresenter";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -74,6 +75,11 @@ const App = () => (
           <Route path="/instructor/presenter" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <PresenterView />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/slides" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <SlidePresenter />
             </ProtectedRoute>
           } />
           <Route path="/admin/auth" element={<AdminAuth />} />

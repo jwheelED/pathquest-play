@@ -2967,6 +2967,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                           <PictureInPicture2 className="h-4 w-4 mr-2" />
                           {isPiPSupported ? '🖼️ Floating Widget (Always-on-top)' : '🖼️ Floating Widget (Chrome/Edge only)'}
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            window.open('/instructor/slides', '_blank');
+                          }}
+                        >
+                          🎞️ Slide Presenter (Full Integration)
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
