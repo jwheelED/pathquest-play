@@ -192,9 +192,20 @@ export class DeepgramStreamingClient {
 
   private async startAudioCapture(): Promise<void> {
     try {
-      // Request microphone with optimal settings for speech
+      // Detect mobile/iOS for flexible audio constraints
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      // Request microphone with optimal settings for speech (flexible for mobile)
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
+        audio: isMobile || isIOS || isSafari ? {
+          // Flexible constraints for mobile - let browser choose optimal settings
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } : {
+          // Strict constraints for desktop
           channelCount: 1,
           sampleRate: 16000, // Deepgram prefers 16kHz
           echoCancellation: true,
@@ -203,10 +214,16 @@ export class DeepgramStreamingClient {
         },
       });
 
-      console.log("🎙️ Microphone access granted");
+      console.log("🎙️ Microphone access granted", isMobile ? "(mobile mode)" : "(desktop mode)");
 
-      // Create MediaRecorder with appropriate MIME type
-      const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+      // Create MediaRecorder with appropriate MIME type (including iOS Safari support)
+      const mimeTypes = [
+        "audio/webm;codecs=opus",    // Chrome, Firefox, Edge
+        "audio/webm",                 // Fallback for Chrome/Firefox
+        "audio/mp4",                  // iOS Safari, newer Safari
+        "audio/mp4;codecs=mp4a.40.2", // iOS Safari with specific codec
+        "audio/ogg;codecs=opus",      // Firefox fallback
+      ];
 
       let selectedMimeType = "";
       for (const mimeType of mimeTypes) {
@@ -217,7 +234,7 @@ export class DeepgramStreamingClient {
       }
 
       if (!selectedMimeType) {
-        throw new Error("No supported audio MIME type found");
+        throw new Error("No supported audio MIME type found on this device");
       }
 
       console.log("🎵 Using MIME type:", selectedMimeType);

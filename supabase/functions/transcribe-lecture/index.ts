@@ -148,13 +148,14 @@ serve(async (req) => {
     // Create blob - cast buffer to ArrayBuffer for type compatibility  
     const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     
-    // Try webm first, fallback to ogg if needed
+    // Detect audio format from file signature (including iOS MP4 support)
     let blob: Blob;
     let filename: string;
     
     // Check file signature to determine actual format
-    const signature = bytes.slice(0, 4);
-    const signatureStr = Array.from(signature).map(b => b.toString(16).padStart(2, '0')).join('');
+    // Need at least 12 bytes to detect MP4 (ftyp at offset 4)
+    const signature = bytes.slice(0, 12);
+    const signatureStr = Array.from(signature.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join('');
     console.log('Audio signature:', signatureStr);
     
     // WebM signature: 1A 45 DF A3
@@ -162,11 +163,26 @@ serve(async (req) => {
       blob = new Blob([buffer], { type: 'audio/webm' });
       filename = 'audio.webm';
       console.log('Detected WebM format');
-    } else {
-      // Fallback to ogg
+    }
+    // MP4/M4A signature: "ftyp" at offset 4 (bytes 4-7 = 0x66 0x74 0x79 0x70)
+    else if (
+      signature[4] === 0x66 && signature[5] === 0x74 && 
+      signature[6] === 0x79 && signature[7] === 0x70
+    ) {
+      blob = new Blob([buffer], { type: 'audio/mp4' });
+      filename = 'audio.m4a';
+      console.log('Detected MP4/M4A format (iOS Safari)');
+    }
+    // OGG signature: "OggS" (0x4F 0x67 0x67 0x53)
+    else if (signature[0] === 0x4F && signature[1] === 0x67 && signature[2] === 0x67 && signature[3] === 0x53) {
       blob = new Blob([buffer], { type: 'audio/ogg' });
       filename = 'audio.ogg';
-      console.log('Using OGG format as fallback');
+      console.log('Detected OGG format');
+    } else {
+      // Fallback to mp4 (most broadly supported by Whisper and works for iOS)
+      blob = new Blob([buffer], { type: 'audio/mp4' });
+      filename = 'audio.m4a';
+      console.log('Using MP4 format as fallback (unknown signature:', signatureStr, ')');
     }
     
     formData.append('file', blob, filename);

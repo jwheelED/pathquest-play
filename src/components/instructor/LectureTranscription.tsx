@@ -1948,9 +1948,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return;
       }
 
-      // Request microphone access
+      // Detect mobile/iOS for flexible audio constraints
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      // Request microphone access with flexible constraints for mobile
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
+        audio: isMobile || isIOS || isSafari ? {
+          // Flexible constraints for mobile - let browser choose optimal settings
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } : {
+          // Strict constraints for desktop
           channelCount: 1,
           sampleRate: 16000,
           echoCancellation: true,
@@ -1987,7 +1998,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       toast({
         title: "🎙️ Recording started",
-        description: "Transcripts will appear every 8 seconds",
+        description: isMobile 
+          ? "Mobile recording active. Keep screen on for best results." 
+          : "Transcripts will appear every 8 seconds",
       });
     } catch (error) {
       console.error("Error starting recording:", error);
@@ -2018,14 +2031,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
       }
 
-      // Try to use the best available audio format
-      let mimeType = "audio/webm;codecs=opus";
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = "audio/webm";
+      // Try to use the best available audio format (including iOS Safari support)
+      const mimeTypes = [
+        "audio/webm;codecs=opus",    // Chrome, Firefox, Edge
+        "audio/webm",                 // Fallback for Chrome/Firefox
+        "audio/mp4",                  // iOS Safari, newer Safari
+        "audio/mp4;codecs=mp4a.40.2", // iOS Safari with specific codec
+        "audio/ogg;codecs=opus",      // Firefox fallback
+      ];
+
+      let mimeType = "";
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          break;
+        }
       }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = "audio/ogg;codecs=opus";
+
+      if (!mimeType) {
+        throw new Error("No supported audio format found on this device");
       }
+
+      console.log("📱 Selected MIME type:", mimeType);
 
       const mediaRecorder = new MediaRecorder(streamRef.current, {
         mimeType,
