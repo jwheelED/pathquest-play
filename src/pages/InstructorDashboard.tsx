@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Users, Code, BookOpen } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LogOut, Users, Code, BookOpen, Presentation } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
@@ -473,6 +473,28 @@ export default function InstructorDashboard() {
             <AutoQuestionSettings />
             
             <LiveSessionControls onSessionChange={setLiveSessionId} />
+
+            {/* Slide Presenter Quick Access */}
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Presentation className="h-5 w-5 text-primary" />
+                  Slide Presenter
+                </CardTitle>
+                <CardDescription>
+                  Present your slides directly in Edvana with integrated live lecture tools
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={() => navigate('/instructor/slides')}
+                  className="w-full"
+                >
+                  <Presentation className="h-4 w-4 mr-2" />
+                  Open Slide Presenter
+                </Button>
+              </CardContent>
+            </Card>
             
             <LectureMaterialsUpload />
             
