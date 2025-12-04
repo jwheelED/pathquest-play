@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { createRoot } from "react-dom/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import {
   Sparkles,
   Star,
   Monitor,
+  PictureInPicture2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -40,10 +42,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { usePresenterBroadcast } from "@/hooks/useLecturePresenterChannel";
+import { useDocumentPiP } from "@/hooks/useDocumentPiP";
+import { PiPPresenterWidget } from "./PiPPresenterWidget";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -160,6 +165,70 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
+
+  // Document Picture-in-Picture for floating presenter widget
+  const { isSupported: isPiPSupported, openPiP } = useDocumentPiP({
+    width: 320,
+    height: 220,
+    onClose: () => console.log('PiP window closed'),
+  });
+
+  // Launch Picture-in-Picture floating widget
+  const launchPiPWidget = async () => {
+    if (!isPiPSupported) {
+      toast({
+        title: "Not Supported",
+        description: "Picture-in-Picture requires Chrome 116+ or Edge. Try the popup windows instead.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const pipWindow = await openPiP();
+    if (!pipWindow) {
+      toast({
+        title: "Failed to open",
+        description: "Could not open Picture-in-Picture window. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Set up the PiP window document
+    pipWindow.document.title = 'Edvana Presenter';
+    
+    // Create container for React
+    const container = pipWindow.document.createElement('div');
+    container.id = 'pip-root';
+    pipWindow.document.body.appendChild(container);
+    pipWindow.document.body.style.margin = '0';
+    pipWindow.document.body.style.padding = '0';
+    pipWindow.document.body.style.overflow = 'hidden';
+
+    // Render the widget
+    const root = createRoot(container);
+    root.render(
+      <PiPPresenterWidget
+        initialData={{
+          isRecording,
+          nextAutoQuestionIn: nextAutoQuestionIn,
+          studentCount,
+        }}
+      />
+    );
+
+    // Broadcast initial state
+    broadcast('state_update', {
+      isRecording,
+      nextAutoQuestionIn,
+      studentCount,
+    });
+
+    toast({
+      title: "🖼️ Floating Widget Active",
+      description: "Widget will stay on top of other windows",
+    });
+  };
 
   // Supabase Realtime channel for broadcasting timer to students
   const studentTimerChannelRef = useRef<any>(null);
@@ -2889,6 +2958,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                           }}
                         >
                           ⏱️ Mini Timer (Compact)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={launchPiPWidget}
+                          disabled={!isPiPSupported}
+                        >
+                          <PictureInPicture2 className="h-4 w-4 mr-2" />
+                          {isPiPSupported ? '🖼️ Floating Widget (Always-on-top)' : '🖼️ Floating Widget (Chrome/Edge only)'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
