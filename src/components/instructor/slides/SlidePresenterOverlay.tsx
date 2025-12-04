@@ -4,18 +4,44 @@ import { Clock, Users, Radio, Mic, MicOff, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export function SlidePresenterOverlay() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [nextQuestionIn, setNextQuestionIn] = useState(0);
-  const [studentCount, setStudentCount] = useState(0);
+interface DirectState {
+  isRecording: boolean;
+  recordingDuration: number;
+  studentCount: number;
+  autoQuestionEnabled: boolean;
+  nextAutoQuestionIn: number;
+}
+
+interface SlidePresenterOverlayProps {
+  directState?: DirectState;
+}
+
+export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProps) {
+  const [isRecording, setIsRecording] = useState(directState?.isRecording || false);
+  const [nextQuestionIn, setNextQuestionIn] = useState(directState?.nextAutoQuestionIn || 0);
+  const [studentCount, setStudentCount] = useState(directState?.studentCount || 0);
   const [lastQuestionText, setLastQuestionText] = useState('');
-  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingDuration, setRecordingDuration] = useState(directState?.recordingDuration || 0);
   const [flashNotification, setFlashNotification] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
+  const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(directState?.autoQuestionEnabled || false);
 
-  // Listen for broadcasts from main dashboard
+  // Update from direct props when they change
+  useEffect(() => {
+    if (directState) {
+      setIsRecording(directState.isRecording);
+      setRecordingDuration(directState.recordingDuration);
+      setStudentCount(directState.studentCount);
+      setAutoQuestionEnabled(directState.autoQuestionEnabled);
+      setNextQuestionIn(directState.nextAutoQuestionIn);
+    }
+  }, [directState]);
+
+  // Listen for broadcasts from main dashboard (fallback when not using direct props)
   usePresenterReceiver((message) => {
+    // Skip broadcast updates if we have direct state
+    if (directState) return;
+    
     switch (message.type) {
       case 'state_update':
         if (message.data.isRecording !== undefined) setIsRecording(message.data.isRecording);

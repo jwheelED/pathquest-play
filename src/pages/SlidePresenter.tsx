@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
 import { SlideViewer } from '@/components/instructor/slides/SlideViewer';
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
+import { SlideRecordingControls } from '@/components/instructor/slides/SlideRecordingControls';
+import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Presentation, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,6 +26,27 @@ export default function SlidePresenter() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Integrate lecture recording hook
+  const {
+    isRecording,
+    recordingDuration,
+    studentCount,
+    autoQuestionEnabled,
+    autoQuestionInterval,
+    nextAutoQuestionIn,
+    isSendingQuestion,
+    voiceCommandDetected,
+    startRecording,
+    stopRecording,
+    handleManualQuestionSend,
+    handleTestAutoQuestion,
+    toggleAutoQuestion,
+  } = useLectureRecording({
+    onQuestionGenerated: () => {
+      console.log('Question generated from slide presenter');
+    },
+  });
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -126,7 +149,7 @@ export default function SlidePresenter() {
     );
   }
 
-  // Fullscreen presentation mode
+  // Fullscreen presentation mode with integrated recording
   if (isFullscreen && activePresentation) {
     return (
       <div className="fixed inset-0 bg-black z-50">
@@ -135,7 +158,34 @@ export default function SlidePresenter() {
           title={activePresentation.title}
           onExit={handleExitPresentation}
         />
-        <SlidePresenterOverlay />
+        
+        {/* Recording Controls - bottom left */}
+        <SlideRecordingControls
+          isRecording={isRecording}
+          recordingDuration={recordingDuration}
+          studentCount={studentCount}
+          autoQuestionEnabled={autoQuestionEnabled}
+          nextAutoQuestionIn={nextAutoQuestionIn}
+          autoQuestionInterval={autoQuestionInterval}
+          isSendingQuestion={isSendingQuestion}
+          voiceCommandDetected={voiceCommandDetected}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
+          onManualSend={handleManualQuestionSend}
+          onToggleAutoQuestion={toggleAutoQuestion}
+          onTestAutoQuestion={handleTestAutoQuestion}
+        />
+        
+        {/* Stats Overlay - top right (receives state via BroadcastChannel) */}
+        <SlidePresenterOverlay
+          directState={{
+            isRecording,
+            recordingDuration,
+            studentCount,
+            autoQuestionEnabled,
+            nextAutoQuestionIn,
+          }}
+        />
       </div>
     );
   }
