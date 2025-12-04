@@ -75,6 +75,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const isGeneratingAutoQuestionRef = useRef(false);
   const lastQuestionSentTimeRef = useRef<number>(0);
   const studentTimerChannelRef = useRef<any>(null);
+  const processAudioChunkRef = useRef<((audioBlob: Blob) => Promise<void>) | null>(null);
 
   // Helper to get question preview
   const getQuestionPreview = (questionText: any, maxLength = 60): string => {
@@ -386,16 +387,26 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   };
 
-  // Process audio chunk
-  const processAudioChunk = async (audioBlob: Blob) => {
+  // Process audio chunk - use ref to always have latest version
+  const processAudioChunk = useCallback(async (audioBlob: Blob) => {
     try {
-      if (!audioBlob || audioBlob.size < 1000) return;
+      if (!audioBlob || audioBlob.size < 1000) {
+        console.log('Audio blob too small:', audioBlob?.size);
+        return;
+      }
+
+      console.log('Processing audio chunk, size:', audioBlob.size);
 
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
         const base64Audio = reader.result?.toString().split(',')[1];
-        if (!base64Audio) return;
+        if (!base64Audio) {
+          console.log('No base64 audio data');
+          return;
+        }
+
+        console.log('Sending to transcribe-lecture, base64 length:', base64Audio.length);
 
         try {
           const { data, error } = await supabase.functions.invoke('transcribe-lecture', {
@@ -408,14 +419,18 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             return;
           }
 
+          console.log('Transcription result:', data);
+
           if (data?.text?.trim()) {
             const newText = data.text.trim();
+            console.log('New transcript chunk:', newText);
             setFailureCount(0);
             setTranscriptChunks((prev) => [...prev, newText]);
             setLastTranscript(newText);
 
             transcriptBufferRef.current += ' ' + newText;
             intervalTranscriptRef.current += ' ' + newText;
+            console.log('Buffer length now:', transcriptBufferRef.current.length);
           }
         } catch (err) {
           console.error('Transcription failed:', err);
@@ -424,7 +439,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     } catch (error) {
       console.error('Process audio error:', error);
     }
-  };
+  }, []);
+
+  // Keep ref updated with latest processAudioChunk
+  useEffect(() => {
+    processAudioChunkRef.current = processAudioChunk;
+  }, [processAudioChunk]);
 
   // Start recording cycle
   const startRecordingCycle = useCallback(async () => {
@@ -467,7 +487,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       mediaRecorder.onstop = async () => {
         if (chunks.length > 0) {
           const audioBlob = new Blob(chunks, { type: mimeType });
-          await processAudioChunk(audioBlob);
+          console.log('Recording cycle complete, processing audio blob');
+          // Use ref to get latest processAudioChunk
+          if (processAudioChunkRef.current) {
+            await processAudioChunkRef.current(audioBlob);
+          }
         }
         chunks.length = 0;
 
