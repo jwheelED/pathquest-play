@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Flame, Target, Shield, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -73,20 +72,12 @@ interface ConfidenceSelectorProps {
 
 export function ConfidenceSelector({ baseReward, onSelect, disabled }: ConfidenceSelectorProps) {
   const [selectedLevel, setSelectedLevel] = useState<ConfidenceLevel | null>(null);
-  const [isLocked, setIsLocked] = useState(false);
 
   const handleSelect = (level: ConfidenceLevel, multiplier: number) => {
-    if (isLocked || disabled) return;
+    if (selectedLevel || disabled) return; // Prevent re-selection after choosing
     setSelectedLevel(level);
-  };
-
-  const handleConfirm = () => {
-    if (!selectedLevel || isLocked || disabled) return;
-    const config = CONFIDENCE_LEVELS.find(c => c.level === selectedLevel);
-    if (config) {
-      setIsLocked(true);
-      onSelect(selectedLevel, config.multiplier);
-    }
+    // Auto-submit immediately on selection
+    onSelect(level, multiplier);
   };
 
   return (
@@ -94,7 +85,7 @@ export function ConfidenceSelector({ baseReward, onSelect, disabled }: Confidenc
       <div className="text-center space-y-2">
         <h3 className="text-xl font-bold text-foreground">How Confident Are You?</h3>
         <p className="text-sm text-muted-foreground">
-          Choose your confidence level to gamble your points
+          Tap your confidence level to submit
         </p>
       </div>
 
@@ -102,6 +93,7 @@ export function ConfidenceSelector({ baseReward, onSelect, disabled }: Confidenc
         {CONFIDENCE_LEVELS.map((config) => {
           const Icon = config.icon;
           const isSelected = selectedLevel === config.level;
+          const isLocked = selectedLevel !== null;
           const potentialReward = Math.round(baseReward * config.multiplier);
           const potentialLoss = config.level === 'low' ? Math.round(baseReward * 0.25) : 
                                config.level === 'medium' ? 0 :
@@ -113,7 +105,7 @@ export function ConfidenceSelector({ baseReward, onSelect, disabled }: Confidenc
               className={cn(
                 "relative p-4 cursor-pointer transition-all duration-200 border-2",
                 isSelected ? `${config.borderColor} ${config.bgColor} scale-105 shadow-lg` : "border-border hover:border-primary/30",
-                isLocked && "opacity-60 cursor-not-allowed",
+                isLocked && !isSelected && "opacity-40 cursor-not-allowed",
                 disabled && "opacity-40 cursor-not-allowed"
               )}
               onClick={() => handleSelect(config.level, config.multiplier)}
@@ -173,18 +165,9 @@ export function ConfidenceSelector({ baseReward, onSelect, disabled }: Confidenc
         })}
       </div>
 
-      <Button
-        onClick={handleConfirm}
-        disabled={!selectedLevel || isLocked || disabled}
-        className="w-full h-12 text-lg font-bold"
-        variant="default"
-      >
-        {isLocked ? '🔒 Locked In!' : selectedLevel ? `Lock In ${CONFIDENCE_LEVELS.find(c => c.level === selectedLevel)?.emoji}` : 'Select Your Confidence'}
-      </Button>
-
-      {selectedLevel && !isLocked && (
-        <p className="text-xs text-center text-muted-foreground animate-pulse">
-          ⚠️ Once you lock in, you can't change your mind!
+      {selectedLevel && (
+        <p className="text-sm text-center text-primary font-medium animate-in fade-in-0">
+          🔒 Locked in with {CONFIDENCE_LEVELS.find(c => c.level === selectedLevel)?.emoji} {CONFIDENCE_LEVELS.find(c => c.level === selectedLevel)?.label}!
         </p>
       )}
     </div>
