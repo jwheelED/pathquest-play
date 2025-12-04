@@ -31,8 +31,8 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       return;
     }
 
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error('File size must be less than 100MB');
+    if (file.size > 200 * 1024 * 1024) {
+      toast.error('File size must be less than 200MB');
       return;
     }
 
