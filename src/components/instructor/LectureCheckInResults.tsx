@@ -350,8 +350,16 @@ export const LectureCheckInResults = () => {
     // Use overridden answer if it exists, otherwise use original correctAnswer
     const correctAnswer = question.overriddenAnswer || question.correctAnswer;
     const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
-      // quiz_responses is an object with string keys like {"0": "B"}
-      const response = a.quiz_responses?.[questionIndex.toString()] || a.quiz_responses?.[questionIndex];
+      // FIX: Find the question index within THIS student's assignment, not the group index
+      const assignmentContent = a.content as any;
+      const assignmentQuestions = assignmentContent?.questions || [];
+      const studentQuestionIdx = assignmentQuestions.findIndex(
+        (q: any) => q.question === question.question
+      );
+      
+      const response = studentQuestionIdx >= 0 
+        ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
+        : null;
       return response === correctAnswer;
     });
 
@@ -398,12 +406,23 @@ export const LectureCheckInResults = () => {
       const stats = calculateQuestionStats(assignments, qIdx, question);
       const studentResponses = assignments
         .filter(a => a.completed)
-        .map(a => ({
-          answer: a.quiz_responses?.[qIdx.toString()] || a.quiz_responses?.[qIdx],
-          isCorrect: (a.quiz_responses?.[qIdx.toString()] || a.quiz_responses?.[qIdx]) === 
-                     (question.overriddenAnswer || question.correctAnswer),
-          grade: a.grade
-        }));
+        .map(a => {
+          // FIX: Find the question index within THIS student's assignment
+          const assignmentContent = a.content as any;
+          const assignmentQuestions = assignmentContent?.questions || [];
+          const studentQuestionIdx = assignmentQuestions.findIndex(
+            (q: any) => q.question === question.question
+          );
+          const studentAnswer = studentQuestionIdx >= 0 
+            ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
+            : null;
+          
+          return {
+            answer: studentAnswer,
+            isCorrect: studentAnswer === (question.overriddenAnswer || question.correctAnswer),
+            grade: a.grade
+          };
+        });
 
       const { data, error } = await supabase.functions.invoke('generate-question-summary', {
         body: {
@@ -1034,8 +1053,17 @@ export const LectureCheckInResults = () => {
                             });
                             
                             return Array.from(uniqueStudents.values()).map((assignment) => {
+                              // FIX: Find the question index within THIS student's assignment, not the group index
+                              const assignmentContent = assignment.content as any;
+                              const assignmentQuestions = assignmentContent?.questions || [];
+                              const studentQuestionIdx = assignmentQuestions.findIndex(
+                                (q: any) => q.question === question.question
+                              );
+                              
                               // quiz_responses is an object with string keys like {"0": "B"}
-                              const studentAnswer = assignment.quiz_responses?.[qIdx.toString()] || assignment.quiz_responses?.[qIdx];
+                              const studentAnswer = studentQuestionIdx >= 0 
+                                ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
+                                : null;
                               const isCompleted = assignment.completed;
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
@@ -1083,7 +1111,7 @@ export const LectureCheckInResults = () => {
                                         {isCorrect ? "Correct" : "Incorrect"}
                                       </Badge>
                                       <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
-                                        Answer: {studentAnswer}
+                                        Answer: {studentAnswer || '(none)'}
                                       </span>
                                       {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
                                         <Badge variant="outline" className="gap-1 text-xs">
@@ -1115,10 +1143,19 @@ export const LectureCheckInResults = () => {
                                   return assignmentQuestions.some((q: any) => q.question === question.question);
                                 });
 
-                                // quiz_responses is an object with string keys like {"0": "B"}
-                                const count = questionAssignments.filter(
-                                  (a) => a.completed && (a.quiz_responses?.[qIdx.toString()] || a.quiz_responses?.[qIdx]) === optionLetter,
-                                ).length;
+                                // FIX: Count using correct question index for each student's assignment
+                                const count = questionAssignments.filter((a) => {
+                                  if (!a.completed) return false;
+                                  const assignmentContent = a.content as any;
+                                  const assignmentQuestions = assignmentContent?.questions || [];
+                                  const studentQuestionIdx = assignmentQuestions.findIndex(
+                                    (q: any) => q.question === question.question
+                                  );
+                                  const studentAnswer = studentQuestionIdx >= 0 
+                                    ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
+                                    : null;
+                                  return studentAnswer === optionLetter;
+                                }).length;
                                 const total = questionAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
@@ -1171,8 +1208,16 @@ export const LectureCheckInResults = () => {
                                 });
                                 
                                 return Array.from(uniqueStudents.values()).map((assignment) => {
-                                  // quiz_responses is an object with string keys like {"0": "B"}
-                                  const studentAnswer = assignment.quiz_responses?.[qIdx.toString()] || assignment.quiz_responses?.[qIdx];
+                                  // FIX: Find the question index within THIS student's assignment
+                                  const assignmentContent = assignment.content as any;
+                                  const assignmentQuestions = assignmentContent?.questions || [];
+                                  const studentQuestionIdx = assignmentQuestions.findIndex(
+                                    (q: any) => q.question === question.question
+                                  );
+                                  
+                                  const studentAnswer = studentQuestionIdx >= 0 
+                                    ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
+                                    : null;
                                   const isCompleted = assignment.completed;
                                   const currentGrade = assignment.grade;
 
