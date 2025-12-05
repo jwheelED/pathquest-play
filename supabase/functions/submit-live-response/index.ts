@@ -5,6 +5,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting: 20 submissions per IP per minute
+const RATE_LIMIT_WINDOW_MS = 60000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const ipRequestCounts = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = ipRequestCounts.get(ip);
+  
+  if (!record || now > record.resetTime) {
+    ipRequestCounts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
+// Get client IP from request headers
+function getClientIP(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+         req.headers.get('x-real-ip') || 
+         'unknown';
+}
+
+// Validate UUID format
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 // Calculate points based on correctness and confidence
 function calculatePoints(
   isCorrect: boolean,
@@ -45,6 +80,16 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Check rate limit
+    const clientIP = getClientIP(req);
+    if (!checkRateLimit(clientIP)) {
+      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -60,12 +105,63 @@ Deno.serve(async (req) => {
       baseReward 
     } = await req.json();
 
+    // Input validation
     if (!questionId || !participantId || !answer) {
       return new Response(
         JSON.stringify({ error: 'Question ID, participant ID, and answer are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Validate UUID formats
+    if (!isValidUUID(questionId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid question ID format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!isValidUUID(participantId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid participant ID format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate answer length (max 5000 characters)
+    if (typeof answer !== 'string' || answer.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: 'Answer must be a string of 5000 characters or less' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate confidence level if provided
+    const validConfidenceLevels = ['low', 'medium', 'high', 'very_high'];
+    if (confidenceLevel && !validConfidenceLevels.includes(confidenceLevel)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid confidence level' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate confidence multiplier if provided
+    const safeMultiplier = typeof confidenceMultiplier === 'number' && 
+                          confidenceMultiplier >= 0.5 && 
+                          confidenceMultiplier <= 3 
+                          ? confidenceMultiplier : 1;
+
+    // Validate base reward if provided
+    const safeBaseReward = typeof baseReward === 'number' && 
+                          baseReward >= 0 && 
+                          baseReward <= 100 
+                          ? baseReward : 10;
+
+    // Validate response time if provided
+    const safeResponseTimeMs = typeof responseTimeMs === 'number' && 
+                               responseTimeMs >= 0 && 
+                               responseTimeMs <= 300000 
+                               ? responseTimeMs : null;
 
     // Get question to check correct answer
     const { data: question, error: questionError } = await supabaseClient
@@ -77,6 +173,20 @@ Deno.serve(async (req) => {
     if (questionError || !question) {
       return new Response(
         JSON.stringify({ error: 'Question not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify participant exists
+    const { data: participant, error: participantError } = await supabaseClient
+      .from('live_participants')
+      .select('id, session_id')
+      .eq('id', participantId)
+      .single();
+
+    if (participantError || !participant) {
+      return new Response(
+        JSON.stringify({ error: 'Participant not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -115,13 +225,13 @@ Deno.serve(async (req) => {
     const pointsEarned = calculatePoints(
       isCorrect,
       confidenceLevel || null,
-      confidenceMultiplier || 1,
-      baseReward || 10
+      safeMultiplier,
+      safeBaseReward
     );
     
     // Add logging for debugging
     console.log(`Grading: student answered "${studentAnswer}", correct answer is "${correctAnswer}", result: ${isCorrect}`);
-    console.log(`Confidence: ${confidenceLevel}, multiplier: ${confidenceMultiplier}, points earned: ${pointsEarned}`);
+    console.log(`Confidence: ${confidenceLevel}, multiplier: ${safeMultiplier}, points earned: ${pointsEarned}`);
 
     // Submit response with confidence data
     const { data: response, error: responseError } = await supabaseClient
@@ -131,9 +241,9 @@ Deno.serve(async (req) => {
         participant_id: participantId,
         answer,
         is_correct: isCorrect,
-        response_time_ms: responseTimeMs,
+        response_time_ms: safeResponseTimeMs,
         confidence_level: confidenceLevel || null,
-        confidence_multiplier: confidenceMultiplier || 1.0,
+        confidence_multiplier: safeMultiplier,
         points_earned: pointsEarned,
       })
       .select()
