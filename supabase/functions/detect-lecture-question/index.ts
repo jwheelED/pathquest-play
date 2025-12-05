@@ -166,7 +166,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-flash-lite", // Optimized for speed in real-time detection
         messages: [
           { role: "system", content: INTENT_DETECTION_PROMPT },
           {
