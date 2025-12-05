@@ -100,13 +100,13 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     prevLiveCheckInsLength.current = liveCheckIns.length;
   }, [liveCheckIns, accordionValue]);
 
-  // Polling fallback when realtime disconnected
+  // Polling fallback when realtime disconnected (5 second interval for faster recovery)
   useEffect(() => {
     if (realtimeStatus !== 'connected') {
       const pollInterval = setInterval(() => {
         console.log('📡 Polling fallback - fetching assignments...');
         fetchAssignments();
-      }, 10000);
+      }, 5000); // Reduced from 10s to 5s for better UX
       
       return () => clearInterval(pollInterval);
     }
@@ -130,7 +130,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
       console.log('🔌 Setting up realtime subscription for student:', userId);
       setRealtimeStatus('connecting');
       
-      // Step 2: Set up subscription WITHOUT server-side filter (filter client-side instead)
+      // Step 2: Set up subscription WITH server-side filter for better performance
       assignmentChannel = supabase
         .channel(`student-assignments-${userId}`)
         .on(
@@ -138,52 +138,35 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
           {
             event: 'INSERT',
             schema: 'public',
-            table: 'student_assignments'
-            // No filter - RLS handles access, we filter client-side
+            table: 'student_assignments',
+            filter: `student_id=eq.${userId}` // Server-side filter - only this student's events
           },
           (payload) => {
-            // Client-side filtering for this user's assignments
-            if (payload.new && (payload.new as any).student_id === userId) {
-              console.log('📬 New assignment received via realtime:', payload);
-              console.log('📊 Assignment details:', {
-                id: payload.new?.id,
-                title: (payload.new as any)?.title,
-                type: (payload.new as any)?.assignment_type,
-                student_id: (payload.new as any)?.student_id
-              });
+            // Server-side filtering already applied - no client-side check needed
+            console.log('📬 New assignment received via realtime:', payload);
+            console.log('📊 Assignment details:', {
+              id: payload.new?.id,
+              title: (payload.new as any)?.title,
+              type: (payload.new as any)?.assignment_type,
+              student_id: (payload.new as any)?.student_id
+            });
+            
+            const newAssignment = payload.new as Assignment;
+            
+            if (newAssignment.assignment_type === 'lecture_checkin') {
+              // Trigger animation
+              setQuestionIncoming(true);
               
-              const newAssignment = payload.new as Assignment;
+              // Play audio notification
+              playNotificationSound().catch(err => 
+                console.log('Could not play notification sound:', err)
+              );
               
-              if (newAssignment.assignment_type === 'lecture_checkin') {
-                // Trigger animation
-                setQuestionIncoming(true);
+              // Show animation for 1.5 seconds before revealing question
+              setTimeout(() => {
+                setQuestionIncoming(false);
                 
-                // Play audio notification
-                playNotificationSound().catch(err => 
-                  console.log('Could not play notification sound:', err)
-                );
-                
-                // Show animation for 1.5 seconds before revealing question
-                setTimeout(() => {
-                  setQuestionIncoming(false);
-                  
-                  // Add assignment to state with proper deduplication
-                  setAssignments(prev => {
-                    if (prev.some(a => a.id === newAssignment.id)) {
-                      console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
-                      return prev;
-                    }
-                    console.log('✅ Adding new assignment:', newAssignment.id);
-                    return [newAssignment, ...prev];
-                  });
-                  
-                  // Show notification
-                  sonnerToast.success("New Question!", {
-                    description: `"${newAssignment.title}" is ready`
-                  });
-                }, 1500);
-              } else {
-                // For non-lecture assignments, add immediately with deduplication
+                // Add assignment to state with proper deduplication
                 setAssignments(prev => {
                   if (prev.some(a => a.id === newAssignment.id)) {
                     console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
@@ -192,7 +175,22 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                   console.log('✅ Adding new assignment:', newAssignment.id);
                   return [newAssignment, ...prev];
                 });
-              }
+                
+                // Show notification
+                sonnerToast.success("New Question!", {
+                  description: `"${newAssignment.title}" is ready`
+                });
+              }, 1500);
+            } else {
+              // For non-lecture assignments, add immediately with deduplication
+              setAssignments(prev => {
+                if (prev.some(a => a.id === newAssignment.id)) {
+                  console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                  return prev;
+                }
+                console.log('✅ Adding new assignment:', newAssignment.id);
+                return [newAssignment, ...prev];
+              });
             }
           }
         )
@@ -201,47 +199,45 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
           {
             event: 'UPDATE',
             schema: 'public',
-            table: 'student_assignments'
-            // No filter - RLS handles access, we filter client-side
+            table: 'student_assignments',
+            filter: `student_id=eq.${userId}` // Server-side filter - only this student's events
           },
           (payload) => {
-            // Client-side filtering
-            if (payload.new && (payload.new as any).student_id === userId) {
-              console.log('📝 Assignment updated:', payload);
+            // Server-side filtering already applied
+            console.log('📝 Assignment updated:', payload);
+            
+            const oldAssignment = payload.old as Assignment;
+            const updatedAssignment = payload.new as Assignment;
+            
+            // Immediate update for answers_released
+            if ('answers_released' in updatedAssignment) {
+              setAssignments(prev => 
+                prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+              );
               
-              const oldAssignment = payload.old as Assignment;
-              const updatedAssignment = payload.new as Assignment;
-              
-              // Immediate update for answers_released
-              if ('answers_released' in updatedAssignment) {
-                setAssignments(prev => 
-                  prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
-                );
-                
-                if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
-                  sonnerToast.success("Answers Released!", {
-                    description: `Answers for "${updatedAssignment.title}" are now available`
-                  });
-                }
-              }
-              
-              // Show toast notification when grade is posted
-              if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
-                setAssignments(prev => 
-                  prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
-                );
-                
-                sonnerToast.success("Grade Posted!", {
-                  description: `Your grade for "${updatedAssignment.title}": ${Math.round(updatedAssignment.grade)}%`
+              if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
+                sonnerToast.success("Answers Released!", {
+                  description: `Answers for "${updatedAssignment.title}" are now available`
                 });
               }
-              
-              // Debounced refresh for other updates
-              clearTimeout(debounceTimer);
-              debounceTimer = setTimeout(() => {
-                fetchAssignments();
-              }, 500);
             }
+            
+            // Show toast notification when grade is posted
+            if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
+              setAssignments(prev => 
+                prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+              );
+              
+              sonnerToast.success("Grade Posted!", {
+                description: `Your grade for "${updatedAssignment.title}": ${Math.round(updatedAssignment.grade)}%`
+              });
+            }
+            
+            // Debounced refresh for other updates
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              fetchAssignments();
+            }, 500);
           }
         )
         .subscribe((status) => {
@@ -255,6 +251,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
               description: 'Listening for new questions from your instructor',
               duration: 3000,
             });
+            // Immediately fetch to catch any questions sent during connection setup
+            setTimeout(() => fetchAssignments(), 500);
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             setRealtimeStatus('error');
             console.error('❌ Real-time connection error:', status);
