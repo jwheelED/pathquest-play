@@ -15,6 +15,82 @@ const languageMap: Record<string, { language: string; version: string }> = {
   c: { language: 'c', version: '10.2.0' },
 };
 
+// Blocked patterns for security - prevents dangerous code execution
+const BLOCKED_PATTERNS = [
+  // File system operations
+  /\bopen\s*\(/i,
+  /\bwrite\s*\(/i,
+  /\bread\s*\(/i,
+  /\bfs\./i,
+  /\brequire\s*\(\s*['"]fs['"]\s*\)/i,
+  /\bimport\s+.*\bos\b/i,
+  /\bimport\s+.*\bsys\b/i,
+  /\bimport\s+.*\bsubprocess\b/i,
+  /\bimport\s+.*\bshutil\b/i,
+  // Network operations
+  /\bfetch\s*\(/i,
+  /\brequests\./i,
+  /\burllib/i,
+  /\bsocket\b/i,
+  /\bhttp\./i,
+  /\bimport\s+.*\brequests\b/i,
+  // Code execution
+  /\beval\s*\(/i,
+  /\bexec\s*\(/i,
+  /\bcompile\s*\(/i,
+  /\b__import__\s*\(/i,
+  // System commands
+  /\bos\.system\s*\(/i,
+  /\bos\.popen\s*\(/i,
+  /\bsubprocess\./i,
+  /\bchild_process/i,
+  /\bspawn\s*\(/i,
+  /\bexecSync\s*\(/i,
+  // Dangerous globals
+  /\bglobals\s*\(\s*\)/i,
+  /\blocals\s*\(\s*\)/i,
+  /\bgetattr\s*\(/i,
+  /\bsetattr\s*\(/i,
+];
+
+// Validate code for dangerous patterns
+function validateCode(code: string): { valid: boolean; reason?: string } {
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(code)) {
+      return { valid: false, reason: `Code contains blocked pattern: ${pattern.source}` };
+    }
+  }
+  
+  // Check for excessive code length
+  if (code.length > 10000) {
+    return { valid: false, reason: 'Code exceeds maximum length (10000 characters)' };
+  }
+  
+  return { valid: true };
+}
+
+// Validate test cases
+function validateTestCases(testCases: any[]): { valid: boolean; reason?: string } {
+  if (testCases.length > 20) {
+    return { valid: false, reason: 'Too many test cases (max 20)' };
+  }
+  
+  for (const testCase of testCases) {
+    if (typeof testCase.input !== 'string' || testCase.input.length > 1000) {
+      return { valid: false, reason: 'Invalid test case input' };
+    }
+    
+    // Check test case input for dangerous patterns
+    for (const pattern of BLOCKED_PATTERNS) {
+      if (pattern.test(testCase.input)) {
+        return { valid: false, reason: `Test case contains blocked pattern` };
+      }
+    }
+  }
+  
+  return { valid: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -34,6 +110,26 @@ serve(async (req) => {
     if (!pistonConfig) {
       return new Response(
         JSON.stringify({ error: `Unsupported language: ${language}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate code for dangerous patterns
+    const codeValidation = validateCode(code);
+    if (!codeValidation.valid) {
+      console.warn(`Code validation failed: ${codeValidation.reason}`);
+      return new Response(
+        JSON.stringify({ error: 'Code validation failed: potentially unsafe code detected' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate test cases
+    const testCaseValidation = validateTestCases(testCases);
+    if (!testCaseValidation.valid) {
+      console.warn(`Test case validation failed: ${testCaseValidation.reason}`);
+      return new Response(
+        JSON.stringify({ error: 'Test case validation failed: potentially unsafe content detected' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
