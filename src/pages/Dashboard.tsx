@@ -137,23 +137,8 @@ export default function Dashboard() {
       return;
     }
 
-    // Check if student has a valid instructor connection
-    const { data: connection } = await supabase
-      .from("instructor_students")
-      .select("instructor_id")
-      .eq("student_id", user.id)
-      .maybeSingle();
-
-    if (!connection) {
-      // Student is onboarded but has no instructor connection - allow re-onboarding
-      logger.warn("Student has no instructor connection, redirecting to onboarding");
-      localStorage.removeItem("edvana_onboarded");
-      toast.error("Your class connection is missing. Please re-enter your class code.");
-      navigate("/onboarding");
-      return;
-    }
-
-    // Update cache
+    // Class connection is optional - students can join classes later via dashboard
+    // No need to force redirect if they don't have a connection
     localStorage.setItem("edvana_onboarded", "true");
   };
 
