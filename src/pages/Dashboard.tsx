@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AchievementSystem from "@/components/AchievementSystem";
 import { BadgesButton } from "@/components/student/BadgesButton";
@@ -15,6 +14,7 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
 import ClassConnectionCard from "@/components/student/ClassConnectionCard";
+import { Radio, Zap, BookOpen, GraduationCap, LogOut, Calendar } from "lucide-react";
 
 interface User {
   id: string;
@@ -36,7 +36,6 @@ export default function Dashboard() {
 
   // Handle answer results for flow state visualization
   const handleAnswerResult = (isCorrect: boolean, grade: number) => {
-    // Dispatch custom event for FlowStateCard
     window.dispatchEvent(new CustomEvent('flowstate:answer', {
       detail: { isCorrect, grade }
     }));
@@ -76,10 +75,7 @@ export default function Dashboard() {
       }
     };
 
-    // Initial check
     verifySession();
-    
-    // Check every 5 minutes
     const interval = setInterval(verifySession, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
@@ -123,7 +119,6 @@ export default function Dashboard() {
   const checkOnboarding = async () => {
     if (!user?.id) return;
     
-    // Always check database - cache is unreliable after instructor re-onboarding
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarded")
@@ -131,14 +126,11 @@ export default function Dashboard() {
       .maybeSingle();
 
     if (!profile?.onboarded) {
-      // Clear stale cache
       localStorage.removeItem("edvana_onboarded");
       navigate("/onboarding");
       return;
     }
 
-    // Class connection is optional - students can join classes later via dashboard
-    // No need to force redirect if they don't have a connection
     localStorage.setItem("edvana_onboarded", "true");
   };
 
@@ -146,7 +138,6 @@ export default function Dashboard() {
     if (!user?.id) return;
     
     try {
-      // Get instructor connection
       const { data: connection } = await supabase
         .from("instructor_students")
         .select("instructor_id")
@@ -154,7 +145,6 @@ export default function Dashboard() {
         .maybeSingle();
 
       if (connection?.instructor_id) {
-        // Fetch instructor's course info
         const { data: instructorProfile } = await supabase
           .from("profiles")
           .select("course_title, course_topics, course_schedule")
@@ -175,7 +165,6 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-    // Clear ALL cached onboarding data
     localStorage.removeItem("edvana_onboarded");
     localStorage.removeItem("lastCourseMaterialsReminder");
     await supabase.auth.signOut();
@@ -184,17 +173,16 @@ export default function Dashboard() {
     navigate("/");
   };
 
-
   if (!session || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
+        <div className="animate-pulse-soft text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen bg-background mesh-gradient pb-24 md:pb-0">
       {/* Mobile Header */}
       <MobileHeader
         userName={userName || user.email || "Student"}
@@ -205,24 +193,27 @@ export default function Dashboard() {
       />
 
       {/* Desktop Header */}
-      <header className="hidden md:block border-b-2 border-primary bg-gradient-to-r from-card to-primary/5 shadow-glow">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <header className="hidden md:block border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-                🎤 Edvana
-              </h1>
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
-                Student Dashboard
-              </Badge>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center">
+                <GraduationCap className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">Edvana</h1>
+                <p className="text-xs text-muted-foreground">Student Dashboard</p>
+              </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {user?.id && <BadgesButton userId={user.id} />}
+              <div className="h-8 w-px bg-border" />
               <span className="text-sm text-muted-foreground">
-                {user?.email || "User"}
+                {userName || user?.email}
               </span>
-              <Button onClick={handleLogout} variant="destructive" size="sm">
+              <Button onClick={handleLogout} variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+                <LogOut className="w-4 h-4" />
                 Logout
               </Button>
             </div>
@@ -230,90 +221,123 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
-        {/* Headless achievement checker - only triggers pop-ups */}
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        {/* Headless achievement checker */}
         {user?.id && <AchievementSystem userId={user.id} />}
         
-        {/* Mobile Stats Card */}
-        {user?.id && (
-          <div className="md:hidden mb-4">
-            <UserStats userId={user.id} onStatsUpdate={setUserStats} />
-          </div>
-        )}
-        
-        <div className="space-y-4 md:space-y-6">
-          {/* Class Connection Card */}
-          {user?.id && <ClassConnectionCard />}
-
-          {/* Join Live Session - Prominent CTA */}
-          <Card className="p-6 md:p-8 bg-gradient-to-br from-green-500/20 via-green-500/10 to-emerald-500/20 border-2 border-green-500 shadow-glow">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 flex items-center justify-center md:justify-start gap-2">
-                  🎯 Join Live Session
-                </h2>
-                <p className="text-muted-foreground text-sm md:text-base">
-                  Join when your instructor starts a live Q&A and shares a 6-digit code
-                </p>
-              </div>
-              <Button 
-                size="lg" 
-                className="text-lg px-8 py-6 shadow-xl hover:shadow-2xl transition-all bg-green-600 hover:bg-green-700"
-                onClick={() => navigate("/join")}
-              >
-                Join Session →
-              </Button>
-            </div>
-          </Card>
-
-          {/* Train with Edvana - Prominent CTA */}
-          <Card className="p-6 md:p-8 bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 border-2 border-primary shadow-glow">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex-1 text-center md:text-left">
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2 flex items-center justify-center md:justify-start gap-2">
-                  🎯 Train with Edvana
-                </h2>
-                <p className="text-muted-foreground text-sm md:text-base">
-                  Practice with AI-generated questions, track your progress, compete on leaderboards, and master your subjects
-                </p>
-              </div>
-              <Button 
-                size="lg" 
-                className="text-lg px-8 py-6 shadow-xl hover:shadow-2xl transition-all"
-                onClick={() => navigate("/training")}
-              >
-                Start Training →
-              </Button>
-            </div>
-          </Card>
+        {/* Bento Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-5">
           
-          {courseContext.courseTitle && (
-            <Card className="p-4 md:p-6 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/30">
-              <h2 className="text-xl md:text-2xl font-bold text-foreground mb-3 md:mb-4 flex items-center gap-2">
-                📚 {courseContext.courseTitle}
-              </h2>
-              {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {courseContext.courseTopics.map((topic, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-xs">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              {courseContext.courseSchedule && (
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  📅 {courseContext.courseSchedule}
-                </p>
-              )}
-            </Card>
+          {/* Quick Stats - Mobile Only */}
+          {user?.id && (
+            <div className="md:hidden col-span-1 animate-fade-in">
+              <UserStats userId={user.id} onStatsUpdate={setUserStats} />
+            </div>
           )}
 
-          {/* Live Lecture Check-ins */}
-          {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
+          {/* Join Live Session Card - Spans 8 cols on desktop */}
+          <div className="col-span-1 md:col-span-8 animate-fade-in stagger-1">
+            <div className="bento-card p-5 md:p-6 bg-gradient-to-br from-energy/5 to-energy/10 border-energy/20 hover:border-energy/40 transition-all group">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-energy/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Radio className="w-6 h-6 text-energy" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-foreground mb-1">Join Live Session</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Enter the 6-digit code from your instructor
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  size="lg" 
+                  className="w-full md:w-auto bg-energy hover:bg-energy/90 text-energy-foreground shadow-md hover:shadow-lg transition-all"
+                  onClick={() => navigate("/join")}
+                >
+                  Join Session
+                </Button>
+              </div>
+            </div>
+          </div>
 
-          {/* Flow State Visualization */}
-          {user?.id && <FlowStateCard userId={user.id} />}
+          {/* Class Info Card - Spans 4 cols */}
+          <div className="col-span-1 md:col-span-4 animate-fade-in stagger-2">
+            {user?.id && <ClassConnectionCard />}
+          </div>
+
+          {/* Train Card - Full Width */}
+          <div className="col-span-1 md:col-span-12 animate-fade-in stagger-3">
+            <div className="bento-card p-5 md:p-8 bg-gradient-to-br from-primary/5 via-primary/8 to-secondary/5 border-primary/20 hover:border-primary/40 transition-all group overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer opacity-0 group-hover:opacity-100" />
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-primary flex items-center justify-center flex-shrink-0 shadow-glow group-hover:scale-105 transition-transform">
+                    <Zap className="w-7 h-7 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-semibold text-foreground mb-1">Train with Edvana</h2>
+                    <p className="text-muted-foreground">
+                      Practice with AI-generated questions, track progress, and compete on leaderboards
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  size="lg" 
+                  className="w-full md:w-auto text-base px-8 shadow-lg hover:shadow-xl transition-all"
+                  onClick={() => navigate("/training")}
+                >
+                  Start Training
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Course Context - Spans 6 cols */}
+          {courseContext.courseTitle && (
+            <div className="col-span-1 md:col-span-6 animate-fade-in stagger-4">
+              <div className="bento-card p-5 h-full">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg font-semibold text-foreground truncate">{courseContext.courseTitle}</h3>
+                    {courseContext.courseSchedule && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {courseContext.courseSchedule}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {courseContext.courseTopics.slice(0, 5).map((topic, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-xs font-normal bg-muted/50">
+                        {topic}
+                      </Badge>
+                    ))}
+                    {courseContext.courseTopics.length > 5 && (
+                      <Badge variant="secondary" className="text-xs font-normal bg-muted/50">
+                        +{courseContext.courseTopics.length - 5} more
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Flow State - Spans remaining cols */}
+          <div className={`col-span-1 ${courseContext.courseTitle ? 'md:col-span-6' : 'md:col-span-12'} animate-fade-in stagger-5`}>
+            {user?.id && <FlowStateCard userId={user.id} />}
+          </div>
+
+          {/* Live Lecture Check-ins - Full Width */}
+          <div className="col-span-1 md:col-span-12 animate-fade-in stagger-6">
+            {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
+          </div>
         </div>
       </div>
 
