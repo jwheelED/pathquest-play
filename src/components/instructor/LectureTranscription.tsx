@@ -2055,12 +2055,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Start Deepgram WebSocket streaming for real-time transcription
   const startDeepgramStreaming = async () => {
-    console.log("🌊 Starting Deepgram WebSocket streaming for real-time transcription");
+    console.log("🌊 [Deepgram] Starting WebSocket streaming for real-time transcription");
+    console.log("🌊 [Deepgram] Auto-question enabled:", autoQuestionEnabled);
     const projectRef = "otsmjgrhyteyvpufkwdh"; // Supabase project ref
+    
+    // Clear any existing client first
+    if (deepgramClientRef.current) {
+      console.log("🌊 [Deepgram] Cleaning up existing client");
+      deepgramClientRef.current.disconnect();
+      deepgramClientRef.current = null;
+    }
     
     deepgramClientRef.current = new DeepgramStreamingClient({
       projectRef,
       onTranscript: (data: DeepgramTranscript) => {
+        console.log("🌊 [Deepgram] onTranscript called:", { 
+          text: data.text.substring(0, 50), 
+          isFinal: data.isFinal,
+          confidence: data.confidence 
+        });
+        
         if (data.text.trim()) {
           if (data.isFinal) {
             // Final transcript - add to chunks array
@@ -2078,27 +2092,33 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         }
       },
       onError: (error) => {
-        console.error("❌ Deepgram streaming error:", error);
+        console.error("❌ [Deepgram] Streaming error:", error);
         setIsStreamingMode(false);
         toast({
           title: "Streaming error",
-          description: "Switching to chunked mode",
+          description: error || "Switching to chunked mode",
           variant: "destructive",
         });
         // Fallback to chunk-based if streaming fails
         startRecordingCycle();
       },
       onReady: () => {
-        console.log("✅ Deepgram streaming ready - real-time transcription active");
+        console.log("✅ [Deepgram] Streaming READY - real-time transcription now active");
         setIsStreamingMode(true);
+        toast({
+          title: "🌊 Real-time streaming active",
+          description: "Deepgram connected - word-by-word transcription",
+        });
       },
       onClose: () => {
-        console.log("🔌 Deepgram streaming closed");
+        console.log("🔌 [Deepgram] Streaming connection closed");
         setIsStreamingMode(false);
       },
     });
     
+    console.log("🌊 [Deepgram] Connecting to WebSocket...");
     await deepgramClientRef.current.connect();
+    console.log("🌊 [Deepgram] Connect() completed, waiting for onReady callback");
   };
 
   // Stop Deepgram streaming
@@ -3141,9 +3161,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               {isRecording && (
                 <div className="space-y-2">
                   <div className="flex gap-2">
-                    <Badge variant="outline" className="flex-1 justify-center py-1.5">
+                    {/* Mode indicator - shows Real-time (Deepgram) vs Chunked (Whisper) */}
+                    <Badge 
+                      variant={isStreamingMode ? "default" : "outline"} 
+                      className={`flex-1 justify-center py-1.5 ${isStreamingMode ? "bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30" : ""}`}
+                    >
                       <Radio className="mr-2 h-3 w-3 text-red-500 animate-pulse" />
-                      Streaming
+                      {isStreamingMode ? "🌊 Real-time" : "📦 Chunked"}
                     </Badge>
                     <Badge variant="secondary" className="flex-1 justify-center py-1.5">
                       {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
@@ -3175,11 +3199,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     </div>
                   )}
 
-                  {lastTranscript && (
+                  {/* Real-time streaming transcript display */}
+                  {isStreamingMode && lastTranscript && (
+                    <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3 space-y-1 animate-pulse-slow">
+                      <p className="text-xs font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">
+                        🌊 Live Transcription (word-by-word):
+                      </p>
+                      <p className="text-sm text-foreground">{lastTranscript}</p>
+                    </div>
+                  )}
+                  
+                  {/* Chunked mode transcript display */}
+                  {!isStreamingMode && lastTranscript && (
                     <div className="bg-muted border border-border rounded-lg p-3 space-y-1">
                       <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                         <Radio className="h-3 w-3" />
-                        Last Transcribed:
+                        Last Chunk Transcribed:
                       </p>
                       <p className="text-sm text-foreground">{lastTranscript}</p>
                     </div>
