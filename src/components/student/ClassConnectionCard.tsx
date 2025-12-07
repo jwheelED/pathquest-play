@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { GraduationCap, BookOpen, Hash, MoreVertical, RefreshCw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ClassInfo {
   instructorName: string;
@@ -30,7 +36,6 @@ export default function ClassConnectionCard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get student's instructor connection
       const { data: connection } = await supabase
         .from("instructor_students")
         .select("instructor_id")
@@ -38,7 +43,6 @@ export default function ClassConnectionCard() {
         .maybeSingle();
 
       if (connection?.instructor_id) {
-        // Fetch instructor details
         const { data: instructor } = await supabase
           .from("profiles")
           .select("full_name, course_title, instructor_code")
@@ -75,7 +79,6 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      // Validate new instructor code
       const { data: newInstructorId, error: validateError } = await supabase
         .rpc("validate_instructor_code", { code: newClassCode.trim() });
 
@@ -84,7 +87,6 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      // Check if trying to connect to same instructor
       if (classInfo && newInstructorId === classInfo.instructorId) {
         toast.info("You're already enrolled in this class.");
         setShowSwitchDialog(false);
@@ -92,13 +94,11 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      // Delete old connection
       await supabase
         .from("instructor_students")
         .delete()
         .eq("student_id", user.id);
 
-      // Create new connection (trigger will automatically sync org_id to both tables)
       const { error: insertError } = await supabase
         .from("instructor_students")
         .insert({
@@ -112,23 +112,18 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      // Ensure onboarded status is maintained
       await supabase
         .from("profiles")
         .update({ onboarded: true })
         .eq("id", user.id);
 
-      // Update localStorage to maintain onboarded status
       localStorage.setItem("edvana_onboarded", "true");
 
       toast.success("Successfully switched to new class!");
       setShowSwitchDialog(false);
       setNewClassCode("");
       
-      // Refresh class info
       await fetchClassInfo();
-      
-      // Refresh the page to update all components after a delay
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error("Error switching class:", error);
@@ -140,81 +135,141 @@ export default function ClassConnectionCard() {
 
   if (loading) {
     return (
-      <Card className="p-6 border-2 border-border bg-card">
-        <div className="animate-pulse">
-          <div className="h-4 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="h-6 bg-muted rounded w-2/3 mb-2"></div>
+      <div className="bento-card p-5 h-full">
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 bg-muted rounded w-1/3"></div>
+          <div className="h-5 bg-muted rounded w-2/3"></div>
           <div className="h-4 bg-muted rounded w-1/2"></div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   if (!classInfo) {
-    return null;
+    return (
+      <div className="bento-card p-5 h-full border-dashed">
+        <div className="flex flex-col items-center justify-center h-full text-center py-4">
+          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
+            <GraduationCap className="w-6 h-6 text-muted-foreground" />
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">No class connected</p>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="rounded-xl"
+            onClick={() => setShowSwitchDialog(true)}
+          >
+            Join a Class
+          </Button>
+        </div>
+        
+        <AlertDialog open={showSwitchDialog} onOpenChange={setShowSwitchDialog}>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Join a Class</AlertDialogTitle>
+              <AlertDialogDescription>
+                Enter the class code provided by your instructor.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            
+            <div className="py-4">
+              <Label htmlFor="newClassCode" className="text-sm font-medium">Class Code</Label>
+              <Input
+                id="newClassCode"
+                type="text"
+                placeholder="Enter class code"
+                value={newClassCode}
+                onChange={(e) => setNewClassCode(e.target.value.toUpperCase())}
+                disabled={switching}
+                className="mt-2 rounded-xl h-12 text-center font-mono text-lg tracking-wider"
+              />
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={switching} className="rounded-xl">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleSwitchClass}
+                disabled={switching || !newClassCode.trim()}
+                className="rounded-xl"
+              >
+                {switching ? "Joining..." : "Join Class"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
   }
 
   return (
     <>
-      <Card className="p-6 border-2 border-primary-glow bg-gradient-to-br from-card to-primary/5">
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            📚 My Class
-          </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSwitchDialog(true)}
-          >
-            Switch Class
-          </Button>
+      <div className="bento-card p-5 h-full">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
+              <GraduationCap className="w-5 h-5 text-secondary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">My Class</h3>
+              <p className="text-xs text-muted-foreground">{classInfo.instructorName}</p>
+            </div>
+          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+              <DropdownMenuItem onClick={() => setShowSwitchDialog(true)} className="gap-2 rounded-lg">
+                <RefreshCw className="h-4 w-4" />
+                Switch Class
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm text-muted-foreground">Instructor</p>
-            <p className="text-lg font-semibold text-foreground">{classInfo.instructorName}</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <BookOpen className="w-4 h-4 text-muted-foreground" />
+            <span className="text-foreground truncate">{classInfo.courseTitle}</span>
           </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Course</p>
-            <p className="text-base text-foreground">{classInfo.courseTitle}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Class Code</p>
-            <p className="text-base font-mono text-foreground">{classInfo.instructorCode}</p>
+          <div className="flex items-center gap-2 text-sm">
+            <Hash className="w-4 h-4 text-muted-foreground" />
+            <span className="font-mono text-muted-foreground">{classInfo.instructorCode}</span>
           </div>
         </div>
-      </Card>
+      </div>
 
       <AlertDialog open={showSwitchDialog} onOpenChange={setShowSwitchDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Switch to a Different Class</AlertDialogTitle>
+            <AlertDialogTitle>Switch Class</AlertDialogTitle>
             <AlertDialogDescription>
-              Enter the class code for the new class you want to join. This will remove you from your current class.
+              Enter the code for the new class. This will remove you from your current class.
             </AlertDialogDescription>
           </AlertDialogHeader>
           
           <div className="py-4">
-            <Label htmlFor="newClassCode">New Class Code</Label>
+            <Label htmlFor="newClassCode" className="text-sm font-medium">New Class Code</Label>
             <Input
               id="newClassCode"
               type="text"
-              placeholder="Enter new class code"
+              placeholder="Enter class code"
               value={newClassCode}
               onChange={(e) => setNewClassCode(e.target.value.toUpperCase())}
               disabled={switching}
-              className="mt-2"
+              className="mt-2 rounded-xl h-12 text-center font-mono text-lg tracking-wider"
             />
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={switching}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={switching} className="rounded-xl">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSwitchClass}
               disabled={switching || !newClassCode.trim()}
+              className="rounded-xl"
             >
               {switching ? "Switching..." : "Switch Class"}
             </AlertDialogAction>

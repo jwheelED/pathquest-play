@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Trophy, Target, Flame, Upload, CheckCircle } from "lucide-react";
+import { Target, Flame, Upload, CheckCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface DailyChallenge {
@@ -23,16 +21,16 @@ interface DailyChallengesProps {
 
 const challengeIcons = {
   practice_count: Target,
-  confidence_win: Trophy,
+  confidence_win: Sparkles,
   streak: Flame,
   study_upload: Upload,
 };
 
 const challengeLabels = {
   practice_count: "Practice Problems",
-  confidence_win: "Win with High Confidence",
+  confidence_win: "Win with Confidence",
   streak: "Maintain Streak",
-  study_upload: "Upload Study Materials",
+  study_upload: "Upload Materials",
 };
 
 export function DailyChallenges({ userId }: DailyChallengesProps) {
@@ -42,7 +40,6 @@ export function DailyChallenges({ userId }: DailyChallengesProps) {
   useEffect(() => {
     fetchChallenges();
     
-    // Subscribe to changes
     const channel = supabase
       .channel('daily_challenges_changes')
       .on(
@@ -66,7 +63,6 @@ export function DailyChallenges({ userId }: DailyChallengesProps) {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      // Fetch today's challenges
       const { data: existingChallenges, error: fetchError } = await supabase
         .from('daily_challenges')
         .select('*')
@@ -75,7 +71,6 @@ export function DailyChallenges({ userId }: DailyChallengesProps) {
 
       if (fetchError) throw fetchError;
 
-      // If no challenges exist for today, create them
       if (!existingChallenges || existingChallenges.length === 0) {
         const newChallenges = [
           { challenge_type: 'practice_count', target_value: 10, xp_reward: 50, coins_reward: 25 },
@@ -108,16 +103,16 @@ export function DailyChallenges({ userId }: DailyChallengesProps) {
 
   if (loading) {
     return (
-      <Card className="p-6 bg-gradient-to-br from-card to-primary/5 border-2 border-primary/20">
+      <div className="bento-card p-5">
         <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-muted rounded w-1/3"></div>
+          <div className="h-5 bg-muted rounded w-1/3"></div>
           <div className="space-y-3">
-            <div className="h-20 bg-muted rounded"></div>
-            <div className="h-20 bg-muted rounded"></div>
-            <div className="h-20 bg-muted rounded"></div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-muted rounded-xl"></div>
+            ))}
           </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -125,73 +120,70 @@ export function DailyChallenges({ userId }: DailyChallengesProps) {
   const totalCount = challenges.length;
 
   return (
-    <Card className="p-6 bg-gradient-to-br from-card to-primary/5 border-2 border-primary/20 shadow-glow">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/20 rounded-lg">
-              <Trophy className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-foreground">Daily Challenges</h3>
-              <p className="text-sm text-muted-foreground">
-                {completedCount} of {totalCount} completed
-              </p>
-            </div>
+    <div className="bento-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-achievement/10 flex items-center justify-center">
+            <Target className="w-5 h-5 text-achievement" />
           </div>
-          {completedCount === totalCount && totalCount > 0 && (
-            <Badge variant="gold" className="text-sm">
-              All Done! 🎉
-            </Badge>
-          )}
+          <div>
+            <h3 className="font-semibold text-foreground">Daily Challenges</h3>
+            <p className="text-xs text-muted-foreground">
+              {completedCount}/{totalCount} completed
+            </p>
+          </div>
         </div>
+        {completedCount === totalCount && totalCount > 0 && (
+          <span className="stat-pill bg-energy/10 text-energy text-xs">
+            All Done!
+          </span>
+        )}
+      </div>
 
-        <div className="space-y-3">
-          {challenges.map((challenge) => {
-            const Icon = challengeIcons[challenge.challenge_type as keyof typeof challengeIcons];
-            const label = challengeLabels[challenge.challenge_type as keyof typeof challengeLabels];
-            const progress = (challenge.current_progress / challenge.target_value) * 100;
+      <div className="space-y-3">
+        {challenges.map((challenge, index) => {
+          const Icon = challengeIcons[challenge.challenge_type as keyof typeof challengeIcons] || Target;
+          const label = challengeLabels[challenge.challenge_type as keyof typeof challengeLabels] || challenge.challenge_type;
+          const progress = (challenge.current_progress / challenge.target_value) * 100;
 
-            return (
-              <div
-                key={challenge.id}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  challenge.completed
-                    ? 'bg-primary/10 border-primary/50'
-                    : 'bg-card border-border hover:border-primary/30'
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={`p-2 rounded-lg ${challenge.completed ? 'bg-primary/20' : 'bg-muted'}`}>
-                      {challenge.completed ? (
-                        <CheckCircle className="w-5 h-5 text-primary" />
-                      ) : (
-                        <Icon className="w-5 h-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-foreground">{label}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {challenge.current_progress} / {challenge.target_value}
-                      </p>
-                    </div>
+          return (
+            <div
+              key={challenge.id}
+              className={`p-4 rounded-xl border transition-all animate-fade-in ${
+                challenge.completed
+                  ? 'bg-energy/5 border-energy/20'
+                  : 'bg-muted/30 border-transparent hover:border-border'
+              }`}
+              style={{ animationDelay: `${index * 0.05}s` }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    challenge.completed ? 'bg-energy/15' : 'bg-muted'
+                  }`}>
+                    {challenge.completed ? (
+                      <CheckCircle className="w-4 h-4 text-energy" />
+                    ) : (
+                      <Icon className="w-4 h-4 text-muted-foreground" />
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-primary">
-                      +{challenge.xp_reward} XP
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      +{challenge.coins_reward} 🪙
-                    </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {challenge.current_progress}/{challenge.target_value}
+                    </p>
                   </div>
                 </div>
-                <Progress value={progress} className="h-2" />
+                <div className="text-right">
+                  <p className="text-xs font-medium text-primary">+{challenge.xp_reward} XP</p>
+                  <p className="text-[10px] text-muted-foreground">+{challenge.coins_reward} coins</p>
+                </div>
               </div>
-            );
-          })}
-        </div>
+              <Progress value={progress} className="h-1.5" />
+            </div>
+          );
+        })}
       </div>
-    </Card>
+    </div>
   );
 }
