@@ -51,6 +51,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStreaming";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -161,6 +162,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const lastQuestionSentTimeRef = useRef<number>(0);
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const intervalStartTimeRef = useRef<number>(0);
+  
+  // Deepgram streaming refs for real-time transcription
+  const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
+  const [isStreamingMode, setIsStreamingMode] = useState(false);
+  
   const { toast } = useToast();
 
   // Presenter broadcast channel (for popup presenter view)
@@ -1649,7 +1655,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     await generateAndSendAutoQuestion(intervalTranscript, true);
   };
 
-  // Toggle auto-question enabled state
+  // Toggle auto-question enabled state with mid-recording mode switching
   const handleToggleAutoQuestion = async () => {
     const newState = !autoQuestionEnabled;
     console.log(`🔄 Toggling auto-questions: ${autoQuestionEnabled} → ${newState}`);
@@ -1673,12 +1679,64 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         setLastAutoQuestionError(null);
       }
 
-      toast({
-        title: newState ? "✅ Auto-Questions Enabled" : "⏸️ Auto-Questions Disabled",
-        description: newState
-          ? `Questions will be generated every ${autoQuestionInterval} minutes`
-          : "Auto-question generation has been paused",
-      });
+      // Handle mid-recording mode switch for hybrid transcription
+      if (isRecording) {
+        if (newState) {
+          // Switching ON: Stop Deepgram streaming, start 8-second chunks with Whisper
+          console.log("🔄 Mid-recording: Switching from Deepgram streaming to Whisper chunks");
+          await stopDeepgramStreaming();
+          
+          // Start chunk-based recording (need microphone stream)
+          if (!streamRef.current) {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+            });
+            streamRef.current = stream;
+          }
+          
+          const now = Date.now();
+          setLastAutoQuestionTime(now);
+          intervalStartTimeRef.current = now;
+          startRecordingCycle();
+          
+          toast({
+            title: "✅ Auto-Questions Enabled",
+            description: "Switched to chunked transcription for reliable question generation",
+          });
+        } else {
+          // Switching OFF: Stop Whisper chunks, start Deepgram streaming
+          console.log("🔄 Mid-recording: Switching from Whisper chunks to Deepgram streaming");
+          
+          // Stop chunk-based recording
+          if (recordingIntervalRef.current) {
+            clearTimeout(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+          }
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            mediaRecorderRef.current.stop();
+          }
+          mediaRecorderRef.current = null;
+          
+          // Start Deepgram streaming for real-time transcription
+          await startDeepgramStreaming();
+          
+          toast({
+            title: "⏸️ Auto-Questions Disabled",
+            description: "Switched to real-time streaming transcription",
+          });
+        }
+      } else {
+        toast({
+          title: newState ? "✅ Auto-Questions Enabled" : "⏸️ Auto-Questions Disabled",
+          description: newState
+            ? `Questions will be generated every ${autoQuestionInterval} minutes`
+            : "Auto-question generation has been paused",
+        });
+      }
 
       console.log("✅ Auto-question state updated successfully");
     } catch (error) {
@@ -1995,6 +2053,64 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     };
   }, []);
 
+  // Start Deepgram WebSocket streaming for real-time transcription
+  const startDeepgramStreaming = async () => {
+    console.log("🌊 Starting Deepgram WebSocket streaming for real-time transcription");
+    const projectRef = "otsmjgrhyteyvpufkwdh"; // Supabase project ref
+    
+    deepgramClientRef.current = new DeepgramStreamingClient({
+      projectRef,
+      onTranscript: (data: DeepgramTranscript) => {
+        if (data.text.trim()) {
+          if (data.isFinal) {
+            // Final transcript - add to chunks array
+            console.log("✅ [Deepgram Final]:", data.text.substring(0, 80));
+            setTranscriptChunks(prev => [...prev, data.text]);
+            setLastTranscript(data.text);
+            transcriptBufferRef.current += ' ' + data.text;
+            intervalTranscriptRef.current += ' ' + data.text;
+            setIntervalTranscriptLength(intervalTranscriptRef.current.length);
+          } else {
+            // Interim transcript - show immediately for real-time display
+            console.log("🔄 [Deepgram Interim]:", data.text.substring(0, 50));
+            setLastTranscript(data.text);
+          }
+        }
+      },
+      onError: (error) => {
+        console.error("❌ Deepgram streaming error:", error);
+        setIsStreamingMode(false);
+        toast({
+          title: "Streaming error",
+          description: "Switching to chunked mode",
+          variant: "destructive",
+        });
+        // Fallback to chunk-based if streaming fails
+        startRecordingCycle();
+      },
+      onReady: () => {
+        console.log("✅ Deepgram streaming ready - real-time transcription active");
+        setIsStreamingMode(true);
+      },
+      onClose: () => {
+        console.log("🔌 Deepgram streaming closed");
+        setIsStreamingMode(false);
+      },
+    });
+    
+    await deepgramClientRef.current.connect();
+  };
+
+  // Stop Deepgram streaming
+  const stopDeepgramStreaming = async () => {
+    if (deepgramClientRef.current) {
+      console.log("🛑 Stopping Deepgram streaming");
+      deepgramClientRef.current.disconnect();
+      deepgramClientRef.current = null;
+      setIsStreamingMode(false);
+    }
+  };
+
   // Handle streaming transcripts from Deepgram
   const startRecording = async () => {
     try {
@@ -2017,33 +2133,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         return;
       }
 
-      // Detect mobile/iOS for flexible audio constraints
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-      // Request microphone access with flexible constraints for mobile
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: isMobile || isIOS || isSafari ? {
-          // Flexible constraints for mobile - let browser choose optimal settings
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } : {
-          // Strict constraints for desktop
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      streamRef.current = stream;
+      // Reset state for fresh recording session
       isRecordingRef.current = true;
       setIsRecording(true);
-
-      // Reset state for fresh recording session
       hasTriggeredRef.current = false;
       setTranscriptChunks([]);
       transcriptBufferRef.current = "";
@@ -2053,24 +2145,58 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
 
-      // Initialize auto-question timer for this session
+      // Detect mobile/iOS for flexible audio constraints
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
       if (autoQuestionEnabled) {
+        // AUTO-QUESTION ON: Use 8-second chunks with Whisper for reliable batch processing
+        console.log("📦 Auto-question ON: Using 8-second chunks with Whisper");
+        
+        // Request microphone access with flexible constraints for mobile
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: isMobile || isIOS || isSafari ? {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } : {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        streamRef.current = stream;
+
+        // Initialize auto-question timer for this session
         const now = Date.now();
         setLastAutoQuestionTime(now);
         intervalStartTimeRef.current = now;
         setAutoQuestionCount(0);
         console.log("⏰ Auto-question timer initialized, first question in", autoQuestionInterval, "minutes");
+
+        // Start chunk-based recording cycle
+        startRecordingCycle();
+
+        toast({
+          title: "🎙️ Recording started",
+          description: isMobile 
+            ? "Mobile recording active. Chunked transcription mode." 
+            : "Chunked transcription active (8-second intervals)",
+        });
+      } else {
+        // AUTO-QUESTION OFF: Use Deepgram WebSocket streaming for real-time transcription
+        console.log("🌊 Auto-question OFF: Using Deepgram WebSocket streaming");
+        
+        await startDeepgramStreaming();
+
+        toast({
+          title: "🎙️ Recording started",
+          description: "Real-time streaming transcription active",
+        });
       }
-
-      // Start chunk-based recording cycle
-      startRecordingCycle();
-
-      toast({
-        title: "🎙️ Recording started",
-        description: isMobile 
-          ? "Mobile recording active. Keep screen on for best results." 
-          : "Transcripts will appear every 8 seconds",
-      });
     } catch (error) {
       console.error("Error starting recording:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to start recording";
@@ -2209,6 +2335,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const stopRecording = () => {
     isRecordingRef.current = false;
     setIsRecording(false);
+
+    // Clean up Deepgram streaming if active
+    if (deepgramClientRef.current) {
+      console.log("🛑 Stopping Deepgram streaming");
+      deepgramClientRef.current.disconnect();
+      deepgramClientRef.current = null;
+      setIsStreamingMode(false);
+    }
 
     // Clean up recording interval
     if (recordingIntervalRef.current) {
