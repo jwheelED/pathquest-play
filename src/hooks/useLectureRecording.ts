@@ -5,6 +5,7 @@ import { toast as sonnerToast } from 'sonner';
 import { usePresenterBroadcast } from '@/hooks/useLecturePresenterChannel';
 import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
+import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 
 // Constants
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -24,6 +25,7 @@ export interface LectureRecordingState {
   dailyQuestionCount: number;
   voiceCommandDetected: boolean;
   isProcessing: boolean;
+  isStreamingMode: boolean;
 }
 
 export interface LectureRecordingActions {
@@ -76,6 +78,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const lastQuestionSentTimeRef = useRef<number>(0);
   const studentTimerChannelRef = useRef<any>(null);
   const processAudioChunkRef = useRef<((audioBlob: Blob) => Promise<void>) | null>(null);
+  
+  // Deepgram streaming refs for real-time transcription
+  const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
+  const [isStreamingMode, setIsStreamingMode] = useState(false);
 
   // Helper to get question preview
   const getQuestionPreview = (questionText: any, maxLength = 60): string => {
@@ -532,26 +538,67 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, [failureCount, toast]);
 
-  // Start recording
+  // Start Deepgram streaming for real-time transcription
+  const startDeepgramStreaming = useCallback(async () => {
+    console.log('🔴 Starting Deepgram WebSocket streaming for real-time transcription');
+    
+    const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'otsmjgrhyteyvpufkwdh';
+    
+    deepgramClientRef.current = new DeepgramStreamingClient({
+      projectRef,
+      onTranscript: (data: DeepgramTranscript) => {
+        if (data.isFinal && data.text.trim()) {
+          console.log('📝 Deepgram final transcript:', data.text);
+          setTranscriptChunks(prev => [...prev, data.text]);
+          setLastTranscript(data.text);
+          transcriptBufferRef.current += ' ' + data.text;
+          intervalTranscriptRef.current += ' ' + data.text;
+        }
+      },
+      onError: (error) => {
+        console.error('❌ Deepgram streaming error:', error);
+        toast({
+          title: 'Transcription error',
+          description: error,
+          variant: 'destructive',
+        });
+      },
+      onReady: () => {
+        console.log('✅ Deepgram streaming ready');
+        setIsStreamingMode(true);
+      },
+      onClose: () => {
+        console.log('🔌 Deepgram streaming closed');
+        setIsStreamingMode(false);
+      },
+    });
+    
+    try {
+      await deepgramClientRef.current.connect();
+    } catch (error) {
+      console.error('Failed to connect Deepgram:', error);
+      // Fallback to chunk-based transcription
+      toast({
+        title: 'Streaming unavailable',
+        description: 'Using chunked transcription instead',
+      });
+      startRecordingCycle();
+    }
+  }, [toast, startRecordingCycle]);
+
+  // Stop Deepgram streaming
+  const stopDeepgramStreaming = useCallback(() => {
+    if (deepgramClientRef.current) {
+      console.log('🛑 Stopping Deepgram streaming');
+      deepgramClientRef.current.disconnect();
+      deepgramClientRef.current = null;
+      setIsStreamingMode(false);
+    }
+  }, []);
+
+  // Start recording - chooses transcription mode based on autoQuestionEnabled
   const startRecording = useCallback(async () => {
     try {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: isMobile ? {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } : {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      streamRef.current = stream;
       isRecordingRef.current = true;
       setIsRecording(true);
       setTranscriptChunks([]);
@@ -560,32 +607,56 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       setFailureCount(0);
 
       if (autoQuestionEnabled) {
+        // Auto-question ON: Use 8-second chunks with Whisper for reliable batch processing
+        console.log('📦 Auto-question ON: Using 8-second chunks with Whisper');
         lastAutoQuestionTimeRef.current = Date.now();
+        
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: isMobile ? {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } : {
+            channelCount: 1,
+            sampleRate: 16000,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        streamRef.current = stream;
+        startRecordingCycle();
+      } else {
+        // Auto-question OFF: Use Deepgram WebSocket streaming for real-time transcription
+        console.log('🌊 Auto-question OFF: Using Deepgram WebSocket streaming');
+        await startDeepgramStreaming();
       }
-
-      startRecordingCycle();
 
       broadcast('recording_status', { isRecording: true });
 
       toast({
         title: '🎙️ Recording started',
-        description: 'Transcription active',
+        description: autoQuestionEnabled ? 'Chunked transcription active' : 'Real-time streaming active',
       });
     } catch (error) {
       console.error('Start recording error:', error);
+      isRecordingRef.current = false;
+      setIsRecording(false);
       toast({
         title: 'Failed to start',
         description: error instanceof Error ? error.message : 'Microphone error',
         variant: 'destructive',
       });
     }
-  }, [autoQuestionEnabled, startRecordingCycle, broadcast, toast]);
+  }, [autoQuestionEnabled, startRecordingCycle, startDeepgramStreaming, broadcast, toast]);
 
-  // Stop recording
+  // Stop recording - cleans up both modes
   const stopRecording = useCallback(() => {
     isRecordingRef.current = false;
     setIsRecording(false);
 
+    // Stop chunk-based recording
     if (recordingIntervalRef.current) {
       clearTimeout(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
@@ -606,9 +677,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       streamRef.current = null;
     }
 
+    // Stop Deepgram streaming
+    stopDeepgramStreaming();
+
     broadcast('recording_status', { isRecording: false });
     toast({ title: 'Recording stopped' });
-  }, [broadcast, toast]);
+  }, [broadcast, toast, stopDeepgramStreaming]);
 
   // Manual question send
   const handleManualQuestionSend = useCallback(async () => {
@@ -738,7 +812,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, [isSendingQuestion, autoQuestionInterval, strictModeEnabled, toast]);
 
-  // Toggle auto-question
+  // Toggle auto-question - switches transcription mode mid-recording if needed
   const toggleAutoQuestion = useCallback(async () => {
     const newState = !autoQuestionEnabled;
 
@@ -755,13 +829,62 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
       setAutoQuestionEnabled(newState);
 
-      if (newState && isRecording) {
-        lastAutoQuestionTimeRef.current = Date.now();
+      // Handle mid-recording mode switch
+      if (isRecording) {
+        if (newState) {
+          // Switching to ON: stop Deepgram streaming, start chunk-based
+          console.log('🔄 Switching to chunk-based transcription (auto-question ON)');
+          stopDeepgramStreaming();
+          
+          // Get microphone access for chunk-based recording
+          const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: isMobile ? {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            } : {
+              channelCount: 1,
+              sampleRate: 16000,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+          streamRef.current = stream;
+          lastAutoQuestionTimeRef.current = Date.now();
+          startRecordingCycle();
+        } else {
+          // Switching to OFF: stop chunk-based, start Deepgram streaming
+          console.log('🔄 Switching to Deepgram streaming (auto-question OFF)');
+          
+          // Stop chunk-based recording
+          if (recordingIntervalRef.current) {
+            clearTimeout(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+          }
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+          mediaRecorderRef.current = null;
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach((track) => {
+              track.stop();
+              track.enabled = false;
+            });
+            streamRef.current = null;
+          }
+          
+          // Start Deepgram streaming
+          await startDeepgramStreaming();
+        }
       }
 
       toast({
         title: newState ? '✅ Auto-Questions On' : '⏸️ Auto-Questions Off',
-        description: newState ? `Every ${autoQuestionInterval} min` : 'Paused',
+        description: newState 
+          ? `Every ${autoQuestionInterval} min (chunked mode)` 
+          : 'Paused (real-time streaming)',
       });
     } catch (error) {
       console.error('Toggle error:', error);
@@ -771,7 +894,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         variant: 'destructive',
       });
     }
-  }, [autoQuestionEnabled, autoQuestionInterval, isRecording, toast]);
+  }, [autoQuestionEnabled, autoQuestionInterval, isRecording, toast, stopDeepgramStreaming, startDeepgramStreaming, startRecordingCycle]);
 
   return {
     // State
@@ -787,6 +910,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     dailyQuestionCount,
     voiceCommandDetected,
     isProcessing,
+    isStreamingMode,
 
     // Actions
     startRecording,
