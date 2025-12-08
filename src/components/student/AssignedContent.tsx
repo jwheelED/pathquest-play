@@ -1844,8 +1844,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             </AccordionItem>
           ))}
         </Accordion>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
     </>
   );
 };
