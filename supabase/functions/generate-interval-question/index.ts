@@ -78,11 +78,12 @@ serve(async (req) => {
       format_preference, 
       force_send, 
       materialContext = [],
-      strict_mode = true,  // Default to strict mode
-      retry_context = null // Context from previously failed attempts
+      strict_mode = true,  // Default to strict mode (always guaranteed questions)
+      retry_context = null, // Context from previously failed attempts
+      slide_context = null // Current slide text content
     } = await req.json();
 
-    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}`);
+    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, slide_context: ${slide_context?.length || 0} chars`);
 
     // In strict mode, use very low minimum content requirements
     const minContentLength = strict_mode ? 10 : (force_send ? 25 : 100);
@@ -94,10 +95,14 @@ serve(async (req) => {
       console.log(`📎 Combined retry context: ${retry_context.length} previous attempts + current`);
     }
 
-    if (!fullTranscript || fullTranscript.length < minContentLength) {
-      // In strict mode with minimal content, use a fallback question
+    // Check if we have enough content from transcript OR slide context
+    const hasSlideContext = slide_context && slide_context.trim().length > 20;
+    const hasTranscript = fullTranscript && fullTranscript.length >= minContentLength;
+
+    if (!hasTranscript && !hasSlideContext) {
+      // In strict mode with no content at all, use a fallback question
       if (strict_mode) {
-        console.log(`🔄 Strict mode: Using fallback question (content: ${fullTranscript?.length || 0} chars)`);
+        console.log(`🔄 Strict mode: Using fallback question (transcript: ${fullTranscript?.length || 0} chars, slide: ${slide_context?.length || 0} chars)`);
         const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
         return new Response(
           JSON.stringify({
@@ -115,7 +120,7 @@ serve(async (req) => {
       }
 
       console.log(
-        `⚠️ Not enough content: ${fullTranscript?.length || 0}/${minContentLength} chars`,
+        `⚠️ Not enough content: transcript ${fullTranscript?.length || 0}/${minContentLength} chars, slide ${slide_context?.length || 0} chars`,
       );
       return new Response(
         JSON.stringify({
@@ -128,8 +133,23 @@ serve(async (req) => {
       );
     }
 
+    // Build context for question generation - prioritize slide content when available
+    let primaryContext = "";
+    let contextSource = "transcript";
+    
+    if (hasSlideContext) {
+      primaryContext = `CURRENT SLIDE CONTENT:\n"${slide_context.trim()}"\n\n`;
+      contextSource = "slide";
+      if (hasTranscript) {
+        primaryContext += `LECTURE AUDIO (last ${interval_minutes} minutes):\n"${fullTranscript}"\n\n`;
+        contextSource = "slide+transcript";
+      }
+    } else {
+      primaryContext = `LECTURE AUDIO (last ${interval_minutes} minutes):\n"${fullTranscript}"\n\n`;
+    }
+
     console.log(
-      `📝 Generating auto-question from ${interval_minutes}-minute interval (${fullTranscript.length} chars)`,
+      `📝 Generating auto-question from ${contextSource} (transcript: ${fullTranscript.length} chars, slide: ${slide_context?.length || 0} chars)`,
     );
     console.log(`🎯 Format preference: ${format_preference || "multiple_choice"}`);
 
@@ -140,10 +160,10 @@ serve(async (req) => {
       // LeetCode-style coding problem generation
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
 
-RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
-"${fullTranscript}"
+${primaryContext}
 
-TASK: Generate ONE LeetCode-style coding problem based on the MOST IMPORTANT concept from this lecture segment.
+TASK: Generate ONE LeetCode-style coding problem based on the MOST IMPORTANT concept from this content.
+${hasSlideContext ? "IMPORTANT: Prioritize the slide content - the question MUST directly test concepts shown on the current slide." : ""}
 
 REQUIREMENTS:
 1. Create a practical coding challenge that tests the key concept taught
@@ -151,6 +171,7 @@ REQUIREMENTS:
 3. Match the programming language being taught in the lecture
 4. Make it solvable based on what was just covered
 5. Appropriate difficulty for a lecture check-in (Easy to Medium level)
+${hasSlideContext ? "6. The answer choices MUST be based on information visible in the slide" : ""}
 
 Return JSON:
 {
@@ -175,7 +196,7 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
       // Original prompt for multiple choice / short answer
       let materialsContext = "";
       if (materialContext && materialContext.length > 0) {
-        materialsContext = "\n\nCOURSE MATERIALS FOR REFERENCE:\n";
+        materialsContext = "\nCOURSE MATERIALS FOR REFERENCE:\n";
         materialContext.forEach((material: any) => {
           materialsContext += `\n[${material.title}]\n`;
           if (material.description) {
@@ -186,30 +207,34 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
         materialsContext += "\nUse these materials to provide additional context and ensure questions align with course content.\n";
       }
 
-      // Adjust prompt based on content quality
-      const contentQualityHint = fullTranscript.length < 200 
-        ? "\nNOTE: Limited lecture content available. Generate a general comprehension question that could apply to the topic being discussed."
+      // Special instructions when slide context is available
+      const slideInstructions = hasSlideContext 
+        ? `\nCRITICAL: The current slide content is the PRIMARY source for this question. 
+- The question MUST directly test a concept, term, or fact visible on the current slide
+- Answer choices for multiple choice MUST include the correct answer from the slide
+- Do NOT create questions about topics NOT shown on the slide
+- If the slide shows a definition, ask about that definition
+- If the slide shows a formula, ask about that formula
+- If the slide shows examples, ask about those specific examples`
         : "";
 
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
 
-RECENT LECTURE CONTENT (last ${interval_minutes} minutes):
-"${fullTranscript}"
-${materialsContext}${contentQualityHint}
+${primaryContext}${materialsContext}${slideInstructions}
+
 TASK: Generate ONE high-quality question that:
-1. Tests the MOST IMPORTANT concept from this interval
+1. Tests the MOST IMPORTANT concept from this content
 2. Is clearly answerable based on what was just taught
 3. Requires students to apply or recall key information
 4. Avoids trivial or overly specific details
-5. ${materialContext.length > 0 ? "Aligns with concepts from the uploaded course materials" : "Focus on the lecture content"}
+${hasSlideContext ? "5. DIRECTLY relates to content visible on the current slide" : "5. Focus on the lecture content"}
 
 CRITERIA:
 - Focus on main concepts, not minor details
 - Question should be fair and clear
 - Appropriate difficulty for what was just covered
-- Avoid questions about examples unless they're core to understanding
+${hasSlideContext ? "- Answer choices MUST include correct information from the slide" : "- Avoid questions about examples unless they're core to understanding"}
 - The question should test comprehension, not just recall
-- ${materialContext.length > 0 ? "Reference course materials when relevant to reinforce key concepts" : "Base question solely on lecture content"}
 - MUST generate a valid question even if content seems limited
 
 Return JSON:
@@ -239,7 +264,7 @@ Return JSON:
             {
               role: "system",
               content:
-                "You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting. NEVER truncate questions mid-sentence. Always generate a question even if content seems limited.",
+                "You are an educational AI that generates high-quality lecture check-in questions. Return ONLY valid JSON, no markdown formatting. NEVER truncate questions mid-sentence. Always generate a question even if content seems limited. When slide content is provided, prioritize generating questions that test concepts directly from the slide.",
             },
             { role: "user", content: prompt },
           ],
@@ -379,7 +404,7 @@ Return JSON:
     }
 
     console.log("✅ Auto-question generated:", result.question_text);
-    console.log("📊 Confidence:", result.confidence, "| Reasoning:", result.reasoning);
+    console.log("📊 Confidence:", result.confidence, "| Reasoning:", result.reasoning, "| Source:", contextSource);
 
     // Validate question completeness before checking confidence
     if (typeof result.question_text === "string") {
@@ -426,7 +451,7 @@ Return JSON:
       }
     }
 
-    // In strict mode, skip confidence threshold entirely
+    // In strict mode, skip confidence threshold entirely - always send a question
     if (!strict_mode) {
       const confidenceThreshold = force_send ? 0.1 : 0.3;
       if (result.confidence < confidenceThreshold) {

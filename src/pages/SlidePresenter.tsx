@@ -26,8 +26,12 @@ export default function SlidePresenter() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Track current slide text for context
+  const [currentSlideText, setCurrentSlideText] = useState<string>('');
+  const [currentSlideNumber, setCurrentSlideNumber] = useState<number>(1);
 
-  // Integrate lecture recording hook
+  // Integrate lecture recording hook with slide context
   const {
     isRecording,
     recordingDuration,
@@ -46,7 +50,15 @@ export default function SlidePresenter() {
     onQuestionGenerated: () => {
       console.log('Question generated from slide presenter');
     },
+    slideContext: currentSlideText,
   });
+
+  // Handle slide change - receive text from SlideViewer
+  const handleSlideChange = useCallback((slideText: string, pageNumber: number) => {
+    setCurrentSlideText(slideText);
+    setCurrentSlideNumber(pageNumber);
+    console.log(`📑 Slide context updated: page ${pageNumber}, ${slideText.length} chars`);
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -94,6 +106,8 @@ export default function SlidePresenter() {
   const handleStartPresentation = async (presentation: SlideData) => {
     setActivePresentation(presentation);
     setIsFullscreen(true);
+    setCurrentSlideText('');
+    setCurrentSlideNumber(1);
     
     // Enter browser fullscreen
     try {
@@ -106,6 +120,8 @@ export default function SlidePresenter() {
   const handleExitPresentation = useCallback(() => {
     setIsFullscreen(false);
     setActivePresentation(null);
+    setCurrentSlideText('');
+    setCurrentSlideNumber(1);
     
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
@@ -157,6 +173,7 @@ export default function SlidePresenter() {
           presentationId={activePresentation.id}
           title={activePresentation.title}
           onExit={handleExitPresentation}
+          onSlideChange={handleSlideChange}
         />
         
         {/* Recording Controls - bottom left */}
