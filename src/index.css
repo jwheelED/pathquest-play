@@ -2,58 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern Bento Learning Platform Design System
+/* Headspace-Inspired Calm Learning Platform Design System
    All colors MUST be HSL for consistency across light/dark modes.
 */
 
 @layer base {
   :root {
-    /* Base system colors - Emerald & Sky Light Theme */
-    --background: 160 20% 98%;
-    --foreground: 160 30% 8%;
+    /* Base system colors - Headspace Sky Blue Theme */
+    --background: 200 60% 94%;
+    --foreground: 220 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 160 30% 8%;
+    --card-foreground: 220 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 160 30% 8%;
+    --popover-foreground: 220 25% 15%;
 
-    /* Primary - Emerald Green */
-    --primary: 160 84% 39%;
+    /* Primary - Coral/Orange (Headspace accent) */
+    --primary: 16 85% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 160 76% 52%;
+    --primary-glow: 16 90% 70%;
 
     /* Secondary - Sky Blue */
-    --secondary: 199 89% 48%;
+    --secondary: 199 89% 65%;
     --secondary-foreground: 0 0% 100%;
-    --secondary-glow: 199 95% 62%;
+    --secondary-glow: 199 95% 75%;
 
     /* Achievement - Warm Amber */
-    --achievement: 45 93% 47%;
-    --achievement-foreground: 160 30% 8%;
-    --achievement-glow: 45 93% 60%;
+    --achievement: 45 93% 55%;
+    --achievement-foreground: 220 25% 15%;
+    --achievement-glow: 45 93% 68%;
 
-    /* Energy - Teal */
-    --energy: 172 66% 50%;
+    /* Energy - Teal/Mint */
+    --energy: 160 50% 50%;
     --energy-foreground: 0 0% 100%;
-    --energy-glow: 172 66% 65%;
+    --energy-glow: 160 55% 65%;
 
     /* Danger/Error */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Neutral tones */
-    --muted: 160 15% 95%;
-    --muted-foreground: 160 10% 45%;
+    --muted: 200 30% 92%;
+    --muted-foreground: 220 15% 45%;
 
-    --accent: 160 15% 95%;
-    --accent-foreground: 160 30% 8%;
+    --accent: 160 40% 92%;
+    --accent-foreground: 220 25% 15%;
 
-    --border: 160 15% 90%;
-    --input: 160 15% 90%;
-    --ring: 160 84% 39%;
+    --border: 200 25% 88%;
+    --input: 200 25% 88%;
+    --ring: 16 85% 60%;
 
-    --radius: 1rem;
+    --radius: 1.5rem;
+
+    /* Headspace-specific colors */
+    --headspace-sky: 199 85% 75%;
+    --headspace-sky-light: 199 90% 88%;
+    --headspace-coral: 16 85% 60%;
+    --headspace-coral-light: 16 90% 75%;
+    --headspace-mint: 160 50% 85%;
+    --headspace-mint-dark: 160 45% 45%;
+    --headspace-amber: 45 93% 55%;
 
     /* Gamification colors */
     --streak-fire: 25 100% 55%;
@@ -72,22 +81,23 @@
     --badge-platinum-glow: 199 89% 70%;
     --badge-locked: 160 10% 50%;
 
-    /* Modern gradients - Emerald/Sky */
+    /* Modern gradients - Headspace Sky */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-glow)));
+    --gradient-headspace: linear-gradient(180deg, hsl(199 85% 78%), hsl(199 80% 88%));
     --gradient-achievement: linear-gradient(135deg, hsl(var(--achievement)), hsl(var(--achievement-glow)));
     --gradient-energy: linear-gradient(135deg, hsl(var(--energy)), hsl(var(--energy-glow)));
-    --gradient-mesh: radial-gradient(at 40% 20%, hsl(var(--primary) / 0.08) 0px, transparent 50%),
-                     radial-gradient(at 80% 0%, hsl(var(--secondary) / 0.08) 0px, transparent 50%),
-                     radial-gradient(at 0% 50%, hsl(var(--energy) / 0.06) 0px, transparent 50%);
+    --gradient-mesh: radial-gradient(at 40% 20%, hsl(var(--headspace-sky) / 0.15) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, hsl(var(--secondary) / 0.1) 0px, transparent 50%),
+                     radial-gradient(at 0% 50%, hsl(var(--headspace-mint) / 0.1) 0px, transparent 50%);
 
     /* Modern shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(160 30% 8% / 0.03);
-    --shadow-md: 0 4px 6px -1px hsl(160 30% 8% / 0.05), 0 2px 4px -2px hsl(160 30% 8% / 0.05);
-    --shadow-lg: 0 10px 15px -3px hsl(160 30% 8% / 0.05), 0 4px 6px -4px hsl(160 30% 8% / 0.05);
-    --shadow-xl: 0 20px 25px -5px hsl(160 30% 8% / 0.08), 0 8px 10px -6px hsl(160 30% 8% / 0.08);
-    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.2);
-    --shadow-glow-secondary: 0 0 20px hsl(var(--secondary) / 0.2);
+    --shadow-sm: 0 1px 3px 0 hsl(220 25% 15% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(220 25% 15% / 0.06);
+    --shadow-lg: 0 12px 24px -4px hsl(220 25% 15% / 0.08);
+    --shadow-xl: 0 24px 48px -8px hsl(220 25% 15% / 0.1);
+    --shadow-glow: 0 0 30px hsl(var(--primary) / 0.15);
+    --shadow-glow-secondary: 0 0 30px hsl(var(--secondary) / 0.15);
 
     /* Animations */
     --transition-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -95,68 +105,76 @@
     --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 160 20% 25%;
-    --sidebar-primary: 160 84% 39%;
+    --sidebar-foreground: 220 20% 25%;
+    --sidebar-primary: 16 85% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 160 15% 95%;
-    --sidebar-accent-foreground: 160 30% 8%;
-    --sidebar-border: 160 15% 90%;
-    --sidebar-ring: 160 84% 39%;
+    --sidebar-accent: 200 30% 95%;
+    --sidebar-accent-foreground: 220 25% 15%;
+    --sidebar-border: 200 25% 90%;
+    --sidebar-ring: 16 85% 60%;
   }
 
   .dark {
-    /* Dark mode - Emerald & Sky Dark Theme */
-    --background: 160 30% 5%;
+    /* Dark mode - Headspace Calm Dark Theme */
+    --background: 220 30% 8%;
     --foreground: 0 0% 98%;
 
-    --card: 160 25% 9%;
+    --card: 220 25% 12%;
     --card-foreground: 0 0% 98%;
 
-    --popover: 160 25% 9%;
+    --popover: 220 25% 12%;
     --popover-foreground: 0 0% 98%;
 
-    /* Primary - Emerald Green */
-    --primary: 160 76% 52%;
-    --primary-foreground: 160 30% 5%;
-    --primary-glow: 160 70% 65%;
+    /* Primary - Coral/Orange */
+    --primary: 16 80% 58%;
+    --primary-foreground: 220 30% 8%;
+    --primary-glow: 16 85% 68%;
 
     /* Secondary - Sky Blue */
-    --secondary: 199 95% 58%;
-    --secondary-foreground: 160 30% 5%;
-    --secondary-glow: 199 95% 72%;
+    --secondary: 199 85% 55%;
+    --secondary-foreground: 220 30% 8%;
+    --secondary-glow: 199 90% 68%;
 
     /* Achievement - Warm Amber */
     --achievement: 45 93% 55%;
-    --achievement-foreground: 160 30% 5%;
+    --achievement-foreground: 220 30% 8%;
     --achievement-glow: 45 93% 68%;
 
-    /* Energy - Teal */
-    --energy: 172 66% 55%;
-    --energy-foreground: 160 30% 5%;
-    --energy-glow: 172 66% 70%;
+    /* Energy - Mint */
+    --energy: 160 50% 50%;
+    --energy-foreground: 220 30% 8%;
+    --energy-glow: 160 55% 65%;
 
     /* Muted tones */
-    --muted: 160 20% 14%;
-    --muted-foreground: 160 10% 65%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 10% 65%;
 
-    --accent: 160 20% 14%;
+    --accent: 220 20% 18%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84% 65%;
-    --destructive-foreground: 160 30% 5%;
+    --destructive-foreground: 220 30% 8%;
 
-    --border: 160 20% 18%;
-    --input: 160 20% 18%;
-    --ring: 160 76% 52%;
+    --border: 220 20% 22%;
+    --input: 220 20% 22%;
+    --ring: 16 80% 58%;
 
-    --sidebar-background: 160 25% 7%;
+    /* Headspace dark colors */
+    --headspace-sky: 199 70% 35%;
+    --headspace-sky-light: 199 75% 45%;
+    --headspace-coral: 16 75% 55%;
+    --headspace-coral-light: 16 80% 65%;
+    --headspace-mint: 160 40% 25%;
+    --headspace-mint-dark: 160 45% 40%;
+
+    --sidebar-background: 220 25% 10%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 160 76% 52%;
+    --sidebar-primary: 16 80% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 160 20% 14%;
+    --sidebar-accent: 220 20% 18%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 160 20% 18%;
-    --sidebar-ring: 160 76% 52%;
+    --sidebar-border: 220 20% 22%;
+    --sidebar-ring: 16 80% 58%;
   }
   
   * {
@@ -197,28 +215,72 @@
     @apply bg-card/95 backdrop-blur-2xl border border-border/80;
   }
 
-  /* Bento card styles */
+  /* Headspace-style card */
+  .headspace-card {
+    @apply bg-card rounded-3xl border-0 shadow-lg transition-all duration-300;
+    box-shadow: 0 4px 20px -4px hsl(220 25% 15% / 0.08);
+  }
+
+  .headspace-card:hover {
+    box-shadow: 0 8px 30px -6px hsl(220 25% 15% / 0.12);
+    transform: translateY(-2px);
+  }
+
+  /* Bento card styles - Updated for Headspace */
   .bento-card {
-    @apply bg-card rounded-2xl border border-border/60 shadow-sm transition-all duration-300;
+    @apply bg-card rounded-3xl border-0 shadow-md transition-all duration-300;
   }
 
   .bento-card:hover {
-    @apply shadow-md border-border;
+    @apply shadow-lg;
+    transform: translateY(-1px);
   }
 
-  /* Stat pill styles */
+  /* Headspace background */
+  .headspace-bg {
+    background: linear-gradient(180deg, hsl(199 85% 82%), hsl(199 80% 90%));
+  }
+
+  .dark .headspace-bg {
+    background: linear-gradient(180deg, hsl(220 30% 10%), hsl(220 28% 14%));
+  }
+
+  /* Headspace button - coral pill */
+  .headspace-button {
+    @apply bg-primary text-primary-foreground rounded-full px-8 py-3 font-semibold shadow-md transition-all duration-200;
+  }
+
+  .headspace-button:hover {
+    @apply shadow-lg;
+    transform: scale(1.02);
+  }
+
+  /* MCQ Option card - Headspace style */
+  .mcq-option {
+    @apply bg-accent/50 rounded-2xl p-4 border-2 border-transparent transition-all duration-200 cursor-pointer;
+  }
+
+  .mcq-option:hover {
+    @apply bg-accent border-primary/30;
+  }
+
+  .mcq-option.selected {
+    @apply bg-primary/10 border-primary;
+  }
+
+  /* Stat pill styles - updated */
   .stat-pill {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-muted/80;
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium bg-card shadow-sm;
   }
 
   /* Action card with gradient border */
   .action-card {
-    @apply relative rounded-2xl overflow-hidden;
+    @apply relative rounded-3xl overflow-hidden;
   }
 
   .action-card::before {
     content: '';
-    @apply absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 -z-10;
+    @apply absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/20 to-secondary/20 -z-10;
   }
 
   /* Progress ring utility */
@@ -238,6 +300,17 @@
   /* Mesh gradient background */
   .mesh-gradient {
     background-image: var(--gradient-mesh);
+  }
+
+  /* Wave decoration */
+  .wave-decoration {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(180deg, transparent 0%, hsl(var(--headspace-mint) / 0.3) 100%);
+    border-radius: 100% 100% 0 0;
   }
 }
 
@@ -296,7 +369,7 @@
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-4px);
+    transform: translateY(-8px);
   }
 }
 
@@ -332,6 +405,24 @@
   }
 }
 
+@keyframes wave {
+  0%, 100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-5px) scaleY(1.05);
+  }
+}
+
+@keyframes gentle-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
 /* Animation utility classes */
 .animate-fade-in {
   animation: fade-in 0.4s ease-out forwards;
@@ -361,6 +452,14 @@
 
 .animate-celebration {
   animation: celebration 0.5s var(--transition-spring);
+}
+
+.animate-wave {
+  animation: wave 4s ease-in-out infinite;
+}
+
+.animate-gentle-bounce {
+  animation: gentle-bounce 2s ease-in-out infinite;
 }
 
 /* Staggered animation delays */

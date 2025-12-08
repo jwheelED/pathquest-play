@@ -8,13 +8,14 @@ import { BadgesButton } from "@/components/student/BadgesButton";
 import { FlowStateCard } from "@/components/student/FlowStateCard";
 import { AssignedContent } from "@/components/student/AssignedContent";
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
+import { FloatingDecorations } from "@/components/student/FloatingDecorations";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import UserStats from "@/components/UserStats";
 import ClassConnectionCard from "@/components/student/ClassConnectionCard";
-import { Radio, Zap, BookOpen, GraduationCap, LogOut, Calendar } from "lucide-react";
+import { Radio, Zap, BookOpen, GraduationCap, LogOut, Calendar, Sparkles } from "lucide-react";
 
 interface User {
   id: string;
@@ -182,7 +183,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background mesh-gradient pb-24 md:pb-0">
+    <div className="min-h-screen headspace-bg relative pb-24 md:pb-0">
+      {/* Floating Decorations */}
+      <FloatingDecorations />
+      
       {/* Mobile Header */}
       <MobileHeader
         userName={userName || user.email || "Student"}
@@ -193,16 +197,16 @@ export default function Dashboard() {
       />
 
       {/* Desktop Header */}
-      <header className="hidden md:block border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
+      <header className="hidden md:block bg-card/80 backdrop-blur-sm sticky top-0 z-40 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-md">
+                <Sparkles className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">Edvana</h1>
-                <p className="text-xs text-muted-foreground">Student Dashboard</p>
+                <h1 className="text-xl font-bold text-foreground">Edvana</h1>
+                <p className="text-xs text-muted-foreground">Your Learning Journey</p>
               </div>
             </div>
             
@@ -212,7 +216,7 @@ export default function Dashboard() {
               <span className="text-sm text-muted-foreground">
                 {userName || user?.email}
               </span>
-              <Button onClick={handleLogout} variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+              <Button onClick={handleLogout} variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground rounded-full">
                 <LogOut className="w-4 h-4" />
                 Logout
               </Button>
@@ -221,12 +225,12 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8 relative z-10">
         {/* Headless achievement checker */}
         {user?.id && <AchievementSystem userId={user.id} />}
         
-        {/* Bento Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-5">
+        {/* Bento Grid Layout - Headspace Style */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6">
           
           {/* Quick Stats - Mobile Only */}
           {user?.id && (
@@ -235,24 +239,24 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Join Live Session Card - Spans 8 cols on desktop */}
+          {/* Join Live Session Card - Headspace Style */}
           <div className="col-span-1 md:col-span-8 animate-fade-in stagger-1">
-            <div className="bento-card p-5 md:p-6 bg-gradient-to-br from-energy/5 to-energy/10 border-energy/20 hover:border-energy/40 transition-all group">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="headspace-card p-6 md:p-8 bg-gradient-to-br from-secondary/10 to-secondary/5">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-energy/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                    <Radio className="w-6 h-6 text-energy" />
+                  <div className="w-14 h-14 rounded-2xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                    <Radio className="w-7 h-7 text-secondary" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-foreground mb-1">Join Live Session</h2>
-                    <p className="text-sm text-muted-foreground">
+                    <h2 className="text-xl font-bold text-foreground mb-1">Join Live Session</h2>
+                    <p className="text-muted-foreground">
                       Enter the 6-digit code from your instructor
                     </p>
                   </div>
                 </div>
                 <Button 
                   size="lg" 
-                  className="w-full md:w-auto bg-energy hover:bg-energy/90 text-energy-foreground shadow-md hover:shadow-lg transition-all"
+                  className="w-full md:w-auto rounded-full px-8 bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-lg hover:shadow-xl transition-all"
                   onClick={() => navigate("/join")}
                 >
                   Join Session
@@ -261,65 +265,64 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Class Info Card - Spans 4 cols */}
+          {/* Class Info Card */}
           <div className="col-span-1 md:col-span-4 animate-fade-in stagger-2">
             {user?.id && <ClassConnectionCard />}
           </div>
 
-          {/* Train Card - Full Width */}
+          {/* Train Card - Headspace Hero Style */}
           <div className="col-span-1 md:col-span-12 animate-fade-in stagger-3">
-            <div className="bento-card p-5 md:p-8 bg-gradient-to-br from-primary/5 via-primary/8 to-secondary/5 border-primary/20 hover:border-primary/40 transition-all group overflow-hidden relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-shimmer opacity-0 group-hover:opacity-100" />
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative">
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-primary flex items-center justify-center flex-shrink-0 shadow-glow group-hover:scale-105 transition-transform">
-                    <Zap className="w-7 h-7 text-primary-foreground" />
+            <div className="headspace-card p-6 md:p-10 bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 overflow-hidden relative">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
+                <div className="flex items-start gap-5">
+                  <div className="w-16 h-16 rounded-3xl bg-primary flex items-center justify-center flex-shrink-0 shadow-lg animate-gentle-bounce">
+                    <Zap className="w-8 h-8 text-primary-foreground" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-semibold text-foreground mb-1">Train with Edvana</h2>
-                    <p className="text-muted-foreground">
-                      Practice with AI-generated questions, track progress, and compete on leaderboards
+                    <h2 className="text-2xl font-bold text-foreground mb-2">Train with Edvana</h2>
+                    <p className="text-muted-foreground max-w-md">
+                      Practice with AI-generated questions, track your progress, and climb the leaderboards
                     </p>
                   </div>
                 </div>
                 <Button 
                   size="lg" 
-                  className="w-full md:w-auto text-base px-8 shadow-lg hover:shadow-xl transition-all"
+                  className="w-full md:w-auto text-base px-10 py-6 rounded-full shadow-xl hover:shadow-2xl transition-all bg-primary hover:bg-primary/90"
                   onClick={() => navigate("/training")}
                 >
-                  Start Training
+                  Start Training ✨
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Course Context - Spans 6 cols */}
+          {/* Course Context - Headspace Style */}
           {courseContext.courseTitle && (
             <div className="col-span-1 md:col-span-6 animate-fade-in stagger-4">
-              <div className="bento-card p-5 h-full">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="w-5 h-5 text-primary" />
+              <div className="headspace-card p-6 h-full">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-6 h-6 text-foreground" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-semibold text-foreground truncate">{courseContext.courseTitle}</h3>
+                    <h3 className="text-lg font-bold text-foreground truncate">{courseContext.courseTitle}</h3>
                     {courseContext.courseSchedule && (
                       <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-4 h-4" />
                         {courseContext.courseSchedule}
                       </p>
                     )}
                   </div>
                 </div>
                 {courseContext.courseTopics && courseContext.courseTopics.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {courseContext.courseTopics.slice(0, 5).map((topic, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs font-normal bg-muted/50">
+                      <Badge key={idx} variant="secondary" className="text-xs font-medium rounded-full px-3 py-1 bg-accent/50">
                         {topic}
                       </Badge>
                     ))}
                     {courseContext.courseTopics.length > 5 && (
-                      <Badge variant="secondary" className="text-xs font-normal bg-muted/50">
+                      <Badge variant="secondary" className="text-xs font-medium rounded-full px-3 py-1 bg-accent/50">
                         +{courseContext.courseTopics.length - 5} more
                       </Badge>
                     )}
@@ -329,12 +332,12 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Flow State - Spans remaining cols */}
+          {/* Flow State */}
           <div className={`col-span-1 ${courseContext.courseTitle ? 'md:col-span-6' : 'md:col-span-12'} animate-fade-in stagger-5`}>
             {user?.id && <FlowStateCard userId={user.id} />}
           </div>
 
-          {/* Live Lecture Check-ins - Full Width */}
+          {/* Live Lecture Check-ins */}
           <div className="col-span-1 md:col-span-12 animate-fade-in stagger-6">
             {user?.id && <AssignedContent userId={user.id} onAnswerResult={handleAnswerResult} />}
           </div>
