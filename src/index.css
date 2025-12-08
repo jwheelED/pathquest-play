@@ -4,11 +4,12 @@
 
 /* Headspace-Inspired Calm Learning Platform Design System
    All colors MUST be HSL for consistency across light/dark modes.
+   Theme: Emerald Green & Sky Blue
 */
 
 @layer base {
   :root {
-    /* Base system colors - Headspace Sky Blue Theme */
+    /* Base system colors - Sky Blue Theme */
     --background: 200 60% 94%;
     --foreground: 220 25% 15%;
 
@@ -18,15 +19,15 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 15%;
 
-    /* Primary - Coral/Orange (Headspace accent) */
-    --primary: 16 85% 60%;
+    /* Primary - Emerald Green */
+    --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 16 90% 70%;
+    --primary-glow: 160 80% 50%;
 
     /* Secondary - Sky Blue */
-    --secondary: 199 89% 65%;
+    --secondary: 199 89% 48%;
     --secondary-foreground: 0 0% 100%;
-    --secondary-glow: 199 95% 75%;
+    --secondary-glow: 199 95% 60%;
 
     /* Achievement - Warm Amber */
     --achievement: 45 93% 55%;
@@ -51,15 +52,15 @@
 
     --border: 200 25% 88%;
     --input: 200 25% 88%;
-    --ring: 16 85% 60%;
+    --ring: 160 84% 39%;
 
     --radius: 1.5rem;
 
-    /* Headspace-specific colors */
+    /* Headspace-specific colors - Emerald & Sky Blue */
     --headspace-sky: 199 85% 75%;
     --headspace-sky-light: 199 90% 88%;
-    --headspace-coral: 16 85% 60%;
-    --headspace-coral-light: 16 90% 75%;
+    --headspace-emerald: 160 84% 39%;
+    --headspace-emerald-light: 160 70% 55%;
     --headspace-mint: 160 50% 85%;
     --headspace-mint-dark: 160 45% 45%;
     --headspace-amber: 45 93% 55%;
@@ -81,7 +82,7 @@
     --badge-platinum-glow: 199 89% 70%;
     --badge-locked: 160 10% 50%;
 
-    /* Modern gradients - Headspace Sky */
+    /* Modern gradients - Emerald & Sky Blue */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
     --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-glow)));
     --gradient-headspace: linear-gradient(180deg, hsl(199 85% 78%), hsl(199 80% 88%));
@@ -106,16 +107,16 @@
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 220 20% 25%;
-    --sidebar-primary: 16 85% 60%;
+    --sidebar-primary: 160 84% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 200 30% 95%;
     --sidebar-accent-foreground: 220 25% 15%;
     --sidebar-border: 200 25% 90%;
-    --sidebar-ring: 16 85% 60%;
+    --sidebar-ring: 160 84% 39%;
   }
 
   .dark {
-    /* Dark mode - Headspace Calm Dark Theme */
+    /* Dark mode - Emerald & Sky Blue Dark Theme */
     --background: 220 30% 8%;
     --foreground: 0 0% 98%;
 
@@ -125,10 +126,10 @@
     --popover: 220 25% 12%;
     --popover-foreground: 0 0% 98%;
 
-    /* Primary - Coral/Orange */
-    --primary: 16 80% 58%;
+    /* Primary - Emerald Green */
+    --primary: 160 70% 45%;
     --primary-foreground: 220 30% 8%;
-    --primary-glow: 16 85% 68%;
+    --primary-glow: 160 75% 55%;
 
     /* Secondary - Sky Blue */
     --secondary: 199 85% 55%;
@@ -157,24 +158,24 @@
 
     --border: 220 20% 22%;
     --input: 220 20% 22%;
-    --ring: 16 80% 58%;
+    --ring: 160 70% 45%;
 
-    /* Headspace dark colors */
+    /* Headspace dark colors - Emerald & Sky Blue */
     --headspace-sky: 199 70% 35%;
     --headspace-sky-light: 199 75% 45%;
-    --headspace-coral: 16 75% 55%;
-    --headspace-coral-light: 16 80% 65%;
+    --headspace-emerald: 160 65% 35%;
+    --headspace-emerald-light: 160 70% 45%;
     --headspace-mint: 160 40% 25%;
     --headspace-mint-dark: 160 45% 40%;
 
     --sidebar-background: 220 25% 10%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 16 80% 58%;
+    --sidebar-primary: 160 70% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 20% 18%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 220 20% 22%;
-    --sidebar-ring: 16 80% 58%;
+    --sidebar-ring: 160 70% 45%;
   }
   
   * {
