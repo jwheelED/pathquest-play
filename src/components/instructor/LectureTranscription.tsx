@@ -51,7 +51,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// Removed Deepgram streaming - using Whisper chunks for both modes
+import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStreaming";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -163,7 +163,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const intervalStartTimeRef = useRef<number>(0);
   
-  // Removed Deepgram streaming - using Whisper chunks for all modes
+  // Deepgram WebSocket streaming via Fly.io proxy
+  const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
+  const [isDeepgramConnected, setIsDeepgramConnected] = useState(false);
   
   const { toast } = useToast();
 
@@ -2033,10 +2035,98 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current = null;
       }
+      // Cleanup Deepgram streaming
+      if (deepgramClientRef.current) {
+        deepgramClientRef.current.disconnect();
+        deepgramClientRef.current = null;
+      }
     };
   }, []);
 
-  // Start recording - always uses Whisper chunks for reliability
+  // Start Deepgram WebSocket streaming via Fly.io proxy
+  const startDeepgramStreaming = async () => {
+    console.log("🌊 Starting Deepgram WebSocket streaming via Fly.io proxy");
+    
+    const proxyUrl = "wss://edvana-deepgram-proxy.fly.dev";
+    
+    const client = new DeepgramStreamingClient({
+      proxyUrl,
+      onTranscript: (data: DeepgramTranscript) => {
+        if (!data.text || !data.text.trim()) return;
+        
+        const newText = data.text.trim();
+        const isFinal = data.isFinal;
+        
+        console.log(`📝 ${isFinal ? "FINAL" : "interim"}: ${newText.substring(0, 80)}...`);
+        
+        // Only add final transcripts to the chunks array for display
+        if (isFinal) {
+          setTranscriptChunks((prev) => [...prev, newText]);
+          setLastTranscript(newText);
+          
+          // Accumulate in transcript buffer
+          if (transcriptBufferRef.current) {
+            transcriptBufferRef.current += " " + newText;
+          } else {
+            transcriptBufferRef.current = newText;
+          }
+          
+          // Also accumulate in interval transcript for auto-questions
+          if (intervalTranscriptRef.current) {
+            intervalTranscriptRef.current += " " + newText;
+          } else {
+            intervalTranscriptRef.current = newText;
+          }
+          
+          // Update interval transcript length for UI
+          setIntervalTranscriptLength(intervalTranscriptRef.current.length);
+          
+          // Reset failure count on successful transcript
+          setFailureCount(0);
+        } else {
+          // For interim results, just update the last transcript for UI feedback
+          setLastTranscript(newText);
+        }
+      },
+      onError: (error: string) => {
+        console.error("❌ Deepgram streaming error:", error);
+        setFailureCount((prev) => prev + 1);
+        
+        if (error.includes("quota") || error.includes("429")) {
+          setQuotaConsecutiveErrors((prev) => prev + 1);
+        }
+        
+        toast({
+          title: "Streaming error",
+          description: error,
+          variant: "destructive",
+        });
+      },
+      onReady: () => {
+        console.log("✅ Deepgram streaming ready");
+        setIsDeepgramConnected(true);
+      },
+      onClose: () => {
+        console.log("🔌 Deepgram streaming closed");
+        setIsDeepgramConnected(false);
+      },
+    });
+    
+    deepgramClientRef.current = client;
+    await client.connect();
+  };
+
+  // Stop Deepgram WebSocket streaming
+  const stopDeepgramStreaming = () => {
+    if (deepgramClientRef.current) {
+      console.log("🛑 Stopping Deepgram streaming");
+      deepgramClientRef.current.disconnect();
+      deepgramClientRef.current = null;
+      setIsDeepgramConnected(false);
+    }
+  };
+
+  // Start recording - uses Deepgram WebSocket streaming via Fly.io proxy for real-time transcription
   const startRecording = async () => {
     try {
       // Check circuit breaker
@@ -2070,29 +2160,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
 
-      // Detect mobile/iOS for flexible audio constraints
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-      // Always use 8-second Whisper chunks for reliable transcription
-      console.log("📦 Starting recording with 8-second Whisper chunks");
-      
-      // Request microphone access with flexible constraints for mobile
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: isMobile || isIOS || isSafari ? {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } : {
-          channelCount: 1,
-          sampleRate: 16000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      streamRef.current = stream;
+      // Use Deepgram WebSocket streaming via Fly.io proxy for real-time transcription
+      console.log("🌊 Starting recording with Deepgram real-time streaming via Fly.io proxy");
 
       // Initialize auto-question timer if enabled
       if (autoQuestionEnabled) {
@@ -2103,17 +2172,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.log("⏰ Auto-question timer initialized, first question in", autoQuestionInterval, "minutes");
       }
 
-      // Start chunk-based recording cycle
-      startRecordingCycle();
+      // Start Deepgram WebSocket streaming (handles microphone access internally)
+      await startDeepgramStreaming();
 
       toast({
         title: "🎙️ Recording started",
-        description: autoQuestionEnabled 
-          ? `Questions every ${autoQuestionInterval} min`
-          : "Transcription only (no auto-questions)",
+        description: "Real-time Deepgram streaming active",
       });
     } catch (error) {
       console.error("Error starting recording:", error);
+      isRecordingRef.current = false;
+      setIsRecording(false);
       const errorMessage = error instanceof Error ? error.message : "Failed to start recording";
       toast({
         title: "Failed to start recording",
@@ -2251,7 +2320,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     isRecordingRef.current = false;
     setIsRecording(false);
 
-    // Clean up recording interval
+    // Stop Deepgram streaming
+    stopDeepgramStreaming();
+
+    // Clean up recording interval (for any legacy Whisper chunks)
     if (recordingIntervalRef.current) {
       clearTimeout(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
