@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Zap } from "lucide-react";
+import { Sparkles, Flame, CheckCircle2 } from "lucide-react";
 
 interface FlowStateCardProps {
   userId: string;
@@ -24,7 +24,7 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
   const pulseScaleRef = useRef(1);
   const rippleRef = useRef({ active: false, progress: 0, radius: 0 });
   const typingRipplesRef = useRef<Array<{ x: number; y: number; progress: number; radius: number; intensity: number }>>([]);
-  const colorsRef = useRef({ primary: "", destructive: "" });
+  const colorsRef = useRef({ primary: "", secondary: "", accent: "" });
   const cursorTrailRef = useRef<Array<{ x: number; y: number; age: number }>>([]);
 
   const [streak, setStreak] = useState(0);
@@ -59,13 +59,14 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
     const styles = getComputedStyle(root);
     colorsRef.current = {
       primary: styles.getPropertyValue("--primary").trim(),
-      destructive: styles.getPropertyValue("--destructive").trim(),
+      secondary: styles.getPropertyValue("--secondary").trim(),
+      accent: styles.getPropertyValue("--headspace-mint-dark").trim() || "160 45% 45%",
     };
   }, []);
 
   const initParticles = useCallback((width: number, height: number) => {
     const particles: Particle[] = [];
-    const particleCount = Math.min(15, Math.floor((width * height) / 6000));
+    const particleCount = Math.min(20, Math.floor((width * height) / 5000));
 
     for (let i = 0; i < particleCount; i++) {
       const x = Math.random() * width;
@@ -86,88 +87,84 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
     const height = canvas.height;
     const mouse = mouseRef.current;
 
-    timeRef.current += 0.01;
+    timeRef.current += 0.008;
     ctx.clearRect(0, 0, width, height);
 
-    // Subtle gradient background
-    const gradient = ctx.createRadialGradient(
-      mouse.isOver ? mouse.x : width / 2,
-      mouse.isOver ? mouse.y : height / 2,
-      0, width / 2, height / 2, Math.max(width, height) * 0.7
-    );
-    gradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.12));
-    gradient.addColorStop(0.5, getCSSColor(colorsRef.current.primary, 0.06));
-    gradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0.02));
+    // Calming gradient background - Headspace style
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, getCSSColor(colorsRef.current.secondary, 0.15));
+    gradient.addColorStop(0.5, getCSSColor(colorsRef.current.accent, 0.08));
+    gradient.addColorStop(1, getCSSColor(colorsRef.current.secondary, 0.12));
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Flowing waves
-    const waveCount = 2;
-    const baseAmplitude = height * 0.04;
-
+    // Gentle waves at bottom - Headspace style
+    const waveCount = 3;
     for (let i = 0; i < waveCount; i++) {
       ctx.beginPath();
-      const amplitude = baseAmplitude * (1 + i * 0.3) * pulseScaleRef.current;
-      const frequency = 0.008 - i * 0.001;
-      const speed = 0.4 + i * 0.15;
-      const offset = (i * Math.PI * 2) / waveCount;
-      const opacity = 0.12 - i * 0.03;
+      const baseY = height * 0.7 + i * 20;
+      const amplitude = 15 + i * 5;
+      const frequency = 0.006 - i * 0.001;
+      const speed = 0.3 + i * 0.1;
+      const opacity = 0.2 - i * 0.05;
 
-      for (let x = 0; x <= width; x += 4) {
-        const y = height / 2 +
-          amplitude * Math.sin(x * frequency + timeRef.current * speed + offset) +
-          amplitude * 0.4 * Math.sin(x * frequency * 2 - timeRef.current * speed * 0.6);
+      for (let x = 0; x <= width; x += 3) {
+        const y = baseY +
+          amplitude * Math.sin(x * frequency + timeRef.current * speed) +
+          amplitude * 0.5 * Math.sin(x * frequency * 1.5 - timeRef.current * speed * 0.7);
 
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
 
-      ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity);
-      ctx.lineWidth = 1.5 + i;
-      ctx.stroke();
+      ctx.lineTo(width, height);
+      ctx.lineTo(0, height);
+      ctx.closePath();
+      
+      const waveGradient = ctx.createLinearGradient(0, baseY - amplitude, 0, height);
+      waveGradient.addColorStop(0, getCSSColor(colorsRef.current.accent, opacity));
+      waveGradient.addColorStop(1, getCSSColor(colorsRef.current.secondary, opacity * 0.5));
+      ctx.fillStyle = waveGradient;
+      ctx.fill();
     }
 
-    // Particles
+    // Floating particles - calming dots
     particlesRef.current.forEach((particle) => {
+      // Gentle floating motion
+      particle.x = particle.baseX + Math.sin(timeRef.current + particle.baseX * 0.01) * 10;
+      particle.y = particle.baseY + Math.cos(timeRef.current + particle.baseY * 0.01) * 8;
+
       if (mouse.isOver) {
         const dx = mouse.x - particle.x;
         const dy = mouse.y - particle.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        const maxDistance = 120;
+        const maxDistance = 100;
 
         if (distance < maxDistance) {
-          const force = (1 - distance / maxDistance) * 0.25;
-          particle.vx += dx * force * 0.01;
-          particle.vy += dy * force * 0.01;
+          const force = (1 - distance / maxDistance) * 0.15;
+          particle.x += dx * force;
+          particle.y += dy * force;
         }
       }
 
-      const returnForce = 0.02;
-      particle.vx += (particle.baseX - particle.x) * returnForce;
-      particle.vy += (particle.baseY - particle.y) * returnForce;
-      particle.vx *= 0.95;
-      particle.vy *= 0.95;
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-
-      const particleGradient = ctx.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, 6);
-      particleGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.4));
+      const particleGradient = ctx.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, 8);
+      particleGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.5));
       particleGradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0));
 
       ctx.fillStyle = particleGradient;
       ctx.beginPath();
-      ctx.arc(particle.x, particle.y, 6, 0, Math.PI * 2);
+      ctx.arc(particle.x, particle.y, 8, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Ripple effect
+    // Success ripple effect
     if (rippleRef.current.active) {
-      rippleRef.current.progress += 0.04;
-      rippleRef.current.radius += 6;
+      rippleRef.current.progress += 0.03;
+      rippleRef.current.radius += 5;
 
       const opacity = Math.max(0, 1 - rippleRef.current.progress);
-      ctx.strokeStyle = getCSSColor(colorsRef.current.destructive, opacity * 0.3);
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity * 0.4);
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(width / 2, height / 2, rippleRef.current.radius, 0, Math.PI * 2);
       ctx.stroke();
@@ -181,17 +178,13 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
 
     // Typing ripples
     typingRipplesRef.current = typingRipplesRef.current.filter((ripple) => {
-      const growthRate = 0.03 + ripple.intensity * 0.02;
-      const radiusGrowth = 2 + ripple.intensity * 1.5;
+      ripple.progress += 0.025;
+      ripple.radius += 2;
 
-      ripple.progress += growthRate;
-      ripple.radius += radiusGrowth;
-
-      const baseOpacity = 0.1 + ripple.intensity * 0.08;
-      const opacity = Math.max(0, baseOpacity * (1 - ripple.progress));
+      const opacity = Math.max(0, 0.2 * (1 - ripple.progress));
 
       if (opacity > 0) {
-        ctx.strokeStyle = getCSSColor(colorsRef.current.primary, opacity);
+        ctx.strokeStyle = getCSSColor(colorsRef.current.secondary, opacity);
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
@@ -203,27 +196,10 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
 
     // Cursor glow
     if (mouse.isOver) {
-      cursorTrailRef.current.forEach((trail) => { trail.age += 0.1; });
-      cursorTrailRef.current = cursorTrailRef.current.filter((trail) => trail.age < 1);
-
-      cursorTrailRef.current.forEach((trail) => {
-        const opacity = (1 - trail.age) * 0.3;
-        const size = 10 * (1 - trail.age * 0.5);
-
-        const trailGradient = ctx.createRadialGradient(trail.x, trail.y, 0, trail.x, trail.y, size);
-        trailGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, opacity * 0.6));
-        trailGradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0));
-
-        ctx.fillStyle = trailGradient;
-        ctx.beginPath();
-        ctx.arc(trail.x, trail.y, size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      const glowSize = 16 + Math.sin(timeRef.current * 2.5) * 2;
+      const glowSize = 20 + Math.sin(timeRef.current * 2) * 3;
       const cursorGradient = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, glowSize);
-      cursorGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.35));
-      cursorGradient.addColorStop(0.5, getCSSColor(colorsRef.current.primary, 0.15));
+      cursorGradient.addColorStop(0, getCSSColor(colorsRef.current.primary, 0.25));
+      cursorGradient.addColorStop(0.5, getCSSColor(colorsRef.current.primary, 0.1));
       cursorGradient.addColorStop(1, getCSSColor(colorsRef.current.primary, 0));
 
       ctx.fillStyle = cursorGradient;
@@ -232,31 +208,24 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
       ctx.fill();
     }
 
-    // Pulse animation
+    // Gentle pulse
     if (pulseScaleRef.current > 1) {
-      pulseScaleRef.current = Math.max(1, pulseScaleRef.current - 0.015);
+      pulseScaleRef.current = Math.max(1, pulseScaleRef.current - 0.01);
     } else {
-      pulseScaleRef.current = 1 + Math.sin(timeRef.current * 1.5) * 0.03;
+      pulseScaleRef.current = 1 + Math.sin(timeRef.current * 1.2) * 0.02;
     }
 
     animationFrameRef.current = requestAnimationFrame(animate);
   }, [getCSSColor]);
 
   const triggerSuccessPulse = useCallback(() => {
-    pulseScaleRef.current = 1.4;
+    pulseScaleRef.current = 1.3;
+    rippleRef.current = { active: true, progress: 0, radius: 20 };
     setStreak((prev) => prev + 1);
     setQuestionsAnswered((prev) => prev + 1);
-
-    particlesRef.current.forEach((particle) => {
-      const angle = Math.random() * Math.PI * 2;
-      const force = 4 + Math.random() * 4;
-      particle.vx += Math.cos(angle) * force;
-      particle.vy += Math.sin(angle) * force;
-    });
   }, []);
 
   const triggerErrorRipple = useCallback(() => {
-    rippleRef.current = { active: true, progress: 0, radius: 15 };
     setStreak(0);
     setQuestionsAnswered((prev) => prev + 1);
   }, []);
@@ -276,14 +245,13 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
       const canvasRect = canvas.getBoundingClientRect();
       const canvasX = x - canvasRect.left;
       const canvasY = y - canvasRect.top;
-      const normalizedSpeed = Math.min(speed / 5, 1);
-      const intensity = 0.3 + normalizedSpeed * 0.7;
+      const intensity = Math.min(speed / 5, 1);
 
-      if (typingRipplesRef.current.length > 15) typingRipplesRef.current.shift();
+      if (typingRipplesRef.current.length > 10) typingRipplesRef.current.shift();
 
       typingRipplesRef.current.push({
         x: canvasX, y: canvasY, progress: 0,
-        radius: 8 + intensity * 12, intensity
+        radius: 5 + intensity * 8, intensity
       });
     };
 
@@ -333,51 +301,52 @@ export function FlowStateCard({ userId, instructorId }: FlowStateCardProps) {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const newX = e.clientX - rect.left;
-    const newY = e.clientY - rect.top;
-
-    mouseRef.current = { x: newX, y: newY, isOver: true };
-
-    const lastTrail = cursorTrailRef.current[cursorTrailRef.current.length - 1];
-    if (!lastTrail || Math.hypot(newX - lastTrail.x, newY - lastTrail.y) > 6) {
-      cursorTrailRef.current.push({ x: newX, y: newY, age: 0 });
-      if (cursorTrailRef.current.length > 12) cursorTrailRef.current.shift();
-    }
+    mouseRef.current = { 
+      x: e.clientX - rect.left, 
+      y: e.clientY - rect.top, 
+      isOver: true 
+    };
   }, []);
 
   const handleMouseEnter = useCallback(() => { mouseRef.current.isOver = true; }, []);
   const handleMouseLeave = useCallback(() => { mouseRef.current.isOver = false; }, []);
 
   return (
-    <div className="bento-card overflow-hidden h-full">
-      <div className="p-4 pb-2">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary" />
+    <div className="headspace-card overflow-hidden h-full">
+      {/* Header */}
+      <div className="p-5 pb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-secondary/20 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-secondary" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Flow State</h3>
-            <p className="text-xs text-muted-foreground">Stay in rhythm</p>
+            <h3 className="text-base font-bold text-foreground">Flow State</h3>
+            <p className="text-xs text-muted-foreground">Stay in your rhythm</p>
           </div>
         </div>
       </div>
-      <div className="relative w-full h-[200px] md:h-[220px]">
+
+      {/* Canvas */}
+      <div className="relative w-full h-[180px] md:h-[200px]">
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 cursor-pointer"
+          className="absolute inset-0 cursor-pointer rounded-b-3xl"
           onMouseMove={handleMouseMove}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         />
-        {/* Stats overlay */}
-        <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end pointer-events-none">
-          <div className="stat-pill text-xs bg-card/80 backdrop-blur-sm">
-            <span className="text-muted-foreground">Streak:</span>
-            <span className="font-semibold text-foreground">{streak}</span>
+        
+        {/* Stats overlay - Headspace pill style */}
+        <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card/90 backdrop-blur-sm shadow-md">
+            <Flame className="w-4 h-4 text-primary" />
+            <span className="text-xs text-muted-foreground">Streak</span>
+            <span className="font-bold text-foreground">{streak}</span>
           </div>
-          <div className="stat-pill text-xs bg-card/80 backdrop-blur-sm">
-            <span className="text-muted-foreground">Answered:</span>
-            <span className="font-semibold text-foreground">{questionsAnswered}</span>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-card/90 backdrop-blur-sm shadow-md">
+            <CheckCircle2 className="w-4 h-4 text-secondary" />
+            <span className="text-xs text-muted-foreground">Answered</span>
+            <span className="font-bold text-foreground">{questionsAnswered}</span>
           </div>
         </div>
       </div>

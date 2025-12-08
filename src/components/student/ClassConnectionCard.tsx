@@ -135,11 +135,11 @@ export default function ClassConnectionCard() {
 
   if (loading) {
     return (
-      <div className="bento-card p-5 h-full">
+      <div className="headspace-card p-5 h-full">
         <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-muted rounded w-1/3"></div>
-          <div className="h-5 bg-muted rounded w-2/3"></div>
-          <div className="h-4 bg-muted rounded w-1/2"></div>
+          <div className="h-4 bg-muted rounded-full w-1/3"></div>
+          <div className="h-5 bg-muted rounded-full w-2/3"></div>
+          <div className="h-4 bg-muted rounded-full w-1/2"></div>
         </div>
       </div>
     );
@@ -147,16 +147,15 @@ export default function ClassConnectionCard() {
 
   if (!classInfo) {
     return (
-      <div className="bento-card p-5 h-full border-dashed">
+      <div className="headspace-card p-5 h-full border-2 border-dashed border-border">
         <div className="flex flex-col items-center justify-center h-full text-center py-4">
-          <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
-            <GraduationCap className="w-6 h-6 text-muted-foreground" />
+          <div className="w-14 h-14 rounded-3xl bg-accent flex items-center justify-center mb-4">
+            <GraduationCap className="w-7 h-7 text-muted-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground mb-3">No class connected</p>
+          <p className="text-sm text-muted-foreground mb-4">No class connected yet</p>
           <Button 
             size="sm" 
-            variant="outline" 
-            className="rounded-xl"
+            className="rounded-full px-6"
             onClick={() => setShowSwitchDialog(true)}
           >
             Join a Class
@@ -164,7 +163,7 @@ export default function ClassConnectionCard() {
         </div>
         
         <AlertDialog open={showSwitchDialog} onOpenChange={setShowSwitchDialog}>
-          <AlertDialogContent className="rounded-2xl">
+          <AlertDialogContent className="rounded-3xl">
             <AlertDialogHeader>
               <AlertDialogTitle>Join a Class</AlertDialogTitle>
               <AlertDialogDescription>
@@ -181,16 +180,16 @@ export default function ClassConnectionCard() {
                 value={newClassCode}
                 onChange={(e) => setNewClassCode(e.target.value.toUpperCase())}
                 disabled={switching}
-                className="mt-2 rounded-xl h-12 text-center font-mono text-lg tracking-wider"
+                className="mt-2 rounded-2xl h-14 text-center font-mono text-xl tracking-widest"
               />
             </div>
 
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={switching} className="rounded-xl">Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={switching} className="rounded-full">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleSwitchClass}
                 disabled={switching || !newClassCode.trim()}
-                className="rounded-xl"
+                className="rounded-full"
               >
                 {switching ? "Joining..." : "Join Class"}
               </AlertDialogAction>
@@ -203,26 +202,26 @@ export default function ClassConnectionCard() {
 
   return (
     <>
-      <div className="bento-card p-5 h-full">
+      <div className="headspace-card p-5 h-full">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-secondary" />
+            <div className="w-11 h-11 rounded-2xl bg-secondary/15 flex items-center justify-center">
+              <GraduationCap className="w-6 h-6 text-secondary" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">My Class</h3>
+              <h3 className="font-bold text-foreground">My Class</h3>
               <p className="text-xs text-muted-foreground">{classInfo.instructorName}</p>
             </div>
           </div>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl">
-              <DropdownMenuItem onClick={() => setShowSwitchDialog(true)} className="gap-2 rounded-lg">
+            <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuItem onClick={() => setShowSwitchDialog(true)} className="gap-2 rounded-xl">
                 <RefreshCw className="h-4 w-4" />
                 Switch Class
               </DropdownMenuItem>
@@ -231,19 +230,19 @@ export default function ClassConnectionCard() {
         </div>
         
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-accent/50">
             <BookOpen className="w-4 h-4 text-muted-foreground" />
-            <span className="text-foreground truncate">{classInfo.courseTitle}</span>
+            <span className="text-sm font-medium text-foreground truncate">{classInfo.courseTitle}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-3 px-3">
             <Hash className="w-4 h-4 text-muted-foreground" />
-            <span className="font-mono text-muted-foreground">{classInfo.instructorCode}</span>
+            <span className="font-mono text-sm text-muted-foreground">{classInfo.instructorCode}</span>
           </div>
         </div>
       </div>
 
       <AlertDialog open={showSwitchDialog} onOpenChange={setShowSwitchDialog}>
-        <AlertDialogContent className="rounded-2xl">
+        <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Switch Class</AlertDialogTitle>
             <AlertDialogDescription>
@@ -260,16 +259,16 @@ export default function ClassConnectionCard() {
               value={newClassCode}
               onChange={(e) => setNewClassCode(e.target.value.toUpperCase())}
               disabled={switching}
-              className="mt-2 rounded-xl h-12 text-center font-mono text-lg tracking-wider"
+              className="mt-2 rounded-2xl h-14 text-center font-mono text-xl tracking-widest"
             />
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={switching} className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={switching} className="rounded-full">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSwitchClass}
               disabled={switching || !newClassCode.trim()}
-              className="rounded-xl"
+              className="rounded-full"
             >
               {switching ? "Switching..." : "Switch Class"}
             </AlertDialogAction>

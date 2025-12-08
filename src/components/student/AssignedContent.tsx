@@ -1018,12 +1018,17 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
         </div>
       )}
       
-      <Card>
-      <CardHeader>
+      <div className="headspace-card overflow-hidden">
+      <div className="p-5 pb-4 border-b border-border/50">
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Assigned Content</CardTitle>
-            <CardDescription>{assignments.filter(a => !a.completed).length} active assignment(s)</CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-secondary/15 flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-secondary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Assigned Content</h2>
+              <p className="text-sm text-muted-foreground">{assignments.filter(a => !a.completed).length} active assignment(s)</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Real-time connection status indicator - ENHANCED */}
@@ -1066,8 +1071,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             </Button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
+      <div className="p-5 space-y-4">
         {/* Live Lecture Check-in Alert */}
         {liveCheckIns.length > 0 && (
           <div className="space-y-3">
