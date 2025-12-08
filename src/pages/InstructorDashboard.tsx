@@ -389,37 +389,39 @@ export default function InstructorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-secondary/10">
+      {/* Mobile-optimized header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Users className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold text-primary">Instructor Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Manage and track your students</p>
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">Instructor Dashboard</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage and track your students</p>
             </div>
           </div>
-          <Button onClick={handleLogout} variant="outline" className="gap-2">
+          <Button onClick={handleLogout} variant="outline" size="sm" className="gap-1 sm:gap-2 flex-shrink-0">
             <LogOut className="w-4 h-4" />
-            Logout
+            <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-6">
         {/* Organization and Admin Connection Info */}
-        <div className="mb-6">
-          <InstructorConnectionCard />
-        </div>
+        <InstructorConnectionCard />
 
+        {/* Instructor Code - Mobile optimized */}
         {instructorCode && (
-          <div className="mb-6 p-6 bg-card border rounded-lg shadow-sm">
-            <h3 className="text-lg font-semibold mb-2">Your Instructor Code</h3>
-            <div className="flex items-center gap-4">
-              <code className="text-2xl font-bold text-primary bg-muted px-4 py-2 rounded">
+          <div className="p-4 sm:p-6 bg-card border rounded-lg shadow-sm">
+            <h3 className="text-base sm:text-lg font-semibold mb-2">Your Instructor Code</h3>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <code className="text-xl sm:text-2xl font-bold text-primary bg-muted px-3 sm:px-4 py-2 rounded text-center sm:text-left">
                 {instructorCode}
               </code>
               <Button
                 variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => {
                   navigator.clipboard.writeText(instructorCode);
                   toast.success("Code copied to clipboard!");
@@ -428,7 +430,7 @@ export default function InstructorDashboard() {
                 Copy Code
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-2">
               Share this code with your students so they can join your class.
             </p>
           </div>
@@ -436,20 +438,21 @@ export default function InstructorDashboard() {
 
         {/* Settings visible regardless of student count */}
         {currentUser && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-4 sm:space-y-6">
+            {/* Settings Grid - Mobile stacked, desktop grid */}
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
               <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
               <AutoGradeSettings />
             
               {professorType === "stem" && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Code className="h-5 w-5" />
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <Code className="h-4 w-4 sm:h-5 sm:w-5" />
                       STEM Features
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
+                  <CardContent className="text-xs sm:text-sm text-muted-foreground pt-0">
                     <p>Enhanced coding question generation and test case auto-grading enabled.</p>
                   </CardContent>
                 </Card>
@@ -457,13 +460,13 @@ export default function InstructorDashboard() {
             
               {professorType === "humanities" && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5" />
+                  <CardHeader className="pb-2 sm:pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                      <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
                       Humanities Features
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
+                  <CardContent className="text-xs sm:text-sm text-muted-foreground pt-0">
                     <p>Essay analysis, discussion prompts, and enhanced short-answer grading enabled.</p>
                   </CardContent>
                 </Card>
@@ -474,21 +477,22 @@ export default function InstructorDashboard() {
             
             <LiveSessionControls onSessionChange={setLiveSessionId} />
 
-            {/* Slide Presenter Quick Access */}
+            {/* Slide Presenter Quick Access - Compact on mobile */}
             <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Presentation className="h-5 w-5 text-primary" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Presentation className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   Slide Presenter
                 </CardTitle>
-                <CardDescription>
-                  Present your slides directly in Edvana with integrated live lecture tools
+                <CardDescription className="text-xs sm:text-sm">
+                  Present slides with integrated live lecture tools
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <Button 
                   onClick={() => navigate('/instructor/slides')}
                   className="w-full"
+                  size="sm"
                 >
                   <Presentation className="h-4 w-4 mr-2" />
                   Open Slide Presenter
@@ -503,30 +507,28 @@ export default function InstructorDashboard() {
         )}
 
         {students.length === 0 ? (
-          <div className="text-center py-12">
-            <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">No Students Yet</h2>
-            <p className="text-muted-foreground">
+          <div className="text-center py-8 sm:py-12">
+            <Users className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+            <h2 className="text-xl sm:text-2xl font-bold mb-2">No Students Yet</h2>
+            <p className="text-sm sm:text-base text-muted-foreground px-4">
               Students will appear here once they join with your code.
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <LectureCheckInResults />
 
             <AnswerReleaseCard instructorId={currentUser.id} />
 
             {currentUser && (
-              <>
-                <AcademicIntegrityInsights instructorId={currentUser.id} />
-              </>
+              <AcademicIntegrityInsights instructorId={currentUser.id} />
             )}
           </div>
         )}
 
         {/* Always show Student Rankings with empty state support */}
         {currentUser && (
-          <div className="mt-6">
+          <div className="mt-4 sm:mt-6">
             <StudentRankingCard 
               students={rankedStudents}
               onStudentClick={handleStudentClick}
