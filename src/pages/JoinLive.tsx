@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -63,7 +64,21 @@ const JoinLive = () => {
       navigate(`/live/${sessionCode.toUpperCase()}`);
     } catch (error: any) {
       console.error("Error joining session:", error);
-      toast.error(error.message || "Failed to join session");
+      
+      let errorMessage = "Failed to join session";
+      
+      if (error instanceof FunctionsHttpError) {
+        try {
+          const errorData = await error.context.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = error.message || errorMessage;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     if (sessionError || !session) {
       console.error(`join-live-session: Session not found or inactive for code: ${sessionCode}`);
       return new Response(
-        JSON.stringify({ error: 'Invalid or inactive session code' }),
+        JSON.stringify({ error: 'Session not found. Please check the code and try again.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     // Check if session has expired
     if (new Date(session.ends_at) < new Date()) {
       return new Response(
-        JSON.stringify({ error: 'Session has expired' }),
+        JSON.stringify({ error: 'This session has ended. Please ask your instructor for a new code.' }),
         { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
