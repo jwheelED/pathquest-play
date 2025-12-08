@@ -42,11 +42,13 @@ export class DeepgramStreamingClient {
   private isDeepgramReady: boolean = false;
   private shouldReconnect: boolean = true;
   
-  // Proactive reconnection properties
+  // Proactive reconnection properties (only used for Supabase Edge Functions, not Fly.io proxy)
   private connectionStartTime: number = 0;
-  private connectionDurationLimit: number = 60000; // 60 seconds - safely before edge function timeout
   private proactiveReconnectTimer: number | null = null;
   private isProactiveReconnect: boolean = false;
+  
+  // Flag to track if using Fly.io proxy (which doesn't have timeout limits)
+  private usesFlyProxy: boolean = false;
 
   constructor(private config: DeepgramStreamingConfig) {}
 
@@ -66,10 +68,14 @@ export class DeepgramStreamingClient {
       
       if (this.config.proxyUrl) {
         // Use Fly.io proxy (no API key validation needed - proxy handles it)
+        // Fly.io proxy has NO timeout limits, so we disable proactive reconnect
         wsUrl = this.config.proxyUrl;
-        console.log("🔗 Connecting to Fly.io Deepgram proxy:", wsUrl);
+        this.usesFlyProxy = true;
+        console.log("🔗 Connecting to Fly.io Deepgram proxy (persistent connection):", wsUrl);
       } else if (this.config.projectRef) {
         // Legacy: Validate API key and use Supabase edge function
+        // Supabase Edge Functions have ~60s timeout, so proactive reconnect is needed
+        this.usesFlyProxy = false;
         console.log("🔍 Validating Deepgram API key...");
         const validation = await validateDeepgramApiKey();
 
@@ -98,16 +104,22 @@ export class DeepgramStreamingClient {
         // Start connection duration tracking
         this.connectionStartTime = Date.now();
         
-        // Set up proactive reconnection monitoring
-        this.proactiveReconnectTimer = window.setInterval(() => {
-          const connectionAge = Date.now() - this.connectionStartTime;
-          console.log(`⏱️ Connection age: ${Math.round(connectionAge / 1000)}s`);
-          
-          if (connectionAge >= 55000) { // 55 seconds - buffer before 60s limit
-            console.log("🔄 Proactive reconnect: approaching timeout limit");
-            this.proactiveReconnect();
-          }
-        }, 5000); // Check every 5 seconds
+        // Only set up proactive reconnection for Supabase Edge Functions (which have ~60s timeout)
+        // Fly.io proxy has NO timeout, so we skip proactive reconnect entirely
+        if (!this.usesFlyProxy) {
+          console.log("⏱️ Setting up proactive reconnect timer (Supabase Edge Function mode)");
+          this.proactiveReconnectTimer = window.setInterval(() => {
+            const connectionAge = Date.now() - this.connectionStartTime;
+            console.log(`⏱️ Connection age: ${Math.round(connectionAge / 1000)}s`);
+            
+            if (connectionAge >= 55000) { // 55 seconds - buffer before 60s limit
+              console.log("🔄 Proactive reconnect: approaching timeout limit");
+              this.proactiveReconnect();
+            }
+          }, 5000); // Check every 5 seconds
+        } else {
+          console.log("🔗 Fly.io proxy mode: persistent connection, no proactive reconnect needed");
+        }
       };
 
       this.ws.onmessage = (event) => {
