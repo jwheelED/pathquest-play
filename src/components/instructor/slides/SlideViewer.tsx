@@ -5,8 +5,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   X, 
-  Maximize2, 
-  Minimize2,
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
@@ -16,9 +14,10 @@ interface SlideViewerProps {
   presentationId: string;
   title: string;
   onExit: () => void;
+  onSlideChange?: (slideText: string, pageNumber: number) => void;
 }
 
-export function SlideViewer({ presentationId, title, onExit }: SlideViewerProps) {
+export function SlideViewer({ presentationId, title, onExit, onSlideChange }: SlideViewerProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -114,6 +113,27 @@ export function SlideViewer({ presentationId, title, onExit }: SlideViewerProps)
     loadPdf();
   }, [pdfUrl]);
 
+  // Extract text from current page and notify parent
+  const extractPageText = useCallback(async (pageNum: number) => {
+    if (!pdfDocRef.current || !onSlideChange) return;
+
+    try {
+      const page = await pdfDocRef.current.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      
+      // Extract text items and join them
+      const textItems = textContent.items
+        .map((item: any) => item.str)
+        .filter((str: string) => str.trim())
+        .join(' ');
+      
+      console.log(`📄 Slide ${pageNum} text (${textItems.length} chars):`, textItems.substring(0, 200));
+      onSlideChange(textItems, pageNum);
+    } catch (error) {
+      console.error('Error extracting page text:', error);
+    }
+  }, [onSlideChange]);
+
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDocRef.current || !canvasRef.current) return;
 
@@ -146,10 +166,13 @@ export function SlideViewer({ presentationId, title, onExit }: SlideViewerProps)
       };
 
       await page.render(renderContext).promise;
+
+      // Extract text for the current slide
+      extractPageText(pageNum);
     } catch (error) {
       console.error('Error rendering page:', error);
     }
-  }, [scale]);
+  }, [scale, extractPageText]);
 
   // Re-render on page change or scale change
   useEffect(() => {

@@ -38,12 +38,16 @@ export interface LectureRecordingActions {
 
 export interface UseLectureRecordingOptions {
   onQuestionGenerated?: () => void;
+  slideContext?: string;
 }
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated } = options;
+  const { onQuestionGenerated, slideContext } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
+  
+  // Store slide context in a ref so it's always current
+  const slideContextRef = useRef<string>('');
 
   // Core state
   const [isRecording, setIsRecording] = useState(false);
@@ -61,8 +65,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
   const [autoQuestionInterval, setAutoQuestionInterval] = useState(15);
   const [autoQuestionForceSend, setAutoQuestionForceSend] = useState(true);
-  const [strictModeEnabled, setStrictModeEnabled] = useState(true);
   const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState(0);
+  
+  // Update slide context ref when prop changes
+  useEffect(() => {
+    slideContextRef.current = slideContext || '';
+  }, [slideContext]);
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -115,7 +123,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         // Fetch profile settings
         const { data: profile } = await supabase
           .from('profiles')
-          .select('auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode')
+          .select('auto_question_enabled, auto_question_interval, auto_question_force_send')
           .eq('id', user.id)
           .single();
 
@@ -123,7 +131,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           setAutoQuestionEnabled(profile.auto_question_enabled || false);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);
-          setStrictModeEnabled(profile.auto_question_strict_mode !== false);
         }
 
         // Fetch today's question count
@@ -363,7 +370,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
           force_send: autoQuestionForceSend,
-          strict_mode: strictModeEnabled,
+          strict_mode: true, // Always strict mode - guaranteed questions
+          slide_context: slideContextRef.current, // Pass current slide text
         },
       });
 
@@ -691,11 +699,14 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     try {
       setIsSendingQuestion(true);
 
-      if (!transcriptBufferRef.current || transcriptBufferRef.current.length < 50) {
+      const hasTranscript = transcriptBufferRef.current && transcriptBufferRef.current.length >= 20;
+      const hasSlideContext = slideContextRef.current && slideContextRef.current.length >= 20;
+
+      // Allow manual send if we have either transcript OR slide context
+      if (!hasTranscript && !hasSlideContext) {
         toast({
-          title: 'Not enough content',
-          description: 'Record more lecture content first',
-          variant: 'destructive',
+          title: 'Still processing audio',
+          description: 'Please wait a moment for more content...',
         });
         return;
       }
@@ -787,7 +798,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_minutes: autoQuestionInterval,
           format_preference: profile?.question_format_preference || 'multiple_choice',
           force_send: true,
-          strict_mode: strictModeEnabled,
+          strict_mode: true, // Always strict mode
+          slide_context: slideContextRef.current,
         },
       });
 
@@ -810,7 +822,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     } finally {
       setIsSendingQuestion(false);
     }
-  }, [isSendingQuestion, autoQuestionInterval, strictModeEnabled, toast]);
+  }, [isSendingQuestion, autoQuestionInterval, toast]);
 
   // Toggle auto-question - switches transcription mode mid-recording if needed
   const toggleAutoQuestion = useCallback(async () => {
