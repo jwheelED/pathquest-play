@@ -550,10 +550,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const startDeepgramStreaming = useCallback(async () => {
     console.log('🔴 Starting Deepgram WebSocket streaming for real-time transcription');
     
-    const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'otsmjgrhyteyvpufkwdh';
+    // Use Fly.io proxy for Deepgram streaming (bypasses Supabase edge function timeout limits)
+    // Replace with your actual Fly.io app URL after deployment
+    const proxyUrl = import.meta.env.VITE_DEEPGRAM_PROXY_URL || 'wss://edvana-deepgram-proxy.fly.dev';
     
     deepgramClientRef.current = new DeepgramStreamingClient({
-      projectRef,
+      proxyUrl,
       onTranscript: (data: DeepgramTranscript) => {
         if (data.isFinal && data.text.trim()) {
           console.log('📝 Deepgram final transcript:', data.text);

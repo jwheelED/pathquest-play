@@ -22,7 +22,8 @@ export interface DeepgramWord {
 }
 
 export interface DeepgramStreamingConfig {
-  projectRef: string;
+  proxyUrl?: string; // Fly.io proxy URL (e.g., wss://your-app.fly.dev)
+  projectRef?: string; // Deprecated: kept for backward compatibility
   onTranscript: (data: DeepgramTranscript) => void;
   onError: (error: string) => void;
   onReady?: () => void;
@@ -60,23 +61,32 @@ export class DeepgramStreamingClient {
     this.isConnecting = true;
 
     try {
-      // Validate API key before attempting to connect
-      console.log("🔍 Validating Deepgram API key...");
-      const validation = await validateDeepgramApiKey();
+      // Determine WebSocket URL - prefer Fly.io proxy, fallback to Supabase edge function
+      let wsUrl: string;
+      
+      if (this.config.proxyUrl) {
+        // Use Fly.io proxy (no API key validation needed - proxy handles it)
+        wsUrl = this.config.proxyUrl;
+        console.log("🔗 Connecting to Fly.io Deepgram proxy:", wsUrl);
+      } else if (this.config.projectRef) {
+        // Legacy: Validate API key and use Supabase edge function
+        console.log("🔍 Validating Deepgram API key...");
+        const validation = await validateDeepgramApiKey();
 
-      if (!validation.valid) {
-        const errorMessage = getValidationErrorMessage(validation);
-        console.error("❌ API key validation failed:", errorMessage);
-        this.isConnecting = false;
-        this.config.onError(errorMessage);
-        return;
+        if (!validation.valid) {
+          const errorMessage = getValidationErrorMessage(validation);
+          console.error("❌ API key validation failed:", errorMessage);
+          this.isConnecting = false;
+          this.config.onError(errorMessage);
+          return;
+        }
+
+        console.log("✅ Deepgram API key validated successfully");
+        wsUrl = `wss://${this.config.projectRef}.functions.supabase.co/deepgram-streaming`;
+        console.log("🔗 Connecting to Supabase streaming relay:", wsUrl);
+      } else {
+        throw new Error("No proxy URL or project reference configured");
       }
-
-      console.log("✅ Deepgram API key validated successfully");
-
-      // Connect to relay edge function via WebSocket
-      const wsUrl = `wss://${this.config.projectRef}.functions.supabase.co/deepgram-streaming`;
-      console.log("🔗 Connecting to streaming relay:", wsUrl);
 
       this.ws = new WebSocket(wsUrl);
 
