@@ -606,7 +606,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, []);
 
-  // Start recording - chooses transcription mode based on autoQuestionEnabled
+  // Start recording - TESTING: Always use Deepgram WebSocket streaming via Fly.io proxy
   const startRecording = useCallback(async () => {
     try {
       isRecordingRef.current = true;
@@ -616,38 +616,18 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       intervalTranscriptRef.current = '';
       setFailureCount(0);
 
+      // TESTING: Always use Deepgram WebSocket streaming to test Fly.io proxy
+      console.log('🌊 TESTING MODE: Using Deepgram WebSocket streaming via Fly.io proxy');
       if (autoQuestionEnabled) {
-        // Auto-question ON: Use 8-second chunks with Whisper for reliable batch processing
-        console.log('📦 Auto-question ON: Using 8-second chunks with Whisper');
         lastAutoQuestionTimeRef.current = Date.now();
-        
-        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: isMobile ? {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          } : {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-        streamRef.current = stream;
-        startRecordingCycle();
-      } else {
-        // Auto-question OFF: Use Deepgram WebSocket streaming for real-time transcription
-        console.log('🌊 Auto-question OFF: Using Deepgram WebSocket streaming');
-        await startDeepgramStreaming();
       }
+      await startDeepgramStreaming();
 
       broadcast('recording_status', { isRecording: true });
 
       toast({
         title: '🎙️ Recording started',
-        description: autoQuestionEnabled ? 'Chunked transcription active' : 'Real-time streaming active',
+        description: 'Real-time Deepgram streaming (Fly.io proxy)',
       });
     } catch (error) {
       console.error('Start recording error:', error);
@@ -659,7 +639,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         variant: 'destructive',
       });
     }
-  }, [autoQuestionEnabled, startRecordingCycle, startDeepgramStreaming, broadcast, toast]);
+  }, [autoQuestionEnabled, startDeepgramStreaming, broadcast, toast]);
 
   // Stop recording - cleans up both modes
   const stopRecording = useCallback(() => {
