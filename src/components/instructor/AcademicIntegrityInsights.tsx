@@ -398,23 +398,9 @@ export const AcademicIntegrityInsights = ({ instructorId }: AcademicIntegrityIns
     );
   }
 
+  // Only show card if there are flagged students
   if (flaggedStudents.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-green-500" />
-            Academic Integrity Insights
-          </CardTitle>
-          <CardDescription>No unusual patterns detected</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            All student submissions show typical completion patterns.
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   const highSuspicionCount = flaggedStudents.filter(s => s.suspicion_level === 'HIGH').length;
