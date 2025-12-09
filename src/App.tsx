@@ -13,6 +13,7 @@ import InstructorAuth from "./pages/InstructorAuth";
 import InstructorOnboarding from "./pages/InstructorOnboarding";
 import InstructorOrgOnboarding from "./pages/InstructorOrgOnboarding";
 import InstructorDashboard from "./pages/InstructorDashboard";
+import InstructorSettings from "./pages/InstructorSettings";
 import AdminAuth from "./pages/AdminAuth";
 import AdminOnboarding from "./pages/AdminOnboarding";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -65,6 +66,11 @@ const App = () => (
           <Route path="/instructor/dashboard" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <InstructorDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/settings" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <InstructorSettings />
             </ProtectedRoute>
           } />
           <Route path="/instructor/lecture-presenter" element={

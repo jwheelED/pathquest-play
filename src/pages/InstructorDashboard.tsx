@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Users, Code, BookOpen, Presentation } from "lucide-react";
+import { LogOut, Users, Code, BookOpen, Presentation, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
@@ -14,10 +14,8 @@ import { AcademicIntegrityInsights } from "@/components/instructor/AcademicInteg
 // import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
-import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
-import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
@@ -399,10 +397,16 @@ export default function InstructorDashboard() {
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage and track your students</p>
             </div>
           </div>
-          <Button onClick={handleLogout} variant="outline" size="sm" className="gap-1 sm:gap-2 flex-shrink-0">
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button onClick={() => navigate("/instructor/settings")} variant="ghost" size="sm" className="gap-1 sm:gap-2">
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Settings</span>
+            </Button>
+            <Button onClick={handleLogout} variant="outline" size="sm" className="gap-1 sm:gap-2">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -439,11 +443,8 @@ export default function InstructorDashboard() {
         {/* Settings visible regardless of student count */}
         {currentUser && (
           <div className="space-y-4 sm:space-y-6">
-            {/* Settings Grid - Mobile stacked, desktop grid */}
+            {/* Course type indicators */}
             <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
-              <AutoGradeSettings />
-            
               {professorType === "stem" && (
                 <Card>
                   <CardHeader className="pb-2 sm:pb-4">
