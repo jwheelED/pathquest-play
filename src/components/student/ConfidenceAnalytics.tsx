@@ -150,19 +150,19 @@ export function ConfidenceAnalytics({ userId }: ConfidenceAnalyticsProps) {
       {/* Overall Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Win Rate</p>
+          <p className="text-xs text-muted-foreground">Success Rate</p>
           <p className="text-2xl font-bold text-primary">{winRate}%</p>
         </div>
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Biggest Win</p>
+          <p className="text-xs text-muted-foreground">Best Streak Bonus</p>
           <p className="text-2xl font-bold text-accent">+{stats.biggestWin}</p>
         </div>
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Biggest Loss</p>
+          <p className="text-xs text-muted-foreground">Largest Penalty</p>
           <p className="text-2xl font-bold text-destructive">-{stats.biggestLoss}</p>
         </div>
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Success</p>
+          <p className="text-xs text-muted-foreground">Correct Answers</p>
           <p className="text-2xl font-bold text-foreground">{stats.successfulGambles}</p>
         </div>
       </div>
@@ -201,7 +201,7 @@ export function ConfidenceAnalytics({ userId }: ConfidenceAnalyticsProps) {
       <Tabs defaultValue="recent" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="recent">Recent</TabsTrigger>
-          <TabsTrigger value="best">Best Wins</TabsTrigger>
+          <TabsTrigger value="best">Top Scores</TabsTrigger>
         </TabsList>
         
         <TabsContent value="recent" className="space-y-2 mt-4">
