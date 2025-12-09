@@ -172,15 +172,26 @@ export default function StudentTraining() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/dashboard")}
-                className="gap-2 rounded-full hover:bg-accent"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/")}
+                  className="gap-2 rounded-full hover:bg-accent"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Home
+                </Button>
+                <span className="text-muted-foreground">/</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/dashboard")}
+                  className="gap-2 rounded-full hover:bg-accent"
+                >
+                  Dashboard
+                </Button>
+              </div>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center">
                   <Target className="w-5 h-5 text-primary-foreground" />
