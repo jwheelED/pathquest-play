@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -16,12 +16,21 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const hasCheckedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    checkAuthorization();
-  }, []);
+    // Only check if we haven't already authorized for this role
+    // This prevents re-checking on every route change within the same role
+    const cacheKey = `${requiredRole}-${location.pathname}`;
+    if (hasCheckedRef.current === cacheKey && authorized === true) {
+      return;
+    }
+    
+    checkAuthorization(cacheKey);
+  }, [location.pathname, requiredRole]);
 
-  const checkAuthorization = async () => {
+  const checkAuthorization = async (cacheKey: string) => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -43,6 +52,7 @@ export function ProtectedRoute({
       return;
     }
 
+    hasCheckedRef.current = cacheKey;
     setAuthorized(true);
   };
 
