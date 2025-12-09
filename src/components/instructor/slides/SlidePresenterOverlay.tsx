@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePresenterReceiver } from '@/hooks/useLecturePresenterChannel';
-import { Clock, Users, Radio, Mic, MicOff, Send } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useLecturePresenterData } from '@/hooks/useLecturePresenterData';
+import { Clock, Users, Send, CheckCircle, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DirectState {
@@ -25,6 +25,14 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
   const [flashNotification, setFlashNotification] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(directState?.autoQuestionEnabled || false);
+
+  // Fetch real-time question stats
+  const { currentQuestion, studentCount: fetchedStudentCount, calculateQuestionStats } = useLecturePresenterData();
+  
+  // Calculate stats for the first question in current group
+  const currentStats = currentQuestion && currentQuestion.questions.length > 0
+    ? calculateQuestionStats(currentQuestion.assignments, 0, currentQuestion.questions[0])
+    : null;
 
   // Update from direct props when they change
   useEffect(() => {
@@ -97,6 +105,13 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
     return 'text-emerald-400';
   };
 
+  const getCorrectPercentColor = (percent: number | null) => {
+    if (percent === null) return 'text-slate-400';
+    if (percent >= 70) return 'text-emerald-400';
+    if (percent >= 40) return 'text-amber-400';
+    return 'text-red-400';
+  };
+
   if (isMinimized) {
     return (
       <div
@@ -121,6 +136,11 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
             <Users className="w-3.5 h-3.5" />
             <span className="text-xs">{studentCount}</span>
           </div>
+          {currentStats && currentStats.responseCount > 0 && currentStats.correctPercentage !== null && (
+            <span className={cn("text-xs font-bold", getCorrectPercentColor(currentStats.correctPercentage))}>
+              {Math.round(currentStats.correctPercentage)}%
+            </span>
+          )}
         </div>
       </div>
     );
@@ -188,6 +208,42 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Response Stats */}
+        {currentStats && currentStats.responseCount > 0 && (
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-2">Last Question Stats</div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1 text-slate-400 mb-1">
+                  <Users className="w-3 h-3" />
+                </div>
+                <div className="text-sm font-bold text-slate-200">
+                  {currentStats.responseCount}/{studentCount}
+                </div>
+                <div className="text-[9px] text-slate-500">Responses</div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1 mb-1">
+                  <CheckCircle className={cn("w-3 h-3", getCorrectPercentColor(currentStats.correctPercentage))} />
+                </div>
+                <div className={cn("text-sm font-bold", getCorrectPercentColor(currentStats.correctPercentage))}>
+                  {currentStats.correctPercentage !== null ? `${Math.round(currentStats.correctPercentage)}%` : '—'}
+                </div>
+                <div className="text-[9px] text-slate-500">Correct</div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-1 text-slate-400 mb-1">
+                  <Timer className="w-3 h-3" />
+                </div>
+                <div className="text-sm font-bold text-slate-200">
+                  {currentStats.avgResponseTime}s
+                </div>
+                <div className="text-[9px] text-slate-500">Avg Time</div>
+              </div>
+            </div>
           </div>
         )}
 
