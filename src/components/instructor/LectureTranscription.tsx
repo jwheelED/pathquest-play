@@ -3091,7 +3091,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                             <ChevronDown className="h-3 w-3" />
                           </Badge>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuContent align="end" className="z-50 bg-popover border border-border shadow-lg">
                           {[1, 2, 3, 5, 10, 15, 20, 30].map((minutes) => (
                             <DropdownMenuItem
                               key={minutes}
