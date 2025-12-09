@@ -771,33 +771,39 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       }
 
       toast({
-        title: "🔍 Extracting question",
-        description: "Analyzing recent speech...",
+        title: "🔍 Generating question",
+        description: "Creating question from lecture content...",
       });
 
       // Get last 45 seconds of transcript
       const recentTranscript = transcriptBufferRef.current.slice(-1500);
 
-      console.log("📝 Manual send - extracting question from transcript:", recentTranscript.length, "chars");
+      console.log("📝 Manual send - generating question from transcript:", recentTranscript.length, "chars");
 
-      const { data, error } = await supabase.functions.invoke("extract-voice-command-question", {
-        body: { recentTranscript },
+      const { data, error } = await supabase.functions.invoke("generate-interval-question", {
+        body: { 
+          interval_transcript: recentTranscript,
+          interval_minutes: 1,
+          format_preference: "multiple_choice",
+          force_send: true,
+          strict_mode: true
+        },
       });
 
       if (error) {
         throw error;
       }
 
-      if (!data?.success || !data?.question_text) {
+      if (!data?.question_text) {
         toast({
-          title: "Could not extract question",
-          description: "Try asking a clearer question or use the voice command 'send question now'",
+          title: "Could not generate question",
+          description: "Not enough lecture content to generate a question",
           variant: "destructive",
         });
         return;
       }
 
-      console.log("✅ Question extracted via manual send:", data.question_text);
+      console.log("✅ Question generated via manual send:", data.question_text);
 
       // Send immediately
       await handleQuestionSend({
