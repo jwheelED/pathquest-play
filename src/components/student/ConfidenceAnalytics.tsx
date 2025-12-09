@@ -135,7 +135,7 @@ export function ConfidenceAnalytics({ userId }: ConfidenceAnalyticsProps) {
           <Trophy className="w-5 h-5 text-primary" />
           Confidence Analytics
         </h3>
-        <Badge variant="outline">{stats.totalGambles} Total Gambles</Badge>
+        <Badge variant="outline">{stats.totalGambles} Confidence Bets</Badge>
       </div>
 
       {/* Insight Alert */}
