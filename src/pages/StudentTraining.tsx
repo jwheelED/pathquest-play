@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Sparkles, Target, Trophy, BookOpen, Users, BarChart3, Upload, Filter } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { DailyChallenges } from "@/components/student/DailyChallenges";
@@ -14,11 +14,11 @@ import { MaterialQuestionStats } from "@/components/student/MaterialQuestionStat
 import { ClassSelector } from "@/components/student/ClassSelector";
 import { StudyGroups } from "@/components/student/StudyGroups";
 import { AdaptiveDifficultyIndicator } from "@/components/student/AdaptiveDifficultyIndicator";
+import { FloatingDecorations } from "@/components/student/FloatingDecorations";
 import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter } from "lucide-react";
 
 interface User {
   id: string;
@@ -149,13 +149,16 @@ export default function StudentTraining() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
+    <div className="min-h-screen headspace-bg relative pb-20 md:pb-0">
+      {/* Floating Decorations */}
+      <FloatingDecorations variant="minimal" />
+      
       <MobileHeader
         userName={userName || user.email || "Student"}
         userEmail={user.email || ""}
@@ -164,143 +167,189 @@ export default function StudentTraining() {
         stats={userStats}
       />
 
-      <header className="hidden md:block border-b-2 border-primary bg-gradient-to-r from-card to-primary/5 shadow-glow">
+      {/* Desktop Header */}
+      <header className="hidden md:block bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-                🎯 Edvana Training
-              </h1>
-            </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">
-                {user?.email || "User"}
-              </span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                Logout
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/dashboard")}
+                className="gap-2 rounded-full hover:bg-accent"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
               </Button>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center">
+                  <Target className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <h1 className="text-xl font-bold text-foreground">
+                  Edvana Training
+                </h1>
+              </div>
             </div>
+            <span className="text-sm text-muted-foreground">
+              {userName || user?.email || "User"}
+            </span>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8">
-        <div className="space-y-4 md:space-y-6">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
+          
           {/* Class Selector */}
-          {user?.id && <ClassSelector userId={user.id} />}
+          <div className="col-span-1 lg:col-span-12 animate-fade-in">
+            {user?.id && <ClassSelector userId={user.id} />}
+          </div>
 
           {/* Onboarding Card for Students Without Classes */}
           {classes.length === 0 && (
-            <div className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-6 shadow-lg">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-full bg-primary/10 border border-primary/20">
-                  <span className="text-3xl">📚</span>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <h3 className="text-xl font-bold text-foreground">
-                    Get Personalized Practice Questions
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Upload your study materials (notes, PDFs, images) to automatically generate AI-powered practice questions tailored to your content. No class connection needed!
-                  </p>
-                  <div className="flex gap-2 pt-2">
-                    <Button 
-                      variant="default" 
-                      onClick={() => {
-                        document.getElementById('study-materials-section')?.scrollIntoView({ 
-                          behavior: 'smooth',
-                          block: 'start'
-                        });
-                      }}
-                    >
-                      Upload Materials Now
-                    </Button>
+            <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-1">
+              <div className="headspace-card p-6 bg-gradient-to-br from-primary/10 to-accent/10">
+                <div className="flex flex-col md:flex-row items-start gap-5">
+                  <div className="w-14 h-14 rounded-3xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Upload className="w-7 h-7 text-primary" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <h3 className="text-xl font-bold text-foreground">
+                      Get Personalized Practice Questions
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Upload your study materials (notes, PDFs, images) to automatically generate AI-powered practice questions tailored to your content. No class connection needed!
+                    </p>
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        className="rounded-full"
+                        onClick={() => {
+                          document.getElementById('study-materials-section')?.scrollIntoView({ 
+                            behavior: 'smooth',
+                            block: 'start'
+                          });
+                        }}
+                      >
+                        Upload Materials Now
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Gamification Section */}
-          {user?.id && <DailyChallenges userId={user.id} />}
+          {/* Daily Challenges */}
+          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-1">
+            {user?.id && <DailyChallenges userId={user.id} />}
+          </div>
 
           {/* Leaderboard */}
-          {user?.id && <Leaderboard userId={user.id} />}
+          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-2">
+            {user?.id && <Leaderboard userId={user.id} />}
+          </div>
 
           {/* Study Groups Section */}
-          {user?.id && <StudyGroups userId={user.id} />}
+          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-3">
+            {user?.id && <StudyGroups userId={user.id} />}
+          </div>
 
           {/* AI-Powered Practice Section */}
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              🎯 Practice with AI-Generated Questions
-            </h2>
-            
-            {/* Adaptive Difficulty Indicator */}
-            {user?.id && (
-              <AdaptiveDifficultyIndicator userId={user.id} />
-            )}
-            
-            {user?.id && (
-              <STEMPractice 
-                userId={user.id}
-                courseContext={courseContext}
-                onPointsEarned={(points) => {
-                  // Trigger stats refresh
-                }}
-              />
-            )}
+          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-4">
+            <div className="headspace-card p-6">
+              <div className="flex items-start gap-4 mb-5">
+                <div className="w-14 h-14 rounded-3xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-7 h-7 text-secondary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground mb-1">Practice with AI-Generated Questions</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Questions adapt to your skill level as you practice
+                  </p>
+                </div>
+              </div>
+              
+              {/* Adaptive Difficulty Indicator */}
+              {user?.id && (
+                <div className="mb-4">
+                  <AdaptiveDifficultyIndicator userId={user.id} />
+                </div>
+              )}
+              
+              {user?.id && (
+                <STEMPractice 
+                  userId={user.id}
+                  courseContext={courseContext}
+                  onPointsEarned={(points) => {
+                    // Trigger stats refresh
+                  }}
+                />
+              )}
+            </div>
           </div>
 
           {/* Study Materials Section */}
-          <div id="study-materials-section" className="space-y-4 scroll-mt-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                📚 My Study Materials
-              </h2>
-              {classes.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <Select value={selectedMaterialClass} onValueChange={setSelectedMaterialClass}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filter by class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Classes</SelectItem>
-                      {classes.map((classOption) => (
-                        <SelectItem key={classOption.instructorId} value={classOption.instructorId}>
-                          {classOption.courseTitle}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div id="study-materials-section" className="col-span-1 lg:col-span-12 animate-fade-in stagger-5 scroll-mt-4">
+            <div className="headspace-card p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-3xl bg-accent flex items-center justify-center flex-shrink-0">
+                    <BookOpen className="w-7 h-7 text-foreground" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground mb-1">My Study Materials</h2>
+                    <p className="text-muted-foreground text-sm">
+                      Upload materials to generate personalized questions
+                    </p>
+                  </div>
+                </div>
+                {classes.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <Select value={selectedMaterialClass} onValueChange={setSelectedMaterialClass}>
+                      <SelectTrigger className="w-[200px] rounded-full">
+                        <SelectValue placeholder="Filter by class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Classes</SelectItem>
+                        {classes.map((classOption) => (
+                          <SelectItem key={classOption.instructorId} value={classOption.instructorId}>
+                            {classOption.courseTitle}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              
+              {user?.id && (
+                <div className="space-y-4">
+                  <StudyMaterialUpload 
+                    userId={user.id} 
+                    onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
+                    adaptiveDifficulty={currentDifficulty}
+                  />
+                  <StudyMaterialLibrary 
+                    userId={user.id} 
+                    instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
+                    refreshKey={materialRefreshKey} 
+                  />
+                  <MaterialQuestionStats 
+                    userId={user.id}
+                    instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
+                    onGenerateQuestions={() => setMaterialRefreshKey(prev => prev + 1)}
+                    adaptiveDifficulty={currentDifficulty}
+                  />
                 </div>
               )}
             </div>
-            {user?.id && (
-              <>
-                <StudyMaterialUpload 
-                  userId={user.id} 
-                  onUploadComplete={() => setMaterialRefreshKey(prev => prev + 1)}
-                  adaptiveDifficulty={currentDifficulty}
-                />
-                <StudyMaterialLibrary 
-                  userId={user.id} 
-                  instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
-                  refreshKey={materialRefreshKey} 
-                />
-                <MaterialQuestionStats 
-                  userId={user.id}
-                  instructorId={selectedMaterialClass !== "all" ? selectedMaterialClass : undefined}
-                  onGenerateQuestions={() => setMaterialRefreshKey(prev => prev + 1)}
-                  adaptiveDifficulty={currentDifficulty}
-                />
-              </>
-            )}
           </div>
 
           {/* Confidence Analytics */}
-          {user?.id && <ConfidenceAnalytics userId={user.id} />}
+          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-6">
+            {user?.id && <ConfidenceAnalytics userId={user.id} />}
+          </div>
         </div>
       </div>
 
