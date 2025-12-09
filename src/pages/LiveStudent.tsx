@@ -189,6 +189,8 @@ const LiveStudent = () => {
 
       // Mark this question as answered to prevent re-prompting
       answeredQuestionsRef.current.add(currentQuestion.id);
+      // Reset interaction flag to allow new questions to load
+      hasStartedAnsweringRef.current = false;
       
       setHasAnswered(true);
       setIsCorrect(data.isCorrect);
@@ -272,6 +274,8 @@ const LiveStudent = () => {
 
       // Mark this question as answered to prevent re-prompting
       answeredQuestionsRef.current.add(currentQuestion.id);
+      // Reset interaction flag to allow new questions to load
+      hasStartedAnsweringRef.current = false;
       
       setHasAnswered(true);
       setIsCorrect(data.isCorrect);
