@@ -115,22 +115,19 @@ serve(async (req) => {
     const userAnswerInfo = userAnswer ? `\nStudent's Answer: ${userAnswer}` : "";
     const outcomeInfo = wasCorrect ? "The student answered correctly." : "The student answered incorrectly.";
 
-    const prompt = `Provide a detailed, in-depth explanation for this practice question:
+    const prompt = `Explain this question briefly:
 
 Question: ${problemText}
 Correct Answer: ${correctAnswer}${userAnswerInfo}
 
 ${outcomeInfo}${contextInfo}
 
-Please provide a comprehensive explanation (200-300 words) that includes:
+Give a 2-4 sentence explanation that:
+- States the key concept being tested
+- Explains why the correct answer is right
+- If wrong, briefly explains the mistake
 
-1. **Conceptual Breakdown**: Explain the underlying concept being tested
-2. **Step-by-Step Reasoning**: Walk through how to arrive at the correct answer
-3. **Why This Matters**: Explain the practical importance or real-world application
-4. **Related Concepts**: Mention connected topics the student should understand
-5. **Common Pitfalls**: Highlight typical mistakes students make with this type of question
-
-Make the explanation engaging, educational, and appropriate for the student's level. Use clear language and examples where helpful.`;
+Be concise and direct. No bullet points or headers.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -144,15 +141,15 @@ Make the explanation engaging, educational, and appropriate for the student's le
           {
             role: "system",
             content:
-              "You are an expert educator providing detailed, clear explanations to help students deeply understand concepts.",
+              "You are a concise educator. Give brief 2-4 sentence explanations. No bullet points, headers, or lengthy responses.",
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        temperature: 0.7,
-        max_tokens: 800,
+        temperature: 0.5,
+        max_tokens: 200,
       }),
     });
 
