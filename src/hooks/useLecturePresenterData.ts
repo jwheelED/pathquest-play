@@ -61,7 +61,16 @@ export const useLecturePresenterData = () => {
 
     const correctAnswer = question.overriddenAnswer || question.correctAnswer;
     const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
-      const response = a.quiz_responses?.[questionIndex.toString()] || a.quiz_responses?.[questionIndex];
+      // FIX: Find the question index within THIS student's assignment, not the group index
+      const assignmentContent = a.content as any;
+      const assignmentQuestions = assignmentContent?.questions || [];
+      const studentQuestionIdx = assignmentQuestions.findIndex(
+        (q: any) => q.question === question.question
+      );
+      
+      const response = studentQuestionIdx >= 0 
+        ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
+        : null;
       return response === correctAnswer;
     });
 
