@@ -3045,7 +3045,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </Button>
                   
-                  {/* Auto-question toggle */}
+                  {/* Auto-question toggle with interval dropdown */}
                   <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
                     <Checkbox
                       id="auto-question-toggle"
@@ -3080,9 +3080,48 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                       Auto-questions
                     </Label>
                     {autoQuestionEnabled && (
-                      <Badge variant="secondary" className="text-xs">
-                        {autoQuestionInterval}m
-                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Badge 
+                            variant="secondary" 
+                            className="text-xs cursor-pointer hover:bg-primary/20 transition-colors flex items-center gap-1"
+                          >
+                            <Clock className="h-3 w-3" />
+                            {autoQuestionInterval}m
+                            <ChevronDown className="h-3 w-3" />
+                          </Badge>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-popover">
+                          {[1, 2, 3, 5, 10, 15, 20, 30].map((minutes) => (
+                            <DropdownMenuItem
+                              key={minutes}
+                              onClick={async () => {
+                                setAutoQuestionInterval(minutes);
+                                
+                                // Persist to database
+                                const { data: { user } } = await supabase.auth.getUser();
+                                if (user) {
+                                  await supabase
+                                    .from("profiles")
+                                    .update({ auto_question_interval: minutes })
+                                    .eq("id", user.id);
+                                }
+                                
+                                // Reset timer with new interval
+                                if (isRecording) {
+                                  setLastAutoQuestionTime(Date.now());
+                                }
+                                
+                                sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
+                              }}
+                              className={autoQuestionInterval === minutes ? "bg-accent" : ""}
+                            >
+                              Every {minutes} minute{minutes > 1 ? 's' : ''}
+                              {minutes === 15 && <span className="ml-2 text-muted-foreground text-xs">(recommended)</span>}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                   
