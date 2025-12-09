@@ -15,7 +15,6 @@ import { AcademicIntegrityInsights } from "@/components/instructor/AcademicInteg
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
-import { AutoQuestionSettings } from "@/components/instructor/AutoQuestionSettings";
 
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
@@ -473,9 +472,6 @@ export default function InstructorDashboard() {
                 </Card>
               )}
             </div>
-            
-            <AutoQuestionSettings />
-            
             <LiveSessionControls onSessionChange={setLiveSessionId} />
 
             {/* Slide Presenter Quick Access - Compact on mobile */}

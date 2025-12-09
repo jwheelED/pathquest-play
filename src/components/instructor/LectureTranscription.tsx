@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Mic,
   MicOff,
@@ -3024,11 +3026,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     onClick={isRecording ? stopRecording : startRecording}
                     variant={isRecording ? "destructive" : "default"}
-                    className="flex-1"
+                    className="flex-1 min-w-[140px]"
                   >
                     {isRecording ? (
                       <>
@@ -3042,6 +3044,48 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                       </>
                     )}
                   </Button>
+                  
+                  {/* Auto-question toggle */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                    <Checkbox
+                      id="auto-question-toggle"
+                      checked={autoQuestionEnabled}
+                      onCheckedChange={async (checked) => {
+                        const newValue = checked === true;
+                        setAutoQuestionEnabled(newValue);
+                        
+                        // Persist to database
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user) {
+                          await supabase
+                            .from("profiles")
+                            .update({ 
+                              auto_question_enabled: newValue,
+                              auto_question_force_send: true,
+                              auto_question_strict_mode: true
+                            })
+                            .eq("id", user.id);
+                        }
+                        
+                        if (newValue && isRecording) {
+                          setLastAutoQuestionTime(Date.now());
+                          sonnerToast.success(`Auto-questions enabled (every ${autoQuestionInterval} min)`);
+                        }
+                      }}
+                    />
+                    <Label 
+                      htmlFor="auto-question-toggle" 
+                      className="text-xs font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Auto-questions
+                    </Label>
+                    {autoQuestionEnabled && (
+                      <Badge variant="secondary" className="text-xs">
+                        {autoQuestionInterval}m
+                      </Badge>
+                    )}
+                  </div>
+                  
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">
                       Clear
