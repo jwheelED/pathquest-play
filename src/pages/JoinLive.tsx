@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 const JoinLive = () => {
   const [sessionCode, setSessionCode] = useState("");
@@ -86,16 +86,27 @@ const JoinLive = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">Join Live Session</CardTitle>
-          <CardDescription>
-            {step === "code" 
-              ? "Your instructor will display a 6-digit code when they start a live Q&A session" 
-              : "Choose your nickname"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="w-full max-w-md space-y-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/dashboard")}
+          className="gap-2 rounded-full hover:bg-accent"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Button>
+        
+        <Card className="w-full">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold">Join Live Session</CardTitle>
+            <CardDescription>
+              {step === "code" 
+                ? "Your instructor will display a 6-digit code when they start a live Q&A session" 
+                : "Choose your nickname"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
           {step === "code" ? (
             <form onSubmit={handleCodeSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -178,6 +189,7 @@ const JoinLive = () => {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };
