@@ -1,5 +1,6 @@
-import { Menu, LogOut, Bell, Flame, Trophy } from "lucide-react";
+import { Menu, LogOut, Bell, Flame, Trophy, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -117,6 +118,17 @@ export function MobileHeader({
                     )}
                   </div>
                 )}
+
+                {/* Home Link */}
+                <Link to="/">
+                  <Button
+                    variant="ghost"
+                    className="w-full rounded-xl h-12 justify-start"
+                  >
+                    <Home className="mr-2 h-4 w-4" />
+                    Back to Home
+                  </Button>
+                </Link>
 
                 {/* Logout Button */}
                 <Button
