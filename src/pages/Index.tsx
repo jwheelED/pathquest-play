@@ -1,7 +1,7 @@
 // Update this page (the content is just a fallback if you fail to update the page)
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,10 +9,12 @@ import { Card } from "@/components/ui/card";
 const Index = () => {
   const [session, setSession] = useState(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const stayOnPage = searchParams.get("stay") === "true";
 
   useEffect(() => {
     const checkSessionAndRedirect = async (session: any) => {
-      if (session) {
+      if (session && !stayOnPage) {
         // Check for admin role
         const { data: adminRole } = await supabase
           .from("user_roles")
@@ -61,7 +63,7 @@ const Index = () => {
     );
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, stayOnPage]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
