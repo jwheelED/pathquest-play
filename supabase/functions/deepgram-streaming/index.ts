@@ -1,14 +1,81 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting: max connections per IP
+const ipConnectionCounts = new Map<string, { count: number; resetTime: number }>();
+const MAX_CONNECTIONS_PER_IP = 3; // Max 3 concurrent connections per IP
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute window
+
+function getClientIP(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+         req.headers.get('cf-connecting-ip') || 
+         req.headers.get('x-real-ip') || 
+         'unknown';
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; reason?: string } {
+  const now = Date.now();
+  const record = ipConnectionCounts.get(ip);
+  
+  if (!record || now > record.resetTime) {
+    ipConnectionCounts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true };
+  }
+  
+  if (record.count >= MAX_CONNECTIONS_PER_IP) {
+    return { allowed: false, reason: 'Too many connections. Please try again later.' };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
+
+// Validate origin - only allow known domains
+function validateOrigin(req: Request): boolean {
+  const origin = req.headers.get('origin') || '';
+  const allowedPatterns = [
+    /^https?:\/\/localhost(:\d+)?$/,
+    /^https?:\/\/.*\.lovable\.app$/,
+    /^https?:\/\/.*\.lovableproject\.com$/,
+    /^https?:\/\/.*\.supabase\.co$/,
+  ];
+  
+  // Also check referer as fallback
+  const referer = req.headers.get('referer') || '';
+  
+  return allowedPatterns.some(pattern => pattern.test(origin) || pattern.test(referer));
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const clientIP = getClientIP(req);
+  
+  // Validate origin
+  if (!validateOrigin(req)) {
+    console.warn(`⛔ Rejected connection from unauthorized origin. IP: ${clientIP}`);
+    return new Response("Unauthorized origin", { 
+      status: 403,
+      headers: corsHeaders 
+    });
+  }
+
+  // Check rate limit
+  const rateLimitCheck = checkRateLimit(clientIP);
+  if (!rateLimitCheck.allowed) {
+    console.warn(`⛔ Rate limit exceeded for IP: ${clientIP}`);
+    return new Response(JSON.stringify({ error: rateLimitCheck.reason }), { 
+      status: 429,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 
   const upgrade = req.headers.get("upgrade") || "";
@@ -19,7 +86,7 @@ serve(async (req) => {
     });
   }
 
-  console.log("🔌 New WebSocket connection request");
+  console.log(`🔌 New WebSocket connection request from IP: ${clientIP}`);
 
   const { socket, response } = Deno.upgradeWebSocket(req);
   const DEEPGRAM_API_KEY = Deno.env.get("DEEPGRAM_API_KEY");
