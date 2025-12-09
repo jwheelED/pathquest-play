@@ -458,19 +458,6 @@ export default function InstructorDashboard() {
                 </Card>
               )}
             
-              {professorType === "humanities" && (
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                      <BookOpen className="h-4 w-4 sm:h-5 sm:w-5" />
-                      Humanities Features
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-xs sm:text-sm text-muted-foreground pt-0">
-                    <p>Essay analysis, discussion prompts, and enhanced short-answer grading enabled.</p>
-                  </CardContent>
-                </Card>
-              )}
             </div>
             <LiveSessionControls onSessionChange={setLiveSessionId} />
 
