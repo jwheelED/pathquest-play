@@ -16,6 +16,7 @@ const languageMap: Record<string, { language: string; version: string }> = {
 };
 
 // Blocked patterns for security - prevents dangerous code execution
+// Uses multiple detection methods to prevent common bypass techniques
 const BLOCKED_PATTERNS = [
   // File system operations
   /\bopen\s*\(/i,
@@ -27,6 +28,8 @@ const BLOCKED_PATTERNS = [
   /\bimport\s+.*\bsys\b/i,
   /\bimport\s+.*\bsubprocess\b/i,
   /\bimport\s+.*\bshutil\b/i,
+  /\bimport\s+.*\bpickle\b/i,
+  /\bimport\s+.*\bmarshall\b/i,
   // Network operations
   /\bfetch\s*\(/i,
   /\brequests\./i,
@@ -51,19 +54,86 @@ const BLOCKED_PATTERNS = [
   /\blocals\s*\(\s*\)/i,
   /\bgetattr\s*\(/i,
   /\bsetattr\s*\(/i,
+  // Python specific dangerous patterns
+  /\b__builtins__/i,
+  /\b__class__/i,
+  /\b__mro__/i,
+  /\b__subclasses__/i,
+  /\b__bases__/i,
+  /\bimportlib/i,
+  /\bpkgutil/i,
+  // Encoding bypass attempts
+  /\\u00[0-9a-f]{2}/i, // Unicode escapes
+  /\\x[0-9a-f]{2}/i,   // Hex escapes
+  /base64\.(decode|b64decode)/i,
+  /codecs\.(decode|encode)/i,
+  // JavaScript specific
+  /\bFunction\s*\(/i,
+  /\bprocess\./i,
+  /\brequire\s*\(/i,
+  /\bimport\s*\(/i,
 ];
 
-// Validate code for dangerous patterns
-function validateCode(code: string): { valid: boolean; reason?: string } {
-  for (const pattern of BLOCKED_PATTERNS) {
-    if (pattern.test(code)) {
-      return { valid: false, reason: `Code contains blocked pattern: ${pattern.source}` };
+// Additional string-based checks for obfuscation attempts
+function detectObfuscation(code: string): boolean {
+  // Check for string concatenation that forms dangerous keywords
+  const dangerousKeywords = ['eval', 'exec', 'open', 'import', 'require', 'system', 'popen'];
+  const loweredCode = code.toLowerCase();
+  
+  for (const keyword of dangerousKeywords) {
+    // Check for character-by-character concatenation like 'e'+'v'+'a'+'l'
+    const concatPattern = keyword.split('').map(c => `['"]${c}['"]`).join('\\s*\\+\\s*');
+    if (new RegExp(concatPattern, 'i').test(code)) {
+      return true;
+    }
+    
+    // Check for chr() or String.fromCharCode() building
+    const charCodes = keyword.split('').map(c => c.charCodeAt(0));
+    for (const charCode of charCodes) {
+      if (loweredCode.includes(`chr(${charCode})`) || loweredCode.includes(`fromcharcode(${charCode})`)) {
+        return true;
+      }
     }
   }
   
-  // Check for excessive code length
+  return false;
+}
+
+// Validate code for dangerous patterns
+function validateCode(code: string): { valid: boolean; reason?: string } {
+  // Check for excessive code length first
   if (code.length > 10000) {
     return { valid: false, reason: 'Code exceeds maximum length (10000 characters)' };
+  }
+  
+  // Check blocked patterns
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(code)) {
+      console.warn(`Blocked pattern detected: ${pattern.source}`);
+      return { valid: false, reason: `Code contains blocked pattern` };
+    }
+  }
+  
+  // Check for obfuscation attempts
+  if (detectObfuscation(code)) {
+    console.warn('Obfuscation attempt detected');
+    return { valid: false, reason: 'Obfuscated code detected' };
+  }
+  
+  // Check for excessive nesting depth (potential DoS)
+  const maxNesting = 20;
+  let currentNesting = 0;
+  let maxFound = 0;
+  for (const char of code) {
+    if (char === '(' || char === '[' || char === '{') {
+      currentNesting++;
+      maxFound = Math.max(maxFound, currentNesting);
+    } else if (char === ')' || char === ']' || char === '}') {
+      currentNesting--;
+    }
+  }
+  if (maxFound > maxNesting) {
+    return { valid: false, reason: 'Excessive nesting depth' };
   }
   
   return { valid: true };
