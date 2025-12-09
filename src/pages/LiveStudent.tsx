@@ -351,7 +351,7 @@ const LiveStudent = () => {
             </CardContent>
           </Card>
         )}
-      <Card className="w-full">
+      <Card key={currentQuestion.id} className="w-full animate-fade-in">
         <CardHeader>
           <CardTitle className="text-2xl">{currentQuestion.question_content.question}</CardTitle>
         </CardHeader>
