@@ -442,23 +442,6 @@ export default function InstructorDashboard() {
         {/* Settings visible regardless of student count */}
         {currentUser && (
           <div className="space-y-4 sm:space-y-6">
-            {/* Course type indicators */}
-            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {professorType === "stem" && (
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                      <Code className="h-4 w-4 sm:h-5 sm:w-5" />
-                      STEM Features
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-xs sm:text-sm text-muted-foreground pt-0">
-                    <p>Enhanced coding question generation and test case auto-grading enabled.</p>
-                  </CardContent>
-                </Card>
-              )}
-            
-            </div>
             <LiveSessionControls onSessionChange={setLiveSessionId} />
 
             {/* Slide Presenter Quick Access - Compact on mobile */}
