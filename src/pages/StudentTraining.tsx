@@ -176,7 +176,7 @@ export default function StudentTraining() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => navigate("/learn-more")}
+                  onClick={() => navigate("/?stay=true")}
                   className="gap-2 rounded-full hover:bg-accent"
                 >
                   <ArrowLeft className="h-4 w-4" />
