@@ -50,6 +50,7 @@ export const SlideViewer = forwardRef<SlideViewerRef, SlideViewerProps>(
   const [selectionEnd, setSelectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [activeSelection, setActiveSelection] = useState<SelectionRect | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const justCompletedSelectionRef = useRef(false);
 
   // Clear selection when slide changes
   useEffect(() => {
@@ -309,7 +310,8 @@ export const SlideViewer = forwardRef<SlideViewerRef, SlideViewerProps>(
 
   // Handle click navigation (click left = prev, click right = next)
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (isSelectionMode) return; // Don't navigate in selection mode
+    // Don't navigate if we just completed a selection or in selection mode
+    if (justCompletedSelectionRef.current || isSelectionMode) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -368,6 +370,12 @@ export const SlideViewer = forwardRef<SlideViewerRef, SlideViewerProps>(
     if (width >= 50 && height >= 50) {
       setActiveSelection({ x, y, width, height });
       onSelectionChange?.(true);
+      
+      // Prevent click navigation immediately after selection
+      justCompletedSelectionRef.current = true;
+      setTimeout(() => {
+        justCompletedSelectionRef.current = false;
+      }, 150);
     } else {
       setActiveSelection(null);
       setSelectionStart(null);
