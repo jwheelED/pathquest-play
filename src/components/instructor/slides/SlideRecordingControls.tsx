@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Mic,
   MicOff,
@@ -11,10 +16,12 @@ import {
   Zap,
   ChevronUp,
   ChevronDown,
-  Play,
-  Pause,
+  FileQuestion,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+export type SlideQuestionType = 'mcq' | 'short_answer' | 'coding';
 
 interface SlideRecordingControlsProps {
   isRecording: boolean;
@@ -25,11 +32,13 @@ interface SlideRecordingControlsProps {
   autoQuestionInterval: number;
   isSendingQuestion: boolean;
   voiceCommandDetected: boolean;
+  isExtractingSlideQuestion?: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onManualSend: () => void;
   onToggleAutoQuestion: () => void;
   onTestAutoQuestion: () => void;
+  onSendSlideQuestion?: (questionType: SlideQuestionType) => void;
 }
 
 export function SlideRecordingControls({
@@ -41,11 +50,13 @@ export function SlideRecordingControls({
   autoQuestionInterval,
   isSendingQuestion,
   voiceCommandDetected,
+  isExtractingSlideQuestion = false,
   onStartRecording,
   onStopRecording,
   onManualSend,
   onToggleAutoQuestion,
   onTestAutoQuestion,
+  onSendSlideQuestion,
 }: SlideRecordingControlsProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -243,6 +254,44 @@ export function SlideRecordingControls({
             <Send className="w-4 h-4 mr-2" />
             {isSendingQuestion ? 'Sending...' : 'Send Question Now'}
           </Button>
+        )}
+
+        {/* Send Slide Question Button - always visible in presentation mode */}
+        {onSendSlideQuestion && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                disabled={isExtractingSlideQuestion || isSendingQuestion}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white border-0"
+              >
+                {isExtractingSlideQuestion ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Extracting Question...
+                  </>
+                ) : (
+                  <>
+                    <FileQuestion className="w-4 h-4 mr-2" />
+                    Send Slide Question
+                  </>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onClick={() => onSendSlideQuestion('mcq')}>
+                <span className="font-medium">Multiple Choice</span>
+                <span className="ml-auto text-xs text-muted-foreground">MCQ</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSendSlideQuestion('short_answer')}>
+                <span className="font-medium">Short Answer</span>
+                <span className="ml-auto text-xs text-muted-foreground">Text</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSendSlideQuestion('coding')}>
+                <span className="font-medium">Coding Challenge</span>
+                <span className="ml-auto text-xs text-muted-foreground">Code</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {/* Voice Command Hint */}

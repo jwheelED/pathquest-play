@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { 
@@ -17,7 +17,13 @@ interface SlideViewerProps {
   onSlideChange?: (slideText: string, pageNumber: number) => void;
 }
 
-export function SlideViewer({ presentationId, title, onExit, onSlideChange }: SlideViewerProps) {
+export interface SlideViewerRef {
+  getSlideImage: () => string | null;
+  getCurrentSlideNumber: () => number;
+}
+
+export const SlideViewer = forwardRef<SlideViewerRef, SlideViewerProps>(
+  ({ presentationId, title, onExit, onSlideChange }, ref) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -26,6 +32,16 @@ export function SlideViewer({ presentationId, title, onExit, onSlideChange }: Sl
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfDocRef = useRef<any>(null);
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    getSlideImage: () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      return canvas.toDataURL('image/png');
+    },
+    getCurrentSlideNumber: () => currentPage,
+  }));
 
   // Load PDF.js dynamically
   useEffect(() => {
@@ -334,4 +350,6 @@ export function SlideViewer({ presentationId, title, onExit, onSlideChange }: Sl
       </div>
     </div>
   );
-}
+});
+
+SlideViewer.displayName = 'SlideViewer';

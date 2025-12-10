@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
-import { SlideViewer } from '@/components/instructor/slides/SlideViewer';
+import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/SlideViewer';
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
-import { SlideRecordingControls } from '@/components/instructor/slides/SlideRecordingControls';
+import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Presentation, Upload } from 'lucide-react';
@@ -26,6 +26,10 @@ export default function SlidePresenter() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isExtractingSlideQuestion, setIsExtractingSlideQuestion] = useState(false);
+  
+  // Ref to SlideViewer for capturing slide image
+  const slideViewerRef = useRef<SlideViewerRef>(null);
   
   // Track current slide text for context
   const [currentSlideText, setCurrentSlideText] = useState<string>('');
@@ -59,6 +63,113 @@ export default function SlidePresenter() {
     setCurrentSlideNumber(pageNumber);
     console.log(`📑 Slide context updated: page ${pageNumber}, ${slideText.length} chars`);
   }, []);
+
+  // Handle sending a question from the current slide via OCR
+  const handleSendSlideQuestion = useCallback(async (questionType: SlideQuestionType) => {
+    if (!slideViewerRef.current) {
+      toast.error('Slide viewer not ready');
+      return;
+    }
+
+    const slideImage = slideViewerRef.current.getSlideImage();
+    if (!slideImage) {
+      toast.error('Could not capture slide image');
+      return;
+    }
+
+    setIsExtractingSlideQuestion(true);
+    
+    try {
+      console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}`);
+      
+      // Call the edge function to extract question via OCR
+      const { data, error } = await supabase.functions.invoke('extract-slide-question', {
+        body: {
+          slideImage,
+          questionType,
+        },
+      });
+
+      if (error) {
+        console.error('Error extracting slide question:', error);
+        toast.error(error.message || 'Failed to extract question from slide');
+        return;
+      }
+
+      if (!data?.success) {
+        toast.error(data?.error || 'No question found on this slide');
+        return;
+      }
+
+      console.log('✅ Extracted question:', data.data);
+
+      // Now send the extracted question to students
+      const extractedData = data.data;
+      
+      // Format the question for sending based on type
+      let questionContent: any;
+      
+      if (questionType === 'mcq') {
+        questionContent = {
+          type: 'quiz',
+          questions: [{
+            question: extractedData.question,
+            options: extractedData.options,
+            correctAnswer: extractedData.correctAnswer,
+            explanation: extractedData.explanation,
+          }],
+        };
+      } else if (questionType === 'short_answer') {
+        questionContent = {
+          type: 'quiz',
+          questions: [{
+            question: extractedData.question,
+            type: 'short_answer',
+            expectedAnswer: extractedData.expectedAnswer,
+            explanation: extractedData.explanation,
+          }],
+        };
+      } else if (questionType === 'coding') {
+        questionContent = {
+          type: 'quiz',
+          questions: [{
+            question: extractedData.question,
+            type: 'coding',
+            functionName: extractedData.functionName,
+            parameters: extractedData.parameters,
+            returnType: extractedData.returnType,
+            examples: extractedData.examples,
+            constraints: extractedData.constraints,
+            starterCode: extractedData.starterCode,
+          }],
+        };
+      }
+
+      // Send via format-and-send-question
+      const { error: sendError } = await supabase.functions.invoke('format-and-send-question', {
+        body: {
+          questionText: extractedData.question,
+          questionType: questionType === 'mcq' ? 'multiple_choice' : questionType,
+          structuredQuestion: questionContent.questions[0],
+          source: 'slide_ocr',
+        },
+      });
+
+      if (sendError) {
+        console.error('Error sending slide question:', sendError);
+        toast.error('Failed to send question to students');
+        return;
+      }
+
+      toast.success(`${questionType.toUpperCase()} question sent to students!`);
+      
+    } catch (err) {
+      console.error('Error in handleSendSlideQuestion:', err);
+      toast.error('An error occurred while processing the slide');
+    } finally {
+      setIsExtractingSlideQuestion(false);
+    }
+  }, [currentSlideNumber]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -170,6 +281,7 @@ export default function SlidePresenter() {
     return (
       <div className="fixed inset-0 bg-black z-50">
         <SlideViewer
+          ref={slideViewerRef}
           presentationId={activePresentation.id}
           title={activePresentation.title}
           onExit={handleExitPresentation}
@@ -186,11 +298,13 @@ export default function SlidePresenter() {
           autoQuestionInterval={autoQuestionInterval}
           isSendingQuestion={isSendingQuestion}
           voiceCommandDetected={voiceCommandDetected}
+          isExtractingSlideQuestion={isExtractingSlideQuestion}
           onStartRecording={startRecording}
           onStopRecording={stopRecording}
           onManualSend={handleManualQuestionSend}
           onToggleAutoQuestion={toggleAutoQuestion}
           onTestAutoQuestion={handleTestAutoQuestion}
+          onSendSlideQuestion={handleSendSlideQuestion}
         />
         
         {/* Stats Overlay - top right (receives state via BroadcastChannel) */}
