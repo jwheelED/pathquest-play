@@ -30,6 +30,10 @@ export default function SlidePresenter() {
   const [loading, setLoading] = useState(true);
   const [extractionStage, setExtractionStage] = useState<'idle' | 'capturing' | 'analyzing' | 'sending'>('idle');
   
+  // Selection mode state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
+  
   // Ref to SlideViewer for capturing slide image
   const slideViewerRef = useRef<SlideViewerRef>(null);
   
@@ -94,6 +98,31 @@ export default function SlidePresenter() {
     console.log(`📑 Slide context updated: page ${pageNumber}, ${slideText.length} chars`);
   }, []);
 
+  // Handle selection mode toggle
+  const handleToggleSelectionMode = useCallback(() => {
+    if (isSelectionMode) {
+      // Exiting selection mode - clear selection
+      slideViewerRef.current?.clearSelection();
+      setHasSelection(false);
+    }
+    setIsSelectionMode(!isSelectionMode);
+  }, [isSelectionMode]);
+
+  // Handle clear selection
+  const handleClearSelection = useCallback(() => {
+    slideViewerRef.current?.clearSelection();
+    setHasSelection(false);
+  }, []);
+
+  // Handle selection change from SlideViewer
+  const handleSelectionChange = useCallback((selected: boolean) => {
+    setHasSelection(selected);
+    if (selected) {
+      // Auto-exit selection mode when selection is complete
+      setIsSelectionMode(false);
+    }
+  }, []);
+
   // Handle sending a question from the current slide via OCR
   const handleSendSlideQuestion = useCallback(async (questionType: SlideQuestionType) => {
     if (!slideViewerRef.current) {
@@ -101,10 +130,13 @@ export default function SlidePresenter() {
       return;
     }
 
-    // Stage 1: Capturing slide
+    // Stage 1: Capturing slide (with optional selection)
     setExtractionStage('capturing');
     
-    const slideImage = slideViewerRef.current.getSlideImage();
+    // Get the active selection if any
+    const selection = slideViewerRef.current.getActiveSelection();
+    const slideImage = slideViewerRef.current.getSlideImage(selection || undefined);
+    
     if (!slideImage) {
       toast.error('Could not capture slide image');
       setExtractionStage('idle');
@@ -115,7 +147,7 @@ export default function SlidePresenter() {
     setExtractionStage('analyzing');
     
     try {
-      console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}`);
+      console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}${selection ? ' (region selected)' : ''}`);
       
       // Fetch instructor's difficulty preference
       const { data: { user } } = await supabase.auth.getUser();
@@ -181,6 +213,12 @@ export default function SlidePresenter() {
       }
 
       toast.success(`${questionType.toUpperCase()} question sent to students!`);
+      
+      // Clear selection after successful send
+      if (selection) {
+        slideViewerRef.current?.clearSelection();
+        setHasSelection(false);
+      }
       
     } catch (err) {
       console.error('Error in handleSendSlideQuestion:', err);
@@ -341,6 +379,8 @@ export default function SlidePresenter() {
           title={activePresentation.title}
           onExit={handleExitPresentation}
           onSlideChange={handleSlideChange}
+          isSelectionMode={isSelectionMode}
+          onSelectionChange={handleSelectionChange}
         />
         
         {/* Recording Controls - bottom left */}
@@ -354,6 +394,10 @@ export default function SlidePresenter() {
           isSendingQuestion={isSendingQuestion}
           voiceCommandDetected={voiceCommandDetected}
           extractionStage={extractionStage}
+          isSelectionMode={isSelectionMode}
+          hasSelection={hasSelection}
+          onToggleSelectionMode={handleToggleSelectionMode}
+          onClearSelection={handleClearSelection}
           onStartRecording={startRecording}
           onStopRecording={stopRecording}
           onManualSend={handleManualQuestionSend}
