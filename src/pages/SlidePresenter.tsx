@@ -133,61 +133,25 @@ export default function SlidePresenter() {
 
       console.log('✅ Extracted question:', data.data);
 
-      // Now send the extracted question to students
+      // Send the extracted question to students via dedicated edge function
       const extractedData = data.data;
       
-      // Format the question for sending based on type
-      let questionContent: any;
-      
-      if (questionType === 'mcq') {
-        questionContent = {
-          type: 'quiz',
-          questions: [{
-            question: extractedData.question,
-            options: extractedData.options,
-            correctAnswer: extractedData.correctAnswer,
-            explanation: extractedData.explanation,
-          }],
-        };
-      } else if (questionType === 'short_answer') {
-        questionContent = {
-          type: 'quiz',
-          questions: [{
-            question: extractedData.question,
-            type: 'short_answer',
-            expectedAnswer: extractedData.expectedAnswer,
-            explanation: extractedData.explanation,
-          }],
-        };
-      } else if (questionType === 'coding') {
-        questionContent = {
-          type: 'quiz',
-          questions: [{
-            question: extractedData.question,
-            type: 'coding',
-            functionName: extractedData.functionName,
-            parameters: extractedData.parameters,
-            returnType: extractedData.returnType,
-            examples: extractedData.examples,
-            constraints: extractedData.constraints,
-            starterCode: extractedData.starterCode,
-          }],
-        };
-      }
-
-      // Send via format-and-send-question
-      const { error: sendError } = await supabase.functions.invoke('format-and-send-question', {
+      const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
         body: {
-          questionText: extractedData.question,
-          questionType: questionType === 'mcq' ? 'multiple_choice' : questionType,
-          structuredQuestion: questionContent.questions[0],
-          source: 'slide_ocr',
+          questionType,
+          extractedQuestion: extractedData,
+          slideNumber: currentSlideNumber,
         },
       });
 
       if (sendError) {
         console.error('Error sending slide question:', sendError);
-        toast.error('Failed to send question to students');
+        toast.error(sendError.message || 'Failed to send question to students');
+        return;
+      }
+
+      if (!sendData?.success) {
+        toast.error(sendData?.error || 'Failed to send question');
         return;
       }
 

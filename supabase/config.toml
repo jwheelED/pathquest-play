@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.extract-slide-question]
 verify_jwt = true
+
+[functions.send-slide-question]
+verify_jwt = true
