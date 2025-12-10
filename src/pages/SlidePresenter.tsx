@@ -28,7 +28,7 @@ export default function SlidePresenter() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isExtractingSlideQuestion, setIsExtractingSlideQuestion] = useState(false);
+  const [extractionStage, setExtractionStage] = useState<'idle' | 'capturing' | 'analyzing' | 'sending'>('idle');
   
   // Ref to SlideViewer for capturing slide image
   const slideViewerRef = useRef<SlideViewerRef>(null);
@@ -101,13 +101,18 @@ export default function SlidePresenter() {
       return;
     }
 
+    // Stage 1: Capturing slide
+    setExtractionStage('capturing');
+    
     const slideImage = slideViewerRef.current.getSlideImage();
     if (!slideImage) {
       toast.error('Could not capture slide image');
+      setExtractionStage('idle');
       return;
     }
 
-    setIsExtractingSlideQuestion(true);
+    // Stage 2: Analyzing with AI
+    setExtractionStage('analyzing');
     
     try {
       console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}`);
@@ -123,15 +128,20 @@ export default function SlidePresenter() {
       if (error) {
         console.error('Error extracting slide question:', error);
         toast.error(error.message || 'Failed to extract question from slide');
+        setExtractionStage('idle');
         return;
       }
 
       if (!data?.success) {
         toast.error(data?.error || 'No question found on this slide');
+        setExtractionStage('idle');
         return;
       }
 
       console.log('✅ Extracted question:', data.data);
+
+      // Stage 3: Sending to students
+      setExtractionStage('sending');
 
       // Send the extracted question to students via dedicated edge function
       const extractedData = data.data;
@@ -147,11 +157,13 @@ export default function SlidePresenter() {
       if (sendError) {
         console.error('Error sending slide question:', sendError);
         toast.error(sendError.message || 'Failed to send question to students');
+        setExtractionStage('idle');
         return;
       }
 
       if (!sendData?.success) {
         toast.error(sendData?.error || 'Failed to send question');
+        setExtractionStage('idle');
         return;
       }
 
@@ -161,7 +173,7 @@ export default function SlidePresenter() {
       console.error('Error in handleSendSlideQuestion:', err);
       toast.error('An error occurred while processing the slide');
     } finally {
-      setIsExtractingSlideQuestion(false);
+      setExtractionStage('idle');
     }
   }, [currentSlideNumber]);
 
@@ -328,7 +340,7 @@ export default function SlidePresenter() {
           autoQuestionInterval={autoQuestionInterval}
           isSendingQuestion={isSendingQuestion}
           voiceCommandDetected={voiceCommandDetected}
-          isExtractingSlideQuestion={isExtractingSlideQuestion}
+          extractionStage={extractionStage}
           onStartRecording={startRecording}
           onStopRecording={stopRecording}
           onManualSend={handleManualQuestionSend}
