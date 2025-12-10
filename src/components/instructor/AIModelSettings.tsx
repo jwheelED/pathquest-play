@@ -20,9 +20,17 @@ interface ModelOption {
 
 const AI_MODELS: ModelOption[] = [
   {
+    value: "google/gemini-3-pro-preview",
+    label: "Gemini 3 Pro",
+    description: "Next-generation model with superior accuracy. Recommended for all use cases.",
+    speed: "fast",
+    cost: "low",
+    quality: "superior"
+  },
+  {
     value: "google/gemini-2.5-flash",
     label: "Gemini 2.5 Flash",
-    description: "Best balance of speed, cost, and accuracy. Recommended for most use cases.",
+    description: "Previous generation. Good balance of speed and quality.",
     speed: "fast",
     cost: "low",
     quality: "excellent"
@@ -30,23 +38,15 @@ const AI_MODELS: ModelOption[] = [
   {
     value: "google/gemini-2.5-pro",
     label: "Gemini 2.5 Pro",
-    description: "Highest accuracy for complex grading. Better for nuanced partial credit.",
+    description: "Previous generation Pro model for complex tasks.",
     speed: "balanced",
     cost: "medium",
-    quality: "superior"
-  },
-  {
-    value: "google/gemini-2.5-flash-lite",
-    label: "Gemini 2.5 Flash Lite",
-    description: "Fastest and cheapest. Good for simple grading tasks.",
-    speed: "fast",
-    cost: "low",
-    quality: "good"
+    quality: "excellent"
   },
   {
     value: "openai/gpt-5-mini",
     label: "GPT-5 Mini",
-    description: "Strong reasoning with moderate cost. Good alternative to Gemini Pro.",
+    description: "Strong reasoning with moderate cost. Good alternative.",
     speed: "balanced",
     cost: "medium",
     quality: "excellent"
@@ -54,7 +54,7 @@ const AI_MODELS: ModelOption[] = [
   {
     value: "openai/gpt-5",
     label: "GPT-5",
-    description: "Most powerful model. Best accuracy but highest cost and slowest.",
+    description: "Most powerful model. Best accuracy but highest cost.",
     speed: "slow",
     cost: "high",
     quality: "superior"
@@ -67,10 +67,10 @@ export const AIModelSettings = () => {
   const [autoGradeMCQ, setAutoGradeMCQ] = useState(true);
   const [autoGradeShortAnswer, setAutoGradeShortAnswer] = useState(true);
   const [autoGradeCoding, setAutoGradeCoding] = useState(false);
-  const [detectionModel, setDetectionModel] = useState("google/gemini-2.5-flash");
-  const [transcriptionModel, setTranscriptionModel] = useState("google/gemini-2.5-flash");
-  const [generationModel, setGenerationModel] = useState("google/gemini-2.5-flash");
-  const [intervalQuestionModel, setIntervalQuestionModel] = useState("google/gemini-2.5-flash");
+  const [detectionModel, setDetectionModel] = useState("google/gemini-3-pro-preview");
+  const [transcriptionModel, setTranscriptionModel] = useState("google/gemini-3-pro-preview");
+  const [generationModel, setGenerationModel] = useState("google/gemini-3-pro-preview");
+  const [intervalQuestionModel, setIntervalQuestionModel] = useState("google/gemini-3-pro-preview");
 
   useEffect(() => {
     fetchSettings();
@@ -93,10 +93,10 @@ export const AIModelSettings = () => {
         setAutoGradeMCQ(data.auto_grade_mcq ?? true);
         setAutoGradeShortAnswer(data.auto_grade_short_answer ?? true);
         setAutoGradeCoding(data.auto_grade_coding ?? false);
-        setDetectionModel(data.detection_model || "google/gemini-2.5-flash");
-        setTranscriptionModel(data.transcription_model || "google/gemini-2.5-flash");
-        setGenerationModel(data.generation_model || "google/gemini-2.5-flash");
-        setIntervalQuestionModel(data.interval_question_model || "google/gemini-2.5-flash");
+        setDetectionModel(data.detection_model || "google/gemini-3-pro-preview");
+        setTranscriptionModel(data.transcription_model || "google/gemini-3-pro-preview");
+        setGenerationModel(data.generation_model || "google/gemini-3-pro-preview");
+        setIntervalQuestionModel(data.interval_question_model || "google/gemini-3-pro-preview");
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -115,7 +115,7 @@ export const AIModelSettings = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          auto_grade_model: 'google/gemini-2.5-pro',
+          auto_grade_model: 'google/gemini-3-pro-preview',
           auto_grade_mcq: autoGradeMCQ,
           auto_grade_short_answer: autoGradeShortAnswer,
           auto_grade_coding: autoGradeCoding,
@@ -164,7 +164,7 @@ export const AIModelSettings = () => {
     return <Badge variant="secondary" className={colors[quality as keyof typeof colors]}>{quality}</Badge>;
   };
 
-  const currentModel = AI_MODELS.find(m => m.value === 'google/gemini-2.5-pro');
+  const currentModel = AI_MODELS.find(m => m.value === 'google/gemini-3-pro-preview');
 
   if (loading) {
     return (
