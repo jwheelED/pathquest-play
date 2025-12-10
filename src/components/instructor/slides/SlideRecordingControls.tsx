@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export type SlideQuestionType = 'mcq' | 'short_answer' | 'coding';
+export type ExtractionStage = 'idle' | 'capturing' | 'analyzing' | 'sending';
 
 interface SlideRecordingControlsProps {
   isRecording: boolean;
@@ -32,7 +33,7 @@ interface SlideRecordingControlsProps {
   autoQuestionInterval: number;
   isSendingQuestion: boolean;
   voiceCommandDetected: boolean;
-  isExtractingSlideQuestion?: boolean;
+  extractionStage?: ExtractionStage;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onManualSend: () => void;
@@ -50,7 +51,7 @@ export function SlideRecordingControls({
   autoQuestionInterval,
   isSendingQuestion,
   voiceCommandDetected,
-  isExtractingSlideQuestion = false,
+  extractionStage = 'idle',
   onStartRecording,
   onStopRecording,
   onManualSend,
@@ -59,6 +60,8 @@ export function SlideRecordingControls({
   onSendSlideQuestion,
 }: SlideRecordingControlsProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+
+  const isExtracting = extractionStage !== 'idle';
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -86,6 +89,19 @@ export function SlideRecordingControls({
     if (nextAutoQuestionIn <= 10) return 'bg-red-500';
     if (nextAutoQuestionIn <= 30) return 'bg-amber-500';
     return 'bg-emerald-500';
+  };
+
+  const getExtractionStageInfo = () => {
+    switch (extractionStage) {
+      case 'capturing':
+        return { label: 'Capturing slide...', progress: 33 };
+      case 'analyzing':
+        return { label: 'Analyzing with AI...', progress: 66 };
+      case 'sending':
+        return { label: 'Sending to students...', progress: 90 };
+      default:
+        return { label: '', progress: 0 };
+    }
   };
 
   const intervalSeconds = autoQuestionInterval * 60;
@@ -281,40 +297,65 @@ export function SlideRecordingControls({
 
         {/* Send Slide Question Button - always visible in presentation mode */}
         {onSendSlideQuestion && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                disabled={isExtractingSlideQuestion || isSendingQuestion}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white border-0"
-              >
-                {isExtractingSlideQuestion ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Extracting Question...
-                  </>
-                ) : (
-                  <>
-                    <FileQuestion className="w-4 h-4 mr-2" />
-                    Send Slide Question
-                  </>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onClick={() => onSendSlideQuestion('mcq')}>
-                <span className="font-medium">Multiple Choice</span>
-                <span className="ml-auto text-xs text-muted-foreground">MCQ</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSendSlideQuestion('short_answer')}>
-                <span className="font-medium">Short Answer</span>
-                <span className="ml-auto text-xs text-muted-foreground">Text</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSendSlideQuestion('coding')}>
-                <span className="font-medium">Coding Challenge</span>
-                <span className="ml-auto text-xs text-muted-foreground">Code</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="space-y-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={isExtracting || isSendingQuestion}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white border-0"
+                >
+                  {isExtracting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {getExtractionStageInfo().label}
+                    </>
+                  ) : (
+                    <>
+                      <FileQuestion className="w-4 h-4 mr-2" />
+                      Send Slide Question
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem onClick={() => onSendSlideQuestion('mcq')}>
+                  <span className="font-medium">Multiple Choice</span>
+                  <span className="ml-auto text-xs text-muted-foreground">MCQ</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSendSlideQuestion('short_answer')}>
+                  <span className="font-medium">Short Answer</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Text</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSendSlideQuestion('coding')}>
+                  <span className="font-medium">Coding Challenge</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Code</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Progress indicator for extraction stages */}
+            {isExtracting && (
+              <div className="space-y-1.5">
+                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 transition-all duration-500 rounded-full"
+                    style={{ width: `${getExtractionStageInfo().progress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-500">
+                  <span className={cn(extractionStage === 'capturing' ? 'text-purple-400' : '')}>
+                    Capture
+                  </span>
+                  <span className={cn(extractionStage === 'analyzing' ? 'text-purple-400' : '')}>
+                    Analyze
+                  </span>
+                  <span className={cn(extractionStage === 'sending' ? 'text-purple-400' : '')}>
+                    Send
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Voice Command Hint */}
