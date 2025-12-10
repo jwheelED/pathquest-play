@@ -9,6 +9,7 @@ import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Presentation, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { playNotificationSound } from '@/lib/audioNotification';
 
 export interface SlideData {
   id: string;
@@ -35,6 +36,28 @@ export default function SlidePresenter() {
   const [currentSlideText, setCurrentSlideText] = useState<string>('');
   const [currentSlideNumber, setCurrentSlideNumber] = useState<number>(1);
 
+  // Refs to hold callbacks to avoid circular dependency with useLectureRecording
+  const handleManualQuestionSendRef = useRef<(() => Promise<void>) | null>(null);
+  const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType) => Promise<void>) | null>(null);
+
+  // Handle voice commands from lecture recording
+  const handleVoiceCommand = useCallback((type: 'send_question' | 'send_slide_question') => {
+    console.log(`🎤 Slide Presenter received voice command: ${type}`);
+    
+    // Play notification sound for voice command detection
+    playNotificationSound().catch(() => {});
+    
+    if (type === 'send_slide_question') {
+      // Voice command to send slide question - default to MCQ
+      toast.success('Voice command: Send Slide Question');
+      handleSendSlideQuestionRef.current?.('mcq');
+    } else if (type === 'send_question') {
+      // Voice command to send regular question from transcript
+      toast.success('Voice command: Send Question');
+      handleManualQuestionSendRef.current?.();
+    }
+  }, []);
+
   // Integrate lecture recording hook with slide context
   const {
     isRecording,
@@ -55,7 +78,13 @@ export default function SlidePresenter() {
       console.log('Question generated from slide presenter');
     },
     slideContext: currentSlideText,
+    onVoiceCommand: handleVoiceCommand,
   });
+
+  // Update ref when handleManualQuestionSend is available
+  useEffect(() => {
+    handleManualQuestionSendRef.current = handleManualQuestionSend;
+  }, [handleManualQuestionSend]);
 
   // Handle slide change - receive text from SlideViewer
   const handleSlideChange = useCallback((slideText: string, pageNumber: number) => {
@@ -170,6 +199,11 @@ export default function SlidePresenter() {
       setIsExtractingSlideQuestion(false);
     }
   }, [currentSlideNumber]);
+
+  // Update ref when handleSendSlideQuestion is available
+  useEffect(() => {
+    handleSendSlideQuestionRef.current = handleSendSlideQuestion;
+  }, [handleSendSlideQuestion]);
 
   useEffect(() => {
     const checkAuth = async () => {
