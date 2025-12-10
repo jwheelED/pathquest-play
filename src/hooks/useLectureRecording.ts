@@ -6,6 +6,7 @@ import { usePresenterBroadcast } from '@/hooks/useLecturePresenterChannel';
 import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
+import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 
 // Constants
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -39,12 +40,26 @@ export interface LectureRecordingActions {
 export interface UseLectureRecordingOptions {
   onQuestionGenerated?: () => void;
   slideContext?: string;
+  onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
 }
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
+  
+  // Voice command detection hook
+  const { checkTranscriptForCommand, resetCooldown: resetVoiceCommandCooldown } = useVoiceCommandDetection({
+    cooldownMs: 5000,
+    onCommandDetected: (type) => {
+      if (type && onVoiceCommand) {
+        console.log(`🎤 Voice command detected: ${type}`);
+        setVoiceCommandDetected(true);
+        setTimeout(() => setVoiceCommandDetected(false), 2000);
+        onVoiceCommand(type);
+      }
+    },
+  });
   
   // Store slide context in a ref so it's always current
   const slideContextRef = useRef<string>('');
@@ -266,6 +281,14 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       isGeneratingAutoQuestionRef.current = false;
     }
   }, [isRecording]);
+
+  // Voice command detection - check transcriptChunks for commands
+  useEffect(() => {
+    if (!isRecording || transcriptChunks.length === 0) return;
+    
+    // Check the latest transcript chunks for voice commands
+    checkTranscriptForCommand(transcriptChunks);
+  }, [isRecording, transcriptChunks, checkTranscriptForCommand]);
 
   // Handle question send
   const handleQuestionSend = async (detectionData: any) => {

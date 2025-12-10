@@ -296,9 +296,9 @@ export function SlideRecordingControls({
 
         {/* Voice Command Hint */}
         {isRecording && (
-          <div className="text-center">
+          <div className="text-center space-y-0.5">
             <p className="text-[10px] text-slate-500">
-              Say "send question" to trigger voice command
+              Voice commands: "send question" or "send slide"
             </p>
           </div>
         )}
