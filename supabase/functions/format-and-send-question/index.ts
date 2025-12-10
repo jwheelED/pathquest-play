@@ -41,7 +41,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
@@ -164,7 +164,7 @@ CRITICAL REQUIREMENTS:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
