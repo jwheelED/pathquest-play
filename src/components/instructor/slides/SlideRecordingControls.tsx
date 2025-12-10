@@ -343,11 +343,11 @@ export function SlideRecordingControls({
           </div>
         )}
 
-        {/* Selection indicator */}
+        {/* Selection indicator with call-to-action */}
         {hasSelection && (
-          <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 rounded-lg px-3 py-2">
-            <Crop className="w-3.5 h-3.5" />
-            <span>Region selected - question will focus on this area</span>
+          <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/30">
+            <Crop className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Region selected! Click <strong>"Send Selected Region"</strong> below to extract question</span>
           </div>
         )}
 
@@ -358,7 +358,10 @@ export function SlideRecordingControls({
               <DropdownMenuTrigger asChild>
                 <Button
                   disabled={isExtracting || isSendingQuestion}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white border-0"
+                  className={cn(
+                    "w-full bg-purple-600 hover:bg-purple-700 text-white border-0 transition-all",
+                    hasSelection && !isExtracting && "animate-pulse ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900"
+                  )}
                 >
                   {isExtracting ? (
                     <>
@@ -368,10 +371,10 @@ export function SlideRecordingControls({
                   ) : (
                     <>
                       <FileQuestion className="w-4 h-4 mr-2" />
-                      Send Slide Question
+                      {hasSelection ? 'Send Selected Region' : 'Send Slide Question'}
                       {hasSelection && (
                         <Badge variant="secondary" className="ml-2 bg-amber-500/30 text-amber-300 text-[10px]">
-                          Region
+                          Ready
                         </Badge>
                       )}
                     </>
