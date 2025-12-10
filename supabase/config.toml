@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.submit-live-response]
 verify_jwt = false
+
+[functions.extract-slide-question]
+verify_jwt = true
