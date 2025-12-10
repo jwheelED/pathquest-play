@@ -44,7 +44,7 @@ serve(async (req) => {
       });
     }
 
-    const { slideImage, questionType } = await req.json();
+    const { slideImage, questionType, difficulty_preference } = await req.json();
 
     if (!slideImage) {
       return new Response(JSON.stringify({ error: 'Slide image is required' }), {
@@ -55,6 +55,14 @@ serve(async (req) => {
 
     const validTypes = ['mcq', 'short_answer', 'coding'];
     const type = validTypes.includes(questionType) ? questionType : 'mcq';
+    const difficulty = ['easy', 'medium', 'hard'].includes(difficulty_preference) ? difficulty_preference : 'easy';
+
+    // Difficulty instructions for prompt
+    const difficultyInstructions = {
+      easy: "Generate an EASY question: focus on basic recall, simple definitions, or straightforward facts visible on the slide. The answer should be directly stated on the slide.",
+      medium: "Generate a MEDIUM difficulty question: require understanding and application of concepts. Students should need to think about the content, not just recall it.",
+      hard: "Generate a HARD question: require analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations."
+    };
 
     console.log(`📋 Extracting ${type} question from slide image (${slideImage.length} chars)`);
 
@@ -67,37 +75,47 @@ serve(async (req) => {
     let extractionPrompt = '';
     
     if (type === 'mcq') {
-      extractionPrompt = `You are analyzing a slide image that contains a multiple choice question.
+      extractionPrompt = `You are analyzing a slide image to extract or generate a multiple choice question.
 
-Extract the question and return it in this exact JSON format:
+${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
+
+If there's an existing question on the slide, extract it. If not, CREATE a question based on the slide content.
+
+Return in this exact JSON format:
 {
   "found": true,
-  "question": "The exact question text from the slide",
+  "question": "The question text (extracted or generated based on slide content)",
   "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
   "correctAnswer": "The letter of the correct answer (A, B, C, or D)",
-  "explanation": "Brief explanation of why this is the correct answer"
+  "explanation": "Brief explanation of why this is the correct answer",
+  "difficulty": "${difficulty}"
 }
 
-If the correct answer is marked on the slide (checkmark, highlight, asterisk, etc.), use that.
-If no correct answer is marked, analyze the content and determine the most likely correct answer.
+If the slide has a question with correct answer marked (checkmark, highlight, asterisk), use that.
+If no question exists, generate one based on the key concept from the slide.
 
-If no question is found on this slide, return:
-{"found": false, "error": "No question found on this slide"}
+If the slide has no meaningful educational content, return:
+{"found": false, "error": "No suitable content found on this slide"}
 
 Return ONLY valid JSON, no other text.`;
     } else if (type === 'short_answer') {
-      extractionPrompt = `You are analyzing a slide image that contains a short answer question.
+      extractionPrompt = `You are analyzing a slide image to extract or generate a short answer question.
 
-Extract the question and return it in this exact JSON format:
+${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
+
+If there's an existing question on the slide, extract it. If not, CREATE a question based on the slide content.
+
+Return in this exact JSON format:
 {
   "found": true,
-  "question": "The exact question text from the slide",
-  "expectedAnswer": "The expected answer if shown, or a brief model answer",
-  "explanation": "Additional context or explanation if available"
+  "question": "The question text (extracted or generated based on slide content)",
+  "expectedAnswer": "The expected answer based on slide content",
+  "explanation": "Additional context or explanation",
+  "difficulty": "${difficulty}"
 }
 
-If no question is found on this slide, return:
-{"found": false, "error": "No question found on this slide"}
+If the slide has no meaningful educational content, return:
+{"found": false, "error": "No suitable content found on this slide"}
 
 Return ONLY valid JSON, no other text.`;
     } else if (type === 'coding') {
