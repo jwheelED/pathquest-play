@@ -18,6 +18,8 @@ import {
   ChevronDown,
   FileQuestion,
   Loader2,
+  Crop,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +36,12 @@ interface SlideRecordingControlsProps {
   isSendingQuestion: boolean;
   voiceCommandDetected: boolean;
   extractionStage?: ExtractionStage;
+  // Selection mode props
+  isSelectionMode?: boolean;
+  hasSelection?: boolean;
+  onToggleSelectionMode?: () => void;
+  onClearSelection?: () => void;
+  // Handlers
   onStartRecording: () => void;
   onStopRecording: () => void;
   onManualSend: () => void;
@@ -52,6 +60,10 @@ export function SlideRecordingControls({
   isSendingQuestion,
   voiceCommandDetected,
   extractionStage = 'idle',
+  isSelectionMode = false,
+  hasSelection = false,
+  onToggleSelectionMode,
+  onClearSelection,
   onStartRecording,
   onStopRecording,
   onManualSend,
@@ -143,6 +155,12 @@ export function SlideRecordingControls({
             <Users className="w-3.5 h-3.5" />
             <span className="text-xs">{studentCount}</span>
           </div>
+          {hasSelection && (
+            <Badge variant="secondary" className="bg-amber-500/20 text-amber-400 text-[10px]">
+              <Crop className="w-2.5 h-2.5 mr-1" />
+              Region
+            </Badge>
+          )}
           {voiceCommandDetected && (
             <Mic className="w-4 h-4 text-emerald-400 animate-bounce" />
           )}
@@ -295,6 +313,44 @@ export function SlideRecordingControls({
           </Button>
         )}
 
+        {/* Region Selection Controls */}
+        {onSendSlideQuestion && onToggleSelectionMode && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleSelectionMode}
+              className={cn(
+                "flex-1 transition-all",
+                isSelectionMode 
+                  ? "bg-amber-600/20 border-amber-500 text-amber-400 hover:bg-amber-600/30" 
+                  : "border-slate-600 text-slate-300 hover:bg-slate-800"
+              )}
+            >
+              <Crop className="w-4 h-4 mr-1.5" />
+              {isSelectionMode ? 'Exit Selection' : 'Select Region'}
+            </Button>
+            {hasSelection && onClearSelection && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClearSelection}
+                className="border-slate-600 text-slate-300 hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Selection indicator */}
+        {hasSelection && (
+          <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 rounded-lg px-3 py-2">
+            <Crop className="w-3.5 h-3.5" />
+            <span>Region selected - question will focus on this area</span>
+          </div>
+        )}
+
         {/* Send Slide Question Button - always visible in presentation mode */}
         {onSendSlideQuestion && (
           <div className="space-y-2">
@@ -313,6 +369,11 @@ export function SlideRecordingControls({
                     <>
                       <FileQuestion className="w-4 h-4 mr-2" />
                       Send Slide Question
+                      {hasSelection && (
+                        <Badge variant="secondary" className="ml-2 bg-amber-500/30 text-amber-300 text-[10px]">
+                          Region
+                        </Badge>
+                      )}
                     </>
                   )}
                 </Button>
