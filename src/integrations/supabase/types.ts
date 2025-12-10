@@ -1154,6 +1154,7 @@ export type Database = {
           onboarded: boolean | null
           org_id: string | null
           professor_type: Database["public"]["Enums"]["professor_type"] | null
+          question_difficulty_preference: string | null
           question_format_preference: string | null
           study_days: string[] | null
           transcription_model: string
@@ -1185,6 +1186,7 @@ export type Database = {
           onboarded?: boolean | null
           org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
+          question_difficulty_preference?: string | null
           question_format_preference?: string | null
           study_days?: string[] | null
           transcription_model?: string
@@ -1216,6 +1218,7 @@ export type Database = {
           onboarded?: boolean | null
           org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
+          question_difficulty_preference?: string | null
           question_format_preference?: string | null
           study_days?: string[] | null
           transcription_model?: string

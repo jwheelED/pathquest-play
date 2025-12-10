@@ -117,11 +117,24 @@ export default function SlidePresenter() {
     try {
       console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}`);
       
+      // Fetch instructor's difficulty preference
+      const { data: { user } } = await supabase.auth.getUser();
+      let difficultyPref = 'easy';
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('question_difficulty_preference')
+          .eq('id', user.id)
+          .single();
+        difficultyPref = profile?.question_difficulty_preference || 'easy';
+      }
+
       // Call the edge function to extract question via OCR
       const { data, error } = await supabase.functions.invoke('extract-slide-question', {
         body: {
           slideImage,
           questionType,
+          difficulty_preference: difficultyPref,
         },
       });
 

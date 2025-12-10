@@ -80,10 +80,20 @@ serve(async (req) => {
       materialContext = [],
       strict_mode = true,  // Default to strict mode (always guaranteed questions)
       retry_context = null, // Context from previously failed attempts
-      slide_context = null // Current slide text content
+      slide_context = null, // Current slide text content
+      difficulty_preference = 'easy' // Question difficulty: easy, medium, hard
     } = await req.json();
 
-    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, slide_context: ${slide_context?.length || 0} chars`);
+    // Difficulty instructions for prompts
+    const difficultyInstructions: Record<string, string> = {
+      easy: "Generate an EASY question: Focus on basic recall, simple definitions, or straightforward facts. The answer should be directly stated in the content.",
+      medium: "Generate a MEDIUM difficulty question: Require understanding and application of concepts. Students should need to think and apply knowledge.",
+      hard: "Generate a HARD question: Require analysis, synthesis, or complex reasoning. Students should connect multiple concepts or apply to new situations."
+    };
+
+    const difficultyInstruction = difficultyInstructions[difficulty_preference] || difficultyInstructions.easy;
+
+    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, difficulty: ${difficulty_preference}, slide_context: ${slide_context?.length || 0} chars`);
 
     // In strict mode, use very low minimum content requirements
     const minContentLength = strict_mode ? 10 : (force_send ? 25 : 100);
@@ -222,19 +232,20 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
 
 ${primaryContext}${materialsContext}${slideInstructions}
 
+DIFFICULTY: ${difficultyInstruction}
+
 TASK: Generate ONE high-quality question that:
 1. Tests the MOST IMPORTANT concept from this content
 2. Is clearly answerable based on what was just taught
-3. Requires students to apply or recall key information
+3. Matches the specified difficulty level
 4. Avoids trivial or overly specific details
 ${hasSlideContext ? "5. DIRECTLY relates to content visible on the current slide" : "5. Focus on the lecture content"}
 
 CRITERIA:
 - Focus on main concepts, not minor details
 - Question should be fair and clear
-- Appropriate difficulty for what was just covered
+- Match the difficulty level specified above
 ${hasSlideContext ? "- Answer choices MUST include correct information from the slide" : "- Avoid questions about examples unless they're core to understanding"}
-- The question should test comprehension, not just recall
 - MUST generate a valid question even if content seems limited
 
 Return JSON:
