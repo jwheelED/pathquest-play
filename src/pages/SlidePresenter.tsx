@@ -7,9 +7,10 @@ import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePrese
 import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Presentation, Upload } from 'lucide-react';
+import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
+import { cn } from '@/lib/utils';
 
 export interface SlideData {
   id: string;
@@ -314,6 +315,37 @@ export default function SlidePresenter() {
   if (isFullscreen && activePresentation) {
     return (
       <div className="fixed inset-0 bg-black z-50">
+        {/* Voice Command Screen Flash Overlay */}
+        <div 
+          className={cn(
+            "absolute inset-0 pointer-events-none z-[60] transition-opacity duration-300",
+            voiceCommandDetected 
+              ? "opacity-100" 
+              : "opacity-0"
+          )}
+        >
+          {/* Border glow effect */}
+          <div className={cn(
+            "absolute inset-0 border-8 border-emerald-400 rounded-lg",
+            voiceCommandDetected && "animate-[border-flash_0.5s_ease-out]"
+          )} 
+          style={{
+            boxShadow: voiceCommandDetected 
+              ? 'inset 0 0 60px rgba(52, 211, 153, 0.3), 0 0 60px rgba(52, 211, 153, 0.5)' 
+              : 'none'
+          }}
+          />
+          
+          {/* Center mic icon indicator */}
+          {voiceCommandDetected && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[voice-icon-appear_0.3s_ease-out]">
+              <div className="bg-emerald-500/90 rounded-full p-6 shadow-[0_0_60px_rgba(52,211,153,0.8)]">
+                <Mic className="w-12 h-12 text-white animate-pulse" />
+              </div>
+            </div>
+          )}
+        </div>
+
         <SlideViewer
           ref={slideViewerRef}
           presentationId={activePresentation.id}
