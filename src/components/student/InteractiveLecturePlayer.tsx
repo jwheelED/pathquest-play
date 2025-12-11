@@ -8,11 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
-  XCircle, ChevronRight, Clock, Brain, Sparkles
+  XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ConfidenceSelector } from '@/components/student/ConfidenceSelector';
+import { cn } from '@/lib/utils';
 
 interface PausePoint {
   id: string;
@@ -37,6 +37,44 @@ interface InteractiveLecturePlayerProps {
   pausePoints: PausePoint[];
   onComplete?: () => void;
 }
+
+// Inline confidence selector for interactive lectures
+const CONFIDENCE_OPTIONS = [
+  { key: 'not_sure', label: 'Not Sure', icon: Shield, multiplier: 0.5, color: 'text-muted-foreground', bg: 'bg-muted/50' },
+  { key: 'maybe', label: 'Fairly Confident', icon: Target, multiplier: 1.0, color: 'text-primary', bg: 'bg-primary/10' },
+  { key: 'pretty_sure', label: 'Confident', icon: TrendingUp, multiplier: 2.0, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  { key: 'absolutely_sure', label: 'Absolutely Sure', icon: Flame, multiplier: 3.0, color: 'text-red-500', bg: 'bg-red-500/10' },
+];
+
+const InlineConfidenceSelector = ({ selected, onSelect }: { selected: string; onSelect: (val: string) => void }) => (
+  <div className="space-y-2">
+    <Label className="text-sm font-medium">How confident are you?</Label>
+    <div className="grid grid-cols-2 gap-2">
+      {CONFIDENCE_OPTIONS.map((opt) => {
+        const Icon = opt.icon;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => onSelect(opt.key)}
+            className={cn(
+              "flex items-center gap-2 p-3 rounded-lg border transition-all text-left",
+              selected === opt.key 
+                ? `${opt.bg} border-current ${opt.color}` 
+                : "border-border hover:border-primary/30"
+            )}
+          >
+            <Icon className={cn("h-4 w-4", selected === opt.key ? opt.color : "text-muted-foreground")} />
+            <div>
+              <div className="font-medium text-sm">{opt.label}</div>
+              <div className="text-xs text-muted-foreground">{opt.multiplier}x</div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
 
 export const InteractiveLecturePlayer = ({
   lectureId,
@@ -363,9 +401,9 @@ export const InteractiveLecturePlayer = ({
 
                     {/* Confidence Selector */}
                     <div className="pt-4 border-t">
-                      <ConfidenceSelector
-                        value={confidenceLevel}
-                        onChange={setConfidenceLevel}
+                      <InlineConfidenceSelector
+                        selected={confidenceLevel}
+                        onSelect={setConfidenceLevel}
                       />
                     </div>
 

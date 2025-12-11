@@ -23,6 +23,7 @@ import LiveStudent from "./pages/LiveStudent";
 import PresenterView from "./pages/PresenterView";
 import LecturePresenterView from "./pages/LecturePresenterView";
 import SlidePresenter from "./pages/SlidePresenter";
+import InteractiveLecture from "./pages/InteractiveLecture";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -101,6 +102,11 @@ const App = () => (
           } />
           <Route path="/join" element={<JoinLive />} />
           <Route path="/live/:sessionCode" element={<LiveStudent />} />
+          <Route path="/lecture/:lectureId" element={
+            <ProtectedRoute requiredRole="student" redirectTo="/auth">
+              <InteractiveLecture />
+            </ProtectedRoute>
+          } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -9,6 +9,7 @@ import { AssignedContent } from "@/components/student/AssignedContent";
 import { FlowStateCard } from "@/components/student/FlowStateCard";
 import { FloatingDecorations } from "@/components/student/FloatingDecorations";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
 
 interface User {
   id: string;
@@ -218,8 +219,13 @@ export default function ClassDashboard() {
             <FlowStateCard userId={user.id} instructorId={instructorId} />
           </div>
 
-          {/* Assigned Content for this class */}
+          {/* Interactive Pre-Recorded Lectures */}
           <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-2">
+            <PreRecordedLectureList instructorId={instructorId} />
+          </div>
+
+          {/* Assigned Content for this class */}
+          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-3">
             <AssignedContent 
               userId={user.id} 
               instructorId={instructorId}

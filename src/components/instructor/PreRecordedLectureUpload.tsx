@@ -81,13 +81,14 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       // Create lecture video record
       const { data: lectureVideo, error: insertError } = await supabase
         .from('lecture_videos')
-        .insert({
+        .insert([{
           title: title.trim(),
           description: description.trim() || null,
           video_path: filePath,
           question_count: questionCount,
-          status: 'processing'
-        })
+          status: 'processing',
+          instructor_id: user.id
+        }])
         .select()
         .single();
 
