@@ -67,6 +67,76 @@ serve(async (req) => {
       `[${formatTime(seg.start)} - ${formatTime(seg.end)}] ${seg.text}`
     ).join('\n');
 
+    // First, generate concept map
+    const conceptMapPrompt = `Analyze this lecture transcript and create a concept map.
+Identify all distinct concepts taught, their timestamps, prerequisites, and difficulty levels.
+
+Return JSON array:
+[
+  {
+    "concept_name": "Concept Name",
+    "start_timestamp": 60.0,
+    "end_timestamp": 120.0,
+    "prerequisites": ["Previous Concept"],
+    "difficulty_level": "intermediate",
+    "description": "Brief description of what is covered"
+  }
+]
+
+Transcript:
+${transcriptText}`;
+
+    const conceptMapResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are an expert curriculum designer. Extract concepts from lecture transcripts. Return only valid JSON.' },
+          { role: 'user', content: conceptMapPrompt }
+        ],
+        max_tokens: 3000,
+        temperature: 0.3,
+      }),
+    });
+
+    if (conceptMapResponse.ok) {
+      const conceptResult = await conceptMapResponse.json();
+      const conceptContent = conceptResult.choices?.[0]?.message?.content;
+      const conceptMatch = conceptContent?.match(/\[[\s\S]*\]/);
+      
+      if (conceptMatch) {
+        try {
+          const concepts = JSON.parse(conceptMatch[0]);
+          console.log(`Generated ${concepts.length} concepts for concept map`);
+          
+          // Insert concept map
+          const conceptsToInsert = concepts.map((c: any) => ({
+            lecture_video_id: lectureVideoId,
+            concept_name: c.concept_name,
+            start_timestamp: c.start_timestamp,
+            end_timestamp: c.end_timestamp,
+            prerequisites: c.prerequisites || [],
+            difficulty_level: c.difficulty_level || 'intermediate',
+            description: c.description
+          }));
+
+          const { error: conceptError } = await supabase
+            .from('lecture_concept_map')
+            .insert(conceptsToInsert);
+
+          if (conceptError) {
+            console.error('Failed to insert concept map:', conceptError);
+          }
+        } catch (e) {
+          console.error('Failed to parse concept map:', e);
+        }
+      }
+    }
+
     const systemPrompt = `You are an expert educational psychologist analyzing a lecture transcript for cognitive load.
 
 Your task is to identify ${questionCount} optimal pause points where students should be asked questions to ensure comprehension before continuing.
@@ -94,7 +164,8 @@ RESPONSE FORMAT (JSON array):
     "reason": "Complex formula introduced - Pythagorean theorem derivation",
     "suggested_question_type": "multiple_choice",
     "context_summary": "Brief summary of content just covered",
-    "question_suggestion": "What is the relationship between the sides of a right triangle?"
+    "question_suggestion": "What is the relationship between the sides of a right triangle?",
+    "related_concept": "Name of the concept this tests"
   }
 ]
 

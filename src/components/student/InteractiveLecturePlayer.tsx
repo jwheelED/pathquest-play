@@ -8,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
-  XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame
+  XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
+  RefreshCw, Rewind, BookOpen
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,6 +29,23 @@ interface PausePoint {
   };
   question_type: string;
   order_index: number;
+}
+
+interface RemediationState {
+  active: boolean;
+  explanation: string;
+  jumpToTimestamp: number;
+  endTimestamp: number;
+  followUpQuestion: {
+    type: string;
+    question: string;
+    options?: string[];
+    correctAnswer?: string;
+    explanation?: string;
+  } | null;
+  originalQuestionId: string;
+  misconception: string;
+  loading: boolean;
 }
 
 interface InteractiveLecturePlayerProps {
@@ -100,6 +118,20 @@ export const InteractiveLecturePlayer = ({
   const [isCorrect, setIsCorrect] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set());
   const [totalPoints, setTotalPoints] = useState(0);
+
+  // Remediation loop state
+  const [remediation, setRemediation] = useState<RemediationState>({
+    active: false,
+    explanation: '',
+    jumpToTimestamp: 0,
+    endTimestamp: 0,
+    followUpQuestion: null,
+    originalQuestionId: '',
+    misconception: '',
+    loading: false
+  });
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [followUpAnswer, setFollowUpAnswer] = useState('');
 
   // Sort pause points by timestamp
   const sortedPausePoints = [...pausePoints].sort((a, b) => a.pause_timestamp - b.pause_timestamp);
@@ -293,6 +325,157 @@ export const InteractiveLecturePlayer = ({
         .eq('lecture_video_id', lectureId)
         .eq('student_id', user.id);
     }
+
+    // If incorrect, trigger remediation loop
+    if (!correct) {
+      triggerRemediation(currentQuestion, answer);
+    }
+  };
+
+  // Trigger remediation loop for incorrect answers
+  const triggerRemediation = async (question: PausePoint, studentAnswer: string) => {
+    setRemediation(prev => ({ ...prev, loading: true }));
+
+    try {
+      // Step 1: Detect misconception
+      const { data: misconceptionData, error: miscError } = await supabase.functions.invoke('detect-misconception', {
+        body: {
+          lectureVideoId: lectureId,
+          pausePointId: question.id,
+          questionText: question.question_content.question,
+          correctAnswer: question.question_content.correctAnswer || question.question_content.expectedAnswer,
+          studentAnswer,
+          questionType: question.question_type
+        }
+      });
+
+      if (miscError) throw miscError;
+
+      // Step 2: Generate remediation content
+      const { data: remediationData, error: remError } = await supabase.functions.invoke('generate-remediation', {
+        body: {
+          lectureVideoId: lectureId,
+          pausePointId: question.id,
+          misconception: misconceptionData.misconception,
+          missingConcept: misconceptionData.missingConcept,
+          rootCause: misconceptionData.rootCause,
+          originalQuestion: question.question_content.question,
+          correctAnswer: question.question_content.correctAnswer || question.question_content.expectedAnswer,
+          studentAnswer
+        }
+      });
+
+      if (remError) throw remError;
+
+      // Step 3: Save to remediation history
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('remediation_history').insert({
+          student_id: user.id,
+          lecture_video_id: lectureId,
+          pause_point_id: question.id,
+          misconception_detected: misconceptionData.misconception,
+          missing_concept: misconceptionData.missingConcept,
+          remediation_timestamp: misconceptionData.recommendedTimestamp,
+          remediation_end_timestamp: misconceptionData.endTimestamp,
+          ai_explanation: remediationData.explanation,
+          follow_up_question: remediationData.followUpQuestion
+        });
+      }
+
+      setRemediation({
+        active: true,
+        explanation: remediationData.explanation,
+        jumpToTimestamp: misconceptionData.recommendedTimestamp,
+        endTimestamp: misconceptionData.endTimestamp,
+        followUpQuestion: remediationData.followUpQuestion,
+        originalQuestionId: question.id,
+        misconception: misconceptionData.misconception,
+        loading: false
+      });
+    } catch (error) {
+      console.error('Remediation failed:', error);
+      setRemediation(prev => ({ ...prev, loading: false }));
+      // Continue without remediation if it fails
+    }
+  };
+
+  // Handle jumping to remediation timestamp
+  const handleWatchRemediation = () => {
+    if (!videoRef.current) return;
+    
+    // Allow seeking to remediation point (override no-skip for this)
+    videoRef.current.currentTime = remediation.jumpToTimestamp;
+    setCurrentQuestion(null);
+    setShowResult(false);
+    setRemediation(prev => ({ ...prev, active: false }));
+    setShowFollowUp(false);
+    
+    videoRef.current.play();
+    setIsPlaying(true);
+
+    // Set up listener to pause at end of remediation segment and show follow-up
+    const handleRemediationEnd = () => {
+      if (videoRef.current && videoRef.current.currentTime >= remediation.endTimestamp) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+        if (remediation.followUpQuestion) {
+          setShowFollowUp(true);
+        }
+        videoRef.current.removeEventListener('timeupdate', handleRemediationEnd);
+      }
+    };
+    
+    videoRef.current.addEventListener('timeupdate', handleRemediationEnd);
+  };
+
+  // Handle follow-up question submission
+  const handleFollowUpSubmit = async () => {
+    if (!remediation.followUpQuestion || !followUpAnswer) return;
+
+    const correct = followUpAnswer.charAt(0).toUpperCase() === remediation.followUpQuestion.correctAnswer;
+    
+    // Update remediation history
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('remediation_history')
+        .update({
+          follow_up_answered: true,
+          follow_up_correct: correct,
+          resolved: correct,
+          resolved_at: correct ? new Date().toISOString() : null
+        })
+        .eq('student_id', user.id)
+        .eq('pause_point_id', remediation.originalQuestionId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+    }
+
+    if (correct) {
+      toast.success('Great! You got it this time!');
+      setTotalPoints(prev => prev + 50); // Bonus for completing remediation
+    } else {
+      toast.info('Keep practicing! You\'ll get it.');
+    }
+
+    // Reset states and continue
+    setShowFollowUp(false);
+    setFollowUpAnswer('');
+    setRemediation({
+      active: false,
+      explanation: '',
+      jumpToTimestamp: 0,
+      endTimestamp: 0,
+      followUpQuestion: null,
+      originalQuestionId: '',
+      misconception: '',
+      loading: false
+    });
+
+    // Resume video
+    videoRef.current?.play();
+    setIsPlaying(true);
   };
 
   const handleContinue = () => {
@@ -301,6 +484,9 @@ export const InteractiveLecturePlayer = ({
     setShortAnswer('');
     setConfidenceLevel('');
     setShowResult(false);
+
+    // If remediation is active, don't auto-continue - wait for user action
+    if (remediation.active) return;
 
     // Check if lecture is complete
     if (answeredQuestions.size === sortedPausePoints.length) {
@@ -446,10 +632,68 @@ export const InteractiveLecturePlayer = ({
                       )}
                     </div>
 
-                    <Button onClick={handleContinue} className="w-full" size="lg">
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Continue Lecture
-                    </Button>
+                    {/* Remediation UI for incorrect answers */}
+                    {!isCorrect && remediation.loading && (
+                      <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                          <span className="text-sm">Analyzing your answer to create a personalized review...</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isCorrect && remediation.active && (
+                      <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-4">
+                        <div className="flex items-center gap-2 text-amber-600">
+                          <BookOpen className="h-5 w-5" />
+                          <span className="font-semibold">Personalized Review Available</span>
+                        </div>
+                        
+                        <p className="text-sm text-muted-foreground">
+                          {remediation.explanation}
+                        </p>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Rewind className="h-4 w-4" />
+                          <span>
+                            We'll take you back to {formatTime(remediation.jumpToTimestamp)} where this concept was explained.
+                          </span>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={handleWatchRemediation}
+                            className="flex-1 bg-amber-500 hover:bg-amber-600"
+                          >
+                            <Rewind className="h-4 w-4 mr-2" />
+                            Watch Review Clip
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={() => {
+                              setRemediation(prev => ({ ...prev, active: false }));
+                              handleContinue();
+                            }}
+                          >
+                            Skip
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {isCorrect && (
+                      <Button onClick={handleContinue} className="w-full" size="lg">
+                        <ChevronRight className="h-4 w-4 mr-2" />
+                        Continue Lecture
+                      </Button>
+                    )}
+
+                    {!isCorrect && !remediation.active && !remediation.loading && (
+                      <Button onClick={handleContinue} className="w-full" size="lg">
+                        <ChevronRight className="h-4 w-4 mr-2" />
+                        Continue Lecture
+                      </Button>
+                    )}
                   </>
                 )}
               </CardContent>
@@ -535,6 +779,52 @@ export const InteractiveLecturePlayer = ({
             </div>
           </div>
         </div>
+
+        {/* Follow-up Question Overlay after Remediation */}
+        {showFollowUp && remediation.followUpQuestion && (
+          <div className="absolute inset-0 bg-black/90 flex items-center justify-center p-4 z-20">
+            <Card className="w-full max-w-2xl">
+              <CardHeader>
+                <Badge className="w-fit bg-amber-500 mb-2">
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Follow-up Question
+                </Badge>
+                <CardTitle>{remediation.followUpQuestion.question}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup
+                  value={followUpAnswer}
+                  onValueChange={setFollowUpAnswer}
+                  className="space-y-2"
+                >
+                  {remediation.followUpQuestion.options?.map((option, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "flex items-center space-x-3 p-3 rounded-lg border transition-colors",
+                        followUpAnswer === option ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+                      )}
+                    >
+                      <RadioGroupItem value={option} id={`followup-${idx}`} />
+                      <Label htmlFor={`followup-${idx}`} className="flex-1 cursor-pointer">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+
+                <Button 
+                  onClick={handleFollowUpSubmit} 
+                  className="w-full" 
+                  size="lg"
+                  disabled={!followUpAnswer}
+                >
+                  Submit Answer
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
