@@ -455,6 +455,50 @@ export type Database = {
           },
         ]
       }
+      lecture_concept_map: {
+        Row: {
+          concept_name: string
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          end_timestamp: number
+          id: string
+          lecture_video_id: string
+          prerequisites: string[] | null
+          start_timestamp: number
+        }
+        Insert: {
+          concept_name: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          end_timestamp: number
+          id?: string
+          lecture_video_id: string
+          prerequisites?: string[] | null
+          start_timestamp: number
+        }
+        Update: {
+          concept_name?: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          end_timestamp?: number
+          id?: string
+          lecture_video_id?: string
+          prerequisites?: string[] | null
+          start_timestamp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_concept_map_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lecture_materials: {
         Row: {
           created_at: string
@@ -1426,6 +1470,82 @@ export type Database = {
           window_start?: string
         }
         Relationships: []
+      }
+      remediation_history: {
+        Row: {
+          ai_explanation: string
+          created_at: string
+          follow_up_answered: boolean | null
+          follow_up_correct: boolean | null
+          follow_up_question: Json | null
+          id: string
+          lecture_video_id: string
+          misconception_detected: string
+          missing_concept: string | null
+          pause_point_id: string | null
+          remediation_end_timestamp: number | null
+          remediation_timestamp: number
+          resolved: boolean | null
+          resolved_at: string | null
+          student_id: string
+        }
+        Insert: {
+          ai_explanation: string
+          created_at?: string
+          follow_up_answered?: boolean | null
+          follow_up_correct?: boolean | null
+          follow_up_question?: Json | null
+          id?: string
+          lecture_video_id: string
+          misconception_detected: string
+          missing_concept?: string | null
+          pause_point_id?: string | null
+          remediation_end_timestamp?: number | null
+          remediation_timestamp: number
+          resolved?: boolean | null
+          resolved_at?: string | null
+          student_id: string
+        }
+        Update: {
+          ai_explanation?: string
+          created_at?: string
+          follow_up_answered?: boolean | null
+          follow_up_correct?: boolean | null
+          follow_up_question?: Json | null
+          id?: string
+          lecture_video_id?: string
+          misconception_detected?: string
+          missing_concept?: string | null
+          pause_point_id?: string | null
+          remediation_end_timestamp?: number | null
+          remediation_timestamp?: number
+          resolved?: boolean | null
+          resolved_at?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remediation_history_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_history_pause_point_id_fkey"
+            columns: ["pause_point_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_pause_points"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spaced_repetition: {
         Row: {
