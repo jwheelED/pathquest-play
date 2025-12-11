@@ -79,6 +79,17 @@ serve(async (req) => {
 
 ${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
 
+**GRAPH & CHART ANALYSIS:**
+If the slide contains graphs, charts, diagrams, or data visualizations:
+- Identify the type (bar chart, line graph, pie chart, scatter plot, flowchart, diagram, table, etc.)
+- Extract key data points, values, trends, comparisons, or relationships shown
+- Read axis labels, legends, data labels, and any numerical values (approximate values are acceptable)
+- Generate questions that test understanding of the visual data such as:
+  * "According to the graph, which category has the highest/lowest value?"
+  * "What trend does the data show between X and Y?"
+  * "Approximately what percentage/value does X represent?"
+  * "Based on the chart, which statement is correct?"
+
 If there's an existing question on the slide, extract it. If not, CREATE a question based on the slide content.
 
 Return in this exact JSON format:
@@ -91,6 +102,7 @@ Return in this exact JSON format:
   "difficulty": "${difficulty}"
 }
 
+For graph-based questions, ensure answer options include plausible values/interpretations from the visual data.
 If the slide has a question with correct answer marked (checkmark, highlight, asterisk), use that.
 If no question exists, generate one based on the key concept from the slide.
 
@@ -103,13 +115,24 @@ Return ONLY valid JSON, no other text.`;
 
 ${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
 
+**GRAPH & CHART ANALYSIS:**
+If the slide contains graphs, charts, diagrams, or data visualizations:
+- Identify the type (bar chart, line graph, pie chart, scatter plot, flowchart, diagram, table, etc.)
+- Extract key data points, values, trends, comparisons, or relationships shown
+- Read axis labels, legends, data labels, and any numerical values (approximate values are acceptable)
+- Generate questions that require interpreting or explaining the visual data such as:
+  * "What trend does the graph show and what might explain it?"
+  * "Describe the relationship between X and Y based on the data."
+  * "What is the approximate value of X according to the chart?"
+  * "Explain what the diagram illustrates about the process."
+
 If there's an existing question on the slide, extract it. If not, CREATE a question based on the slide content.
 
 Return in this exact JSON format:
 {
   "found": true,
   "question": "The question text (extracted or generated based on slide content)",
-  "expectedAnswer": "The expected answer based on slide content",
+  "expectedAnswer": "The expected answer based on slide content (for graph questions, accept reasonable approximations)",
   "explanation": "Additional context or explanation",
   "difficulty": "${difficulty}"
 }
