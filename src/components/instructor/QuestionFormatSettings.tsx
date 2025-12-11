@@ -8,7 +8,7 @@ import { Settings } from "lucide-react";
 
 interface QuestionFormatSettingsProps {
   instructorId: string;
-  professorType?: 'stem' | 'humanities' | null;
+  professorType?: 'stem' | 'humanities' | 'medical' | null;
 }
 
 export const QuestionFormatSettings = ({ instructorId, professorType }: QuestionFormatSettingsProps) => {

@@ -549,6 +549,53 @@ export type Database = {
           },
         ]
       }
+      lecture_medical_entities: {
+        Row: {
+          clinical_context: Json | null
+          created_at: string
+          description: string | null
+          end_timestamp: number | null
+          entity_name: string
+          entity_type: string
+          id: string
+          lecture_video_id: string
+          related_entities: string[] | null
+          start_timestamp: number | null
+        }
+        Insert: {
+          clinical_context?: Json | null
+          created_at?: string
+          description?: string | null
+          end_timestamp?: number | null
+          entity_name: string
+          entity_type: string
+          id?: string
+          lecture_video_id: string
+          related_entities?: string[] | null
+          start_timestamp?: number | null
+        }
+        Update: {
+          clinical_context?: Json | null
+          created_at?: string
+          description?: string | null
+          end_timestamp?: number | null
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          lecture_video_id?: string
+          related_entities?: string[] | null
+          start_timestamp?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_medical_entities_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lecture_pause_points: {
         Row: {
           cognitive_load_score: number | null
@@ -642,8 +689,10 @@ export type Database = {
           cognitive_analysis: Json | null
           created_at: string
           description: string | null
+          domain_type: string | null
           duration_seconds: number | null
           error_message: string | null
+          extracted_entities: Json | null
           id: string
           instructor_id: string
           org_id: string | null
@@ -659,8 +708,10 @@ export type Database = {
           cognitive_analysis?: Json | null
           created_at?: string
           description?: string | null
+          domain_type?: string | null
           duration_seconds?: number | null
           error_message?: string | null
+          extracted_entities?: Json | null
           id?: string
           instructor_id: string
           org_id?: string | null
@@ -676,8 +727,10 @@ export type Database = {
           cognitive_analysis?: Json | null
           created_at?: string
           description?: string | null
+          domain_type?: string | null
           duration_seconds?: number | null
           error_message?: string | null
+          extracted_entities?: Json | null
           id?: string
           instructor_id?: string
           org_id?: string | null
@@ -1303,6 +1356,7 @@ export type Database = {
           created_at: string | null
           daily_question_limit: number | null
           detection_model: string
+          exam_style_preference: string | null
           experience_level: string | null
           full_name: string | null
           generation_model: string
@@ -1311,6 +1365,7 @@ export type Database = {
           instructor_code: string | null
           interval_question_model: string
           last_auto_question_at: string | null
+          medical_specialty: string | null
           onboarded: boolean | null
           org_id: string | null
           professor_type: Database["public"]["Enums"]["professor_type"] | null
@@ -1335,6 +1390,7 @@ export type Database = {
           created_at?: string | null
           daily_question_limit?: number | null
           detection_model?: string
+          exam_style_preference?: string | null
           experience_level?: string | null
           full_name?: string | null
           generation_model?: string
@@ -1343,6 +1399,7 @@ export type Database = {
           instructor_code?: string | null
           interval_question_model?: string
           last_auto_question_at?: string | null
+          medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
@@ -1367,6 +1424,7 @@ export type Database = {
           created_at?: string | null
           daily_question_limit?: number | null
           detection_model?: string
+          exam_style_preference?: string | null
           experience_level?: string | null
           full_name?: string | null
           generation_model?: string
@@ -1375,6 +1433,7 @@ export type Database = {
           instructor_code?: string | null
           interval_question_model?: string
           last_auto_question_at?: string | null
+          medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
@@ -2380,7 +2439,7 @@ export type Database = {
         | "manual_grade"
       assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
       draft_status: "draft" | "approved" | "published"
-      professor_type: "stem" | "humanities"
+      professor_type: "stem" | "humanities" | "medical"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2517,7 +2576,7 @@ export const Constants = {
       ],
       assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
       draft_status: ["draft", "approved", "published"],
-      professor_type: ["stem", "humanities"],
+      professor_type: ["stem", "humanities", "medical"],
     },
   },
 } as const
