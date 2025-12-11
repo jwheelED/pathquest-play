@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Users, Code, BookOpen, Presentation, Settings } from "lucide-react";
+import { LogOut, Users, Code, BookOpen, Presentation, Settings, Video } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
@@ -19,6 +19,7 @@ import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
+import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 
 interface Student {
   id: string;
@@ -468,6 +469,13 @@ export default function InstructorDashboard() {
             </Card>
             
             <LectureMaterialsUpload />
+
+            {/* Pre-Recorded Lecture Upload */}
+            <PreRecordedLectureUpload 
+              onUploadComplete={(lectureId) => {
+                toast.success('Lecture ready! Students can now view it.');
+              }}
+            />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
           </div>
