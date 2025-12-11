@@ -505,6 +505,53 @@ export type Database = {
           },
         ]
       }
+      lecture_pause_points: {
+        Row: {
+          cognitive_load_score: number | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          lecture_video_id: string
+          order_index: number
+          pause_timestamp: number
+          question_content: Json
+          question_type: string
+          reason: string | null
+        }
+        Insert: {
+          cognitive_load_score?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          lecture_video_id: string
+          order_index: number
+          pause_timestamp: number
+          question_content: Json
+          question_type: string
+          reason?: string | null
+        }
+        Update: {
+          cognitive_load_score?: number | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          lecture_video_id?: string
+          order_index?: number
+          pause_timestamp?: number
+          question_content?: Json
+          question_type?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_pause_points_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lecture_questions: {
         Row: {
           created_at: string
@@ -539,6 +586,75 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "lecture_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_videos: {
+        Row: {
+          cognitive_analysis: Json | null
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          error_message: string | null
+          id: string
+          instructor_id: string
+          org_id: string | null
+          question_count: number | null
+          status: string | null
+          title: string
+          transcript: Json | null
+          updated_at: string
+          video_path: string
+          video_url: string | null
+        }
+        Insert: {
+          cognitive_analysis?: Json | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          question_count?: number | null
+          status?: string | null
+          title: string
+          transcript?: Json | null
+          updated_at?: string
+          video_path: string
+          video_url?: string | null
+        }
+        Update: {
+          cognitive_analysis?: Json | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          question_count?: number | null
+          status?: string | null
+          title?: string
+          transcript?: Json | null
+          updated_at?: string
+          video_path?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_videos_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_videos_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1518,6 +1634,67 @@ export type Database = {
           student_count?: number
         }
         Relationships: []
+      }
+      student_lecture_progress: {
+        Row: {
+          completed_at: string | null
+          completed_pause_points: string[] | null
+          id: string
+          lecture_video_id: string
+          org_id: string | null
+          responses: Json | null
+          started_at: string
+          student_id: string
+          total_points_earned: number | null
+          video_position: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_pause_points?: string[] | null
+          id?: string
+          lecture_video_id: string
+          org_id?: string | null
+          responses?: Json | null
+          started_at?: string
+          student_id: string
+          total_points_earned?: number | null
+          video_position?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          completed_pause_points?: string[] | null
+          id?: string
+          lecture_video_id?: string
+          org_id?: string | null
+          responses?: Json | null
+          started_at?: string
+          student_id?: string
+          total_points_earned?: number | null
+          video_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_lecture_progress_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_lecture_progress_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_lecture_progress_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_paste_events: {
         Row: {
