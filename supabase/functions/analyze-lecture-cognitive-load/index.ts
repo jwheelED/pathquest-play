@@ -51,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-    const { lectureVideoId, transcript, questionCount = 5, professorType = 'stem' } = await req.json();
+    const { lectureVideoId, transcript, questionCount = 5, professorType = 'stem', examStyle = 'usmle_step1', medicalSpecialty = 'general' } = await req.json();
 
     if (!lectureVideoId || !transcript || !Array.isArray(transcript)) {
       return new Response(JSON.stringify({ error: 'Missing lectureVideoId or transcript array' }), {
@@ -60,12 +60,96 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, ${questionCount} questions requested`);
+    console.log(`Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, ${questionCount} questions requested, professorType: ${professorType}`);
 
     // Build transcript text with timestamps for analysis
     const transcriptText = transcript.map((seg: any) => 
       `[${formatTime(seg.start)} - ${formatTime(seg.end)}] ${seg.text}`
     ).join('\n');
+
+    // For medical lectures, first extract medical entities
+    let medicalEntities: any[] = [];
+    if (professorType === 'medical') {
+      console.log('Medical lecture detected, extracting medical entities first...');
+      
+      try {
+        const entityResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-pro',
+            messages: [
+              { 
+                role: 'system', 
+                content: `You are an expert medical educator. Extract medical entities from this transcript for USMLE-style question generation.
+                
+Return JSON:
+{
+  "entities": [
+    {
+      "entity_type": "pathology|treatment|mechanism|finding|risk_factor",
+      "entity_name": "Medical term",
+      "description": "Brief description",
+      "start_timestamp": 60.0,
+      "end_timestamp": 120.0,
+      "related_entities": ["related term 1", "related term 2"],
+      "clinical_context": {
+        "classic_presentation": "symptoms",
+        "key_labs": "lab findings",
+        "treatment": "treatment approach"
+      }
+    }
+  ],
+  "high_yield_topics": ["topic1", "topic2"]
+}` 
+              },
+              { role: 'user', content: `Extract medical entities from this lecture:\n\n${transcriptText}` }
+            ],
+            max_tokens: 4000,
+            temperature: 0.3,
+          }),
+        });
+
+        if (entityResponse.ok) {
+          const entityResult = await entityResponse.json();
+          const entityContent = entityResult.choices?.[0]?.message?.content;
+          const entityMatch = entityContent?.match(/\{[\s\S]*\}/);
+          
+          if (entityMatch) {
+            const parsed = JSON.parse(entityMatch[0]);
+            medicalEntities = parsed.entities || [];
+            console.log(`Extracted ${medicalEntities.length} medical entities`);
+            
+            // Store entities in database
+            if (medicalEntities.length > 0) {
+              const entitiesToInsert = medicalEntities.map((e: any) => ({
+                lecture_video_id: lectureVideoId,
+                entity_type: e.entity_type,
+                entity_name: e.entity_name,
+                description: e.description,
+                start_timestamp: e.start_timestamp,
+                end_timestamp: e.end_timestamp,
+                related_entities: e.related_entities || [],
+                clinical_context: e.clinical_context || {}
+              }));
+
+              await supabase.from('lecture_medical_entities').insert(entitiesToInsert);
+            }
+
+            // Update lecture video with entities
+            await supabase.from('lecture_videos').update({
+              domain_type: 'medical',
+              extracted_entities: { entities: medicalEntities, high_yield_topics: parsed.high_yield_topics }
+            }).eq('id', lectureVideoId);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to extract medical entities:', e);
+      }
+    }
 
     // First, generate concept map
     const conceptMapPrompt = `Analyze this lecture transcript and create a concept map.
@@ -137,7 +221,61 @@ ${transcriptText}`;
       }
     }
 
-    const systemPrompt = `You are an expert educational psychologist analyzing a lecture transcript for cognitive load.
+    // Build system prompt based on professor type
+    let systemPrompt: string;
+    
+    if (professorType === 'medical') {
+      systemPrompt = `You are an expert medical educator analyzing a lecture transcript for cognitive load and USMLE-style question placement.
+
+Your task is to identify ${questionCount} optimal pause points where students should be asked USMLE-style clinical vignette questions.
+
+COGNITIVE LOAD INDICATORS FOR MEDICAL CONTENT (score 1-10):
+- New pathophysiology explanation (8-10)
+- Drug mechanism of action (8-10)
+- Complex disease processes (7-9)
+- Differential diagnosis discussion (7-9)
+- Treatment protocols (7-9)
+- Clinical presentation patterns (6-8)
+- Lab/imaging interpretation (6-8)
+- Epidemiology and risk factors (5-7)
+
+EXAM STYLE: ${examStyle === 'usmle_step1' ? 'USMLE Step 1 (focus on mechanisms, pathophysiology)' : 
+               examStyle === 'usmle_step2' ? 'USMLE Step 2 CK (focus on diagnosis, management)' :
+               'NBME Shelf (clinical reasoning)'}
+
+MEDICAL ENTITIES IDENTIFIED IN LECTURE:
+${medicalEntities.map((e: any) => `- ${e.entity_name} (${e.entity_type}): ${e.description || ''}`).join('\n')}
+
+RESPONSE FORMAT (JSON array):
+[
+  {
+    "timestamp": 125.5,
+    "cognitive_load_score": 8,
+    "reason": "Complex pathophysiology of pheochromocytoma explained",
+    "suggested_question_type": "usmle_vignette",
+    "question_stem_type": "diagnosis",
+    "context_summary": "Brief summary of medical content just covered",
+    "related_entity": "pheochromocytoma",
+    "clinical_focus": "catecholamine excess and hypertension"
+  }
+]
+
+Question stem types for USMLE vignettes:
+- "diagnosis" - What is the most likely diagnosis?
+- "mechanism" - What is the mechanism of action?
+- "next_step" - What is the next best step in management?
+- "treatment" - What is the most appropriate treatment?
+- "finding" - Which finding would you expect?
+- "avoid" - Which medication should be avoided?
+
+Rules:
+1. Space questions evenly (minimum 2 minutes apart)
+2. Prioritize high cognitive load clinical concepts
+3. Vary question stem types for comprehensive testing
+4. Focus on high-yield, board-relevant topics
+5. Return exactly ${questionCount} pause points`;
+    } else {
+      systemPrompt = `You are an expert educational psychologist analyzing a lecture transcript for cognitive load.
 
 Your task is to identify ${questionCount} optimal pause points where students should be asked questions to ensure comprehension before continuing.
 
@@ -175,6 +313,7 @@ Rules:
 3. Never place questions in the middle of an explanation - find natural breaks
 4. Consider cumulative load - if several complex topics stack, pause earlier
 5. Return exactly ${questionCount} pause points`;
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -225,10 +364,72 @@ Rules:
     const questionsPromises = pausePoints.map(async (point: any, index: number) => {
       const questionType = point.suggested_question_type || 'multiple_choice';
       
+      // For USMLE vignettes, generate clinical scenarios
+      if (questionType === 'usmle_vignette' && professorType === 'medical') {
+        const relatedEntity = medicalEntities.find((e: any) => 
+          e.entity_name.toLowerCase().includes(point.related_entity?.toLowerCase() || '') ||
+          point.context_summary?.toLowerCase().includes(e.entity_name.toLowerCase())
+        ) || medicalEntities[index % medicalEntities.length];
+
+        const vignettePrompt = `Create a USMLE-style clinical vignette question.
+
+Medical concept: ${point.related_entity || point.context_summary}
+Question type: ${point.question_stem_type || 'diagnosis'}
+Clinical focus: ${point.clinical_focus || 'general understanding'}
+Entity context: ${JSON.stringify(relatedEntity?.clinical_context || {})}
+
+Return JSON:
+{
+  "question": "Full clinical vignette text with patient presentation",
+  "options": ["A. Option 1", "B. Option 2", "C. Option 3", "D. Option 4", "E. Option 5"],
+  "correctAnswer": "A",
+  "explanation": "Clinical reasoning explanation",
+  "vignette_type": "${point.question_stem_type || 'diagnosis'}",
+  "tested_concept": "${point.related_entity || ''}"
+}`;
+
+        try {
+          const qResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-pro',
+              messages: [
+                { role: 'system', content: 'You are an expert USMLE question writer. Create clinical vignettes with realistic patient scenarios. Return only valid JSON.' },
+                { role: 'user', content: vignettePrompt }
+              ],
+              max_tokens: 1500,
+              temperature: 0.5,
+            }),
+          });
+
+          if (qResponse.ok) {
+            const qResult = await qResponse.json();
+            const qContent = qResult.choices?.[0]?.message?.content;
+            const jsonMatch = qContent?.match(/\{[\s\S]*\}/);
+            
+            if (jsonMatch) {
+              return {
+                ...point,
+                order_index: index,
+                question_content: JSON.parse(jsonMatch[0]),
+                question_type: 'usmle_vignette'
+              };
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to generate USMLE vignette for point ${index}:`, e);
+        }
+      }
+      
+      // Standard question generation for non-medical
       const questionPrompt = `Generate a ${questionType} question based on this lecture content:
 
 Context: ${point.context_summary}
-Suggested question: ${point.question_suggestion}
+Suggested question: ${point.question_suggestion || point.clinical_focus}
 
 ${questionType === 'multiple_choice' ? `Return JSON:
 {

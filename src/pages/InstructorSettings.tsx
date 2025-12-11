@@ -11,7 +11,7 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 export default function InstructorSettings() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [professorType, setProfessorType] = useState<"stem" | "humanities" | null>(null);
+  const [professorType, setProfessorType] = useState<"stem" | "humanities" | "medical" | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

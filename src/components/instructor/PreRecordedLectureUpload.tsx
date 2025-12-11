@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,21 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState<'idle' | 'uploading' | 'transcribing' | 'analyzing' | 'ready' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [professorType, setProfessorType] = useState<string | null>(null);
+  const [examStyle, setExamStyle] = useState('usmle_step1');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch professor type on mount
+  useEffect(() => {
+    const fetchProfessorType = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('professor_type').eq('id', user.id).single();
+        setProfessorType(profile?.professor_type || null);
+      }
+    };
+    fetchProfessorType();
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -134,7 +148,8 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               lectureVideoId: lectureVideo.id,
               transcript: updated.transcript,
               questionCount,
-              professorType: profile?.professor_type || 'stem'
+              professorType: professorType || 'stem',
+              examStyle: professorType === 'medical' ? examStyle : undefined
             }
           });
 
