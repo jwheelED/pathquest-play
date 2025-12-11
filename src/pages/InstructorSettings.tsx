@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
+import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 
 export default function InstructorSettings() {
   const navigate = useNavigate();
@@ -78,12 +79,13 @@ export default function InstructorSettings() {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl mx-auto">
           {currentUser && (
             <>
               <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
               <QuestionDifficultySettings />
               <AutoGradeSettings />
+              <LMSIntegrationSettings />
             </>
           )}
         </div>
