@@ -5,6 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Base64URL decode helper
+function base64UrlDecode(str: string): Uint8Array {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = '='.repeat((4 - base64.length % 4) % 4);
+  const binary = atob(base64 + padding);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 // Decode JWT without verification (verification happens after fetching JWKS)
 function decodeJwt(token: string): { header: any; payload: any; signature: string } {
   const parts = token.split('.');
@@ -16,6 +28,107 @@ function decodeJwt(token: string): { header: any; payload: any; signature: strin
   const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
   
   return { header, payload, signature: parts[2] };
+}
+
+// Convert JWK to CryptoKey for verification
+async function importJwkKey(jwk: any): Promise<CryptoKey> {
+  return await crypto.subtle.importKey(
+    'jwk',
+    {
+      kty: jwk.kty,
+      n: jwk.n,
+      e: jwk.e,
+      alg: jwk.alg || 'RS256',
+      use: 'sig',
+    },
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: { name: 'SHA-256' },
+    },
+    false,
+    ['verify']
+  );
+}
+
+// Verify JWT signature against JWKS
+async function verifyJwtSignature(token: string, jwksUrl: string, header: any): Promise<boolean> {
+  try {
+    // Fetch JWKS from platform
+    const jwksResponse = await fetch(jwksUrl);
+    if (!jwksResponse.ok) {
+      console.error('Failed to fetch JWKS:', jwksResponse.status);
+      return false;
+    }
+    
+    const jwks = await jwksResponse.json();
+    
+    // Find the matching key by kid
+    const key = jwks.keys?.find((k: any) => k.kid === header.kid);
+    if (!key) {
+      console.error('No matching key found for kid:', header.kid);
+      return false;
+    }
+    
+    // Import the JWK as a CryptoKey
+    const cryptoKey = await importJwkKey(key);
+    
+    // Split token and get signature
+    const parts = token.split('.');
+    const signedData = new TextEncoder().encode(parts[0] + '.' + parts[1]);
+    const signatureBytes = base64UrlDecode(parts[2]);
+    
+    // Verify signature - create new ArrayBuffer copies for compatibility
+    const signatureBuffer = new ArrayBuffer(signatureBytes.length);
+    new Uint8Array(signatureBuffer).set(signatureBytes);
+    
+    const signedDataBuffer = new ArrayBuffer(signedData.length);
+    new Uint8Array(signedDataBuffer).set(signedData);
+    
+    const isValid = await crypto.subtle.verify(
+      { name: 'RSASSA-PKCS1-v1_5' },
+      cryptoKey,
+      signatureBuffer,
+      signedDataBuffer
+    );
+    
+    return isValid;
+  } catch (error) {
+    console.error('JWT verification error:', error);
+    return false;
+  }
+}
+
+// Validate JWT claims
+function validateJwtClaims(payload: any, expectedIssuer: string, expectedAudience: string): { valid: boolean; error?: string } {
+  const now = Math.floor(Date.now() / 1000);
+  
+  // Check expiration
+  if (payload.exp && payload.exp < now) {
+    return { valid: false, error: 'Token has expired' };
+  }
+  
+  // Check not before
+  if (payload.nbf && payload.nbf > now) {
+    return { valid: false, error: 'Token not yet valid' };
+  }
+  
+  // Check issued at (allow 5 minute clock skew)
+  if (payload.iat && payload.iat > now + 300) {
+    return { valid: false, error: 'Token issued in the future' };
+  }
+  
+  // Check issuer
+  if (payload.iss !== expectedIssuer) {
+    return { valid: false, error: `Invalid issuer: expected ${expectedIssuer}, got ${payload.iss}` };
+  }
+  
+  // Check audience (can be string or array)
+  const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (!aud.includes(expectedAudience)) {
+    return { valid: false, error: `Invalid audience: expected ${expectedAudience}` };
+  }
+  
+  return { valid: true };
 }
 
 Deno.serve(async (req) => {
@@ -78,8 +191,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    // TODO: Verify JWT signature against platform's JWKS
-    // For production, fetch JWKS from platform.jwks_url and verify signature
+    // Verify JWT signature against platform's JWKS
+    console.log('Verifying JWT signature against JWKS:', platform.jwks_url);
+    const isSignatureValid = await verifyJwtSignature(idToken, platform.jwks_url, header);
+    
+    if (!isSignatureValid) {
+      console.error('JWT signature verification failed');
+      return new Response(
+        JSON.stringify({ error: 'Invalid JWT signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log('JWT signature verified successfully');
+
+    // Validate JWT claims
+    const expectedAudience = Array.isArray(payload.aud) ? payload.aud[0] : payload.aud;
+    const claimsValidation = validateJwtClaims(payload, platform.issuer, expectedAudience);
+    
+    if (!claimsValidation.valid) {
+      console.error('JWT claims validation failed:', claimsValidation.error);
+      return new Response(
+        JSON.stringify({ error: claimsValidation.error }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    console.log('JWT claims validated successfully');
 
     // Extract LTI claims
     const ltiClaims = {
