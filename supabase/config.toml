@@ -95,3 +95,15 @@ verify_jwt = true
 
 [functions.generate-usmle-vignette]
 verify_jwt = true
+
+[functions.lti-jwks]
+verify_jwt = false
+
+[functions.lti-oidc-login]
+verify_jwt = false
+
+[functions.lti-launch]
+verify_jwt = false
+
+[functions.lti-submit-grade]
+verify_jwt = true

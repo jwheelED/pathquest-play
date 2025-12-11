@@ -423,6 +423,68 @@ export type Database = {
           },
         ]
       }
+      grade_sync_log: {
+        Row: {
+          activity_progress: string | null
+          assignment_id: string
+          assignment_type: string
+          context_id: string | null
+          error_message: string | null
+          grading_progress: string | null
+          id: string
+          lms_response: Json | null
+          lti_user_id: string | null
+          retry_count: number | null
+          score_given: number
+          score_maximum: number
+          student_id: string
+          sync_status: string
+          synced_at: string
+        }
+        Insert: {
+          activity_progress?: string | null
+          assignment_id: string
+          assignment_type: string
+          context_id?: string | null
+          error_message?: string | null
+          grading_progress?: string | null
+          id?: string
+          lms_response?: Json | null
+          lti_user_id?: string | null
+          retry_count?: number | null
+          score_given: number
+          score_maximum?: number
+          student_id: string
+          sync_status?: string
+          synced_at?: string
+        }
+        Update: {
+          activity_progress?: string | null
+          assignment_id?: string
+          assignment_type?: string
+          context_id?: string | null
+          error_message?: string | null
+          grading_progress?: string | null
+          id?: string
+          lms_response?: Json | null
+          lti_user_id?: string | null
+          retry_count?: number | null
+          score_given?: number
+          score_maximum?: number
+          student_id?: string
+          sync_status?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_sync_log_context_id_fkey"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "lti_contexts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_students: {
         Row: {
           created_at: string | null
@@ -1033,6 +1095,227 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_contexts: {
+        Row: {
+          context_id: string
+          context_title: string | null
+          created_at: string
+          id: string
+          instructor_id: string
+          lineitem_url: string | null
+          lineitems_url: string | null
+          platform_id: string
+          resource_link_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          context_id: string
+          context_title?: string | null
+          created_at?: string
+          id?: string
+          instructor_id: string
+          lineitem_url?: string | null
+          lineitems_url?: string | null
+          platform_id: string
+          resource_link_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          context_id?: string
+          context_title?: string | null
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          lineitem_url?: string | null
+          lineitems_url?: string | null
+          platform_id?: string
+          resource_link_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_contexts_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_platforms: {
+        Row: {
+          ags_scopes: string[] | null
+          auth_url: string
+          client_id: string
+          created_at: string
+          deployment_id: string | null
+          id: string
+          is_active: boolean | null
+          issuer: string
+          jwks_url: string
+          org_id: string | null
+          platform_name: string
+          platform_type: string
+          token_url: string
+          updated_at: string
+        }
+        Insert: {
+          ags_scopes?: string[] | null
+          auth_url: string
+          client_id: string
+          created_at?: string
+          deployment_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          issuer: string
+          jwks_url: string
+          org_id?: string | null
+          platform_name: string
+          platform_type: string
+          token_url: string
+          updated_at?: string
+        }
+        Update: {
+          ags_scopes?: string[] | null
+          auth_url?: string
+          client_id?: string
+          created_at?: string
+          deployment_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          issuer?: string
+          jwks_url?: string
+          org_id?: string | null
+          platform_name?: string
+          platform_type?: string
+          token_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_platforms_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_token_cache: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          platform_id: string
+          scope: string | null
+          token_type: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          platform_id: string
+          scope?: string | null
+          token_type?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          platform_id?: string
+          scope?: string | null
+          token_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_token_cache_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_tool_keys: {
+        Row: {
+          algorithm: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          kid: string
+          private_key: string
+          public_key: string
+        }
+        Insert: {
+          algorithm?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          kid: string
+          private_key: string
+          public_key: string
+        }
+        Update: {
+          algorithm?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          kid?: string
+          private_key?: string
+          public_key?: string
+        }
+        Relationships: []
+      }
+      lti_users: {
+        Row: {
+          created_at: string
+          edvana_user_id: string | null
+          email: string | null
+          id: string
+          lti_user_id: string
+          name: string | null
+          platform_id: string
+          roles: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          edvana_user_id?: string | null
+          email?: string | null
+          id?: string
+          lti_user_id: string
+          name?: string | null
+          platform_id: string
+          roles?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          edvana_user_id?: string | null
+          email?: string | null
+          id?: string
+          lti_user_id?: string
+          name?: string | null
+          platform_id?: string
+          roles?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_users_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
             referencedColumns: ["id"]
           },
         ]
