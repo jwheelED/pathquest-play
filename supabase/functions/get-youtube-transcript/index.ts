@@ -19,45 +19,6 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-// Fetch available caption tracks for a video
-async function getCaptionTracks(videoId: string): Promise<any[]> {
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-    
-    const html = await response.text();
-    
-    // Extract captions data from the page
-    const captionsMatch = html.match(/"captions":\s*(\{[^}]+\})/);
-    if (!captionsMatch) {
-      // Try alternative pattern for playerCaptionsTracklistRenderer
-      const altMatch = html.match(/playerCaptionsTracklistRenderer":\s*(\{.+?\})\s*,\s*"videoDetails/s);
-      if (!altMatch) {
-        console.log('No captions data found in page');
-        return [];
-      }
-    }
-    
-    // Look for timedtext URL in the page
-    const timedtextMatch = html.match(/https:\/\/www\.youtube\.com\/api\/timedtext[^"]+/g);
-    if (timedtextMatch && timedtextMatch.length > 0) {
-      // Clean up the URL (unescape)
-      const captionUrl = timedtextMatch[0].replace(/\\u0026/g, '&');
-      return [{ url: captionUrl }];
-    }
-    
-    return [];
-  } catch (error) {
-    console.error('Error fetching caption tracks:', error);
-    return [];
-  }
-}
-
 // Parse YouTube's timedtext XML format
 function parseTimedTextXml(xml: string): { text: string; start: number; duration: number }[] {
   const segments: { text: string; start: number; duration: number }[] = [];
@@ -87,18 +48,19 @@ function parseTimedTextXml(xml: string): { text: string; start: number; duration
   return segments;
 }
 
-// Fetch transcript using YouTube's internal API
+// Try multiple methods to fetch transcript
 async function fetchYouTubeTranscript(videoId: string): Promise<{ segments: any[]; fullText: string } | null> {
   console.log('Fetching transcript for video:', videoId);
   
-  // Try fetching the video page to get caption URLs
+  // Method 1: Try fetching from the watch page (standard approach)
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
   
   try {
     const pageResponse = await fetch(watchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9'
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     });
     
@@ -109,39 +71,78 @@ async function fetchYouTubeTranscript(videoId: string): Promise<{ segments: any[
     
     const html = await pageResponse.text();
     
-    // Extract the captionTracks from ytInitialPlayerResponse
-    const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/s);
-    if (!playerResponseMatch) {
-      console.log('Could not find ytInitialPlayerResponse');
-      return null;
+    // Try to find caption tracks in multiple ways
+    let captionTracks: any[] = [];
+    
+    // Method 1a: Look for ytInitialPlayerResponse
+    const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});\s*(?:var|const|let|<\/script>)/s);
+    if (playerResponseMatch) {
+      try {
+        const playerResponse = JSON.parse(playerResponseMatch[1]);
+        captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+        console.log('Found caption tracks via ytInitialPlayerResponse:', captionTracks.length);
+      } catch (e) {
+        console.log('Failed to parse ytInitialPlayerResponse');
+      }
     }
     
-    let playerResponse;
-    try {
-      playerResponse = JSON.parse(playerResponseMatch[1]);
-    } catch (e) {
-      console.error('Failed to parse player response:', e);
-      return null;
+    // Method 1b: Look for captions in the embedded player config
+    if (captionTracks.length === 0) {
+      const configMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+      if (configMatch) {
+        try {
+          captionTracks = JSON.parse(configMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'));
+          console.log('Found caption tracks via captionTracks array:', captionTracks.length);
+        } catch (e) {
+          console.log('Failed to parse captionTracks array');
+        }
+      }
     }
     
-    const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (!captionTracks || captionTracks.length === 0) {
-      console.log('No caption tracks available for this video');
-      return null;
+    // Method 1c: Look for timedtext URL directly
+    if (captionTracks.length === 0) {
+      const timedtextUrls = html.match(/https:\/\/www\.youtube\.com\/api\/timedtext[^"'\s\\]+/g);
+      if (timedtextUrls && timedtextUrls.length > 0) {
+        // Clean up the URL
+        let captionUrl = timedtextUrls[0]
+          .replace(/\\u0026/g, '&')
+          .replace(/\\"/g, '')
+          .replace(/\\/g, '');
+        captionTracks = [{ baseUrl: captionUrl }];
+        console.log('Found timedtext URL directly');
+      }
     }
     
-    console.log('Found caption tracks:', captionTracks.length);
+    if (captionTracks.length === 0) {
+      console.log('No caption tracks found in page');
+      
+      // Method 2: Try using the innertube API directly
+      console.log('Trying innertube API...');
+      const innertubeResult = await tryInnertubeApi(videoId);
+      if (innertubeResult) {
+        return innertubeResult;
+      }
+      
+      return null;
+    }
     
     // Prefer English captions, fall back to first available
-    let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'en' || t.languageCode?.startsWith('en'));
+    let selectedTrack = captionTracks.find((t: any) => 
+      t.languageCode === 'en' || t.languageCode?.startsWith('en') || t.vssId?.includes('.en')
+    );
     if (!selectedTrack) {
       selectedTrack = captionTracks[0];
     }
     
-    console.log('Using caption track:', selectedTrack.languageCode, selectedTrack.name?.simpleText);
+    const captionUrl = selectedTrack.baseUrl || selectedTrack.url;
+    if (!captionUrl) {
+      console.log('No caption URL found in track');
+      return null;
+    }
+    
+    console.log('Fetching captions from:', captionUrl.substring(0, 100) + '...');
     
     // Fetch the caption XML
-    const captionUrl = selectedTrack.baseUrl;
     const captionResponse = await fetch(captionUrl);
     
     if (!captionResponse.ok) {
@@ -177,6 +178,83 @@ async function fetchYouTubeTranscript(videoId: string): Promise<{ segments: any[
   }
 }
 
+// Try using YouTube's innertube API
+async function tryInnertubeApi(videoId: string): Promise<{ segments: any[]; fullText: string } | null> {
+  try {
+    // First, get the video info to find caption tracks
+    const response = await fetch('https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'WEB',
+            clientVersion: '2.20231219.04.00',
+            hl: 'en',
+            gl: 'US'
+          }
+        },
+        videoId: videoId
+      })
+    });
+    
+    if (!response.ok) {
+      console.log('Innertube API request failed:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    const captionTracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+    
+    if (!captionTracks || captionTracks.length === 0) {
+      console.log('No captions found via innertube API');
+      return null;
+    }
+    
+    console.log('Found', captionTracks.length, 'caption tracks via innertube');
+    
+    // Prefer English
+    let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'en' || t.languageCode?.startsWith('en'));
+    if (!selectedTrack) {
+      selectedTrack = captionTracks[0];
+    }
+    
+    const captionUrl = selectedTrack.baseUrl;
+    if (!captionUrl) {
+      return null;
+    }
+    
+    // Fetch captions
+    const captionResponse = await fetch(captionUrl);
+    if (!captionResponse.ok) {
+      return null;
+    }
+    
+    const captionXml = await captionResponse.text();
+    const segments = parseTimedTextXml(captionXml);
+    
+    if (segments.length === 0) {
+      return null;
+    }
+    
+    const fullText = segments.map(s => s.text).join(' ');
+    const formattedSegments = segments.map(s => ({
+      text: s.text,
+      start: s.start,
+      end: s.start + s.duration
+    }));
+    
+    return { segments: formattedSegments, fullText };
+    
+  } catch (error) {
+    console.error('Innertube API error:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -207,7 +285,7 @@ serve(async (req) => {
     if (!result) {
       return new Response(JSON.stringify({ 
         error: 'No captions available',
-        message: 'This YouTube video does not have captions available. Please enable auto-generated captions on the video or upload the video file directly.'
+        message: 'This YouTube video does not have captions available. To fix this:\n\n1. Go to your YouTube video settings\n2. Enable "Allow auto-generated captions"\n3. Or add manual captions/subtitles\n4. Wait a few minutes for YouTube to process\n5. Try again\n\nAlternatively, upload the video file directly instead of using a YouTube link.'
       }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
