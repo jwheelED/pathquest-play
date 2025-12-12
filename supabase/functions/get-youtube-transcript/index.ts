@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+
+const YOUTUBE_API_KEY = Deno.env.get('AIzaSyBVAUlc5S8BbmZ4FaOsPem3CCMs7Hkzxnc');
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -48,6 +51,48 @@ function parseTimedTextXml(xml: string): { text: string; start: number; duration
   return segments;
 }
 
+// Parse SRT format captions
+function parseSrtFormat(srt: string): { text: string; start: number; duration: number }[] {
+  const segments: { text: string; start: number; duration: number }[] = [];
+  const blocks = srt.trim().split(/\n\n+/);
+  
+  for (const block of blocks) {
+    const lines = block.split('\n');
+    if (lines.length < 2) continue;
+    
+    // Find timestamp line (format: 00:00:00,000 --> 00:00:00,000)
+    const timestampLine = lines.find(l => l.includes('-->'));
+    if (!timestampLine) continue;
+    
+    const [startStr, endStr] = timestampLine.split('-->').map(s => s.trim());
+    
+    const parseTime = (timeStr: string): number => {
+      const [time, ms] = timeStr.replace(',', '.').split('.');
+      const [h, m, s] = time.split(':').map(Number);
+      return h * 3600 + m * 60 + s + (parseFloat(`0.${ms}`) || 0);
+    };
+    
+    const start = parseTime(startStr);
+    const end = parseTime(endStr);
+    const textLines = lines.slice(lines.indexOf(timestampLine) + 1);
+    const text = textLines.join(' ').replace(/<[^>]+>/g, '').trim();
+    
+    if (text) {
+      segments.push({ text, start, duration: end - start });
+    }
+  }
+  
+  return segments;
+}
+
+// Method 0: Try YouTube Data API v3 first (for error detection)
+const apiResult = await tryYouTubeDataApi(videoId);
+if (apiResult?.error) {
+  // Return specific error for better user messaging
+  return { segments: [], fullText: '', error: apiResult.error } as any;
+}
+
+
 // Try multiple methods to fetch transcript
 async function fetchYouTubeTranscript(videoId: string): Promise<{ segments: any[]; fullText: string } | null> {
   console.log('Fetching transcript for video:', videoId);
@@ -70,6 +115,96 @@ async function fetchYouTubeTranscript(videoId: string): Promise<{ segments: any[
     }
     
     const html = await pageResponse.text();
+  // Try YouTube Data API v3 (official method - requires API key)
+async function tryYouTubeDataApi(videoId: string): Promise<{ segments: any[]; fullText: string; error?: string } | null> {
+  if (!YOUTUBE_API_KEY) {
+    console.log('No YOUTUBE_API_KEY configured, skipping Data API method');
+    return null;
+  }
+
+  try {
+    console.log('Trying YouTube Data API v3...');
+    
+    // Step 1: List available caption tracks
+    const listUrl = `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`;
+    const listResponse = await fetch(listUrl);
+    
+    if (!listResponse.ok) {
+      const errorData = await listResponse.json();
+      console.error('YouTube API list error:', listResponse.status, errorData);
+      
+      if (listResponse.status === 403) {
+        const errorReason = errorData?.error?.errors?.[0]?.reason;
+        if (errorReason === 'forbidden') {
+          return { 
+            segments: [], 
+            fullText: '', 
+            error: 'CAPTION_DOWNLOAD_DISABLED' 
+          };
+        }
+        return { 
+          segments: [], 
+          fullText: '', 
+          error: 'API_FORBIDDEN' 
+        };
+      }
+      if (listResponse.status === 404) {
+        return { 
+          segments: [], 
+          fullText: '', 
+          error: 'VIDEO_NOT_FOUND' 
+        };
+      }
+      if (listResponse.status === 429) {
+        return { 
+          segments: [], 
+          fullText: '', 
+          error: 'QUOTA_EXCEEDED' 
+        };
+      }
+      return null;
+    }
+    
+    const listData = await listResponse.json();
+    const captionTracks = listData.items || [];
+    
+    if (captionTracks.length === 0) {
+      console.log('No caption tracks found via Data API');
+      return { segments: [], fullText: '', error: 'NO_CAPTIONS' };
+    }
+    
+    console.log('Found', captionTracks.length, 'caption tracks via Data API');
+    
+    // Prefer English, then any manual captions, then auto-generated
+    let selectedTrack = captionTracks.find((t: any) => 
+      t.snippet?.language === 'en' && t.snippet?.trackKind !== 'ASR'
+    );
+    if (!selectedTrack) {
+      selectedTrack = captionTracks.find((t: any) => t.snippet?.language === 'en');
+    }
+    if (!selectedTrack) {
+      selectedTrack = captionTracks.find((t: any) => t.snippet?.trackKind !== 'ASR');
+    }
+    if (!selectedTrack) {
+      selectedTrack = captionTracks[0];
+    }
+    
+    const captionId = selectedTrack.id;
+    console.log('Selected caption track:', captionId, selectedTrack.snippet?.language);
+    
+    // Step 2: Download the caption content
+    // Note: This requires OAuth for most videos, so we'll use the timedtext approach instead
+    // The Data API captions.download endpoint requires the video owner's OAuth token
+    // Instead, we'll use the baseUrl from the Innertube API which doesn't require OAuth
+    
+    return null; // Fall through to other methods
+    
+  } catch (error) {
+    console.error('YouTube Data API error:', error);
+    return null;
+  }
+}
+
     
     // Try to find caption tracks in multiple ways
     let captionTracks: any[] = [];
