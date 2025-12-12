@@ -56,8 +56,8 @@ serve(async (req) => {
 
     const { lectureVideoId, videoPath } = await req.json();
 
-    if (!lectureVideoId || !videoPath) {
-      return new Response(JSON.stringify({ error: 'Missing lectureVideoId or videoPath' }), {
+    if (!lectureVideoId) {
+      return new Response(JSON.stringify({ error: 'Missing lectureVideoId' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -71,22 +71,53 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', lectureVideoId);
 
-    // Get signed URL for the video
-    const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
-      .storage
-      .from('lecture-videos')
-      .createSignedUrl(videoPath, 3600); // 1 hour expiry
+    // Fetch the lecture video record to check for external URL
+    const { data: lectureVideo, error: fetchError } = await supabaseAdmin
+      .from('lecture_videos')
+      .select('video_url, video_path')
+      .eq('id', lectureVideoId)
+      .single();
 
-    if (signedUrlError || !signedUrlData?.signedUrl) {
-      console.error('Failed to get signed URL:', signedUrlError);
+    if (fetchError || !lectureVideo) {
+      console.error('Failed to fetch lecture video:', fetchError);
       await supabase
         .from('lecture_videos')
-        .update({ status: 'error', error_message: 'Failed to access video file' })
+        .update({ status: 'error', error_message: 'Failed to fetch lecture record' })
         .eq('id', lectureVideoId);
-      throw new Error('Failed to get signed URL for video');
+      throw new Error('Failed to fetch lecture video record');
     }
 
-    console.log('Got signed URL, sending to Deepgram...');
+    let transcriptionUrl: string;
+
+    if (lectureVideo.video_url) {
+      // External URL - use it directly with Deepgram
+      console.log('Using external video URL:', lectureVideo.video_url);
+      transcriptionUrl = lectureVideo.video_url;
+    } else if (lectureVideo.video_path) {
+      // Uploaded file - get signed URL from storage
+      const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
+        .storage
+        .from('lecture-videos')
+        .createSignedUrl(lectureVideo.video_path, 3600); // 1 hour expiry
+
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        console.error('Failed to get signed URL:', signedUrlError);
+        await supabase
+          .from('lecture_videos')
+          .update({ status: 'error', error_message: 'Failed to access video file' })
+          .eq('id', lectureVideoId);
+        throw new Error('Failed to get signed URL for video');
+      }
+      transcriptionUrl = signedUrlData.signedUrl;
+    } else {
+      await supabase
+        .from('lecture_videos')
+        .update({ status: 'error', error_message: 'No video URL or file path provided' })
+        .eq('id', lectureVideoId);
+      throw new Error('No video URL or file path provided');
+    }
+
+    console.log('Got transcription URL, sending to Deepgram...');
 
     // Send to Deepgram for transcription with timestamps
     const deepgramResponse = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&paragraphs=true', {
@@ -96,7 +127,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        url: signedUrlData.signedUrl
+        url: transcriptionUrl
       }),
     });
 
