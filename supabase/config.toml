@@ -107,3 +107,9 @@ verify_jwt = false
 
 [functions.lti-submit-grade]
 verify_jwt = true
+
+[functions.get-youtube-transcript]
+verify_jwt = false
+
+[functions.health-check]
+verify_jwt = false
