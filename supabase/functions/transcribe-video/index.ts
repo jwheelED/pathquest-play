@@ -9,6 +9,11 @@ const corsHeaders = {
 
 const DEEPGRAM_API_KEY = Deno.env.get('DEEPGRAM_API_KEY');
 
+// Check if URL is a YouTube URL
+function isYouTubeUrl(url: string): boolean {
+  return /(?:youtube\.com|youtu\.be)/i.test(url);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -87,112 +92,149 @@ serve(async (req) => {
       throw new Error('Failed to fetch lecture video record');
     }
 
-    let transcriptionUrl: string;
+    let transcriptSegments: Array<{ start: number; end: number; text: string }> = [];
+    let duration = 0;
 
-    if (lectureVideo.video_url) {
-      // External URL - use it directly with Deepgram
-      console.log('Using external video URL:', lectureVideo.video_url);
-      transcriptionUrl = lectureVideo.video_url;
-    } else if (lectureVideo.video_path) {
-      // Uploaded file - get signed URL from storage
-      const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
-        .storage
-        .from('lecture-videos')
-        .createSignedUrl(lectureVideo.video_path, 3600); // 1 hour expiry
+    // Check if this is a YouTube URL - use caption extraction instead of Deepgram
+    if (lectureVideo.video_url && isYouTubeUrl(lectureVideo.video_url)) {
+      console.log('Detected YouTube URL, using caption extraction...');
+      
+      // Call the YouTube transcript function
+      const ytResponse = await fetch(`${supabaseUrl}/functions/v1/get-youtube-transcript`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({ videoUrl: lectureVideo.video_url })
+      });
 
-      if (signedUrlError || !signedUrlData?.signedUrl) {
-        console.error('Failed to get signed URL:', signedUrlError);
+      if (!ytResponse.ok) {
+        const errorData = await ytResponse.json();
+        console.error('YouTube transcript error:', errorData);
+        
+        const errorMessage = errorData.message || 'This YouTube video does not have captions available. Please enable auto-generated captions on the video or upload the video file directly.';
+        
         await supabase
           .from('lecture_videos')
-          .update({ status: 'error', error_message: 'Failed to access video file' })
+          .update({ status: 'error', error_message: errorMessage })
           .eq('id', lectureVideoId);
-        throw new Error('Failed to get signed URL for video');
-      }
-      transcriptionUrl = signedUrlData.signedUrl;
-    } else {
-      await supabase
-        .from('lecture_videos')
-        .update({ status: 'error', error_message: 'No video URL or file path provided' })
-        .eq('id', lectureVideoId);
-      throw new Error('No video URL or file path provided');
-    }
-
-    console.log('Got transcription URL, sending to Deepgram...');
-
-    // Send to Deepgram for transcription with timestamps
-    const deepgramResponse = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&paragraphs=true', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: transcriptionUrl
-      }),
-    });
-
-    if (!deepgramResponse.ok) {
-      const errorText = await deepgramResponse.text();
-      console.error('Deepgram error:', errorText);
-      await supabase
-        .from('lecture_videos')
-        .update({ status: 'error', error_message: 'Transcription service failed' })
-        .eq('id', lectureVideoId);
-      throw new Error(`Deepgram error: ${deepgramResponse.status}`);
-    }
-
-    const deepgramResult = await deepgramResponse.json();
-    console.log('Transcription complete');
-
-    // Extract utterances with timestamps
-    const utterances = deepgramResult.results?.utterances || [];
-    const paragraphs = deepgramResult.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs || [];
-    
-    // Build transcript segments from utterances or paragraphs
-    let transcriptSegments: Array<{ start: number; end: number; text: string }> = [];
-    
-    if (utterances.length > 0) {
-      transcriptSegments = utterances.map((u: any) => ({
-        start: u.start,
-        end: u.end,
-        text: u.transcript
-      }));
-    } else if (paragraphs.length > 0) {
-      transcriptSegments = paragraphs.flatMap((p: any) => 
-        p.sentences.map((s: any) => ({
-          start: s.start,
-          end: s.end,
-          text: s.text
-        }))
-      );
-    } else {
-      // Fallback to words if no utterances/paragraphs
-      const words = deepgramResult.results?.channels?.[0]?.alternatives?.[0]?.words || [];
-      if (words.length > 0) {
-        // Group words into ~30 second segments
-        const segmentDuration = 30;
-        let currentSegment = { start: words[0].start, end: 0, text: '' };
         
-        for (const word of words) {
-          if (word.start - currentSegment.start > segmentDuration && currentSegment.text) {
-            currentSegment.end = word.start;
-            transcriptSegments.push({ ...currentSegment });
-            currentSegment = { start: word.start, end: 0, text: '' };
+        throw new Error(errorMessage);
+      }
+
+      const ytResult = await ytResponse.json();
+      console.log('YouTube transcript extracted:', ytResult.transcript?.length, 'segments');
+      
+      transcriptSegments = ytResult.transcript || [];
+      duration = ytResult.duration || 0;
+      
+    } else {
+      // Use Deepgram for direct video URLs or uploaded files
+      let transcriptionUrl: string;
+
+      if (lectureVideo.video_url) {
+        // External URL - use it directly with Deepgram
+        console.log('Using external video URL:', lectureVideo.video_url);
+        transcriptionUrl = lectureVideo.video_url;
+      } else if (lectureVideo.video_path) {
+        // Uploaded file - get signed URL from storage
+        const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin
+          .storage
+          .from('lecture-videos')
+          .createSignedUrl(lectureVideo.video_path, 3600); // 1 hour expiry
+
+        if (signedUrlError || !signedUrlData?.signedUrl) {
+          console.error('Failed to get signed URL:', signedUrlError);
+          await supabase
+            .from('lecture_videos')
+            .update({ status: 'error', error_message: 'Failed to access video file' })
+            .eq('id', lectureVideoId);
+          throw new Error('Failed to get signed URL for video');
+        }
+        transcriptionUrl = signedUrlData.signedUrl;
+      } else {
+        await supabase
+          .from('lecture_videos')
+          .update({ status: 'error', error_message: 'No video URL or file path provided' })
+          .eq('id', lectureVideoId);
+        throw new Error('No video URL or file path provided');
+      }
+
+      console.log('Got transcription URL, sending to Deepgram...');
+
+      // Send to Deepgram for transcription with timestamps
+      const deepgramResponse = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&paragraphs=true', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: transcriptionUrl
+        }),
+      });
+
+      if (!deepgramResponse.ok) {
+        const errorText = await deepgramResponse.text();
+        console.error('Deepgram error:', errorText);
+        await supabase
+          .from('lecture_videos')
+          .update({ status: 'error', error_message: 'Transcription service failed' })
+          .eq('id', lectureVideoId);
+        throw new Error(`Deepgram error: ${deepgramResponse.status}`);
+      }
+
+      const deepgramResult = await deepgramResponse.json();
+      console.log('Transcription complete');
+
+      // Extract utterances with timestamps
+      const utterances = deepgramResult.results?.utterances || [];
+      const paragraphs = deepgramResult.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs || [];
+      
+      if (utterances.length > 0) {
+        transcriptSegments = utterances.map((u: any) => ({
+          start: u.start,
+          end: u.end,
+          text: u.transcript
+        }));
+      } else if (paragraphs.length > 0) {
+        transcriptSegments = paragraphs.flatMap((p: any) => 
+          p.sentences.map((s: any) => ({
+            start: s.start,
+            end: s.end,
+            text: s.text
+          }))
+        );
+      } else {
+        // Fallback to words if no utterances/paragraphs
+        const words = deepgramResult.results?.channels?.[0]?.alternatives?.[0]?.words || [];
+        if (words.length > 0) {
+          // Group words into ~30 second segments
+          const segmentDuration = 30;
+          let currentSegment = { start: words[0].start, end: 0, text: '' };
+          
+          for (const word of words) {
+            if (word.start - currentSegment.start > segmentDuration && currentSegment.text) {
+              currentSegment.end = word.start;
+              transcriptSegments.push({ ...currentSegment });
+              currentSegment = { start: word.start, end: 0, text: '' };
+            }
+            currentSegment.text += (currentSegment.text ? ' ' : '') + word.word;
+            currentSegment.end = word.end;
           }
-          currentSegment.text += (currentSegment.text ? ' ' : '') + word.word;
-          currentSegment.end = word.end;
-        }
-        
-        if (currentSegment.text) {
-          transcriptSegments.push(currentSegment);
+          
+          if (currentSegment.text) {
+            transcriptSegments.push(currentSegment);
+          }
         }
       }
-    }
 
-    // Get duration from last segment or metadata
-    const duration = transcriptSegments.length > 0 
-      ? Math.ceil(transcriptSegments[transcriptSegments.length - 1].end)
-      : deepgramResult.metadata?.duration || 0;
+      // Get duration from last segment or metadata
+      duration = transcriptSegments.length > 0 
+        ? Math.ceil(transcriptSegments[transcriptSegments.length - 1].end)
+        : deepgramResult.metadata?.duration || 0;
+    }
 
     console.log(`Extracted ${transcriptSegments.length} segments, duration: ${duration}s`);
 
@@ -219,10 +261,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in transcribe-video:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to transcribe video';
     return new Response(JSON.stringify({ 
-      error: error?.message || 'Failed to transcribe video'
+      error: errorMessage
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
