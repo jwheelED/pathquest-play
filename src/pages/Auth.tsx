@@ -19,6 +19,25 @@ export default function AuthPage() {
 
   const navigate = useNavigate();
 
+  // Helper to navigate user to the correct dashboard based on their role
+  const navigateByRole = async (userId: string) => {
+    // Check roles in order of priority: admin > instructor > student
+    const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
+    if (isAdmin) {
+      navigate("/admin/dashboard");
+      return;
+    }
+
+    const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: userId, _role: 'instructor' });
+    if (isInstructor) {
+      navigate("/instructor/dashboard");
+      return;
+    }
+
+    // Default to student dashboard
+    navigate("/dashboard");
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleAuth();
@@ -110,7 +129,7 @@ export default function AuthPage() {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ 
+      const { data, error } = await supabase.auth.signInWithPassword({ 
         email: validationResult.data.email, 
         password: validationResult.data.password 
       });
@@ -131,8 +150,8 @@ export default function AuthPage() {
         }
       } else {
         setSuccess("Signed in successfully!");
-        // All students go directly to dashboard (training page)
-        navigate("/dashboard");
+        // Navigate based on user role
+        await navigateByRole(data.user.id);
       }
     }
   };
@@ -208,8 +227,8 @@ export default function AuthPage() {
             await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
           }
 
-          // Navigate to dashboard (training page)
-          navigate("/dashboard");
+          // Navigate based on user role
+          await navigateByRole(session.user.id);
         };
 
         initializeUser();
