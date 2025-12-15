@@ -21,6 +21,7 @@ import { InstructorConnectionCard } from "@/components/instructor/InstructorConn
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
+import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 
 interface Student {
   id: string;
@@ -480,6 +481,9 @@ export default function InstructorDashboard() {
 
             {/* Manage Existing Lectures */}
             <LectureVideoManager />
+
+            {/* Pre-Recorded Lecture Grades */}
+            <PreRecordedLectureGrades />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
           </div>
