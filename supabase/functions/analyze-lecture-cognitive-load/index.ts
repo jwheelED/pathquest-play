@@ -431,7 +431,48 @@ Rules:
       pausePoints.sort((a: any, b: any) => a.timestamp - b.timestamp);
     }
 
-    console.log(`Final pause point count: ${pausePoints.length}`);
+    // CRITICAL: Final validation - ensure EXACTLY the requested count
+    if (pausePoints.length !== questionCount) {
+      console.error(`MISMATCH: Have ${pausePoints.length} pause points but need ${questionCount}. Forcing correction.`);
+      
+      // If still not enough, keep generating until we hit the target
+      while (pausePoints.length < questionCount) {
+        const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp / 30) * 30));
+        const interval = (lectureDuration - minStartTime) / (questionCount + 1);
+        let targetTime = minStartTime + interval * (pausePoints.length + 1);
+        
+        // Find an unused slot
+        let attempts = 0;
+        while (usedTimestamps.has(Math.floor(targetTime / 30) * 30) && attempts < 20) {
+          targetTime += 30;
+          attempts++;
+          if (targetTime >= lectureDuration - 30) {
+            targetTime = minStartTime + (Math.random() * (lectureDuration - minStartTime - 60));
+          }
+        }
+        
+        pausePoints.push({
+          timestamp: Math.round(targetTime),
+          cognitive_load_score: 6,
+          reason: "Comprehension checkpoint",
+          suggested_question_type: "multiple_choice",
+          context_summary: "Review of recent lecture content",
+          question_suggestion: "What key concept was just explained?"
+        });
+        console.log(`Generated placeholder at ${Math.round(targetTime)}s (${pausePoints.length}/${questionCount})`);
+      }
+      
+      // If too many, trim to exact count
+      if (pausePoints.length > questionCount) {
+        pausePoints.sort((a: any, b: any) => (b.cognitive_load_score || 0) - (a.cognitive_load_score || 0));
+        pausePoints = pausePoints.slice(0, questionCount);
+      }
+      
+      // Sort by timestamp
+      pausePoints.sort((a: any, b: any) => a.timestamp - b.timestamp);
+    }
+
+    console.log(`Final pause point count: ${pausePoints.length} (requested: ${questionCount})`);
 
     // Now generate questions for each pause point
     const questionsPromises = pausePoints.map(async (point: any, index: number) => {

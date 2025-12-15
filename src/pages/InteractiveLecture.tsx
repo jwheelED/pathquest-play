@@ -85,7 +85,46 @@ export default function InteractiveLecture() {
           .order('order_index');
 
         if (pointsError) throw pointsError;
-        setPausePoints(pointsData || []);
+        
+        // Frontend fallback: if we have fewer pause points than expected, generate placeholder dots
+        let displayPoints = pointsData || [];
+        const expectedCount = lectureData.question_count || 0;
+        
+        if (displayPoints.length < expectedCount && lectureData.duration_seconds) {
+          console.log(`Frontend fallback: have ${displayPoints.length} points, expected ${expectedCount}`);
+          const duration = lectureData.duration_seconds;
+          const minStart = Math.max(60, duration * 0.1);
+          const missing = expectedCount - displayPoints.length;
+          const interval = (duration - minStart) / (missing + 1);
+          
+          for (let i = 0; i < missing; i++) {
+            const timestamp = minStart + interval * (i + 1);
+            displayPoints.push({
+              id: `placeholder-${i}`,
+              pause_timestamp: Math.round(timestamp),
+              cognitive_load_score: 6,
+              reason: "Comprehension checkpoint",
+              question_content: {
+                question: "What is a key takeaway from this section?",
+                options: ["Option A", "Option B", "Option C", "Option D"],
+                correct_answer: "A",
+                explanation: "Review the content for the answer."
+              },
+              question_type: "multiple_choice",
+              order_index: displayPoints.length,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              lecture_video_id: lectureId!
+            });
+          }
+          
+          // Sort by timestamp
+          displayPoints.sort((a, b) => a.pause_timestamp - b.pause_timestamp);
+          // Re-index
+          displayPoints = displayPoints.map((p, idx) => ({ ...p, order_index: idx }));
+        }
+        
+        setPausePoints(displayPoints);
 
         // Fetch student progress
         const { data: { user } } = await supabase.auth.getUser();

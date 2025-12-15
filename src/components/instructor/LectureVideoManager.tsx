@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Video, Trash2, Eye, EyeOff, Clock, Brain, Users } from "lucide-react";
+import { Video, Trash2, Eye, EyeOff, Clock, Brain, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -35,6 +35,7 @@ export const LectureVideoManager = () => {
   const [lectures, setLectures] = useState<LectureVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLectures();
@@ -115,6 +116,57 @@ export const LectureVideoManager = () => {
     }
   };
 
+  const reanalyzeLecture = async (lecture: LectureVideo) => {
+    setReanalyzingId(lecture.id);
+    try {
+      // Fetch the transcript from the lecture
+      const { data: lectureData, error: lectureError } = await supabase
+        .from('lecture_videos')
+        .select('transcript, question_count')
+        .eq('id', lecture.id)
+        .single();
+
+      if (lectureError || !lectureData?.transcript) {
+        throw new Error('Could not find transcript for this lecture');
+      }
+
+      // Delete existing pause points
+      await supabase.from('lecture_pause_points').delete().eq('lecture_video_id', lecture.id);
+
+      // Get user's profile for professor type
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('professor_type, exam_style_preference, medical_specialty')
+        .eq('id', user?.id)
+        .single();
+
+      // Re-run cognitive load analysis
+      const { error: analyzeError } = await supabase.functions.invoke('analyze-lecture-cognitive-load', {
+        body: {
+          lectureVideoId: lecture.id,
+          transcript: lectureData.transcript,
+          questionCount: lectureData.question_count || lecture.question_count,
+          professorType: profile?.professor_type || 'stem',
+          examStyle: profile?.exam_style_preference || 'usmle_step1',
+          medicalSpecialty: profile?.medical_specialty || 'general'
+        }
+      });
+
+      if (analyzeError) throw analyzeError;
+
+      toast.success(`Re-analyzed "${lecture.title}" - questions regenerated`);
+      
+      // Refresh the list to get updated pause point counts
+      fetchLectures();
+    } catch (error: any) {
+      console.error('Error re-analyzing lecture:', error);
+      toast.error(error.message || 'Failed to re-analyze lecture');
+    } finally {
+      setReanalyzingId(null);
+    }
+  };
+
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return '--:--';
     const mins = Math.floor(seconds / 60);
@@ -179,7 +231,7 @@ export const LectureVideoManager = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
                   {lecture.published ? 'Visible' : 'Hidden'}
@@ -189,6 +241,16 @@ export const LectureVideoManager = () => {
                   onCheckedChange={() => togglePublished(lecture.id, lecture.published)}
                 />
               </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => reanalyzeLecture(lecture)}
+                disabled={reanalyzingId === lecture.id}
+                title="Re-analyze and regenerate questions"
+              >
+                <RefreshCw className={`h-4 w-4 ${reanalyzingId === lecture.id ? 'animate-spin' : ''}`} />
+              </Button>
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
