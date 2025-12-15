@@ -758,6 +758,7 @@ export type Database = {
           id: string
           instructor_id: string
           org_id: string | null
+          published: boolean | null
           question_count: number | null
           status: string | null
           title: string
@@ -777,6 +778,7 @@ export type Database = {
           id?: string
           instructor_id: string
           org_id?: string | null
+          published?: boolean | null
           question_count?: number | null
           status?: string | null
           title: string
@@ -796,6 +798,7 @@ export type Database = {
           id?: string
           instructor_id?: string
           org_id?: string | null
+          published?: boolean | null
           question_count?: number | null
           status?: string | null
           title?: string

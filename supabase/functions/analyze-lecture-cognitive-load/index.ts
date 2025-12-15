@@ -270,11 +270,12 @@ Question stem types for USMLE vignettes:
 - "avoid" - Which medication should be avoided?
 
 Rules:
-1. Space questions evenly (minimum 2 minutes apart)
-2. Prioritize high cognitive load clinical concepts
-3. Vary question stem types for comprehensive testing
-4. Focus on high-yield, board-relevant topics
-5. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
+1. NEVER place a question in the first 60 seconds - instructors typically do introductions/setup
+2. Space questions evenly throughout the lecture (minimum 2 minutes apart)
+3. Prioritize high cognitive load clinical concepts
+4. Vary question stem types for comprehensive testing
+5. Focus on high-yield, board-relevant topics
+6. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
     } else {
       systemPrompt = `You are an expert educational psychologist analyzing a lecture transcript for cognitive load.
 
@@ -310,11 +311,12 @@ CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 6
 ]
 
 Rules:
-1. Space questions evenly throughout the lecture (minimum 2 minutes apart)
-2. Prioritize points where cognitive load is highest
-3. Never place questions in the middle of an explanation - find natural breaks
-4. Consider cumulative load - if several complex topics stack, pause earlier
-5. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
+1. NEVER place a question in the first 60 seconds - instructors typically do introductions/setup
+2. Space questions evenly throughout the lecture (minimum 2 minutes apart)
+3. Prioritize points where cognitive load is highest
+4. Never place questions in the middle of an explanation - find natural breaks
+5. Consider cumulative load - if several complex topics stack, pause earlier
+6. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
     }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -371,13 +373,20 @@ Rules:
 
     console.log(`AI returned ${pausePoints.length} pause points, requested ${questionCount}`);
 
+    // Calculate lecture duration from last transcript segment
+    const lastSegment = transcript[transcript.length - 1];
+    const lectureDuration = lastSegment?.end || 600; // default 10 min
+    
+    // Minimum start time: 60 seconds or 10% of duration for very short lectures
+    const minStartTime = Math.max(60, lectureDuration * 0.1);
+
+    // Filter out any questions in the first 60 seconds (post-processing validation)
+    pausePoints = pausePoints.filter((p: any) => p.timestamp >= minStartTime);
+    console.log(`After filtering early questions: ${pausePoints.length} pause points remain`);
+
     // Validate and fix pause point count
     if (pausePoints.length < questionCount) {
       console.log(`Generating ${questionCount - pausePoints.length} additional pause points to meet quota`);
-      
-      // Calculate lecture duration from last transcript segment
-      const lastSegment = transcript[transcript.length - 1];
-      const lectureDuration = lastSegment?.end || 600; // default 10 min
       
       // Find timestamps that are already used
       const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp)));
@@ -387,8 +396,8 @@ Rules:
       const interval = lectureDuration / (questionCount + 1);
       
       for (let i = 0; i < missingCount; i++) {
-        // Find next available timestamp slot
-        let targetTime = interval * (pausePoints.length + i + 1);
+        // Find next available timestamp slot - ensure it starts after minStartTime
+        let targetTime = Math.max(minStartTime, interval * (pausePoints.length + i + 1));
         
         // Ensure at least 2 minutes apart from existing points
         while (usedTimestamps.has(Math.floor(targetTime)) || 

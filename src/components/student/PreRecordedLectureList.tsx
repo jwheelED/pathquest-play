@@ -43,6 +43,7 @@ export const PreRecordedLectureList = ({ instructorId }: PreRecordedLectureListP
           .from('lecture_videos')
           .select('*')
           .eq('status', 'ready')
+          .eq('published', true)
           .order('created_at', { ascending: false });
 
         if (instructorId) {
