@@ -274,7 +274,7 @@ Rules:
 2. Prioritize high cognitive load clinical concepts
 3. Vary question stem types for comprehensive testing
 4. Focus on high-yield, board-relevant topics
-5. Return exactly ${questionCount} pause points`;
+5. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
     } else {
       systemPrompt = `You are an expert educational psychologist analyzing a lecture transcript for cognitive load.
 
@@ -314,7 +314,7 @@ Rules:
 2. Prioritize points where cognitive load is highest
 3. Never place questions in the middle of an explanation - find natural breaks
 4. Consider cumulative load - if several complex topics stack, pause earlier
-5. Return exactly ${questionCount} pause points`;
+5. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
     }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -369,7 +369,60 @@ Rules:
       throw new Error('Failed to parse cognitive load analysis');
     }
 
-    console.log(`Identified ${pausePoints.length} pause points`);
+    console.log(`AI returned ${pausePoints.length} pause points, requested ${questionCount}`);
+
+    // Validate and fix pause point count
+    if (pausePoints.length < questionCount) {
+      console.log(`Generating ${questionCount - pausePoints.length} additional pause points to meet quota`);
+      
+      // Calculate lecture duration from last transcript segment
+      const lastSegment = transcript[transcript.length - 1];
+      const lectureDuration = lastSegment?.end || 600; // default 10 min
+      
+      // Find timestamps that are already used
+      const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp)));
+      
+      // Generate evenly spaced additional points
+      const missingCount = questionCount - pausePoints.length;
+      const interval = lectureDuration / (questionCount + 1);
+      
+      for (let i = 0; i < missingCount; i++) {
+        // Find next available timestamp slot
+        let targetTime = interval * (pausePoints.length + i + 1);
+        
+        // Ensure at least 2 minutes apart from existing points
+        while (usedTimestamps.has(Math.floor(targetTime)) || 
+               pausePoints.some((p: any) => Math.abs(p.timestamp - targetTime) < 120)) {
+          targetTime += 30; // Shift by 30 seconds
+          if (targetTime >= lectureDuration) {
+            targetTime = lectureDuration - 60 - (i * 30); // Work backwards from end
+          }
+        }
+        
+        // Create placeholder pause point
+        pausePoints.push({
+          timestamp: Math.round(targetTime),
+          cognitive_load_score: 7,
+          reason: "Additional question point for comprehensive coverage",
+          suggested_question_type: "multiple_choice",
+          context_summary: "Key concept from lecture content",
+          question_suggestion: "What is the main takeaway from this section?"
+        });
+        
+        usedTimestamps.add(Math.floor(targetTime));
+      }
+      
+      // Sort by timestamp after adding new points
+      pausePoints.sort((a: any, b: any) => a.timestamp - b.timestamp);
+    } else if (pausePoints.length > questionCount) {
+      // If we have too many, keep the ones with highest cognitive load
+      console.log(`Trimming ${pausePoints.length - questionCount} excess pause points`);
+      pausePoints.sort((a: any, b: any) => (b.cognitive_load_score || 0) - (a.cognitive_load_score || 0));
+      pausePoints = pausePoints.slice(0, questionCount);
+      pausePoints.sort((a: any, b: any) => a.timestamp - b.timestamp);
+    }
+
+    console.log(`Final pause point count: ${pausePoints.length}`);
 
     // Now generate questions for each pause point
     const questionsPromises = pausePoints.map(async (point: any, index: number) => {

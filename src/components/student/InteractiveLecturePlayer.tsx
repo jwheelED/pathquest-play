@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
-  RefreshCw, Rewind, BookOpen
+  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2
 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -102,11 +103,14 @@ export const InteractiveLecturePlayer = ({
   onComplete
 }: InteractiveLecturePlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [maxAllowedTime, setMaxAllowedTime] = useState(0);
   
   // Question overlay state
@@ -254,6 +258,40 @@ export const InteractiveLecturePlayer = ({
     if (!videoRef.current) return;
     videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
   };
+
+  const handleVolumeChange = (value: number[]) => {
+    if (!videoRef.current) return;
+    const newVolume = value[0];
+    videoRef.current.volume = newVolume;
+    setVolume(newVolume);
+    setIsMuted(newVolume === 0);
+  };
+
+  const handleFullscreenToggle = async () => {
+    if (!containerRef.current) return;
+    
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+    }
+  };
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const handleSubmitAnswer = async () => {
     if (!currentQuestion || !confidenceLevel) {
@@ -522,9 +560,9 @@ export const InteractiveLecturePlayer = ({
   const totalQuestions = sortedPausePoints.length;
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" ref={containerRef}>
       {/* Video Player */}
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+      <div className={cn("relative bg-black rounded-lg overflow-hidden", isFullscreen ? "h-full" : "aspect-video")}>
         <video
           ref={videoRef}
           src={videoUrl}
@@ -751,20 +789,45 @@ export const InteractiveLecturePlayer = ({
               >
                 <RotateCcw className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleVolumeToggle}
-                className="text-white hover:bg-white/20"
+              <div 
+                className="relative flex items-center gap-1"
+                onMouseEnter={() => setShowVolumeSlider(true)}
+                onMouseLeave={() => setShowVolumeSlider(false)}
               >
-                {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleVolumeToggle}
+                  className="text-white hover:bg-white/20"
+                >
+                  {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                </Button>
+                {showVolumeSlider && (
+                  <div className="w-20 px-2">
+                    <Slider
+                      value={[isMuted ? 0 : volume]}
+                      max={1}
+                      step={0.1}
+                      onValueChange={handleVolumeChange}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                )}
+              </div>
               <span className="text-sm text-white/80">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
 
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleFullscreenToggle}
+                className="text-white hover:bg-white/20"
+              >
+                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+              </Button>
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Lock className="h-3 w-3" />
                 No Skip
