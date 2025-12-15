@@ -247,9 +247,10 @@ MEDICAL ENTITIES IDENTIFIED IN LECTURE:
 ${medicalEntities.map((e: any) => `- ${e.entity_name} (${e.entity_type}): ${e.description || ''}`).join('\n')}
 
 RESPONSE FORMAT (JSON array):
+CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 600.0), NOT a time string like "6:04".
 [
   {
-    "timestamp": 125.5,
+    "timestamp": 364,
     "cognitive_load_score": 8,
     "reason": "Complex pathophysiology of pheochromocytoma explained",
     "suggested_question_type": "usmle_vignette",
@@ -295,9 +296,10 @@ ${professorType === 'stem'
   : '- Key argument transitions\n- Introduction of new theories\n- Complex philosophical concepts\n- Historical cause-effect chains\n- Literary analysis points'}
 
 RESPONSE FORMAT (JSON array):
+CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 600.0), NOT a time string like "6:04".
 [
   {
-    "timestamp": 125.5,
+    "timestamp": 364,
     "cognitive_load_score": 8,
     "reason": "Complex formula introduced - Pythagorean theorem derivation",
     "suggested_question_type": "multiple_choice",
@@ -352,7 +354,16 @@ Rules:
       if (!jsonMatch) {
         throw new Error('No JSON array found in response');
       }
-      pausePoints = JSON.parse(jsonMatch[0]);
+      
+      // Fix common AI formatting issues: timestamps like 6:04 instead of 364
+      let jsonStr = jsonMatch[0];
+      // Convert MM:SS timestamps to seconds (e.g., "timestamp": 6:04 → "timestamp": 364)
+      jsonStr = jsonStr.replace(/"timestamp":\s*(\d+):(\d+)/g, (_match: string, min: string, sec: string) => {
+        const seconds = parseInt(min) * 60 + parseInt(sec);
+        return `"timestamp": ${seconds}`;
+      });
+      
+      pausePoints = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       throw new Error('Failed to parse cognitive load analysis');
