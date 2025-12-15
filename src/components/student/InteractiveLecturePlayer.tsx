@@ -295,6 +295,10 @@ export const InteractiveLecturePlayer = ({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  const [isGrading, setIsGrading] = useState(false);
+  const [shortAnswerGrade, setShortAnswerGrade] = useState<number | null>(null);
+  const [shortAnswerFeedback, setShortAnswerFeedback] = useState<string | null>(null);
+
   const handleSubmitAnswer = async () => {
     if (!currentQuestion || !confidenceLevel) {
       toast.error('Please select your confidence level');
@@ -308,18 +312,51 @@ export const InteractiveLecturePlayer = ({
     }
 
     let correct = false;
+    let grade: number | null = null;
+    let feedback: string | null = null;
+
     if (currentQuestion.question_type === 'multiple_choice') {
       // Extract letter from answer (e.g., "A. Option" -> "A")
       const letterMatch = answer.match(/^([A-D])/i);
       const answerLetter = letterMatch ? letterMatch[1].toUpperCase() : answer;
       correct = answerLetter === currentQuestion.question_content.correctAnswer;
+      grade = correct ? 100 : 0;
     } else {
-      // For short answer, we'll be lenient - compare keywords
-      // In production, you might want AI grading here
-      correct = true; // Default to correct for short answer
+      // Use AI grading for short answer questions
+      setIsGrading(true);
+      try {
+        const expectedAnswer = currentQuestion.question_content.expectedAnswer || 
+                               currentQuestion.question_content.correctAnswer || '';
+        
+        const { data, error } = await supabase.functions.invoke('auto-grade-short-answer', {
+          body: {
+            studentAnswer: answer,
+            expectedAnswer: expectedAnswer,
+            question: currentQuestion.question_content.question
+          }
+        });
+
+        if (error) throw error;
+
+        grade = data.grade;
+        feedback = data.feedback;
+        // Consider >= 70% as "correct" for point calculation and remediation
+        correct = grade >= 70;
+        
+        setShortAnswerGrade(grade);
+        setShortAnswerFeedback(feedback);
+      } catch (error) {
+        console.error('Auto-grading failed:', error);
+        toast.error('Grading failed. Defaulting to manual review.');
+        // Fallback: mark as needs review but don't penalize
+        grade = null;
+        correct = true; // Don't trigger remediation on grading failure
+      } finally {
+        setIsGrading(false);
+      }
     }
 
-    // Calculate points based on confidence
+    // Calculate points based on confidence and grade
     const multipliers: Record<string, number> = {
       'not_sure': 0.5,
       'maybe': 1.0,
@@ -329,7 +366,25 @@ export const InteractiveLecturePlayer = ({
     
     const basePoints = 100;
     const multiplier = multipliers[confidenceLevel] || 1;
-    const points = correct ? Math.round(basePoints * multiplier) : -Math.round(basePoints * multiplier * 0.5);
+    
+    // For short answers, scale points by grade percentage
+    let points: number;
+    if (currentQuestion.question_type === 'multiple_choice') {
+      points = correct ? Math.round(basePoints * multiplier) : -Math.round(basePoints * multiplier * 0.5);
+    } else {
+      // Partial credit for short answers based on AI grade
+      const gradePercent = (grade ?? 100) / 100;
+      if (gradePercent >= 0.7) {
+        // Good answer: full points scaled by grade
+        points = Math.round(basePoints * multiplier * gradePercent);
+      } else if (gradePercent >= 0.4) {
+        // Partial credit: reduced points, no penalty
+        points = Math.round(basePoints * gradePercent * 0.5);
+      } else {
+        // Poor answer: penalty scaled by confidence
+        points = -Math.round(basePoints * multiplier * 0.3);
+      }
+    }
     
     setIsCorrect(correct);
     setShowResult(true);
@@ -350,6 +405,8 @@ export const InteractiveLecturePlayer = ({
       responses[currentQuestion.id] = {
         answer,
         correct,
+        grade,
+        feedback,
         confidence: confidenceLevel,
         points,
         timestamp: new Date().toISOString()
@@ -366,7 +423,7 @@ export const InteractiveLecturePlayer = ({
         .eq('student_id', user.id);
     }
 
-    // If incorrect, trigger remediation loop
+    // If incorrect (or low grade for short answer), trigger remediation loop
     if (!correct) {
       triggerRemediation(currentQuestion, answer);
     }
@@ -524,6 +581,8 @@ export const InteractiveLecturePlayer = ({
     setShortAnswer('');
     setConfidenceLevel('');
     setShowResult(false);
+    setShortAnswerGrade(null);
+    setShortAnswerFeedback(null);
 
     // If remediation is active, don't auto-continue - wait for user action
     if (remediation.active) return;
@@ -637,37 +696,70 @@ export const InteractiveLecturePlayer = ({
                       onClick={handleSubmitAnswer}
                       className="w-full"
                       size="lg"
-                      disabled={!confidenceLevel || (currentQuestion.question_type === 'multiple_choice' ? !selectedAnswer : !shortAnswer.trim())}
+                      disabled={isGrading || !confidenceLevel || (currentQuestion.question_type === 'multiple_choice' ? !selectedAnswer : !shortAnswer.trim())}
                     >
-                      Submit Answer
+                      {isGrading ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Grading...
+                        </>
+                      ) : (
+                        'Submit Answer'
+                      )}
                     </Button>
                   </>
                 ) : (
                   <>
                     {/* Result Display */}
-                    <div className={`p-4 rounded-lg ${isCorrect ? 'bg-emerald-500/10 border-emerald-500' : 'bg-red-500/10 border-red-500'} border`}>
+                    <div className={`p-4 rounded-lg ${isCorrect ? 'bg-emerald-500/10 border-emerald-500' : shortAnswerGrade !== null && shortAnswerGrade >= 40 ? 'bg-amber-500/10 border-amber-500' : 'bg-red-500/10 border-red-500'} border`}>
                       <div className="flex items-center gap-2 mb-2">
                         {isCorrect ? (
                           <>
                             <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                            <span className="font-semibold text-emerald-500">Correct!</span>
+                            <span className="font-semibold text-emerald-500">
+                              {shortAnswerGrade !== null ? `Great! Score: ${shortAnswerGrade}%` : 'Correct!'}
+                            </span>
+                          </>
+                        ) : shortAnswerGrade !== null && shortAnswerGrade >= 40 ? (
+                          <>
+                            <Target className="h-6 w-6 text-amber-500" />
+                            <span className="font-semibold text-amber-500">Partial Credit: {shortAnswerGrade}%</span>
                           </>
                         ) : (
                           <>
                             <XCircle className="h-6 w-6 text-red-500" />
-                            <span className="font-semibold text-red-500">Not quite</span>
+                            <span className="font-semibold text-red-500">
+                              {shortAnswerGrade !== null ? `Needs improvement: ${shortAnswerGrade}%` : 'Not quite'}
+                            </span>
                           </>
                         )}
                       </div>
-                      {currentQuestion.question_content.explanation && (
+                      
+                      {/* Short answer AI feedback */}
+                      {shortAnswerFeedback && (
+                        <div className="mt-3 p-3 rounded bg-background/50">
+                          <p className="text-sm font-medium mb-1 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> AI Feedback:
+                          </p>
+                          <p className="text-sm text-muted-foreground">{shortAnswerFeedback}</p>
+                        </div>
+                      )}
+                      
+                      {currentQuestion.question_content.explanation && !shortAnswerFeedback && (
                         <p className="text-sm text-muted-foreground">
                           {currentQuestion.question_content.explanation}
                         </p>
                       )}
-                      {!isCorrect && currentQuestion.question_content.correctAnswer && (
+                      {!isCorrect && currentQuestion.question_content.correctAnswer && currentQuestion.question_type === 'multiple_choice' && (
                         <p className="text-sm mt-2">
                           <span className="font-medium">Correct answer:</span>{' '}
                           {currentQuestion.question_content.correctAnswer}
+                        </p>
+                      )}
+                      {!isCorrect && currentQuestion.question_content.expectedAnswer && currentQuestion.question_type !== 'multiple_choice' && (
+                        <p className="text-sm mt-2">
+                          <span className="font-medium">Expected answer:</span>{' '}
+                          {currentQuestion.question_content.expectedAnswer}
                         </p>
                       )}
                     </div>
