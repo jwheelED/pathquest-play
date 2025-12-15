@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Video, Users, TrendingUp, CheckCircle, XCircle, Clock, Sparkles, ChevronDown, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -312,14 +312,19 @@ export function PreRecordedLectureGrades() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Video className="h-5 w-5 text-primary" />
-          Pre-Recorded Lecture Grades
-        </CardTitle>
-        <CardDescription>
-          View student performance on pre-recorded lecture questions
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Video className="h-5 w-5 text-primary" />
+            Pre-Recorded Lecture Grades
+          </CardTitle>
+          <CardDescription>
+            View student performance on pre-recorded lecture questions
+          </CardDescription>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchLectureGrades} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
+        </Button>
       </CardHeader>
       <CardContent>
         <Accordion type="single" collapsible value={expandedLecture || undefined} onValueChange={setExpandedLecture}>
@@ -379,8 +384,8 @@ export function PreRecordedLectureGrades() {
                       </div>
                     )}
 
-                    {/* Student List */}
-                    <ScrollArea className="max-h-[500px]">
+                    {/* Student List - with proper scrolling */}
+                    <div className="h-[400px] overflow-y-auto border rounded-lg p-2">
                       <Accordion type="multiple" className="space-y-2">
                         {lecture.studentProgress.map(progress => {
                           const overallScore = getStudentOverallScore(progress, lecture.pausePoints);
@@ -435,7 +440,7 @@ export function PreRecordedLectureGrades() {
                           );
                         })}
                       </Accordion>
-                    </ScrollArea>
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
