@@ -95,11 +95,11 @@ serve(async (req) => {
     let transcriptSegments: Array<{ start: number; end: number; text: string }> = [];
     let duration = 0;
 
-    // Check if this is a YouTube URL - use caption extraction first, fallback to audio extraction
+    // Check if this is a YouTube URL - use caption extraction instead of Deepgram
     if (lectureVideo.video_url && isYouTubeUrl(lectureVideo.video_url)) {
-      console.log('Detected YouTube URL, trying caption extraction first...');
+      console.log('Detected YouTube URL, using caption extraction...');
       
-      // Try caption extraction first (faster and cheaper)
+      // Call the YouTube transcript function
       const ytResponse = await fetch(`${supabaseUrl}/functions/v1/get-youtube-transcript`, {
         method: 'POST',
         headers: {
@@ -109,115 +109,25 @@ serve(async (req) => {
         body: JSON.stringify({ videoUrl: lectureVideo.video_url })
       });
 
-      if (ytResponse.ok) {
-        const ytResult = await ytResponse.json();
-        console.log('YouTube captions extracted:', ytResult.transcript?.length, 'segments');
-        transcriptSegments = ytResult.transcript || [];
-        duration = ytResult.duration || 0;
-      } else {
-        // Captions not available - fallback to audio extraction via Cloudinary
-        console.log('Captions not available, falling back to audio extraction...');
+      if (!ytResponse.ok) {
+        const errorData = await ytResponse.json();
+        console.error('YouTube transcript error:', errorData);
+        
+        const errorMessage = errorData.message || 'This YouTube video does not have captions available. Please enable auto-generated captions on the video or upload the video file directly.';
         
         await supabase
           .from('lecture_videos')
-          .update({ status: 'processing', error_message: 'Extracting audio from YouTube...' })
+          .update({ status: 'error', error_message: errorMessage })
           .eq('id', lectureVideoId);
-
-        // Extract audio and upload to Cloudinary
-        const audioResponse = await fetch(`${supabaseUrl}/functions/v1/extract-youtube-audio`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${serviceRoleKey}`
-          },
-          body: JSON.stringify({ videoUrl: lectureVideo.video_url })
-        });
-
-        if (!audioResponse.ok) {
-          const audioError = await audioResponse.json();
-          console.error('Audio extraction failed:', audioError);
-          await supabase
-            .from('lecture_videos')
-            .update({ status: 'error', error_message: audioError.error || 'Failed to extract audio from YouTube' })
-            .eq('id', lectureVideoId);
-          throw new Error(audioError.error || 'Failed to extract audio');
-        }
-
-        const audioResult = await audioResponse.json();
-        console.log('Audio extracted, now transcribing with Deepgram...');
-
-        await supabase
-          .from('lecture_videos')
-          .update({ status: 'processing', error_message: 'Transcribing audio...' })
-          .eq('id', lectureVideoId);
-
-        // Send Cloudinary URL to Deepgram for transcription
-        const deepgramResponse = await fetch('https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&paragraphs=true', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url: audioResult.audioUrl }),
-        });
-
-        if (!deepgramResponse.ok) {
-          const errorText = await deepgramResponse.text();
-          console.error('Deepgram error on YouTube audio:', errorText);
-          await supabase
-            .from('lecture_videos')
-            .update({ status: 'error', error_message: 'Transcription service failed' })
-            .eq('id', lectureVideoId);
-          throw new Error(`Deepgram error: ${deepgramResponse.status}`);
-        }
-
-        const deepgramResult = await deepgramResponse.json();
-        console.log('YouTube audio transcription complete');
-
-        // Extract segments from Deepgram result
-        const utterances = deepgramResult.results?.utterances || [];
-        const paragraphs = deepgramResult.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs || [];
         
-        if (utterances.length > 0) {
-          transcriptSegments = utterances.map((u: any) => ({
-            start: u.start,
-            end: u.end,
-            text: u.transcript
-          }));
-        } else if (paragraphs.length > 0) {
-          transcriptSegments = paragraphs.flatMap((p: any) => 
-            p.sentences.map((s: any) => ({
-              start: s.start,
-              end: s.end,
-              text: s.text
-            }))
-          );
-        } else {
-          const words = deepgramResult.results?.channels?.[0]?.alternatives?.[0]?.words || [];
-          if (words.length > 0) {
-            const segmentDuration = 30;
-            let currentSegment = { start: words[0].start, end: 0, text: '' };
-            
-            for (const word of words) {
-              if (word.start - currentSegment.start > segmentDuration && currentSegment.text) {
-                currentSegment.end = word.start;
-                transcriptSegments.push({ ...currentSegment });
-                currentSegment = { start: word.start, end: 0, text: '' };
-              }
-              currentSegment.text += (currentSegment.text ? ' ' : '') + word.word;
-              currentSegment.end = word.end;
-            }
-            
-            if (currentSegment.text) {
-              transcriptSegments.push(currentSegment);
-            }
-          }
-        }
-
-        duration = transcriptSegments.length > 0 
-          ? Math.ceil(transcriptSegments[transcriptSegments.length - 1].end)
-          : deepgramResult.metadata?.duration || 0;
+        throw new Error(errorMessage);
       }
+
+      const ytResult = await ytResponse.json();
+      console.log('YouTube transcript extracted:', ytResult.transcript?.length, 'segments');
+      
+      transcriptSegments = ytResult.transcript || [];
+      duration = ytResult.duration || 0;
       
     } else {
       // Use Deepgram for direct video URLs or uploaded files
