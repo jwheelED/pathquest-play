@@ -86,13 +86,22 @@ export default function InteractiveLecture() {
 
         if (pointsError) throw pointsError;
         
+        // Safety filter: remove pause points beyond video duration
+        const videoDuration = lectureData.duration_seconds || 0;
+        const maxValidTimestamp = videoDuration > 0 ? videoDuration - 10 : Infinity;
+        
+        let displayPoints = (pointsData || []).filter(
+          (p: PausePoint) => p.pause_timestamp <= maxValidTimestamp && p.pause_timestamp >= 0
+        );
+        
+        console.log(`Pause points: ${pointsData?.length || 0} total, ${displayPoints.length} within valid range (0-${maxValidTimestamp}s)`);
+        
         // Frontend fallback: if we have fewer pause points than expected, generate placeholder dots
-        let displayPoints = pointsData || [];
         const expectedCount = lectureData.question_count || 0;
         
-        if (displayPoints.length < expectedCount && lectureData.duration_seconds) {
-          console.log(`Frontend fallback: have ${displayPoints.length} points, expected ${expectedCount}`);
-          const duration = lectureData.duration_seconds;
+        if (displayPoints.length < expectedCount && videoDuration > 0) {
+          console.log(`Frontend fallback: have ${displayPoints.length} valid points, expected ${expectedCount}`);
+          const duration = videoDuration;
           const minStart = Math.max(60, duration * 0.1);
           const missing = expectedCount - displayPoints.length;
           const interval = (duration - minStart) / (missing + 1);
