@@ -116,3 +116,6 @@ verify_jwt = false
 
 [functions.extract-youtube-audio]
 verify_jwt = true
+
+[functions.generate-lecture-grades-summary]
+verify_jwt = true
