@@ -137,8 +137,10 @@ export const InteractiveLecturePlayer = ({
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [followUpAnswer, setFollowUpAnswer] = useState('');
 
-  // Sort pause points by timestamp
-  const sortedPausePoints = [...pausePoints].sort((a, b) => a.pause_timestamp - b.pause_timestamp);
+  // Sort and filter pause points by timestamp (safety: clamp to video duration)
+  const sortedPausePoints = [...pausePoints]
+    .filter(p => duration === 0 || p.pause_timestamp <= duration)
+    .sort((a, b) => a.pause_timestamp - b.pause_timestamp);
 
   // Load saved progress
   useEffect(() => {

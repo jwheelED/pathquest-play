@@ -375,38 +375,75 @@ Rules:
 
     // Calculate lecture duration from last transcript segment
     const lastSegment = transcript[transcript.length - 1];
-    const lectureDuration = lastSegment?.end || 600; // default 10 min
+    const transcriptDuration = lastSegment?.end || 600; // default 10 min
+    
+    // Get actual video duration from database for accurate validation
+    const { data: lectureVideo } = await supabase
+      .from('lecture_videos')
+      .select('duration_seconds')
+      .eq('id', lectureVideoId)
+      .single();
+    
+    const lectureDuration = lectureVideo?.duration_seconds || transcriptDuration;
     
     // Minimum start time: 60 seconds or 10% of duration for very short lectures
     const minStartTime = Math.max(60, lectureDuration * 0.1);
+    // Maximum timestamp: 30 seconds before end of video
+    const maxTimestamp = Math.max(minStartTime + 60, lectureDuration - 30);
+    
+    console.log(`[Duration Validation] Video: ${lectureDuration}s, valid range: ${minStartTime}s - ${maxTimestamp}s`);
 
-    // Filter out any questions in the first 60 seconds (post-processing validation)
-    pausePoints = pausePoints.filter((p: any) => p.timestamp >= minStartTime);
-    console.log(`After filtering early questions: ${pausePoints.length} pause points remain`);
+    // Filter out any questions outside valid timestamp range
+    pausePoints = pausePoints.filter((p: any) => {
+      const valid = p.timestamp >= minStartTime && p.timestamp <= maxTimestamp;
+      if (!valid) {
+        console.log(`[Filtering] Removed point at ${p.timestamp}s (outside range ${minStartTime}-${maxTimestamp})`);
+      }
+      return valid;
+    });
+    console.log(`After range filtering: ${pausePoints.length} pause points remain`);
 
     // Validate and fix pause point count
     if (pausePoints.length < questionCount) {
       console.log(`Generating ${questionCount - pausePoints.length} additional pause points to meet quota`);
       
-      // Find timestamps that are already used
-      const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp)));
+      // Find timestamps that are already used (30-second buckets)
+      const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp / 30)));
       
-      // Generate evenly spaced additional points
+      // Generate evenly spaced additional points within valid range
       const missingCount = questionCount - pausePoints.length;
-      const interval = lectureDuration / (questionCount + 1);
+      const availableRange = maxTimestamp - minStartTime;
+      const interval = availableRange / (missingCount + 1);
       
       for (let i = 0; i < missingCount; i++) {
-        // Find next available timestamp slot - ensure it starts after minStartTime
-        let targetTime = Math.max(minStartTime, interval * (pausePoints.length + i + 1));
+        let targetTime = Math.round(minStartTime + interval * (i + 1));
         
-        // Ensure at least 2 minutes apart from existing points
-        while (usedTimestamps.has(Math.floor(targetTime)) || 
-               pausePoints.some((p: any) => Math.abs(p.timestamp - targetTime) < 120)) {
-          targetTime += 30; // Shift by 30 seconds
-          if (targetTime >= lectureDuration) {
-            targetTime = lectureDuration - 60 - (i * 30); // Work backwards from end
-          }
+        // Ensure within bounds
+        targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
+        
+        // Avoid timestamp conflicts (30-second buckets)
+        let bucket = Math.floor(targetTime / 30);
+        let attempts = 0;
+        while (usedTimestamps.has(bucket) && attempts < 20) {
+          bucket++;
+          targetTime = bucket * 30;
+          attempts++;
         }
+        
+        // If we went past max, try going backwards
+        if (targetTime > maxTimestamp) {
+          bucket = Math.floor(maxTimestamp / 30);
+          while (usedTimestamps.has(bucket) && bucket > Math.floor(minStartTime / 30)) {
+            bucket--;
+          }
+          targetTime = Math.max(minStartTime, bucket * 30);
+        }
+        
+        // Final bounds check
+        targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
+        usedTimestamps.add(Math.floor(targetTime / 30));
+        
+        console.log(`[Placeholder] Generated point at ${targetTime}s`);
         
         // Create placeholder pause point
         pausePoints.push({
@@ -417,8 +454,6 @@ Rules:
           context_summary: "Key concept from lecture content",
           question_suggestion: "What is the main takeaway from this section?"
         });
-        
-        usedTimestamps.add(Math.floor(targetTime));
       }
       
       // Sort by timestamp after adding new points
@@ -441,25 +476,28 @@ Rules:
         const interval = (lectureDuration - minStartTime) / (questionCount + 1);
         let targetTime = minStartTime + interval * (pausePoints.length + 1);
         
-        // Find an unused slot
-        let attempts = 0;
-        while (usedTimestamps.has(Math.floor(targetTime / 30) * 30) && attempts < 20) {
-          targetTime += 30;
-          attempts++;
-          if (targetTime >= lectureDuration - 30) {
-            targetTime = minStartTime + (Math.random() * (lectureDuration - minStartTime - 60));
-          }
+      // Find an unused slot within valid range
+      let attempts = 0;
+      while (usedTimestamps.has(Math.floor(targetTime / 30) * 30) && attempts < 20) {
+        targetTime += 30;
+        attempts++;
+        if (targetTime > maxTimestamp) {
+          targetTime = minStartTime + (Math.random() * (maxTimestamp - minStartTime));
         }
-        
-        pausePoints.push({
-          timestamp: Math.round(targetTime),
-          cognitive_load_score: 6,
-          reason: "Comprehension checkpoint",
-          suggested_question_type: "multiple_choice",
-          context_summary: "Review of recent lecture content",
-          question_suggestion: "What key concept was just explained?"
-        });
-        console.log(`Generated placeholder at ${Math.round(targetTime)}s (${pausePoints.length}/${questionCount})`);
+      }
+      
+      // Ensure within bounds
+      targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
+      
+      pausePoints.push({
+        timestamp: Math.round(targetTime),
+        cognitive_load_score: 6,
+        reason: "Comprehension checkpoint",
+        suggested_question_type: "multiple_choice",
+        context_summary: "Review of recent lecture content",
+        question_suggestion: "What key concept was just explained?"
+      });
+      console.log(`Generated placeholder at ${Math.round(targetTime)}s (${pausePoints.length}/${questionCount})`);
       }
       
       // If too many, trim to exact count
