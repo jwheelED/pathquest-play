@@ -20,6 +20,7 @@ import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterials
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
+import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 
 interface Student {
   id: string;
@@ -476,6 +477,9 @@ export default function InstructorDashboard() {
                 toast.success('Lecture ready! Students can now view it.');
               }}
             />
+
+            {/* Manage Existing Lectures */}
+            <LectureVideoManager />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
           </div>
