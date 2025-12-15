@@ -87,18 +87,28 @@ export default function InteractiveLecture() {
             .select('*')
             .eq('lecture_video_id', lectureId)
             .eq('student_id', user.id)
-            .single();
+            .maybeSingle();
 
           setProgress(progressData);
         }
 
-        // Get signed URL for video
-        const { data: signedUrl, error: urlError } = await supabase.storage
-          .from('lecture-videos')
-          .createSignedUrl(lectureData.video_path, 3600);
+        // Get signed URL for video - handle missing files gracefully
+        try {
+          const { data: signedUrl, error: urlError } = await supabase.storage
+            .from('lecture-videos')
+            .createSignedUrl(lectureData.video_path, 3600);
 
-        if (urlError) throw urlError;
-        setVideoUrl(signedUrl.signedUrl);
+          if (urlError) {
+            console.error('Video file not found:', urlError);
+            // Don't throw - let the page load without video
+            setVideoUrl(null);
+          } else {
+            setVideoUrl(signedUrl.signedUrl);
+          }
+        } catch (storageErr) {
+          console.error('Storage error:', storageErr);
+          setVideoUrl(null);
+        }
 
       } catch (err: any) {
         console.error('Error fetching lecture:', err);
@@ -239,10 +249,17 @@ export default function InteractiveLecture() {
             }}
           />
         ) : (
-          <Card className="aspect-video flex items-center justify-center">
-            <div className="text-center">
-              <Lock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Video unavailable</p>
+          <Card className="aspect-video flex items-center justify-center border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+            <div className="text-center p-6">
+              <Lock className="h-12 w-12 mx-auto text-amber-500 mb-4" />
+              <p className="font-medium text-amber-700 dark:text-amber-400">Video file unavailable</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                The video file may still be processing or needs to be re-uploaded by your instructor.
+              </p>
+              <Button onClick={() => navigate(-1)} variant="outline" className="mt-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Go Back
+              </Button>
             </div>
           </Card>
         )}
