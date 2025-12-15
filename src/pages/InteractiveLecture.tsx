@@ -40,6 +40,14 @@ interface StudentProgress {
 export default function InteractiveLecture() {
   const { lectureId } = useParams<{ lectureId: string }>();
   const navigate = useNavigate();
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard');
+    }
+  };
   const [lecture, setLecture] = useState<LectureVideo | null>(null);
   const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
   const [progress, setProgress] = useState<StudentProgress | null>(null);
@@ -154,7 +162,7 @@ export default function InteractiveLecture() {
               <CardDescription>{error || 'Lecture not found'}</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button onClick={() => navigate(-1)} variant="outline">
+              <Button onClick={handleGoBack} variant="outline">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
               </Button>
@@ -185,7 +193,7 @@ export default function InteractiveLecture() {
                 Please check back in a few minutes. The AI is analyzing the lecture content 
                 to identify optimal learning moments.
               </p>
-              <Button onClick={() => navigate(-1)} variant="outline">
+              <Button onClick={handleGoBack} variant="outline">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
               </Button>
@@ -206,7 +214,7 @@ export default function InteractiveLecture() {
         <div className="max-w-5xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <Button variant="ghost" size="icon" onClick={handleGoBack}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
@@ -256,7 +264,7 @@ export default function InteractiveLecture() {
               <p className="text-sm text-muted-foreground mt-2">
                 The video file may still be processing or needs to be re-uploaded by your instructor.
               </p>
-              <Button onClick={() => navigate(-1)} variant="outline" className="mt-4">
+              <Button onClick={handleGoBack} variant="outline" className="mt-4">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
               </Button>
