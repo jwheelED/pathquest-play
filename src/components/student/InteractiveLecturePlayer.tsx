@@ -9,13 +9,14 @@ import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
-  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle
+  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle, History
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ContextualTutorChat } from './ContextualTutorChat';
+import { MasterySummary } from './MasterySummary';
 
 interface PausePoint {
   id: string;
@@ -145,6 +146,10 @@ export const InteractiveLecturePlayer = ({
   // Contextual chat state
   const [showContextualChat, setShowContextualChat] = useState(false);
   const [lectureTranscript, setLectureTranscript] = useState<string | null>(null);
+  
+  // Mastery summary state
+  const [showMasterySummary, setShowMasterySummary] = useState(false);
+  const [allResponses, setAllResponses] = useState<Record<string, { correct: boolean; answer: string }>>({});
 
   // Sort and filter pause points by timestamp (safety: clamp to video duration)
   const sortedPausePoints = [...pausePoints]
@@ -439,6 +444,15 @@ export const InteractiveLecturePlayer = ({
     setShowResult(true);
     setTotalPoints(prev => Math.max(0, prev + points));
     setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
+    
+    // Track response for mastery summary
+    setAllResponses(prev => ({
+      ...prev,
+      [currentQuestion.id]: {
+        correct,
+        answer: currentQuestion.question_type === 'multiple_choice' ? selectedAnswer : shortAnswer
+      }
+    }));
 
     // Save response
     const { data: { user } } = await supabase.auth.getUser();
@@ -650,13 +664,33 @@ export const InteractiveLecturePlayer = ({
           }
         });
       });
-      toast.success('🎉 Lecture Complete! Great job!');
-      onComplete?.();
+      
+      // Show mastery summary instead of just toast
+      if (!isPreview) {
+        setShowMasterySummary(true);
+      } else {
+        toast.success('🎉 Lecture Complete! Great job!');
+        onComplete?.();
+      }
     } else {
       // Resume video
       videoRef.current?.play();
       setIsPlaying(true);
     }
+  };
+
+  // Handle replay last 20 seconds
+  const handleReplayLast20 = () => {
+    if (!videoRef.current || !currentQuestion) return;
+    const replayTime = Math.max(0, currentQuestion.pause_timestamp - 20);
+    videoRef.current.currentTime = replayTime;
+    setCurrentQuestion(null);
+    setShowResult(false);
+    setSelectedAnswer('');
+    setShortAnswer('');
+    setConfidenceLevel('');
+    videoRef.current.play();
+    setIsPlaying(true);
   };
 
   const formatTime = (seconds: number) => {
@@ -870,17 +904,30 @@ export const InteractiveLecturePlayer = ({
                       </div>
                     )}
 
-                    {/* Ask About This button - always visible in result state */}
-                    {!isPreview && (
+                    {/* Action buttons row */}
+                    <div className="flex gap-2 mb-3">
+                      {/* Replay Last 20 Seconds button */}
                       <Button
                         variant="outline"
-                        className="w-full mb-3"
-                        onClick={() => setShowContextualChat(true)}
+                        className="flex-1"
+                        onClick={handleReplayLast20}
                       >
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Ask About This
+                        <History className="h-4 w-4 mr-2" />
+                        Replay Last 20s
                       </Button>
-                    )}
+                      
+                      {/* Ask About This button */}
+                      {!isPreview && (
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setShowContextualChat(true)}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          Ask About This
+                        </Button>
+                      )}
+                    </div>
 
                     {isCorrect && (
                       <Button onClick={handleContinue} className="w-full" size="lg">
@@ -1076,6 +1123,37 @@ export const InteractiveLecturePlayer = ({
           })() : undefined}
           onClose={() => setShowContextualChat(false)}
         />
+      )}
+
+      {/* Mastery Summary Overlay */}
+      {showMasterySummary && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <MasterySummary
+            lectureId={lectureId}
+            lectureTitle={title}
+            totalPoints={totalPoints}
+            questionsAnswered={answeredQuestions.size}
+            correctAnswers={Object.values(allResponses).filter(r => r.correct).length}
+            pausePoints={sortedPausePoints}
+            responses={allResponses}
+            onRewatch={(timestamp) => {
+              setShowMasterySummary(false);
+              if (videoRef.current) {
+                videoRef.current.currentTime = timestamp;
+                videoRef.current.play();
+                setIsPlaying(true);
+              }
+            }}
+            onStartReview={() => {
+              toast.info('Review quiz feature coming soon!');
+            }}
+            onContinue={() => {
+              setShowMasterySummary(false);
+              toast.success('🎉 Lecture Complete! Great job!');
+              onComplete?.();
+            }}
+          />
+        </div>
       )}
     </div>
   );

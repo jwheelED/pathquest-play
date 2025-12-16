@@ -2097,6 +2097,71 @@ export type Database = {
           },
         ]
       }
+      student_concept_mastery: {
+        Row: {
+          concept_name: string
+          correct_attempts: number | null
+          created_at: string | null
+          decay_factor: number | null
+          error_patterns: Json | null
+          id: string
+          last_practiced_at: string | null
+          mastery_level: string | null
+          next_review_at: string | null
+          org_id: string | null
+          performance_by_type: Json | null
+          related_lectures: string[] | null
+          strength_score: number | null
+          student_id: string
+          total_attempts: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          concept_name: string
+          correct_attempts?: number | null
+          created_at?: string | null
+          decay_factor?: number | null
+          error_patterns?: Json | null
+          id?: string
+          last_practiced_at?: string | null
+          mastery_level?: string | null
+          next_review_at?: string | null
+          org_id?: string | null
+          performance_by_type?: Json | null
+          related_lectures?: string[] | null
+          strength_score?: number | null
+          student_id: string
+          total_attempts?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          concept_name?: string
+          correct_attempts?: number | null
+          created_at?: string | null
+          decay_factor?: number | null
+          error_patterns?: Json | null
+          id?: string
+          last_practiced_at?: string | null
+          mastery_level?: string | null
+          next_review_at?: string | null
+          org_id?: string | null
+          performance_by_type?: Json | null
+          related_lectures?: string[] | null
+          strength_score?: number | null
+          student_id?: string
+          total_attempts?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_concept_mastery_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_connection_health: {
         Row: {
           checked_at: string | null
@@ -2117,6 +2182,56 @@ export type Database = {
           student_count?: number
         }
         Relationships: []
+      }
+      student_error_patterns: {
+        Row: {
+          concept_a: string
+          concept_b: string | null
+          created_at: string | null
+          error_type: string
+          id: string
+          last_occurred_at: string | null
+          occurrence_count: number | null
+          org_id: string | null
+          resolution_method: string | null
+          resolved: boolean | null
+          student_id: string
+        }
+        Insert: {
+          concept_a: string
+          concept_b?: string | null
+          created_at?: string | null
+          error_type: string
+          id?: string
+          last_occurred_at?: string | null
+          occurrence_count?: number | null
+          org_id?: string | null
+          resolution_method?: string | null
+          resolved?: boolean | null
+          student_id: string
+        }
+        Update: {
+          concept_a?: string
+          concept_b?: string | null
+          created_at?: string | null
+          error_type?: string
+          id?: string
+          last_occurred_at?: string | null
+          occurrence_count?: number | null
+          org_id?: string | null
+          resolution_method?: string | null
+          resolved?: boolean | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_error_patterns_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_lecture_progress: {
         Row: {
