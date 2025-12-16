@@ -4,11 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
+import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import ReactMarkdown from "react-markdown";
 
 interface Question {
@@ -420,33 +421,34 @@ const LiveStudent = () => {
               )}
             </>
           ) : (
-            <div className="text-center space-y-4 py-8">
+            <div className="text-center space-y-6 py-8">
               {isCorrect ? (
                 <>
-                  <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
-                  <p className="text-2xl font-bold text-green-500">Correct!</p>
-                  {pointsEarned > 0 && (
-                    <div className="flex items-center justify-center gap-2 text-green-500">
-                      <TrendingUp className="h-5 w-5" />
-                      <span className="text-xl font-bold">+{pointsEarned} XP</span>
-                      {confidenceLevel && (
-                        <span className="text-sm">({confidenceMultiplier}x bonus!)</span>
-                      )}
-                    </div>
+                  <div className="relative">
+                    <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                  </div>
+                  <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
+                  {pointsEarned !== 0 && (
+                    <AnimatedXPDisplay 
+                      points={pointsEarned}
+                      multiplier={confidenceMultiplier}
+                      isCorrect={true}
+                    />
                   )}
                 </>
               ) : (
                 <>
-                  <XCircle className="h-16 w-16 text-red-500 mx-auto" />
-                  <p className="text-2xl font-bold text-red-500">Incorrect</p>
+                  <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
+                  <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
                   <p className="text-muted-foreground">
                     Correct answer: {currentQuestion.question_content.correctAnswer}
                   </p>
-              {pointsEarned < 0 && (
-                    <div className="flex items-center justify-center gap-2 text-red-500">
-                      <TrendingDown className="h-5 w-5" />
-                      <span className="text-xl font-bold">{pointsEarned} XP</span>
-                    </div>
+                  {pointsEarned < 0 && (
+                    <AnimatedXPDisplay 
+                      points={pointsEarned}
+                      multiplier={confidenceMultiplier}
+                      isCorrect={false}
+                    />
                   )}
                 </>
               )}
@@ -466,10 +468,7 @@ const LiveStudent = () => {
                 ) : showExplanation ? (
                   <>📚 Hide Explanation</>
                 ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Why? Get AI Explanation
-                  </>
+                  <>✨ Why? Get AI Explanation</>
                 )}
               </Button>
               
