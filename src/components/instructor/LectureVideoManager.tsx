@@ -264,12 +264,13 @@ export const LectureVideoManager = () => {
               </div>
 
               <Button
-                variant="ghost"
-                size="icon"
+                variant="outline"
+                size="sm"
                 onClick={() => window.open(`/instructor/preview/${lecture.id}`, '_blank')}
-                title="Preview lecture as student would see it"
+                className="gap-1"
               >
-                <Play className="h-4 w-4" />
+                <Play className="h-3.5 w-3.5" />
+                Preview
               </Button>
 
               <Button
