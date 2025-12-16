@@ -9,8 +9,15 @@ import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
-  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle, History, Flag
+  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle, History, Flag,
+  Gauge
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -118,6 +125,9 @@ export const InteractiveLecturePlayer = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  
+  const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const [maxAllowedTime, setMaxAllowedTime] = useState(0);
   
   // Question overlay state
@@ -327,6 +337,12 @@ export const InteractiveLecturePlayer = ({
     setIsMuted(newVolume === 0);
   };
 
+  const handleSpeedChange = (speed: number) => {
+    if (!videoRef.current) return;
+    videoRef.current.playbackRate = speed;
+    setPlaybackSpeed(speed);
+  };
+
   const handleFullscreenToggle = async () => {
     if (!containerRef.current) return;
     
@@ -342,6 +358,31 @@ export const InteractiveLecturePlayer = ({
       console.error('Fullscreen error:', err);
     }
   };
+
+  // Keyboard shortcuts for playback speed
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      const currentIdx = PLAYBACK_SPEEDS.indexOf(playbackSpeed);
+      
+      if (e.key === '>' || e.key === '.') {
+        // Increase speed
+        if (currentIdx < PLAYBACK_SPEEDS.length - 1) {
+          handleSpeedChange(PLAYBACK_SPEEDS[currentIdx + 1]);
+        }
+      } else if (e.key === '<' || e.key === ',') {
+        // Decrease speed
+        if (currentIdx > 0) {
+          handleSpeedChange(PLAYBACK_SPEEDS[currentIdx - 1]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [playbackSpeed]);
 
   // Listen for fullscreen changes
   useEffect(() => {
@@ -1041,6 +1082,35 @@ export const InteractiveLecturePlayer = ({
                   </div>
                 )}
               </div>
+              
+              {/* Playback Speed Control */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/20 px-2 h-8 min-w-[50px]"
+                  >
+                    <Gauge className="h-3 w-3 mr-1" />
+                    {playbackSpeed}x
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="min-w-[80px]">
+                  {PLAYBACK_SPEEDS.map((speed) => (
+                    <DropdownMenuItem
+                      key={speed}
+                      onClick={() => handleSpeedChange(speed)}
+                      className={cn(
+                        "justify-center",
+                        playbackSpeed === speed && "bg-primary/10 text-primary font-medium"
+                      )}
+                    >
+                      {speed}x
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
               <span className="text-sm text-white/80">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
