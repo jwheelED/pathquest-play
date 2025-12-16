@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
-  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle, History
+  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle, History, Flag
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ContextualTutorChat } from './ContextualTutorChat';
 import { MasterySummary } from './MasterySummary';
+import { QuestionReportDialog } from './QuestionReportDialog';
 
 interface PausePoint {
   id: string;
@@ -150,6 +151,9 @@ export const InteractiveLecturePlayer = ({
   // Mastery summary state
   const [showMasterySummary, setShowMasterySummary] = useState(false);
   const [allResponses, setAllResponses] = useState<Record<string, { correct: boolean; answer: string }>>({});
+  
+  // Question report state
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   // Sort and filter pause points by timestamp (safety: clamp to video duration)
   const sortedPausePoints = [...pausePoints]
@@ -927,6 +931,19 @@ export const InteractiveLecturePlayer = ({
                           Ask About This
                         </Button>
                       )}
+                      
+                      {/* Report Issue button */}
+                      {!isPreview && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowReportDialog(true)}
+                          title="Report issue with this question"
+                          className="flex-shrink-0 text-muted-foreground hover:text-amber-500"
+                        >
+                          <Flag className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
                     {isCorrect && (
@@ -1154,6 +1171,16 @@ export const InteractiveLecturePlayer = ({
             }}
           />
         </div>
+      )}
+
+      {/* Question Report Dialog */}
+      {currentQuestion && (
+        <QuestionReportDialog
+          open={showReportDialog}
+          onOpenChange={setShowReportDialog}
+          pausePointId={currentQuestion.id}
+          questionText={currentQuestion.question_content.question}
+        />
       )}
     </div>
   );
