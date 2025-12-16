@@ -391,13 +391,25 @@ Return JSON:
 
         if (entityResponse.ok) {
           const entityResult = await entityResponse.json();
-          const entityContent = entityResult.choices?.[0]?.message?.content;
-          const entityMatch = entityContent?.match(/\{[\s\S]*\}/);
+          let entityContent = entityResult.choices?.[0]?.message?.content || '';
+          
+          // Strip markdown code fences
+          entityContent = entityContent.replace(/```json\s*/gi, '');
+          entityContent = entityContent.replace(/```\s*/g, '');
+          entityContent = entityContent.trim();
+          
+          const entityMatch = entityContent.match(/\{[\s\S]*\}/);
           
           if (entityMatch) {
-            const parsed = JSON.parse(entityMatch[0]);
-            medicalEntities = parsed.entities || [];
-            console.log(`Extracted ${medicalEntities.length} medical entities`);
+            let highYieldTopics: any[] = [];
+            try {
+              const parsed = JSON.parse(entityMatch[0]);
+              medicalEntities = parsed.entities || [];
+              highYieldTopics = parsed.high_yield_topics || [];
+              console.log(`Extracted ${medicalEntities.length} medical entities`);
+            } catch (parseErr) {
+              console.error('Failed to parse medical entities:', parseErr);
+            }
             
             // Store entities in database
             if (medicalEntities.length > 0) {
@@ -418,7 +430,7 @@ Return JSON:
             // Update lecture video with entities
             await supabase.from('lecture_videos').update({
               domain_type: 'medical',
-              extracted_entities: { entities: medicalEntities, high_yield_topics: parsed.high_yield_topics }
+              extracted_entities: { entities: medicalEntities, high_yield_topics: highYieldTopics }
             }).eq('id', lectureVideoId);
           }
         }
@@ -465,8 +477,14 @@ ${transcriptText}`;
 
     if (conceptMapResponse.ok) {
       const conceptResult = await conceptMapResponse.json();
-      const conceptContent = conceptResult.choices?.[0]?.message?.content;
-      const conceptMatch = conceptContent?.match(/\[[\s\S]*\]/);
+      let conceptContent = conceptResult.choices?.[0]?.message?.content || '';
+      
+      // Strip markdown code fences
+      conceptContent = conceptContent.replace(/```json\s*/gi, '');
+      conceptContent = conceptContent.replace(/```\s*/g, '');
+      conceptContent = conceptContent.trim();
+      
+      const conceptMatch = conceptContent.match(/\[[\s\S]*\]/);
       
       if (conceptMatch) {
         try {
@@ -663,7 +681,7 @@ Rules:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Analyze this lecture transcript and identify ${questionCount} optimal pause points with Bloom's Taxonomy levels:\n\n${transcriptText}` }
         ],
-        max_tokens: 4000,
+        max_tokens: 8000,
         temperature: 0.4,
       }),
     });
@@ -684,21 +702,49 @@ Rules:
     // Parse the JSON response
     let pausePoints;
     try {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      // Strip markdown code fences if present
+      let cleanContent = content;
+      cleanContent = cleanContent.replace(/```json\s*/gi, '');
+      cleanContent = cleanContent.replace(/```\s*/g, '');
+      cleanContent = cleanContent.trim();
+      
+      const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        throw new Error('No JSON array found in response');
+        // Try to recover from truncated response by finding array start
+        const arrayStart = cleanContent.indexOf('[');
+        if (arrayStart !== -1) {
+          let jsonStr = cleanContent.slice(arrayStart);
+          // Try to close unclosed objects/arrays for truncated responses
+          const openBraces = (jsonStr.match(/{/g) || []).length;
+          const closeBraces = (jsonStr.match(/}/g) || []).length;
+          const openBrackets = (jsonStr.match(/\[/g) || []).length;
+          const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+          
+          // Close any unclosed structures
+          for (let i = 0; i < openBraces - closeBraces; i++) jsonStr += '}';
+          for (let i = 0; i < openBrackets - closeBrackets; i++) jsonStr += ']';
+          
+          // Remove trailing comma if present before closing bracket
+          jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+          
+          console.log('Attempting to recover truncated JSON...');
+          pausePoints = JSON.parse(jsonStr);
+        } else {
+          throw new Error('No JSON array found in response');
+        }
+      } else {
+        let jsonStr = jsonMatch[0];
+        // Fix common AI formatting issues: timestamps like 6:04 instead of 364
+        jsonStr = jsonStr.replace(/"timestamp":\s*(\d+):(\d+)/g, (_match: string, min: string, sec: string) => {
+          const seconds = parseInt(min) * 60 + parseInt(sec);
+          return `"timestamp": ${seconds}`;
+        });
+        
+        pausePoints = JSON.parse(jsonStr);
       }
-      
-      // Fix common AI formatting issues: timestamps like 6:04 instead of 364
-      let jsonStr = jsonMatch[0];
-      jsonStr = jsonStr.replace(/"timestamp":\s*(\d+):(\d+)/g, (_match: string, min: string, sec: string) => {
-        const seconds = parseInt(min) * 60 + parseInt(sec);
-        return `"timestamp": ${seconds}`;
-      });
-      
-      pausePoints = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
+      console.error('Failed to parse AI response:', content.slice(0, 500));
+      console.error('Parse error:', parseError);
       throw new Error('Failed to parse cognitive load analysis');
     }
 
