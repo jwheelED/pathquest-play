@@ -662,6 +662,8 @@ export type Database = {
         Row: {
           cognitive_load_score: number | null
           created_at: string
+          difficulty_type: string | null
+          follow_up_questions: Json | null
           id: string
           is_active: boolean | null
           lecture_video_id: string
@@ -670,10 +672,13 @@ export type Database = {
           question_content: Json
           question_type: string
           reason: string | null
+          why_not_other_choices: Json | null
         }
         Insert: {
           cognitive_load_score?: number | null
           created_at?: string
+          difficulty_type?: string | null
+          follow_up_questions?: Json | null
           id?: string
           is_active?: boolean | null
           lecture_video_id: string
@@ -682,10 +687,13 @@ export type Database = {
           question_content: Json
           question_type: string
           reason?: string | null
+          why_not_other_choices?: Json | null
         }
         Update: {
           cognitive_load_score?: number | null
           created_at?: string
+          difficulty_type?: string | null
+          follow_up_questions?: Json | null
           id?: string
           is_active?: boolean | null
           lecture_video_id?: string
@@ -694,6 +702,7 @@ export type Database = {
           question_content?: Json
           question_type?: string
           reason?: string | null
+          why_not_other_choices?: Json | null
         }
         Relationships: [
           {
@@ -1642,6 +1651,7 @@ export type Database = {
           created_at: string | null
           daily_question_limit: number | null
           detection_model: string
+          difficulty_mix: Json | null
           exam_style_preference: string | null
           experience_level: string | null
           full_name: string | null
@@ -1657,7 +1667,9 @@ export type Database = {
           professor_type: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference: string | null
           question_format_preference: string | null
+          question_preset: string | null
           study_days: string[] | null
+          style_mix: Json | null
           transcription_model: string
         }
         Insert: {
@@ -1676,6 +1688,7 @@ export type Database = {
           created_at?: string | null
           daily_question_limit?: number | null
           detection_model?: string
+          difficulty_mix?: Json | null
           exam_style_preference?: string | null
           experience_level?: string | null
           full_name?: string | null
@@ -1691,7 +1704,9 @@ export type Database = {
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
+          question_preset?: string | null
           study_days?: string[] | null
+          style_mix?: Json | null
           transcription_model?: string
         }
         Update: {
@@ -1710,6 +1725,7 @@ export type Database = {
           created_at?: string | null
           daily_question_limit?: number | null
           detection_model?: string
+          difficulty_mix?: Json | null
           exam_style_preference?: string | null
           experience_level?: string | null
           full_name?: string | null
@@ -1725,7 +1741,9 @@ export type Database = {
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
+          question_preset?: string | null
           study_days?: string[] | null
+          style_mix?: Json | null
           transcription_model?: string
         }
         Relationships: [
@@ -2107,6 +2125,7 @@ export type Database = {
           id: string
           lecture_video_id: string
           org_id: string | null
+          response_times: Json | null
           responses: Json | null
           started_at: string
           student_id: string
@@ -2119,6 +2138,7 @@ export type Database = {
           id?: string
           lecture_video_id: string
           org_id?: string | null
+          response_times?: Json | null
           responses?: Json | null
           started_at?: string
           student_id: string
@@ -2131,6 +2151,7 @@ export type Database = {
           id?: string
           lecture_video_id?: string
           org_id?: string | null
+          response_times?: Json | null
           responses?: Json | null
           started_at?: string
           student_id?: string
