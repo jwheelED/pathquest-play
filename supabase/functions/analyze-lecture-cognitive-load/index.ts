@@ -840,7 +840,9 @@ Rules:
           question_style: styleTypes[i % 2],
           reason: `${taxonomy.name} level question for comprehensive coverage`,
           context_summary: truncatedContext,
-          question_suggestion: `${taxonomy.questionStems[0]} based on: ${truncatedContext.slice(0, 100)}...`,
+          question_suggestion: truncatedContext.length > 50 
+            ? `Focus on the concepts: "${truncatedContext.slice(0, 150)}"`
+            : `Key concepts discussed at ${formatTime(targetTime)}`,
           blooms_verb: taxonomy.verbs[0],
           transcript_context: truncatedContext
         });
@@ -892,7 +894,9 @@ Rules:
           question_style: styleTypes[pausePoints.length % 2],
           reason: `${taxonomy.name} level comprehension checkpoint`,
           context_summary: truncCtx,
-          question_suggestion: `${taxonomy.questionStems[0]} based on: ${truncCtx.slice(0, 100)}...`,
+          question_suggestion: truncCtx.length > 50 
+            ? `Focus on the concepts: "${truncCtx.slice(0, 150)}"`
+            : `Key concepts discussed at ${formatTime(targetTime)}`,
           blooms_verb: taxonomy.verbs[0],
           transcript_context: truncCtx
         });
@@ -1051,10 +1055,10 @@ EXAMPLE STEMS TO USE: ${taxonomy.questionStems.join(' | ')}
 GOOD EXAMPLE: "${taxonomy.exampleGood}"
 ANTI-PATTERN TO AVOID: "${taxonomy.exampleBad}"
 
-=== LECTURE CONTENT ===
-Transcript excerpt: "${transcriptContext}"
-Context summary: ${point.context_summary}
-Suggested focus: ${point.question_suggestion || 'key concepts'}
+=== LECTURE CONTENT (BASE YOUR QUESTION ON THIS) ===
+${transcriptContext || point.context_summary || 'General lecture concepts'}
+
+IMPORTANT: Generate a question ONLY about the lecture content above. Do not use placeholder variables like X or Y.
 
 === CRITICAL INSTRUCTIONS ===
 1. Your question MUST require students to ${taxonomy.description.toLowerCase()}
