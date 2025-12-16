@@ -122,3 +122,6 @@ verify_jwt = true
 
 [functions.contextual-tutor-chat]
 verify_jwt = true
+
+[functions.generate-lecture-mastery-summary]
+verify_jwt = true
