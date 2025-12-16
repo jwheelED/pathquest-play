@@ -699,7 +699,7 @@ Rules:
       throw new Error('No content in AI response');
     }
 
-    // Parse the JSON response
+    // Parse the JSON response with robust truncation recovery
     let pausePoints;
     try {
       // Strip markdown code fences if present
@@ -708,26 +708,63 @@ Rules:
       cleanContent = cleanContent.replace(/```\s*/g, '');
       cleanContent = cleanContent.trim();
       
+      // Helper function to repair truncated JSON
+      const repairTruncatedJson = (jsonStr: string): string => {
+        let repaired = jsonStr;
+        
+        // Count quotes to check if we're inside an unclosed string
+        // Remove escaped quotes for counting
+        const unescapedContent = repaired.replace(/\\"/g, '');
+        const quoteCount = (unescapedContent.match(/"/g) || []).length;
+        
+        // If odd number of quotes, we have an unclosed string
+        if (quoteCount % 2 !== 0) {
+          // Find the last quote and close the string there
+          // First, find where the truncation happened (likely end of content)
+          // Close the string with a quote
+          repaired = repaired.trimEnd();
+          // Remove any partial escape sequences at the end
+          repaired = repaired.replace(/\\+$/, '');
+          // Remove any incomplete escape sequence
+          if (repaired.endsWith('\\')) {
+            repaired = repaired.slice(0, -1);
+          }
+          repaired += '"';
+          console.log('[JSON Recovery] Closed unclosed string');
+        }
+        
+        // Now handle unclosed braces/brackets
+        const openBraces = (repaired.match(/{/g) || []).length;
+        const closeBraces = (repaired.match(/}/g) || []).length;
+        const openBrackets = (repaired.match(/\[/g) || []).length;
+        const closeBrackets = (repaired.match(/\]/g) || []).length;
+        
+        // Remove trailing comma before we add closing brackets
+        repaired = repaired.replace(/,\s*$/, '');
+        
+        // Close any unclosed structures
+        for (let i = 0; i < openBraces - closeBraces; i++) {
+          repaired += '}';
+        }
+        for (let i = 0; i < openBrackets - closeBrackets; i++) {
+          repaired += ']';
+        }
+        
+        // Clean up any trailing comma before closing brackets
+        repaired = repaired.replace(/,\s*([}\]])/g, '$1');
+        
+        return repaired;
+      };
+      
       const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         // Try to recover from truncated response by finding array start
         const arrayStart = cleanContent.indexOf('[');
         if (arrayStart !== -1) {
           let jsonStr = cleanContent.slice(arrayStart);
-          // Try to close unclosed objects/arrays for truncated responses
-          const openBraces = (jsonStr.match(/{/g) || []).length;
-          const closeBraces = (jsonStr.match(/}/g) || []).length;
-          const openBrackets = (jsonStr.match(/\[/g) || []).length;
-          const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+          jsonStr = repairTruncatedJson(jsonStr);
           
-          // Close any unclosed structures
-          for (let i = 0; i < openBraces - closeBraces; i++) jsonStr += '}';
-          for (let i = 0; i < openBrackets - closeBrackets; i++) jsonStr += ']';
-          
-          // Remove trailing comma if present before closing bracket
-          jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
-          
-          console.log('Attempting to recover truncated JSON...');
+          console.log('[JSON Recovery] Attempting to parse repaired truncated JSON...');
           pausePoints = JSON.parse(jsonStr);
         } else {
           throw new Error('No JSON array found in response');
@@ -740,12 +777,22 @@ Rules:
           return `"timestamp": ${seconds}`;
         });
         
-        pausePoints = JSON.parse(jsonStr);
+        try {
+          pausePoints = JSON.parse(jsonStr);
+        } catch (innerParseError) {
+          // If normal parse fails, try recovery
+          console.log('[JSON Recovery] Initial parse failed, attempting repair...');
+          jsonStr = repairTruncatedJson(jsonStr);
+          pausePoints = JSON.parse(jsonStr);
+        }
       }
     } catch (parseError) {
       console.error('Failed to parse AI response:', content.slice(0, 500));
       console.error('Parse error:', parseError);
-      throw new Error('Failed to parse cognitive load analysis');
+      
+      // Last resort: return empty array and let the fallback generation create all questions
+      console.log('[JSON Recovery] All parsing failed, using fallback generation for all questions');
+      pausePoints = [];
     }
 
     console.log(`AI returned ${pausePoints.length} pause points, requested ${questionCount}`);
