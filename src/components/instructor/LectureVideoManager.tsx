@@ -15,9 +15,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Video, Trash2, Eye, EyeOff, Clock, Brain, RefreshCw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Video, Trash2, Eye, EyeOff, Clock, Brain, RefreshCw, Settings2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { 
+  PausePointEditor, 
+  PausePoint, 
+  PausePointReason,
+  calculateRecommendedPausePoints, 
+  generateAutoPausePoints 
+} from "./PausePointEditor";
 
 interface LectureVideo {
   id: string;
@@ -36,6 +50,13 @@ export const LectureVideoManager = () => {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [reanalyzingId, setReanalyzingId] = useState<string | null>(null);
+  
+  // Pause point editing state
+  const [editingLecture, setEditingLecture] = useState<LectureVideo | null>(null);
+  const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
+  const [flowLevel, setFlowLevel] = useState(3);
+  const [highYieldOnly, setHighYieldOnly] = useState(false);
+  const [savingPoints, setSavingPoints] = useState(false);
 
   useEffect(() => {
     fetchLectures();

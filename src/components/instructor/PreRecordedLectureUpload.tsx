@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Zap, Settings2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { 
+  PausePointEditor, 
+  PausePoint, 
+  calculateRecommendedPausePoints, 
+  generateAutoPausePoints 
+} from "./PausePointEditor";
 
 interface PreRecordedLectureUploadProps {
   onUploadComplete?: (lectureId: string) => void;
@@ -22,7 +30,6 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [uploadMode, setUploadMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [questionCount, setQuestionCount] = useState(5);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -31,6 +38,26 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [professorType, setProfessorType] = useState<string | null>(null);
   const [examStyle, setExamStyle] = useState("usmle_step1");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // New state for pause point configuration
+  const [estimatedDuration, setEstimatedDuration] = useState<number>(600); // Default 10 min
+  const [flowLevel, setFlowLevel] = useState(3); // 1-5 scale
+  const [highYieldOnly, setHighYieldOnly] = useState(false);
+  const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
+  const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
+  
+  // Calculate recommended count based on duration and flow level
+  const recommendedCount = useMemo(() => {
+    return calculateRecommendedPausePoints(estimatedDuration, flowLevel);
+  }, [estimatedDuration, flowLevel]);
+  
+  // Actual question count to use (filtered by high-yield if enabled)
+  const effectiveQuestionCount = useMemo(() => {
+    if (highYieldOnly && pausePoints.length > 0) {
+      return pausePoints.filter(p => p.isHighYield).length;
+    }
+    return pausePoints.length || recommendedCount;
+  }, [pausePoints, highYieldOnly, recommendedCount]);
 
   // Fetch professor type on mount
   useEffect(() => {
@@ -46,7 +73,23 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
     fetchProfessorType();
   }, []);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Detect video duration from file
+  const detectVideoDuration = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.onloadedmetadata = () => {
+        URL.revokeObjectURL(video.src);
+        resolve(Math.floor(video.duration));
+      };
+      video.onerror = () => {
+        resolve(600); // Default 10 min if detection fails
+      };
+      video.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // Check file type
@@ -62,6 +105,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       setSelectedFile(file);
       setStatus("idle");
       setErrorMessage("");
+      
+      // Detect duration and generate initial pause points
+      const duration = await detectVideoDuration(file);
+      setEstimatedDuration(duration);
+      const count = calculateRecommendedPausePoints(duration, flowLevel);
+      setPausePoints(generateAutoPausePoints(duration, count));
     }
   };
 
@@ -134,7 +183,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         setUploadProgress(100);
       }
 
-      // Create lecture video record
+      // Create lecture video record with effective question count
       const { data: lectureVideo, error: insertError } = await supabase
         .from("lecture_videos")
         .insert([
@@ -143,7 +192,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             description: description.trim() || null,
             video_path: filePath,
             video_url: externalVideoUrl,
-            question_count: questionCount,
+            question_count: effectiveQuestionCount,
             status: "processing",
             instructor_id: user.id,
           },
@@ -188,7 +237,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             body: {
               lectureVideoId: lectureVideo.id,
               transcript: updated.transcript,
-              questionCount,
+              questionCount: effectiveQuestionCount,
               professorType: professorType || "stem",
               examStyle: professorType === "medical" ? examStyle : undefined,
             },
@@ -300,25 +349,83 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-        {/* Question Count Slider */}
-        <div className="space-y-3">
+        {/* Flow-based Pause Point Configuration */}
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label>Number of Questions</Label>
-            <Badge variant="secondary" className="font-mono">
-              {questionCount}
+            <Label className="text-sm font-medium">Interruption Frequency</Label>
+            <Badge variant="outline" className="text-xs">
+              {effectiveQuestionCount} pause points
             </Badge>
           </div>
-          <Slider
-            value={[questionCount]}
-            onValueChange={([val]) => setQuestionCount(val)}
-            min={3}
-            max={20}
-            step={1}
-            disabled={status !== "idle"}
-            className="py-2"
-          />
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground w-16">Fewer</span>
+            <Slider
+              value={[flowLevel]}
+              onValueChange={([val]) => {
+                setFlowLevel(val);
+                // Regenerate pause points with new flow level
+                const count = calculateRecommendedPausePoints(estimatedDuration, val);
+                setPausePoints(generateAutoPausePoints(estimatedDuration, count));
+              }}
+              min={1}
+              max={5}
+              step={1}
+              disabled={status !== "idle"}
+              className="flex-1"
+            />
+            <span className="text-xs text-muted-foreground w-16 text-right">More</span>
+          </div>
+          
+          {/* High-yield only toggle */}
+          <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-500" />
+              <div>
+                <span className="text-sm font-medium">High-yield only</span>
+                <p className="text-xs text-muted-foreground">Focus on the most important pause points</p>
+              </div>
+            </div>
+            <Switch
+              checked={highYieldOnly}
+              onCheckedChange={setHighYieldOnly}
+              disabled={status !== "idle"}
+            />
+          </div>
+          
+          {/* Advanced configuration collapsible */}
+          {(selectedFile || videoUrl) && estimatedDuration > 0 && (
+            <Collapsible open={showAdvancedConfig} onOpenChange={setShowAdvancedConfig}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full justify-between">
+                  <span className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Advanced: Edit pause points
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedConfig ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <PausePointEditor
+                  durationSeconds={estimatedDuration}
+                  pausePoints={pausePoints}
+                  onPausePointsChange={setPausePoints}
+                  flowLevel={flowLevel}
+                  onFlowLevelChange={(val) => {
+                    setFlowLevel(val);
+                    const count = calculateRecommendedPausePoints(estimatedDuration, val);
+                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
+                  }}
+                  highYieldOnly={highYieldOnly}
+                  onHighYieldOnlyChange={setHighYieldOnly}
+                  recommendedCount={recommendedCount}
+                  disabled={status !== "idle"}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+          
           <p className="text-xs text-muted-foreground">
-            AI will identify {questionCount} optimal pause points based on cognitive load
+            AI will place {effectiveQuestionCount} pause points at optimal learning moments
           </p>
         </div>
 
@@ -369,15 +476,42 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               )}
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Input
                 placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
                 value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
+                onChange={(e) => {
+                  setVideoUrl(e.target.value);
+                  // When URL is entered, use default/user-set duration
+                  if (e.target.value.trim() && pausePoints.length === 0) {
+                    const count = calculateRecommendedPausePoints(estimatedDuration, flowLevel);
+                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
+                  }
+                }}
                 disabled={status !== "idle"}
               />
+              <div className="flex items-center gap-3">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Est. duration:</Label>
+                <Slider
+                  value={[Math.floor(estimatedDuration / 60)]}
+                  onValueChange={([mins]) => {
+                    const newDuration = mins * 60;
+                    setEstimatedDuration(newDuration);
+                    const count = calculateRecommendedPausePoints(newDuration, flowLevel);
+                    setPausePoints(generateAutoPausePoints(newDuration, count));
+                  }}
+                  min={5}
+                  max={120}
+                  step={5}
+                  disabled={status !== "idle"}
+                  className="flex-1"
+                />
+                <Badge variant="outline" className="font-mono text-xs w-16 justify-center">
+                  {Math.floor(estimatedDuration / 60)} min
+                </Badge>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Paste a YouTube, Vimeo, or direct video link. No file size limits!
+                Paste a YouTube, Vimeo, or direct video link. Adjust estimated duration for accurate pause point placement.
               </p>
             </div>
           )}
