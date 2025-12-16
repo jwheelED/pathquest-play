@@ -423,6 +423,33 @@ export type Database = {
           },
         ]
       }
+      diagram_generations: {
+        Row: {
+          concept_context: string
+          created_at: string
+          id: string
+          image_data: string
+          question_text: string | null
+          student_id: string
+        }
+        Insert: {
+          concept_context: string
+          created_at?: string
+          id?: string
+          image_data: string
+          question_text?: string | null
+          student_id: string
+        }
+        Update: {
+          concept_context?: string
+          created_at?: string
+          id?: string
+          image_data?: string
+          question_text?: string | null
+          student_id?: string
+        }
+        Relationships: []
+      }
       grade_sync_log: {
         Row: {
           activity_progress: string | null
