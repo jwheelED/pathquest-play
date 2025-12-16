@@ -1194,17 +1194,38 @@ Return only valid JSON.` },
         console.error(`Failed to generate question for point ${index}:`, e);
       }
 
-      // Fallback question with Bloom's context
+      // Fallback: Generate a simple but coherent question from transcript context
+      const contextText = transcriptContext || point.context_summary || '';
+      const cleanContext = contextText.replace(/[^\w\s.,]/g, ' ').trim();
+      
+      // Extract key terms from the context for better question generation
+      const words = cleanContext.split(/\s+/).filter((w: string) => w.length > 4);
+      const keyTerms = words.slice(0, 5).join(', ');
+      
+      // Create a sensible fallback question based on the content
+      const fallbackQuestion = questionStyle === 'multiple_choice'
+        ? `Based on the lecture content about ${keyTerms || 'this topic'}, which statement best describes the main concept discussed?`
+        : `Explain the key concept discussed in the lecture regarding ${keyTerms || 'this topic'}.`;
+      
+      console.log(`[Fallback] Generated fallback question for point ${index} due to AI generation failure`);
+      
       return {
         ...point,
         order_index: index,
         blooms_level: bloomsLevel,
         question_content: {
-          question: `${taxonomy.questionStems[0]} ${point.context_summary?.slice(0, 50) || 'the main concept discussed'}?`,
-          options: questionStyle === 'multiple_choice' ? ['A. Option 1', 'B. Option 2', 'C. Option 3', 'D. Option 4'] : undefined,
+          question: fallbackQuestion,
+          options: questionStyle === 'multiple_choice' 
+            ? [
+                'A. The concept involves a specific process described in the lecture',
+                'B. The concept relates to an alternative mechanism discussed',
+                'C. The concept contradicts the main theory presented',
+                'D. The concept is unrelated to the lecture topic'
+              ] 
+            : undefined,
           correctAnswer: questionStyle === 'multiple_choice' ? 'A' : undefined,
-          expectedAnswer: questionStyle === 'short_answer' ? 'Answer based on lecture content' : undefined,
-          explanation: 'Review the lecture content for details.',
+          expectedAnswer: questionStyle === 'short_answer' ? `Explain the concept of ${keyTerms || 'the topic discussed'}` : undefined,
+          explanation: `This question tests understanding of ${keyTerms || 'the lecture content'}. Review the lecture around this timestamp for more details.`,
           blooms_level: bloomsLevel
         },
         question_type: questionStyle,
