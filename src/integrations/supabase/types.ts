@@ -1661,6 +1661,7 @@ export type Database = {
           instructor_code: string | null
           interval_question_model: string
           last_auto_question_at: string | null
+          lecture_preferences: Json | null
           medical_specialty: string | null
           onboarded: boolean | null
           org_id: string | null
@@ -1698,6 +1699,7 @@ export type Database = {
           instructor_code?: string | null
           interval_question_model?: string
           last_auto_question_at?: string | null
+          lecture_preferences?: Json | null
           medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
@@ -1735,6 +1737,7 @@ export type Database = {
           instructor_code?: string | null
           interval_question_model?: string
           last_auto_question_at?: string | null
+          lecture_preferences?: Json | null
           medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
@@ -1752,6 +1755,50 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_reports: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          pause_point_id: string
+          report_type: string
+          resolved_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          student_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          pause_point_id: string
+          report_type: string
+          resolved_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          student_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          pause_point_id?: string
+          report_type?: string
+          resolved_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_reports_pause_point_id_fkey"
+            columns: ["pause_point_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_pause_points"
             referencedColumns: ["id"]
           },
         ]

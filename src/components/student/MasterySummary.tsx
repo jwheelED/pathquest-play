@@ -49,7 +49,13 @@ interface MasterySummaryProps {
   pausePoints: Array<{
     id: string;
     pause_timestamp: number;
-    question_content: { question: string };
+    question_type?: string;
+    question_content: { 
+      question: string;
+      correctAnswer?: string;
+      expectedAnswer?: string;
+      explanation?: string;
+    };
   }>;
   responses: Record<string, { correct: boolean; answer: string }>;
   onRewatch?: (timestamp: number) => void;
@@ -125,27 +131,48 @@ export const MasterySummary = ({
   const handleExportAnki = async () => {
     setExporting(true);
     try {
-      // Generate Anki-compatible CSV
+      // Generate comprehensive Anki-compatible CSV
       const weakConcepts = summaryData?.weakConcepts || [];
       const incorrectQuestions = pausePoints.filter(p => responses[p.id] && !responses[p.id].correct);
       
+      // CSV header for Anki import
       let csv = 'front,back,tags\n';
+      
+      // Add weak concepts as review cards
+      weakConcepts.forEach(concept => {
+        const front = `What is ${concept.name}? (Review needed - ${Math.round(concept.strengthScore * 100)}% mastery)`.replace(/"/g, '""');
+        const back = `Review this concept from the lecture.`.replace(/"/g, '""');
+        const tags = `lecture::${lectureTitle.replace(/\s+/g, '_')} concept::${concept.name.replace(/\s+/g, '_')} status::weak`;
+        csv += `"${front}","${back}","${tags}"\n`;
+      });
+      
+      // Add incorrect questions as review cards
       incorrectQuestions.forEach(q => {
         const question = q.question_content.question.replace(/"/g, '""');
-        const tags = `lecture::${lectureTitle.replace(/\s+/g, '_')} status::needs_review`;
-        csv += `"${question}","Review this concept","${tags}"\n`;
+        const answer = (q.question_content.correctAnswer || q.question_content.expectedAnswer || 'Review the lecture').replace(/"/g, '""');
+        const explanation = (q.question_content.explanation || '').replace(/"/g, '""');
+        const tags = `lecture::${lectureTitle.replace(/\s+/g, '_')} type::${q.question_type} status::incorrect`;
+        csv += `"${question}","${answer}${explanation ? ' - ' + explanation : ''}","${tags}"\n`;
+      });
+
+      // Add recommended rewatches as study cards
+      summaryData?.recommendedRewatches?.forEach(rewatch => {
+        const front = `Review: ${rewatch.concept} (${formatTime(rewatch.timestamp)})`.replace(/"/g, '""');
+        const back = `${rewatch.reason}`.replace(/"/g, '""');
+        const tags = `lecture::${lectureTitle.replace(/\s+/g, '_')} type::rewatch timestamp::${Math.floor(rewatch.timestamp)}`;
+        csv += `"${front}","${back}","${tags}"\n`;
       });
 
       // Download CSV
-      const blob = new Blob([csv], { type: 'text/csv' });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${lectureTitle.replace(/\s+/g, '_')}_review_cards.csv`;
+      a.download = `${lectureTitle.replace(/\s+/g, '_')}_anki_cards.csv`;
       a.click();
       URL.revokeObjectURL(url);
 
-      toast.success('Exported review cards for Anki!');
+      toast.success(`Exported ${weakConcepts.length + incorrectQuestions.length} review cards for Anki!`);
     } catch (error) {
       toast.error('Failed to export');
     } finally {

@@ -15,6 +15,7 @@ import { ClassSelector } from "@/components/student/ClassSelector";
 import { StudyGroups } from "@/components/student/StudyGroups";
 import { AdaptiveDifficultyIndicator } from "@/components/student/AdaptiveDifficultyIndicator";
 import { FloatingDecorations } from "@/components/student/FloatingDecorations";
+import { ReviewDashboard } from "@/components/student/ReviewDashboard";
 import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
@@ -251,12 +252,17 @@ export default function StudentTraining() {
           )}
 
           {/* Daily Challenges */}
-          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-1">
+          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
             {user?.id && <DailyChallenges userId={user.id} />}
           </div>
 
+          {/* Daily Review Dashboard */}
+          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
+            {user?.id && <ReviewDashboard userId={user.id} />}
+          </div>
+
           {/* Leaderboard */}
-          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-2">
+          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-2">
             {user?.id && <Leaderboard userId={user.id} />}
           </div>
 
