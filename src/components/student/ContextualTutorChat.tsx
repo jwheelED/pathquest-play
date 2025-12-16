@@ -4,7 +4,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   MessageCircle, Send, Clock, FileText, Sparkles, 
   ChevronDown, ChevronUp, X, Lightbulb, HelpCircle
@@ -32,10 +31,8 @@ interface ContextualTutorChatProps {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Explain like I\'m 8', prompt: 'Explain this concept like I\'m 8 years old, using simple words and examples.', icon: '🧒' },
-  { label: 'Give a metaphor', prompt: 'Give me a helpful metaphor or analogy to understand this concept better.', icon: '🎯' },
-  { label: '2 more practice questions', prompt: 'Give me 2 more practice questions about this concept to test my understanding.', icon: '📝' },
-  { label: 'Summarize in 1 sentence', prompt: 'Summarize the key concept from this section in exactly 1 sentence.', icon: '✨' },
+  { label: 'Simplify', prompt: 'Explain this concept in simpler terms, using easy words and examples.', icon: Sparkles },
+  { label: '2 more practice questions', prompt: 'Give me 2 more practice questions about this concept to test my understanding.', icon: FileText },
 ];
 
 const formatTimestamp = (seconds: number): string => {
@@ -177,11 +174,11 @@ export function ContextualTutorChat({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
         {messages.length === 0 ? (
-          <div className="text-center py-8 space-y-4">
-            <div className="p-4 rounded-full bg-muted/50 w-fit mx-auto">
-              <HelpCircle className="h-8 w-8 text-muted-foreground" />
+          <div className="text-center py-6 space-y-3">
+            <div className="p-3 rounded-full bg-muted/50 w-fit mx-auto">
+              <HelpCircle className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
               <p className="font-medium text-sm">Ask me anything about this concept</p>
@@ -190,17 +187,17 @@ export function ContextualTutorChat({
               </p>
             </div>
             
-            {/* Quick actions */}
-            <div className="grid grid-cols-2 gap-2 pt-4">
+            {/* Quick actions - 2 buttons side by side */}
+            <div className="flex gap-2 pt-2">
               {QUICK_ACTIONS.map((action) => (
                 <Button
                   key={action.label}
                   variant="outline"
                   size="sm"
-                  className="text-xs h-auto py-2 px-3 justify-start"
+                  className="flex-1 text-xs h-9"
                   onClick={() => handleQuickAction(action.prompt)}
                 >
-                  <span className="mr-2">{action.icon}</span>
+                  <action.icon className="h-3.5 w-3.5 mr-1.5" />
                   {action.label}
                 </Button>
               ))}
@@ -277,22 +274,22 @@ export function ContextualTutorChat({
             )}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       {/* Quick actions when in conversation */}
       {messages.length > 0 && (
         <div className="px-4 py-2 border-t bg-muted/10">
-          <div className="flex gap-1 overflow-x-auto pb-1">
+          <div className="flex gap-2">
             {QUICK_ACTIONS.map((action) => (
               <Button
                 key={action.label}
                 variant="ghost"
                 size="sm"
-                className="text-xs h-7 px-2 shrink-0"
+                className="flex-1 text-xs h-8"
                 onClick={() => handleQuickAction(action.prompt)}
                 disabled={isLoading}
               >
-                <span className="mr-1">{action.icon}</span>
+                <action.icon className="h-3 w-3 mr-1" />
                 {action.label}
               </Button>
             ))}
