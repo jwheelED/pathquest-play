@@ -51,7 +51,14 @@ serve(async (req) => {
       });
     }
 
-    const { lectureVideoId, transcript, questionCount = 5, professorType = 'stem', examStyle = 'usmle_step1', medicalSpecialty = 'general' } = await req.json();
+    const { 
+      lectureVideoId, 
+      transcript, 
+      questionCount = 5, 
+      professorType = 'stem', 
+      examStyle = 'usmle_step1', 
+      medicalSpecialty = 'general' 
+    } = await req.json();
 
     if (!lectureVideoId || !transcript || !Array.isArray(transcript)) {
       return new Response(JSON.stringify({ error: 'Missing lectureVideoId or transcript array' }), {
@@ -60,7 +67,18 @@ serve(async (req) => {
       });
     }
 
+    // Fetch instructor's adaptive tutoring settings
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('difficulty_mix, style_mix, question_preset')
+      .eq('id', user.id)
+      .single();
+
+    const difficultyMix = profile?.difficulty_mix || { recall: 40, application: 40, reasoning: 20 };
+    const styleMix = profile?.style_mix || { mcq: 70, short_answer: 30 };
+
     console.log(`Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, ${questionCount} questions requested, professorType: ${professorType}`);
+    console.log(`Difficulty mix: ${JSON.stringify(difficultyMix)}, Style mix: ${JSON.stringify(styleMix)}`);
 
     // Build transcript text with timestamps for analysis
     const transcriptText = transcript.map((seg: any) => 
@@ -221,13 +239,32 @@ ${transcriptText}`;
       }
     }
 
-    // Build system prompt based on professor type
+    // Build system prompt based on professor type with adaptive tutoring settings
     let systemPrompt: string;
+    
+    // Calculate question type distribution based on settings
+    const recallCount = Math.round(questionCount * (difficultyMix.recall / 100));
+    const applicationCount = Math.round(questionCount * (difficultyMix.application / 100));
+    const reasoningCount = questionCount - recallCount - applicationCount;
+    const mcqCount = Math.round(questionCount * (styleMix.mcq / 100));
+    const shortAnswerCount = questionCount - mcqCount;
+
+    console.log(`Question distribution - Recall: ${recallCount}, Application: ${applicationCount}, Reasoning: ${reasoningCount}`);
+    console.log(`Style distribution - MCQ: ${mcqCount}, Short Answer: ${shortAnswerCount}`);
     
     if (professorType === 'medical') {
       systemPrompt = `You are an expert medical educator analyzing a lecture transcript for cognitive load and USMLE-style question placement.
 
-Your task is to identify ${questionCount} optimal pause points where students should be asked USMLE-style clinical vignette questions.
+Your task is to identify ${questionCount} optimal pause points where students should be asked questions.
+
+QUESTION TYPE DISTRIBUTION (based on instructor preferences):
+- RECALL questions (definitions, facts): ${recallCount}
+- APPLICATION questions (use concept in new example): ${applicationCount}
+- REASONING questions (why, compare, predict, critical thinking): ${reasoningCount}
+
+QUESTION STYLE DISTRIBUTION:
+- Multiple Choice: ${mcqCount}
+- Short Answer: ${shortAnswerCount}
 
 COGNITIVE LOAD INDICATORS FOR MEDICAL CONTENT (score 1-10):
 - New pathophysiology explanation (8-10)
@@ -252,6 +289,8 @@ CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 6
   {
     "timestamp": 364,
     "cognitive_load_score": 8,
+    "difficulty_type": "application",
+    "question_style": "multiple_choice",
     "reason": "Complex pathophysiology of pheochromocytoma explained",
     "suggested_question_type": "usmle_vignette",
     "question_stem_type": "diagnosis",
@@ -275,11 +314,21 @@ Rules:
 3. Prioritize high cognitive load clinical concepts
 4. Vary question stem types for comprehensive testing
 5. Focus on high-yield, board-relevant topics
-6. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
+6. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.
+7. Include the specified distribution of difficulty_type (recall/application/reasoning) and question_style (multiple_choice/short_answer)`;
     } else {
       systemPrompt = `You are an expert educational psychologist analyzing a lecture transcript for cognitive load.
 
 Your task is to identify ${questionCount} optimal pause points where students should be asked questions to ensure comprehension before continuing.
+
+QUESTION TYPE DISTRIBUTION (based on instructor preferences):
+- RECALL questions (definitions, facts, basic concepts): ${recallCount}
+- APPLICATION questions (using concepts in new examples): ${applicationCount}  
+- REASONING questions (why, compare, predict, critical thinking): ${reasoningCount}
+
+QUESTION STYLE DISTRIBUTION:
+- Multiple Choice: ${mcqCount}
+- Short Answer: ${shortAnswerCount}
 
 COGNITIVE LOAD INDICATORS (score 1-10):
 - Introduction of new complex concepts (7-10)
@@ -302,6 +351,8 @@ CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 6
   {
     "timestamp": 364,
     "cognitive_load_score": 8,
+    "difficulty_type": "application",
+    "question_style": "multiple_choice",
     "reason": "Complex formula introduced - Pythagorean theorem derivation",
     "suggested_question_type": "multiple_choice",
     "context_summary": "Brief summary of content just covered",
@@ -316,7 +367,8 @@ Rules:
 3. Prioritize points where cognitive load is highest
 4. Never place questions in the middle of an explanation - find natural breaks
 5. Consider cumulative load - if several complex topics stack, pause earlier
-6. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.`;
+6. You MUST return EXACTLY ${questionCount} pause points - no more, no fewer. This is critical.
+7. Include the specified distribution of difficulty_type (recall/application/reasoning) and question_style (multiple_choice/short_answer)`;
     }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -445,12 +497,18 @@ Rules:
         
         console.log(`[Placeholder] Generated point at ${targetTime}s`);
         
+        // Alternate difficulty types for placeholder questions
+        const diffTypes = ['recall', 'application', 'reasoning'];
+        const styleTypes = ['multiple_choice', 'short_answer'];
+        
         // Create placeholder pause point
         pausePoints.push({
           timestamp: Math.round(targetTime),
           cognitive_load_score: 7,
+          difficulty_type: diffTypes[i % 3],
+          question_style: styleTypes[i % 2],
           reason: "Additional question point for comprehensive coverage",
-          suggested_question_type: "multiple_choice",
+          suggested_question_type: styleTypes[i % 2],
           context_summary: "Key concept from lecture content",
           question_suggestion: "What is the main takeaway from this section?"
         });
@@ -476,28 +534,33 @@ Rules:
         const interval = (lectureDuration - minStartTime) / (questionCount + 1);
         let targetTime = minStartTime + interval * (pausePoints.length + 1);
         
-      // Find an unused slot within valid range
-      let attempts = 0;
-      while (usedTimestamps.has(Math.floor(targetTime / 30) * 30) && attempts < 20) {
-        targetTime += 30;
-        attempts++;
-        if (targetTime > maxTimestamp) {
-          targetTime = minStartTime + (Math.random() * (maxTimestamp - minStartTime));
+        // Find an unused slot within valid range
+        let attempts = 0;
+        while (usedTimestamps.has(Math.floor(targetTime / 30) * 30) && attempts < 20) {
+          targetTime += 30;
+          attempts++;
+          if (targetTime > maxTimestamp) {
+            targetTime = minStartTime + (Math.random() * (maxTimestamp - minStartTime));
+          }
         }
-      }
-      
-      // Ensure within bounds
-      targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
-      
-      pausePoints.push({
-        timestamp: Math.round(targetTime),
-        cognitive_load_score: 6,
-        reason: "Comprehension checkpoint",
-        suggested_question_type: "multiple_choice",
-        context_summary: "Review of recent lecture content",
-        question_suggestion: "What key concept was just explained?"
-      });
-      console.log(`Generated placeholder at ${Math.round(targetTime)}s (${pausePoints.length}/${questionCount})`);
+        
+        // Ensure within bounds
+        targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
+        
+        const diffTypes = ['recall', 'application', 'reasoning'];
+        const styleTypes = ['multiple_choice', 'short_answer'];
+        
+        pausePoints.push({
+          timestamp: Math.round(targetTime),
+          cognitive_load_score: 6,
+          difficulty_type: diffTypes[pausePoints.length % 3],
+          question_style: styleTypes[pausePoints.length % 2],
+          reason: "Comprehension checkpoint",
+          suggested_question_type: styleTypes[pausePoints.length % 2],
+          context_summary: "Review of recent lecture content",
+          question_suggestion: "What key concept was just explained?"
+        });
+        console.log(`Generated placeholder at ${Math.round(targetTime)}s (${pausePoints.length}/${questionCount})`);
       }
       
       // If too many, trim to exact count
@@ -512,22 +575,24 @@ Rules:
 
     console.log(`Final pause point count: ${pausePoints.length} (requested: ${questionCount})`);
 
-    // Now generate questions for each pause point
+    // Now generate questions for each pause point with enhanced structure
     const questionsPromises = pausePoints.map(async (point: any, index: number) => {
-      const questionType = point.suggested_question_type || 'multiple_choice';
+      const questionStyle = point.question_style || point.suggested_question_type || 'multiple_choice';
+      const difficultyType = point.difficulty_type || 'application';
       
       // For USMLE vignettes, generate clinical scenarios
-      if (questionType === 'usmle_vignette' && professorType === 'medical') {
+      if (questionStyle === 'usmle_vignette' && professorType === 'medical') {
         const relatedEntity = medicalEntities.find((e: any) => 
           e.entity_name.toLowerCase().includes(point.related_entity?.toLowerCase() || '') ||
           point.context_summary?.toLowerCase().includes(e.entity_name.toLowerCase())
         ) || medicalEntities[index % medicalEntities.length];
 
-        const vignettePrompt = `Create a USMLE-style clinical vignette question.
+        const vignettePrompt = `Create a USMLE-style clinical vignette question with adaptive tutoring components.
 
 Medical concept: ${point.related_entity || point.context_summary}
 Question type: ${point.question_stem_type || 'diagnosis'}
 Clinical focus: ${point.clinical_focus || 'general understanding'}
+Difficulty type: ${difficultyType}
 Entity context: ${JSON.stringify(relatedEntity?.clinical_context || {})}
 
 Return JSON:
@@ -537,7 +602,29 @@ Return JSON:
   "correctAnswer": "A",
   "explanation": "Clinical reasoning explanation",
   "vignette_type": "${point.question_stem_type || 'diagnosis'}",
-  "tested_concept": "${point.related_entity || ''}"
+  "tested_concept": "${point.related_entity || ''}",
+  "why_not_other_choices": {
+    "B": "Why option B is incorrect",
+    "C": "Why option C is incorrect", 
+    "D": "Why option D is incorrect",
+    "E": "Why option E is incorrect"
+  },
+  "follow_ups": {
+    "correct_confident": {
+      "question": "A harder transfer question for students who got it right confidently",
+      "type": "multiple_choice",
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "correctAnswer": "A",
+      "explanation": "Why this is correct"
+    },
+    "correct_uncertain": {
+      "question": "A reinforcement question to solidify understanding",
+      "type": "multiple_choice", 
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "correctAnswer": "A",
+      "explanation": "Why this is correct"
+    }
+  }
 }`;
 
         try {
@@ -550,10 +637,10 @@ Return JSON:
             body: JSON.stringify({
               model: 'google/gemini-2.5-pro',
               messages: [
-                { role: 'system', content: 'You are an expert USMLE question writer. Create clinical vignettes with realistic patient scenarios. Return only valid JSON.' },
+                { role: 'system', content: 'You are an expert USMLE question writer. Create clinical vignettes with realistic patient scenarios. Include "why not other choices" explanations and adaptive follow-up questions. Return only valid JSON.' },
                 { role: 'user', content: vignettePrompt }
               ],
-              max_tokens: 1500,
+              max_tokens: 2500,
               temperature: 0.5,
             }),
           });
@@ -564,11 +651,22 @@ Return JSON:
             const jsonMatch = qContent?.match(/\{[\s\S]*\}/);
             
             if (jsonMatch) {
+              const parsedQuestion = JSON.parse(jsonMatch[0]);
               return {
                 ...point,
                 order_index: index,
-                question_content: JSON.parse(jsonMatch[0]),
-                question_type: 'usmle_vignette'
+                difficulty_type: difficultyType,
+                question_content: {
+                  question: parsedQuestion.question,
+                  options: parsedQuestion.options,
+                  correctAnswer: parsedQuestion.correctAnswer,
+                  explanation: parsedQuestion.explanation,
+                  vignette_type: parsedQuestion.vignette_type,
+                  tested_concept: parsedQuestion.tested_concept
+                },
+                question_type: 'usmle_vignette',
+                why_not_other_choices: parsedQuestion.why_not_other_choices || null,
+                follow_up_questions: parsedQuestion.follow_ups || null
               };
             }
           }
@@ -577,23 +675,59 @@ Return JSON:
         }
       }
       
-      // Standard question generation for non-medical
-      const questionPrompt = `Generate a ${questionType} question based on this lecture content:
+      // Standard question generation with enhanced structure
+      const questionPrompt = `Generate a ${questionStyle} question based on this lecture content.
 
 Context: ${point.context_summary}
 Suggested question: ${point.question_suggestion || point.clinical_focus}
+Difficulty type: ${difficultyType} (${difficultyType === 'recall' ? 'testing facts, definitions' : difficultyType === 'application' ? 'applying concept to new example' : 'critical thinking, why/compare/predict'})
 
-${questionType === 'multiple_choice' ? `Return JSON:
+${questionStyle === 'multiple_choice' ? `Return JSON:
 {
   "question": "question text",
   "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
   "correctAnswer": "A",
-  "explanation": "Why this is correct"
+  "explanation": "Why this is correct",
+  "why_not_other_choices": {
+    "B": "Why B is wrong",
+    "C": "Why C is wrong",
+    "D": "Why D is wrong"
+  },
+  "follow_ups": {
+    "correct_confident": {
+      "question": "A harder transfer question",
+      "type": "multiple_choice",
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "correctAnswer": "A",
+      "explanation": "Why this is correct"
+    },
+    "correct_uncertain": {
+      "question": "A reinforcement question with simpler framing",
+      "type": "multiple_choice",
+      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+      "correctAnswer": "A", 
+      "explanation": "Why this is correct"
+    }
+  }
 }` : `Return JSON:
 {
   "question": "question text",
   "expectedAnswer": "expected answer",
-  "explanation": "Explanation of the answer"
+  "explanation": "Explanation of the answer",
+  "follow_ups": {
+    "correct_confident": {
+      "question": "A harder transfer question",
+      "type": "short_answer",
+      "expectedAnswer": "expected answer",
+      "explanation": "Explanation"
+    },
+    "correct_uncertain": {
+      "question": "A reinforcement question",
+      "type": "short_answer",
+      "expectedAnswer": "expected answer",
+      "explanation": "Explanation"
+    }
+  }
 }`}`;
 
       try {
@@ -606,10 +740,10 @@ ${questionType === 'multiple_choice' ? `Return JSON:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'You are an expert educator creating questions to test student understanding. Return only valid JSON.' },
+              { role: 'system', content: 'You are an expert educator creating questions to test student understanding. Include "why not other choices" for MCQ and adaptive follow-up questions. Return only valid JSON.' },
               { role: 'user', content: questionPrompt }
             ],
-            max_tokens: 500,
+            max_tokens: 1500,
             temperature: 0.4,
           }),
         });
@@ -623,11 +757,21 @@ ${questionType === 'multiple_choice' ? `Return JSON:
         const jsonMatch = qContent?.match(/\{[\s\S]*\}/);
         
         if (jsonMatch) {
+          const parsedQuestion = JSON.parse(jsonMatch[0]);
           return {
             ...point,
             order_index: index,
-            question_content: JSON.parse(jsonMatch[0]),
-            question_type: questionType
+            difficulty_type: difficultyType,
+            question_content: {
+              question: parsedQuestion.question,
+              options: parsedQuestion.options,
+              correctAnswer: parsedQuestion.correctAnswer,
+              expectedAnswer: parsedQuestion.expectedAnswer,
+              explanation: parsedQuestion.explanation
+            },
+            question_type: questionStyle,
+            why_not_other_choices: parsedQuestion.why_not_other_choices || null,
+            follow_up_questions: parsedQuestion.follow_ups || null
           };
         }
       } catch (e) {
@@ -638,14 +782,17 @@ ${questionType === 'multiple_choice' ? `Return JSON:
       return {
         ...point,
         order_index: index,
+        difficulty_type: difficultyType,
         question_content: {
           question: point.question_suggestion || 'What was the main concept discussed?',
-          options: questionType === 'multiple_choice' ? ['A. Option 1', 'B. Option 2', 'C. Option 3', 'D. Option 4'] : undefined,
-          correctAnswer: questionType === 'multiple_choice' ? 'A' : undefined,
-          expectedAnswer: questionType === 'short_answer' ? 'Answer based on lecture content' : undefined,
+          options: questionStyle === 'multiple_choice' ? ['A. Option 1', 'B. Option 2', 'C. Option 3', 'D. Option 4'] : undefined,
+          correctAnswer: questionStyle === 'multiple_choice' ? 'A' : undefined,
+          expectedAnswer: questionStyle === 'short_answer' ? 'Answer based on lecture content' : undefined,
           explanation: 'Review the lecture content for details.'
         },
-        question_type: questionType
+        question_type: questionStyle,
+        why_not_other_choices: null,
+        follow_up_questions: null
       };
     });
 
@@ -660,6 +807,9 @@ ${questionType === 'multiple_choice' ? `Return JSON:
       question_content: point.question_content,
       question_type: point.question_type,
       order_index: point.order_index,
+      difficulty_type: point.difficulty_type || 'application',
+      follow_up_questions: point.follow_up_questions,
+      why_not_other_choices: point.why_not_other_choices,
       is_active: true
     }));
 
@@ -680,7 +830,12 @@ ${questionType === 'multiple_choice' ? `Return JSON:
         cognitive_analysis: {
           analyzed_at: new Date().toISOString(),
           total_pause_points: pausePointsToInsert.length,
-          avg_cognitive_load: pausePointsToInsert.reduce((sum: number, p: any) => sum + p.cognitive_load_score, 0) / pausePointsToInsert.length
+          avg_cognitive_load: pausePointsToInsert.reduce((sum: number, p: any) => sum + p.cognitive_load_score, 0) / pausePointsToInsert.length,
+          difficulty_distribution: {
+            recall: pausePointsToInsert.filter((p: any) => p.difficulty_type === 'recall').length,
+            application: pausePointsToInsert.filter((p: any) => p.difficulty_type === 'application').length,
+            reasoning: pausePointsToInsert.filter((p: any) => p.difficulty_type === 'reasoning').length
+          }
         }
       })
       .eq('id', lectureVideoId);

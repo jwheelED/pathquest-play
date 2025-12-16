@@ -28,6 +28,9 @@ interface PausePoint {
   question_type: string;
   order_index: number;
   is_active: boolean;
+  difficulty_type?: string;
+  follow_up_questions?: any;
+  why_not_other_choices?: any;
 }
 
 interface StudentProgress {
@@ -108,7 +111,7 @@ export default function InteractiveLecture() {
           
           for (let i = 0; i < missing; i++) {
             const timestamp = minStart + interval * (i + 1);
-            displayPoints.push({
+            const placeholderPoint: PausePoint = {
               id: `placeholder-${i}`,
               pause_timestamp: Math.round(timestamp),
               cognitive_load_score: 6,
@@ -122,9 +125,11 @@ export default function InteractiveLecture() {
               question_type: "multiple_choice",
               order_index: displayPoints.length,
               is_active: true,
-              created_at: new Date().toISOString(),
-              lecture_video_id: lectureId!
-            });
+              difficulty_type: 'application',
+              follow_up_questions: null,
+              why_not_other_choices: null
+            };
+            displayPoints.push(placeholderPoint as any);
           }
           
           // Sort by timestamp
