@@ -9,12 +9,13 @@ import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
-  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye
+  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ContextualTutorChat } from './ContextualTutorChat';
 
 interface PausePoint {
   id: string;
@@ -140,6 +141,10 @@ export const InteractiveLecturePlayer = ({
   });
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [followUpAnswer, setFollowUpAnswer] = useState('');
+  
+  // Contextual chat state
+  const [showContextualChat, setShowContextualChat] = useState(false);
+  const [lectureTranscript, setLectureTranscript] = useState<string | null>(null);
 
   // Sort and filter pause points by timestamp (safety: clamp to video duration)
   const sortedPausePoints = [...pausePoints]
@@ -187,6 +192,30 @@ export const InteractiveLecturePlayer = ({
 
     loadProgress();
   }, [lectureId, isPreview]);
+
+  // Load lecture transcript for contextual chat
+  useEffect(() => {
+    const loadTranscript = async () => {
+      const { data: lecture } = await supabase
+        .from('lecture_videos')
+        .select('transcript')
+        .eq('id', lectureId)
+        .single();
+      
+      if (lecture?.transcript) {
+        // Extract text from transcript object (handle various formats)
+        const transcript = lecture.transcript;
+        if (typeof transcript === 'string') {
+          setLectureTranscript(transcript);
+        } else if (Array.isArray(transcript)) {
+          setLectureTranscript(transcript.map((t: any) => t.text || t.content || '').join(' '));
+        } else if (typeof transcript === 'object' && transcript !== null) {
+          setLectureTranscript((transcript as any).text || (transcript as any).content || JSON.stringify(transcript));
+        }
+      }
+    };
+    loadTranscript();
+  }, [lectureId]);
 
   // Save progress periodically (skip in preview mode)
   const saveProgress = useCallback(async () => {
@@ -841,6 +870,18 @@ export const InteractiveLecturePlayer = ({
                       </div>
                     )}
 
+                    {/* Ask About This button - always visible in result state */}
+                    {!isPreview && (
+                      <Button
+                        variant="outline"
+                        className="w-full mb-3"
+                        onClick={() => setShowContextualChat(true)}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Ask About This
+                      </Button>
+                    )}
+
                     {isCorrect && (
                       <Button onClick={handleContinue} className="w-full" size="lg">
                         <ChevronRight className="h-4 w-4 mr-2" />
@@ -1011,6 +1052,31 @@ export const InteractiveLecturePlayer = ({
           </div>
         )}
       </div>
+
+      {/* Contextual Tutor Chat */}
+      {showContextualChat && currentQuestion && (
+        <ContextualTutorChat
+          lectureId={lectureId}
+          pausePointId={currentQuestion.id}
+          question={currentQuestion.question_content.question}
+          userAnswer={currentQuestion.question_type === 'multiple_choice' ? selectedAnswer : shortAnswer}
+          correctAnswer={currentQuestion.question_content.correctAnswer || currentQuestion.question_content.expectedAnswer || ''}
+          timestampRange={{
+            start: Math.max(0, currentQuestion.pause_timestamp - 120), // 2 mins before
+            end: currentQuestion.pause_timestamp
+          }}
+          transcriptChunk={lectureTranscript ? (() => {
+            // Extract relevant portion of transcript around the question timestamp
+            const words = lectureTranscript.split(' ');
+            const totalDuration = duration || 1;
+            const wordsPerSecond = words.length / totalDuration;
+            const startWord = Math.max(0, Math.floor((currentQuestion.pause_timestamp - 120) * wordsPerSecond));
+            const endWord = Math.floor(currentQuestion.pause_timestamp * wordsPerSecond);
+            return words.slice(startWord, endWord).join(' ');
+          })() : undefined}
+          onClose={() => setShowContextualChat(false)}
+        />
+      )}
     </div>
   );
 };
