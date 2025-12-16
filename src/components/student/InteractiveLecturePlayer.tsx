@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { 
   Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
-  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2
+  RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,6 +55,8 @@ interface InteractiveLecturePlayerProps {
   title: string;
   pausePoints: PausePoint[];
   onComplete?: () => void;
+  isPreview?: boolean;
+  onQuestionSelect?: (questionId: string) => void;
 }
 
 // Inline confidence selector for interactive lectures
@@ -100,7 +102,9 @@ export const InteractiveLecturePlayer = ({
   videoUrl,
   title,
   pausePoints,
-  onComplete
+  onComplete,
+  isPreview = false,
+  onQuestionSelect
 }: InteractiveLecturePlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -142,8 +146,14 @@ export const InteractiveLecturePlayer = ({
     .filter(p => duration === 0 || p.pause_timestamp <= duration)
     .sort((a, b) => a.pause_timestamp - b.pause_timestamp);
 
-  // Load saved progress
+  // Load saved progress (skip in preview mode)
   useEffect(() => {
+    if (isPreview) {
+      // In preview mode, allow full seeking
+      setMaxAllowedTime(Infinity);
+      return;
+    }
+
     const loadProgress = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -176,10 +186,12 @@ export const InteractiveLecturePlayer = ({
     };
 
     loadProgress();
-  }, [lectureId]);
+  }, [lectureId, isPreview]);
 
-  // Save progress periodically
+  // Save progress periodically (skip in preview mode)
   const saveProgress = useCallback(async () => {
+    if (isPreview) return;
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -194,12 +206,13 @@ export const InteractiveLecturePlayer = ({
       }, {
         onConflict: 'student_id,lecture_video_id'
       });
-  }, [lectureId, maxAllowedTime, answeredQuestions, totalPoints]);
+  }, [lectureId, maxAllowedTime, answeredQuestions, totalPoints, isPreview]);
 
   useEffect(() => {
+    if (isPreview) return;
     const interval = setInterval(saveProgress, 10000); // Save every 10 seconds
     return () => clearInterval(interval);
-  }, [saveProgress]);
+  }, [saveProgress, isPreview]);
 
   // Handle time update and pause point detection
   const handleTimeUpdate = () => {
@@ -229,14 +242,21 @@ export const InteractiveLecturePlayer = ({
     }
   };
 
-  // Prevent seeking forward
+  // Prevent seeking forward (allow in preview mode)
   const handleSeeking = () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || isPreview) return;
     
     if (videoRef.current.currentTime > maxAllowedTime) {
       videoRef.current.currentTime = maxAllowedTime;
       toast.info("You can't skip ahead. Answer questions to progress.");
     }
+  };
+
+  // Jump to specific timestamp (for preview mode question panel)
+  const jumpToTimestamp = (timestamp: number) => {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = timestamp;
+    setCurrentTime(timestamp);
   };
 
   const handlePlayPause = () => {
@@ -622,8 +642,16 @@ export const InteractiveLecturePlayer = ({
 
   return (
     <div className="relative w-full" ref={containerRef}>
+      {/* Preview Mode Banner */}
+      {isPreview && (
+        <div className="bg-amber-500 text-white text-center py-2 px-4 font-medium flex items-center justify-center gap-2 rounded-t-lg">
+          <Eye className="h-4 w-4" />
+          PREVIEW MODE - Progress will not be saved
+        </div>
+      )}
+      
       {/* Video Player */}
-      <div className={cn("relative bg-black rounded-lg overflow-hidden", isFullscreen ? "h-full" : "aspect-video")}>
+      <div className={cn("relative bg-black overflow-hidden", isFullscreen ? "h-full" : "aspect-video", !isPreview && "rounded-lg", isPreview && "rounded-b-lg")}>
         <video
           ref={videoRef}
           src={videoUrl}
