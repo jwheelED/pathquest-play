@@ -4,9 +4,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import { 
   MessageCircle, Send, Clock, FileText, Sparkles, 
-  ChevronDown, ChevronUp, X, Lightbulb, HelpCircle
+  ChevronDown, ChevronUp, X, Lightbulb, HelpCircle,
+  Image, Download, Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -16,6 +18,7 @@ interface Message {
   content: string;
   timestamp?: string;
   evidence?: string;
+  imageUrl?: string;
 }
 
 interface ContextualTutorChatProps {
@@ -55,11 +58,14 @@ export function ContextualTutorChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
+  const [diagramLimitReached, setDiagramLimitReached] = useState(false);
   const [allowGeneralKnowledge, setAllowGeneralKnowledge] = useState(false);
   const [showEvidence, setShowEvidence] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -111,6 +117,96 @@ export function ContextualTutorChat({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGenerateDiagram = async () => {
+    if (isGeneratingDiagram || diagramLimitReached) return;
+
+    setIsGeneratingDiagram(true);
+    
+    // Add user message showing they requested a diagram
+    const userMessage: Message = { role: 'user', content: '🎨 Generate a visual diagram for this concept' };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-concept-diagram', {
+        body: {
+          concept: question,
+          questionText: question,
+          transcriptContext: transcriptChunk || slideText,
+        },
+      });
+
+      if (error) {
+        // Check if it's a limit error
+        if (error.message?.includes('429') || error.message?.includes('limit')) {
+          setDiagramLimitReached(true);
+          toast({
+            title: "Daily limit reached",
+            description: "You've used your daily diagram. Try again tomorrow!",
+            variant: "destructive",
+          });
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: "You've already generated your diagram for today. Try again tomorrow! 📅",
+          }]);
+          return;
+        }
+        throw error;
+      }
+
+      if (data.limitReached) {
+        setDiagramLimitReached(true);
+        toast({
+          title: "Daily limit reached",
+          description: data.message || "You've used your daily diagram. Try again tomorrow!",
+          variant: "destructive",
+        });
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: data.message || "You've already generated your diagram for today. Try again tomorrow! 📅",
+        }]);
+        return;
+      }
+
+      if (data.success && data.imageUrl) {
+        const assistantMessage: Message = {
+          role: 'assistant',
+          content: data.description || 'Here\'s a visual diagram to help you understand this concept:',
+          imageUrl: data.imageUrl,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        toast({
+          title: "Diagram generated!",
+          description: "Your visual diagram is ready.",
+        });
+      } else {
+        throw new Error('No image returned');
+      }
+    } catch (error) {
+      console.error('Diagram generation error:', error);
+      toast({
+        title: "Generation failed",
+        description: "Could not generate diagram. Please try again.",
+        variant: "destructive",
+      });
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I couldn\'t generate a diagram right now. Please try again later.',
+      }]);
+    } finally {
+      setIsGeneratingDiagram(false);
+    }
+  };
+
+  const handleDownloadImage = (imageUrl: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `concept-diagram-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleQuickAction = (prompt: string) => {
@@ -202,6 +298,32 @@ export function ContextualTutorChat({
                 </Button>
               ))}
             </div>
+
+            {/* Generate Diagram button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs h-9 border-dashed"
+              onClick={handleGenerateDiagram}
+              disabled={isGeneratingDiagram || diagramLimitReached}
+            >
+              {isGeneratingDiagram ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Generating...
+                </>
+              ) : diagramLimitReached ? (
+                <>
+                  <Image className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                  Limit reached (1/day)
+                </>
+              ) : (
+                <>
+                  <Image className="h-3.5 w-3.5 mr-1.5" />
+                  Generate Diagram
+                </>
+              )}
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -222,6 +344,26 @@ export function ContextualTutorChat({
                   )}
                 >
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  
+                  {/* Image display */}
+                  {msg.imageUrl && (
+                    <div className="mt-3 space-y-2">
+                      <img 
+                        src={msg.imageUrl} 
+                        alt="Generated concept diagram" 
+                        className="rounded-lg w-full max-h-64 object-contain bg-white"
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full text-xs h-8"
+                        onClick={() => handleDownloadImage(msg.imageUrl!)}
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                  )}
                   
                   {/* Timestamp citation */}
                   {msg.timestamp && (
@@ -261,14 +403,21 @@ export function ContextualTutorChat({
               </div>
             ))}
             
-            {isLoading && (
+            {(isLoading || isGeneratingDiagram) && (
               <div className="flex items-start">
                 <div className="bg-muted rounded-xl p-3">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                  {isGeneratingDiagram ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Generating diagram...</span>
+                    </div>
+                  ) : (
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -287,12 +436,27 @@ export function ContextualTutorChat({
                 size="sm"
                 className="flex-1 text-xs h-8"
                 onClick={() => handleQuickAction(action.prompt)}
-                disabled={isLoading}
+                disabled={isLoading || isGeneratingDiagram}
               >
                 <action.icon className="h-3 w-3 mr-1" />
                 {action.label}
               </Button>
             ))}
+            {/* Diagram button in conversation mode */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-8 px-2"
+              onClick={handleGenerateDiagram}
+              disabled={isLoading || isGeneratingDiagram || diagramLimitReached}
+              title={diagramLimitReached ? "Daily limit reached" : "Generate diagram"}
+            >
+              {isGeneratingDiagram ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Image className={cn("h-3 w-3", diagramLimitReached && "opacity-50")} />
+              )}
+            </Button>
           </div>
         </div>
       )}
@@ -329,7 +493,7 @@ export function ContextualTutorChat({
           <Button
             size="icon"
             onClick={() => sendMessage(input)}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || isGeneratingDiagram}
           >
             <Send className="h-4 w-4" />
           </Button>

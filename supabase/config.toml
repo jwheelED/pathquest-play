@@ -128,3 +128,6 @@ verify_jwt = true
 
 [functions.generate-daily-remediation]
 verify_jwt = true
+
+[functions.generate-concept-diagram]
+verify_jwt = true
