@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Video, Trash2, Eye, EyeOff, Clock, Brain, RefreshCw, Settings2 } from "lucide-react";
+import { Video, Trash2, Eye, EyeOff, Clock, Brain, RefreshCw, Settings2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -262,6 +262,15 @@ export const LectureVideoManager = () => {
                   onCheckedChange={() => togglePublished(lecture.id, lecture.published)}
                 />
               </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open(`/instructor/preview/${lecture.id}`, '_blank')}
+                title="Preview lecture as student would see it"
+              >
+                <Play className="h-4 w-4" />
+              </Button>
 
               <Button
                 variant="ghost"
