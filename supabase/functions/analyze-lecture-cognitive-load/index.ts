@@ -501,7 +501,14 @@ Rules:
         const diffTypes = ['recall', 'application', 'reasoning'];
         const styleTypes = ['multiple_choice', 'short_answer'];
         
-        // Create placeholder pause point
+        // Extract actual transcript content around this timestamp (±60 seconds window)
+        const relevantSegments = transcript.filter((seg: any) => 
+          seg.start >= (targetTime - 60) && seg.end <= (targetTime + 60)
+        );
+        const contextText = relevantSegments.map((s: any) => s.text).join(' ').trim();
+        const truncatedContext = contextText.slice(0, 500) || 'Lecture content';
+        
+        // Create placeholder pause point with actual transcript context
         pausePoints.push({
           timestamp: Math.round(targetTime),
           cognitive_load_score: 7,
@@ -509,8 +516,9 @@ Rules:
           question_style: styleTypes[i % 2],
           reason: "Additional question point for comprehensive coverage",
           suggested_question_type: styleTypes[i % 2],
-          context_summary: "Key concept from lecture content",
-          question_suggestion: "What is the main takeaway from this section?"
+          context_summary: truncatedContext,
+          question_suggestion: `Based on this section: ${truncatedContext.slice(0, 150)}...`,
+          transcript_context: truncatedContext
         });
       }
       
@@ -550,6 +558,13 @@ Rules:
         const diffTypes = ['recall', 'application', 'reasoning'];
         const styleTypes = ['multiple_choice', 'short_answer'];
         
+        // Extract actual transcript content around this timestamp (±60 seconds window)
+        const relevantSegs = transcript.filter((seg: any) => 
+          seg.start >= (targetTime - 60) && seg.end <= (targetTime + 60)
+        );
+        const ctxText = relevantSegs.map((s: any) => s.text).join(' ').trim();
+        const truncCtx = ctxText.slice(0, 500) || 'Lecture content';
+        
         pausePoints.push({
           timestamp: Math.round(targetTime),
           cognitive_load_score: 6,
@@ -557,8 +572,9 @@ Rules:
           question_style: styleTypes[pausePoints.length % 2],
           reason: "Comprehension checkpoint",
           suggested_question_type: styleTypes[pausePoints.length % 2],
-          context_summary: "Review of recent lecture content",
-          question_suggestion: "What key concept was just explained?"
+          context_summary: truncCtx,
+          question_suggestion: `Based on this section: ${truncCtx.slice(0, 150)}...`,
+          transcript_context: truncCtx
         });
         console.log(`Generated placeholder at ${Math.round(targetTime)}s (${pausePoints.length}/${questionCount})`);
       }
@@ -676,10 +692,18 @@ Return JSON:
       }
       
       // Standard question generation with enhanced structure
+      // Use transcript_context if available (for placeholders), otherwise use context_summary
+      const transcriptContext = point.transcript_context || point.context_summary || '';
+      
       const questionPrompt = `Generate a ${questionStyle} question based on this lecture content.
 
-Context: ${point.context_summary}
-Suggested question: ${point.question_suggestion || point.clinical_focus}
+IMPORTANT: The question MUST be directly related to the transcript content provided below. Do NOT generate questions about topics not mentioned in the transcript.
+
+Transcript content from lecture:
+"${transcriptContext}"
+
+Context summary: ${point.context_summary}
+Suggested question focus: ${point.question_suggestion || point.clinical_focus}
 Difficulty type: ${difficultyType} (${difficultyType === 'recall' ? 'testing facts, definitions' : difficultyType === 'application' ? 'applying concept to new example' : 'critical thinking, why/compare/predict'})
 
 ${questionStyle === 'multiple_choice' ? `Return JSON:
@@ -740,7 +764,7 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'You are an expert educator creating questions to test student understanding. Include "why not other choices" for MCQ and adaptive follow-up questions. Return only valid JSON.' },
+              { role: 'system', content: 'You are an expert educator creating questions to test student understanding. CRITICAL: Your questions MUST be directly based on the transcript content provided. Do NOT generate questions about topics not mentioned in the transcript. Include "why not other choices" for MCQ and adaptive follow-up questions. Return only valid JSON.' },
               { role: 'user', content: questionPrompt }
             ],
             max_tokens: 1500,
