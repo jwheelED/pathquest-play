@@ -126,6 +126,44 @@ export default {
           "50%": { opacity: "1", transform: "translate(-50%, -50%) scale(1.1)" },
           "100%": { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
         },
+        // Confidence betting animations
+        "lock-in-bounce": {
+          "0%": { transform: "scale(1)" },
+          "30%": { transform: "scale(1.08)" },
+          "50%": { transform: "scale(0.95)" },
+          "70%": { transform: "scale(1.03)" },
+          "100%": { transform: "scale(1.02)" },
+        },
+        "lock-in-fire": {
+          "0%": { transform: "scale(1)", filter: "brightness(1)" },
+          "20%": { transform: "scale(1.1)", filter: "brightness(1.2)" },
+          "40%": { transform: "scale(0.95)", filter: "brightness(1.1)" },
+          "60%": { transform: "scale(1.05)", filter: "brightness(1.15)" },
+          "100%": { transform: "scale(1.02)", filter: "brightness(1.05)" },
+        },
+        "lock-in-check": {
+          "0%": { transform: "scale(0) rotate(-45deg)", opacity: "0" },
+          "50%": { transform: "scale(1.3) rotate(10deg)", opacity: "1" },
+          "100%": { transform: "scale(1) rotate(0deg)", opacity: "1" },
+        },
+        "xp-particle": {
+          "0%": { transform: "scale(0) translateY(0)", opacity: "0" },
+          "30%": { transform: "scale(1.2) translateY(-10px)", opacity: "1" },
+          "100%": { transform: "scale(0) translateY(-30px)", opacity: "0" },
+        },
+        "xp-complete": {
+          "0%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.15)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "text-glow-gold": {
+          "0%, 100%": { textShadow: "0 0 10px hsl(45 100% 50% / 0.5), 0 0 20px hsl(45 100% 50% / 0.3)" },
+          "50%": { textShadow: "0 0 20px hsl(45 100% 50% / 0.7), 0 0 30px hsl(45 100% 50% / 0.5)" },
+        },
+        "text-glow-fire": {
+          "0%, 100%": { textShadow: "0 0 10px hsl(25 100% 50% / 0.6), 0 0 25px hsl(0 100% 50% / 0.4)" },
+          "50%": { textShadow: "0 0 25px hsl(25 100% 50% / 0.8), 0 0 40px hsl(0 100% 50% / 0.6)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -137,6 +175,14 @@ export default {
         "voice-command-pulse": "voice-command-pulse 0.5s ease-out",
         "border-flash": "border-flash 0.5s ease-out forwards",
         "voice-icon-appear": "voice-icon-appear 0.3s ease-out forwards",
+        // Confidence betting animations
+        "lock-in-bounce": "lock-in-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        "lock-in-fire": "lock-in-fire 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        "lock-in-check": "lock-in-check 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        "xp-particle": "xp-particle 0.8s ease-out forwards",
+        "xp-complete": "xp-complete 0.4s ease-out",
+        "text-glow-gold": "text-glow-gold 1.5s ease-in-out infinite",
+        "text-glow-fire": "text-glow-fire 1.2s ease-in-out infinite",
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",
