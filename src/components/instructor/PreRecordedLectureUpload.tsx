@@ -44,7 +44,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   // New state for pause point configuration
   const [estimatedDuration, setEstimatedDuration] = useState<number>(600); // Default 10 min
   const [flowLevel, setFlowLevel] = useState(3); // 1-5 scale
-  const [highYieldOnly, setHighYieldOnly] = useState(false);
+  const [highYieldOnly, setHighYieldOnly] = useState(true); // Default to high-yield for smarter questions
   const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   
@@ -427,12 +427,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           </div>
           
           {/* High-yield only toggle */}
-          <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50">
+          <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-500" />
               <div>
-                <span className="text-sm font-medium">High-yield only</span>
-                <p className="text-xs text-muted-foreground">Focus on the most important pause points</p>
+                <span className="text-sm font-medium">Smart High-Yield Mode</span>
+                <p className="text-xs text-muted-foreground">AI analyzes your video to find the most important moments</p>
               </div>
             </div>
             <Switch
@@ -441,6 +441,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               disabled={status !== "idle"}
             />
           </div>
+          
+          {highYieldOnly && (
+            <p className="text-xs text-muted-foreground italic px-1">
+              Questions will be placed at key learning moments detected from your lecture content
+            </p>
+          )}
           
           {/* Advanced configuration collapsible */}
           {(selectedFile || videoUrl) && estimatedDuration > 0 && (
