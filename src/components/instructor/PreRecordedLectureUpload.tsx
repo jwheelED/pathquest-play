@@ -39,6 +39,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [examStyle, setExamStyle] = useState("usmle_step1");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [createdLectureId, setCreatedLectureId] = useState<string | null>(null);
   
   // New state for pause point configuration
   const [estimatedDuration, setEstimatedDuration] = useState<number>(600); // Default 10 min
@@ -300,6 +301,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
             if (final?.status === "ready") {
               setStatus("ready");
+              setCreatedLectureId(lectureVideo.id);
               toast.success("Lecture processed successfully!");
               onUploadComplete?.(lectureVideo.id);
             } else if (final?.status === "error") {
@@ -312,6 +314,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           }, 5000);
         } else if (updated?.status === "ready") {
           setStatus("ready");
+          setCreatedLectureId(lectureVideo.id);
           toast.success("Lecture processed successfully!");
           onUploadComplete?.(lectureVideo.id);
         } else if (updated?.status === "error") {
@@ -584,12 +587,19 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
         {/* Submit Button */}
         <Button
-          onClick={handleUpload}
+          onClick={() => {
+            if (status === "ready" && createdLectureId) {
+              window.open(`/instructor/preview/${createdLectureId}`, '_blank');
+            } else {
+              handleUpload();
+            }
+          }}
           disabled={
+            status === "ready" ? false :
             (uploadMode === "file" && !selectedFile) ||
             (uploadMode === "url" && !videoUrl.trim()) ||
             !title.trim() ||
-            status !== "idle"
+            (status !== "idle")
           }
           className="w-full"
           size="lg"
