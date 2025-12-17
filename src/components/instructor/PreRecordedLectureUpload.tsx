@@ -9,7 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Settings2, X } from "lucide-react";
+import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Settings2, X, Sparkles } from "lucide-react";
+import { QuestionStudioDialog } from "./QuestionStudioDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -400,7 +401,16 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-        {/* Optional: Customize timing (hidden by default, smart mode is silent default) */}
+        {/* Question Studio Button */}
+        <QuestionStudioDialog
+          trigger={
+            <Button variant="outline" className="w-full gap-2" disabled={status !== "idle"}>
+              <Sparkles className="h-4 w-4" />
+              Open Question Studio
+            </Button>
+          }
+        />
+
         <div className="space-y-2">
           <button
             type="button"

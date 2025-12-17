@@ -22,7 +22,7 @@ import { LiveSessionControls } from "@/components/instructor/LiveSessionControls
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
-import { QuestionStudio } from "@/components/instructor/QuestionStudio";
+
 
 interface Student {
   id: string;
@@ -485,9 +485,6 @@ export default function InstructorDashboard() {
 
             {/* Pre-Recorded Lecture Grades */}
             <PreRecordedLectureGrades />
-
-            {/* Question Studio for custom question generation */}
-            <QuestionStudio />
             
             <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
           </div>
