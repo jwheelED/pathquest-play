@@ -310,11 +310,15 @@ serve(async (req) => {
     const { 
       lectureVideoId, 
       transcript, 
-      questionCount = 5, 
+      questionCount: providedQuestionCount, 
+      smartMode = false,
       professorType = 'stem', 
       examStyle = 'usmle_step1', 
       medicalSpecialty = 'general' 
     } = await req.json();
+    
+    // For smart mode, we'll determine questionCount from content analysis
+    let questionCount = providedQuestionCount || 5;
 
     if (!lectureVideoId || !transcript || !Array.isArray(transcript)) {
       return new Response(JSON.stringify({ error: 'Missing lectureVideoId or transcript array' }), {
@@ -332,16 +336,115 @@ serve(async (req) => {
 
     const styleMix = profile?.style_mix || { mcq: 70, short_answer: 30 };
     
-    // Generate Bloom's distribution
-    const bloomsDistribution = generateBloomsDistribution(questionCount, profile);
-    
-    console.log(`Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, ${questionCount} questions requested`);
-    console.log(`Bloom's Distribution: ${JSON.stringify(bloomsDistribution)}`);
+    console.log(`Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, smartMode: ${smartMode}`);
 
     // Build transcript text with timestamps for analysis
     const transcriptText = transcript.map((seg: any) => 
       `[${formatTime(seg.start)} - ${formatTime(seg.end)}] ${seg.text}`
     ).join('\n');
+    
+    // Calculate lecture duration from transcript
+    const lastSegment = transcript[transcript.length - 1];
+    const lectureDurationSeconds = lastSegment?.end || 600;
+    
+    // SMART MODE: Analyze content to determine optimal question count
+    if (smartMode) {
+      console.log('Smart Mode enabled - analyzing content for optimal question placement...');
+      
+      const smartAnalysisPrompt = `You are an expert educational psychologist. Analyze this lecture transcript and determine the OPTIMAL number of pause points for questions.
+
+Consider these factors:
+1. Content density - How much new information per minute?
+2. Cognitive load peaks - Where are complex concepts explained?
+3. Natural topic transitions - Where do clear breaks occur?
+4. Lecture duration: ${Math.round(lectureDurationSeconds / 60)} minutes
+
+Rules:
+- Minimum 1 question per 5-7 minutes of lecture
+- Maximum 1 question per 2-3 minutes (don't interrupt flow too much)
+- Focus only on HIGH-YIELD moments - key concepts, important definitions, complex explanations
+- Don't question during introductions (first 60 seconds) or conclusions (last 30 seconds)
+
+Return JSON:
+{
+  "recommended_count": <number>,
+  "reasoning": "Brief explanation of why this count is optimal",
+  "high_yield_moments": [
+    {
+      "timestamp": <seconds as number>,
+      "importance": "critical|important|moderate",
+      "concept": "What key concept is being explained"
+    }
+  ]
+}
+
+Transcript:
+${transcriptText}`;
+
+      try {
+        const smartResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'You are an expert at analyzing educational content. Return only valid JSON.' },
+              { role: 'user', content: smartAnalysisPrompt }
+            ],
+            max_tokens: 2000,
+            temperature: 0.3,
+          }),
+        });
+
+        if (smartResponse.ok) {
+          const smartResult = await smartResponse.json();
+          let smartContent = smartResult.choices?.[0]?.message?.content || '';
+          
+          // Strip markdown code fences
+          smartContent = smartContent.replace(/```json\s*/gi, '');
+          smartContent = smartContent.replace(/```\s*/g, '');
+          smartContent = smartContent.trim();
+          
+          const smartMatch = smartContent.match(/\{[\s\S]*\}/);
+          
+          if (smartMatch) {
+            try {
+              const smartAnalysis = JSON.parse(smartMatch[0]);
+              questionCount = smartAnalysis.recommended_count || Math.max(3, Math.round(lectureDurationSeconds / 300));
+              console.log(`Smart Mode determined optimal question count: ${questionCount}`);
+              console.log(`Reasoning: ${smartAnalysis.reasoning}`);
+              
+              // Update the lecture_videos table with the smart analysis
+              await supabase.from('lecture_videos').update({
+                question_count: questionCount,
+                cognitive_analysis: {
+                  smart_mode: true,
+                  recommended_count: questionCount,
+                  reasoning: smartAnalysis.reasoning,
+                  high_yield_moments: smartAnalysis.high_yield_moments || []
+                }
+              }).eq('id', lectureVideoId);
+              
+            } catch (parseErr) {
+              console.error('Failed to parse smart analysis:', parseErr);
+              // Fallback: use duration-based calculation
+              questionCount = Math.max(3, Math.round(lectureDurationSeconds / 300)); // 1 question per 5 minutes
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Smart mode analysis failed:', e);
+        // Fallback calculation
+        questionCount = Math.max(3, Math.round(lectureDurationSeconds / 300));
+      }
+    }
+    
+    // Generate Bloom's distribution with the determined question count
+    const bloomsDistribution = generateBloomsDistribution(questionCount, profile);
+    console.log(`Final question count: ${questionCount}, Bloom's Distribution: ${JSON.stringify(bloomsDistribution)}`);
 
     // For medical lectures, first extract medical entities
     let medicalEntities: any[] = [];
@@ -797,9 +900,9 @@ Rules:
 
     console.log(`AI returned ${pausePoints.length} pause points, requested ${questionCount}`);
 
-    // Calculate lecture duration from last transcript segment
-    const lastSegment = transcript[transcript.length - 1];
-    const transcriptDuration = lastSegment?.end || 600;
+    // Calculate lecture duration from last transcript segment (use different var name to avoid redeclaration)
+    const finalSegment = transcript[transcript.length - 1];
+    const transcriptDuration = finalSegment?.end || 600;
     
     const { data: lectureVideo } = await supabase
       .from('lecture_videos')

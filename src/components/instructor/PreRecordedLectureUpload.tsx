@@ -231,7 +231,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         setUploadProgress(100);
       }
 
-      // Create lecture video record with effective question count
+      // Create lecture video record (question_count set later by AI in smart mode)
       const { data: lectureVideo, error: insertError } = await supabase
         .from("lecture_videos")
         .insert([
@@ -240,7 +240,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             description: description.trim() || null,
             video_path: filePath,
             video_url: externalVideoUrl,
-            question_count: effectiveQuestionCount,
+            question_count: highYieldOnly ? null : effectiveQuestionCount,
             status: "processing",
             instructor_id: user.id,
           },
@@ -285,7 +285,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             body: {
               lectureVideoId: lectureVideo.id,
               transcript: updated.transcript,
-              questionCount: effectiveQuestionCount,
+              // In smart mode, AI determines question count; otherwise use manual setting
+              smartMode: highYieldOnly,
+              questionCount: highYieldOnly ? undefined : effectiveQuestionCount,
               professorType: professorType || "stem",
               examStyle: professorType === "medical" ? examStyle : undefined,
             },
@@ -348,7 +350,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       case "analyzing":
         return {
           icon: <Brain className="h-5 w-5 animate-pulse" />,
-          text: "Analyzing cognitive load...",
+          text: highYieldOnly ? "AI analyzing for optimal question placement..." : "Analyzing cognitive load...",
           color: "bg-purple-500",
         };
       case "ready":
@@ -401,38 +403,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
         {/* Flow-based Pause Point Configuration */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Interruption Frequency</Label>
-            <Badge variant="outline" className="text-xs">
-              {effectiveQuestionCount} pause points
-            </Badge>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground w-16">Fewer</span>
-            <Slider
-              value={[flowLevel]}
-              onValueChange={([val]) => {
-                setFlowLevel(val);
-                // Regenerate pause points with new flow level
-                const count = calculateRecommendedPausePoints(estimatedDuration, val);
-                setPausePoints(generateAutoPausePoints(estimatedDuration, count));
-              }}
-              min={1}
-              max={5}
-              step={1}
-              disabled={status !== "idle"}
-              className="flex-1"
-            />
-            <span className="text-xs text-muted-foreground w-16 text-right">More</span>
-          </div>
-          
-          {/* High-yield only toggle */}
+          {/* High-yield only toggle - now at the top */}
           <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-500" />
               <div>
                 <span className="text-sm font-medium">Smart High-Yield Mode</span>
-                <p className="text-xs text-muted-foreground">AI analyzes your video to find the most important moments</p>
+                <p className="text-xs text-muted-foreground">AI determines optimal question count and placement</p>
               </div>
             </div>
             <Switch
@@ -442,10 +419,43 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             />
           </div>
           
-          {highYieldOnly && (
-            <p className="text-xs text-muted-foreground italic px-1">
-              Questions will be placed at key learning moments detected from your lecture content
-            </p>
+          {highYieldOnly ? (
+            <div className="text-center py-4 px-3 rounded-lg bg-muted/30 border border-dashed">
+              <Brain className="h-6 w-6 text-primary mx-auto mb-2 opacity-70" />
+              <p className="text-sm text-muted-foreground">
+                AI will analyze your lecture content and automatically determine the optimal number and placement of questions
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 italic">
+                Questions will be placed at key learning moments, topic transitions, and high cognitive load sections
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Interruption Frequency (Manual)</Label>
+                <Badge variant="outline" className="text-xs">
+                  {effectiveQuestionCount} pause points
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-16">Fewer</span>
+                <Slider
+                  value={[flowLevel]}
+                  onValueChange={([val]) => {
+                    setFlowLevel(val);
+                    // Regenerate pause points with new flow level
+                    const count = calculateRecommendedPausePoints(estimatedDuration, val);
+                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
+                  }}
+                  min={1}
+                  max={5}
+                  step={1}
+                  disabled={status !== "idle"}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground w-16 text-right">More</span>
+              </div>
+            </>
           )}
           
           {/* Advanced configuration collapsible */}
