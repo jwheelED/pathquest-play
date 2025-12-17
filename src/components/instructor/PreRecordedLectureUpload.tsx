@@ -401,15 +401,17 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-        {/* Question Studio Button */}
-        <QuestionStudioDialog
-          trigger={
-            <Button variant="outline" className="w-full gap-2" disabled={status !== "idle"}>
-              <Sparkles className="h-4 w-4" />
-              Open Question Studio
-            </Button>
-          }
-        />
+        {/* Calibrate Questions - only show after video is processed */}
+        {status === "ready" && (
+          <QuestionStudioDialog
+            trigger={
+              <Button variant="outline" className="w-full gap-2">
+                <Sparkles className="h-4 w-4" />
+                Calibrate Questions
+              </Button>
+            }
+          />
+        )}
 
         <div className="space-y-2">
           <button
