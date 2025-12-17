@@ -38,6 +38,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [professorType, setProfessorType] = useState<string | null>(null);
   const [examStyle, setExamStyle] = useState("usmle_step1");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   // New state for pause point configuration
   const [estimatedDuration, setEstimatedDuration] = useState<number>(600); // Default 10 min
@@ -107,6 +108,52 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       setErrorMessage("");
       
       // Detect duration and generate initial pause points
+      const duration = await detectVideoDuration(file);
+      setEstimatedDuration(duration);
+      const count = calculateRecommendedPausePoints(duration, flowLevel);
+      setPausePoints(generateAutoPausePoints(duration, count));
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (status === "idle") setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (status !== "idle") return;
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("video/")) {
+        toast.error("Please drop a video file");
+        return;
+      }
+      if (file.size > 500 * 1024 * 1024) {
+        toast.error("File size must be less than 500MB");
+        return;
+      }
+      setSelectedFile(file);
+      setStatus("idle");
+      setErrorMessage("");
+      
       const duration = await detectVideoDuration(file);
       setEstimatedDuration(duration);
       const count = calculateRecommendedPausePoints(duration, flowLevel);
@@ -448,9 +495,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           {uploadMode === "file" ? (
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                selectedFile ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                isDragging ? "border-primary bg-primary/10" : selectedFile ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
               } ${status !== "idle" ? "pointer-events-none opacity-50" : ""}`}
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
               <input
                 ref={fileInputRef}
