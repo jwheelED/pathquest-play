@@ -1089,82 +1089,36 @@ Return only valid JSON.` },
         }
       }
       
-      // Standard question generation with Bloom's Taxonomy enforcement
+      // Simplified question generation - focus on content, not taxonomy
       const transcriptContext = point.transcript_context || point.context_summary || '';
       
-      const questionPrompt = `Generate a ${questionStyle} question at Bloom's Taxonomy ${taxonomy.name} level.
+      const questionPrompt = `Create a ${questionStyle === 'multiple_choice' ? 'multiple choice' : 'short answer'} quiz question based on this lecture content:
 
-=== BLOOM'S TAXONOMY REQUIREMENTS ===
-Level: ${taxonomy.name} (${taxonomy.level}/6)
-Description: ${taxonomy.description}
-REQUIRED ACTION VERBS (use at least one): ${taxonomy.verbs.join(', ')}
-EXAMPLE STEMS TO USE: ${taxonomy.questionStems.join(' | ')}
-GOOD EXAMPLE: "${taxonomy.exampleGood}"
-ANTI-PATTERN TO AVOID: "${taxonomy.exampleBad}"
+=== LECTURE CONTENT ===
+${transcriptContext || 'Lecture content about the topic'}
 
-=== LECTURE CONTENT (BASE YOUR QUESTION ON THIS) ===
-${transcriptContext || point.context_summary || 'General lecture concepts'}
-
-IMPORTANT: Generate a question ONLY about the lecture content above. Do not use placeholder variables like X or Y.
-
-=== CRITICAL INSTRUCTIONS ===
-1. Your question MUST require students to ${taxonomy.description.toLowerCase()}
-2. Use one of these verbs in your question: ${taxonomy.verbs.slice(0, 5).join(', ')}
-3. The question should NOT be answerable through simple recall unless this is explicitly Remember level
-4. For Apply+ levels: Present a NOVEL scenario not directly from the lecture
-5. For Analyze level: REQUIRE comparing, contrasting, or examining relationships
-6. For Evaluate level: REQUIRE judgment with justification ("and why?")
+=== REQUIREMENTS ===
+1. Ask about SPECIFIC facts, concepts, processes, or relationships from the content above
+2. DO NOT ask meta-questions like "what was discussed" or "what concept was covered"
+3. Ask REAL questions like:
+   - "What is the function of [specific thing]?"
+   - "How does [A] relate to [B]?"
+   - "Why does [specific process] occur?"
+   - "What happens when [specific condition]?"
+4. All answer options must be specific and realistic - NO generic placeholders
+5. The correct answer must be clearly supported by the lecture content
 
 ${questionStyle === 'multiple_choice' ? `Return JSON:
 {
-  "question": "Question text that clearly tests ${taxonomy.name} level thinking using verbs like: ${taxonomy.verbs.slice(0, 3).join(', ')}",
-  "options": ["A. Plausible option", "B. Plausible option", "C. Plausible option", "D. Plausible option"],
+  "question": "A specific question about the lecture content",
+  "options": ["A. Specific factual answer", "B. Another plausible answer", "C. Another plausible answer", "D. Another plausible answer"],
   "correctAnswer": "A",
-  "explanation": "Detailed explanation of the reasoning process required",
-  "blooms_level": "${bloomsLevel}",
-  "blooms_verb_used": "the specific action verb from the list that this question uses",
-  "why_not_other_choices": {
-    "B": "Why B is wrong - address the specific misconception",
-    "C": "Why C is wrong",
-    "D": "Why D is wrong"
-  },
-  "follow_ups": {
-    "correct_confident": {
-      "question": "A harder question at the next Bloom's level up",
-      "type": "multiple_choice",
-      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-      "correctAnswer": "A",
-      "explanation": "Why this is correct"
-    },
-    "correct_uncertain": {
-      "question": "A reinforcement question with simpler framing at same level",
-      "type": "multiple_choice",
-      "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-      "correctAnswer": "A",
-      "explanation": "Why this is correct"
-    }
-  }
+  "explanation": "Brief explanation of why this is correct based on the lecture"
 }` : `Return JSON:
 {
-  "question": "Question text that clearly tests ${taxonomy.name} level thinking",
-  "expectedAnswer": "Expected answer demonstrating ${taxonomy.name} level understanding",
-  "explanation": "Explanation of why this answer demonstrates the required cognitive level",
-  "blooms_level": "${bloomsLevel}",
-  "blooms_verb_used": "the specific action verb used",
-  "follow_ups": {
-    "correct_confident": {
-      "question": "A harder transfer question",
-      "type": "short_answer",
-      "expectedAnswer": "expected answer",
-      "explanation": "Explanation"
-    },
-    "correct_uncertain": {
-      "question": "A reinforcement question",
-      "type": "short_answer",
-      "expectedAnswer": "expected answer",
-      "explanation": "Explanation"
-    }
-  }
+  "question": "A specific question requiring explanation",
+  "expectedAnswer": "The expected answer based on lecture content",
+  "explanation": "Brief explanation"
 }`}`;
 
       try {
@@ -1175,29 +1129,13 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
             'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-pro', // Use Pro for better question quality
+            model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: `You are an expert educator who creates questions at specific Bloom's Taxonomy cognitive levels.
-
-YOUR CRITICAL MISSION: Create questions that genuinely test higher-order thinking, not just recall.
-
-VALIDATION RULES YOU MUST FOLLOW:
-1. If the question can be answered by reciting a definition → It's Remember level, regardless of how you phrase it
-2. If the question asks "What is X?" → It's Remember level
-3. Apply level MUST present a new scenario the student hasn't seen
-4. Analyze level MUST require breaking down information and seeing relationships
-5. Evaluate level MUST require making a judgment with criteria
-
-QUALITY CHECK: Before returning, verify your question matches the claimed level by checking:
-- Does it use the specified action verbs?
-- Could a student answer it with pure memorization? (If yes, it's Remember level)
-- Does it require the cognitive process described for this level?
-
-Return only valid JSON.` },
+              { role: 'system', content: 'You are a quiz question writer. Create specific, content-based questions about the lecture material. Never ask vague meta-questions. Return only valid JSON.' },
               { role: 'user', content: questionPrompt }
             ],
-            max_tokens: 1500,
-            temperature: 0.4,
+            max_tokens: 800,
+            temperature: 0.3,
           }),
         });
 
@@ -1212,71 +1150,101 @@ Return only valid JSON.` },
         if (jsonMatch) {
           const parsedQuestion = JSON.parse(jsonMatch[0]);
           
-          // Validate Bloom's level
-          const validation = validateBloomsLevel(parsedQuestion.question, bloomsLevel);
-          if (!validation.valid) {
-            console.log(`[Bloom's Validation] Question ${index} claimed ${bloomsLevel} but appears to be ${validation.suggestedLevel}: ${validation.reason}`);
-          }
-          
           return {
             ...point,
             order_index: index,
-            blooms_level: validation.valid ? bloomsLevel : validation.suggestedLevel,
             question_content: {
               question: parsedQuestion.question,
               options: parsedQuestion.options,
               correctAnswer: parsedQuestion.correctAnswer,
               expectedAnswer: parsedQuestion.expectedAnswer,
               explanation: parsedQuestion.explanation,
-              blooms_level: bloomsLevel,
-              blooms_verb_used: parsedQuestion.blooms_verb_used
             },
             question_type: questionStyle,
-            difficulty_type: bloomsLevel,
-            why_not_other_choices: parsedQuestion.why_not_other_choices || null,
-            follow_up_questions: parsedQuestion.follow_ups || null
+            difficulty_type: 'standard',
+            why_not_other_choices: null,
+            follow_up_questions: null
           };
         }
       } catch (e) {
         console.error(`Failed to generate question for point ${index}:`, e);
       }
 
-      // Fallback: Generate a simple but coherent question from transcript context
+      // Fallback: Extract real content from transcript and create specific question
       const contextText = transcriptContext || point.context_summary || '';
-      const cleanContext = contextText.replace(/[^\w\s.,]/g, ' ').trim();
       
-      // Extract key terms from the context for better question generation
-      const words = cleanContext.split(/\s+/).filter((w: string) => w.length > 4);
-      const keyTerms = words.slice(0, 5).join(', ');
+      // Extract meaningful sentences from the transcript
+      const sentences = contextText.split(/[.!?]+/)
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 30 && s.length < 200);
       
-      // Create a sensible fallback question based on the content
-      const fallbackQuestion = questionStyle === 'multiple_choice'
-        ? `Based on the lecture content about ${keyTerms || 'this topic'}, which statement best describes the main concept discussed?`
-        : `Explain the key concept discussed in the lecture regarding ${keyTerms || 'this topic'}.`;
+      // Find key concepts/terms (nouns, technical terms)
+      const words = contextText.toLowerCase().split(/\s+/);
+      const stopWords = new Set(['the', 'and', 'is', 'are', 'was', 'were', 'that', 'this', 'with', 'for', 'from', 'have', 'has', 'been', 'being', 'will', 'would', 'could', 'should', 'about', 'which', 'their', 'there', 'they', 'what', 'when', 'where', 'how', 'why', 'also', 'more', 'some', 'into', 'over', 'such', 'than', 'then', 'these', 'those', 'very', 'just', 'only', 'other', 'like', 'said', 'know', 'going', 'okay', 'really', 'actually', 'basically', 'thing', 'things', 'lecture', 'lecturer', 'discussed', 'talked', 'mentioned', 'saying']);
       
-      console.log(`[Fallback] Generated fallback question for point ${index} due to AI generation failure`);
+      const significantWords = words
+        .filter((w: string) => w.length > 4 && !stopWords.has(w))
+        .reduce((acc: Record<string, number>, word: string) => {
+          acc[word] = (acc[word] || 0) + 1;
+          return acc;
+        }, {});
+      
+      // Get most frequent significant terms
+      const topTerms = Object.entries(significantWords)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 3)
+        .map(([word]) => word);
+      
+      const mainTerm = topTerms[0] || 'concept';
+      
+      // Generate a real question based on the content
+      let fallbackQuestion: string;
+      let fallbackOptions: string[] | undefined;
+      let fallbackAnswer: string;
+      let fallbackExpectedAnswer: string | undefined;
+      
+      if (questionStyle === 'multiple_choice') {
+        // Create a real question about the main term
+        fallbackQuestion = `What is the primary function or characteristic of ${mainTerm} as described in the lecture?`;
+        
+        // Try to create options from actual content phrases
+        if (sentences.length >= 2) {
+          const mainSentence = sentences.find((s: string) => s.toLowerCase().includes(mainTerm)) || sentences[0];
+          fallbackOptions = [
+            `A. ${mainSentence.slice(0, 100)}`,
+            `B. It serves a different purpose than described`,
+            `C. It is unrelated to the main topic`,
+            `D. The lecture did not specify its function`
+          ];
+        } else {
+          fallbackOptions = [
+            `A. It plays a key role in the process described in the lecture`,
+            `B. It is a secondary component with minimal impact`,
+            `C. It contradicts the main theory presented`,
+            `D. It was mentioned but not explained in detail`
+          ];
+        }
+        fallbackAnswer = 'A';
+      } else {
+        fallbackQuestion = `Explain the role of ${mainTerm} based on what was discussed in the lecture.`;
+        fallbackExpectedAnswer = `${mainTerm} is described in the lecture as ${sentences[0] || 'a key concept in the material covered'}.`;
+        fallbackAnswer = '';
+      }
+      
+      console.log(`[Fallback] Generated content-based fallback question for point ${index} about: ${mainTerm}`);
       
       return {
         ...point,
         order_index: index,
-        blooms_level: bloomsLevel,
         question_content: {
           question: fallbackQuestion,
-          options: questionStyle === 'multiple_choice' 
-            ? [
-                'A. The concept involves a specific process described in the lecture',
-                'B. The concept relates to an alternative mechanism discussed',
-                'C. The concept contradicts the main theory presented',
-                'D. The concept is unrelated to the lecture topic'
-              ] 
-            : undefined,
-          correctAnswer: questionStyle === 'multiple_choice' ? 'A' : undefined,
-          expectedAnswer: questionStyle === 'short_answer' ? `Explain the concept of ${keyTerms || 'the topic discussed'}` : undefined,
-          explanation: `This question tests understanding of ${keyTerms || 'the lecture content'}. Review the lecture around this timestamp for more details.`,
-          blooms_level: bloomsLevel
+          options: fallbackOptions,
+          correctAnswer: questionStyle === 'multiple_choice' ? fallbackAnswer : undefined,
+          expectedAnswer: fallbackExpectedAnswer,
+          explanation: `This question focuses on ${mainTerm}, which was discussed in this section of the lecture.`,
         },
         question_type: questionStyle,
-        difficulty_type: bloomsLevel,
+        difficulty_type: 'standard',
         why_not_other_choices: null,
         follow_up_questions: null
       };
