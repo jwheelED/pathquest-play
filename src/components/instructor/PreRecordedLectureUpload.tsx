@@ -596,9 +596,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="gap-1.5 animate-fade-in"
+                      className="gap-1.5 animate-fade-in hover:scale-105 transition-transform"
                     >
-                      <Sparkles className="h-3.5 w-3.5" />
+                      <Sparkles className="h-3.5 w-3.5 animate-pulse text-amber-500" />
                       Calibrate Questions
                     </Button>
                   }
