@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Zap, Settings2 } from "lucide-react";
+import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Zap, Settings2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -515,12 +515,24 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 disabled={status !== "idle"}
               />
               {selectedFile ? (
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center gap-3 relative">
                   <Video className="h-8 w-8 text-primary" />
                   <div className="text-left">
                     <p className="font-medium">{selectedFile.name}</p>
                     <p className="text-sm text-muted-foreground">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(null);
+                      setPausePoints([]);
+                    }}
+                    className="absolute top-0 right-0 p-1 rounded-full hover:bg-muted transition-colors"
+                    disabled={status !== "idle"}
+                  >
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </button>
                 </div>
               ) : (
                 <>
