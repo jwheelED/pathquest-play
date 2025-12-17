@@ -131,3 +131,6 @@ verify_jwt = true
 
 [functions.generate-concept-diagram]
 verify_jwt = true
+
+[functions.generate-studio-questions]
+verify_jwt = true
