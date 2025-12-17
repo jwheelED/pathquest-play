@@ -401,16 +401,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-        {/* Flow-based Pause Point Configuration */}
+        {/* Pause Point Configuration */}
         <div className="space-y-4">
-          {/* High-yield only toggle - now at the top */}
-          <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          {/* Smart mode toggle - simple and clean */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-500" />
-              <div>
-                <span className="text-sm font-medium">Smart High-Yield Mode</span>
-                <p className="text-xs text-muted-foreground">AI determines optimal question count and placement</p>
-              </div>
+              <span className="text-sm font-medium">Smart question placement</span>
             </div>
             <Switch
               checked={highYieldOnly}
@@ -419,31 +416,21 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             />
           </div>
           
-          {highYieldOnly ? (
-            <div className="text-center py-4 px-3 rounded-lg bg-muted/30 border border-dashed">
-              <Brain className="h-6 w-6 text-primary mx-auto mb-2 opacity-70" />
-              <p className="text-sm text-muted-foreground">
-                AI will analyze your lecture content and automatically determine the optimal number and placement of questions
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 italic">
-                Questions will be placed at key learning moments, topic transitions, and high cognitive load sections
-              </p>
-            </div>
-          ) : (
-            <>
+          {/* Manual controls only when smart mode is off */}
+          {!highYieldOnly && (
+            <div className="space-y-2 pl-6 border-l-2 border-muted">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Interruption Frequency (Manual)</Label>
+                <span className="text-xs text-muted-foreground">Interruption frequency</span>
                 <Badge variant="outline" className="text-xs">
-                  {effectiveQuestionCount} pause points
+                  {effectiveQuestionCount} questions
                 </Badge>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-16">Fewer</span>
+                <span className="text-xs text-muted-foreground">Fewer</span>
                 <Slider
                   value={[flowLevel]}
                   onValueChange={([val]) => {
                     setFlowLevel(val);
-                    // Regenerate pause points with new flow level
                     const count = calculateRecommendedPausePoints(estimatedDuration, val);
                     setPausePoints(generateAutoPausePoints(estimatedDuration, count));
                   }}
@@ -453,9 +440,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                   disabled={status !== "idle"}
                   className="flex-1"
                 />
-                <span className="text-xs text-muted-foreground w-16 text-right">More</span>
+                <span className="text-xs text-muted-foreground">More</span>
               </div>
-            </>
+            </div>
           )}
           
           {/* Advanced configuration collapsible */}
