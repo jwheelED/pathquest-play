@@ -7,10 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Zap, Settings2, X } from "lucide-react";
+import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Settings2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -401,26 +400,21 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-        {/* Pause Point Configuration */}
-        <div className="space-y-4">
-          {/* Smart mode toggle - simple and clean */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-500" />
-              <span className="text-sm font-medium">Smart question placement</span>
-            </div>
-            <Switch
-              checked={highYieldOnly}
-              onCheckedChange={setHighYieldOnly}
-              disabled={status !== "idle"}
-            />
-          </div>
+        {/* Optional: Customize timing (hidden by default, smart mode is silent default) */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setHighYieldOnly(!highYieldOnly)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            disabled={status !== "idle"}
+          >
+            {highYieldOnly ? "Customize question timing →" : "← Use automatic timing"}
+          </button>
           
-          {/* Manual controls only when smart mode is off */}
           {!highYieldOnly && (
-            <div className="space-y-2 pl-6 border-l-2 border-muted">
+            <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Interruption frequency</span>
+                <span className="text-xs text-muted-foreground">Question frequency</span>
                 <Badge variant="outline" className="text-xs">
                   {effectiveQuestionCount} questions
                 </Badge>
