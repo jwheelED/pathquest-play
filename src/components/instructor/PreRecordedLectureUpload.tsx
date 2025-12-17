@@ -401,17 +401,6 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-        {/* Calibrate Questions - only show after video is processed */}
-        {status === "ready" && (
-          <QuestionStudioDialog
-            trigger={
-              <Button variant="outline" className="w-full gap-2">
-                <Sparkles className="h-4 w-4" />
-                Calibrate Questions
-              </Button>
-            }
-          />
-        )}
 
         <div className="space-y-2">
           <button
@@ -595,11 +584,26 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         {/* Progress/Status */}
         {status !== "idle" && statusDisplay && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Badge className={statusDisplay.color}>
                 {statusDisplay.icon}
                 <span className="ml-1">{statusDisplay.text}</span>
               </Badge>
+              {/* Calibrate Questions - appears with animation when ready */}
+              {status === "ready" && (
+                <QuestionStudioDialog
+                  trigger={
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1.5 animate-fade-in"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Calibrate Questions
+                    </Button>
+                  }
+                />
+              )}
             </div>
             {status === "uploading" && <Progress value={uploadProgress} className="h-2" />}
             {status === "error" && errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
