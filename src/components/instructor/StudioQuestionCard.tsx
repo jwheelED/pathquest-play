@@ -15,6 +15,7 @@ export interface StudioQuestion {
   correct_answer: string;
   explanation: string;
   status: "pending" | "approved" | "edited" | "regenerating";
+  timestamp?: number; // Video timestamp in seconds for calibration mode
 }
 
 interface StudioQuestionCardProps {

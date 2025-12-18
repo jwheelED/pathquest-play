@@ -590,8 +590,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 <span className="ml-1">{statusDisplay.text}</span>
               </Badge>
               {/* Calibrate Questions - appears with animation when ready */}
-              {status === "ready" && (
+              {status === "ready" && createdLectureId && (
                 <QuestionStudioDialog
+                  lectureId={createdLectureId}
                   trigger={
                     <Button 
                       variant="outline" 

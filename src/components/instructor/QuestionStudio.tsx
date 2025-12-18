@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, FileText, X, Sparkles, Loader2, Send, Plus } from "lucide-react";
+import { Upload, FileText, X, Sparkles, Loader2, Send, Plus, Wand2, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { StudioQuestionCard, StudioQuestion } from "./StudioQuestionCard";
@@ -23,18 +23,94 @@ interface LectureVideo {
   title: string;
 }
 
-export function QuestionStudio() {
+interface TranscriptSegment {
+  text: string;
+  start: number;
+  end?: number;
+}
+
+interface QuestionStudioProps {
+  lectureId?: string;
+}
+
+export function QuestionStudio({ lectureId }: QuestionStudioProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isTransforming, setIsTransforming] = useState(false);
   const [questions, setQuestions] = useState<StudioQuestion[]>([]);
   const [lectures, setLectures] = useState<LectureVideo[]>([]);
   const [selectedLectureId, setSelectedLectureId] = useState<string>("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Lecture context for calibration mode
+  const [lectureTitle, setLectureTitle] = useState<string>("");
+  const [lectureTranscript, setLectureTranscript] = useState<TranscriptSegment[]>([]);
+  const [isLoadingLecture, setIsLoadingLecture] = useState(false);
 
-  // Fetch lectures on mount
-  useState(() => {
+  // Fetch lecture data if lectureId is provided (calibration mode)
+  useEffect(() => {
+    if (!lectureId) return;
+    
+    const fetchLectureData = async () => {
+      setIsLoadingLecture(true);
+      try {
+        // Fetch lecture details and existing pause points
+        const [lectureResult, pausePointsResult] = await Promise.all([
+          supabase
+            .from("lecture_videos")
+            .select("id, title, transcript, duration_seconds")
+            .eq("id", lectureId)
+            .single(),
+          supabase
+            .from("lecture_pause_points")
+            .select("*")
+            .eq("lecture_video_id", lectureId)
+            .order("pause_timestamp", { ascending: true })
+        ]);
+
+        if (lectureResult.error) throw lectureResult.error;
+        
+        const lecture = lectureResult.data;
+        setLectureTitle(lecture.title);
+        
+        // Parse transcript
+        const transcript = Array.isArray(lecture.transcript) 
+          ? (lecture.transcript as unknown as TranscriptSegment[])
+          : [];
+        setLectureTranscript(transcript);
+        
+        // Convert existing pause points to studio questions
+        if (pausePointsResult.data && pausePointsResult.data.length > 0) {
+          const existingQuestions: StudioQuestion[] = pausePointsResult.data.map((pp, idx) => {
+            const content = pp.question_content as any;
+            return {
+              id: pp.id,
+              question_text: content?.question || "",
+              question_type: pp.question_type === "short_answer" ? "short_answer" : "multiple_choice",
+              options: content?.options || [],
+              correct_answer: content?.correctAnswer || "",
+              explanation: content?.explanation || "",
+              status: "pending" as const,
+              timestamp: pp.pause_timestamp,
+            };
+          });
+          setQuestions(existingQuestions);
+        }
+      } catch (err: any) {
+        console.error("Error fetching lecture:", err);
+        toast.error("Failed to load lecture data");
+      } finally {
+        setIsLoadingLecture(false);
+      }
+    };
+    
+    fetchLectureData();
+  }, [lectureId]);
+
+  // Fetch lectures on mount (for assignment dropdown)
+  useEffect(() => {
     const fetchLectures = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -49,7 +125,7 @@ export function QuestionStudio() {
       if (data) setLectures(data);
     };
     fetchLectures();
-  });
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -99,12 +175,10 @@ export function QuestionStudio() {
       
       setUploadedFiles(prev => [...prev, newFile]);
 
-      // Parse the file
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("Not authenticated");
 
-        // Upload to storage first
         const filePath = `studio/${session.user.id}/${fileId}-${file.name}`;
         const { error: uploadError } = await supabase.storage
           .from("lecture-materials")
@@ -112,7 +186,6 @@ export function QuestionStudio() {
 
         if (uploadError) throw uploadError;
 
-        // Parse the content
         const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
           body: { filePath },
         });
@@ -138,6 +211,82 @@ export function QuestionStudio() {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
+  // Get transcript text up to a specific timestamp
+  const getTranscriptUpToTimestamp = (timestamp: number): string => {
+    return lectureTranscript
+      .filter(segment => segment.start <= timestamp)
+      .map(s => s.text)
+      .join(" ");
+  };
+
+  // Transform existing questions with new style (calibration mode)
+  const handleTransform = async () => {
+    if (!prompt.trim()) {
+      toast.error("Please describe how you want to transform the questions");
+      return;
+    }
+
+    if (questions.length === 0) {
+      toast.error("No questions to transform");
+      return;
+    }
+
+    setIsTransforming(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("question_difficulty_preference, professor_type, question_format_preference")
+        .eq("id", session.user.id)
+        .single();
+
+      // Prepare questions with their transcript context
+      const questionsWithContext = questions.map(q => ({
+        ...q,
+        transcriptContext: q.timestamp ? getTranscriptUpToTimestamp(q.timestamp) : "",
+      }));
+
+      const { data, error } = await supabase.functions.invoke("generate-studio-questions", {
+        body: {
+          mode: "transform",
+          prompt: prompt.trim(),
+          existingQuestions: questionsWithContext,
+          lectureTranscript: lectureTranscript.map(s => s.text).join(" "),
+          instructorPreferences: {
+            difficulty: profile?.question_difficulty_preference || "medium",
+            professorType: profile?.professor_type || "stem",
+            questionFormat: profile?.question_format_preference || "multiple_choice",
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.questions) {
+        const transformedQuestions: StudioQuestion[] = data.questions.map((q: any, idx: number) => ({
+          id: questions[idx]?.id || `studio-${Date.now()}-${idx}`,
+          question_text: q.question_text,
+          question_type: q.question_type || "multiple_choice",
+          options: q.options || [],
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || "",
+          status: "pending" as const,
+          timestamp: questions[idx]?.timestamp,
+        }));
+        setQuestions(transformedQuestions);
+        toast.success(`Transformed ${transformedQuestions.length} questions`);
+      }
+    } catch (err: any) {
+      console.error("Transform error:", err);
+      toast.error(err.message || "Failed to transform questions");
+    } finally {
+      setIsTransforming(false);
+    }
+  };
+
+  // Generate new questions (standalone mode)
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error("Please enter instructions for question generation");
@@ -149,7 +298,6 @@ export function QuestionStudio() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
-      // Get instructor preferences
       const { data: profile } = await supabase
         .from("profiles")
         .select("question_difficulty_preference, professor_type, question_format_preference")
@@ -204,15 +352,16 @@ export function QuestionStudio() {
     ));
 
     try {
-      const parsedMaterials = uploadedFiles
-        .filter(f => f.parsedContent)
-        .map(f => ({ filename: f.name, content: f.parsedContent || "" }));
+      const transcriptContext = question.timestamp 
+        ? getTranscriptUpToTimestamp(question.timestamp) 
+        : "";
 
       const { data, error } = await supabase.functions.invoke("generate-studio-questions", {
         body: {
+          mode: lectureId ? "transform" : "generate",
           prompt: `Regenerate this question with similar content but different phrasing: "${question.question_text}"`,
-          parsedMaterials,
-          regenerateQuestion: question,
+          existingQuestions: [{ ...question, transcriptContext }],
+          lectureTranscript: lectureTranscript.map(s => s.text).join(" "),
           count: 1,
         },
       });
@@ -261,7 +410,9 @@ export function QuestionStudio() {
   const approvedQuestions = questions.filter(q => q.status === "approved" || q.status === "edited");
 
   const handleAssignToLecture = async () => {
-    if (!selectedLectureId) {
+    const targetLectureId = lectureId || selectedLectureId;
+    
+    if (!targetLectureId) {
       toast.error("Please select a lecture");
       return;
     }
@@ -272,14 +423,13 @@ export function QuestionStudio() {
     }
 
     try {
-      // Get lecture duration to calculate timestamps
       const { data: lecture } = await supabase
         .from("lecture_videos")
         .select("duration_seconds")
-        .eq("id", selectedLectureId)
+        .eq("id", targetLectureId)
         .single();
 
-      const duration = lecture?.duration_seconds || 600; // Default 10 min
+      const duration = lecture?.duration_seconds || 600;
       const minTimestamp = Math.max(60, duration * 0.1);
       const maxTimestamp = duration - 30;
       const availableRange = maxTimestamp - minTimestamp;
@@ -289,12 +439,12 @@ export function QuestionStudio() {
       await supabase
         .from("lecture_pause_points")
         .delete()
-        .eq("lecture_video_id", selectedLectureId);
+        .eq("lecture_video_id", targetLectureId);
 
       // Insert new pause points
       const pausePoints = approvedQuestions.map((q, idx) => ({
-        lecture_video_id: selectedLectureId,
-        pause_timestamp: Math.floor(minTimestamp + interval * (idx + 1)),
+        lecture_video_id: targetLectureId,
+        pause_timestamp: q.timestamp || Math.floor(minTimestamp + interval * (idx + 1)),
         order_index: idx,
         question_type: q.question_type,
         question_content: {
@@ -303,7 +453,7 @@ export function QuestionStudio() {
           correctAnswer: q.correct_answer,
           explanation: q.explanation,
         },
-        reason: "Studio generated",
+        reason: "Studio calibrated",
       }));
 
       const { error } = await supabase
@@ -312,15 +462,13 @@ export function QuestionStudio() {
 
       if (error) throw error;
 
-      // Update question count on lecture
       await supabase
         .from("lecture_videos")
         .update({ question_count: approvedQuestions.length })
-        .eq("id", selectedLectureId);
+        .eq("id", targetLectureId);
 
       toast.success(`Assigned ${approvedQuestions.length} questions to lecture`);
       
-      // Clear approved questions from the list
       setQuestions(prev => prev.filter(q => q.status !== "approved" && q.status !== "edited"));
       setSelectedLectureId("");
     } catch (err: any) {
@@ -329,6 +477,146 @@ export function QuestionStudio() {
     }
   };
 
+  // Format timestamp for display
+  const formatTimestamp = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Calibration mode UI
+  if (lectureId) {
+    return (
+      <Card className="border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wand2 className="h-5 w-5 text-primary" />
+            Calibrate Questions
+          </CardTitle>
+          <CardDescription>
+            {lectureTitle ? (
+              <span className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                {lectureTitle}
+              </span>
+            ) : (
+              "Transform auto-generated questions to match your teaching style"
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {isLoadingLecture ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading lecture questions...</span>
+            </div>
+          ) : (
+            <>
+              {/* Transform Instructions */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Wand2 className="h-4 w-4" />
+                  How should questions be transformed?
+                </label>
+                <Textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="e.g., Make these USMLE Step 1 style clinical vignettes, or Convert to Socratic questions that test deeper understanding..."
+                  className="min-h-[80px]"
+                />
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span>Examples:</span>
+                  <button
+                    className="hover:text-primary underline"
+                    onClick={() => setPrompt("Transform into USMLE Step 1 style clinical vignettes with patient presentations")}
+                  >
+                    USMLE vignettes
+                  </button>
+                  <span>•</span>
+                  <button
+                    className="hover:text-primary underline"
+                    onClick={() => setPrompt("Make questions more challenging with deeper conceptual reasoning required")}
+                  >
+                    Harder
+                  </button>
+                  <span>•</span>
+                  <button
+                    className="hover:text-primary underline"
+                    onClick={() => setPrompt("Convert to short answer questions that test understanding not just recall")}
+                  >
+                    Short answer
+                  </button>
+                </div>
+                <Button
+                  onClick={handleTransform}
+                  disabled={isTransforming || !prompt.trim() || questions.length === 0}
+                  className="w-full"
+                >
+                  {isTransforming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Transforming...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Transform {questions.length} Questions
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Questions List */}
+              {questions.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">
+                      Questions ({questions.length})
+                    </label>
+                    <Badge variant="outline">
+                      {approvedQuestions.length} approved
+                    </Badge>
+                  </div>
+                  <ScrollArea className="h-[400px] pr-4">
+                    <div className="space-y-3">
+                      {questions.map((question, idx) => (
+                        <div key={question.id} className="relative">
+                          {question.timestamp && (
+                            <Badge variant="secondary" className="absolute -top-2 -left-2 text-xs z-10">
+                              {formatTimestamp(question.timestamp)}
+                            </Badge>
+                          )}
+                          <StudioQuestionCard
+                            question={question}
+                            index={idx + 1}
+                            onApprove={() => handleApprove(question.id)}
+                            onEdit={(updates) => handleEdit(question.id, updates)}
+                            onRegenerate={() => handleRegenerate(question.id)}
+                            onDelete={() => handleDelete(question.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+
+                  {/* Save to Lecture */}
+                  {approvedQuestions.length > 0 && (
+                    <div className="pt-4 border-t">
+                      <Button onClick={handleAssignToLecture} className="w-full">
+                        Save {approvedQuestions.length} Calibrated Questions
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Standalone mode UI (original behavior)
   return (
     <Card className="border-primary/20">
       <CardHeader>
