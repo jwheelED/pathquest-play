@@ -6,9 +6,10 @@ import { QuestionStudio } from "./QuestionStudio";
 
 interface QuestionStudioDialogProps {
   trigger?: React.ReactNode;
+  lectureId?: string;
 }
 
-export const QuestionStudioDialog = ({ trigger }: QuestionStudioDialogProps) => {
+export const QuestionStudioDialog = ({ trigger, lectureId }: QuestionStudioDialogProps) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -25,10 +26,10 @@ export const QuestionStudioDialog = ({ trigger }: QuestionStudioDialogProps) => 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Question Studio
+            {lectureId ? "Calibrate Questions" : "Question Studio"}
           </DialogTitle>
         </DialogHeader>
-        <QuestionStudio />
+        <QuestionStudio lectureId={lectureId} />
       </DialogContent>
     </Dialog>
   );
