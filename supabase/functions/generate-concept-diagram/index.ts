@@ -37,7 +37,7 @@ serve(async (req) => {
 
     const { concept, questionText, transcriptContext } = await req.json();
 
-    // Check daily limit (1 diagram per day)
+    // Check daily limit (5 diagrams per day)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -55,11 +55,14 @@ serve(async (req) => {
       });
     }
 
-    if (todayDiagrams && todayDiagrams.length >= 1) {
+    const usedCount = todayDiagrams?.length || 0;
+    if (usedCount >= 5) {
       return new Response(JSON.stringify({ 
         error: 'Daily limit reached',
         limitReached: true,
-        message: "You've used your daily diagram. Try again tomorrow!"
+        message: "You've used all 5 of your daily diagrams. Try again tomorrow!",
+        used: usedCount,
+        limit: 5
       }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
