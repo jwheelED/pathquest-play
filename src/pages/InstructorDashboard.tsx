@@ -502,7 +502,7 @@ export default function InstructorDashboard() {
           <div className="space-y-4 sm:space-y-6">
             <LectureCheckInResults />
 
-            <AnswerReleaseCard instructorId={currentUser.id} />
+            {currentUser && <AnswerReleaseCard instructorId={currentUser.id} />}
 
             {currentUser && (
               <AcademicIntegrityInsights instructorId={currentUser.id} />
