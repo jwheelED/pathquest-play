@@ -2605,6 +2605,112 @@ export type Database = {
           },
         ]
       }
+      study_plan_daily_tasks: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          content_reference: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          order_index: number
+          plan_id: string
+          scheduled_date: string
+          task_type: string
+          title: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          content_reference?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          plan_id: string
+          scheduled_date: string
+          task_type: string
+          title: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          content_reference?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          plan_id?: string
+          scheduled_date?: string
+          task_type?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_plan_daily_tasks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "study_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_plans: {
+        Row: {
+          concepts_mastered: number | null
+          created_at: string
+          exam_date: string
+          goal_type: string | null
+          id: string
+          material_ids: string[] | null
+          org_id: string | null
+          start_date: string
+          status: string
+          title: string
+          total_concepts: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          concepts_mastered?: number | null
+          created_at?: string
+          exam_date: string
+          goal_type?: string | null
+          id?: string
+          material_ids?: string[] | null
+          org_id?: string | null
+          start_date?: string
+          status?: string
+          title: string
+          total_concepts?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          concepts_mastered?: number | null
+          created_at?: string
+          exam_date?: string
+          goal_type?: string | null
+          id?: string
+          material_ids?: string[] | null
+          org_id?: string | null
+          start_date?: string
+          status?: string
+          title?: string
+          total_concepts?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_achievements: {
         Row: {
           achievement_id: string

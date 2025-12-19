@@ -11,6 +11,7 @@ import { ReadinessMeter } from "@/components/student/ReadinessMeter";
 import { LearningPathFeed } from "@/components/student/LearningPathFeed";
 import { TestOutGate } from "@/components/student/TestOutGate";
 import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
+import { StudyPlanHeader } from "@/components/student/StudyPlanHeader";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { LogOut, Sparkles, Upload, Radio, Plus } from "lucide-react";
@@ -261,6 +262,9 @@ export default function Dashboard() {
         {/* Headless achievement checker */}
         {user?.id && <AchievementSystem userId={user.id} />}
 
+        {/* Today's Date & Study Plan Progress */}
+        <StudyPlanHeader userId={user.id} />
+
         {/* Hero Section - Readiness Meter */}
         <section className="mb-8 md:mb-12 animate-fade-in">
           <div className="bg-card rounded-3xl p-6 md:p-10 border border-border/50 shadow-lg">
@@ -279,7 +283,7 @@ export default function Dashboard() {
         {/* Unified Learning Stream */}
         <section className="animate-fade-in stagger-2">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4 px-2">
-            Your Learning Path
+            Today's Tasks
           </h2>
           <LearningPathFeed
             userId={user.id}
