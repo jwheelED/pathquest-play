@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import MarketingLanding from "./pages/MarketingLanding";
-import StudentTraining from "./pages/StudentTraining";
+import Dashboard from "./pages/Dashboard";
 import ClassDashboard from "./pages/ClassDashboard";
 import Auth from "./pages/Auth";
 import Onboarding from "./pages/Onboarding";
@@ -46,7 +46,7 @@ const App = () => (
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="student" redirectTo="/auth">
-              <StudentTraining />
+              <Dashboard />
             </ProtectedRoute>
           } />
           <Route path="/class/:instructorId" element={
