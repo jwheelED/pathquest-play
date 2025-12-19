@@ -37,7 +37,15 @@ export function PracticeQuestionCard({
   const [showExplanation, setShowExplanation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const options = question.options || [];
+  // Normalize options - handle both string[] and { label, text }[] formats
+  const rawOptions = question.options || [];
+  const options = rawOptions.map((opt, index) => {
+    if (typeof opt === 'string') {
+      const label = String.fromCharCode(65 + index); // A, B, C, D...
+      return { label, text: opt };
+    }
+    return opt as { label: string; text: string };
+  });
   const isMultipleChoice = question.question_type === 'multiple_choice' && options.length > 0;
 
   const handleSubmit = async () => {
@@ -46,8 +54,14 @@ export function PracticeQuestionCard({
     setSubmitting(true);
     
     try {
-      // Check if correct
-      const correct = selectedAnswer === question.correct_answer;
+      // Find the correct answer - compare against both label and text
+      const correctOption = options.find(
+        opt => opt.label === question.correct_answer || opt.text === question.correct_answer
+      );
+      const selectedOption = options.find(opt => opt.label === selectedAnswer);
+      const correct = selectedOption?.text === question.correct_answer || 
+                      selectedAnswer === question.correct_answer ||
+                      (correctOption && selectedAnswer === correctOption.label);
       setIsCorrect(correct);
       setIsSubmitted(true);
 
@@ -119,7 +133,7 @@ export function PracticeQuestionCard({
           <div className="space-y-3">
             {options.map((option) => {
               const isSelected = selectedAnswer === option.label;
-              const isCorrectAnswer = option.label === question.correct_answer;
+              const isCorrectAnswer = option.text === question.correct_answer || option.label === question.correct_answer;
               
               let optionClass = 'border-border hover:border-primary/50 hover:bg-accent/50';
               if (isSubmitted) {
