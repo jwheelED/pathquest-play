@@ -470,3 +470,93 @@
 .stagger-4 { animation-delay: 0.2s; }
 .stagger-5 { animation-delay: 0.25s; }
 .stagger-6 { animation-delay: 0.3s; }
+
+/* ============================================
+   MASTERY PATH - GPS Learning Interface
+   ============================================ */
+
+/* Path Timeline Container */
+.path-timeline {
+  @apply relative pl-6 md:pl-8;
+}
+
+.path-timeline::before {
+  content: '';
+  @apply absolute left-2 md:left-3 top-6 bottom-6 w-0.5 bg-border;
+  background: linear-gradient(to bottom, hsl(var(--border)), hsl(var(--border) / 0.3));
+}
+
+/* Path Card */
+.path-card {
+  @apply relative p-4 rounded-2xl bg-card border border-border/50 transition-all duration-200;
+  box-shadow: 0 2px 8px -2px hsl(220 25% 15% / 0.06);
+}
+
+.path-card:hover {
+  @apply border-border;
+  box-shadow: 0 4px 16px -4px hsl(220 25% 15% / 0.1);
+  transform: translateX(4px);
+}
+
+/* Path Timeline Dot */
+.path-dot {
+  @apply absolute -left-6 md:-left-8 top-5 w-4 h-4 rounded-full border-2 bg-background;
+  margin-left: 2px;
+}
+
+/* Card Type Accents */
+.path-card-prime {
+  @apply border-l-4 border-l-violet-500;
+}
+
+.path-card-core {
+  @apply border-l-4 border-l-amber-500;
+}
+
+.path-card-review {
+  @apply border-l-4 border-l-rose-500;
+}
+
+/* Dark mode path styles */
+.dark .path-timeline::before {
+  background: linear-gradient(to bottom, hsl(var(--border)), hsl(var(--border) / 0.2));
+}
+
+.dark .path-card {
+  box-shadow: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
+}
+
+.dark .path-card:hover {
+  box-shadow: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
+}
+
+/* Pulsing Action Button */
+@keyframes pulse-scale {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 4px 20px -4px hsl(var(--primary) / 0.4);
+  }
+  50% { 
+    transform: scale(1.03);
+    box-shadow: 0 8px 30px -4px hsl(var(--primary) / 0.5);
+  }
+}
+
+.pulse-action {
+  animation: pulse-scale 2.5s ease-in-out infinite;
+}
+
+.pulse-action:hover {
+  animation: none;
+  transform: scale(1.05);
+}
+
+/* Mastery Background - Dark optimized */
+.mastery-bg {
+  @apply min-h-screen;
+  background: linear-gradient(180deg, hsl(199 85% 82%), hsl(199 80% 90%));
+}
+
+.dark .mastery-bg {
+  background: linear-gradient(180deg, hsl(220 30% 6%), hsl(220 28% 10%));
+}
