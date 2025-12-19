@@ -134,3 +134,6 @@ verify_jwt = true
 
 [functions.generate-studio-questions]
 verify_jwt = true
+
+[functions.generate-study-plan]
+verify_jwt = true

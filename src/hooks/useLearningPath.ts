@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export type PathItemType = 'prime' | 'core' | 'review';
-export type PathItemActionType = 'navigate' | 'practice' | 'upload' | 'challenge';
+export type PathItemType = 'prime' | 'core' | 'review' | 'study-plan';
+export type PathItemActionType = 'navigate' | 'practice' | 'upload' | 'challenge' | 'study-task';
 
 export interface PathItem {
   id: string;
@@ -16,6 +16,8 @@ export interface PathItem {
   priority: number;
   action: () => void;
   data?: any;
+  taskType?: string;
+  completed?: boolean;
 }
 
 interface LearningPathData {
@@ -23,7 +25,8 @@ interface LearningPathData {
   nextItem: PathItem | null;
   loading: boolean;
   hasContent: boolean;
-  hasRealContent: boolean; // True only for real student content (not daily challenges)
+  hasRealContent: boolean;
+  hasStudyPlan: boolean;
 }
 
 export function useLearningPath(
@@ -39,6 +42,7 @@ export function useLearningPath(
     loading: true,
     hasContent: false,
     hasRealContent: false,
+    hasStudyPlan: false,
   });
 
   const fetchLearningPath = useCallback(async () => {
@@ -47,9 +51,61 @@ export function useLearningPath(
     try {
       const items: PathItem[] = [];
       let hasAnyContent = false;
-      let hasRealStudentContent = false; // Track real content separately
+      let hasRealStudentContent = false;
+      let hasStudyPlan = false;
+      const today = new Date().toISOString().split('T')[0];
 
-      // 1. Fetch incomplete instructor assignments (CORE - highest priority) - REAL CONTENT
+      // 0. Fetch TODAY's study plan tasks (HIGHEST PRIORITY) - REAL CONTENT
+      const { data: activePlans } = await supabase
+        .from('study_plans')
+        .select('id, title, exam_date')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .limit(1);
+
+      if (activePlans && activePlans.length > 0) {
+        hasStudyPlan = true;
+        const planId = activePlans[0].id;
+        const planTitle = activePlans[0].title;
+
+        const { data: todayTasks } = await supabase
+          .from('study_plan_daily_tasks')
+          .select('*')
+          .eq('plan_id', planId)
+          .eq('scheduled_date', today)
+          .order('order_index', { ascending: true });
+
+        if (todayTasks && todayTasks.length > 0) {
+          hasAnyContent = true;
+          hasRealStudentContent = true;
+
+          todayTasks.forEach((task, idx) => {
+            const priorityBase = task.completed ? 50 : 150; // Incomplete tasks are highest priority
+            items.push({
+              id: `study-task-${task.id}`,
+              type: 'study-plan',
+              actionType: 'study-task',
+              taskType: task.task_type,
+              title: task.title,
+              description: task.description || `${task.task_type} task for today`,
+              sourceContext: `Study Plan: ${planTitle}`,
+              priority: priorityBase - idx,
+              completed: task.completed,
+              action: () => {
+                // Mark task complete and navigate based on type
+                if (task.task_type === 'practice' || task.task_type === 'quiz') {
+                  onNavigate?.('/training', { studyTaskId: task.id });
+                } else {
+                  onNavigate?.('/training', { studyTaskId: task.id });
+                }
+              },
+              data: task,
+            });
+          });
+        }
+      }
+
+      // 1. Fetch incomplete instructor assignments (CORE - high priority) - REAL CONTENT
       const { data: assignments } = await supabase
         .from('student_assignments')
         .select('*')
@@ -245,7 +301,6 @@ export function useLearningPath(
       }
 
       // 7. Add daily challenges if not completed (PRIME) - NOT REAL CONTENT
-      const today = new Date().toISOString().split('T')[0];
       const { data: challenges } = await supabase
         .from('daily_challenges')
         .select('*')
@@ -279,10 +334,11 @@ export function useLearningPath(
         loading: false,
         hasContent: hasAnyContent,
         hasRealContent: hasRealStudentContent,
+        hasStudyPlan,
       });
     } catch (error) {
       console.error('Error fetching learning path:', error);
-      setData(prev => ({ ...prev, loading: false, hasContent: false, hasRealContent: false }));
+      setData(prev => ({ ...prev, loading: false, hasContent: false, hasRealContent: false, hasStudyPlan: false }));
     }
   }, [userId, classId, onNavigate, onPractice, onUpload]);
 
