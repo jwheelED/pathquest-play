@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { TestOutGate } from "@/components/student/TestOutGate";
 import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { LogOut, Sparkles, Upload, Radio } from "lucide-react";
+import { LogOut, Sparkles, Upload, Radio, Plus } from "lucide-react";
 
 interface User {
   id: string;
@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("");
   const [userStats, setUserStats] = useState({ level: 1, streak: 0 });
   const [className, setClassName] = useState<string>("");
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -187,6 +188,7 @@ export default function Dashboard() {
         userEmail={user.email || ""}
         role="student"
         onLogout={handleLogout}
+        userId={user.id}
         stats={userStats}
       />
 
@@ -282,10 +284,25 @@ export default function Dashboard() {
           <LearningPathFeed
             userId={user.id}
             onNavigate={handleNavigate}
-            onUpload={() => {}}
+            onUpload={() => setUploadSheetOpen(true)}
           />
         </section>
       </main>
+
+      {/* Mobile Floating Action Button for Upload */}
+      <div className="md:hidden fixed bottom-24 right-4 z-50">
+        <QuickUploadSheet
+          userId={user.id}
+          trigger={
+            <Button
+              size="lg"
+              className="rounded-full w-14 h-14 shadow-xl bg-primary hover:bg-primary/90"
+            >
+              <Plus className="w-6 h-6" />
+            </Button>
+          }
+        />
+      </div>
 
       {/* Connection Debug Panel */}
       {user?.id && <ConnectionDebugPanel userId={user.id} />}

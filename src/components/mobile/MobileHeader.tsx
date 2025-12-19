@@ -16,6 +16,7 @@ interface MobileHeaderProps {
   userEmail: string;
   role: "student" | "instructor" | "admin";
   onLogout: () => void;
+  userId?: string;
   stats?: {
     level?: number;
     streak?: number;
@@ -28,6 +29,7 @@ export function MobileHeader({
   userEmail,
   role,
   onLogout,
+  userId,
   stats,
 }: MobileHeaderProps) {
   const initials = userName
