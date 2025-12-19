@@ -14,7 +14,14 @@ interface PathActionCardProps {
   isFirst?: boolean;
 }
 
-const typeConfig = {
+const typeConfig: Record<string, {
+  label: string;
+  icon: typeof Sparkles;
+  accentClass: string;
+  badgeVariant: 'default';
+  badgeClass: string;
+  dotClass: string;
+}> = {
   prime: {
     label: 'Prep for Tomorrow',
     icon: Sparkles,
@@ -38,6 +45,14 @@ const typeConfig = {
     badgeVariant: 'default' as const,
     badgeClass: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
     dotClass: 'bg-rose-500 border-rose-400',
+  },
+  'study-plan': {
+    label: 'Study Plan',
+    icon: BookOpen,
+    accentClass: 'path-card-core',
+    badgeVariant: 'default' as const,
+    badgeClass: 'bg-primary/20 text-primary border-primary/30',
+    dotClass: 'bg-primary border-primary/80',
   },
 };
 
