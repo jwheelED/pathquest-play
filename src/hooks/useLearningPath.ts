@@ -23,6 +23,7 @@ interface LearningPathData {
   nextItem: PathItem | null;
   loading: boolean;
   hasContent: boolean;
+  hasRealContent: boolean; // True only for real student content (not daily challenges)
 }
 
 export function useLearningPath(
@@ -37,6 +38,7 @@ export function useLearningPath(
     nextItem: null,
     loading: true,
     hasContent: false,
+    hasRealContent: false,
   });
 
   const fetchLearningPath = useCallback(async () => {
@@ -45,8 +47,9 @@ export function useLearningPath(
     try {
       const items: PathItem[] = [];
       let hasAnyContent = false;
+      let hasRealStudentContent = false; // Track real content separately
 
-      // 1. Fetch incomplete instructor assignments (CORE - highest priority)
+      // 1. Fetch incomplete instructor assignments (CORE - highest priority) - REAL CONTENT
       const { data: assignments } = await supabase
         .from('student_assignments')
         .select('*')
@@ -57,6 +60,7 @@ export function useLearningPath(
 
       if (assignments && assignments.length > 0) {
         hasAnyContent = true;
+        hasRealStudentContent = true;
         assignments.forEach((assignment, idx) => {
           items.push({
             id: `assignment-${assignment.id}`,
@@ -72,7 +76,7 @@ export function useLearningPath(
         });
       }
 
-      // 2. Fetch unpracticed personalized questions (CORE)
+      // 2. Fetch unpracticed personalized questions (CORE) - REAL CONTENT
       const { data: unpracticedQuestions } = await supabase
         .from('personalized_questions')
         .select('*, student_study_materials(title)')
@@ -83,6 +87,7 @@ export function useLearningPath(
 
       if (unpracticedQuestions && unpracticedQuestions.length > 0) {
         hasAnyContent = true;
+        hasRealStudentContent = true;
         // Group questions by material
         const questionsByMaterial = unpracticedQuestions.reduce((acc: any, q) => {
           const materialTitle = (q.student_study_materials as any)?.title || 'General';
@@ -110,7 +115,7 @@ export function useLearningPath(
         });
       }
 
-      // 3. Fetch questions that need review (REVIEW - got wrong before)
+      // 3. Fetch questions that need review (REVIEW - got wrong before) - REAL CONTENT
       const { data: reviewQuestions } = await supabase
         .from('personalized_questions')
         .select('*, student_study_materials(title)')
@@ -122,6 +127,7 @@ export function useLearningPath(
 
       if (reviewQuestions && reviewQuestions.length > 0) {
         hasAnyContent = true;
+        hasRealStudentContent = true;
         reviewQuestions.forEach((q, idx) => {
           const materialTitle = (q.student_study_materials as any)?.title;
           items.push({
@@ -138,7 +144,7 @@ export function useLearningPath(
         });
       }
 
-      // 4. Fetch remediation/weakness data (REVIEW)
+      // 4. Fetch remediation/weakness data (REVIEW) - REAL CONTENT
       const { data: remediationData } = await supabase
         .from('remediation_history')
         .select(`
@@ -156,6 +162,7 @@ export function useLearningPath(
 
       if (remediationData && remediationData.length > 0) {
         hasAnyContent = true;
+        hasRealStudentContent = true;
         remediationData.forEach((item, idx) => {
           const lectureTitle = (item.lecture_videos as any)?.title || 'Lecture';
           items.push({
@@ -172,7 +179,7 @@ export function useLearningPath(
         });
       }
 
-      // 5. Fetch upcoming lecture prep (PRIME)
+      // 5. Fetch upcoming lecture prep (PRIME) - REAL CONTENT
       const { data: instructorConnection } = await supabase
         .from('instructor_students')
         .select('instructor_id')
@@ -180,7 +187,6 @@ export function useLearningPath(
         .maybeSingle();
 
       if (instructorConnection?.instructor_id) {
-        // Note: Don't set hasAnyContent here - only if we find actual lecture videos
         const { data: lectureVideos } = await supabase
           .from('lecture_videos')
           .select('id, title, duration_seconds')
@@ -190,6 +196,7 @@ export function useLearningPath(
 
         if (lectureVideos && lectureVideos.length > 0) {
           hasAnyContent = true;
+          hasRealStudentContent = true;
           lectureVideos.forEach((video, idx) => {
             const duration = video.duration_seconds 
               ? `${Math.round(video.duration_seconds / 60)} min` 
@@ -209,7 +216,7 @@ export function useLearningPath(
         }
       }
 
-      // 6. Fetch student study materials needing more questions (PRIME)
+      // 6. Fetch student study materials needing more questions (PRIME) - REAL CONTENT
       const { data: studyMaterials } = await supabase
         .from('student_study_materials')
         .select('id, title, material_type, questions_generated')
@@ -220,6 +227,7 @@ export function useLearningPath(
 
       if (studyMaterials && studyMaterials.length > 0) {
         hasAnyContent = true;
+        hasRealStudentContent = true;
         studyMaterials.forEach((material, idx) => {
           const questionsLeft = 5 - (material.questions_generated || 0);
           items.push({
@@ -236,7 +244,7 @@ export function useLearningPath(
         });
       }
 
-      // 7. Add daily challenges if not completed (PRIME)
+      // 7. Add daily challenges if not completed (PRIME) - NOT REAL CONTENT
       const today = new Date().toISOString().split('T')[0];
       const { data: challenges } = await supabase
         .from('daily_challenges')
@@ -248,6 +256,7 @@ export function useLearningPath(
 
       if (challenges && challenges.length > 0) {
         hasAnyContent = true;
+        // Note: Daily challenges do NOT set hasRealStudentContent
         items.push({
           id: 'daily-challenge',
           type: 'prime',
@@ -269,10 +278,11 @@ export function useLearningPath(
         nextItem: items[0] || null,
         loading: false,
         hasContent: hasAnyContent,
+        hasRealContent: hasRealStudentContent,
       });
     } catch (error) {
       console.error('Error fetching learning path:', error);
-      setData(prev => ({ ...prev, loading: false, hasContent: false }));
+      setData(prev => ({ ...prev, loading: false, hasContent: false, hasRealContent: false }));
     }
   }, [userId, classId, onNavigate, onPractice, onUpload]);
 

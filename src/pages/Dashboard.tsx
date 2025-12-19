@@ -289,8 +289,8 @@ export default function Dashboard() {
         </section>
       </main>
 
-      {/* Mobile Floating Action Button for Upload */}
-      <div className="md:hidden fixed bottom-24 right-4 z-50">
+      {/* Floating Action Button for Upload - visible on all screens */}
+      <div className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8">
         <QuickUploadSheet
           userId={user.id}
           trigger={
