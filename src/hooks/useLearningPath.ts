@@ -180,7 +180,7 @@ export function useLearningPath(
         .maybeSingle();
 
       if (instructorConnection?.instructor_id) {
-        hasAnyContent = true;
+        // Note: Don't set hasAnyContent here - only if we find actual lecture videos
         const { data: lectureVideos } = await supabase
           .from('lecture_videos')
           .select('id, title, duration_seconds')
@@ -188,7 +188,8 @@ export function useLearningPath(
           .eq('published', true)
           .limit(2);
 
-        if (lectureVideos) {
+        if (lectureVideos && lectureVideos.length > 0) {
+          hasAnyContent = true;
           lectureVideos.forEach((video, idx) => {
             const duration = video.duration_seconds 
               ? `${Math.round(video.duration_seconds / 60)} min` 
