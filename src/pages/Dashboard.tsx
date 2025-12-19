@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/mobile/BottomNav";
 import { ReadinessMeter } from "@/components/student/ReadinessMeter";
 import { LearningPathFeed } from "@/components/student/LearningPathFeed";
 import { TestOutGate } from "@/components/student/TestOutGate";
+import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { LogOut, Sparkles, Upload, Radio } from "lucide-react";
@@ -217,16 +218,20 @@ export default function Dashboard() {
                 Join Live
               </Button>
 
-              {/* Upload - Secondary Icon */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/training")}
-                className="rounded-full w-8 h-8"
-                title="Upload Materials"
-              >
-                <Upload className="w-4 h-4" />
-              </Button>
+              {/* Upload - Quick Upload Sheet */}
+              <QuickUploadSheet
+                userId={user.id}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full w-8 h-8"
+                    title="Upload Materials"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                }
+              />
 
               {user?.id && <BadgesButton userId={user.id} />}
               
@@ -277,6 +282,7 @@ export default function Dashboard() {
           <LearningPathFeed
             userId={user.id}
             onNavigate={handleNavigate}
+            onUpload={() => {}}
           />
         </section>
       </main>

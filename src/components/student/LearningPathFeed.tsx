@@ -1,15 +1,36 @@
+import { useState, useCallback } from 'react';
 import { useLearningPath } from '@/hooks/useLearningPath';
 import { PathActionCard } from './PathActionCard';
+import { PathEmptyState } from './PathEmptyState';
+import { PracticeQuestionCard } from './PracticeQuestionCard';
 import { Loader2 } from 'lucide-react';
 
 interface LearningPathFeedProps {
   userId: string;
   classId?: string;
   onNavigate: (path: string, state?: any) => void;
+  onUpload: () => void;
 }
 
-export function LearningPathFeed({ userId, classId, onNavigate }: LearningPathFeedProps) {
-  const { items, loading } = useLearningPath(userId, classId, onNavigate);
+export function LearningPathFeed({ userId, classId, onNavigate, onUpload }: LearningPathFeedProps) {
+  const [practiceQuestion, setPracticeQuestion] = useState<any>(null);
+
+  const handlePractice = useCallback((question: any) => {
+    setPracticeQuestion(question);
+  }, []);
+
+  const { items, loading, hasContent } = useLearningPath(
+    userId, 
+    classId, 
+    onNavigate,
+    handlePractice,
+    onUpload
+  );
+
+  const handleQuestionComplete = (correct: boolean) => {
+    setPracticeQuestion(null);
+    // Could refresh the feed here if needed
+  };
 
   if (loading) {
     return (
@@ -21,6 +42,33 @@ export function LearningPathFeed({ userId, classId, onNavigate }: LearningPathFe
     );
   }
 
+  // Show practice question card if active
+  if (practiceQuestion) {
+    return (
+      <div className="path-timeline">
+        <PracticeQuestionCard
+          question={practiceQuestion}
+          onComplete={handleQuestionComplete}
+          onSkip={() => setPracticeQuestion(null)}
+          onClose={() => setPracticeQuestion(null)}
+        />
+      </div>
+    );
+  }
+
+  // Show empty state if no content at all
+  if (!hasContent && items.length === 0) {
+    return (
+      <div className="path-timeline">
+        <PathEmptyState
+          onUpload={onUpload}
+          onJoinClass={() => onNavigate('/onboarding')}
+        />
+      </div>
+    );
+  }
+
+  // Show caught up message if has content but no pending items
   if (items.length === 0) {
     return (
       <div className="path-timeline">
