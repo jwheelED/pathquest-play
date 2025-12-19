@@ -19,7 +19,7 @@ export function LearningPathFeed({ userId, classId, onNavigate, onUpload }: Lear
     setPracticeQuestion(question);
   }, []);
 
-  const { items, loading, hasContent } = useLearningPath(
+  const { items, loading, hasRealContent } = useLearningPath(
     userId, 
     classId, 
     onNavigate,
@@ -56,8 +56,9 @@ export function LearningPathFeed({ userId, classId, onNavigate, onUpload }: Lear
     );
   }
 
-  // Show empty state if no content at all
-  if (!hasContent && items.length === 0) {
+  // Show empty state if no REAL content (student materials, assignments, etc.)
+  // Daily challenges alone don't count as real content
+  if (!hasRealContent) {
     return (
       <div className="path-timeline">
         <PathEmptyState
@@ -68,7 +69,7 @@ export function LearningPathFeed({ userId, classId, onNavigate, onUpload }: Lear
     );
   }
 
-  // Show caught up message if has content but no pending items
+  // Show caught up message if has real content but no pending items
   if (items.length === 0) {
     return (
       <div className="path-timeline">
