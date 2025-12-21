@@ -25,6 +25,7 @@ import LecturePresenterView from "./pages/LecturePresenterView";
 import SlidePresenter from "./pages/SlidePresenter";
 import InteractiveLecture from "./pages/InteractiveLecture";
 import InstructorLecturePreview from "./pages/InstructorLecturePreview";
+import StudentTraining from "./pages/StudentTraining";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -111,6 +112,11 @@ const App = () => (
           <Route path="/lecture/:lectureId" element={
             <ProtectedRoute requiredRole="student" redirectTo="/auth">
               <InteractiveLecture />
+            </ProtectedRoute>
+          } />
+          <Route path="/training" element={
+            <ProtectedRoute requiredRole="student" redirectTo="/auth">
+              <StudentTraining />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
