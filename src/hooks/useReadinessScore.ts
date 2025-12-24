@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface StudyPlanContext {
+  title: string;
+  examDate: string;
+  daysUntilExam: number;
+}
+
 interface ReadinessData {
   readiness: number;
   conceptMastery: number;
   assignmentsProgress: number;
   challengesProgress: number;
   loading: boolean;
+  studyPlan: StudyPlanContext | null;
 }
 
 export function useReadinessScore(userId: string, classId?: string): ReadinessData {
@@ -16,6 +23,7 @@ export function useReadinessScore(userId: string, classId?: string): ReadinessDa
     assignmentsProgress: 0,
     challengesProgress: 0,
     loading: true,
+    studyPlan: null,
   });
 
   useEffect(() => {
@@ -23,7 +31,31 @@ export function useReadinessScore(userId: string, classId?: string): ReadinessDa
 
     const calculateReadiness = async () => {
       try {
-        // 1. Fetch concept mastery scores
+        // 1. Fetch active study plan
+        const { data: studyPlanData } = await supabase
+          .from('study_plans')
+          .select('title, exam_date, concepts_mastered, total_concepts')
+          .eq('user_id', userId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        let studyPlanContext: StudyPlanContext | null = null;
+        if (studyPlanData?.exam_date) {
+          const examDate = new Date(studyPlanData.exam_date);
+          const today = new Date();
+          const diffTime = examDate.getTime() - today.getTime();
+          const daysUntilExam = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          studyPlanContext = {
+            title: studyPlanData.title || 'Your Exam',
+            examDate: studyPlanData.exam_date,
+            daysUntilExam: Math.max(0, daysUntilExam),
+          };
+        }
+
+        // 2. Fetch concept mastery scores
         const { data: masteryData } = await supabase
           .from('student_concept_mastery')
           .select('strength_score')
@@ -33,7 +65,7 @@ export function useReadinessScore(userId: string, classId?: string): ReadinessDa
           ? masteryData.reduce((sum, m) => sum + (m.strength_score || 0), 0) / masteryData.length 
           : 0;
 
-        // 2. Fetch pending assignments
+        // 3. Fetch pending assignments
         const { data: assignments } = await supabase
           .from('student_assignments')
           .select('completed')
@@ -44,7 +76,7 @@ export function useReadinessScore(userId: string, classId?: string): ReadinessDa
         const totalAssignments = assignments?.length || 1;
         const assignmentRate = (completedAssignments / totalAssignments) * 100;
 
-        // 3. Fetch daily challenges completion
+        // 4. Fetch daily challenges completion
         const today = new Date().toISOString().split('T')[0];
         const { data: challenges } = await supabase
           .from('daily_challenges')
@@ -70,6 +102,7 @@ export function useReadinessScore(userId: string, classId?: string): ReadinessDa
           assignmentsProgress: Math.round(assignmentRate),
           challengesProgress: Math.round(challengeRate),
           loading: false,
+          studyPlan: studyPlanContext,
         });
       } catch (error) {
         console.error('Error calculating readiness:', error);
