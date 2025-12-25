@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Mic, Brain, BarChart3, ArrowRight, ChevronRight } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
+import mockupInstructor from "@/assets/mockup-instructor-dashboard.png";
+import mockupStudent from "@/assets/mockup-student-view.png";
+import mockupFlow from "@/assets/mockup-live-flow.png";
 
 const Index = () => {
   const [session, setSession] = useState(null);
@@ -159,6 +162,67 @@ const Index = () => {
               <p className="text-muted-foreground text-sm">
                 Know exactly who understood and who's struggling before they fall behind
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Product Showcase */}
+      <section className="py-16 px-4">
+        <div className="container mx-auto max-w-6xl">
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-foreground">See It In Action</h2>
+          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
+            From your lecture to student comprehension insights in seconds
+          </p>
+          
+          {/* Live Flow Diagram */}
+          <div className="mb-16">
+            <div className="rounded-xl overflow-hidden shadow-xl border border-border">
+              <img 
+                src={mockupFlow} 
+                alt="How Edvana works - Instructor speaks, AI processes, students receive questions" 
+                className="w-full h-auto"
+              />
+            </div>
+            <p className="text-center text-sm text-muted-foreground mt-4">
+              Your lecture is transcribed → AI generates check-in questions → Students answer on their devices
+            </p>
+          </div>
+
+          {/* Dashboard Previews */}
+          <div className="grid md:grid-cols-2 gap-8 items-start">
+            {/* Instructor Dashboard */}
+            <div className="space-y-4">
+              <div className="rounded-xl overflow-hidden shadow-xl border border-border">
+                <img 
+                  src={mockupInstructor} 
+                  alt="Instructor dashboard showing real-time student engagement" 
+                  className="w-full h-auto"
+                />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-foreground">Instructor Dashboard</h3>
+                <p className="text-sm text-muted-foreground">
+                  Live response tracking, engagement metrics, and AI-generated questions
+                </p>
+              </div>
+            </div>
+
+            {/* Student View */}
+            <div className="space-y-4 flex flex-col items-center">
+              <div className="rounded-xl overflow-hidden shadow-xl border border-border max-w-[280px]">
+                <img 
+                  src={mockupStudent} 
+                  alt="Student mobile view with check-in question" 
+                  className="w-full h-auto"
+                />
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-foreground">Student View</h3>
+                <p className="text-sm text-muted-foreground">
+                  Quick check-ins arrive right on their phone or laptop
+                </p>
+              </div>
             </div>
           </div>
         </div>
