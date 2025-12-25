@@ -21,24 +21,24 @@ const Index = () => {
           .eq("user_id", session.user.id)
           .eq("role", "admin")
           .maybeSingle();
-        
+
         if (adminRole) {
           navigate("/admin/dashboard");
           return;
         }
-        
+
         const { data: instructorRole } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", session.user.id)
           .eq("role", "instructor")
           .maybeSingle();
-        
+
         if (instructorRole) {
           navigate("/instructor/dashboard");
           return;
         }
-        
+
         navigate("/dashboard");
       }
     };
@@ -48,16 +48,16 @@ const Index = () => {
       checkSessionAndRedirect(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        if (session) {
-          setTimeout(() => {
-            checkSessionAndRedirect(session);
-          }, 0);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (session) {
+        setTimeout(() => {
+          checkSessionAndRedirect(session);
+        }, 0);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, [navigate, stayOnPage]);
@@ -69,21 +69,13 @@ const Index = () => {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <img src={edvanaLogo} alt="Edvana" className="h-8" />
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate("/join")}
-            >
+            <Button variant="ghost" size="sm" onClick={() => navigate("/join")}>
               Join Session
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate("/auth")}
-            >
+            <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
               Login
             </Button>
-            <button 
+            <button
               onClick={() => navigate("/admin/auth")}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -97,29 +89,27 @@ const Index = () => {
       <section className="py-16 md:py-24 px-4">
         <div className="container mx-auto max-w-4xl text-center space-y-6">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
-            Know Who's Following Along —{" "}
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
-              In Real Time
-            </span>
+            Know Who's Following Along{" "}
+            <span className="bg-gradient-primary bg-clip-text text-transparent">In Real Time</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            AI listens to your lecture and sends check-in questions to students automatically. 
-            See who understood and who needs help — instantly.
+            AI listens to your lecture and sends check-in questions to students automatically. See who understood and
+            who needs help — instantly.
           </p>
-          
+
           {/* Primary CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               onClick={() => navigate("/instructor/auth")}
               className="w-full sm:w-auto min-w-[200px] gap-2"
             >
               I'm an Instructor
               <ArrowRight className="w-4 h-4" />
             </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
+            <Button
+              size="lg"
+              variant="outline"
               onClick={() => navigate("/auth")}
               className="w-full sm:w-auto min-w-[200px] gap-2"
             >
@@ -133,9 +123,7 @@ const Index = () => {
       {/* How It Works */}
       <section className="py-16 px-4 bg-muted/30">
         <div className="container mx-auto max-w-5xl">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12 text-foreground">
-            How It Works
-          </h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12 text-foreground">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {/* Step 1 */}
             <div className="text-center space-y-4">
@@ -181,27 +169,21 @@ const Index = () => {
         <div className="container mx-auto max-w-5xl">
           <div className="grid md:grid-cols-3 gap-6">
             <Card className="p-6 border-primary/20 hover:border-primary/40 transition-colors">
-              <h3 className="font-semibold text-foreground mb-2">
-                Never wonder if students are following along
-              </h3>
+              <h3 className="font-semibold text-foreground mb-2">Never wonder if students are following along</h3>
               <p className="text-sm text-muted-foreground">
                 Get real-time insight into comprehension without interrupting your flow
               </p>
             </Card>
 
             <Card className="p-6 border-primary/20 hover:border-primary/40 transition-colors">
-              <h3 className="font-semibold text-foreground mb-2">
-                Questions based on what you just said
-              </h3>
+              <h3 className="font-semibold text-foreground mb-2">Questions based on what you just said</h3>
               <p className="text-sm text-muted-foreground">
                 AI generates relevant check-ins from your actual lecture content
               </p>
             </Card>
 
             <Card className="p-6 border-primary/20 hover:border-primary/40 transition-colors">
-              <h3 className="font-semibold text-foreground mb-2">
-                Know who needs help before it's too late
-              </h3>
+              <h3 className="font-semibold text-foreground mb-2">Know who needs help before it's too late</h3>
               <p className="text-sm text-muted-foreground">
                 Identify struggling students and intervene while there's still time
               </p>
@@ -234,12 +216,10 @@ const Index = () => {
       {/* Final CTA */}
       <section className="py-16 px-4">
         <div className="container mx-auto max-w-2xl text-center space-y-6">
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-            Ready to transform your classroom?
-          </h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground">Ready to transform your classroom?</h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               onClick={() => navigate("/instructor/auth")}
               className="w-full sm:w-auto min-w-[200px] gap-2"
             >
@@ -254,10 +234,7 @@ const Index = () => {
       <footer className="py-6 px-4 border-t border-border">
         <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <p>&copy; 2025 Edvana. All rights reserved.</p>
-          <button 
-            onClick={() => navigate("/admin/auth")}
-            className="hover:text-foreground transition-colors"
-          >
+          <button onClick={() => navigate("/admin/auth")} className="hover:text-foreground transition-colors">
             Admin Portal
           </button>
         </div>
