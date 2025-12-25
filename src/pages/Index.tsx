@@ -1,10 +1,10 @@
-// Update this page (the content is just a fallback if you fail to update the page)
-
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Mic, Brain, BarChart3, ArrowRight, ChevronRight } from "lucide-react";
+import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
 const Index = () => {
   const [session, setSession] = useState(null);
@@ -15,7 +15,6 @@ const Index = () => {
   useEffect(() => {
     const checkSessionAndRedirect = async (session: any) => {
       if (session && !stayOnPage) {
-        // Check for admin role
         const { data: adminRole } = await supabase
           .from("user_roles")
           .select("role")
@@ -28,7 +27,6 @@ const Index = () => {
           return;
         }
         
-        // Check for instructor role
         const { data: instructorRole } = await supabase
           .from("user_roles")
           .select("role")
@@ -41,7 +39,6 @@ const Index = () => {
           return;
         }
         
-        // Default to student dashboard
         navigate("/dashboard");
       }
     };
@@ -66,135 +63,205 @@ const Index = () => {
   }, [navigate, stayOnPage]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="max-w-4xl mx-auto text-center space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-6xl font-bold bg-gradient-primary bg-clip-text text-transparent animate-pulse-glow">
-            🎤 Edvana
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <img src={edvanaLogo} alt="Edvana" className="h-8" />
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate("/join")}
+            >
+              Join Session
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate("/auth")}
+            >
+              Login
+            </Button>
+            <button 
+              onClick={() => navigate("/admin/auth")}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Admin
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="py-16 md:py-24 px-4">
+        <div className="container mx-auto max-w-4xl text-center space-y-6">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight">
+            Know Who's Following Along —{" "}
+            <span className="bg-gradient-primary bg-clip-text text-transparent">
+              In Real Time
+            </span>
           </h1>
-          <p className="text-2xl font-semibold text-primary">
-            Live Lecture Capture & Learning Platform
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+            AI listens to your lecture and sends check-in questions to students automatically. 
+            See who understood and who needs help — instantly.
           </p>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Real-time lecture transcription, AI-powered check-ins, and intelligent content generation 
-            to enhance classroom engagement and learning outcomes.
-          </p>
-          <Button 
-            onClick={() => navigate("/join")}
-            variant="retro"
-            size="lg"
-            className="mt-4"
+          
+          {/* Primary CTAs */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
+            <Button 
+              size="lg" 
+              onClick={() => navigate("/instructor/auth")}
+              className="w-full sm:w-auto min-w-[200px] gap-2"
+            >
+              I'm an Instructor
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              onClick={() => navigate("/auth")}
+              className="w-full sm:w-auto min-w-[200px] gap-2"
+            >
+              I'm a Student
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-16 px-4 bg-muted/30">
+        <div className="container mx-auto max-w-5xl">
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-12 text-foreground">
+            How It Works
+          </h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <Mic className="w-8 h-8 text-primary" />
+              </div>
+              <div className="text-sm font-medium text-primary">Step 1</div>
+              <h3 className="text-lg font-semibold text-foreground">You Teach</h3>
+              <p className="text-muted-foreground text-sm">
+                Lecture as normal — Edvana listens and transcribes in real-time
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <Brain className="w-8 h-8 text-primary" />
+              </div>
+              <div className="text-sm font-medium text-primary">Step 2</div>
+              <h3 className="text-lg font-semibold text-foreground">AI Generates Questions</h3>
+              <p className="text-muted-foreground text-sm">
+                Smart check-ins appear on student devices based on what you just said
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <BarChart3 className="w-8 h-8 text-primary" />
+              </div>
+              <div className="text-sm font-medium text-primary">Step 3</div>
+              <h3 className="text-lg font-semibold text-foreground">See Results Instantly</h3>
+              <p className="text-muted-foreground text-sm">
+                Know exactly who understood and who's struggling — before they fall behind
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="py-16 px-4">
+        <div className="container mx-auto max-w-5xl">
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card className="p-6 border-primary/20 hover:border-primary/40 transition-colors">
+              <h3 className="font-semibold text-foreground mb-2">
+                Never wonder if students are following along
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Get real-time insight into comprehension without interrupting your flow
+              </p>
+            </Card>
+
+            <Card className="p-6 border-primary/20 hover:border-primary/40 transition-colors">
+              <h3 className="font-semibold text-foreground mb-2">
+                Questions based on what you just said
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                AI generates relevant check-ins from your actual lecture content
+              </p>
+            </Card>
+
+            <Card className="p-6 border-primary/20 hover:border-primary/40 transition-colors">
+              <h3 className="font-semibold text-foreground mb-2">
+                Know who needs help before it's too late
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Identify struggling students and intervene while there's still time
+              </p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-16 px-4 bg-muted/30">
+        <div className="container mx-auto max-w-4xl">
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="p-6 border-primary/20">
+              <p className="text-foreground italic mb-4">
+                "I demoed this. It has tremendous promise for student engagement."
+              </p>
+              <p className="text-sm text-muted-foreground">— Professor</p>
+            </Card>
+
+            <Card className="p-6 border-primary/20">
+              <p className="text-foreground italic mb-4">
+                "It was quite refreshing to have quick questions about what was said a few minutes ago"
+              </p>
+              <p className="text-sm text-muted-foreground">— Student</p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-16 px-4">
+        <div className="container mx-auto max-w-2xl text-center space-y-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+            Ready to transform your classroom?
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button 
+              size="lg" 
+              onClick={() => navigate("/instructor/auth")}
+              className="w-full sm:w-auto min-w-[200px] gap-2"
+            >
+              Get Started as Instructor
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-6 px-4 border-t border-border">
+        <div className="container mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+          <p>&copy; 2025 Edvana. All rights reserved.</p>
+          <button 
+            onClick={() => navigate("/admin/auth")}
+            className="hover:text-foreground transition-colors"
           >
-            🎯 Join Live Session
-          </Button>
+            Admin Portal
+          </button>
         </div>
-
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {/* Student Path */}
-          <Card className="p-8 bg-gradient-to-br from-card to-primary/10 border-2 border-primary-glow shadow-glow hover:shadow-elegant transition-all">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="text-5xl">📚</div>
-                <h2 className="text-2xl font-bold text-foreground">I'm a Student</h2>
-                <p className="text-sm text-muted-foreground">
-                  Engage with live lecture check-ins, receive instant feedback, and track your progress with AI-powered assessments.
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <Button 
-                  onClick={() => navigate("/auth")}
-                  variant="retro"
-                  size="lg"
-                  className="w-full"
-                >
-                  📖 Start Learning
-                </Button>
-                
-                <p className="text-xs text-muted-foreground">
-                  Sign up and complete onboarding to begin your quest!
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Instructor Path */}
-          <Card className="p-8 bg-gradient-to-br from-card to-secondary/10 border-2 border-secondary-glow shadow-glow hover:shadow-elegant transition-all">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="text-5xl">👨‍🏫</div>
-                <h2 className="text-2xl font-bold text-foreground">I'm an Instructor</h2>
-                <p className="text-sm text-muted-foreground">
-                  Capture live lectures, generate real-time check-ins, monitor student engagement, and detect academic integrity concerns with AI-powered tools.
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <Button 
-                  onClick={() => navigate("/instructor/auth")}
-                  variant="retro"
-                  size="lg"
-                  className="w-full bg-secondary hover:bg-secondary/90"
-                >
-                  📊 Instructor Portal
-                </Button>
-                
-                <p className="text-xs text-muted-foreground">
-                  Sign in to access your instructor dashboard
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Administrator Path */}
-          <Card className="p-8 bg-gradient-to-br from-card to-accent/10 border-2 border-accent shadow-glow hover:shadow-elegant transition-all">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="text-5xl">🏢</div>
-                <h2 className="text-2xl font-bold text-foreground">I'm an Admin</h2>
-                <p className="text-sm text-muted-foreground">
-                  Access school-wide analytics, ROI metrics, exportable reports, and comprehensive engagement data.
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <Button 
-                  onClick={() => navigate("/admin/auth")}
-                  variant="retro"
-                  size="lg"
-                  className="w-full bg-accent hover:bg-accent/90"
-                >
-                  📈 Admin Portal
-                </Button>
-                
-                <p className="text-xs text-muted-foreground">
-                  Sign in to access analytics and reports
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-          <Card className="p-4 bg-gradient-secondary border border-secondary-glow">
-            <div className="text-2xl mb-2">🎙️</div>
-            <h3 className="font-semibold text-secondary-foreground">Live Lecture Capture</h3>
-            <p className="text-sm text-secondary-foreground/80">Real-time audio transcription</p>
-          </Card>
-          
-          <Card className="p-4 bg-gradient-achievement border border-achievement-glow">
-            <div className="text-2xl mb-2">✅</div>
-            <h3 className="font-semibold text-achievement-foreground">Smart Check-Ins</h3>
-            <p className="text-sm text-achievement-foreground/80">AI-powered comprehension questions</p>
-          </Card>
-          
-          <Card className="p-4 bg-gradient-energy border border-energy-glow">
-            <div className="text-2xl mb-2">🔍</div>
-            <h3 className="font-semibold text-energy-foreground">Cheat Detection</h3>
-            <p className="text-sm text-energy-foreground/80">Tab switching & paste behavior analysis</p>
-          </Card>
-        </div>
-      </div>
+      </footer>
     </div>
   );
 };
