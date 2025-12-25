@@ -133,7 +133,7 @@ const Index = () => {
               <div className="text-sm font-medium text-primary">Step 1</div>
               <h3 className="text-lg font-semibold text-foreground">You Teach</h3>
               <p className="text-muted-foreground text-sm">
-                Lecture as normal — Edvana listens and transcribes in real-time
+                Lecture as normal, Edvana listens and transcribes in real-time
               </p>
             </div>
 
@@ -157,7 +157,7 @@ const Index = () => {
               <div className="text-sm font-medium text-primary">Step 3</div>
               <h3 className="text-lg font-semibold text-foreground">See Results Instantly</h3>
               <p className="text-muted-foreground text-sm">
-                Know exactly who understood and who's struggling — before they fall behind
+                Know exactly who understood and who's struggling before they fall behind
               </p>
             </div>
           </div>
