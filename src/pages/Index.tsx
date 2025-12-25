@@ -94,7 +94,7 @@ const Index = () => {
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             AI listens to your lecture and sends check-in questions to students automatically. See who understood and
-            who needs help — instantly.
+            who needs help instantly.
           </p>
 
           {/* Primary CTAs */}
