@@ -171,14 +171,14 @@ const Index = () => {
                 </div>
                 
                 {/* Student live check-in card */}
-                <div className="absolute -bottom-12 -left-16 md:-left-24 w-64 md:w-80 animate-float">
+                <div className="absolute -bottom-6 left-0 md:-left-8 w-72 md:w-96 animate-float z-10">
                   <div className="relative bg-card rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
                     {/* Card header accent */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
                     <img 
                       src={mockupStudent} 
                       alt="Student live check-in view showing a real-time lecture question with multiple choice answers" 
-                      className="w-full h-auto"
+                      className="w-full h-auto object-contain"
                     />
                   </div>
                 </div>
