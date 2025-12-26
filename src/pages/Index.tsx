@@ -171,12 +171,22 @@ const Index = () => {
                 </div>
                 
                 {/* Floating student phone mockup */}
-                <div className="absolute -bottom-8 -left-8 w-32 md:w-40 rounded-2xl overflow-hidden shadow-xl border border-border/50 bg-card animate-float">
-                  <img 
-                    src={mockupStudent} 
-                    alt="Student mobile view" 
-                    className="w-full h-auto"
-                  />
+                <div className="absolute -bottom-8 -left-8 w-36 md:w-48 animate-float">
+                  {/* Phone frame */}
+                  <div className="relative bg-foreground rounded-[2rem] p-2 shadow-2xl">
+                    {/* Phone notch */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-6 bg-foreground rounded-b-xl z-10" />
+                    {/* Phone screen */}
+                    <div className="rounded-[1.5rem] overflow-hidden bg-background">
+                      <img 
+                        src={mockupStudent} 
+                        alt="Student live check-in view" 
+                        className="w-full h-auto"
+                      />
+                    </div>
+                    {/* Home indicator */}
+                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-muted-foreground/50 rounded-full" />
+                  </div>
                 </div>
 
                 {/* Decorative badge */}
