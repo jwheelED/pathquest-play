@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface TabSwitch {
   left_at: string;
@@ -20,14 +20,22 @@ export const useTabSwitchingDetection = (isActive: boolean) => {
   const [lastTabLeaveTime, setLastTabLeaveTime] = useState<Date | null>(null);
   const questionDisplayedAtRef = useRef<string | null>(null);
   const hasStartedRef = useRef(false);
+  const wasActiveRef = useRef(false);
 
-  // Set the question displayed time when tracking becomes active
-  useEffect(() => {
-    if (isActive && !hasStartedRef.current) {
-      questionDisplayedAtRef.current = new Date().toISOString();
-      hasStartedRef.current = true;
-    }
-  }, [isActive]);
+  // Initialize synchronously when isActive becomes true
+  // This ensures refs are set BEFORE any render completes
+  if (isActive && !wasActiveRef.current) {
+    console.log('🎯 [TabSwitching] Initializing synchronously on activation');
+    questionDisplayedAtRef.current = new Date().toISOString();
+    hasStartedRef.current = true;
+    wasActiveRef.current = true;
+  }
+
+  // Reset refs when isActive becomes false
+  if (!isActive && wasActiveRef.current) {
+    console.log('🔄 [TabSwitching] Deactivating tracking');
+    wasActiveRef.current = false;
+  }
 
   useEffect(() => {
     if (!isActive) return;
@@ -36,7 +44,8 @@ export const useTabSwitchingDetection = (isActive: boolean) => {
       console.log('👀 [TabSwitching] Visibility change:', {
         hidden: document.hidden,
         isActive,
-        hasStarted: hasStartedRef.current
+        hasStarted: hasStartedRef.current,
+        questionDisplayedAt: questionDisplayedAtRef.current
       });
       
       if (document.hidden) {
@@ -76,8 +85,13 @@ export const useTabSwitchingDetection = (isActive: boolean) => {
     };
   }, [isActive, lastTabLeaveTime]);
 
-  const getTabSwitchingData = (): TabSwitchingData | null => {
+  const getTabSwitchingData = useCallback((): TabSwitchingData | null => {
+    // Return null only if we were never activated
     if (!hasStartedRef.current || !questionDisplayedAtRef.current) {
+      console.log('⚠️ [TabSwitching] getTabSwitchingData returning null:', {
+        hasStarted: hasStartedRef.current,
+        questionDisplayedAt: questionDisplayedAtRef.current
+      });
       return null;
     }
 
@@ -98,7 +112,7 @@ export const useTabSwitchingDetection = (isActive: boolean) => {
         new Date(questionDisplayedAtRef.current).getTime() <
         10000;
 
-    return {
+    const data = {
       tab_switch_count: tabSwitches.length,
       total_time_away_seconds: totalTimeAwaySeconds,
       tab_switches: tabSwitches,
@@ -106,14 +120,19 @@ export const useTabSwitchingDetection = (isActive: boolean) => {
       switched_away_immediately: switchedAwayImmediately,
       question_displayed_at: questionDisplayedAtRef.current,
     };
-  };
 
-  const resetTracking = () => {
+    console.log('📊 [TabSwitching] getTabSwitchingData returning:', data);
+    return data;
+  }, [tabSwitches]);
+
+  const resetTracking = useCallback(() => {
+    console.log('🔄 [TabSwitching] Resetting tracking state');
     setTabSwitches([]);
     setLastTabLeaveTime(null);
     questionDisplayedAtRef.current = null;
     hasStartedRef.current = false;
-  };
+    wasActiveRef.current = false;
+  }, []);
 
   return {
     tabSwitchingData: getTabSwitchingData(),
