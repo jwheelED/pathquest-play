@@ -19,6 +19,7 @@ import {
   Star,
   Monitor,
   PictureInPicture2,
+  BookOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -135,7 +136,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
   const [quotaCircuitBreakerCountdown, setQuotaCircuitBreakerCountdown] = useState<number>(0);
 
-  // Error history tracking
+  // Answer Key MCQ integration
+  const [useAnswerKeyMcqs, setUseAnswerKeyMcqs] = useState(false);
   const [errorHistory, setErrorHistory] = useState<ErrorRecord[]>([]);
 
   // Extraction error dialog
@@ -998,6 +1000,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             context: fullContext,
             confidence: detectionData.confidence,
             source: detectionData.source || "manual_button",
+            use_answer_key: useAnswerKeyMcqs,
           },
         });
       });
@@ -3123,6 +3126,27 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
+                  </div>
+                  
+                  {/* Answer Key MCQ toggle */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                    <Checkbox
+                      id="answer-key-toggle"
+                      checked={useAnswerKeyMcqs}
+                      onCheckedChange={(checked) => {
+                        setUseAnswerKeyMcqs(checked === true);
+                        if (checked) {
+                          sonnerToast.success("Using verified answer key MCQs when matched");
+                        }
+                      }}
+                    />
+                    <Label 
+                      htmlFor="answer-key-toggle" 
+                      className="text-xs font-medium cursor-pointer whitespace-nowrap flex items-center gap-1"
+                    >
+                      <BookOpen className="h-3 w-3" />
+                      Answer Keys
+                    </Label>
                   </div>
                   
                   {transcriptChunks.length > 0 && (
