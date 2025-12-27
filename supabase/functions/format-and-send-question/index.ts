@@ -359,7 +359,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, suggested_type, context, source = "manual_button" } = await req.json();
+    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -394,6 +394,109 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // === ANSWER KEY MATCHING ===
+    // Check if instructor wants to use answer key MCQs and has verified problems
+    let answerKeyMcq: any = null;
+    if (use_answer_key && context && instructorPreference === "multiple_choice") {
+      console.log("🔑 Checking for answer key match...");
+      
+      try {
+        // Get instructor's verified problems with MCQs
+        const { data: answerKeys } = await supabase
+          .from("instructor_answer_keys")
+          .select("id")
+          .eq("instructor_id", user.id)
+          .eq("status", "parsed");
+        
+        if (answerKeys && answerKeys.length > 0) {
+          const answerKeyIds = answerKeys.map(k => k.id);
+          
+          // Get verified problems with their MCQs
+          const { data: problems } = await supabase
+            .from("answer_key_problems")
+            .select(`
+              id,
+              problem_text,
+              final_answer,
+              keywords,
+              topic_tags,
+              answer_key_mcqs (
+                id,
+                question_text,
+                correct_answer,
+                distractors,
+                explanation
+              )
+            `)
+            .in("answer_key_id", answerKeyIds)
+            .eq("verified_by_instructor", true);
+          
+          if (problems && problems.length > 0) {
+            // Simple keyword matching against context
+            const contextLower = context.toLowerCase();
+            let bestMatch: any = null;
+            let bestScore = 0;
+            
+            for (const problem of problems) {
+              const keywords = problem.keywords || [];
+              const tags = problem.topic_tags || [];
+              const allTerms = [...keywords, ...tags];
+              
+              let matchCount = 0;
+              for (const term of allTerms) {
+                if (contextLower.includes(term.toLowerCase())) {
+                  matchCount++;
+                }
+              }
+              
+              // Also check if problem text appears in context
+              const problemWords = problem.problem_text.toLowerCase().split(/\s+/).filter((w: string) => w.length > 4);
+              for (const word of problemWords.slice(0, 5)) {
+                if (contextLower.includes(word)) {
+                  matchCount += 0.5;
+                }
+              }
+              
+              const score = allTerms.length > 0 ? matchCount / allTerms.length : 0;
+              
+              if (score > bestScore && score >= 0.3 && (problem as any).answer_key_mcqs?.length > 0) {
+                bestScore = score;
+                bestMatch = problem;
+              }
+            }
+            
+            if (bestMatch && (bestMatch as any).answer_key_mcqs?.[0]) {
+              const mcq = (bestMatch as any).answer_key_mcqs[0];
+              answerKeyMcq = {
+                question: mcq.question_text,
+                correctAnswer: mcq.correct_answer,
+                options: mcq.distractors,
+                explanation: mcq.explanation,
+                problemId: bestMatch.id,
+                mcqId: mcq.id,
+                confidence: bestScore,
+              };
+              console.log(`✅ Answer key match found! Confidence: ${(bestScore * 100).toFixed(0)}%`);
+              
+              // Log usage
+              await supabase.from("answer_key_usage_log").insert({
+                instructor_id: user.id,
+                problem_id: bestMatch.id,
+                mcq_id: mcq.id,
+                session_id: null,
+                transcript_snippet: context.substring(0, 500),
+                match_confidence: bestScore,
+                match_keywords: bestMatch.keywords?.filter((k: string) => contextLower.includes(k.toLowerCase())) || [],
+              });
+            }
+          }
+        }
+      } catch (matchError) {
+        console.error("Answer key matching error:", matchError);
+        // Continue with AI generation if matching fails
+      }
     }
 
     // Handle logging for both string and object question_text
@@ -463,14 +566,29 @@ serve(async (req) => {
         };
       }
     } else if (finalType === "multiple_choice") {
-      const mcq = await generateMCQ(question_text, context || "");
-      formattedQuestion = {
-        question: mcq.question,
-        type: "multiple_choice",
-        options: mcq.options,
-        correctAnswer: mcq.correctAnswer,
-        explanation: mcq.explanation,
-      };
+      // Use answer key MCQ if available, otherwise generate with AI
+      if (answerKeyMcq) {
+        console.log("📚 Using verified answer key MCQ");
+        formattedQuestion = {
+          question: answerKeyMcq.question,
+          type: "multiple_choice",
+          options: answerKeyMcq.options,
+          correctAnswer: answerKeyMcq.correctAnswer,
+          explanation: answerKeyMcq.explanation,
+          source: "answer_key",
+          answerKeyProblemId: answerKeyMcq.problemId,
+          answerKeyMcqId: answerKeyMcq.mcqId,
+        };
+      } else {
+        const mcq = await generateMCQ(question_text, context || "");
+        formattedQuestion = {
+          question: mcq.question,
+          type: "multiple_choice",
+          options: mcq.options,
+          correctAnswer: mcq.correctAnswer,
+          explanation: mcq.explanation,
+        };
+      }
     } else {
       // Short answer format - always manual grade for lecture check-ins
       formattedQuestion = {
