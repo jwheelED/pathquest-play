@@ -137,3 +137,12 @@ verify_jwt = true
 
 [functions.generate-study-plan]
 verify_jwt = true
+
+[functions.parse-answer-key]
+verify_jwt = true
+
+[functions.generate-answer-key-mcq]
+verify_jwt = true
+
+[functions.match-transcript-to-problem]
+verify_jwt = true
