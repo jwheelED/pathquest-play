@@ -201,6 +201,201 @@ export type Database = {
         }
         Relationships: []
       }
+      answer_key_mcqs: {
+        Row: {
+          correct_answer: string
+          correct_answer_latex: string | null
+          created_at: string
+          distractors: Json
+          explanation: string | null
+          explanation_latex: string | null
+          id: string
+          problem_id: string
+          question_latex: string | null
+          question_text: string
+          updated_at: string
+          usage_count: number | null
+          verified: boolean | null
+        }
+        Insert: {
+          correct_answer: string
+          correct_answer_latex?: string | null
+          created_at?: string
+          distractors?: Json
+          explanation?: string | null
+          explanation_latex?: string | null
+          id?: string
+          problem_id: string
+          question_latex?: string | null
+          question_text: string
+          updated_at?: string
+          usage_count?: number | null
+          verified?: boolean | null
+        }
+        Update: {
+          correct_answer?: string
+          correct_answer_latex?: string | null
+          created_at?: string
+          distractors?: Json
+          explanation?: string | null
+          explanation_latex?: string | null
+          id?: string
+          problem_id?: string
+          question_latex?: string | null
+          question_text?: string
+          updated_at?: string
+          usage_count?: number | null
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_key_mcqs_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "answer_key_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      answer_key_problems: {
+        Row: {
+          answer_key_id: string
+          created_at: string
+          difficulty: string | null
+          final_answer: string
+          final_answer_latex: string | null
+          id: string
+          keywords: string[] | null
+          order_index: number | null
+          problem_latex: string | null
+          problem_number: string | null
+          problem_text: string
+          solution_latex: string | null
+          solution_steps: Json | null
+          solution_text: string
+          topic_tags: string[] | null
+          units: string | null
+          updated_at: string
+          verification_notes: string | null
+          verified_by_instructor: boolean | null
+        }
+        Insert: {
+          answer_key_id: string
+          created_at?: string
+          difficulty?: string | null
+          final_answer: string
+          final_answer_latex?: string | null
+          id?: string
+          keywords?: string[] | null
+          order_index?: number | null
+          problem_latex?: string | null
+          problem_number?: string | null
+          problem_text: string
+          solution_latex?: string | null
+          solution_steps?: Json | null
+          solution_text: string
+          topic_tags?: string[] | null
+          units?: string | null
+          updated_at?: string
+          verification_notes?: string | null
+          verified_by_instructor?: boolean | null
+        }
+        Update: {
+          answer_key_id?: string
+          created_at?: string
+          difficulty?: string | null
+          final_answer?: string
+          final_answer_latex?: string | null
+          id?: string
+          keywords?: string[] | null
+          order_index?: number | null
+          problem_latex?: string | null
+          problem_number?: string | null
+          problem_text?: string
+          solution_latex?: string | null
+          solution_steps?: Json | null
+          solution_text?: string
+          topic_tags?: string[] | null
+          units?: string | null
+          updated_at?: string
+          verification_notes?: string | null
+          verified_by_instructor?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_key_problems_answer_key_id_fkey"
+            columns: ["answer_key_id"]
+            isOneToOne: false
+            referencedRelation: "instructor_answer_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      answer_key_usage_log: {
+        Row: {
+          id: string
+          instructor_id: string
+          match_confidence: number | null
+          match_keywords: string[] | null
+          mcq_id: string | null
+          problem_id: string | null
+          session_id: string | null
+          transcript_snippet: string | null
+          used_at: string
+        }
+        Insert: {
+          id?: string
+          instructor_id: string
+          match_confidence?: number | null
+          match_keywords?: string[] | null
+          mcq_id?: string | null
+          problem_id?: string | null
+          session_id?: string | null
+          transcript_snippet?: string | null
+          used_at?: string
+        }
+        Update: {
+          id?: string
+          instructor_id?: string
+          match_confidence?: number | null
+          match_keywords?: string[] | null
+          mcq_id?: string | null
+          problem_id?: string | null
+          session_id?: string | null
+          transcript_snippet?: string | null
+          used_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_key_usage_log_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_usage_log_mcq_id_fkey"
+            columns: ["mcq_id"]
+            isOneToOne: false
+            referencedRelation: "answer_key_mcqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_usage_log_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "answer_key_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_usage_log_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       answer_version_history: {
         Row: {
           answer_copied: boolean | null
@@ -508,6 +703,69 @@ export type Database = {
             columns: ["context_id"]
             isOneToOne: false
             referencedRelation: "lti_contexts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_answer_keys: {
+        Row: {
+          course_context: string | null
+          created_at: string
+          file_name: string | null
+          file_path: string | null
+          file_type: string | null
+          id: string
+          instructor_id: string
+          org_id: string | null
+          problem_count: number | null
+          status: string
+          subject: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          course_context?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          problem_count?: number | null
+          status?: string
+          subject: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          course_context?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          problem_count?: number | null
+          status?: string
+          subject?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_answer_keys_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_answer_keys_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
