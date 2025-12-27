@@ -1509,6 +1509,73 @@ export type Database = {
           },
         ]
       }
+      pilot_rebates: {
+        Row: {
+          claimed_at: string | null
+          created_at: string
+          eligible_until: string
+          id: string
+          institutional_subscription_id: string | null
+          instructor_id: string
+          original_amount_cents: number
+          refund_amount_cents: number | null
+          status: string
+          stripe_payment_intent_id: string
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          created_at?: string
+          eligible_until: string
+          id?: string
+          institutional_subscription_id?: string | null
+          instructor_id: string
+          original_amount_cents: number
+          refund_amount_cents?: number | null
+          status?: string
+          stripe_payment_intent_id: string
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          created_at?: string
+          eligible_until?: string
+          id?: string
+          institutional_subscription_id?: string | null
+          instructor_id?: string
+          original_amount_cents?: number
+          refund_amount_cents?: number | null
+          status?: string
+          stripe_payment_intent_id?: string
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pilot_rebates_institutional_subscription_id_fkey"
+            columns: ["institutional_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pilot_rebates_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pilot_rebates_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       practice_goals: {
         Row: {
           completed: boolean
@@ -1980,6 +2047,106 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_allocations: {
+        Row: {
+          allocated_at: string
+          allocated_by: string | null
+          allocated_seats: number
+          id: string
+          instructor_id: string
+          notes: string | null
+          seat_license_id: string
+        }
+        Insert: {
+          allocated_at?: string
+          allocated_by?: string | null
+          allocated_seats?: number
+          id?: string
+          instructor_id: string
+          notes?: string | null
+          seat_license_id: string
+        }
+        Update: {
+          allocated_at?: string
+          allocated_by?: string | null
+          allocated_seats?: number
+          id?: string
+          instructor_id?: string
+          notes?: string | null
+          seat_license_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_allocations_allocated_by_fkey"
+            columns: ["allocated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_allocations_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_allocations_seat_license_id_fkey"
+            columns: ["seat_license_id"]
+            isOneToOne: false
+            referencedRelation: "seat_licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_licenses: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          price_per_seat_cents: number
+          subscription_id: string
+          total_seats: number
+          updated_at: string
+          used_seats: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          price_per_seat_cents: number
+          subscription_id: string
+          total_seats: number
+          updated_at?: string
+          used_seats?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          price_per_seat_cents?: number
+          subscription_id?: string
+          total_seats?: number
+          updated_at?: string
+          used_seats?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_licenses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_licenses_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -2711,6 +2878,178 @@ export type Database = {
           },
         ]
       }
+      subscription_tiers: {
+        Row: {
+          billing_period: string
+          created_at: string
+          description: string | null
+          display_name: string
+          features: Json
+          id: string
+          is_active: boolean
+          name: string
+          price_cents: number
+          sort_order: number
+          student_limit: number | null
+          updated_at: string
+        }
+        Insert: {
+          billing_period?: string
+          created_at?: string
+          description?: string | null
+          display_name: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          price_cents?: number
+          sort_order?: number
+          student_limit?: number | null
+          updated_at?: string
+        }
+        Update: {
+          billing_period?: string
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_cents?: number
+          sort_order?: number
+          student_limit?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_records: {
+        Row: {
+          created_at: string
+          id: string
+          metric_type: string
+          org_id: string | null
+          period_end: string
+          period_start: string
+          updated_at: string
+          usage_count: number
+          usage_limit: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric_type: string
+          org_id?: string | null
+          period_end: string
+          period_start: string
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric_type?: string
+          org_id?: string | null
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_achievements: {
         Row: {
           achievement_id: string
@@ -2995,7 +3334,16 @@ export type Database = {
           total_questions: number
         }[]
       }
+      get_student_limit: { Args: { _user_id: string }; Returns: number }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      get_user_subscription_tier: {
+        Args: { _user_id: string }
+        Returns: string
+      }
+      has_feature_access: {
+        Args: { _feature: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
