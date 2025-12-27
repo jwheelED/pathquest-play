@@ -12,7 +12,9 @@ import {
   AlertCircle,
   ChevronRight,
   FileText,
-  Plus
+  Plus,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -49,9 +51,10 @@ interface AnswerKeyLibraryProps {
 
 export function AnswerKeyLibrary({ onSelectKey, onCreateNew }: AnswerKeyLibraryProps) {
   const [search, setSearch] = useState("");
+  const [reparsingId, setReparsingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: answerKeys = [], isLoading } = useQuery({
+  const { data: answerKeys = [], isLoading, refetch } = useQuery({
     queryKey: ["answer-keys"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -65,6 +68,31 @@ export function AnswerKeyLibrary({ onSelectKey, onCreateNew }: AnswerKeyLibraryP
 
       if (error) throw error;
       return data as AnswerKey[];
+    },
+    refetchInterval: (query) => {
+      // Auto-refetch if any key is processing
+      const hasProcessing = query.state.data?.some(k => k.status === "processing");
+      return hasProcessing ? 5000 : false;
+    },
+  });
+
+  const reparseMutation = useMutation({
+    mutationFn: async (answerKeyId: string) => {
+      setReparsingId(answerKeyId);
+      const { error } = await supabase.functions.invoke("parse-answer-key", {
+        body: { answerKeyId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Re-parsing started");
+      setTimeout(() => refetch(), 3000);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to re-parse");
+    },
+    onSettled: () => {
+      setReparsingId(null);
     },
   });
 
@@ -103,7 +131,7 @@ export function AnswerKeyLibrary({ onSelectKey, onCreateNew }: AnswerKeyLibraryP
       key.course_context?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const getStatusBadge = (status: string, problemCount: number) => {
+  const getStatusBadge = (status: string, problemCount: number, answerKeyId?: string) => {
     switch (status) {
       case "verified":
         return (
@@ -122,7 +150,7 @@ export function AnswerKeyLibrary({ onSelectKey, onCreateNew }: AnswerKeyLibraryP
       case "processing":
         return (
           <Badge variant="outline" className="text-muted-foreground">
-            <Clock className="h-3 w-3 mr-1 animate-pulse" />
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Processing
           </Badge>
         );
@@ -236,6 +264,24 @@ export function AnswerKeyLibrary({ onSelectKey, onCreateNew }: AnswerKeyLibraryP
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {answerKey.status === "error" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        reparseMutation.mutate(answerKey.id);
+                      }}
+                      disabled={reparsingId === answerKey.id}
+                    >
+                      {reparsingId === answerKey.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button

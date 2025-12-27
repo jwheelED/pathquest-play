@@ -78,17 +78,21 @@ export function AnswerKeyUpload({ onUploadComplete }: AnswerKeyUploadProps) {
 
       if (dbError) throw dbError;
 
-      // Trigger AI parsing (will be implemented in Phase 3)
-      // For now, just mark as ready for manual entry
-      await supabase
-        .from("instructor_answer_keys")
-        .update({ status: "parsed" })
-        .eq("id", answerKey.id);
+      // Trigger AI parsing via edge function
+      const { error: parseError } = await supabase.functions.invoke("parse-answer-key", {
+        body: { answerKeyId: answerKey.id },
+      });
+
+      if (parseError) {
+        console.error("Parse error (non-blocking):", parseError);
+        // Don't throw - parsing happens async, user can still add problems manually
+        toast.info("AI parsing started in background. You can add problems manually while waiting.");
+      }
 
       return answerKey.id;
     },
     onSuccess: (answerKeyId) => {
-      toast.success("Answer key uploaded! You can now add problems.");
+      toast.success("Answer key uploaded! AI is parsing your document.");
       setTitle("");
       setSubject("");
       setCourseContext("");

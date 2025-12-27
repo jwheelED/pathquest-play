@@ -13,7 +13,9 @@ import {
   Trash2,
   Edit3,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -64,6 +66,7 @@ interface AnswerKey {
   subject: string;
   course_context: string | null;
   file_name: string | null;
+  file_path: string | null;
   status: string;
   problem_count: number;
   created_at: string;
@@ -82,7 +85,7 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
   const queryClient = useQueryClient();
 
   // Fetch answer key details
-  const { data: answerKey, isLoading: loadingKey } = useQuery({
+  const { data: answerKey, isLoading: loadingKey, refetch: refetchKey } = useQuery({
     queryKey: ["answer-key", answerKeyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -97,7 +100,7 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
   });
 
   // Fetch problems
-  const { data: problems = [], isLoading: loadingProblems } = useQuery({
+  const { data: problems = [], isLoading: loadingProblems, refetch: refetchProblems } = useQuery({
     queryKey: ["answer-key-problems", answerKeyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -109,6 +112,26 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
       if (error) throw error;
       return data as Problem[];
     },
+  });
+
+  // Fetch MCQ counts for each problem
+  const { data: mcqCounts = {} } = useQuery({
+    queryKey: ["answer-key-mcq-counts", answerKeyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("answer_key_mcqs")
+        .select("problem_id")
+        .in("problem_id", problems.map(p => p.id));
+
+      if (error) throw error;
+      
+      const counts: Record<string, number> = {};
+      data.forEach(mcq => {
+        counts[mcq.problem_id] = (counts[mcq.problem_id] || 0) + 1;
+      });
+      return counts;
+    },
+    enabled: problems.length > 0,
   });
 
   const deleteProblemMutation = useMutation({
@@ -126,6 +149,49 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to delete problem");
+    },
+  });
+
+  // Re-parse mutation
+  const reparseMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("parse-answer-key", {
+        body: { answerKeyId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Re-parsing started. Refresh in a few seconds.");
+      setTimeout(() => {
+        refetchKey();
+        refetchProblems();
+      }, 3000);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to re-parse");
+    },
+  });
+
+  // Generate MCQs mutation
+  const generateMcqsMutation = useMutation({
+    mutationFn: async (problemIds?: string[]) => {
+      const verifiedProblems = problemIds || problems.filter(p => p.verified_by_instructor).map(p => p.id);
+      if (verifiedProblems.length === 0) {
+        throw new Error("No verified problems to generate MCQs for");
+      }
+
+      const { data, error } = await supabase.functions.invoke("generate-answer-key-mcq", {
+        body: { problemIds: verifiedProblems },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Generated ${data.generated || 0} MCQs!`);
+      queryClient.invalidateQueries({ queryKey: ["answer-key-mcq-counts", answerKeyId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to generate MCQs");
     },
   });
 
@@ -219,15 +285,38 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button onClick={() => setShowAddProblem(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Add Problem
             </Button>
-            <Button variant="outline" disabled>
-              <Sparkles className="h-4 w-4 mr-1" />
-              Generate MCQs
+            <Button 
+              variant="outline" 
+              onClick={() => generateMcqsMutation.mutate(undefined)}
+              disabled={generateMcqsMutation.isPending || verifiedCount === 0}
+            >
+              {generateMcqsMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-1" />
+              )}
+              Generate MCQs ({verifiedCount} verified)
             </Button>
+            {answerKey.file_path && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => reparseMutation.mutate()}
+                disabled={reparseMutation.isPending}
+              >
+                {reparseMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                )}
+                Re-parse File
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -348,6 +437,14 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
                         </div>
                       )}
 
+                      {/* MCQ Status */}
+                      {mcqCounts[problem.id] > 0 && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          {mcqCounts[problem.id]} MCQ{mcqCounts[problem.id] !== 1 ? "s" : ""} generated
+                        </div>
+                      )}
+
                       {/* Actions */}
                       <div className="flex items-center gap-2 pt-2 border-t">
                         <Button
@@ -358,6 +455,21 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
                           <Edit3 className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
+                        {problem.verified_by_instructor && !mcqCounts[problem.id] && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateMcqsMutation.mutate([problem.id])}
+                            disabled={generateMcqsMutation.isPending}
+                          >
+                            {generateMcqsMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-4 w-4 mr-1" />
+                            )}
+                            Generate MCQ
+                          </Button>
+                        )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="sm" className="text-destructive">
