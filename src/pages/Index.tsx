@@ -158,9 +158,9 @@ const Index = () => {
         </div>
       </section>
 
-      {/* How It Works - Bento Grid */}
+      {/* How It Works - Full Width Steps */}
       <section className="relative z-10 py-20 px-4">
-        <div className="container mx-auto max-w-6xl">
+        <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-16 animate-fade-in">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Engagement Made <span className="text-primary">Effortless</span>
@@ -170,64 +170,88 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Steps Grid */}
-          <div className="grid md:grid-cols-3 gap-8">
+          {/* Steps - Stacked with large images */}
+          <div className="space-y-16">
             {/* Step 1 */}
-            <div className="headspace-card p-6 flex flex-col animate-fade-in stagger-1">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center mb-4 shadow-glow">
-                <svg className="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
+            <div className="grid lg:grid-cols-2 gap-8 items-center animate-fade-in">
+              <div className="order-2 lg:order-1">
+                <div className="rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
+                  <img 
+                    src={step1Image} 
+                    alt="Live lecture capture interface showing real-time transcription" 
+                    className="w-full h-auto"
+                  />
+                </div>
               </div>
-              <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Step 1</div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Just Teach</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Lecture normally while Edvana listens. No special setup, no interruptions to your flow.
-              </p>
-              <div className="mt-auto rounded-xl overflow-hidden border border-border/50 shadow-lg">
-                <img 
-                  src={step1Image} 
-                  alt="Live lecture capture interface" 
-                  className="w-full h-auto"
-                />
+              <div className="order-1 lg:order-2 space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-glow">
+                  <svg className="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                </div>
+                <div className="text-sm font-semibold text-primary uppercase tracking-wider">Step 1</div>
+                <h3 className="text-2xl md:text-3xl font-bold text-foreground">Just Teach</h3>
+                <p className="text-lg text-muted-foreground leading-relaxed">
+                  Lecture normally while Edvana listens and transcribes in real-time. No special setup, no interruptions to your teaching flow.
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  Real-time transcription active
+                </div>
               </div>
             </div>
 
             {/* Step 2 */}
-            <div className="headspace-card p-6 flex flex-col animate-fade-in stagger-2">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary to-secondary-glow flex items-center justify-center mb-4 shadow-glow-secondary">
-                <Zap className="w-6 h-6 text-secondary-foreground" />
+            <div className="grid lg:grid-cols-2 gap-8 items-center animate-fade-in">
+              <div className="space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-secondary to-secondary-glow flex items-center justify-center shadow-glow-secondary">
+                  <Zap className="w-7 h-7 text-secondary-foreground" />
+                </div>
+                <div className="text-sm font-semibold text-secondary uppercase tracking-wider">Step 2</div>
+                <h3 className="text-2xl md:text-3xl font-bold text-foreground">AI Sends Check-Ins</h3>
+                <p className="text-lg text-muted-foreground leading-relaxed">
+                  Smart questions are generated from what you just explained and sent directly to students' devices. They answer without disrupting the lecture.
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                  <Zap className="w-4 h-4 text-secondary" />
+                  Contextual questions in seconds
+                </div>
               </div>
-              <div className="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">Step 2</div>
-              <h3 className="text-xl font-bold text-foreground mb-2">AI Creates Questions</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Smart check-ins generated from what you just explained
-              </p>
-              <div className="mt-auto rounded-xl overflow-hidden border border-border/50 shadow-lg">
-                <img 
-                  src={step2Image} 
-                  alt="Student receiving live check-in question" 
-                  className="w-full h-auto"
-                />
+              <div>
+                <div className="rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
+                  <img 
+                    src={step2Image} 
+                    alt="Student receiving a live check-in question during lecture" 
+                    className="w-full h-auto"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Step 3 */}
-            <div className="headspace-card p-6 flex flex-col animate-fade-in stagger-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-achievement to-achievement-glow flex items-center justify-center mb-4">
-                <Users className="w-6 h-6 text-achievement-foreground" />
+            <div className="grid lg:grid-cols-2 gap-8 items-center animate-fade-in">
+              <div className="order-2 lg:order-1">
+                <div className="rounded-2xl overflow-hidden border border-border/50 shadow-2xl bg-card">
+                  <img 
+                    src={step3Image} 
+                    alt="Analytics dashboard showing student comprehension and performance" 
+                    className="w-full h-auto"
+                  />
+                </div>
               </div>
-              <div className="text-xs font-semibold text-achievement uppercase tracking-wider mb-2">Step 3</div>
-              <h3 className="text-xl font-bold text-foreground mb-2">See Who Gets It</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Instant visibility into comprehension across your class
-              </p>
-              <div className="mt-auto rounded-xl overflow-hidden border border-border/50 shadow-lg">
-                <img 
-                  src={step3Image} 
-                  alt="Analytics and feedback dashboard" 
-                  className="w-full h-auto"
-                />
+              <div className="order-1 lg:order-2 space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-achievement to-achievement-glow flex items-center justify-center">
+                  <Users className="w-7 h-7 text-achievement-foreground" />
+                </div>
+                <div className="text-sm font-semibold text-achievement uppercase tracking-wider">Step 3</div>
+                <h3 className="text-2xl md:text-3xl font-bold text-foreground">See Who Gets It</h3>
+                <p className="text-lg text-muted-foreground leading-relaxed">
+                  Get instant visibility into comprehension across your class. Visual analytics show answer distribution and identify struggling students immediately.
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+                  <Users className="w-4 h-4 text-achievement" />
+                  Real-time class insights
+                </div>
               </div>
             </div>
           </div>
