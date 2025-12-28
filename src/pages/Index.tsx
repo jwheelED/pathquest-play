@@ -4,9 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles, Users, Zap, CheckCircle2 } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
-import mockupInstructor from "@/assets/mockup-instructor-dashboard.png";
-import mockupStudent from "@/assets/mockup-student-view.png";
-import mockupFlow from "@/assets/mockup-live-flow.png";
+import step1Image from "@/assets/step1-live-lecture.png";
+import step2Image from "@/assets/step2-question.png";
+import step3Image from "@/assets/step3-feedback.png";
 
 const Index = () => {
   const [session, setSession] = useState(null);
@@ -102,91 +102,56 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Hero Section - Asymmetric Layout */}
+      {/* Hero Section - Centered */}
       <section className="relative z-10 py-12 md:py-20 px-4">
-        <div className="container mx-auto max-w-7xl">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left content */}
-            <div className="space-y-8 animate-fade-in">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                <Sparkles className="w-4 h-4" />
-                AI-Powered Engagement
-              </div>
-              
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
-                Know Who's
-                <span className="block mt-2 bg-gradient-to-r from-primary via-primary-glow to-secondary bg-clip-text text-transparent">
-                  Actually Learning
-                </span>
-              </h1>
-              
-              <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed">
-                AI listens to your lecture and sends smart check-ins to students. See comprehension gaps{" "}
-                <span className="text-foreground font-medium">before</span> anyone falls behind.
-              </p>
+        <div className="container mx-auto max-w-4xl text-center">
+          <div className="space-y-8 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+              <Sparkles className="w-4 h-4" />
+              AI-Powered Engagement
+            </div>
+            
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-[1.1] tracking-tight">
+              Know Who's
+              <span className="block mt-2 bg-gradient-to-r from-primary via-primary-glow to-secondary bg-clip-text text-transparent">
+                Actually Learning
+              </span>
+            </h1>
+            
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              AI listens to your lecture and sends smart check-ins to students. See comprehension gaps{" "}
+              <span className="text-foreground font-medium">before</span> anyone falls behind.
+            </p>
 
-              {/* CTAs */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button
-                  size="lg"
-                  onClick={() => navigate("/instructor/auth")}
-                  className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
-                >
-                  Start Teaching Smarter
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => navigate("/auth")}
-                  className="rounded-full px-8 border-border/50 hover:bg-muted/50"
-                >
-                  I'm a Student
-                </Button>
-              </div>
-
-              {/* Trust signals */}
-              <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                  Free to start
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                  No credit card
-                </div>
-              </div>
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center">
+              <Button
+                size="lg"
+                onClick={() => navigate("/instructor/auth")}
+                className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
+              >
+                Start Teaching Smarter
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/auth")}
+                className="rounded-full px-8 border-border/50 hover:bg-muted/50"
+              >
+                I'm a Student
+              </Button>
             </div>
 
-            {/* Right - Hero image */}
-            <div className="relative animate-fade-in stagger-2">
-              <div className="relative">
-                {/* Main dashboard mockup */}
-                <div className="rounded-2xl overflow-hidden shadow-2xl border border-border/50 bg-card">
-                  <img 
-                    src={mockupInstructor} 
-                    alt="Edvana instructor dashboard" 
-                    className="w-full h-auto"
-                  />
-                </div>
-                
-                {/* Student live check-in card */}
-                <div className="absolute -bottom-6 left-0 md:-left-8 w-72 md:w-96 animate-float z-10">
-                  <div className="relative bg-card rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
-                    {/* Card header accent */}
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary" />
-                    <img 
-                      src={mockupStudent} 
-                      alt="Student live check-in view showing a real-time lecture question with multiple choice answers" 
-                      className="w-full h-auto object-contain"
-                    />
-                  </div>
-                </div>
-
-                {/* Decorative badge */}
-                <div className="absolute -top-4 -right-4 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg animate-gentle-bounce">
-                  Live ✨
-                </div>
+            {/* Trust signals */}
+            <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground justify-center">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                Free to start
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                No credit card
               </div>
             </div>
           </div>
@@ -205,61 +170,65 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Bento Grid */}
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Step 1 - Large card */}
-            <div className="md:row-span-2 headspace-card p-8 flex flex-col justify-between animate-fade-in stagger-1">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center mb-6 shadow-glow">
-                  <svg className="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                </div>
-                <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Step 1</div>
-                <h3 className="text-2xl font-bold text-foreground mb-3">Just Teach</h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Lecture normally while Edvana listens. No special setup, no interruptions to your teaching flow.
-                </p>
+          {/* Steps Grid */}
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Step 1 */}
+            <div className="headspace-card p-6 flex flex-col animate-fade-in stagger-1">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center mb-4 shadow-glow">
+                <svg className="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
               </div>
-              <div className="mt-6 pt-6 border-t border-border/50">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                  Real-time transcription
-                </div>
+              <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">Step 1</div>
+              <h3 className="text-xl font-bold text-foreground mb-2">Just Teach</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Lecture normally while Edvana listens. No special setup, no interruptions to your flow.
+              </p>
+              <div className="mt-auto rounded-xl overflow-hidden border border-border/50 shadow-lg">
+                <img 
+                  src={step1Image} 
+                  alt="Live lecture capture interface" 
+                  className="w-full h-auto"
+                />
               </div>
             </div>
 
             {/* Step 2 */}
-            <div className="headspace-card p-6 animate-fade-in stagger-2">
+            <div className="headspace-card p-6 flex flex-col animate-fade-in stagger-2">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary to-secondary-glow flex items-center justify-center mb-4 shadow-glow-secondary">
                 <Zap className="w-6 h-6 text-secondary-foreground" />
               </div>
               <div className="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">Step 2</div>
               <h3 className="text-xl font-bold text-foreground mb-2">AI Creates Questions</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-4">
                 Smart check-ins generated from what you just explained
               </p>
+              <div className="mt-auto rounded-xl overflow-hidden border border-border/50 shadow-lg">
+                <img 
+                  src={step2Image} 
+                  alt="Student receiving live check-in question" 
+                  className="w-full h-auto"
+                />
+              </div>
             </div>
 
             {/* Step 3 */}
-            <div className="headspace-card p-6 animate-fade-in stagger-3">
+            <div className="headspace-card p-6 flex flex-col animate-fade-in stagger-3">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-achievement to-achievement-glow flex items-center justify-center mb-4">
                 <Users className="w-6 h-6 text-achievement-foreground" />
               </div>
               <div className="text-xs font-semibold text-achievement uppercase tracking-wider mb-2">Step 3</div>
               <h3 className="text-xl font-bold text-foreground mb-2">See Who Gets It</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-4">
                 Instant visibility into comprehension across your class
               </p>
-            </div>
-
-            {/* Flow diagram - spans 2 columns */}
-            <div className="md:col-span-2 rounded-3xl overflow-hidden shadow-xl border border-border/50 animate-fade-in stagger-4">
-              <img 
-                src={mockupFlow} 
-                alt="How Edvana connects instructors to students through AI" 
-                className="w-full h-auto"
-              />
+              <div className="mt-auto rounded-xl overflow-hidden border border-border/50 shadow-lg">
+                <img 
+                  src={step3Image} 
+                  alt="Analytics and feedback dashboard" 
+                  className="w-full h-auto"
+                />
+              </div>
             </div>
           </div>
         </div>
