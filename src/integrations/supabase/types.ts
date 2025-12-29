@@ -802,6 +802,45 @@ export type Database = {
           },
         ]
       }
+      instructor_usage_tracking: {
+        Row: {
+          created_at: string
+          id: string
+          instructor_id: string
+          minutes_limit: number
+          minutes_used: number
+          org_id: string | null
+          updated_at: string
+          usage_month: string
+          warning_100_sent: boolean
+          warning_75_sent: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructor_id: string
+          minutes_limit?: number
+          minutes_used?: number
+          org_id?: string | null
+          updated_at?: string
+          usage_month?: string
+          warning_100_sent?: boolean
+          warning_75_sent?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          minutes_limit?: number
+          minutes_used?: number
+          org_id?: string | null
+          updated_at?: string
+          usage_month?: string
+          warning_100_sent?: boolean
+          warning_75_sent?: boolean
+        }
+        Relationships: []
+      }
       lecture_concept_map: {
         Row: {
           concept_name: string
@@ -3527,6 +3566,16 @@ export type Database = {
       }
     }
     Functions: {
+      add_lecture_minutes: {
+        Args: { p_instructor_id: string; p_minutes: number }
+        Returns: {
+          minutes_limit: number
+          new_total: number
+          usage_percent: number
+          warning_level: string
+          warning_triggered: boolean
+        }[]
+      }
       assign_oauth_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -3545,6 +3594,10 @@ export type Database = {
       }
       can_manage_group: {
         Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_record_lecture: {
+        Args: { p_instructor_id: string }
         Returns: boolean
       }
       can_view_user: {
@@ -3572,6 +3625,15 @@ export type Database = {
           difficulty_history: Json
           success_rate_by_level: Json
           total_questions_at_level: Json
+        }[]
+      }
+      get_current_usage: {
+        Args: { p_instructor_id: string }
+        Returns: {
+          minutes_limit: number
+          minutes_used: number
+          usage_percent: number
+          warning_level: string
         }[]
       }
       get_problem_answer: {
