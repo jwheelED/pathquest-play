@@ -146,3 +146,6 @@ verify_jwt = true
 
 [functions.match-transcript-to-problem]
 verify_jwt = true
+
+[functions.convert-pptx-to-pdf]
+verify_jwt = true

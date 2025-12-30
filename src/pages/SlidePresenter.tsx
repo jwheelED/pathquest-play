@@ -458,7 +458,7 @@ export default function SlidePresenter() {
             <Presentation className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">No Presentations Yet</h2>
             <p className="text-muted-foreground mb-6">
-              Upload PDF slides to start presenting with integrated live lecture tools
+              Upload PDF or PowerPoint slides to start presenting with integrated live lecture tools
             </p>
             <Button onClick={() => setShowUploader(true)}>
               <Upload className="h-4 w-4 mr-2" />
