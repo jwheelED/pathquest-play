@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileImage, X, Loader2 } from 'lucide-react';
+import { Upload, FileImage, X, Loader2, FileType } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getOrgId } from '@/hooks/useOrgId';
@@ -14,20 +14,38 @@ interface SlideUploaderProps {
   onCancel: () => void;
 }
 
+type UploadStage = 'idle' | 'uploading' | 'converting' | 'saving';
+
 export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
   const [title, setTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
+
+  const allowedTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+    'application/vnd.ms-powerpoint', // .ppt (older format)
+  ];
+
+  const isPptxFile = (file: File) => {
+    return file.type.includes('presentation') || file.type.includes('powerpoint') || 
+           file.name.toLowerCase().endsWith('.pptx') || file.name.toLowerCase().endsWith('.ppt');
+  };
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Only accept PDFs for now (can be extended to images)
-    const allowedTypes = ['application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload a PDF file');
+    // Check file type
+    const isAllowed = allowedTypes.includes(file.type) || 
+                      file.name.toLowerCase().endsWith('.pdf') ||
+                      file.name.toLowerCase().endsWith('.pptx') ||
+                      file.name.toLowerCase().endsWith('.ppt');
+    
+    if (!isAllowed) {
+      toast.error('Please upload a PDF or PowerPoint file (.pdf, .pptx, .ppt)');
       return;
     }
 
@@ -39,6 +57,20 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
     setSelectedFile(file);
   }, []);
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix to get pure base64
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleUpload = async () => {
     if (!selectedFile || !title.trim()) {
       toast.error('Please provide a title and select a file');
@@ -47,36 +79,81 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
 
     setUploading(true);
     setUploadProgress(10);
+    setUploadStage('uploading');
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      setUploadProgress(30);
+      let filePath: string;
+      let finalFileType = selectedFile.type;
+      let finalFileName = selectedFile.name;
 
-      // Upload the PDF to storage
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/slides/${fileName}`;
+      // Check if this is a PPTX file that needs conversion
+      if (isPptxFile(selectedFile)) {
+        setUploadStage('converting');
+        setUploadProgress(30);
+        
+        toast.info('Converting PowerPoint to PDF...', { duration: 5000 });
+        
+        // Convert file to base64
+        const fileBase64 = await fileToBase64(selectedFile);
+        
+        setUploadProgress(50);
+        
+        // Call edge function to convert PPTX to PDF
+        const { data, error } = await supabase.functions.invoke('convert-pptx-to-pdf', {
+          body: {
+            fileBase64,
+            fileName: selectedFile.name,
+            instructorId: user.id,
+          },
+        });
 
-      const { error: uploadError } = await supabase.storage
-        .from('lecture-materials')
-        .upload(filePath, selectedFile);
+        if (error) {
+          console.error('Conversion error:', error);
+          throw new Error(error.message || 'Failed to convert PowerPoint file');
+        }
 
-      if (uploadError) throw uploadError;
+        if (!data?.success) {
+          throw new Error(data?.error || 'Conversion failed');
+        }
 
-      setUploadProgress(70);
+        filePath = data.filePath;
+        finalFileType = 'application/pdf';
+        finalFileName = data.convertedName;
+        
+        setUploadProgress(80);
+      } else {
+        // Direct PDF upload
+        setUploadProgress(30);
+        
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        filePath = `${user.id}/slides/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('lecture-materials')
+          .upload(filePath, selectedFile);
+
+        if (uploadError) throw uploadError;
+
+        setUploadProgress(70);
+      }
 
       // Save to database
+      setUploadStage('saving');
+      setUploadProgress(90);
+      
       const orgId = await getOrgId(user.id);
       const { error: dbError } = await supabase
         .from('lecture_materials')
         .insert({
           instructor_id: user.id,
           org_id: orgId,
-          file_name: selectedFile.name,
+          file_name: finalFileName,
           file_path: filePath,
-          file_type: selectedFile.type,
+          file_type: finalFileType,
           file_size: selectedFile.size,
           title: title.trim(),
           description: 'Presentation slides',
@@ -85,28 +162,61 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       if (dbError) throw dbError;
 
       setUploadProgress(100);
+      toast.success(isPptxFile(selectedFile) ? 'PowerPoint converted and uploaded!' : 'Slides uploaded successfully!');
       onComplete();
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error(error.message || 'Failed to upload slides');
     } finally {
       setUploading(false);
+      setUploadStage('idle');
     }
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') {
+    
+    const isAllowed = allowedTypes.includes(file?.type) || 
+                      file?.name.toLowerCase().endsWith('.pdf') ||
+                      file?.name.toLowerCase().endsWith('.pptx') ||
+                      file?.name.toLowerCase().endsWith('.ppt');
+    
+    if (file && isAllowed) {
+      if (file.size > 200 * 1024 * 1024) {
+        toast.error('File size must be less than 200MB');
+        return;
+      }
       setSelectedFile(file);
     } else {
-      toast.error('Please drop a PDF file');
+      toast.error('Please drop a PDF or PowerPoint file');
     }
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
+
+  const getStageMessage = () => {
+    switch (uploadStage) {
+      case 'uploading':
+        return 'Uploading...';
+      case 'converting':
+        return 'Converting PowerPoint to PDF...';
+      case 'saving':
+        return 'Saving...';
+      default:
+        return `${uploadProgress}%`;
+    }
+  };
+
+  const getFileIcon = () => {
+    if (!selectedFile) return null;
+    if (isPptxFile(selectedFile)) {
+      return <FileType className="h-12 w-12 text-orange-500 mx-auto" />;
+    }
+    return <FileImage className="h-12 w-12 text-primary mx-auto" />;
+  };
 
   return (
     <Card className="max-w-2xl mx-auto">
@@ -115,7 +225,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           <div>
             <CardTitle>Upload Presentation Slides</CardTitle>
             <CardDescription>
-              Upload a PDF file to present during your live lectures
+              Upload a PDF or PowerPoint file to present during your live lectures
             </CardDescription>
           </div>
           <Button variant="ghost" size="icon" onClick={onCancel}>
@@ -146,10 +256,13 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
         >
           {selectedFile ? (
             <div className="space-y-2">
-              <FileImage className="h-12 w-12 text-primary mx-auto" />
+              {getFileIcon()}
               <p className="font-medium">{selectedFile.name}</p>
               <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                {isPptxFile(selectedFile) && (
+                  <span className="ml-2 text-orange-500">(will be converted to PDF)</span>
+                )}
               </p>
               {!uploading && (
                 <Button
@@ -165,12 +278,12 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
             <div className="space-y-4">
               <Upload className="h-12 w-12 text-muted-foreground mx-auto" />
               <div>
-                <p className="font-medium">Drag and drop your PDF here</p>
-                <p className="text-sm text-muted-foreground">or click to browse</p>
+                <p className="font-medium">Drag and drop your PDF or PowerPoint here</p>
+                <p className="text-sm text-muted-foreground">Supports .pdf, .pptx, and .ppt files</p>
               </div>
               <Input
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.pptx,.ppt,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-powerpoint"
                 onChange={handleFileChange}
                 className="max-w-xs mx-auto"
                 disabled={uploading}
@@ -183,7 +296,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           <div className="space-y-2">
             <Progress value={uploadProgress} />
             <p className="text-sm text-center text-muted-foreground">
-              Uploading... {uploadProgress}%
+              {getStageMessage()}
             </p>
           </div>
         )}
@@ -200,7 +313,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
             {uploading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Uploading...
+                {uploadStage === 'converting' ? 'Converting...' : 'Uploading...'}
               </>
             ) : (
               <>
