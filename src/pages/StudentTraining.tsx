@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Sparkles, Target, Trophy, BookOpen, Users, BarChart3, Upload, Filter } from "lucide-react";
-import { MobileHeader } from "@/components/mobile/MobileHeader";
+import { Sparkles, Target, BookOpen, Upload, Filter, Radio, Trophy, Plus } from "lucide-react";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { QuickActions } from "@/components/dashboard/QuickActions";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { DailyChallenges } from "@/components/student/DailyChallenges";
 import { Leaderboard } from "@/components/student/Leaderboard";
@@ -16,6 +17,14 @@ import { StudyGroups } from "@/components/student/StudyGroups";
 import { AdaptiveDifficultyIndicator } from "@/components/student/AdaptiveDifficultyIndicator";
 import { FloatingDecorations } from "@/components/student/FloatingDecorations";
 import { ReviewDashboard } from "@/components/student/ReviewDashboard";
+import { ReadinessMeter } from "@/components/student/ReadinessMeter";
+import { StreakWidget } from "@/components/student/StreakWidget";
+import { QuickStatsBar } from "@/components/student/QuickStatsBar";
+import { StudyPlanHeader } from "@/components/student/StudyPlanHeader";
+import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
+import { BadgesButton } from "@/components/student/BadgesButton";
+import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
+import AchievementSystem from "@/components/AchievementSystem";
 import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
 import STEMPractice from "@/components/STEMPractice";
 import { logger } from "@/lib/logger";
@@ -39,6 +48,7 @@ export default function StudentTraining() {
   const [materialRefreshKey, setMaterialRefreshKey] = useState(0);
   const [selectedMaterialClass, setSelectedMaterialClass] = useState<string>("all");
   const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [className, setClassName] = useState<string>("");
   const [courseContext, setCourseContext] = useState<{
     courseTitle?: string;
     courseTopics?: string[];
@@ -95,6 +105,11 @@ export default function StudentTraining() {
 
       const classData = await Promise.all(classPromises);
       setClasses(classData);
+      
+      // Set first class name for header subtitle
+      if (classData.length > 0) {
+        setClassName(classData[0].courseTitle);
+      }
     } catch (error: any) {
       logger.error("Error fetching classes:", error);
     }
@@ -147,69 +162,70 @@ export default function StudentTraining() {
     navigate("/");
   };
 
+  const quickActions = [
+    {
+      icon: <Radio className="w-3 h-3" />,
+      label: "Join Live",
+      onClick: () => navigate("/join"),
+      variant: "primary" as const,
+    },
+    {
+      icon: <Upload className="w-3 h-3" />,
+      label: "Upload",
+      onClick: () => {
+        document.getElementById('study-materials-section')?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      },
+    },
+    {
+      icon: <Trophy className="w-3 h-3" />,
+      label: "Badges",
+      onClick: () => navigate("/dashboard#badges"),
+    },
+  ];
+
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse-soft text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen headspace-bg relative pb-20 md:pb-0">
+    <DashboardShell
+      role="student"
+      userName={userName || user.email || "Student"}
+      userEmail={user.email || ""}
+      userId={user.id}
+      onLogout={handleLogout}
+      stats={userStats}
+      title="Edvana Student"
+      subtitle={className}
+      headerActions={
+        <>
+          <QuickActions actions={quickActions} className="hidden lg:flex" />
+          {user?.id && <BadgesButton userId={user.id} />}
+        </>
+      }
+    >
+      {/* Headless achievement checker */}
+      {user?.id && <AchievementSystem userId={user.id} />}
+      
       {/* Floating Decorations */}
       <FloatingDecorations variant="minimal" />
-      
-      <MobileHeader
-        userName={userName || user.email || "Student"}
-        userEmail={user.email || ""}
-        role="student"
-        onLogout={handleLogout}
-        stats={userStats}
-      />
 
-      {/* Desktop Header */}
-      <header className="hidden md:block bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/?stay=true")}
-                  className="gap-2 rounded-full hover:bg-accent"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Home
-                </Button>
-                <span className="text-muted-foreground">/</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/dashboard")}
-                  className="gap-2 rounded-full hover:bg-accent"
-                >
-                  Dashboard
-                </Button>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center">
-                  <Target className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <h1 className="text-xl font-bold text-foreground">
-                  Edvana Training
-                </h1>
-              </div>
-            </div>
-            <span className="text-sm text-muted-foreground">
-              {userName || user?.email || "User"}
-            </span>
-          </div>
-        </div>
-      </header>
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* Study Plan Header */}
+        <StudyPlanHeader userId={user.id} />
+        
+        {/* Quick Stats Bar */}
+        <section className="mb-6 animate-fade-in">
+          <QuickStatsBar userId={user.id} />
+        </section>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
           
           {/* Class Selector */}
@@ -217,9 +233,34 @@ export default function StudentTraining() {
             {user?.id && <ClassSelector userId={user.id} />}
           </div>
 
+          {/* Readiness Meter - Now a feature card, not hero */}
+          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
+            <div className="headspace-card rounded-3xl p-5 border border-border/50 h-full">
+              <ReadinessMeter
+                userId={user.id}
+                onContinue={() => {
+                  document.getElementById('practice-section')?.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                  });
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Streak Widget */}
+          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
+            <StreakWidget userId={user.id} />
+          </div>
+
+          {/* Daily Challenges */}
+          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
+            {user?.id && <DailyChallenges userId={user.id} />}
+          </div>
+
           {/* Onboarding Card for Students Without Classes */}
           {classes.length === 0 && (
-            <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-1">
+            <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-2">
               <div className="headspace-card p-6 bg-gradient-to-br from-primary/10 to-accent/10">
                 <div className="flex flex-col md:flex-row items-start gap-5">
                   <div className="w-14 h-14 rounded-3xl bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -251,18 +292,13 @@ export default function StudentTraining() {
             </div>
           )}
 
-          {/* Daily Challenges */}
-          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
-            {user?.id && <DailyChallenges userId={user.id} />}
-          </div>
-
           {/* Daily Review Dashboard */}
-          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
+          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-2">
             {user?.id && <ReviewDashboard userId={user.id} />}
           </div>
 
           {/* Leaderboard */}
-          <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-2">
+          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-2">
             {user?.id && <Leaderboard userId={user.id} />}
           </div>
 
@@ -272,7 +308,7 @@ export default function StudentTraining() {
           </div>
 
           {/* AI-Powered Practice Section */}
-          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-4">
+          <div id="practice-section" className="col-span-1 lg:col-span-12 animate-fade-in stagger-4 scroll-mt-4">
             <div className="headspace-card p-6">
               <div className="flex items-start gap-4 mb-5">
                 <div className="w-14 h-14 rounded-3xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
@@ -370,7 +406,25 @@ export default function StudentTraining() {
         </div>
       </div>
 
+      {/* Floating Action Button for Upload */}
+      <div className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8">
+        <QuickUploadSheet
+          userId={user.id}
+          trigger={
+            <Button
+              size="lg"
+              className="rounded-full w-14 h-14 shadow-xl bg-primary hover:bg-primary/90"
+            >
+              <Plus className="w-6 h-6" />
+            </Button>
+          }
+        />
+      </div>
+
+      {/* Connection Debug Panel */}
+      {user?.id && <ConnectionDebugPanel userId={user.id} />}
+
       <BottomNav role="student" />
-    </div>
+    </DashboardShell>
   );
 }
