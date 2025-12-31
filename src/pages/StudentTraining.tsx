@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Target, BookOpen, Upload, Filter, Radio, Trophy, Plus } from "lucide-react";
@@ -22,6 +22,7 @@ import { StreakWidget } from "@/components/student/StreakWidget";
 import { QuickStatsBar } from "@/components/student/QuickStatsBar";
 import { StudyPlanHeader } from "@/components/student/StudyPlanHeader";
 import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
+import { BadgesDialog } from "@/components/student/BadgesButton";
 
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
 import AchievementSystem from "@/components/AchievementSystem";
@@ -49,15 +50,26 @@ export default function StudentTraining() {
   const [selectedMaterialClass, setSelectedMaterialClass] = useState<string>("all");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [className, setClassName] = useState<string>("");
+  const [badgesOpen, setBadgesOpen] = useState(false);
   const [courseContext, setCourseContext] = useState<{
     courseTitle?: string;
     courseTopics?: string[];
     courseSchedule?: string;
   }>({});
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Get adaptive difficulty for the user
   const { currentDifficulty } = useAdaptiveDifficulty(user?.id);
+
+  // Handle hash-based navigation for badges
+  useEffect(() => {
+    if (location.hash === '#badges' && user?.id) {
+      setBadgesOpen(true);
+      // Clear the hash after opening
+      window.history.replaceState(null, '', location.pathname);
+    }
+  }, [location.hash, user?.id]);
 
   useEffect(() => {
     checkSession();
@@ -182,7 +194,7 @@ export default function StudentTraining() {
     {
       icon: <Trophy className="w-3 h-3" />,
       label: "Badges",
-      onClick: () => navigate("/dashboard#badges"),
+      onClick: () => setBadgesOpen(true),
     },
   ];
 
@@ -208,6 +220,15 @@ export default function StudentTraining() {
         <QuickActions actions={quickActions} className="hidden lg:flex" />
       }
     >
+      {/* Badges Dialog */}
+      {user?.id && (
+        <BadgesDialog 
+          userId={user.id} 
+          open={badgesOpen} 
+          onOpenChange={setBadgesOpen} 
+        />
+      )}
+
       {/* Headless achievement checker */}
       {user?.id && <AchievementSystem userId={user.id} />}
       

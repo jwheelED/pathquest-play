@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Trophy } from "lucide-react";
+import { Lock } from "lucide-react";
 
-interface BadgesButtonProps {
+interface BadgesDialogProps {
   userId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 interface Achievement {
@@ -27,15 +28,17 @@ interface UserAchievement {
   earned_at: string;
 }
 
-export const BadgesButton = ({ userId }: BadgesButtonProps) => {
+export const BadgesDialog = ({ userId, open, onOpenChange }: BadgesDialogProps) => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [earnedAchievements, setEarnedAchievements] = useState<UserAchievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   useEffect(() => {
-    fetchData();
-  }, [userId]);
+    if (open) {
+      fetchData();
+    }
+  }, [userId, open]);
 
   const fetchData = async () => {
     try {
@@ -97,13 +100,7 @@ export const BadgesButton = ({ userId }: BadgesButtonProps) => {
   const totalCount = achievements.length;
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Trophy className="w-4 h-4" />
-          Badges ({earnedCount}/{totalCount})
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
@@ -193,13 +190,13 @@ export const BadgesButton = ({ userId }: BadgesButtonProps) => {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Collection Progress</span>
                 <span className="font-bold text-primary">
-                  {((earnedCount / totalCount) * 100).toFixed(0)}%
+                  {totalCount > 0 ? ((earnedCount / totalCount) * 100).toFixed(0) : 0}%
                 </span>
               </div>
               <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-primary transition-all duration-500"
-                  style={{ width: `${(earnedCount / totalCount) * 100}%` }}
+                  style={{ width: `${totalCount > 0 ? (earnedCount / totalCount) * 100 : 0}%` }}
                 />
               </div>
             </div>
