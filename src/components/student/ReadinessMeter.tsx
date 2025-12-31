@@ -1,6 +1,5 @@
 import { useReadinessScore } from '@/hooks/useReadinessScore';
-import { Button } from '@/components/ui/button';
-import { Play, Loader2, Calendar, Brain, ClipboardCheck, Zap } from 'lucide-react';
+import { Loader2, Calendar, Brain, ClipboardCheck, Zap } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -12,10 +11,9 @@ interface ReadinessMeterProps {
   userId: string;
   classId?: string;
   className?: string;
-  onContinue: () => void;
 }
 
-export function ReadinessMeter({ userId, classId, className, onContinue }: ReadinessMeterProps) {
+export function ReadinessMeter({ userId, classId, className }: ReadinessMeterProps) {
   const { readiness, conceptMastery, assignmentsProgress, challengesProgress, loading, studyPlan } = useReadinessScore(userId, classId);
 
   const circumference = 2 * Math.PI * 70;
@@ -141,28 +139,17 @@ export function ReadinessMeter({ userId, classId, className, onContinue }: Readi
         </Tooltip>
       </TooltipProvider>
 
-      {/* Action Area */}
-      <div className="flex flex-col items-center md:items-start gap-4 text-center md:text-left">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
-            {getReadinessLabel()}
-          </h2>
-          <p className="text-muted-foreground">
-            {studyPlan 
-              ? `You're preparing for your upcoming exam`
-              : 'Your personalized learning path awaits'
-            }
-          </p>
-        </div>
-        
-        <Button
-          size="lg"
-          onClick={onContinue}
-          className="pulse-action rounded-full px-8 py-6 text-lg font-semibold shadow-xl hover:shadow-2xl bg-primary hover:bg-primary/90 gap-3"
-        >
-          <Play className="w-5 h-5" />
-          Continue Path
-        </Button>
+      {/* Label Area */}
+      <div className="flex flex-col items-center md:items-start gap-2 text-center md:text-left">
+        <h2 className="text-xl md:text-2xl font-bold text-foreground">
+          {getReadinessLabel()}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {studyPlan 
+            ? `Preparing for your upcoming exam`
+            : 'Your personalized learning path'
+          }
+        </p>
       </div>
     </div>
   );

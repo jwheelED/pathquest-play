@@ -22,7 +22,7 @@ import { StreakWidget } from "@/components/student/StreakWidget";
 import { QuickStatsBar } from "@/components/student/QuickStatsBar";
 import { StudyPlanHeader } from "@/components/student/StudyPlanHeader";
 import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
-import { BadgesButton } from "@/components/student/BadgesButton";
+
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
 import AchievementSystem from "@/components/AchievementSystem";
 import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
@@ -205,10 +205,7 @@ export default function StudentTraining() {
       title="Edvana Student"
       subtitle={className}
       headerActions={
-        <>
-          <QuickActions actions={quickActions} className="hidden lg:flex" />
-          {user?.id && <BadgesButton userId={user.id} />}
-        </>
+        <QuickActions actions={quickActions} className="hidden lg:flex" />
       }
     >
       {/* Headless achievement checker */}
@@ -236,15 +233,7 @@ export default function StudentTraining() {
           {/* Readiness Meter - Now a feature card, not hero */}
           <div className="col-span-1 lg:col-span-4 animate-fade-in stagger-1">
             <div className="headspace-card rounded-3xl p-5 border border-border/50 h-full">
-              <ReadinessMeter
-                userId={user.id}
-                onContinue={() => {
-                  document.getElementById('practice-section')?.scrollIntoView({ 
-                    behavior: 'smooth',
-                    block: 'start'
-                  });
-                }}
-              />
+              <ReadinessMeter userId={user.id} />
             </div>
           </div>
 
