@@ -3,26 +3,24 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogOut, Users, Code, BookOpen, Presentation, Settings, Video } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { InstructorOverview } from "@/components/instructor/InstructorOverview";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
-// LEGACY: Content Generator replaced by Lecture Transcription
-// import { ContentGenerator } from "@/components/instructor/ContentGenerator";
-// import { ReviewQueue } from "@/components/instructor/ReviewQueue";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
-
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
-
 
 interface Student {
   id: string;
@@ -53,7 +51,6 @@ export default function InstructorDashboard() {
     checkAuth();
     fetchStudents();
     
-    // Show reminder about course materials once per day
     const lastReminderDate = localStorage.getItem('lastCourseMaterialsReminder');
     const today = new Date().toDateString();
     if (lastReminderDate !== today) {
@@ -65,12 +62,10 @@ export default function InstructorDashboard() {
       }, 1500);
     }
     
-    // Set up real-time updates after getting user
     const setupRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Real-time updates for classroom stats and student progress
       const channel = supabase
         .channel('instructor-realtime-updates')
         .on(
@@ -83,7 +78,7 @@ export default function InstructorDashboard() {
           },
           (payload) => {
             console.log('👥 New student joined:', payload);
-            fetchStudents(); // Refresh student list immediately
+            fetchStudents();
             toast.success('New student joined the class!', { duration: 3000 });
           }
         )
@@ -97,8 +92,6 @@ export default function InstructorDashboard() {
           },
           (payload) => {
             console.log('📋 Assignment update:', payload);
-            
-            // Debounce to handle multiple rapid updates
             if (fetchDebounceTimer.current) {
               clearTimeout(fetchDebounceTimer.current);
             }
@@ -116,8 +109,6 @@ export default function InstructorDashboard() {
           },
           (payload) => {
             console.log('📊 Student stats updated:', payload);
-            
-            // Debounce to handle multiple rapid updates
             if (fetchDebounceTimer.current) {
               clearTimeout(fetchDebounceTimer.current);
             }
@@ -152,7 +143,6 @@ export default function InstructorDashboard() {
       return;
     }
 
-    // Verify instructor role using user_roles table
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -166,24 +156,20 @@ export default function InstructorDashboard() {
       return;
     }
     
-    // Fetch profile details
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name")
       .eq("id", session.user.id)
       .single();
     
     setInstructorProfile(profile);
 
-    // Only require re-onboarding if NEVER onboarded before
-    // Don't force if just one field is missing
     if (!profile?.onboarded) {
       toast.info("Please complete your instructor onboarding");
       navigate("/instructor/onboarding");
       return;
     }
 
-    // Warn about missing fields but don't block access
     if (!profile?.course_title || !profile.course_schedule || 
         !profile.course_topics || profile.course_topics.length === 0) {
       toast.warning("⚠️ Your course details are incomplete. Please update them in onboarding.", {
@@ -200,12 +186,11 @@ export default function InstructorDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Optimized: Single query with limit for large classes
       const { data: studentLinks } = await supabase
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", user.id)
-        .limit(100); // Reasonable limit for classroom size
+        .limit(100);
 
       if (!studentLinks || studentLinks.length === 0) {
         setLoading(false);
@@ -214,7 +199,6 @@ export default function InstructorDashboard() {
 
       const studentIds = studentLinks.map(link => link.student_id);
 
-      // Parallel queries for better performance with 40+ students
       const [profilesData, statsData, progressData, masteryData, gradesData] = await Promise.all([
         supabase.from("profiles").select("id, full_name").in("id", studentIds),
         supabase.from("user_stats").select("*").in("user_id", studentIds),
@@ -228,20 +212,17 @@ export default function InstructorDashboard() {
           .in("student_id", studentIds),
       ]);
 
-      // Create lookup maps for O(1) access - much faster with 40+ students
       const statsMap = new Map(statsData.data?.map(s => [s.user_id, s]));
       const progressMap = new Map<string, number>();
       const masteryMap = new Map<string, { total: number; sum: number }>();
       const gradesMap = new Map<string, number[]>();
 
-      // Aggregate progress efficiently
       progressData.data?.forEach(p => {
         if (p.completed) {
           progressMap.set(p.user_id, (progressMap.get(p.user_id) || 0) + 1);
         }
       });
 
-      // Aggregate mastery efficiently  
       masteryData.data?.forEach(m => {
         if (m.is_mastered) {
           const existing = masteryMap.get(m.user_id) || { total: 0, sum: 0 };
@@ -252,7 +233,6 @@ export default function InstructorDashboard() {
         }
       });
 
-      // Aggregate grades efficiently
       gradesData.data?.forEach(g => {
         if (g.grade !== null) {
           const existing = gradesMap.get(g.student_id) || [];
@@ -292,7 +272,6 @@ export default function InstructorDashboard() {
   };
 
   const handleLogout = async () => {
-    // Clear ALL cached data
     localStorage.removeItem("edvana_onboarded");
     localStorage.removeItem("lastCourseMaterialsReminder");
     await supabase.auth.signOut();
@@ -388,145 +367,168 @@ export default function InstructorDashboard() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-secondary/10">
-      {/* Mobile-optimized header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary flex-shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold text-primary truncate">Instructor Dashboard</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage and track your students</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button onClick={() => navigate("/instructor/settings")} variant="ghost" size="sm" className="gap-1 sm:gap-2">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </Button>
-            <Button onClick={handleLogout} variant="outline" size="sm" className="gap-1 sm:gap-2">
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+  const quickActions = [
+    {
+      icon: <Radio className="w-3 h-3" />,
+      label: "Start Live",
+      onClick: () => {},
+      variant: "primary" as const,
+    },
+    {
+      icon: <Presentation className="w-3 h-3" />,
+      label: "Present Slides",
+      onClick: () => navigate("/instructor/slides"),
+    },
+    {
+      icon: <Video className="w-3 h-3" />,
+      label: "Record",
+      onClick: () => navigate("/instructor/presenter"),
+    },
+  ];
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-6">
+  return (
+    <DashboardShell
+      role="instructor"
+      userName={instructorProfile?.full_name || currentUser?.email || "Instructor"}
+      userEmail={currentUser?.email || ""}
+      userId={currentUser?.id}
+      onLogout={handleLogout}
+      title="Instructor Dashboard"
+      subtitle={instructorProfile?.course_title}
+      headerActions={
+        <QuickActions actions={quickActions} className="hidden lg:flex" />
+      }
+    >
+      <div className="space-y-6">
         {/* Organization and Admin Connection Info */}
         <InstructorConnectionCard />
 
-        {/* Instructor Code - Mobile optimized */}
-        {instructorCode && (
-          <div className="p-4 sm:p-6 bg-card border rounded-lg shadow-sm">
-            <h3 className="text-base sm:text-lg font-semibold mb-2">Your Instructor Code</h3>
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-              <code className="text-xl sm:text-2xl font-bold text-primary bg-muted px-3 sm:px-4 py-2 rounded text-center sm:text-left">
-                {instructorCode}
-              </code>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                onClick={() => {
-                  navigator.clipboard.writeText(instructorCode);
-                  toast.success("Code copied to clipboard!");
-                }}
-              >
-                Copy Code
-              </Button>
+        {/* Top Section - Overview and Code */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Class Health Overview */}
+          {currentUser && (
+            <div className="lg:col-span-2">
+              <InstructorOverview instructorId={currentUser.id} />
             </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-              Share this code with your students so they can join your class.
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Settings visible regardless of student count */}
+          {/* Instructor Code Card */}
+          {instructorCode && (
+            <div className="headspace-card rounded-2xl p-6 border border-border/50">
+              <h3 className="text-lg font-semibold mb-3 text-foreground">Your Class Code</h3>
+              <div className="flex flex-col gap-3">
+                <code className="text-3xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center">
+                  {instructorCode}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full rounded-xl"
+                  onClick={() => {
+                    navigator.clipboard.writeText(instructorCode);
+                    toast.success("Code copied to clipboard!");
+                  }}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Code
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                Share this code with your students to join your class
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Live Session & Presentation Tools */}
         {currentUser && (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <LiveSessionControls onSessionChange={setLiveSessionId} />
 
-            {/* Slide Presenter Quick Access - Compact on mobile */}
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-              <CardHeader className="pb-2 sm:pb-4">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Presentation className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            {/* Slide Presenter Quick Access */}
+            <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Presentation className="h-5 w-5 text-primary" />
                   Slide Presenter
                 </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
+                <CardDescription>
                   Present slides with integrated live lecture tools
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
                 <Button 
                   onClick={() => navigate('/instructor/slides')}
-                  className="w-full"
-                  size="sm"
+                  className="w-full rounded-xl"
                 >
-                  <Presentation className="h-4 w-4 mr-2" />
                   Open Slide Presenter
                 </Button>
               </CardContent>
             </Card>
-            
-            <LectureMaterialsUpload />
-
-            {/* Pre-Recorded Lecture Upload */}
-            <PreRecordedLectureUpload 
-              onUploadComplete={(lectureId) => {
-                toast.success('Lecture ready! Students can now view it.');
-              }}
-            />
-
-            {/* Manage Existing Lectures */}
-            <LectureVideoManager />
-
-            {/* Pre-Recorded Lecture Grades */}
-            <PreRecordedLectureGrades />
-            
-            <LectureTranscription onQuestionGenerated={() => setRefreshQueue(prev => prev + 1)} />
           </div>
         )}
 
-        {students.length === 0 ? (
-          <div className="text-center py-8 sm:py-12">
-            <Users className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-            <h2 className="text-xl sm:text-2xl font-bold mb-2">No Students Yet</h2>
-            <p className="text-sm sm:text-base text-muted-foreground px-4">
-              Students will appear here once they join with your code.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4 sm:space-y-6">
-            <LectureCheckInResults />
+        {/* Content Management */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <LectureMaterialsUpload />
+          
+          {professorType === "research" && (
+            <Card className="headspace-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Code className="h-5 w-5 text-primary" />
+                  Research Tools
+                </CardTitle>
+                <CardDescription>
+                  AI-powered content generation for research
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full rounded-xl">
+                  Access Lab Portal
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-            {currentUser && <AnswerReleaseCard instructorId={currentUser.id} />}
+        {/* Pre-recorded Lectures */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PreRecordedLectureUpload />
+          <LectureVideoManager />
+        </div>
 
-            {currentUser && (
-              <AcademicIntegrityInsights instructorId={currentUser.id} />
-            )}
-          </div>
+        {/* Grades and Check-ins */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PreRecordedLectureGrades />
+          <LectureCheckInResults />
+        </div>
+
+        {/* Live Lecture Tools */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <LectureTranscription onQuestionGenerated={() => {}} />
+          <AnswerReleaseCard instructorId={currentUser?.id || ""} />
+        </div>
+
+        {/* Academic Integrity */}
+        {currentUser && <AcademicIntegrityInsights instructorId={currentUser.id} />}
+
+        {/* Student Rankings */}
+        <StudentRankingCard
+          students={rankedStudents}
+          onStudentClick={handleStudentClick}
+          onRefresh={fetchStudents}
+        />
+
+        {/* Student Detail Dialog */}
+        {selectedStudentDetail && (
+          <StudentDetailDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            student={selectedStudentDetail}
+          />
         )}
-
-        {/* Always show Student Rankings with empty state support */}
-        {currentUser && (
-          <div className="mt-4 sm:mt-6">
-            <StudentRankingCard 
-              students={rankedStudents}
-              onStudentClick={handleStudentClick}
-              onRefresh={fetchStudents}
-            />
-          </div>
-        )}
-      </main>
-
-      <StudentDetailDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        student={selectedStudentDetail}
-      />
-    </div>
+      </div>
+    </DashboardShell>
   );
 }

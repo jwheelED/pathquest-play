@@ -5,16 +5,18 @@ import { Button } from "@/components/ui/button";
 import AchievementSystem from "@/components/AchievementSystem";
 import { BadgesButton } from "@/components/student/BadgesButton";
 import { ConnectionDebugPanel } from "@/components/student/ConnectionDebugPanel";
-import { MobileHeader } from "@/components/mobile/MobileHeader";
-import { BottomNav } from "@/components/mobile/BottomNav";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { QuickActions } from "@/components/dashboard/QuickActions";
 import { ReadinessMeter } from "@/components/student/ReadinessMeter";
 import { LearningPathFeed } from "@/components/student/LearningPathFeed";
 import { TestOutGate } from "@/components/student/TestOutGate";
 import { QuickUploadSheet } from "@/components/student/QuickUploadSheet";
 import { StudyPlanHeader } from "@/components/student/StudyPlanHeader";
+import { StreakWidget } from "@/components/student/StreakWidget";
+import { QuickStatsBar } from "@/components/student/QuickStatsBar";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { LogOut, Sparkles, Upload, Radio, Plus } from "lucide-react";
+import { Radio, Plus, Upload, Trophy } from "lucide-react";
 
 interface User {
   id: string;
@@ -159,7 +161,6 @@ export default function Dashboard() {
   };
 
   const handleContinuePath = () => {
-    // Navigate to first priority item or training
     navigate("/training");
   };
 
@@ -181,104 +182,81 @@ export default function Dashboard() {
     );
   }
 
+  const quickActions = [
+    {
+      icon: <Radio className="w-3 h-3" />,
+      label: "Join Live",
+      onClick: () => navigate("/join"),
+      variant: "primary" as const,
+    },
+    {
+      icon: <Upload className="w-3 h-3" />,
+      label: "Upload",
+      onClick: () => setUploadSheetOpen(true),
+    },
+    {
+      icon: <Trophy className="w-3 h-3" />,
+      label: "Badges",
+      onClick: () => navigate("/dashboard#badges"),
+    },
+  ];
+
   return (
-    <div className="min-h-screen mastery-bg pb-24 md:pb-0">
-      {/* Mobile Header */}
-      <MobileHeader
-        userName={userName || user.email || "Student"}
-        userEmail={user.email || ""}
-        role="student"
-        onLogout={handleLogout}
-        userId={user.id}
-        stats={userStats}
-      />
+    <DashboardShell
+      role="student"
+      userName={userName || user.email || "Student"}
+      userEmail={user.email || ""}
+      userId={user.id}
+      onLogout={handleLogout}
+      stats={userStats}
+      title="Edvana"
+      subtitle={className}
+      headerActions={
+        <>
+          <QuickActions actions={quickActions} className="hidden lg:flex" />
+          {user?.id && <BadgesButton userId={user.id} />}
+        </>
+      }
+    >
+      {/* Headless achievement checker */}
+      {user?.id && <AchievementSystem userId={user.id} />}
 
-      {/* Desktop Header - Compact */}
-      <header className="hidden md:block bg-card/80 backdrop-blur-sm sticky top-0 z-40 border-b border-border/50">
-        <div className="max-w-3xl mx-auto px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-foreground">Edvana</h1>
-                {className && (
-                  <p className="text-xs text-muted-foreground">{className}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Join Live Session - Small */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/join")}
-                className="rounded-full gap-2 text-xs"
-              >
-                <Radio className="w-3 h-3" />
-                Join Live
-              </Button>
-
-              {/* Upload - Quick Upload Sheet */}
-              <QuickUploadSheet
-                userId={user.id}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-full w-8 h-8"
-                    title="Upload Materials"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
-                }
-              />
-
-              {user?.id && <BadgesButton userId={user.id} />}
-              
-              <div className="h-6 w-px bg-border" />
-              
-              <span className="text-sm text-muted-foreground hidden lg:block">
-                {userName || user?.email}
-              </span>
-              
-              <Button 
-                onClick={handleLogout} 
-                variant="ghost" 
-                size="icon" 
-                className="rounded-full w-8 h-8 text-muted-foreground hover:text-foreground"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content - Single Stream */}
-      <main className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-10">
-        {/* Headless achievement checker */}
-        {user?.id && <AchievementSystem userId={user.id} />}
-
+      <div className="max-w-3xl mx-auto">
         {/* Today's Date & Study Plan Progress */}
         <StudyPlanHeader userId={user.id} />
 
-        {/* Hero Section - Readiness Meter */}
-        <section className="mb-8 md:mb-12 animate-fade-in">
-          <div className="bg-card rounded-3xl p-6 md:p-10 border border-border/50 shadow-lg">
-            <ReadinessMeter
-              userId={user.id}
-              onContinue={handleContinuePath}
-            />
-          </div>
+        {/* Quick Stats Bar - Mobile prominent */}
+        <section className="mb-6 animate-fade-in">
+          <QuickStatsBar userId={user.id} />
         </section>
 
-        {/* Test Out Gate */}
-        <section className="animate-fade-in stagger-1">
-          <TestOutGate onTestOut={handleTestOut} />
-        </section>
+        {/* Two Column Layout on larger screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Hero Section - Readiness Meter */}
+            <section className="animate-fade-in">
+              <div className="headspace-card rounded-3xl p-6 md:p-8 border border-border/50">
+                <ReadinessMeter
+                  userId={user.id}
+                  onContinue={handleContinuePath}
+                />
+              </div>
+            </section>
+
+            {/* Test Out Gate */}
+            <section className="animate-fade-in stagger-1">
+              <TestOutGate onTestOut={handleTestOut} />
+            </section>
+          </div>
+
+          {/* Sidebar - Streak Widget */}
+          <div className="lg:col-span-1 space-y-6">
+            <section className="animate-fade-in stagger-1">
+              <StreakWidget userId={user.id} />
+            </section>
+          </div>
+        </div>
 
         {/* Unified Learning Stream */}
         <section className="animate-fade-in stagger-2">
@@ -291,9 +269,9 @@ export default function Dashboard() {
             onUpload={() => setUploadSheetOpen(true)}
           />
         </section>
-      </main>
+      </div>
 
-      {/* Floating Action Button for Upload - visible on all screens */}
+      {/* Floating Action Button for Upload */}
       <div className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8">
         <QuickUploadSheet
           userId={user.id}
@@ -310,9 +288,6 @@ export default function Dashboard() {
 
       {/* Connection Debug Panel */}
       {user?.id && <ConnectionDebugPanel userId={user.id} />}
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNav role="student" />
-    </div>
+    </DashboardShell>
   );
 }

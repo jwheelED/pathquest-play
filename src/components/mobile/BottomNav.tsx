@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface BottomNavProps {
-  role: "student" | "instructor";
+  role: "student" | "instructor" | "admin";
 }
 
 export function BottomNav({ role }: BottomNavProps) {
