@@ -2,72 +2,94 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Building2, ArrowRight } from "lucide-react";
+import { Building2, ArrowRight, CheckCircle2, Clock, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function InstructorOrgOnboarding() {
-  const [orgCode, setOrgCode] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [orgStatus, setOrgStatus] = useState<{
+    connected: boolean;
+    orgName: string | null;
+    pendingInvite: boolean;
+  }>({ connected: false, orgName: null, pendingInvite: false });
   const navigate = useNavigate();
 
   useEffect(() => {
-    checkExistingOrg();
+    checkOrgStatus();
   }, []);
 
-  const checkExistingOrg = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/instructor/auth");
-      return;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("org_id, onboarded")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.onboarded) {
-      navigate("/instructor/onboarding");
-    }
-  };
-
-  const handleSkip = () => {
-    toast.info("Skipping organization setup");
-    navigate("/instructor/onboarding");
-  };
-
-  const handleJoinOrganization = async () => {
-    if (!orgCode.trim()) {
-      toast.error("Please enter an admin code");
-      return;
-    }
-
-    setLoading(true);
+  const checkOrgStatus = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Connect to admin using their code
-      const { data: adminId, error: connectError } = await supabase
-        .rpc("connect_instructor_to_admin", { _admin_code: orgCode.toUpperCase() });
-
-      if (connectError || !adminId) {
-        throw new Error(connectError?.message || "Invalid admin code");
+      if (!user) {
+        navigate("/instructor/auth");
+        return;
       }
 
-      toast.success("Successfully connected to administrator!");
-      navigate("/instructor/onboarding");
-    } catch (error: any) {
-      console.error("Error connecting to admin:", error);
-      toast.error(error.message || "Failed to connect to administrator");
+      // Check profile for org_id and onboarded status
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id, onboarded")
+        .eq("id", user.id)
+        .single();
+
+      // If already onboarded, go to main onboarding
+      if (profile?.onboarded) {
+        navigate("/instructor/onboarding");
+        return;
+      }
+
+      // Check if connected to org
+      if (profile?.org_id) {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("name")
+          .eq("id", profile.org_id)
+          .single();
+
+        setOrgStatus({
+          connected: true,
+          orgName: org?.name || null,
+          pendingInvite: false,
+        });
+      } else {
+        // Check for pending invite
+        const { data: invite } = await supabase
+          .from("instructor_invites")
+          .select("id")
+          .eq("status", "pending")
+          .maybeSingle();
+
+        setOrgStatus({
+          connected: false,
+          orgName: null,
+          pendingInvite: !!invite,
+        });
+      }
+    } catch (error) {
+      console.error("Error checking org status:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleContinue = () => {
+    navigate("/instructor/onboarding");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="animate-pulse text-center">Checking organization status...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -75,50 +97,66 @@ export default function InstructorOrgOnboarding() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="w-6 h-6" />
-            Connect to Administrator
+            Organization Connection
           </CardTitle>
           <CardDescription>
-            Enter the admin code provided by your administrator, or skip to continue independently
+            {orgStatus.connected 
+              ? "You're connected to an organization!" 
+              : "Connect to your institution for the full experience"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="orgCode">Admin Code</Label>
-            <Input
-              id="orgCode"
-              placeholder="ADM-XXXXXXXX"
-              value={orgCode}
-              onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
-              maxLength={12}
-            />
-            <p className="text-sm text-muted-foreground">
-              This code connects you to your administrator's organization
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button
-              onClick={handleJoinOrganization}
-              disabled={loading || !orgCode.trim()}
-              className="w-full"
-            >
-              {loading ? "Joining..." : (
-                <>
-                  Join Organization <ArrowRight className="w-4 h-4 ml-2" />
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={handleSkip}
-              disabled={loading}
-              variant="outline"
-              className="w-full"
-            >
-              Skip for now
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            You can connect to an administrator later from your dashboard
-          </p>
+        <CardContent className="space-y-6">
+          {orgStatus.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+                <div>
+                  <p className="font-semibold text-green-700 dark:text-green-400">Connected</p>
+                  <p className="text-sm text-green-600 dark:text-green-500">{orgStatus.orgName}</p>
+                </div>
+              </div>
+              <Button onClick={handleContinue} className="w-full">
+                Continue to Setup <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                <Clock className="w-6 h-6 text-amber-600" />
+                <div>
+                  <p className="font-semibold text-amber-700 dark:text-amber-400">Not Connected Yet</p>
+                  <p className="text-sm text-amber-600 dark:text-amber-500">
+                    {orgStatus.pendingInvite 
+                      ? "You have a pending invite - sign up to auto-join" 
+                      : "No organization connection found"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">How to connect:</p>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2">
+                    <Mail className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>Use your institutional email - you may auto-join if your domain is registered</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Building2 className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>Ask your administrator to send you an invite</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <Button onClick={handleContinue} className="w-full">
+                  Continue Without Organization <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  You can connect to an organization later from your dashboard
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

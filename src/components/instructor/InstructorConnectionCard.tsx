@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Shield, User } from "lucide-react";
+import { Building2, Shield, User, CheckCircle2, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export function InstructorConnectionCard() {
   const [loading, setLoading] = useState(true);
@@ -16,8 +14,6 @@ export function InstructorConnectionCard() {
     orgName: string | null;
     orgSlug: string | null;
   } | null>(null);
-  const [adminCode, setAdminCode] = useState("");
-  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     fetchConnectionData();
@@ -89,31 +85,6 @@ export function InstructorConnectionCard() {
     }
   };
 
-  const handleConnectToAdmin = async () => {
-    if (!adminCode.trim()) {
-      toast.error("Please enter an admin code");
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      const { data, error } = await supabase.rpc("connect_instructor_to_admin", {
-        _admin_code: adminCode.trim(),
-      });
-
-      if (error) throw error;
-
-      toast.success("Successfully connected to administrator!");
-      setAdminCode("");
-      fetchConnectionData(); // Refresh the connection data
-    } catch (error: any) {
-      console.error("Error connecting to admin:", error);
-      toast.error(error.message || "Failed to connect. Please check the admin code.");
-    } finally {
-      setConnecting(false);
-    }
-  };
-
   if (loading) {
     return (
       <Card>
@@ -129,90 +100,85 @@ export function InstructorConnectionCard() {
     );
   }
 
-  // Show card even if no connection data yet
-  const hasConnection = connectionData?.adminName || connectionData?.orgName;
+  const isConnected = connectionData?.orgName;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building2 className="w-5 h-5" />
-          Organization & Admin Connection
+          Organization Connection
         </CardTitle>
         <CardDescription>
-          Your organization details and connected administrator
+          {isConnected 
+            ? "You are connected to an organization" 
+            : "You are not connected to an organization yet"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Organization Info */}
-        {connectionData?.orgName && (
+        {isConnected ? (
           <>
+            {/* Organization Info */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Building2 className="w-4 h-4" />
                 Organization
               </div>
               <div className="pl-6 space-y-1">
-                <p className="text-lg font-semibold">{connectionData.orgName}</p>
-                {connectionData.orgSlug && (
+                <div className="flex items-center gap-2">
+                  <p className="text-lg font-semibold">{connectionData?.orgName}</p>
+                  <Badge variant="default" className="bg-green-600">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Connected
+                  </Badge>
+                </div>
+                {connectionData?.orgSlug && (
                   <code className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
                     {connectionData.orgSlug}
                   </code>
                 )}
               </div>
             </div>
-            <Separator />
-          </>
-        )}
 
-        {/* Admin Info */}
-        {connectionData?.adminName ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Shield className="w-4 h-4" />
-              Connected Administrator
-            </div>
-            <div className="pl-6 space-y-1">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-primary" />
-                <p className="font-semibold">{connectionData.adminName}</p>
-              </div>
-              {connectionData.adminEmail && (
-                <p className="text-sm text-muted-foreground">{connectionData.adminEmail}</p>
-              )}
-            </div>
-          </div>
+            {/* Admin Info */}
+            {connectionData?.adminName && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Shield className="w-4 h-4" />
+                    Administrator
+                  </div>
+                  <div className="pl-6 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-primary" />
+                      <p className="font-semibold">{connectionData.adminName}</p>
+                    </div>
+                    {connectionData.adminEmail && (
+                      <p className="text-sm text-muted-foreground">{connectionData.adminEmail}</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Shield className="w-4 h-4" />
-              Connect to Administrator
+            <div className="flex items-center gap-2 text-amber-600">
+              <Clock className="w-5 h-5" />
+              <span className="font-medium">Pending Organization Connection</span>
             </div>
-            <div className="pl-6 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Enter your administrator's code to connect to your organization
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter admin code (e.g., ADM-XXXXXXXX)"
-                  value={adminCode}
-                  onChange={(e) => setAdminCode(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleConnectToAdmin();
-                    }
-                  }}
-                  disabled={connecting}
-                  className="font-mono"
-                />
-                <Button 
-                  onClick={handleConnectToAdmin} 
-                  disabled={connecting || !adminCode.trim()}
-                >
-                  {connecting ? "Connecting..." : "Connect"}
-                </Button>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              You'll be automatically connected to an organization when:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 pl-2">
+              <li>Your email domain matches an organization's allowed domains</li>
+              <li>An administrator sends you a direct invite</li>
+              <li>You're assigned a seat in an institutional license</li>
+            </ul>
+            <p className="text-sm text-muted-foreground mt-2">
+              Contact your institution's administrator if you need to be connected.
+            </p>
           </div>
         )}
       </CardContent>
