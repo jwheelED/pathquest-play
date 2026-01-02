@@ -376,7 +376,7 @@ const Index = () => {
             <img src={edvanaLogo} alt="Edvana" className="h-5 opacity-60" />
             <span>&copy; 2025 Edvana</span>
           </div>
-          <button onClick={() => navigate("/admin/auth")} className="hover:text-foreground transition-colors">
+          <button onClick={() => navigate("/admin/auth")} className="text-foreground/80 hover:text-foreground transition-colors font-medium">
             Admin Portal
           </button>
         </div>
