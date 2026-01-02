@@ -1227,7 +1227,7 @@ export const LectureCheckInResults = () => {
                                       <span className="font-medium text-sm">{assignment.student_name}</span>
                                       <div className="flex items-center gap-2">
                                         {!isCompleted && (
-                                          <Badge variant="outline" className="gap-1">
+                                          <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
                                             <Clock className="h-3 w-3" />
                                             Not Answered
                                           </Badge>
