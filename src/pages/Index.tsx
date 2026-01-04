@@ -94,7 +94,7 @@ const Index = () => {
             </Button>
             <button
               onClick={() => navigate("/admin/auth")}
-              className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors hidden sm:block"
+              className="text-xs text-sky-500 hover:text-sky-400 transition-colors hidden sm:block"
             >
               Admin
             </button>
