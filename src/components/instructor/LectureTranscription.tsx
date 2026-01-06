@@ -352,7 +352,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setDailyQuestionCount(count);
         }
 
-        // Fetch verified answer key problems count
+        // Fetch verified answer key problems count (only verified ones)
         const { data: answerKeys } = await supabase
           .from("instructor_answer_keys")
           .select("id")
@@ -364,7 +364,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           const { count: problemsCount } = await supabase
             .from("answer_key_problems")
             .select("id", { count: "exact", head: true })
-            .in("answer_key_id", answerKeyIds);
+            .in("answer_key_id", answerKeyIds)
+            .eq("verified_by_instructor", true);
           
           setVerifiedProblemsCount(problemsCount ?? 0);
         } else {
