@@ -6,9 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { LogOut, Building2, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import ROIMetricsCard from "@/components/admin/ROIMetricsCard";
-import EngagementChart from "@/components/admin/EngagementChart";
-import SchoolProgressCard from "@/components/admin/SchoolProgressCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
@@ -22,13 +19,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({
     totalStudents: 0,
     activeStudents: 0,
-    totalLessonsCompleted: 0,
-    totalAchievementsUnlocked: 0,
     avgCompletionRate: 0,
-    avgTimeSpent: 0,
-    engagementScore: 0,
   });
-  const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [instructorPerformance, setInstructorPerformance] = useState<InstructorPerformance[]>([]);
   const [retentionMetrics, setRetentionMetrics] = useState({
@@ -119,13 +111,8 @@ export default function AdminDashboard() {
         setStats({
           totalStudents: 0,
           activeStudents: 0,
-          totalLessonsCompleted: 0,
-          totalAchievementsUnlocked: 0,
           avgCompletionRate: 0,
-          avgTimeSpent: 0,
-          engagementScore: 0,
         });
-        setWeeklyData([]);
         setAtRiskStudents([]);
         setInstructorPerformance([]);
         setRetentionMetrics({
@@ -175,18 +162,6 @@ export default function AdminDashboard() {
         .gte("last_activity_date", sevenDaysAgo.toISOString().split('T')[0]);
 
       const activeUserIds = new Set(activeUserStats?.map(s => s.user_id) || []);
-
-      // Fetch lesson progress for org
-      const { data: lessonData } = await supabase
-        .from("lesson_progress")
-        .select("*")
-        .eq("org_id", userOrgId);
-
-      // Fetch achievements for org
-      const { data: achievementData } = await supabase
-        .from("user_achievements")
-        .select("*")
-        .eq("org_id", userOrgId);
 
       // Fetch user stats for calculations
       const { data: userStats } = await supabase
@@ -377,23 +352,6 @@ export default function AdminDashboard() {
 
       setInstructorPerformance(instructorPerf);
 
-      // Calculate metrics
-      const avgTimeSpent = userStats && userStats.length > 0
-        ? userStats.reduce((acc, stat) => acc + (stat.current_streak || 0), 0) / userStats.length
-        : 0;
-
-      const totalLessonsCompleted = lessonData?.length || 0;
-      const totalAchievementsUnlocked = achievementData?.length || 0;
-      
-      // Calculate completion rate
-      const { data: allLessons } = await supabase
-        .from("lessons")
-        .select("id");
-      
-      const avgCompletionRate = allLessons && allLessons.length > 0
-        ? (totalLessonsCompleted / (allLessons.length * (totalStudents || 1))) * 100
-        : 0;
-
       // Engagement score (percentage of active vs total students)
       const engagementScore = totalStudents && totalStudents > 0
         ? ((activeStudents || 0) / totalStudents) * 100
@@ -402,11 +360,7 @@ export default function AdminDashboard() {
       setStats({
         totalStudents: totalStudents || 0,
         activeStudents: activeStudents || 0,
-        totalLessonsCompleted,
-        totalAchievementsUnlocked,
-        avgCompletionRate: Math.min(avgCompletionRate, 100),
-        avgTimeSpent,
-        engagementScore,
+        avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
       });
 
       // Set retention metrics
@@ -421,15 +375,6 @@ export default function AdminDashboard() {
         retentionRate: engagementScore,
         avgCompletionRate: avgAssignmentCompletion,
       });
-
-      // Generate weekly engagement data
-      const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-      setWeeklyData(weeks.map((week, i) => ({
-        week,
-        students: Math.floor((activeStudents || 0) * (0.8 + Math.random() * 0.4)),
-        problems: Math.floor(Math.random() * 150 + 50),
-        lessons: Math.floor(Math.random() * 80 + 20),
-      })));
 
     } catch (error) {
       logger.error("Error fetching dashboard data:", error);
@@ -508,33 +453,13 @@ export default function AdminDashboard() {
           {/* At-Risk Students Table (Full Width) */}
           <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
 
-          {/* Third Row: Instructor Performance + ROI Metrics */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <InstructorPerformanceCard
-              instructors={instructorPerformance}
-              loading={loading}
-            />
-            <ROIMetricsCard
-              totalStudents={stats.totalStudents}
-              avgTimeSpent={stats.avgTimeSpent}
-              completionRate={stats.avgCompletionRate}
-              engagementScore={stats.engagementScore}
-            />
-          </div>
+          {/* Instructor Performance */}
+          <InstructorPerformanceCard
+            instructors={instructorPerformance}
+            loading={loading}
+          />
 
-          {/* Fourth Row: School Progress + Engagement Chart */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <SchoolProgressCard
-              totalStudents={stats.totalStudents}
-              activeStudents={stats.activeStudents}
-              totalLessonsCompleted={stats.totalLessonsCompleted}
-              totalAchievementsUnlocked={stats.totalAchievementsUnlocked}
-              avgCompletionRate={stats.avgCompletionRate}
-            />
-            <EngagementChart data={weeklyData} />
-          </div>
-
-          {/* Bottom Row: Export Reports */}
+          {/* Export Reports */}
           <ExportReportsCard data={stats} />
         </div>
       </div>
