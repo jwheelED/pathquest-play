@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,9 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Bot,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,6 +40,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
 
 interface Problem {
   id: string;
@@ -83,8 +86,9 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
   const [editingProblemId, setEditingProblemId] = useState<string | null>(null);
   const [expandedProblems, setExpandedProblems] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+  const prevStatusRef = useRef<string | undefined>(undefined);
 
-  // Fetch answer key details
+  // Fetch answer key details with polling when processing
   const { data: answerKey, isLoading: loadingKey, refetch: refetchKey } = useQuery({
     queryKey: ["answer-key", answerKeyId],
     queryFn: async () => {
@@ -97,9 +101,13 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
       if (error) throw error;
       return data as AnswerKey;
     },
+    refetchInterval: (query) => {
+      // Poll every 3 seconds while processing
+      return query.state.data?.status === "processing" ? 3000 : false;
+    },
   });
 
-  // Fetch problems
+  // Fetch problems with polling when processing
   const { data: problems = [], isLoading: loadingProblems, refetch: refetchProblems } = useQuery({
     queryKey: ["answer-key-problems", answerKeyId],
     queryFn: async () => {
@@ -112,7 +120,29 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
       if (error) throw error;
       return data as Problem[];
     },
+    refetchInterval: (query) => {
+      // Poll every 3 seconds while processing to show new problems as they're parsed
+      return answerKey?.status === "processing" ? 3000 : false;
+    },
   });
+
+  // Detect status transitions and show toast notifications
+  useEffect(() => {
+    if (!answerKey?.status) return;
+    
+    const prevStatus = prevStatusRef.current;
+    const currentStatus = answerKey.status;
+    
+    if (prevStatus === "processing" && currentStatus === "parsed") {
+      toast.success(`Parsing complete! Found ${answerKey.problem_count || problems.length} problems.`);
+      queryClient.invalidateQueries({ queryKey: ["answer-key-problems", answerKeyId] });
+      queryClient.invalidateQueries({ queryKey: ["answer-keys"] });
+    } else if (prevStatus === "processing" && currentStatus === "error") {
+      toast.error("Parsing failed. You can try re-parsing or add problems manually.");
+    }
+    
+    prevStatusRef.current = currentStatus;
+  }, [answerKey?.status, answerKey?.problem_count, problems.length, answerKeyId, queryClient]);
 
   // Fetch MCQ counts for each problem
   const { data: mcqCounts = {} } = useQuery({
@@ -244,8 +274,73 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
     );
   }
 
+  const isProcessing = answerKey.status === "processing";
+  const hasError = answerKey.status === "error";
+
   return (
     <div className="space-y-4">
+      {/* Processing Banner */}
+      {isProcessing && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="py-6">
+            <div className="flex items-start gap-4">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Bot className="h-6 w-6 text-primary animate-pulse" />
+              </div>
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-foreground">AI is parsing your answer key...</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    This usually takes 30-60 seconds. You can add problems manually while waiting.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Progress value={undefined} className="h-2 w-full max-w-md [&>div]:animate-pulse" />
+                  <p className="text-xs text-muted-foreground">
+                    {problems.length > 0 
+                      ? `${problems.length} problem${problems.length !== 1 ? 's' : ''} found so far...`
+                      : "Analyzing document structure..."
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error Banner */}
+      {hasError && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">Parsing failed</p>
+                <p className="text-sm text-muted-foreground">
+                  There was an issue parsing your document. You can try re-parsing or add problems manually.
+                </p>
+              </div>
+              {answerKey.file_path && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => reparseMutation.mutate()}
+                  disabled={reparseMutation.isPending}
+                >
+                  {reparseMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                  )}
+                  Retry
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <Card>
         <CardHeader>
