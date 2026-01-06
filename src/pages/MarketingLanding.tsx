@@ -129,8 +129,16 @@ const MarketingLanding = () => {
 
       {/* Footer */}
       <footer className="py-6 px-4 border-t border-border">
-        <div className="container mx-auto text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 Edvana. All rights reserved.</p>
+        <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
+          <span>&copy; 2025 Edvana</span>
+          <span className="hidden sm:inline">•</span>
+          <button onClick={() => navigate("/privacy")} className="hover:text-foreground transition-colors">
+            Privacy Policy
+          </button>
+          <span className="hidden sm:inline">•</span>
+          <button onClick={() => navigate("/terms")} className="hover:text-foreground transition-colors">
+            Terms of Service
+          </button>
         </div>
       </footer>
     </div>
