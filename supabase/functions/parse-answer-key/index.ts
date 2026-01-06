@@ -63,23 +63,105 @@ serve(async (req) => {
       });
     }
 
-    const { answer_key_id, file_content, subject, course_context } = await req.json();
+    const { answerKeyId, answer_key_id: legacyId } = await req.json();
+    const actualAnswerKeyId = answerKeyId || legacyId;
 
-    if (!answer_key_id || !file_content) {
-      console.error("Missing required fields: answer_key_id or file_content");
-      return new Response(JSON.stringify({ error: "Missing answer_key_id or file_content" }), {
+    if (!actualAnswerKeyId) {
+      console.error("Missing required field: answerKeyId");
+      return new Response(JSON.stringify({ error: "Missing answerKeyId" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log(`Parsing answer key ${answer_key_id} for user ${user.id}, subject: ${subject}`);
+    console.log(`Fetching answer key ${actualAnswerKeyId} for user ${user.id}`);
+
+    // Fetch the answer key record to get file path and metadata
+    const { data: answerKey, error: fetchError } = await supabase
+      .from("instructor_answer_keys")
+      .select("*")
+      .eq("id", actualAnswerKeyId)
+      .single();
+
+    if (fetchError || !answerKey) {
+      console.error("Failed to fetch answer key:", fetchError);
+      return new Response(JSON.stringify({ error: "Answer key not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!answerKey.file_path) {
+      console.error("Answer key has no file path");
+      return new Response(JSON.stringify({ error: "No file associated with this answer key" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Update status to processing
     await supabase
       .from("instructor_answer_keys")
       .update({ status: "processing" })
-      .eq("id", answer_key_id);
+      .eq("id", actualAnswerKeyId);
+
+    // Download the file from storage
+    console.log(`Downloading file from storage: ${answerKey.file_path}`);
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from("answer-keys")
+      .download(answerKey.file_path);
+
+    if (downloadError || !fileData) {
+      console.error("Failed to download file:", downloadError);
+      await supabase
+        .from("instructor_answer_keys")
+        .update({ status: "error" })
+        .eq("id", actualAnswerKeyId);
+      return new Response(JSON.stringify({ error: "Failed to download file" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Convert file to text content
+    let file_content: string;
+    const fileType = answerKey.file_type || "";
+    
+    if (fileType.includes("text") || answerKey.file_name?.endsWith(".txt")) {
+      file_content = await fileData.text();
+    } else if (fileType.includes("pdf") || answerKey.file_name?.endsWith(".pdf")) {
+      // For PDFs, we need to extract text - for now, send the base64 and let AI handle it
+      const arrayBuffer = await fileData.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      file_content = `[PDF Document - Base64 Encoded]\n${base64.substring(0, 50000)}...`; // Truncate for API limits
+      console.log("PDF detected, using base64 encoding (truncated)");
+    } else if (fileType.includes("image") || /\.(png|jpg|jpeg)$/i.test(answerKey.file_name || "")) {
+      // For images, use base64 encoding for vision models
+      const arrayBuffer = await fileData.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      file_content = `[Image Document - Please extract text from this base64 image]\ndata:${fileType};base64,${base64}`;
+      console.log("Image detected, using base64 encoding");
+    } else {
+      // Try to read as text
+      try {
+        file_content = await fileData.text();
+      } catch {
+        console.error("Could not read file as text");
+        await supabase
+          .from("instructor_answer_keys")
+          .update({ status: "error" })
+          .eq("id", actualAnswerKeyId);
+        return new Response(JSON.stringify({ error: "Unsupported file format" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    const subject = answerKey.subject;
+    const course_context = answerKey.course_context;
+
+    console.log(`Parsing answer key ${actualAnswerKeyId}, subject: ${subject}, content length: ${file_content.length}`);
 
     // Build the AI prompt for parsing
     const systemPrompt = `You are an expert academic parser specializing in extracting problem-solution pairs from STEM answer keys.
@@ -164,7 +246,7 @@ Return your response as a valid JSON object with this structure:
       await supabase
         .from("instructor_answer_keys")
         .update({ status: "error" })
-        .eq("id", answer_key_id);
+        .eq("id", actualAnswerKeyId);
 
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
@@ -193,7 +275,7 @@ Return your response as a valid JSON object with this structure:
       await supabase
         .from("instructor_answer_keys")
         .update({ status: "error" })
-        .eq("id", answer_key_id);
+        .eq("id", actualAnswerKeyId);
       return new Response(JSON.stringify({ error: "AI returned empty response" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -219,7 +301,7 @@ Return your response as a valid JSON object with this structure:
       await supabase
         .from("instructor_answer_keys")
         .update({ status: "error" })
-        .eq("id", answer_key_id);
+        .eq("id", actualAnswerKeyId);
       
       return new Response(JSON.stringify({ error: "Failed to parse AI response" }), {
         status: 500,
@@ -235,7 +317,7 @@ Return your response as a valid JSON object with this structure:
       await supabase
         .from("instructor_answer_keys")
         .update({ status: "parsed", problem_count: 0 })
-        .eq("id", answer_key_id);
+        .eq("id", actualAnswerKeyId);
       
       return new Response(JSON.stringify({ 
         success: true, 
@@ -248,7 +330,7 @@ Return your response as a valid JSON object with this structure:
 
     // Insert problems into database
     const problemInserts = problems.map((problem, index) => ({
-      answer_key_id,
+      answer_key_id: actualAnswerKeyId,
       problem_number: problem.problem_number || `${index + 1}`,
       problem_text: problem.problem_text,
       problem_latex: problem.problem_latex || null,
@@ -276,7 +358,7 @@ Return your response as a valid JSON object with this structure:
       await supabase
         .from("instructor_answer_keys")
         .update({ status: "error" })
-        .eq("id", answer_key_id);
+        .eq("id", actualAnswerKeyId);
       
       return new Response(JSON.stringify({ error: "Failed to save extracted problems" }), {
         status: 500,
@@ -291,9 +373,9 @@ Return your response as a valid JSON object with this structure:
         status: "parsed",
         problem_count: problems.length 
       })
-      .eq("id", answer_key_id);
+      .eq("id", actualAnswerKeyId);
 
-    console.log(`Successfully parsed and saved ${problems.length} problems for answer key ${answer_key_id}`);
+    console.log(`Successfully parsed and saved ${problems.length} problems for answer key ${actualAnswerKeyId}`);
 
     return new Response(JSON.stringify({
       success: true,
