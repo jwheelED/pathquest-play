@@ -33,10 +33,7 @@ export default function ExportReportsCard({ data }: ExportReportsCardProps) {
         ['Metric', 'Value'],
         ['Total Students', data.totalStudents],
         ['Active Students', data.activeStudents],
-        ['Avg Completion Rate', `${data.avgCompletionRate}%`],
-        ['Total Lessons Completed', data.totalLessonsCompleted],
-        ['Total Achievements', data.totalAchievementsUnlocked],
-        ['Engagement Score', `${data.engagementScore}%`],
+        ['Avg Completion Rate', `${data.avgCompletionRate?.toFixed(1) || 0}%`],
       ].map(row => row.join(',')).join('\n');
 
       // Create download link
@@ -93,11 +90,9 @@ export default function ExportReportsCard({ data }: ExportReportsCardProps) {
         <div className="pt-4 border-t">
           <h4 className="font-semibold mb-2 text-sm">Report Includes:</h4>
           <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>• Student engagement metrics</li>
-            <li>• Completion rates and progress</li>
-            <li>• ROI calculations and time savings</li>
-            <li>• Platform adoption statistics</li>
-            <li>• Achievement and performance data</li>
+            <li>• Student enrollment counts</li>
+            <li>• Active student metrics</li>
+            <li>• Assignment completion rates</li>
           </ul>
         </div>
       </CardContent>
