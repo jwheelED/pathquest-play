@@ -17,7 +17,8 @@ import {
   Loader2,
   RefreshCw,
   Bot,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -162,6 +163,50 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
       return counts;
     },
     enabled: problems.length > 0,
+  });
+
+  // Quick verify mutation
+  const verifyProblemMutation = useMutation({
+    mutationFn: async ({ problemId, verified }: { problemId: string; verified: boolean }) => {
+      const { error } = await supabase
+        .from("answer_key_problems")
+        .update({ verified_by_instructor: verified })
+        .eq("id", problemId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { verified }) => {
+      toast.success(verified ? "Problem verified" : "Verification removed");
+      queryClient.invalidateQueries({ queryKey: ["answer-key-problems", answerKeyId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to update verification");
+    },
+  });
+
+  // Verify all problems mutation
+  const verifyAllMutation = useMutation({
+    mutationFn: async () => {
+      const unverifiedIds = problems.filter(p => !p.verified_by_instructor).map(p => p.id);
+      if (unverifiedIds.length === 0) return { count: 0 };
+      
+      const { error } = await supabase
+        .from("answer_key_problems")
+        .update({ verified_by_instructor: true })
+        .in("id", unverifiedIds);
+      if (error) throw error;
+      return { count: unverifiedIds.length };
+    },
+    onSuccess: (data) => {
+      if (data.count > 0) {
+        toast.success(`Verified ${data.count} problem${data.count !== 1 ? 's' : ''}`);
+        queryClient.invalidateQueries({ queryKey: ["answer-key-problems", answerKeyId] });
+      } else {
+        toast.info("All problems are already verified");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to verify problems");
+    },
   });
 
   const deleteProblemMutation = useMutation({
@@ -385,6 +430,20 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
               <Plus className="h-4 w-4 mr-1" />
               Add Problem
             </Button>
+            {problems.length > 0 && verifiedCount < problems.length && (
+              <Button 
+                variant="outline"
+                onClick={() => verifyAllMutation.mutate()}
+                disabled={verifyAllMutation.isPending}
+              >
+                {verifyAllMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                )}
+                Verify All ({problems.length - verifiedCount})
+              </Button>
+            )}
             <Button 
               variant="outline" 
               onClick={() => generateMcqsMutation.mutate(undefined)}
@@ -415,6 +474,73 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Workflow Guidance Banner */}
+      {problems.length > 0 && (verifiedCount === 0 || Object.keys(mcqCounts).length === 0) && !isProcessing && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                <Zap className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-medium text-sm text-foreground">Complete setup for live lecture matching</h4>
+                <div className="mt-2 space-y-1.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span className="text-muted-foreground">Upload answer key</span>
+                    <Badge variant="secondary" className="text-xs">Done</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span className="text-muted-foreground">Parse problems</span>
+                    <Badge variant="secondary" className="text-xs">{problems.length} found</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {verifiedCount > 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-amber-600" />
+                    )}
+                    <span className={verifiedCount === 0 ? "font-medium text-foreground" : "text-muted-foreground"}>
+                      Verify problems
+                    </span>
+                    <Badge variant={verifiedCount > 0 ? "secondary" : "outline"} className="text-xs">
+                      {verifiedCount}/{problems.length} verified
+                    </Badge>
+                    {verifiedCount === 0 && (
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="h-auto p-0 text-xs text-primary"
+                        onClick={() => verifyAllMutation.mutate()}
+                        disabled={verifyAllMutation.isPending}
+                      >
+                        Verify all →
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {Object.keys(mcqCounts).length > 0 ? (
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="text-muted-foreground">Generate MCQs</span>
+                    {Object.keys(mcqCounts).length > 0 ? (
+                      <Badge variant="secondary" className="text-xs">Ready</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        {verifiedCount > 0 ? "Click 'Generate MCQs' above" : "Verify problems first"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Add Problem Form */}
       {showAddProblem && (
@@ -473,15 +599,35 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
                               {problem.difficulty}
                             </Badge>
                             {problem.verified_by_instructor ? (
-                              <Badge variant="default" className="text-xs bg-primary/10 text-primary border-primary/20">
+                              <Badge 
+                                variant="default" 
+                                className="text-xs bg-primary/10 text-primary border-primary/20 cursor-pointer hover:bg-primary/20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  verifyProblemMutation.mutate({ problemId: problem.id, verified: false });
+                                }}
+                              >
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
                                 Verified
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs text-muted-foreground">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Unverified
-                              </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-xs px-2 border-dashed hover:border-primary hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  verifyProblemMutation.mutate({ problemId: problem.id, verified: true });
+                                }}
+                                disabled={verifyProblemMutation.isPending}
+                              >
+                                {verifyProblemMutation.isPending ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                )}
+                                Click to Verify
+                              </Button>
                             )}
                             {problem.topic_tags.slice(0, 3).map((tag) => (
                               <Badge key={tag} variant="secondary" className="text-xs">
