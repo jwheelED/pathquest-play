@@ -376,9 +376,17 @@ const Index = () => {
             <img src={edvanaLogo} alt="Edvana" className="h-5 opacity-60" />
             <span>&copy; 2025 Edvana</span>
           </div>
-          <button onClick={() => navigate("/admin/auth")} className="text-sky-500 hover:text-sky-400 transition-colors font-medium">
-            Admin Portal
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate("/privacy")} className="hover:text-foreground transition-colors">
+              Privacy Policy
+            </button>
+            <button onClick={() => navigate("/terms")} className="hover:text-foreground transition-colors">
+              Terms of Service
+            </button>
+            <button onClick={() => navigate("/admin/auth")} className="text-sky-500 hover:text-sky-400 transition-colors font-medium">
+              Admin Portal
+            </button>
+          </div>
         </div>
       </footer>
     </div>
