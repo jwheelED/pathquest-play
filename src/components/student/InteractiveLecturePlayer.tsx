@@ -67,6 +67,7 @@ interface InteractiveLecturePlayerProps {
   onComplete?: () => void;
   isPreview?: boolean;
   onQuestionSelect?: (questionId: string) => void;
+  captionUrl?: string;
 }
 
 // Inline confidence selector for interactive lectures
@@ -114,7 +115,8 @@ export const InteractiveLecturePlayer = ({
   pausePoints,
   onComplete,
   isPreview = false,
-  onQuestionSelect
+  onQuestionSelect,
+  captionUrl
 }: InteractiveLecturePlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -769,23 +771,45 @@ export const InteractiveLecturePlayer = ({
           onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
-        />
+          aria-label={`Video: ${title}`}
+        >
+          {/* Captions track for WCAG 2.1 AA compliance */}
+          {captionUrl && (
+            <track
+              kind="captions"
+              src={captionUrl}
+              srcLang="en"
+              label="English captions"
+              default
+            />
+          )}
+          Your browser does not support the video tag.
+        </video>
 
         {/* Question Overlay */}
         {currentQuestion && (
-          <div className="absolute inset-0 bg-black/90 flex items-center justify-center p-4 z-20">
+          <div 
+            className="absolute inset-0 bg-black/90 flex items-center justify-center p-4 z-20"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="question-title"
+            aria-describedby="question-instructions"
+          >
             <Card className="w-full max-w-2xl max-h-[90%] overflow-y-auto">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <Badge variant="secondary" className="flex items-center gap-1">
-                    <Brain className="h-3 w-3" />
-                    Cognitive Load: {currentQuestion.cognitive_load_score}/10
+                    <Brain className="h-3 w-3" aria-hidden="true" />
+                    <span>Cognitive Load: {currentQuestion.cognitive_load_score}/10</span>
                   </Badge>
                   <Badge variant="outline">
                     Question {currentQuestion.order_index + 1}/{totalQuestions}
                   </Badge>
                 </div>
-                <CardTitle className="mt-4">{currentQuestion.question_content.question}</CardTitle>
+                <CardTitle id="question-title" className="mt-4">{currentQuestion.question_content.question}</CardTitle>
+                <p id="question-instructions" className="sr-only">
+                  Answer the question below and select your confidence level before submitting.
+                </p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {!showResult ? (
@@ -812,12 +836,17 @@ export const InteractiveLecturePlayer = ({
                         ))}
                       </RadioGroup>
                     ) : (
-                      <Textarea
-                        placeholder="Type your answer..."
-                        value={shortAnswer}
-                        onChange={(e) => setShortAnswer(e.target.value)}
-                        rows={4}
-                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="short-answer">Your Answer</Label>
+                        <Textarea
+                          id="short-answer"
+                          placeholder="Type your answer..."
+                          value={shortAnswer}
+                          onChange={(e) => setShortAnswer(e.target.value)}
+                          rows={4}
+                          aria-required="true"
+                        />
+                      </div>
                     )}
 
                     {/* Confidence Selector */}

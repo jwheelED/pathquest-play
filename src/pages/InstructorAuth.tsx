@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
@@ -228,32 +229,44 @@ export default function InstructorAuth() {
         </CardHeader>
         <CardContent className="space-y-4">
           {!isResetMode && isSignUp && (
-            <Input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="retro-input"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="instructor-name">Full Name</Label>
+              <Input
+                id="instructor-name"
+                type="text"
+                placeholder="Enter your full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="retro-input"
+              />
+            </div>
           )}
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
-            className="retro-input"
-          />
-          {!isResetMode && (
+          <div className="space-y-2">
+            <Label htmlFor="instructor-email">Email</Label>
             <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyPress={handleKeyPress}
+              id="instructor-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
               className="retro-input"
             />
+          </div>
+          {!isResetMode && (
+            <div className="space-y-2">
+              <Label htmlFor="instructor-password">Password</Label>
+              <Input
+                id="instructor-password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyPress={handleKeyPress}
+                className="retro-input"
+              />
+            </div>
           )}
           <Button
             onClick={isResetMode ? handlePasswordReset : handleAuth}

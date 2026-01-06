@@ -19,10 +19,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 15%;
 
-    /* Primary - Emerald Green */
-    --primary: 160 84% 39%;
+    /* Primary - Emerald Green - Adjusted for WCAG 2.1 AA (4.5:1 contrast on white) */
+    --primary: 160 84% 29%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 160 80% 50%;
+    --primary-glow: 160 80% 42%;
 
     /* Secondary - Sky Blue */
     --secondary: 199 89% 48%;
@@ -45,7 +45,7 @@
 
     /* Neutral tones */
     --muted: 200 30% 92%;
-    --muted-foreground: 220 15% 45%;
+    --muted-foreground: 220 15% 35%;
 
     --accent: 160 40% 92%;
     --accent-foreground: 220 25% 15%;
@@ -315,10 +315,35 @@
   }
 }
 
-/* Smooth scroll behavior */
+/* Smooth scroll behavior - respect reduced motion preference */
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .animate-fade-in,
+  .animate-fade-in-scale,
+  .animate-slide-up,
+  .animate-pulse-soft,
+  .animate-float,
+  .animate-shimmer,
+  .animate-celebration,
+  .animate-wave,
+  .animate-gentle-bounce,
+  .pulse-action {
+    animation: none !important;
   }
 }
 

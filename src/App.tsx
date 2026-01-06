@@ -31,18 +31,22 @@ import StudentTraining from "./pages/StudentTraining";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
+import { SkipLink, ScreenReaderAnnouncer } from "./components/accessibility";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <OfflineIndicator />
-      <InstallPrompt />
-      <BrowserRouter>
-        <Routes>
+      <ScreenReaderAnnouncer>
+        <SkipLink />
+        <Toaster />
+        <Sonner />
+        <OfflineIndicator />
+        <InstallPrompt />
+        <BrowserRouter>
+          <main id="main-content">
+            <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/learn-more" element={<MarketingLanding />} />
           <Route path="/auth" element={<Auth />} />
@@ -124,12 +128,14 @@ const App = () => (
           } />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    </ScreenReaderAnnouncer>
+  </TooltipProvider>
+</QueryClientProvider>
 );
 
 export default App;
