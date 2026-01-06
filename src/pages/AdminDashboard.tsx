@@ -3,19 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Building2, Shield } from "lucide-react";
+import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
-import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
+import AggregateMetricsCard from "@/components/admin/AggregateMetricsCard";
+import UsageOverTimeChart from "@/components/admin/UsageOverTimeChart";
+import LearningInsightsCard from "@/components/admin/LearningInsightsCard";
 import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/components/admin/AtRiskStudentsTable";
 import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
+import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
+import ExportReportsCard from "@/components/admin/ExportReportsCard";
+import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
+
+type TabValue = "overview" | "adoption" | "support";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const [stats, setStats] = useState({
     totalStudents: 0,
     activeStudents: 0,
@@ -30,7 +38,12 @@ export default function AdminDashboard() {
     avgCompletionRate: 0,
   });
   const [adminName, setAdminName] = useState("");
+  const [instructorIds, setInstructorIds] = useState<string[]>([]);
   const navigate = useNavigate();
+
+  // Use the new hook for aggregate data
+  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } = 
+    useAdminDashboardData(instructorIds);
 
   useEffect(() => {
     checkSession();
@@ -60,7 +73,6 @@ export default function AdminDashboard() {
     } else {
       setSession(data.session);
       
-      // Check if user is admin using user_roles table
       const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
@@ -82,7 +94,6 @@ export default function AdminDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get admin's profile
       const { data: profile } = await supabase
         .from("profiles")
         .select("org_id, full_name")
@@ -98,16 +109,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Get connected instructors for this admin
       const { data: connectedInstructors } = await supabase
         .from('admin_instructors')
         .select('instructor_id')
         .eq('admin_id', user.id);
 
-      const instructorIds = connectedInstructors?.map(ci => ci.instructor_id) || [];
+      const fetchedInstructorIds = connectedInstructors?.map(ci => ci.instructor_id) || [];
+      setInstructorIds(fetchedInstructorIds);
 
-      // If no instructors connected, show empty state
-      if (instructorIds.length === 0) {
+      if (fetchedInstructorIds.length === 0) {
         setStats({
           totalStudents: 0,
           activeStudents: 0,
@@ -125,33 +135,29 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Get instructor profiles
       const { data: instructorProfiles } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .in('id', instructorIds);
+        .in('id', fetchedInstructorIds);
 
       const instructorMap = new Map(
         instructorProfiles?.map(i => [i.id, i.full_name || 'Unknown Instructor']) || []
       );
 
-      // Get student IDs from connected instructors
       const { data: studentRelations } = await supabase
         .from('instructor_students')
         .select('student_id, instructor_id')
-        .in('instructor_id', instructorIds)
+        .in('instructor_id', fetchedInstructorIds)
         .eq('org_id', userOrgId);
 
       const studentIds = [...new Set(studentRelations?.map(sr => sr.student_id) || [])];
 
-      // Count students with student role in this org
       const { count: totalStudents } = await supabase
         .from("user_roles")
         .select("*", { count: 'exact', head: true })
         .eq("role", "student")
         .in("user_id", studentIds);
 
-      // Fetch active students (activity in last 7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
@@ -163,13 +169,11 @@ export default function AdminDashboard() {
 
       const activeUserIds = new Set(activeUserStats?.map(s => s.user_id) || []);
 
-      // Fetch user stats for calculations
       const { data: userStats } = await supabase
         .from("user_stats")
         .select("*")
         .eq("org_id", userOrgId);
 
-      // Fetch student profiles for at-risk table
       const { data: studentProfiles } = await supabase
         .from("profiles")
         .select("id, full_name")
@@ -179,13 +183,11 @@ export default function AdminDashboard() {
         studentProfiles?.map(s => [s.id, s.full_name || 'Unknown Student']) || []
       );
 
-      // Fetch student assignments for grade and completion analysis
       const { data: assignments } = await supabase
         .from("student_assignments")
         .select("student_id, instructor_id, grade, completed, created_at")
         .in("student_id", studentIds);
 
-      // Calculate per-student metrics
       const studentMetrics = new Map<string, {
         grades: number[];
         completed: number;
@@ -218,7 +220,6 @@ export default function AdminDashboard() {
         }
       });
 
-      // Calculate at-risk students
       const atRiskList: AtRiskStudent[] = [];
       let passCount = 0;
       let totalGradedStudents = 0;
@@ -242,7 +243,6 @@ export default function AdminDashboard() {
           }
         }
 
-        // Calculate days since last activity
         const lastActivityStat = userStats?.find(s => s.user_id === studentId);
         const lastActivityDate = lastActivityStat?.last_activity_date
           ? new Date(lastActivityStat.last_activity_date)
@@ -263,12 +263,11 @@ export default function AdminDashboard() {
           0
         );
 
-        // Only include students with some risk
         if (score >= 3) {
           atRiskList.push({
             id: studentId,
             name: studentNameMap.get(studentId) || 'Unknown Student',
-            email: '', // Privacy: not showing email
+            email: '',
             instructorName: instructorMap.get(metrics.instructorId) || 'Unknown',
             avgGrade,
             lastActive: lastActivityDate
@@ -282,11 +281,9 @@ export default function AdminDashboard() {
         }
       });
 
-      // Sort by risk score descending
       atRiskList.sort((a, b) => b.riskScore - a.riskScore);
       setAtRiskStudents(atRiskList);
 
-      // Calculate instructor performance
       const instructorStats = new Map<string, {
         studentCount: number;
         grades: number[];
@@ -294,7 +291,7 @@ export default function AdminDashboard() {
         activeCount: number;
       }>();
 
-      instructorIds.forEach(id => {
+      fetchedInstructorIds.forEach(id => {
         instructorStats.set(id, {
           studentCount: 0,
           grades: [],
@@ -331,7 +328,7 @@ export default function AdminDashboard() {
         }
       });
 
-      const instructorPerf: InstructorPerformance[] = instructorIds.map(id => {
+      const instructorPerf: InstructorPerformance[] = fetchedInstructorIds.map(id => {
         const stats = instructorStats.get(id)!;
         const avgGrade = stats.grades.length > 0
           ? stats.grades.reduce((a, b) => a + b, 0) / stats.grades.length
@@ -352,7 +349,6 @@ export default function AdminDashboard() {
 
       setInstructorPerformance(instructorPerf);
 
-      // Engagement score (percentage of active vs total students)
       const engagementScore = totalStudents && totalStudents > 0
         ? ((activeStudents || 0) / totalStudents) * 100
         : 0;
@@ -363,7 +359,6 @@ export default function AdminDashboard() {
         avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
       });
 
-      // Set retention metrics
       const passRate = totalGradedStudents > 0 ? (passCount / totalGradedStudents) * 100 : 100;
       const avgAssignmentCompletion = studentMetrics.size > 0
         ? totalCompletionRate / studentMetrics.size
@@ -389,6 +384,12 @@ export default function AdminDashboard() {
     navigate("/");
   };
 
+  const navItems = [
+    { value: "overview" as TabValue, label: "Overview", icon: LayoutDashboard },
+    { value: "adoption" as TabValue, label: "Adoption", icon: BarChart3 },
+    { value: "support" as TabValue, label: "Support Workflow", icon: HeartHandshake },
+  ];
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -398,71 +399,126 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-foreground">
-                    Edvana Leadership Console
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Institutional Analytics for Deans, Chairs & Administrators
-                  </p>
-                </div>
-              </div>
-              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 hidden sm:flex">
-                <Shield className="w-3 h-3 mr-1" />
-                Admin
-              </Badge>
+    <div className="min-h-screen bg-background flex">
+      {/* Sidebar */}
+      <aside className="w-56 border-r border-border bg-sidebar-background flex flex-col">
+        <div className="p-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-white" />
             </div>
-            
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground hidden sm:block">
-                Welcome, {adminName}
-              </span>
-              <Button onClick={handleLogout} variant="outline" size="sm">
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
+            <div>
+              <h1 className="text-sm font-bold text-sidebar-foreground">Edvana</h1>
+              <p className="text-xs text-muted-foreground">Leadership Console</p>
             </div>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="space-y-6">
-          {/* Organization Setup Section */}
-          <OrganizationSetup />
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setActiveTab(item.value)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                activeTab === item.value
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              )}
+            >
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </button>
+          ))}
+        </nav>
 
-          {/* Top Row: Retention Health (Full Width) */}
-          <RetentionHealthCard
-            atRiskCount={retentionMetrics.atRiskCount}
-            totalStudents={stats.totalStudents}
-            passRate={retentionMetrics.passRate}
-            retentionRate={retentionMetrics.retentionRate}
-            avgCompletionRate={retentionMetrics.avgCompletionRate}
-          />
-
-          {/* At-Risk Students Table (Full Width) */}
-          <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
-
-          {/* Instructor Performance */}
-          <InstructorPerformanceCard
-            instructors={instructorPerformance}
-            loading={loading}
-          />
-
-          {/* Export Reports */}
-          <ExportReportsCard data={stats} />
+        <div className="p-3 border-t border-sidebar-border">
+          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+            <Shield className="w-4 h-4" />
+            <span className="truncate">{adminName}</span>
+          </div>
+          <Button onClick={handleLogout} variant="ghost" size="sm" className="w-full justify-start mt-1">
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout
+          </Button>
         </div>
-      </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-h-screen">
+        {/* Header */}
+        <header className="border-b border-border bg-card px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-foreground">
+                {navItems.find((n) => n.value === activeTab)?.label || "Dashboard"}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Institutional Analytics for Deans, Chairs & Administrators
+              </p>
+            </div>
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+              <Shield className="w-3 h-3 mr-1" />
+              Admin
+            </Badge>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-6">
+          {activeTab === "overview" && (
+            <div className="space-y-6 max-w-7xl mx-auto">
+              {/* Organization Setup */}
+              <OrganizationSetup />
+
+              {/* Aggregate Metrics */}
+              <AggregateMetricsCard metrics={metrics} loading={aggregateLoading} />
+
+              {/* Usage Chart */}
+              <UsageOverTimeChart data={weeklyUsage} loading={aggregateLoading} />
+
+              {/* Learning Insights */}
+              <LearningInsightsCard
+                misconceptions={misconceptions}
+                confidenceIssues={confidenceIssues}
+                loading={aggregateLoading}
+              />
+
+              {/* Export Reports */}
+              <ExportReportsCard data={stats} />
+            </div>
+          )}
+
+          {activeTab === "adoption" && (
+            <div className="space-y-6 max-w-7xl mx-auto">
+              <InstructorPerformanceCard
+                instructors={instructorPerformance}
+                loading={loading}
+              />
+            </div>
+          )}
+
+          {activeTab === "support" && (
+            <div className="space-y-6 max-w-7xl mx-auto">
+              <RetentionHealthCard
+                atRiskCount={retentionMetrics.atRiskCount}
+                totalStudents={stats.totalStudents}
+                passRate={retentionMetrics.passRate}
+                retentionRate={retentionMetrics.retentionRate}
+                avgCompletionRate={retentionMetrics.avgCompletionRate}
+              />
+              <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
+            </div>
+          )}
+        </div>
+
+        {/* Footer Disclaimer */}
+        <footer className="border-t border-border bg-card px-6 py-3">
+          <p className="text-xs text-muted-foreground text-center">
+            Aggregate only • Formative (not graded) • Not faculty evaluation • Role-based access
+          </p>
+        </footer>
+      </main>
     </div>
   );
 }
