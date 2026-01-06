@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { studentSignUpSchema, signInSchema } from "@/lib/validation";
 import { getOrgId } from "@/hooks/useOrgId";
+import { Label } from "@/components/ui/label";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -258,37 +259,60 @@ export default function AuthPage() {
               {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Sign in to your account"}
             </h2>
 
-            {error && <p className="text-destructive mb-4 text-sm">{error}</p>}
-            {success && <p className="text-primary mb-4 text-sm">{success}</p>}
-
-            {!isResetMode && isSignUp && (
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+            {error && (
+              <div role="alert" className="text-destructive mb-4 text-sm">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div role="status" className="text-primary mb-4 text-sm">
+                {success}
+              </div>
             )}
 
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
-              className="w-full mb-4 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {!isResetMode && (
+            {!isResetMode && isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <input
+                  id="name"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  aria-describedby={error ? "auth-error" : undefined}
+                  className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
               <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full mb-6 p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
+                aria-describedby={error ? "auth-error" : undefined}
+                className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
+            </div>
+            {!isResetMode && (
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="password">Password</Label>
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  aria-describedby={error ? "auth-error" : undefined}
+                  className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
             )}
 
             <button
