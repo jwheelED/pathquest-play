@@ -279,8 +279,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       setNextAutoQuestionIn(0);
       intervalTranscriptRef.current = '';
       isGeneratingAutoQuestionRef.current = false;
+      resetVoiceCommandCooldown(); // Reset voice command chunk tracking
     }
-  }, [isRecording]);
+  }, [isRecording, resetVoiceCommandCooldown]);
 
   // Voice command detection - check transcriptChunks for commands
   useEffect(() => {

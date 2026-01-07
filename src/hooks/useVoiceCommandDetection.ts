@@ -64,17 +64,13 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
   const { cooldownMs = 5000, onCommandDetected } = options;
   
   const lastCommandTimeRef = useRef<number>(0);
-  const lastProcessedTextRef = useRef<string>('');
+  const lastCheckedIndexRef = useRef<number>(0);
+  const lastDetectedCommandRef = useRef<string>('');
   
   const detectCommand = useCallback((text: string): VoiceCommandType => {
     if (!text || text.length < 5) return null;
     
     const normalizedText = text.toLowerCase().trim();
-    
-    // Skip if we've already processed this exact text recently
-    if (normalizedText === lastProcessedTextRef.current) {
-      return null;
-    }
     
     // Check cooldown
     const now = Date.now();
@@ -86,7 +82,6 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
     for (const pattern of SEND_SLIDE_PATTERNS) {
       if (pattern.test(normalizedText)) {
         lastCommandTimeRef.current = now;
-        lastProcessedTextRef.current = normalizedText;
         return 'send_slide_question';
       }
     }
@@ -95,7 +90,6 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
     for (const phrase of FUZZY_SEND_SLIDE_PHRASES) {
       if (normalizedText.includes(phrase) || calculateSimilarity(normalizedText, phrase) > 0.85) {
         lastCommandTimeRef.current = now;
-        lastProcessedTextRef.current = normalizedText;
         return 'send_slide_question';
       }
     }
@@ -104,7 +98,6 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
     for (const pattern of SEND_QUESTION_PATTERNS) {
       if (pattern.test(normalizedText)) {
         lastCommandTimeRef.current = now;
-        lastProcessedTextRef.current = normalizedText;
         return 'send_question';
       }
     }
@@ -113,7 +106,6 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
     for (const phrase of FUZZY_SEND_QUESTION_PHRASES) {
       if (normalizedText.includes(phrase) || calculateSimilarity(normalizedText, phrase) > 0.85) {
         lastCommandTimeRef.current = now;
-        lastProcessedTextRef.current = normalizedText;
         return 'send_question';
       }
     }
@@ -124,13 +116,27 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
   const checkTranscriptForCommand = useCallback((transcriptChunks: string[]): VoiceCommandType => {
     if (transcriptChunks.length === 0) return null;
     
-    // Check the last few chunks for voice commands
-    const recentChunks = transcriptChunks.slice(-3);
-    const recentText = recentChunks.join(' ');
+    // Only check chunks we haven't processed yet
+    const startIndex = lastCheckedIndexRef.current;
+    if (startIndex >= transcriptChunks.length) return null;
     
-    const command = detectCommand(recentText);
+    // Get only new chunks since last check
+    const newChunks = transcriptChunks.slice(startIndex);
+    const newText = newChunks.join(' ');
+    
+    // Update the last checked index
+    lastCheckedIndexRef.current = transcriptChunks.length;
+    
+    // Skip if this text contains the same command phrase we just detected
+    if (lastDetectedCommandRef.current && newText.toLowerCase().includes(lastDetectedCommandRef.current)) {
+      return null;
+    }
+    
+    const command = detectCommand(newText);
     
     if (command && onCommandDetected) {
+      // Store a portion of the phrase that triggered the command to prevent re-detection
+      lastDetectedCommandRef.current = newText.toLowerCase().substring(0, 50);
       onCommandDetected(command);
     }
     
@@ -139,7 +145,8 @@ export function useVoiceCommandDetection(options: VoiceCommandDetectionOptions =
   
   const resetCooldown = useCallback(() => {
     lastCommandTimeRef.current = 0;
-    lastProcessedTextRef.current = '';
+    lastCheckedIndexRef.current = 0;
+    lastDetectedCommandRef.current = '';
   }, []);
   
   return {
