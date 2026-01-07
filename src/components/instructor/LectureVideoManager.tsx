@@ -213,7 +213,7 @@ export const LectureVideoManager = () => {
   }
 
   return (
-    <Card className="border-primary/20">
+    <Card className="border-primary/20 overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Video className="h-5 w-5 text-primary" />

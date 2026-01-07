@@ -306,7 +306,7 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
   const hasMore = pendingReleases.length > 3;
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>

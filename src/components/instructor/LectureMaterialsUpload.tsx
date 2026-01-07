@@ -281,7 +281,7 @@ export function LectureMaterialsUpload() {
   };
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle>Lecture Materials</CardTitle>
         <CardDescription>

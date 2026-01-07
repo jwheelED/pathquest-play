@@ -139,7 +139,7 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
   if (activeSession) {
     return (
       <>
-        <Card className="border-primary">
+        <Card className="border-primary overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
@@ -210,7 +210,7 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
   }
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle>Start Live Session</CardTitle>
       </CardHeader>

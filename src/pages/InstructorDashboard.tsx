@@ -405,20 +405,14 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <InstructorConnectionCard />
             
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {currentUser && (
-                <div className="lg:col-span-2">
-                  <InstructorOverview instructorId={currentUser.id} />
-                </div>
-              )}
-
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {instructorCode && (
-                <Card className="headspace-card">
+                <Card className="headspace-card h-fit">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg">Your Class Code</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block">
+                    <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block break-all">
                       {instructorCode}
                     </code>
                     <Button
@@ -439,6 +433,12 @@ export default function InstructorDashboard() {
                   </CardContent>
                 </Card>
               )}
+
+              {currentUser && (
+                <div className="xl:col-span-2">
+                  <InstructorOverview instructorId={currentUser.id} />
+                </div>
+              )}
             </div>
           </div>
         );
@@ -446,16 +446,20 @@ export default function InstructorDashboard() {
       case "live":
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {currentUser && <LiveSessionControls onSessionChange={setLiveSessionId} />}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {currentUser && (
+                <div className="min-w-0">
+                  <LiveSessionControls onSessionChange={setLiveSessionId} />
+                </div>
+              )}
 
-              <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-                <CardHeader className="pb-2">
+              <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent h-fit">
+                <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Presentation className="h-5 w-5 text-primary" />
                     Slide Presenter
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-sm">
                     Present slides with integrated live lecture tools
                   </CardDescription>
                 </CardHeader>
@@ -470,8 +474,11 @@ export default function InstructorDashboard() {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="min-w-0">
               <LectureTranscription onQuestionGenerated={() => {}} />
+            </div>
+            
+            <div className="min-w-0">
               <AnswerReleaseCard instructorId={currentUser?.id || ""} />
             </div>
           </div>
@@ -480,26 +487,41 @@ export default function InstructorDashboard() {
       case "recorded":
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="min-w-0">
               <PreRecordedLectureUpload />
+            </div>
+            
+            <div className="min-w-0">
               <LectureVideoManager />
             </div>
-            <PreRecordedLectureGrades />
+            
+            <div className="min-w-0">
+              <PreRecordedLectureGrades />
+            </div>
           </div>
         );
 
       case "students":
         return (
           <div className="space-y-6">
-            <StudentRankingCard
-              students={rankedStudents}
-              onStudentClick={handleStudentClick}
-              onRefresh={fetchStudents}
-            />
+            <div className="min-w-0">
+              <StudentRankingCard
+                students={rankedStudents}
+                onStudentClick={handleStudentClick}
+                onRefresh={fetchStudents}
+              />
+            </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LectureCheckInResults />
-              {currentUser && <AcademicIntegrityInsights instructorId={currentUser.id} />}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="min-w-0">
+                <LectureCheckInResults />
+              </div>
+              
+              {currentUser && (
+                <div className="min-w-0">
+                  <AcademicIntegrityInsights instructorId={currentUser.id} />
+                </div>
+              )}
             </div>
           </div>
         );
@@ -507,28 +529,28 @@ export default function InstructorDashboard() {
       case "materials":
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="min-w-0">
               <LectureMaterialsUpload />
-              
-              {professorType === "research" && (
-                <Card className="headspace-card">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Code className="h-5 w-5 text-primary" />
-                      Research Tools
-                    </CardTitle>
-                    <CardDescription>
-                      AI-powered content generation for research
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button variant="outline" className="w-full rounded-xl">
-                      Access Lab Portal
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
             </div>
+            
+            {professorType === "research" && (
+              <Card className="headspace-card h-fit">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Code className="h-5 w-5 text-primary" />
+                    Research Tools
+                  </CardTitle>
+                  <CardDescription>
+                    AI-powered content generation for research
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" className="w-full rounded-xl">
+                    Access Lab Portal
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         );
 

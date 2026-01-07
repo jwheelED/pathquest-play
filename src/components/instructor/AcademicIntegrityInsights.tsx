@@ -408,7 +408,7 @@ export const AcademicIntegrityInsights = ({ instructorId }: AcademicIntegrityIns
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="border-red-500/50 bg-red-50/50 dark:bg-red-950/20">
+      <Card className="border-red-500/50 bg-red-50/50 dark:bg-red-950/20 overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex-1">

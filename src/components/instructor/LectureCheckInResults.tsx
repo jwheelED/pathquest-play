@@ -744,7 +744,7 @@ export const LectureCheckInResults = () => {
   };
 
   return (
-    <Card className="shadow-lg border-2">
+    <Card className="shadow-lg border-2 overflow-hidden">
       <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
         <div className="flex items-center justify-between">
           <div>

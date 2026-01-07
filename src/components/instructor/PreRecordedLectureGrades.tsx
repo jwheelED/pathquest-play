@@ -311,7 +311,7 @@ export function PreRecordedLectureGrades() {
   }
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
