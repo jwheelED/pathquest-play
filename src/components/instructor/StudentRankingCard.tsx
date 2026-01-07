@@ -35,7 +35,7 @@ export default function StudentRankingCard({ students, onStudentClick, onRefresh
   };
 
   return (
-    <Card className="pixel-corners">
+    <Card className="pixel-corners overflow-hidden">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
