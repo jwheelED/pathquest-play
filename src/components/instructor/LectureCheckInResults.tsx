@@ -746,37 +746,38 @@ export const LectureCheckInResults = () => {
   return (
     <Card className="shadow-lg border-2 overflow-hidden">
       <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <TrendingUp className="h-6 w-6 text-primary" />
-              Live Lecture Check-In Results
-            </CardTitle>
-            <CardDescription className="mt-1 flex items-center gap-2">
-              Auto-graded student performance on lecture questions
-              <span className="text-xs">• Last synced: {formatLastUpdated()}</span>
-            </CardDescription>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <TrendingUp className="h-6 w-6 text-primary shrink-0" />
+                <span className="truncate">Check-In Results</span>
+              </CardTitle>
+              <CardDescription className="mt-1 text-xs">
+                Auto-graded performance • Last synced: {formatLastUpdated()}
+              </CardDescription>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button 
               onClick={handleManualRefresh} 
               variant="outline" 
               size="sm" 
-              className="gap-2"
+              className="gap-1"
               disabled={refreshing}
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Syncing...' : 'Refresh'}
+              <span className="hidden sm:inline">{refreshing ? 'Syncing...' : 'Refresh'}</span>
             </Button>
-            <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-2">
+            <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-1">
               <Download className="h-4 w-4" />
-              Export CSV
+              <span className="hidden sm:inline">Export</span>
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="gap-2">
+                <Button variant="destructive" size="sm" className="gap-1">
                   <Trash className="h-4 w-4" />
-                  Delete All
+                  <span className="hidden sm:inline">Delete All</span>
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
