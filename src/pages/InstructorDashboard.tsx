@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -21,6 +21,7 @@ import { LiveSessionControls } from "@/components/instructor/LiveSessionControls
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
+import { cn } from "@/lib/utils";
 
 interface Student {
   id: string;
@@ -31,6 +32,16 @@ interface Student {
   averageMasteryAttempts?: number;
   average_grade?: number;
 }
+
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials";
+
+const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
+  { value: "overview", label: "Overview", icon: LayoutDashboard },
+  { value: "live", label: "Live Lecture", icon: Radio },
+  { value: "recorded", label: "Pre-Recorded", icon: Video },
+  { value: "students", label: "Students", icon: Users },
+  { value: "materials", label: "Materials", icon: FileText },
+];
 
 export default function InstructorDashboard() {
   const navigate = useNavigate();
@@ -43,6 +54,7 @@ export default function InstructorDashboard() {
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [instructorProfile, setInstructorProfile] = useState<any>(null);
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   
   const professorType = instructorProfile?.professor_type;
@@ -55,7 +67,7 @@ export default function InstructorDashboard() {
     const today = new Date().toDateString();
     if (lastReminderDate !== today) {
       setTimeout(() => {
-        toast.info("💡 Tip: You can upload lecture slides and materials in the Course Materials card below!", {
+        toast.info("💡 Tip: You can upload lecture slides and materials in the Materials tab!", {
           duration: 5000,
         });
         localStorage.setItem('lastCourseMaterialsReminder', today);
@@ -371,7 +383,7 @@ export default function InstructorDashboard() {
     {
       icon: <Radio className="w-3 h-3" />,
       label: "Start Live",
-      onClick: () => {},
+      onClick: () => setActiveTab("live"),
       variant: "primary" as const,
     },
     {
@@ -386,6 +398,145 @@ export default function InstructorDashboard() {
     },
   ];
 
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return (
+          <div className="space-y-6">
+            <InstructorConnectionCard />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {currentUser && (
+                <div className="lg:col-span-2">
+                  <InstructorOverview instructorId={currentUser.id} />
+                </div>
+              )}
+
+              {instructorCode && (
+                <Card className="headspace-card">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Your Class Code</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block">
+                      {instructorCode}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full rounded-xl"
+                      onClick={() => {
+                        navigator.clipboard.writeText(instructorCode);
+                        toast.success("Code copied to clipboard!");
+                      }}
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Code
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Share this code with your students
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        );
+
+      case "live":
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {currentUser && <LiveSessionControls onSessionChange={setLiveSessionId} />}
+
+              <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Presentation className="h-5 w-5 text-primary" />
+                    Slide Presenter
+                  </CardTitle>
+                  <CardDescription>
+                    Present slides with integrated live lecture tools
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <Button 
+                    onClick={() => navigate('/instructor/slides')}
+                    className="w-full rounded-xl"
+                  >
+                    Open Slide Presenter
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LectureTranscription onQuestionGenerated={() => {}} />
+              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
+            </div>
+          </div>
+        );
+
+      case "recorded":
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PreRecordedLectureUpload />
+              <LectureVideoManager />
+            </div>
+            <PreRecordedLectureGrades />
+          </div>
+        );
+
+      case "students":
+        return (
+          <div className="space-y-6">
+            <StudentRankingCard
+              students={rankedStudents}
+              onStudentClick={handleStudentClick}
+              onRefresh={fetchStudents}
+            />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LectureCheckInResults />
+              {currentUser && <AcademicIntegrityInsights instructorId={currentUser.id} />}
+            </div>
+          </div>
+        );
+
+      case "materials":
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LectureMaterialsUpload />
+              
+              {professorType === "research" && (
+                <Card className="headspace-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Code className="h-5 w-5 text-primary" />
+                      Research Tools
+                    </CardTitle>
+                    <CardDescription>
+                      AI-powered content generation for research
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="outline" className="w-full rounded-xl">
+                      Access Lab Portal
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <DashboardShell
       role="instructor"
@@ -395,140 +546,52 @@ export default function InstructorDashboard() {
       onLogout={handleLogout}
       title="Instructor Dashboard"
       subtitle={instructorProfile?.course_title}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as TabValue)}
       headerActions={
         <QuickActions actions={quickActions} className="hidden lg:flex" />
       }
     >
-      <div className="space-y-6">
-        {/* Organization and Admin Connection Info */}
-        <InstructorConnectionCard />
-
-        {/* Top Section - Overview and Code */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Class Health Overview */}
-          {currentUser && (
-            <div className="lg:col-span-2">
-              <InstructorOverview instructorId={currentUser.id} />
-            </div>
-          )}
-
-          {/* Instructor Code Card */}
-          {instructorCode && (
-            <div className="headspace-card rounded-2xl p-6 border border-border/50">
-              <h3 className="text-lg font-semibold mb-3 text-foreground">Your Class Code</h3>
-              <div className="flex flex-col gap-3">
-                <code className="text-3xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center">
-                  {instructorCode}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full rounded-xl"
-                  onClick={() => {
-                    navigator.clipboard.writeText(instructorCode);
-                    toast.success("Code copied to clipboard!");
-                  }}
+      <div className="flex min-h-[calc(100vh-12rem)]">
+        {/* Sidebar Navigation - Desktop Only */}
+        <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
+          <nav className="flex flex-col gap-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.value;
+              return (
+                <button
+                  key={item.value}
+                  onClick={() => setActiveTab(item.value)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
                 >
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy Code
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-3 text-center">
-                Share this code with your students to join your class
-              </p>
-            </div>
-          )}
-        </div>
+                  <Icon className="h-5 w-5" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-        {/* Live Session & Presentation Tools */}
-        {currentUser && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <LiveSessionControls onSessionChange={setLiveSessionId} />
-
-            {/* Slide Presenter Quick Access */}
-            <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Presentation className="h-5 w-5 text-primary" />
-                  Slide Presenter
-                </CardTitle>
-                <CardDescription>
-                  Present slides with integrated live lecture tools
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <Button 
-                  onClick={() => navigate('/instructor/slides')}
-                  className="w-full rounded-xl"
-                >
-                  Open Slide Presenter
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Content Management */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <LectureMaterialsUpload />
-          
-          {professorType === "research" && (
-            <Card className="headspace-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Code className="h-5 w-5 text-primary" />
-                  Research Tools
-                </CardTitle>
-                <CardDescription>
-                  AI-powered content generation for research
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full rounded-xl">
-                  Access Lab Portal
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Pre-recorded Lectures */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PreRecordedLectureUpload />
-          <LectureVideoManager />
-        </div>
-
-        {/* Grades and Check-ins */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PreRecordedLectureGrades />
-          <LectureCheckInResults />
-        </div>
-
-        {/* Live Lecture Tools */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <LectureTranscription onQuestionGenerated={() => {}} />
-          <AnswerReleaseCard instructorId={currentUser?.id || ""} />
-        </div>
-
-        {/* Academic Integrity */}
-        {currentUser && <AcademicIntegrityInsights instructorId={currentUser.id} />}
-
-        {/* Student Rankings */}
-        <StudentRankingCard
-          students={rankedStudents}
-          onStudentClick={handleStudentClick}
-          onRefresh={fetchStudents}
-        />
-
-        {/* Student Detail Dialog */}
-        {selectedStudentDetail && (
-          <StudentDetailDialog
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            student={selectedStudentDetail}
-          />
-        )}
+        {/* Main Content */}
+        <main className="flex-1 min-w-0">
+          {renderTabContent()}
+        </main>
       </div>
+
+      {/* Student Detail Dialog */}
+      {selectedStudentDetail && (
+        <StudentDetailDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          student={selectedStudentDetail}
+        />
+      )}
     </DashboardShell>
   );
 }

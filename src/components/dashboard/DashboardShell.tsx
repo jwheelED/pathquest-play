@@ -20,6 +20,8 @@ interface DashboardShellProps {
   headerActions?: ReactNode;
   title?: string;
   subtitle?: string;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export function DashboardShell({
@@ -33,6 +35,8 @@ export function DashboardShell({
   headerActions,
   title,
   subtitle,
+  activeTab,
+  onTabChange,
 }: DashboardShellProps) {
   const navigate = useNavigate();
 
@@ -128,7 +132,7 @@ export function DashboardShell({
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <BottomNav role={role} />
+      <BottomNav role={role} activeTab={activeTab} onTabChange={onTabChange} />
     </div>
   );
 }

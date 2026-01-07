@@ -1,12 +1,14 @@
-import { Home, BookOpen, Radio, Trophy } from "lucide-react";
+import { Home, BookOpen, Radio, Trophy, Video, Users, FileText, LayoutDashboard } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface BottomNavProps {
   role: "student" | "instructor" | "admin";
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function BottomNav({ role }: BottomNavProps) {
+export function BottomNav({ role, activeTab, onTabChange }: BottomNavProps) {
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -18,24 +20,36 @@ export function BottomNav({ role }: BottomNavProps) {
   ];
 
   const instructorNavItems = [
-    { icon: Home, label: "Dashboard", path: "/instructor/dashboard" },
-    { icon: BookOpen, label: "Content", path: "/instructor/dashboard#content" },
+    { icon: LayoutDashboard, label: "Overview", path: "/instructor/dashboard", tab: "overview" },
+    { icon: Radio, label: "Live", path: "/instructor/dashboard", tab: "live" },
+    { icon: Video, label: "Recorded", path: "/instructor/dashboard", tab: "recorded" },
+    { icon: Users, label: "Students", path: "/instructor/dashboard", tab: "students" },
   ];
 
   const navItems = role === "student" ? studentNavItems : instructorNavItems;
 
+  const handleClick = (item: { icon: React.ElementType; label: string; path: string; tab?: string }, e: React.MouseEvent) => {
+    if (role === "instructor" && onTabChange && item.tab) {
+      e.preventDefault();
+      onTabChange(item.tab);
+    }
+  };
+
   return (
-    <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50">
+    <nav className="lg:hidden fixed bottom-4 left-4 right-4 z-50">
       <div className="bg-card/95 backdrop-blur-xl rounded-2xl shadow-xl border border-border/50 px-2 py-2 safe-bottom">
         <div className="flex justify-around items-center">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentPath === item.path.split("#")[0];
+            const isActive = role === "instructor" && activeTab 
+              ? ('tab' in item && item.tab === activeTab)
+              : currentPath === item.path.split("#")[0];
             
             return (
               <Link
-                key={item.path}
+                key={item.path + ('tab' in item ? item.tab : '')}
                 to={item.path}
+                onClick={(e) => handleClick(item, e)}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 py-2 px-3 rounded-xl transition-all",
                   isActive
