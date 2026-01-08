@@ -49,10 +49,11 @@ interface Problem {
   problem_number: string | null;
   problem_text: string;
   problem_latex: string | null;
-  solution_text: string;
+  has_solution: boolean | null;
+  solution_text: string | null;
   solution_latex: string | null;
   solution_steps: any[];
-  final_answer: string;
+  final_answer: string | null;
   final_answer_latex: string | null;
   units: string | null;
   topic_tags: string[];
@@ -698,6 +699,12 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
                             <Badge variant="outline" className="text-xs capitalize">
                               {problem.difficulty}
                             </Badge>
+                            {!problem.has_solution && (
+                              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Problem Only
+                              </Badge>
+                            )}
                             {problem.verified_by_instructor ? (
                               <Badge 
                                 variant="default" 
@@ -747,20 +754,35 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
 
                   <CollapsibleContent>
                     <CardContent className="pt-0 pb-4 space-y-4">
-                      {/* Solution */}
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">Solution:</p>
-                        <p className="text-sm">{problem.solution_text}</p>
-                      </div>
+                      {/* Solution - only show if has_solution */}
+                      {problem.has_solution ? (
+                        <>
+                          {problem.solution_text && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground mb-1">Solution:</p>
+                              <p className="text-sm">{problem.solution_text}</p>
+                            </div>
+                          )}
 
-                      {/* Final Answer */}
-                      <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                        <p className="text-sm font-medium text-primary mb-1">Final Answer:</p>
-                        <p className="font-mono font-medium">
-                          {problem.final_answer}
-                          {problem.units && <span className="ml-1 text-muted-foreground">{problem.units}</span>}
-                        </p>
-                      </div>
+                          {/* Final Answer */}
+                          {problem.final_answer && (
+                            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                              <p className="text-sm font-medium text-primary mb-1">Final Answer:</p>
+                              <p className="font-mono font-medium">
+                                {problem.final_answer}
+                                {problem.units && <span className="ml-1 text-muted-foreground">{problem.units}</span>}
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-sm font-medium text-amber-700 mb-1">No Solution Available</p>
+                          <p className="text-sm text-amber-600">
+                            This is a problem-only entry. You can add a solution by clicking Edit below.
+                          </p>
+                        </div>
+                      )}
 
                       {/* Keywords */}
                       {problem.keywords.length > 0 && (

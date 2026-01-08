@@ -30,17 +30,18 @@ interface Problem {
   problem_number: string;
   problem_text: string;
   problem_latex?: string;
-  solution_text: string;
-  solution_latex?: string;
+  has_solution?: boolean;
+  solution_text?: string | null;
+  solution_latex?: string | null;
   solution_steps: SolutionStep[];
-  final_answer: string;
-  final_answer_latex?: string;
-  units?: string;
+  final_answer?: string | null;
+  final_answer_latex?: string | null;
+  units?: string | null;
   topic_tags: string[];
   keywords: string[];
   difficulty: string;
   verified_by_instructor: boolean;
-  verification_notes?: string;
+  verification_notes?: string | null;
 }
 
 interface ProblemEditorProps {
@@ -85,15 +86,19 @@ export function ProblemEditor({ answerKeyId, problem, onSave, onCancel }: Proble
         latex: step.latex || "",
       }));
 
+      // Determine if this problem has a solution
+      const hasSolution = !!(formData.solution_text?.trim() || formData.final_answer?.trim());
+
       const payload = {
         answer_key_id: formData.answer_key_id,
         problem_number: formData.problem_number || null,
         problem_text: formData.problem_text,
         problem_latex: formData.problem_latex || null,
-        solution_text: formData.solution_text,
+        has_solution: hasSolution,
+        solution_text: formData.solution_text || null,
         solution_latex: formData.solution_latex || null,
         solution_steps: solutionStepsJson as any,
-        final_answer: formData.final_answer,
+        final_answer: formData.final_answer || null,
         final_answer_latex: formData.final_answer_latex || null,
         units: formData.units || null,
         topic_tags: formData.topic_tags,
@@ -191,7 +196,8 @@ export function ProblemEditor({ answerKeyId, problem, onSave, onCancel }: Proble
     }));
   };
 
-  const isValid = formData.problem_text.trim() && formData.solution_text.trim() && formData.final_answer.trim();
+  // Only require problem_text - solution fields are now optional
+  const isValid = formData.problem_text.trim();
 
   return (
     <Card>
@@ -282,11 +288,11 @@ export function ProblemEditor({ answerKeyId, problem, onSave, onCancel }: Proble
 
         {/* Solution */}
         <div>
-          <Label>Solution Explanation *</Label>
+          <Label>Solution Explanation (optional for problem-only entries)</Label>
           <Textarea
-            value={formData.solution_text}
+            value={formData.solution_text || ""}
             onChange={(e) => setFormData((prev) => ({ ...prev, solution_text: e.target.value }))}
-            placeholder="Explain the solution approach..."
+            placeholder="Explain the solution approach... (leave empty for problem-only entries)"
             className="mt-1.5 min-h-[100px]"
           />
         </div>
@@ -335,10 +341,10 @@ export function ProblemEditor({ answerKeyId, problem, onSave, onCancel }: Proble
 
         {/* Final Answer */}
         <div className="p-4 border-2 border-primary/20 rounded-xl bg-primary/5">
-          <Label className="text-primary font-semibold">Final Answer *</Label>
+          <Label className="text-primary font-semibold">Final Answer (optional for problem-only entries)</Label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
             <Input
-              value={formData.final_answer}
+              value={formData.final_answer || ""}
               onChange={(e) => setFormData((prev) => ({ ...prev, final_answer: e.target.value }))}
               placeholder="The definitive answer..."
               className="font-medium"

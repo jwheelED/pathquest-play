@@ -275,8 +275,9 @@ export type Database = {
           answer_key_id: string
           created_at: string
           difficulty: string | null
-          final_answer: string
+          final_answer: string | null
           final_answer_latex: string | null
+          has_solution: boolean | null
           id: string
           keywords: string[] | null
           order_index: number | null
@@ -285,7 +286,7 @@ export type Database = {
           problem_text: string
           solution_latex: string | null
           solution_steps: Json | null
-          solution_text: string
+          solution_text: string | null
           topic_tags: string[] | null
           units: string | null
           updated_at: string
@@ -296,8 +297,9 @@ export type Database = {
           answer_key_id: string
           created_at?: string
           difficulty?: string | null
-          final_answer: string
+          final_answer?: string | null
           final_answer_latex?: string | null
+          has_solution?: boolean | null
           id?: string
           keywords?: string[] | null
           order_index?: number | null
@@ -306,7 +308,7 @@ export type Database = {
           problem_text: string
           solution_latex?: string | null
           solution_steps?: Json | null
-          solution_text: string
+          solution_text?: string | null
           topic_tags?: string[] | null
           units?: string | null
           updated_at?: string
@@ -317,8 +319,9 @@ export type Database = {
           answer_key_id?: string
           created_at?: string
           difficulty?: string | null
-          final_answer?: string
+          final_answer?: string | null
           final_answer_latex?: string | null
+          has_solution?: boolean | null
           id?: string
           keywords?: string[] | null
           order_index?: number | null
@@ -327,7 +330,7 @@ export type Database = {
           problem_text?: string
           solution_latex?: string | null
           solution_steps?: Json | null
-          solution_text?: string
+          solution_text?: string | null
           topic_tags?: string[] | null
           units?: string | null
           updated_at?: string
