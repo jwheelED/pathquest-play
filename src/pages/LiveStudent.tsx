@@ -254,7 +254,11 @@ const LiveStudent = () => {
     }
   };
 
-  // For short answer questions (no confidence betting)
+  // AI grade state for short answers
+  const [aiGrade, setAiGrade] = useState<number | null>(null);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+
+  // For short answer questions (with AI grading)
   const handleSubmit = async () => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
 
@@ -280,12 +284,16 @@ const LiveStudent = () => {
       
       setHasAnswered(true);
       setIsCorrect(data.isCorrect);
+      setAiGrade(data.aiGrade || null);
+      setAiFeedback(data.aiFeedback || null);
       setShowAccountPrompt(true);
       
       if (data.isCorrect) {
-        toast.success("Correct! 🎉");
+        const gradeText = data.aiGrade ? ` (${data.aiGrade}%)` : "";
+        toast.success(`Correct${gradeText}! 🎉`);
       } else {
-        toast.error("Incorrect. Try again next time!");
+        const gradeText = data.aiGrade ? ` (${data.aiGrade}%)` : "";
+        toast.error(`Incorrect${gradeText}. Try again next time!`);
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
@@ -428,6 +436,15 @@ const LiveStudent = () => {
                     <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
                   </div>
                   <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
+                  {/* Show AI grade for short answers */}
+                  {!isMCQ && aiGrade !== null && (
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
+                      <p className="text-sm font-medium">AI Score: {aiGrade}%</p>
+                      {aiFeedback && (
+                        <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
+                      )}
+                    </div>
+                  )}
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}
@@ -443,6 +460,15 @@ const LiveStudent = () => {
                   <p className="text-muted-foreground">
                     Correct answer: {currentQuestion.question_content.correctAnswer}
                   </p>
+                  {/* Show AI grade for short answers */}
+                  {!isMCQ && aiGrade !== null && (
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
+                      <p className="text-sm font-medium">AI Score: {aiGrade}%</p>
+                      {aiFeedback && (
+                        <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
+                      )}
+                    </div>
+                  )}
                   {pointsEarned < 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}
