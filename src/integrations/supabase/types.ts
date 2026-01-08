@@ -1409,6 +1409,8 @@ export type Database = {
       }
       live_responses: {
         Row: {
+          ai_feedback: string | null
+          ai_grade: number | null
           answer: string
           confidence_level: string | null
           confidence_multiplier: number | null
@@ -1421,6 +1423,8 @@ export type Database = {
           response_time_ms: number | null
         }
         Insert: {
+          ai_feedback?: string | null
+          ai_grade?: number | null
           answer: string
           confidence_level?: string | null
           confidence_multiplier?: number | null
@@ -1433,6 +1437,8 @@ export type Database = {
           response_time_ms?: number | null
         }
         Update: {
+          ai_feedback?: string | null
+          ai_grade?: number | null
           answer?: string
           confidence_level?: string | null
           confidence_multiplier?: number | null
