@@ -480,7 +480,7 @@ export default function InstructorDashboard() {
             </div>
             
             <div className="min-w-0">
-              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
+              <LectureCheckInResults />
             </div>
           </div>
         );
@@ -514,7 +514,7 @@ export default function InstructorDashboard() {
             </div>
             
             <div className="min-w-0">
-              <LectureCheckInResults />
+              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
             </div>
             
             {currentUser && (
