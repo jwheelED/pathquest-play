@@ -10,10 +10,11 @@ interface ProblemSolution {
   problem_number: string;
   problem_text: string;
   problem_latex: string | null;
-  solution_text: string;
+  has_solution: boolean;
+  solution_text: string | null;
   solution_latex: string | null;
   solution_steps: { step: number; explanation: string; latex: string }[];
-  final_answer: string;
+  final_answer: string | null;
   final_answer_latex: string | null;
   units: string | null;
   topic_tags: string[];
@@ -123,28 +124,49 @@ serve(async (req) => {
       });
     }
 
-    // Convert file to text content
-    let file_content: string;
+    // Detect file type and prepare content for AI
     const fileType = answerKey.file_type || "";
+    const fileName = answerKey.file_name || "";
+    const isImage = fileType.includes("image") || /\.(png|jpg|jpeg|gif|webp)$/i.test(fileName);
+    const isPdf = fileType.includes("pdf") || fileName.endsWith(".pdf");
     
-    if (fileType.includes("text") || answerKey.file_name?.endsWith(".txt")) {
-      file_content = await fileData.text();
-    } else if (fileType.includes("pdf") || answerKey.file_name?.endsWith(".pdf")) {
-      // For PDFs, we need to extract text - for now, send the base64 and let AI handle it
+    let messageContent: any;
+
+    if (isImage) {
+      // For images, use proper multimodal content array for vision models
       const arrayBuffer = await fileData.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      file_content = `[PDF Document - Base64 Encoded]\n${base64.substring(0, 50000)}...`; // Truncate for API limits
-      console.log("PDF detected, using base64 encoding (truncated)");
-    } else if (fileType.includes("image") || /\.(png|jpg|jpeg)$/i.test(answerKey.file_name || "")) {
-      // For images, use base64 encoding for vision models
+      const mimeType = fileType || "image/png";
+      
+      console.log(`Image detected (${mimeType}), using multimodal content for vision model`);
+      
+      messageContent = [
+        { 
+          type: "text", 
+          text: buildUserPrompt(answerKey.subject, answerKey.course_context) 
+        },
+        { 
+          type: "image_url", 
+          image_url: { 
+            url: `data:${mimeType};base64,${base64}` 
+          }
+        }
+      ];
+    } else if (isPdf) {
+      // For PDFs, extract base64 and send as document context
       const arrayBuffer = await fileData.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      file_content = `[Image Document - Please extract text from this base64 image]\ndata:${fileType};base64,${base64}`;
-      console.log("Image detected, using base64 encoding");
+      const truncatedBase64 = base64.substring(0, 50000); // API limits
+      
+      console.log("PDF detected, using base64 encoding (truncated for API limits)");
+      
+      messageContent = buildUserPrompt(answerKey.subject, answerKey.course_context) + 
+        `\n\n[PDF Document - Base64 Encoded]\n${truncatedBase64}...`;
     } else {
-      // Try to read as text
+      // For text files, read as text
+      let fileText: string;
       try {
-        file_content = await fileData.text();
+        fileText = await fileData.text();
       } catch {
         console.error("Could not read file as text");
         await supabase
@@ -156,42 +178,51 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      
+      messageContent = buildUserPrompt(answerKey.subject, answerKey.course_context) + 
+        `\n\n${fileText}`;
     }
 
     const subject = answerKey.subject;
     const course_context = answerKey.course_context;
 
-    console.log(`Parsing answer key ${actualAnswerKeyId}, subject: ${subject}, content length: ${file_content.length}`);
+    console.log(`Parsing answer key ${actualAnswerKeyId}, subject: ${subject}, is_image: ${isImage}`);
 
-    // Build the AI prompt for parsing
-    const systemPrompt = `You are an expert academic parser specializing in extracting problem-solution pairs from STEM answer keys.
+    // Build the AI prompt for flexible parsing (supports both problems+solutions AND problem-only)
+    const systemPrompt = `You are an expert academic parser specializing in extracting problems from STEM documents.
 
-Your task is to parse the provided content and extract structured problem-solution pairs.
+Your task is to parse the provided content and extract ALL problems you find. The content may contain:
+- Problems WITH full worked solutions
+- Problems with ONLY final answers (no steps)
+- Problems with NO answers at all (problem statements only)
 
-For each problem you find, extract:
-1. problem_number: The problem number/label (e.g., "1a", "2.3", "Problem 5")
-2. problem_text: The complete problem statement in plain text
+For EACH problem you find, extract what is AVAILABLE:
+
+1. problem_number: The problem number/label (e.g., "1a", "2.3", "Problem 5", "5a")
+2. problem_text: The complete problem statement in plain text (include all given information, values, conditions)
 3. problem_latex: LaTeX representation of any equations in the problem (or null if none)
-4. solution_text: Complete solution explanation in plain text
-5. solution_latex: LaTeX for any equations in the solution (or null if none)
-6. solution_steps: Array of step-by-step breakdown: [{step: 1, explanation: "...", latex: "..."}, ...]
-7. final_answer: The definitive final answer
-8. final_answer_latex: LaTeX version of the final answer (or null if plain text)
-9. units: Physical units if applicable (e.g., "m/s", "J", "N")
-10. topic_tags: Array of topic tags (e.g., ["kinematics", "projectile-motion"])
-11. keywords: 5-10 trigger words/phrases that would appear when discussing this problem (for transcript matching)
-12. difficulty: One of "beginner", "intermediate", "advanced", "expert"
+4. has_solution: boolean - true if ANY solution/answer is provided, false if problem-only
+5. solution_text: Complete solution explanation in plain text (null if not available)
+6. solution_latex: LaTeX for any equations in the solution (null if none)
+7. solution_steps: Array of step-by-step breakdown: [{step: 1, explanation: "...", latex: "..."}] (empty array if not available)
+8. final_answer: The definitive final answer if provided (null if not available)
+9. final_answer_latex: LaTeX version of the final answer (null if plain text or not available)
+10. units: Physical units if applicable (e.g., "m/s", "J", "N")
+11. topic_tags: Array of topic tags (e.g., ["circular-motion", "energy-conservation", "roller-coaster"])
+12. keywords: 5-10 trigger words/phrases for transcript matching - words an instructor would say when discussing this problem
+13. difficulty: One of "beginner", "intermediate", "advanced", "expert"
 
 Subject context: ${subject || "general"}
 Course context: ${course_context || "not specified"}
 
-IMPORTANT:
-- Extract ALL problems you can find in the content
-- For complex equations, use proper LaTeX notation
-- For physics/engineering: include vectors (\\vec{v}), Greek letters (\\alpha, \\beta), units
-- For chemistry: include molecular formulas, reaction equations
-- For math: include integrals, matrices, summations, limits
-- Generate meaningful keywords that instructors might say when discussing each problem
+CRITICAL RULES:
+- Extract EVERY distinct problem or sub-part (a, b, c, etc.) as a SEPARATE entry
+- If a problem has multiple parts (a, b, c), create individual entries for EACH part
+- If NO solution/answer is shown, set has_solution: false and leave solution fields null
+- For IMAGES: carefully read ALL text including diagrams, figure labels, axis labels, and annotations
+- For physics/engineering problems: extract all given values (mass, radius, height, velocity, etc.)
+- Generate meaningful keywords even for problem-only entries based on the physics concepts involved
+- For complex equations, use proper LaTeX notation (\\vec{v}, \\alpha, \\frac{}, etc.)
 
 Return your response as a valid JSON object with this structure:
 {
@@ -200,10 +231,11 @@ Return your response as a valid JSON object with this structure:
       "problem_number": "1",
       "problem_text": "...",
       "problem_latex": null,
-      "solution_text": "...",
+      "has_solution": false,
+      "solution_text": null,
       "solution_latex": null,
       "solution_steps": [],
-      "final_answer": "...",
+      "final_answer": null,
       "final_answer_latex": null,
       "units": null,
       "topic_tags": [],
@@ -213,14 +245,23 @@ Return your response as a valid JSON object with this structure:
   ],
   "metadata": {
     "total_problems": 0,
+    "problems_with_solutions": 0,
+    "problems_without_solutions": 0,
     "subjects_detected": [],
     "parsing_notes": ""
   }
 }`;
 
-    const userPrompt = `Parse the following answer key content and extract all problem-solution pairs:\n\n${file_content}`;
-
     console.log("Calling Lovable AI Gateway for parsing...");
+
+    // Build the messages array based on content type
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { 
+        role: "user", 
+        content: messageContent 
+      },
+    ];
 
     // Call Lovable AI Gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -231,10 +272,7 @@ Return your response as a valid JSON object with this structure:
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        messages,
         temperature: 0.3, // Lower temperature for more consistent parsing
       }),
     });
@@ -310,7 +348,11 @@ Return your response as a valid JSON object with this structure:
     }
 
     const problems: ProblemSolution[] = parsedResult.problems || [];
+    const metadata = parsedResult.metadata || {};
+    
     console.log(`Parsed ${problems.length} problems from answer key`);
+    console.log(`  - With solutions: ${metadata.problems_with_solutions || 'unknown'}`);
+    console.log(`  - Without solutions: ${metadata.problems_without_solutions || 'unknown'}`);
 
     if (problems.length === 0) {
       console.warn("No problems extracted from content");
@@ -328,16 +370,17 @@ Return your response as a valid JSON object with this structure:
       });
     }
 
-    // Insert problems into database
+    // Insert problems into database with proper handling of nullable fields
     const problemInserts = problems.map((problem, index) => ({
       answer_key_id: actualAnswerKeyId,
       problem_number: problem.problem_number || `${index + 1}`,
       problem_text: problem.problem_text,
       problem_latex: problem.problem_latex || null,
-      solution_text: problem.solution_text,
-      solution_latex: problem.solution_latex || null,
+      has_solution: problem.has_solution ?? false,
+      solution_text: problem.has_solution ? (problem.solution_text || null) : null,
+      solution_latex: problem.has_solution ? (problem.solution_latex || null) : null,
       solution_steps: problem.solution_steps || [],
-      final_answer: problem.final_answer,
+      final_answer: problem.has_solution ? (problem.final_answer || null) : null,
       final_answer_latex: problem.final_answer_latex || null,
       units: problem.units || null,
       topic_tags: problem.topic_tags || [],
@@ -380,6 +423,8 @@ Return your response as a valid JSON object with this structure:
     return new Response(JSON.stringify({
       success: true,
       problems_extracted: problems.length,
+      problems_with_solutions: metadata.problems_with_solutions || 0,
+      problems_without_solutions: metadata.problems_without_solutions || 0,
       metadata: parsedResult.metadata || {},
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -394,3 +439,13 @@ Return your response as a valid JSON object with this structure:
     });
   }
 });
+
+// Helper function to build user prompt
+function buildUserPrompt(subject: string | null, courseContext: string | null): string {
+  return `Parse this content and extract all problems with their solutions (if available).
+Subject: ${subject || 'general'}
+Course context: ${courseContext || 'not specified'}
+
+Extract every problem you find, including sub-parts (a, b, c, etc.) as separate entries.
+For problem-only content (no solutions shown), set has_solution: false.`;
+}
