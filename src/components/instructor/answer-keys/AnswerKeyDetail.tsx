@@ -73,8 +73,20 @@ interface AnswerKey {
   file_path: string | null;
   status: string;
   problem_count: number;
+  content_type: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface ExtractedMCQ {
+  id: string;
+  question_text: string;
+  question_latex: string | null;
+  correct_answer: string;
+  distractors: unknown;
+  explanation: string | null;
+  source_type: string;
+  verified: boolean;
 }
 
 interface AnswerKeyDetailProps {
@@ -108,7 +120,7 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
     },
   });
 
-  // Fetch problems with polling when processing
+  // Fetch problems with polling when processing (only for problem-solutions type)
   const { data: problems = [], isLoading: loadingProblems, refetch: refetchProblems } = useQuery({
     queryKey: ["answer-key-problems", answerKeyId],
     queryFn: async () => {
@@ -121,8 +133,28 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
       if (error) throw error;
       return data as Problem[];
     },
+    enabled: answerKey?.content_type !== "mcqs",
     refetchInterval: (query) => {
-      // Poll every 3 seconds while processing to show new problems as they're parsed
+      return answerKey?.status === "processing" ? 3000 : false;
+    },
+  });
+
+  // Fetch extracted MCQs (only for mcqs type)
+  const { data: extractedMcqs = [], isLoading: loadingMcqs, refetch: refetchMcqs } = useQuery({
+    queryKey: ["answer-key-extracted-mcqs", answerKeyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("answer_key_mcqs")
+        .select("*")
+        .eq("answer_key_id", answerKeyId)
+        .eq("source_type", "extracted")
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      return data as ExtractedMCQ[];
+    },
+    enabled: answerKey?.content_type === "mcqs",
+    refetchInterval: (query) => {
       return answerKey?.status === "processing" ? 3000 : false;
     },
   });
@@ -426,36 +458,46 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3 flex-wrap">
-            <Button onClick={() => setShowAddProblem(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Problem
-            </Button>
-            {problems.length > 0 && verifiedCount < problems.length && (
-              <Button 
-                variant="outline"
-                onClick={() => verifyAllMutation.mutate()}
-                disabled={verifyAllMutation.isPending}
-              >
-                {verifyAllMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
+            {answerKey.content_type !== "mcqs" && (
+              <>
+                <Button onClick={() => setShowAddProblem(true)}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Problem
+                </Button>
+                {problems.length > 0 && verifiedCount < problems.length && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => verifyAllMutation.mutate()}
+                    disabled={verifyAllMutation.isPending}
+                  >
+                    {verifyAllMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                    )}
+                    Verify All ({problems.length - verifiedCount})
+                  </Button>
                 )}
-                Verify All ({problems.length - verifiedCount})
-              </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => generateMcqsMutation.mutate(undefined)}
+                  disabled={generateMcqsMutation.isPending || verifiedCount === 0}
+                >
+                  {generateMcqsMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-1" />
+                  )}
+                  Generate MCQs ({verifiedCount} verified)
+                </Button>
+              </>
             )}
-            <Button 
-              variant="outline" 
-              onClick={() => generateMcqsMutation.mutate(undefined)}
-              disabled={generateMcqsMutation.isPending || verifiedCount === 0}
-            >
-              {generateMcqsMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4 mr-1" />
-              )}
-              Generate MCQs ({verifiedCount} verified)
-            </Button>
+            {answerKey.content_type === "mcqs" && extractedMcqs.length > 0 && (
+              <Badge variant="default" className="bg-primary/10 text-primary border-primary/20">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {extractedMcqs.length} MCQs Ready for Matching
+              </Badge>
+            )}
             {answerKey.file_path && (
               <Button 
                 variant="ghost" 
@@ -551,24 +593,82 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
         />
       )}
 
-      {/* Problems List */}
-      {loadingProblems ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Loading problems...
-          </CardContent>
-        </Card>
-      ) : problems.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground">No problems added yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Add problems manually or let AI parse them from your uploaded file
-            </p>
-          </CardContent>
-        </Card>
+      {/* Content Display - MCQs or Problems based on content_type */}
+      {answerKey.content_type === "mcqs" ? (
+        // Extracted MCQs view
+        loadingMcqs ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Loading MCQs...
+            </CardContent>
+          </Card>
+        ) : extractedMcqs.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+              <p className="text-muted-foreground">No MCQs extracted yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                AI is extracting questions from your file...
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {extractedMcqs.map((mcq, index) => {
+              const distractors = Array.isArray(mcq.distractors) ? mcq.distractors : [];
+              return (
+                <Card key={mcq.id}>
+                  <CardHeader className="py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{mcq.question_text}</p>
+                        <div className="mt-3 space-y-1.5">
+                          <div className="flex items-center gap-2 p-2 bg-primary/5 border border-primary/20 rounded text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="font-medium">{mcq.correct_answer}</span>
+                          </div>
+                          {distractors.map((d: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm text-muted-foreground">
+                              <span className="w-4 h-4 flex-shrink-0" />
+                              <span>{d.text || d}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {mcq.explanation && (
+                          <p className="text-sm text-muted-foreground mt-3">
+                            <strong>Explanation:</strong> {mcq.explanation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })}
+          </div>
+        )
       ) : (
+        // Problems view (existing code)
+        loadingProblems ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Loading problems...
+            </CardContent>
+          </Card>
+        ) : problems.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+              <p className="text-muted-foreground">No problems added yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add problems manually or let AI parse them from your uploaded file
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
         <div className="space-y-3">
           {problems.map((problem) => (
             <Card key={problem.id}>
@@ -744,6 +844,7 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
             </Card>
           ))}
         </div>
+        )
       )}
     </div>
   );

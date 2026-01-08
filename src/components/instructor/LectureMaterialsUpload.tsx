@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, FileText, Trash2, Download, BookOpen, Loader2 } from "lucide-react";
+import { Upload, FileText, Trash2, Download, BookOpen, Loader2, ListChecks, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface LectureMaterial {
   id: string;
@@ -51,6 +52,7 @@ export function LectureMaterialsUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parseAsAnswerKey, setParseAsAnswerKey] = useState(false);
   const [answerKeySubject, setAnswerKeySubject] = useState("");
+  const [answerKeyType, setAnswerKeyType] = useState<"problem-solutions" | "mcqs">("problem-solutions");
   const [isParsing, setIsParsing] = useState(false);
   const queryClient = useQueryClient();
 
@@ -124,21 +126,29 @@ export function LectureMaterialsUpload() {
             file_name: selectedFile.name,
             file_type: selectedFile.type,
             status: "processing",
+            content_type: answerKeyType,
           })
           .select()
           .single();
 
         if (dbError) throw dbError;
 
-        // Trigger AI parsing
+        // Trigger appropriate AI parsing based on content type
         setIsParsing(true);
-        const { error: parseError } = await supabase.functions.invoke("parse-answer-key", {
+        const functionName = answerKeyType === "mcqs" 
+          ? "extract-mcqs-from-file" 
+          : "parse-answer-key";
+        
+        const { error: parseError } = await supabase.functions.invoke(functionName, {
           body: { answerKeyId: answerKey.id },
         });
 
         if (parseError) {
           console.error("Parse error (non-blocking):", parseError);
-          toast.info("AI parsing started. Problems will appear in Answer Keys manager when ready.");
+          const actionText = answerKeyType === "mcqs" 
+            ? "MCQs will appear in Answer Keys manager when ready."
+            : "Problems will appear in Answer Keys manager when ready.";
+          toast.info(`AI parsing started. ${actionText}`);
         }
 
         // Also add to lecture_materials for reference
@@ -155,7 +165,7 @@ export function LectureMaterialsUpload() {
             description: `[Answer Key] ${description.trim() || answerKeySubject}`,
           });
 
-        return { isAnswerKey: true, answerKeyId: answerKey.id };
+        return { isAnswerKey: true, answerKeyId: answerKey.id, contentType: answerKeyType };
       } else {
         // Regular material upload
         const { error: dbError } = await supabase
@@ -177,7 +187,10 @@ export function LectureMaterialsUpload() {
     },
     onSuccess: (result) => {
       if (result?.isAnswerKey) {
-        toast.success("Answer key uploaded! AI is parsing problems for live matching.");
+        const successText = result.contentType === "mcqs"
+          ? "Answer key uploaded! AI is extracting MCQs for live matching."
+          : "Answer key uploaded! AI is parsing problems for live matching.";
+        toast.success(successText);
       } else {
         toast.success("Material uploaded successfully!");
       }
@@ -186,6 +199,7 @@ export function LectureMaterialsUpload() {
       setSelectedFile(null);
       setParseAsAnswerKey(false);
       setAnswerKeySubject("");
+      setAnswerKeyType("problem-solutions");
       setIsParsing(false);
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
       queryClient.invalidateQueries({ queryKey: ["answer-keys"] });
@@ -341,24 +355,62 @@ export function LectureMaterialsUpload() {
               </Label>
             </div>
             <p className="text-xs text-muted-foreground ml-6">
-              Enable this for quizzes, tests, or problem sets. AI will extract problems and create MCQs for live lecture matching.
+              Enable this for quizzes, tests, or problem sets. AI will process the file for live lecture matching.
             </p>
 
             {parseAsAnswerKey && (
-              <div className="ml-6">
-                <Label htmlFor="answer-key-subject" className="text-xs">Subject *</Label>
-                <Select value={answerKeySubject} onValueChange={setAnswerKeySubject}>
-                  <SelectTrigger className="mt-1 h-8 text-sm">
-                    <SelectValue placeholder="Select subject" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUBJECTS.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="ml-6 space-y-4">
+                {/* Content Type Selection */}
+                <div>
+                  <Label className="text-xs font-medium mb-2 block">Content Type *</Label>
+                  <RadioGroup 
+                    value={answerKeyType} 
+                    onValueChange={(v) => setAnswerKeyType(v as "problem-solutions" | "mcqs")}
+                    className="grid grid-cols-1 gap-2"
+                  >
+                    <div className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
+                      <RadioGroupItem value="mcqs" id="mcqs" className="mt-1" />
+                      <Label htmlFor="mcqs" className="cursor-pointer flex-1">
+                        <div className="flex items-center gap-2">
+                          <ListChecks className="h-4 w-4 text-primary" />
+                          <span className="font-medium">Ready-Made Quiz Questions</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          File already contains MCQs with answer choices. AI will extract them directly.
+                        </p>
+                      </Label>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
+                      <RadioGroupItem value="problem-solutions" id="problem-solutions" className="mt-1" />
+                      <Label htmlFor="problem-solutions" className="cursor-pointer flex-1">
+                        <div className="flex items-center gap-2">
+                          <Calculator className="h-4 w-4 text-primary" />
+                          <span className="font-medium">Problems with Solutions</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          File contains worked problems. AI will parse them, then you can generate MCQs.
+                        </p>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Subject Selection */}
+                <div>
+                  <Label htmlFor="answer-key-subject" className="text-xs">Subject *</Label>
+                  <Select value={answerKeySubject} onValueChange={setAnswerKeySubject}>
+                    <SelectTrigger className="mt-1 h-8 text-sm">
+                      <SelectValue placeholder="Select subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUBJECTS.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
           </div>
