@@ -292,8 +292,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate a session token or redirect URL
-    // In production, create an Edvana session for the user
+    // Generate a secure session token instead of passing data in URL
     const appUrl = Deno.env.get('APP_URL') || 'https://edvana.app';
     
     // Determine redirect based on role
@@ -302,18 +301,34 @@ Deno.serve(async (req) => {
       redirectPath = '/instructor';
     }
 
-    // Add launch data as query params (in production, use secure session)
-    const launchParams = new URLSearchParams({
-      lti_launch: 'true',
-      platform_id: platform.id,
-      context_id: ltiClaims.context?.id || '',
-      user_id: payload.sub,
-      is_instructor: isInstructor.toString(),
-    });
+    // Create a short-lived session token (5 minutes)
+    const sessionToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    const redirectUrl = `${appUrl}${redirectPath}?${launchParams.toString()}`;
+    const { error: tokenError } = await supabase
+      .from('lti_session_tokens')
+      .insert({
+        token: sessionToken,
+        platform_id: platform.id,
+        context_id: ltiClaims.context?.id || null,
+        user_id: payload.sub,
+        is_instructor: isInstructor,
+        redirect_path: redirectPath,
+        expires_at: expiresAt.toISOString(),
+      });
 
-    console.log('Redirecting to:', redirectUrl);
+    if (tokenError) {
+      console.error('Error creating session token:', tokenError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create session token' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Only pass the session token in URL - no sensitive data exposed
+    const redirectUrl = `${appUrl}${redirectPath}?lti_session=${sessionToken}`;
+
+    console.log('Redirecting with session token (token redacted)');
 
     return new Response(
       `<!DOCTYPE html>

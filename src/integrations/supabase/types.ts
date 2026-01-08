@@ -1589,6 +1589,53 @@ export type Database = {
           },
         ]
       }
+      lti_session_tokens: {
+        Row: {
+          context_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          is_instructor: boolean
+          platform_id: string
+          redirect_path: string
+          token: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          context_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_instructor?: boolean
+          platform_id: string
+          redirect_path?: string
+          token: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          context_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_instructor?: boolean
+          platform_id?: string
+          redirect_path?: string
+          token?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_session_tokens_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lti_token_cache: {
         Row: {
           access_token: string
@@ -3694,6 +3741,7 @@ export type Database = {
         Args: { _target_user_id: string; _viewer_id: string }
         Returns: boolean
       }
+      cleanup_expired_lti_tokens: { Args: never; Returns: number }
       cleanup_old_question_logs: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: number }
       cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
