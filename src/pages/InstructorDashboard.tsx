@@ -16,6 +16,7 @@ import { LectureTranscription } from "@/components/instructor/LectureTranscripti
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
+import { AnswerKeyManager } from "@/components/instructor/answer-keys/AnswerKeyManager";
 import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
@@ -529,6 +530,10 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <div className="min-w-0">
               <LectureMaterialsUpload />
+            </div>
+            
+            <div className="min-w-0">
+              <AnswerKeyManager />
             </div>
             
             {professorType === "research" && (
