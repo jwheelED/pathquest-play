@@ -271,7 +271,7 @@ Return your response as a valid JSON object with this structure:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages,
         temperature: 0.3, // Lower temperature for more consistent parsing
       }),

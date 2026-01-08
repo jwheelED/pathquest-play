@@ -86,7 +86,7 @@ Analyze why the student got this wrong and identify which concept they need to r
         'X-Title': 'Edvana Education Platform',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
