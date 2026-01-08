@@ -20,20 +20,20 @@ interface ModelOption {
 
 const AI_MODELS: ModelOption[] = [
   {
-    value: "google/gemini-3-pro-preview",
-    label: "Gemini 3 Pro",
-    description: "Next-generation model with superior accuracy. Recommended for all use cases.",
+    value: "google/gemini-3-flash-preview",
+    label: "Gemini 3 Flash",
+    description: "Next-generation Flash model. Fast and efficient with great quality.",
     speed: "fast",
     cost: "low",
     quality: "superior"
   },
   {
-    value: "google/gemini-2.5-flash",
-    label: "Gemini 2.5 Flash",
-    description: "Previous generation. Good balance of speed and quality.",
-    speed: "fast",
-    cost: "low",
-    quality: "excellent"
+    value: "google/gemini-3-pro-preview",
+    label: "Gemini 3 Pro",
+    description: "Next-generation Pro model with superior accuracy for complex tasks.",
+    speed: "balanced",
+    cost: "medium",
+    quality: "superior"
   },
   {
     value: "google/gemini-2.5-pro",

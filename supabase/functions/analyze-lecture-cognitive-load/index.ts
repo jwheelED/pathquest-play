@@ -389,7 +389,7 @@ ${transcriptText}`;
             'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: 'google/gemini-3-flash-preview',
             messages: [
               { role: 'system', content: 'You are an expert at analyzing educational content. Return only valid JSON.' },
               { role: 'user', content: smartAnalysisPrompt }
@@ -568,7 +568,7 @@ ${transcriptText}`;
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-3-flash-preview',
         messages: [
           { role: 'system', content: 'You are an expert curriculum designer. Extract concepts from lecture transcripts. Return only valid JSON.' },
           { role: 'user', content: conceptMapPrompt }
@@ -1232,7 +1232,7 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
             'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
+            model: 'google/gemini-3-flash-preview',
             messages: [
               { role: 'system', content: 'You are a quiz question writer. Create specific, content-based questions about the lecture material. Never ask vague meta-questions. Return only valid JSON.' },
               { role: 'user', content: questionPrompt }
