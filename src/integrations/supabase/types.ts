@@ -203,6 +203,7 @@ export type Database = {
       }
       answer_key_mcqs: {
         Row: {
+          answer_key_id: string | null
           correct_answer: string
           correct_answer_latex: string | null
           created_at: string
@@ -213,11 +214,13 @@ export type Database = {
           problem_id: string
           question_latex: string | null
           question_text: string
+          source_type: string | null
           updated_at: string
           usage_count: number | null
           verified: boolean | null
         }
         Insert: {
+          answer_key_id?: string | null
           correct_answer: string
           correct_answer_latex?: string | null
           created_at?: string
@@ -228,11 +231,13 @@ export type Database = {
           problem_id: string
           question_latex?: string | null
           question_text: string
+          source_type?: string | null
           updated_at?: string
           usage_count?: number | null
           verified?: boolean | null
         }
         Update: {
+          answer_key_id?: string | null
           correct_answer?: string
           correct_answer_latex?: string | null
           created_at?: string
@@ -243,11 +248,19 @@ export type Database = {
           problem_id?: string
           question_latex?: string | null
           question_text?: string
+          source_type?: string | null
           updated_at?: string
           usage_count?: number | null
           verified?: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "answer_key_mcqs_answer_key_id_fkey"
+            columns: ["answer_key_id"]
+            isOneToOne: false
+            referencedRelation: "instructor_answer_keys"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "answer_key_mcqs_problem_id_fkey"
             columns: ["problem_id"]
@@ -709,6 +722,7 @@ export type Database = {
       }
       instructor_answer_keys: {
         Row: {
+          content_type: string | null
           course_context: string | null
           created_at: string
           file_name: string | null
@@ -724,6 +738,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          content_type?: string | null
           course_context?: string | null
           created_at?: string
           file_name?: string | null
@@ -739,6 +754,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          content_type?: string | null
           course_context?: string | null
           created_at?: string
           file_name?: string | null
