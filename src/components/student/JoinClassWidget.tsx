@@ -24,23 +24,48 @@ export function JoinClassWidget({ userId, onClassJoined, onCancel }: JoinClassWi
 
     setLoading(true);
     try {
-      // Validate instructor code
-      const { data: instructorId, error: validateError } = await supabase
-        .rpc("validate_instructor_code", { code: classCode.trim() });
+      // Try new course code validation first
+      const { data: courseData, error: courseError } = await supabase
+        .rpc("validate_course_code", { code: classCode.trim() });
 
-      if (validateError || !instructorId) {
+      let instructorId: string | null = null;
+      let courseId: string | null = null;
+
+      if (courseData && courseData.length > 0) {
+        // Found course with new system
+        instructorId = courseData[0].instructor_id;
+        courseId = courseData[0].course_id;
+      } else {
+        // Fallback to legacy instructor code validation
+        const { data: legacyInstructorId, error: validateError } = await supabase
+          .rpc("validate_instructor_code", { code: classCode.trim() });
+
+        if (validateError || !legacyInstructorId) {
+          toast.error("Invalid class code. Please check with your instructor.");
+          setLoading(false);
+          return;
+        }
+        instructorId = legacyInstructorId;
+      }
+
+      if (!instructorId) {
         toast.error("Invalid class code. Please check with your instructor.");
         setLoading(false);
         return;
       }
 
-      // Check if already connected to this instructor
-      const { data: existing } = await supabase
+      // Check if already connected to this course/instructor
+      let existingQuery = supabase
         .from("instructor_students")
         .select("id")
         .eq("instructor_id", instructorId)
-        .eq("student_id", userId)
-        .maybeSingle();
+        .eq("student_id", userId);
+
+      if (courseId) {
+        existingQuery = existingQuery.eq("course_id", courseId);
+      }
+
+      const { data: existing } = await existingQuery.maybeSingle();
 
       if (existing) {
         toast.info("You're already enrolled in this class.");
@@ -48,13 +73,19 @@ export function JoinClassWidget({ userId, onClassJoined, onCancel }: JoinClassWi
         return;
       }
 
-      // Add new connection (keeps existing connections)
+      // Add new connection with course_id if available
+      const insertData: { instructor_id: string; student_id: string; course_id?: string } = {
+        instructor_id: instructorId,
+        student_id: userId
+      };
+      
+      if (courseId) {
+        insertData.course_id = courseId;
+      }
+
       const { error: insertError } = await supabase
         .from("instructor_students")
-        .insert({
-          instructor_id: instructorId,
-          student_id: userId
-        });
+        .insert(insertData);
 
       if (insertError) {
         toast.error("Failed to join class. Please try again.");
