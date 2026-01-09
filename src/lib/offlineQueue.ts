@@ -1,7 +1,15 @@
+import { supabase } from '@/integrations/supabase/client';
+
+// Typed action types for offline queue
+export type OfflineActionType = 
+  | 'submit-live-response'
+  | 'record-practice-attempt'
+  | 'update-user-stats';
+
 interface QueueItem {
   id: string;
-  type: string;
-  data: any;
+  type: OfflineActionType;
+  data: Record<string, unknown>;
   timestamp: number;
   retries: number;
 }
@@ -9,6 +17,46 @@ interface QueueItem {
 const DB_NAME = "edvana-offline";
 const DB_VERSION = 1;
 const STORE_NAME = "queue";
+
+// Maximum age for queued items (30 minutes)
+const MAX_QUEUE_AGE_MS = 30 * 60 * 1000;
+// Maximum retries before giving up
+const MAX_RETRIES = 3;
+
+// Sync handlers for each action type
+const syncHandlers: Record<OfflineActionType, (data: Record<string, unknown>) => Promise<void>> = {
+  'submit-live-response': async (data) => {
+    // Check if already submitted (duplicate prevention)
+    const { data: existing } = await supabase
+      .from('live_responses')
+      .select('id')
+      .eq('question_id', data.questionId as string)
+      .eq('participant_id', data.participantId as string)
+      .maybeSingle();
+
+    if (existing) {
+      console.log('Response already synced, skipping');
+      return;
+    }
+
+    const { error } = await supabase.functions.invoke('submit-live-response', { body: data });
+    if (error) throw error;
+  },
+  
+  'record-practice-attempt': async (data) => {
+    const { error } = await supabase
+      .from('practice_sessions')
+      .insert(data as any);
+    if (error) throw error;
+  },
+  
+  'update-user-stats': async (data) => {
+    const { error } = await supabase
+      .from('user_stats')
+      .upsert(data as any);
+    if (error) throw error;
+  }
+};
 
 class OfflineQueue {
   private db: IDBDatabase | null = null;
@@ -32,11 +80,11 @@ class OfflineQueue {
     });
   }
 
-  async add(type: string, data: any): Promise<string> {
+  async add(type: OfflineActionType, data: Record<string, unknown>): Promise<string> {
     if (!this.db) await this.init();
 
     const item: QueueItem = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type,
       data,
       timestamp: Date.now(),
@@ -123,25 +171,62 @@ export const offlineQueue = new OfflineQueue();
 if (typeof window !== "undefined") {
   window.addEventListener("online", async () => {
     console.log("Back online, syncing queued actions...");
-    const items = await offlineQueue.getAll();
     
-    for (const item of items) {
-      try {
-        // Process each queued item based on type
-        // This is a placeholder - implement actual sync logic based on your app's needs
-        console.log("Syncing item:", item);
-        
-        // Remove from queue after successful sync
-        await offlineQueue.remove(item.id);
-      } catch (error) {
-        console.error("Failed to sync item:", item.id, error);
-        await offlineQueue.incrementRetry(item.id);
-        
-        // Remove if too many retries
-        if (item.retries > 3) {
+    try {
+      const items = await offlineQueue.getAll();
+      
+      if (items.length === 0) {
+        return;
+      }
+      
+      let synced = 0;
+      let failed = 0;
+      
+      for (const item of items) {
+        try {
+          // Skip stale items (older than 30 minutes)
+          if (item.timestamp < Date.now() - MAX_QUEUE_AGE_MS) {
+            console.log(`Skipping stale item: ${item.id}`);
+            await offlineQueue.remove(item.id);
+            continue;
+          }
+          
+          // Get handler for this action type
+          const handler = syncHandlers[item.type];
+          if (!handler) {
+            console.warn(`No handler for action type: ${item.type}`);
+            await offlineQueue.remove(item.id);
+            continue;
+          }
+          
+          // Execute sync
+          await handler(item.data);
           await offlineQueue.remove(item.id);
+          synced++;
+          console.log(`Synced item: ${item.id}`);
+          
+        } catch (error) {
+          console.error("Failed to sync item:", item.id, error);
+          await offlineQueue.incrementRetry(item.id);
+          
+          // Remove if too many retries
+          if (item.retries >= MAX_RETRIES) {
+            console.log(`Max retries reached for item: ${item.id}, removing`);
+            await offlineQueue.remove(item.id);
+            failed++;
+          }
         }
       }
+      
+      // Dispatch event for UI to show notification
+      if (synced > 0 || failed > 0) {
+        window.dispatchEvent(new CustomEvent('offline-sync-complete', { 
+          detail: { synced, failed } 
+        }));
+      }
+      
+    } catch (error) {
+      console.error("Error during offline sync:", error);
     }
   });
 }
