@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import ReactMarkdown from "react-markdown";
+import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 
 interface Question {
   id: string;
@@ -173,36 +174,55 @@ const LiveStudent = () => {
     setIsSubmitting(true);
     const responseTimeMs = Date.now() - questionStartTime;
 
-    try {
-      const { data, error } = await supabase.functions.invoke("submit-live-response", {
-        body: {
-          questionId: currentQuestion.id,
-          participantId,
-          answer: selectedAnswer,
-          responseTimeMs,
-          confidenceLevel: level,
-          confidenceMultiplier: multiplier,
-          baseReward: BASE_REWARD,
-        },
-      });
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: selectedAnswer,
+      responseTimeMs,
+      confidenceLevel: level,
+      confidenceMultiplier: multiplier,
+      baseReward: BASE_REWARD,
+    };
 
-      if (error) throw error;
+    try {
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
+      );
 
       // Mark this question as answered to prevent re-prompting
       answeredQuestionsRef.current.add(currentQuestion.id);
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
       
-      setHasAnswered(true);
-      setIsCorrect(data.isCorrect);
-      setPointsEarned(data.pointsEarned || 0);
-      setShowAccountPrompt(true);
-      
-      if (data.isCorrect) {
-        toast.success(`Correct! +${data.pointsEarned} XP 🎉`);
-      } else {
-        const penalty = data.pointsEarned < 0 ? ` ${data.pointsEarned} XP` : '';
-        toast.error(`Incorrect${penalty}`);
+      if (result.queued) {
+        // Optimistic UI for offline submission
+        setHasAnswered(true);
+        setShowAccountPrompt(true);
+        toast.info("Answer saved! Will sync when back online.", {
+          icon: "📡",
+        });
+      } else if (result.success && result.data) {
+        setHasAnswered(true);
+        setIsCorrect(result.data.isCorrect);
+        setPointsEarned(result.data.pointsEarned || 0);
+        setShowAccountPrompt(true);
+        
+        if (result.data.isCorrect) {
+          toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
+        } else {
+          const penalty = result.data.pointsEarned < 0 ? ` ${result.data.pointsEarned} XP` : '';
+          toast.error(`Incorrect${penalty}`);
+        }
+      } else if (result.error) {
+        throw result.error;
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
@@ -265,35 +285,54 @@ const LiveStudent = () => {
     setIsSubmitting(true);
     const responseTimeMs = Date.now() - questionStartTime;
 
-    try {
-      const { data, error } = await supabase.functions.invoke("submit-live-response", {
-        body: {
-          questionId: currentQuestion.id,
-          participantId,
-          answer: selectedAnswer,
-          responseTimeMs,
-        },
-      });
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: selectedAnswer,
+      responseTimeMs,
+    };
 
-      if (error) throw error;
+    try {
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
+      );
 
       // Mark this question as answered to prevent re-prompting
       answeredQuestionsRef.current.add(currentQuestion.id);
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
-      
-      setHasAnswered(true);
-      setIsCorrect(data.isCorrect);
-      setAiGrade(data.aiGrade || null);
-      setAiFeedback(data.aiFeedback || null);
-      setShowAccountPrompt(true);
-      
-      if (data.isCorrect) {
-        const gradeText = data.aiGrade ? ` (${data.aiGrade}%)` : "";
-        toast.success(`Correct${gradeText}! 🎉`);
-      } else {
-        const gradeText = data.aiGrade ? ` (${data.aiGrade}%)` : "";
-        toast.error(`Incorrect${gradeText}. Try again next time!`);
+
+      if (result.queued) {
+        // Optimistic UI for offline submission
+        setHasAnswered(true);
+        setShowAccountPrompt(true);
+        toast.info("Answer saved! Will sync when back online.", {
+          icon: "📡",
+        });
+      } else if (result.success && result.data) {
+        setHasAnswered(true);
+        setIsCorrect(result.data.isCorrect);
+        setAiGrade(result.data.aiGrade || null);
+        setAiFeedback(result.data.aiFeedback || null);
+        setShowAccountPrompt(true);
+        
+        if (result.data.isCorrect) {
+          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
+          toast.success(`Correct${gradeText}! 🎉`);
+        } else {
+          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
+          toast.error(`Incorrect${gradeText}. Try again next time!`);
+        }
+      } else if (result.error) {
+        throw result.error;
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
