@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface Assignment {
   id: string;
@@ -50,9 +51,11 @@ export const LectureCheckInResults = () => {
   const [questionSummaries, setQuestionSummaries] = useState<Record<string, {
     summary: string;
     trend: string;
+    sentiment?: string;
     loading: boolean;
     responseCount?: number;
   }>>({});
+  const { selectedCourse } = useCourseContext();
 
   useEffect(() => {
     localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
@@ -432,7 +435,8 @@ export const LectureCheckInResults = () => {
           options: question.options,
           studentResponses,
           totalStudents: stats.total,
-          completedCount: stats.completed
+          completedCount: stats.completed,
+          courseType: selectedCourse?.course_type || 'stem'
         }
       });
 
@@ -443,6 +447,7 @@ export const LectureCheckInResults = () => {
         [key]: {
           summary: data.summary,
           trend: data.trend,
+          sentiment: data.sentiment,
           loading: false,
           responseCount: stats.completed
         }
@@ -944,6 +949,14 @@ export const LectureCheckInResults = () => {
                                 <p className="text-muted-foreground">
                                   {questionSummaries[`${groupIdx}-${qIdx}`].trend}
                                 </p>
+                                {questionSummaries[`${groupIdx}-${qIdx}`].sentiment && selectedCourse?.course_type === 'humanities' && (
+                                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-primary/10">
+                                    <Heart className="h-4 w-4 text-pink-500" />
+                                    <span className="text-muted-foreground italic">
+                                      {questionSummaries[`${groupIdx}-${qIdx}`].sentiment}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="text-sm text-muted-foreground">

@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { question, questionType, correctAnswer, options, studentResponses, totalStudents, completedCount } =
+    const { question, questionType, correctAnswer, options, studentResponses, totalStudents, completedCount, courseType } =
       await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -22,6 +22,9 @@ serve(async (req) => {
     // Calculate statistics
     const correctCount = studentResponses.filter((r: any) => r.isCorrect).length;
     const correctPercentage = completedCount > 0 ? Math.round((correctCount / completedCount) * 100) : 0;
+
+    // Determine if this is a humanities course
+    const isHumanities = courseType === 'humanities';
 
     // Build analysis data based on question type
     let analysisData = "";
@@ -48,42 +51,77 @@ ${Object.entries(distribution)
   })
   .join("\n")}`;
     } else if (questionType === "short_answer") {
-      // Analyze grades if available
-      const gradesWithValues = studentResponses.filter((r: any) => r.grade != null);
+      // For humanities short answers, include actual response texts for sentiment analysis
+      if (isHumanities) {
+        const responseTexts = studentResponses
+          .filter((r: any) => r.answer && typeof r.answer === 'string')
+          .map((r: any) => `- "${r.answer.slice(0, 200)}"`)
+          .slice(0, 15) // Limit to 15 responses for token efficiency
+          .join('\n');
+        
+        analysisData = `Student Responses (sample for sentiment analysis):
+${responseTexts || "No text responses available."}`;
+      } else {
+        // STEM: Analyze grades if available
+        const gradesWithValues = studentResponses.filter((r: any) => r.grade != null);
 
-      if (gradesWithValues.length > 0) {
-        const avgGrade = Math.round(
-          gradesWithValues.reduce((sum: number, r: any) => sum + r.grade, 0) / gradesWithValues.length,
-        );
+        if (gradesWithValues.length > 0) {
+          const avgGrade = Math.round(
+            gradesWithValues.reduce((sum: number, r: any) => sum + r.grade, 0) / gradesWithValues.length,
+          );
 
-        const gradeRanges = {
-          "90-100%": 0,
-          "80-89%": 0,
-          "70-79%": 0,
-          "60-69%": 0,
-          "Below 60%": 0,
-        };
+          const gradeRanges = {
+            "90-100%": 0,
+            "80-89%": 0,
+            "70-79%": 0,
+            "60-69%": 0,
+            "Below 60%": 0,
+          };
 
-        gradesWithValues.forEach((r: any) => {
-          if (r.grade >= 90) gradeRanges["90-100%"]++;
-          else if (r.grade >= 80) gradeRanges["80-89%"]++;
-          else if (r.grade >= 70) gradeRanges["70-79%"]++;
-          else if (r.grade >= 60) gradeRanges["60-69%"]++;
-          else gradeRanges["Below 60%"]++;
-        });
+          gradesWithValues.forEach((r: any) => {
+            if (r.grade >= 90) gradeRanges["90-100%"]++;
+            else if (r.grade >= 80) gradeRanges["80-89%"]++;
+            else if (r.grade >= 70) gradeRanges["70-79%"]++;
+            else if (r.grade >= 60) gradeRanges["60-69%"]++;
+            else gradeRanges["Below 60%"]++;
+          });
 
-        analysisData = `Grade Distribution (Average: ${avgGrade}%):
+          analysisData = `Grade Distribution (Average: ${avgGrade}%):
 ${Object.entries(gradeRanges)
   .filter(([_, count]) => count > 0)
   .map(([range, count]) => `${range}: ${count} students`)
   .join("\n")}`;
-      } else {
-        analysisData = "Responses received but not yet graded.";
+        } else {
+          analysisData = "Responses received but not yet graded.";
+        }
       }
     }
 
-    // Build AI prompt
-    const systemPrompt = `You are an educational analytics expert. Generate concise, actionable summaries of student performance on quiz questions.
+    // Build AI prompt - use different prompts for Humanities vs STEM
+    let systemPrompt: string;
+    let additionalInstructions = "";
+
+    if (isHumanities && questionType === "short_answer") {
+      // Humanities-specific sentiment analysis prompt
+      systemPrompt = `You are an educational analytics expert specializing in humanities education.
+
+FORMAT REQUIREMENTS:
+- Line 1 (Summary): Overall engagement and analytical depth assessment (max 20 words)
+- Line 2 (Trend): Key themes or perspectives emerging from responses (max 20 words)
+- Line 3 (Sentiment): "Sentiment: [Positive/Neutral/Mixed/Negative] - [brief reason]"
+
+ANALYZE:
+- Emotional tone across responses (enthusiasm, skepticism, confusion, insight)
+- Depth of critical thinking (surface-level vs. analytical)
+- Common perspectives or disagreements
+- Level of engagement with the material
+
+Focus on giving actionable teaching insights for humanities educators.`;
+      
+      additionalInstructions = "Analyze the sentiment and themes in student responses. Look for engagement levels, critical thinking depth, and common perspectives.";
+    } else {
+      // Standard STEM prompt
+      systemPrompt = `You are an educational analytics expert. Generate concise, actionable summaries of student performance on quiz questions.
 
 FORMAT REQUIREMENTS:
 - Line 1 (Summary): Start with "Summary:" followed by overall performance assessment (max 15 words)
@@ -97,29 +135,30 @@ FOCUS ON:
 
 BE SPECIFIC with numbers and percentages. Keep it brief and actionable.`;
 
-    let additionalInstructions = "";
-    if (questionType === "multiple_choice") {
-      additionalInstructions = "Focus on which wrong answers were chosen and why they might be confusing.";
-    } else if (questionType === "short_answer") {
-      additionalInstructions = "Analyze grade distribution and what patterns emerge from student responses.";
+      if (questionType === "multiple_choice") {
+        additionalInstructions = "Focus on which wrong answers were chosen and why they might be confusing.";
+      } else if (questionType === "short_answer") {
+        additionalInstructions = "Analyze grade distribution and what patterns emerge from student responses.";
+      }
     }
 
     const userPrompt = `Question: "${question}"
 Question Type: ${questionType}
 ${questionType === "multiple_choice" ? `Correct Answer: ${correctAnswer}` : ""}
+${isHumanities ? "Course Type: Humanities" : ""}
 
 STUDENT RESPONSES:
 Total Students: ${totalStudents}
 Completed: ${completedCount}
-Correct: ${correctCount} (${correctPercentage}%)
+${!isHumanities || questionType === "multiple_choice" ? `Correct: ${correctCount} (${correctPercentage}%)` : ""}
 
 ${analysisData}
 
 ${additionalInstructions}
 
-Generate a 2-line summary (Summary + Trend).`;
+Generate a ${isHumanities && questionType === "short_answer" ? "3-line summary (Summary + Trend + Sentiment)" : "2-line summary (Summary + Trend)"}.`;
 
-    console.log("Calling Lovable AI for summary generation...");
+    console.log("Calling Lovable AI for summary generation...", { isHumanities, questionType });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -169,16 +208,19 @@ Generate a 2-line summary (Summary + Trend).`;
 
     console.log("AI generated text:", generatedText);
 
-    // Parse the generated text to extract summary and trend
+    // Parse the generated text to extract summary, trend, and sentiment
     const lines = generatedText.split("\n").filter((line: string) => line.trim());
     let summary = "";
     let trend = "";
+    let sentiment = "";
 
     for (const line of lines) {
       if (line.toLowerCase().startsWith("summary:")) {
         summary = line.trim();
       } else if (line.toLowerCase().startsWith("trend:")) {
         trend = line.trim();
+      } else if (line.toLowerCase().startsWith("sentiment:")) {
+        sentiment = line.trim();
       }
     }
 
@@ -188,7 +230,13 @@ Generate a 2-line summary (Summary + Trend).`;
       trend = `Trend: ${completedCount} out of ${totalStudents} students responded.`;
     }
 
-    return new Response(JSON.stringify({ summary, trend }), {
+    // Return sentiment only for humanities courses
+    const result: any = { summary, trend };
+    if (isHumanities && sentiment) {
+      result.sentiment = sentiment;
+    }
+
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
