@@ -32,6 +32,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { SkipLink, ScreenReaderAnnouncer } from "./components/accessibility";
+import { CourseProvider } from "./hooks/useCourseContext";
 
 const queryClient = new QueryClient();
 
@@ -74,12 +75,16 @@ const App = () => (
           } />
           <Route path="/instructor/dashboard" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <InstructorDashboard />
+              <CourseProvider>
+                <InstructorDashboard />
+              </CourseProvider>
             </ProtectedRoute>
           } />
           <Route path="/instructor/settings" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <InstructorSettings />
+              <CourseProvider>
+                <InstructorSettings />
+              </CourseProvider>
             </ProtectedRoute>
           } />
           <Route path="/instructor/lecture-presenter" element={
