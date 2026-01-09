@@ -176,9 +176,11 @@ export function PracticeQuestionCard({
             })}
           </div>
         ) : (
-          <p className="text-muted-foreground italic">
-            Short answer questions coming soon
-          </p>
+          <div className="p-4 rounded-xl bg-muted/50 border border-border">
+            <p className="text-sm text-muted-foreground">
+              This is a short answer question. Practice with multiple choice questions for now.
+            </p>
+          </div>
         )}
 
         {/* Explanation */}
