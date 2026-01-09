@@ -175,10 +175,10 @@ export const AdaptiveTutoringSettings = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Brain className="h-5 w-5 text-primary" />
-          Adaptive Tutoring Settings
+          Pre-Recorded Lecture Settings
         </CardTitle>
         <CardDescription>
-          Configure how AI generates questions for pre-recorded lectures
+          Configure AI question generation for pre-recorded lecture videos only. These settings do not affect live lecture questions.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
