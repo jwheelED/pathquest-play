@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Mic, CheckCircle, Copy, X, Code, BookOpen } from "lucide-react";
+import { Upload, Mic, CheckCircle, Copy, X, Code, BookOpen, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,6 +19,8 @@ export default function InstructorOnboarding() {
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [audioPermission, setAudioPermission] = useState(false);
   const [existingCode, setExistingCode] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -98,32 +100,110 @@ export default function InstructorOnboarding() {
       return;
     }
 
+    setIsFinishing(true);
+    setUploadProgress("Setting up course...");
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get user's org_id to include in profile update
+      // Get user's org_id from profile
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('org_id')
         .eq('id', user.id)
         .single();
 
-      // Update instructor profile with course info
-      const { error } = await supabase
+      // Step 1: Create the course record
+      setUploadProgress("Creating course...");
+      const { data: newCourse, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          instructor_id: user.id,
+          title: courseTitle,
+          topics: topics.split(',').map(t => t.trim()).filter(Boolean),
+          schedule: schedule,
+          course_type: courseType,
+          org_id: currentProfile?.org_id || null,
+        })
+        .select('id, course_code')
+        .single();
+
+      if (courseError) throw courseError;
+
+      // Step 2: Upload syllabus if provided
+      if (syllabusFile && newCourse) {
+        setUploadProgress("Uploading syllabus...");
+        const filePath = `${user.id}/syllabus/${Date.now()}-${syllabusFile.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('lecture-materials')
+          .upload(filePath, syllabusFile, {
+            upsert: true,
+            contentType: syllabusFile.type
+          });
+
+        if (uploadError) {
+          console.error('Syllabus upload failed:', uploadError);
+          toast({ 
+            title: "Syllabus upload failed", 
+            description: "Course created, but syllabus couldn't be uploaded. You can upload it later.",
+            variant: "destructive" 
+          });
+        } else {
+          // Step 3: Save syllabus metadata to lecture_materials
+          setUploadProgress("Saving syllabus metadata...");
+          const { error: materialError } = await supabase
+            .from('lecture_materials')
+            .insert({
+              instructor_id: user.id,
+              course_id: newCourse.id,
+              file_name: syllabusFile.name,
+              file_path: filePath,
+              file_type: syllabusFile.type,
+              file_size: syllabusFile.size,
+              title: `Course Syllabus - ${courseTitle}`,
+              description: 'Course syllabus uploaded during onboarding. Used as AI context for question generation.',
+              org_id: currentProfile?.org_id || null,
+            });
+
+          if (materialError) {
+            console.error('Failed to save syllabus metadata:', materialError);
+          } else {
+            // Step 4: Trigger syllabus parsing in background (don't block completion)
+            setUploadProgress("Processing syllabus...");
+            supabase.functions.invoke('parse-lecture-material', {
+              body: { filePath }
+            }).then(result => {
+              console.log('Syllabus parsed successfully, content length:', result.data?.text?.length);
+            }).catch(err => {
+              console.warn('Syllabus parsing failed (will retry on first use):', err);
+            });
+          }
+        }
+      }
+
+      // Step 5: Update instructor profile with course info (legacy fields for backwards compatibility)
+      setUploadProgress("Finalizing setup...");
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           course_title: courseTitle,
           course_schedule: schedule,
-          course_topics: topics.split(',').map(t => t.trim()),
+          course_topics: topics.split(',').map(t => t.trim()).filter(Boolean),
           professor_type: courseType,
           onboarded: true,
         })
         .eq('id', user.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      toast({ title: "Setup complete!", description: "Ready to start lectures" });
+      toast({ 
+        title: "Setup complete!", 
+        description: syllabusFile 
+          ? "Your course and syllabus are ready. Questions will be based on your syllabus content." 
+          : "Ready to start lectures" 
+      });
       navigate('/instructor/dashboard');
     } catch (error: any) {
       console.error('Onboarding error:', error);
@@ -132,6 +212,9 @@ export default function InstructorOnboarding() {
         description: error.message,
         variant: "destructive" 
       });
+    } finally {
+      setIsFinishing(false);
+      setUploadProgress(null);
     }
   };
 
@@ -372,8 +455,15 @@ export default function InstructorOnboarding() {
             {step < totalSteps ? (
               <Button onClick={handleNext}>Next</Button>
             ) : (
-              <Button onClick={handleFinish}>
-                Finish Setup
+              <Button onClick={handleFinish} disabled={isFinishing}>
+                {isFinishing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {uploadProgress || "Finishing..."}
+                  </>
+                ) : (
+                  "Finish Setup"
+                )}
               </Button>
             )}
           </div>
