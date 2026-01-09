@@ -289,11 +289,11 @@ export default function InstructorOnboarding() {
                         </li>
                         <li className="flex items-start gap-2">
                           <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                          <span>Essay-style prompts</span>
+                          <span>Analytical short answers</span>
                         </li>
                         <li className="flex items-start gap-2">
                           <CheckCircle className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                          <span>Discussion question generation</span>
+                          <span>Open-ended reflection questions</span>
                         </li>
                       </ul>
                     </div>
