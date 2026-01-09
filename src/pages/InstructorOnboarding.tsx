@@ -41,7 +41,7 @@ export default function InstructorOnboarding() {
     fetchExistingCode();
   }, []);
 
-  const totalSteps = 5;
+  const totalSteps = 4;
   const progress = (step / totalSteps) * 100;
 
   const handleSyllabusUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -334,36 +334,6 @@ export default function InstructorOnboarding() {
           )}
 
           {step === 4 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Syllabus & Outline (Optional)</h3>
-              <p className="text-sm text-muted-foreground">
-                Upload your syllabus to help generate more relevant questions
-              </p>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <Label htmlFor="syllabusUpload" className="cursor-pointer">
-                  <Button variant="outline" asChild>
-                    <span>Choose File</span>
-                  </Button>
-                </Label>
-                <Input
-                  id="syllabusUpload"
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={handleSyllabusUpload}
-                  className="hidden"
-                />
-                {syllabusFile && (
-                  <p className="text-sm text-green-600 mt-4 flex items-center justify-center gap-2">
-                    <CheckCircle className="h-4 w-4" />
-                    {syllabusFile.name}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {step === 5 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Audio Setup</h3>
               <p className="text-sm text-muted-foreground">
