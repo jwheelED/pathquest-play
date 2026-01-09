@@ -1261,7 +1261,15 @@ export const InteractiveLecturePlayer = ({
               }
             }}
             onStartReview={() => {
-              toast.info('Review quiz feature coming soon!');
+              // Restart lecture from beginning for review
+              if (videoRef.current) {
+                videoRef.current.currentTime = 0;
+                setCurrentTime(0);
+                setShowMasterySummary(false);
+                videoRef.current.play();
+                setIsPlaying(true);
+                toast.success('Restarting lecture for review');
+              }
             }}
             onContinue={() => {
               setShowMasterySummary(false);

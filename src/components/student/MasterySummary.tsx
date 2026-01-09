@@ -297,8 +297,8 @@ export const MasterySummary = ({
         <div className="flex flex-col gap-3 pt-4 border-t">
           {summaryData?.weakConcepts && summaryData.weakConcepts.length > 0 && (
             <Button onClick={onStartReview} className="w-full" size="lg">
-              <Brain className="h-4 w-4 mr-2" />
-              Start Review Quiz
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Rewatch Lecture
             </Button>
           )}
           
