@@ -63,6 +63,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   
   // Store slide context in a ref so it's always current
   const slideContextRef = useRef<string>('');
+  
+  // Store course context (topics, title) for AI question generation
+  const courseContextRef = useRef<{ title: string; topics: string[] } | null>(null);
 
   // Core state
   const [isRecording, setIsRecording] = useState(false);
@@ -135,10 +138,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
         if (students) setStudentCount(students.length);
 
-        // Fetch profile settings
+        // Fetch profile settings including course context
         const { data: profile } = await supabase
           .from('profiles')
-          .select('auto_question_enabled, auto_question_interval, auto_question_force_send')
+          .select('auto_question_enabled, auto_question_interval, auto_question_force_send, course_title, course_topics')
           .eq('id', user.id)
           .single();
 
@@ -146,6 +149,13 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           setAutoQuestionEnabled(profile.auto_question_enabled || false);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);
+          
+          // Store course context for AI question generation
+          courseContextRef.current = {
+            title: profile.course_title || '',
+            topics: profile.course_topics || []
+          };
+          console.log('📚 Course context loaded:', courseContextRef.current);
         }
 
         // Fetch today's question count
@@ -320,7 +330,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       });
 
       const { data, error } = await supabase.functions.invoke('format-and-send-question', {
-        body: detectionData,
+        body: {
+          ...detectionData,
+          course_context: courseContextRef.current, // Pass course title and topics for better MCQ generation
+        },
       });
 
       if (error) {
@@ -396,6 +409,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           force_send: autoQuestionForceSend,
           strict_mode: true, // Always strict mode - guaranteed questions
           slide_context: slideContextRef.current, // Pass current slide text
+          course_context: courseContextRef.current, // Pass course title and topics for better context
         },
       });
 
@@ -806,6 +820,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           force_send: true,
           strict_mode: true, // Always strict mode
           slide_context: slideContextRef.current,
+          course_context: courseContextRef.current, // Pass course title and topics for better context
         },
       });
 

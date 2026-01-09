@@ -146,7 +146,7 @@ serve(async (req) => {
       });
     }
 
-    const { recentChunk, context } = await req.json();
+    const { recentChunk, context, course_context } = await req.json();
 
     if (!recentChunk || !context) {
       return new Response(JSON.stringify({ error: "Missing recentChunk or context" }), {
@@ -157,6 +157,19 @@ serve(async (req) => {
 
     console.log("🔍 Analyzing chunk for questions...");
     console.log("Recent:", recentChunk.substring(0, 100));
+    if (course_context?.title) {
+      console.log("Course context:", course_context.title);
+    }
+
+    // Build course context prefix for AI
+    let coursePrefix = "";
+    if (course_context?.title) {
+      coursePrefix = `[Course: ${course_context.title}]\n`;
+      if (course_context.topics?.length > 0) {
+        coursePrefix += `[Topics: ${course_context.topics.join(", ")}]\n`;
+      }
+      coursePrefix += "\n";
+    }
 
     // Call Lovable AI for intent detection
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -171,7 +184,7 @@ serve(async (req) => {
           { role: "system", content: INTENT_DETECTION_PROMPT },
           {
             role: "user",
-            content: `RECENT SPEECH (last 20-60 seconds):\n"${recentChunk}"\n\nBROADER CONTEXT (last 90 seconds):\n"${context}"\n\nAnalyze if the professor is asking a REAL question for students to answer. Consider the full context to determine if they answer their own question.`,
+            content: `${coursePrefix}RECENT SPEECH (last 20-60 seconds):\n"${recentChunk}"\n\nBROADER CONTEXT (last 90 seconds):\n"${context}"\n\nAnalyze if the professor is asking a REAL question for students to answer. Consider the full context to determine if they answer their own question.`,
           },
         ],
         temperature: 0.2,

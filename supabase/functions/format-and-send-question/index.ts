@@ -9,17 +9,27 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-const generateMCQ = async (questionText: string, context: string) => {
+const generateMCQ = async (questionText: string, context: string, courseContext?: { title: string; topics: string[] } | null) => {
+  // Build course context for prompt
+  let courseInfo = "";
+  if (courseContext?.title) {
+    courseInfo += `\nCourse: ${courseContext.title}`;
+  }
+  if (courseContext?.topics?.length) {
+    courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
+  }
+  
   const prompt = `The professor asked: "${questionText}"
 
-Context from lecture: "${context}"
+Context from lecture: "${context}"${courseInfo}
 
 Generate a multiple choice question with 4 options:
 - One correct answer
-- Three plausible distractors based on common misconceptions
+- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ''}
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
 - Keep it concise and clear
+${courseContext?.topics?.length ? `- Consider these key topics when creating distractors: ${courseContext.topics.join(", ")}` : ''}
 
 Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
@@ -98,13 +108,22 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   }
 };
 
-const generateCodingQuestion = async (questionText: string, context: string) => {
+const generateCodingQuestion = async (questionText: string, context: string, courseContext?: { title: string; topics: string[] } | null) => {
+  // Build course context for prompt
+  let courseInfo = "";
+  if (courseContext?.title) {
+    courseInfo += `\nCourse: ${courseContext.title}`;
+  }
+  if (courseContext?.topics?.length) {
+    courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
+  }
+  
   const prompt = `Based on the lecture content, create a LeetCode-style coding problem.
 
 PROFESSOR'S QUESTION/TOPIC: "${questionText}"
 
 LECTURE CONTEXT:
-"${context}"
+"${context}"${courseInfo}
 
 Generate a professional coding challenge with this EXACT JSON structure:
 
@@ -359,7 +378,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false } = await req.json();
+    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -548,6 +567,7 @@ serve(async (req) => {
         const codingProblem = await generateCodingQuestion(
           typeof question_text === "string" ? question_text : JSON.stringify(question_text),
           context || "",
+          course_context,
         );
         formattedQuestion = {
           title: codingProblem.title || question_text,
@@ -580,7 +600,7 @@ serve(async (req) => {
           answerKeyMcqId: answerKeyMcq.mcqId,
         };
       } else {
-        const mcq = await generateMCQ(question_text, context || "");
+        const mcq = await generateMCQ(question_text, context || "", course_context);
         formattedQuestion = {
           question: mcq.question,
           type: "multiple_choice",

@@ -81,7 +81,8 @@ serve(async (req) => {
       strict_mode = true,  // Default to strict mode (always guaranteed questions)
       retry_context = null, // Context from previously failed attempts
       slide_context = null, // Current slide text content
-      difficulty_preference = 'easy' // Question difficulty: easy, medium, hard
+      difficulty_preference = 'easy', // Question difficulty: easy, medium, hard
+      course_context = null, // Course title and topics for better question context
     } = await req.json();
 
     // Difficulty instructions for prompts
@@ -93,7 +94,20 @@ serve(async (req) => {
 
     const difficultyInstruction = difficultyInstructions[difficulty_preference] || difficultyInstructions.easy;
 
-    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, difficulty: ${difficulty_preference}, slide_context: ${slide_context?.length || 0} chars`);
+    // Build course context string for AI prompts
+    let courseInfo = "";
+    if (course_context?.title || (course_context?.topics && course_context.topics.length > 0)) {
+      courseInfo = "COURSE CONTEXT:\n";
+      if (course_context.title) {
+        courseInfo += `Course: ${course_context.title}\n`;
+      }
+      if (course_context.topics?.length > 0) {
+        courseInfo += `Key Topics: ${course_context.topics.join(", ")}\n`;
+      }
+      courseInfo += "Use this course context to ensure questions are relevant to the subject matter and use appropriate terminology.\n\n";
+    }
+
+    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, difficulty: ${difficulty_preference}, slide_context: ${slide_context?.length || 0} chars, course: ${course_context?.title || 'none'}`);
 
     // In strict mode, use very low minimum content requirements
     const minContentLength = strict_mode ? 10 : (force_send ? 25 : 100);
@@ -170,7 +184,7 @@ serve(async (req) => {
       // LeetCode-style coding problem generation
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
 
-${primaryContext}
+${courseInfo}${primaryContext}
 
 TASK: Generate ONE LeetCode-style coding problem based on the MOST IMPORTANT concept from this content.
 ${hasSlideContext ? "IMPORTANT: Prioritize the slide content - the question MUST directly test concepts shown on the current slide." : ""}
@@ -230,7 +244,7 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
 
       prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
 
-${primaryContext}${materialsContext}${slideInstructions}
+${courseInfo}${primaryContext}${materialsContext}${slideInstructions}
 
 DIFFICULTY: ${difficultyInstruction}
 
