@@ -243,7 +243,7 @@ export default function InteractiveLecture() {
                 Status: {lecture.status}
               </Badge>
               <p className="text-sm text-muted-foreground">
-                Please check back in a few minutes. The AI is analyzing the lecture content 
+                Please check back in a few minutes. The lecture content is being analyzed 
                 to identify optimal learning moments.
               </p>
               <Button onClick={handleGoBack} variant="outline">

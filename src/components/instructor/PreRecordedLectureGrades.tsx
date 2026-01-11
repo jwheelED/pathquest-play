@@ -210,10 +210,10 @@ export function PreRecordedLectureGrades() {
         [lecture.id]: data.summary
       }));
 
-      toast.success("AI summary generated!");
+      toast.success("Summary generated!");
     } catch (error) {
-      console.error("Error generating AI summary:", error);
-      toast.error("Failed to generate AI summary");
+    console.error("Error generating summary:", error);
+      toast.error("Failed to generate summary");
     } finally {
       setGeneratingSummary(null);
     }
@@ -284,7 +284,7 @@ export function PreRecordedLectureGrades() {
 
                 {response.feedback && (
                   <div className="mt-2 p-2 bg-background rounded text-xs">
-                    <span className="text-muted-foreground">AI Feedback: </span>
+                    <span className="text-muted-foreground">Feedback: </span>
                     {response.feedback}
                   </div>
                 )}
@@ -368,7 +368,7 @@ export function PreRecordedLectureGrades() {
                         ) : (
                           <Sparkles className="h-4 w-4 mr-2" />
                         )}
-                        {aiSummary[lecture.id] ? "Regenerate AI Summary" : "Generate AI Summary"}
+                        {aiSummary[lecture.id] ? "Regenerate Summary" : "Generate Summary"}
                       </Button>
                     </div>
 
@@ -376,7 +376,7 @@ export function PreRecordedLectureGrades() {
                       <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
                         <h5 className="font-medium text-sm mb-2 flex items-center gap-2">
                           <Sparkles className="h-4 w-4 text-primary" />
-                          AI Performance Analysis
+                          Performance Analysis
                         </h5>
                         <div className="prose prose-sm max-w-none text-sm">
                           <ReactMarkdown>{aiSummary[lecture.id]}</ReactMarkdown>

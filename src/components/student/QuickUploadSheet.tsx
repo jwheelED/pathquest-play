@@ -423,7 +423,7 @@ export function QuickUploadSheet({ userId, trigger, onUploadComplete }: QuickUpl
                 <div className="flex items-start gap-2">
                   <Sparkles className="w-4 h-4 text-primary mt-0.5" />
                   <p className="text-sm text-muted-foreground">
-                    AI will create a personalized study plan with daily tasks from now until your exam
+                    A personalized study plan will be created with daily tasks from now until your exam
                   </p>
                 </div>
               </div>

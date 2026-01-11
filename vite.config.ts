@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: "Edvana - Live Lecture Capture & Learning Platform",
         short_name: "Edvana",
-        description: "Real-time lecture transcription, AI-powered check-ins, and intelligent content generation",
+        description: "Real-time lecture transcription, smart check-ins, and intelligent content generation",
         theme_color: "#7C3AED",
         background_color: "#ffffff",
         display: "standalone",

@@ -37,7 +37,7 @@ const PrivacyPolicy = () => {
           <CardContent className="pt-6">
             <p className="text-muted-foreground leading-relaxed">
               Edvana ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we
-              collect, use, disclose, and safeguard your information when you use our AI-powered educational technology
+              collect, use, disclose, and safeguard your information when you use our educational technology
               platform. Please read this policy carefully to understand our practices regarding your personal data.
             </p>
           </CardContent>
@@ -91,7 +91,7 @@ const PrivacyPolicy = () => {
             <AccordionTrigger className="text-lg font-semibold">2. How We Use Your Information</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
               <ul className="list-disc pl-6 space-y-2">
-                <li>Provide AI-powered lecture transcription and real-time comprehension check-ins</li>
+                <li>Provide lecture transcription and real-time comprehension check-ins</li>
                 <li>Generate personalized questions and adaptive learning experiences</li>
                 <li>Track and display your learning progress, achievements, and streaks</li>
                 <li>Enable instructors to monitor class engagement and identify students who may need support</li>
