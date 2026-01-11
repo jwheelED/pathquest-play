@@ -202,6 +202,118 @@ Student Answer: ${studentAnswer}`;
   }
 }
 
+// AI grading for coding questions - concept-focused, lenient
+async function gradeCodingQuestion(
+  studentCode: string,
+  expectedSolution: string | null,
+  problemStatement: string,
+  language: string | null
+): Promise<{ grade: number; feedback: string; understandsConcept: boolean }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  if (!LOVABLE_API_KEY) {
+    console.warn("LOVABLE_API_KEY not set, using fallback grading");
+    return {
+      grade: 50,
+      feedback: "Could not grade automatically. Your instructor will review your submission.",
+      understandsConcept: false
+    };
+  }
+
+  const systemPrompt = `You are a LENIENT coding grader focused on CONCEPTUAL UNDERSTANDING, not strict correctness.
+
+GRADING PHILOSOPHY:
+- Your PRIMARY goal is to determine if the student UNDERSTANDS THE CONCEPT/ALGORITHM
+- If the student demonstrates they understand the approach, award HIGH MARKS (90-100%)
+- Minor syntax errors, off-by-one errors, typos, or small bugs should NOT significantly reduce the grade
+- Focus on: "Did they get the right idea?" NOT "Does it compile and run perfectly?"
+
+COMPONENT-BASED GRADING:
+1. ALGORITHMIC UNDERSTANDING (50 points): Correct approach/algorithm choice
+2. LOGIC CORRECTNESS (30 points): Sound logic flow
+3. CODE QUALITY (10 points): Readable and structured
+4. EDGE CASE AWARENESS (10 points): Consideration for edge cases
+
+Return a total grade (0-100) and brief feedback.`;
+
+  const userPrompt = `Problem: ${problemStatement}
+${language ? `Language: ${language}` : ""}
+${expectedSolution ? `Reference Solution:\n${expectedSolution}` : ""}
+
+Student's Code:
+\`\`\`
+${studentCode}
+\`\`\`
+
+Grade this with focus on conceptual understanding, being lenient with minor errors.`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "grade_code",
+            description: "Grade the student's code solution",
+            parameters: {
+              type: "object",
+              properties: {
+                grade: { type: "number", description: "Grade from 0-100" },
+                feedback: { type: "string", description: "Brief constructive feedback" },
+                understands_concept: { type: "boolean", description: "Does student understand the core concept?" }
+              },
+              required: ["grade", "feedback", "understands_concept"],
+              additionalProperties: false
+            }
+          }
+        }],
+        tool_choice: { type: "function", function: { name: "grade_code" } },
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (toolCall?.function?.arguments) {
+      const result = JSON.parse(toolCall.function.arguments);
+      // Boost grade if concept is understood
+      let finalGrade = Math.min(100, Math.max(0, result.grade));
+      if (result.understands_concept && finalGrade < 90) {
+        finalGrade = Math.max(finalGrade, 90);
+      }
+      return {
+        grade: finalGrade,
+        feedback: result.feedback || "",
+        understandsConcept: result.understands_concept
+      };
+    }
+    
+    throw new Error("Invalid AI response format");
+  } catch (error) {
+    console.error("AI coding grading failed:", error);
+    return {
+      grade: 50,
+      feedback: "Could not grade automatically. Your instructor will review your submission.",
+      understandsConcept: false
+    };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -361,8 +473,25 @@ Deno.serve(async (req) => {
       aiFeedback = gradeResult.feedback;
       isCorrect = aiGrade >= 70; // 70%+ = correct
       console.log(`AI grade: ${aiGrade}, feedback: ${aiFeedback}, isCorrect: ${isCorrect}`);
+    } else if (questionType === "coding") {
+      // For coding: Use AI grading with concept focus
+      const problemStatement = questionText || "Solve the coding problem";
+      const expectedSolution = correctAnswer; // May be null
+      const language = question.question_content.language || null;
+      
+      console.log(`AI grading coding submission for: "${problemStatement}"`);
+      const gradeResult = await gradeCodingQuestion(
+        answer,
+        expectedSolution,
+        problemStatement,
+        language
+      );
+      aiGrade = gradeResult.grade;
+      aiFeedback = gradeResult.feedback;
+      isCorrect = aiGrade >= 70; // 70%+ = correct
+      console.log(`Coding grade: ${aiGrade}, understands concept: ${gradeResult.understandsConcept}`);
     } else {
-      // Default fallback for unknown types
+      // Default fallback for truly unknown types
       isCorrect = studentAnswer === correctAnswer;
     }
     

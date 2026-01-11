@@ -12,6 +12,7 @@ import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/Confid
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import ReactMarkdown from "react-markdown";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
+import { CodeEditor } from "@/components/ui/code-editor";
 
 interface Question {
   id: string;
@@ -20,6 +21,7 @@ interface Question {
     options: string[];
     correctAnswer: string;
     type: string;
+    language?: string; // For coding questions
   };
   sent_at: string;
 }
@@ -31,6 +33,7 @@ const LiveStudent = () => {
   const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
+  const [codeAnswer, setCodeAnswer] = useState<string>("");
   const [hasAnswered, setHasAnswered] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -141,6 +144,7 @@ const LiveStudent = () => {
         if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
           setCurrentQuestion(latestQuestion);
           setSelectedAnswer("");
+          setCodeAnswer("");
           setHasAnswered(false);
           setIsCorrect(null);
           setQuestionStartTime(Date.now());
@@ -348,6 +352,81 @@ const LiveStudent = () => {
     }
   };
 
+  // For coding questions (with AI concept-focused grading)
+  const handleCodingSubmit = async () => {
+    if (!codeAnswer.trim() || !participantId || !currentQuestion) return;
+
+    setIsSubmitting(true);
+    const responseTimeMs = Date.now() - questionStartTime;
+
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: codeAnswer,
+      responseTimeMs,
+      // Coding questions don't use confidence betting (too complex)
+      confidenceLevel: null,
+      confidenceMultiplier: 1,
+      baseReward: BASE_REWARD,
+    };
+
+    try {
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
+      );
+
+      // Mark this question as answered to prevent re-prompting
+      answeredQuestionsRef.current.add(currentQuestion.id);
+      // Reset interaction flag to allow new questions to load
+      hasStartedAnsweringRef.current = false;
+
+      if (result.queued) {
+        // Optimistic UI for offline submission
+        setHasAnswered(true);
+        setShowAccountPrompt(true);
+        toast.info("Code saved! Will sync when back online.", {
+          icon: "📡",
+        });
+      } else if (result.success && result.data) {
+        setHasAnswered(true);
+        setIsCorrect(result.data.isCorrect);
+        setAiGrade(result.data.aiGrade || null);
+        setAiFeedback(result.data.aiFeedback || null);
+        setPointsEarned(result.data.pointsEarned || 0);
+        setShowAccountPrompt(true);
+        
+        if (result.data.isCorrect) {
+          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
+          toast.success(`Good work${gradeText}! 🎉`);
+        } else {
+          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
+          toast.error(`Needs improvement${gradeText}.`);
+        }
+      } else if (result.error) {
+        throw result.error;
+      }
+    } catch (error: any) {
+      console.error("Error submitting code:", error);
+      if (error.message?.includes("Already answered")) {
+        toast.info("You already submitted code for this question");
+        answeredQuestionsRef.current.add(currentQuestion.id);
+        setHasAnswered(true);
+      } else {
+        toast.error("Failed to submit code. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!currentQuestion) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
@@ -466,6 +545,38 @@ const LiveStudent = () => {
                   </Button>
                 </>
               )}
+
+              {/* Coding question */}
+              {currentQuestion.question_content.type === "coding" && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">
+                      Write your code below ({currentQuestion.question_content.language || 'any language'}):
+                    </Label>
+                    <CodeEditor
+                      value={codeAnswer}
+                      onChange={setCodeAnswer}
+                      language={currentQuestion.question_content.language || 'python'}
+                      placeholder="// Write your solution here..."
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleCodingSubmit} 
+                    className="w-full" 
+                    size="lg"
+                    disabled={!codeAnswer.trim() || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Grading your code...
+                      </>
+                    ) : (
+                      "Submit Code"
+                    )}
+                  </Button>
+                </>
+              )}
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
@@ -475,12 +586,17 @@ const LiveStudent = () => {
                     <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
                   </div>
                   <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
-                  {/* Show grade for short answers */}
+                  {/* Show grade for short answers and coding */}
                   {!isMCQ && aiGrade !== null && (
                     <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
                       <p className="text-sm font-medium">Score: {aiGrade}%</p>
                       {aiFeedback && (
                         <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
+                      )}
+                      {currentQuestion.question_content.type === "coding" && (
+                        <p className="text-xs text-muted-foreground mt-2 italic">
+                          Graded on conceptual understanding, logic, and code quality
+                        </p>
                       )}
                     </div>
                   )}
@@ -499,12 +615,17 @@ const LiveStudent = () => {
                   <p className="text-muted-foreground">
                     Correct answer: {currentQuestion.question_content.correctAnswer}
                   </p>
-                  {/* Show grade for short answers */}
+                  {/* Show grade for short answers and coding */}
                   {!isMCQ && aiGrade !== null && (
                     <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
                       <p className="text-sm font-medium">Score: {aiGrade}%</p>
                       {aiFeedback && (
                         <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
+                      )}
+                      {currentQuestion.question_content.type === "coding" && (
+                        <p className="text-xs text-muted-foreground mt-2 italic">
+                          Graded on conceptual understanding, logic, and code quality
+                        </p>
                       )}
                     </div>
                   )}

@@ -152,7 +152,7 @@ export const AutoGradeSettings = () => {
                 Coding Questions
               </Label>
               <p className="text-sm text-muted-foreground">
-                All test cases must pass for full credit (100%), otherwise requires review
+                Concept-focused grading (0-100) evaluates algorithmic understanding, logic, and code quality
               </p>
             </div>
             <Switch
