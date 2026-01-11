@@ -392,11 +392,6 @@ export default function InstructorDashboard() {
       label: "Present Slides",
       onClick: () => navigate("/instructor/slides"),
     },
-    {
-      icon: <Video className="w-3 h-3" />,
-      label: "Record",
-      onClick: () => navigate("/instructor/presenter"),
-    },
   ];
 
   const renderTabContent = () => {
