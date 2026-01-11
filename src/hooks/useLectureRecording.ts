@@ -7,6 +7,8 @@ import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
+import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
+import { retryWithBackoff } from '@/lib/retryWithBackoff';
 
 // Constants
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -105,9 +107,25 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const studentTimerChannelRef = useRef<any>(null);
   const processAudioChunkRef = useRef<((audioBlob: Blob) => Promise<void>) | null>(null);
   
+  // Reliable timer ref for auto-questions (Web Worker-based, throttle-resistant)
+  const reliableTimerRef = useRef<ReliableTimer | null>(null);
+  
+  // Refs for values that the timer needs (avoids stale closures)
+  const studentCountRef = useRef(studentCount);
+  const autoQuestionIntervalRef = useRef(autoQuestionInterval);
+  
   // Deepgram streaming refs for real-time transcription
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
+
+  // Keep refs updated when state changes (avoids stale closures in timer callbacks)
+  useEffect(() => {
+    studentCountRef.current = studentCount;
+  }, [studentCount]);
+
+  useEffect(() => {
+    autoQuestionIntervalRef.current = autoQuestionInterval;
+  }, [autoQuestionInterval]);
 
   // Helper to get question preview
   const getQuestionPreview = (questionText: any, maxLength = 60): string => {
@@ -226,81 +244,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     };
   }, [isRecording, autoQuestionEnabled, autoQuestionInterval, studentCount, broadcast]);
 
-  // Auto-question timer - use ref for start time to avoid stale closure issues
-  const lastAutoQuestionTimeRef = useRef<number>(0);
-  
-  useEffect(() => {
-    if (!isRecording || !autoQuestionEnabled) return;
-
-    const intervalMs = autoQuestionInterval * 60 * 1000;
-
-    // Initialize start time when recording begins with auto-question enabled
-    if (lastAutoQuestionTimeRef.current === 0) {
-      lastAutoQuestionTimeRef.current = Date.now();
-    }
-
-    const checkInterval = setInterval(() => {
-      if (isGeneratingAutoQuestionRef.current) return;
-
-      const now = Date.now();
-      const elapsed = now - lastAutoQuestionTimeRef.current;
-      const timeLeft = intervalMs - elapsed;
-      const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
-
-      setNextAutoQuestionIn(secondsLeft);
-
-      broadcast('countdown_tick', {
-        nextAutoQuestionIn: secondsLeft,
-        autoQuestionEnabled: true,
-        isRecording: true,
-        studentCount,
-      });
-
-      if (studentTimerChannelRef.current && (secondsLeft % 5 === 0 || secondsLeft <= 10)) {
-        studentTimerChannelRef.current.send({
-          type: 'broadcast',
-          event: 'timer_update',
-          payload: { nextQuestionIn: secondsLeft, intervalMinutes: autoQuestionInterval, autoQuestionEnabled: true, isRecording: true }
-        });
-      }
-
-      if (elapsed >= intervalMs && !isGeneratingAutoQuestionRef.current) {
-        isGeneratingAutoQuestionRef.current = true;
-        handleAutoQuestionGeneration()
-          .then((success) => {
-            lastAutoQuestionTimeRef.current = Date.now();
-            if (success) {
-              intervalTranscriptRef.current = '';
-            }
-          })
-          .finally(() => {
-            isGeneratingAutoQuestionRef.current = false;
-          });
-      }
-    }, 1000);
-
-    return () => clearInterval(checkInterval);
-  }, [isRecording, autoQuestionEnabled, autoQuestionInterval, studentCount, broadcast]);
-
-  // Reset state when recording stops
-  useEffect(() => {
-    if (!isRecording) {
-      lastAutoQuestionTimeRef.current = 0;
-      setNextAutoQuestionIn(0);
-      intervalTranscriptRef.current = '';
-      isGeneratingAutoQuestionRef.current = false;
-      resetVoiceCommandCooldown(); // Reset voice command chunk tracking
-    }
-  }, [isRecording, resetVoiceCommandCooldown]);
-
-  // Voice command detection - check transcriptChunks for commands
-  useEffect(() => {
-    if (!isRecording || transcriptChunks.length === 0) return;
-    
-    // Check the latest transcript chunks for voice commands
-    checkTranscriptForCommand(transcriptChunks);
-  }, [isRecording, transcriptChunks, checkTranscriptForCommand]);
-
   // Handle question send
   const handleQuestionSend = async (detectionData: any) => {
     try {
@@ -332,7 +275,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       const { data, error } = await supabase.functions.invoke('format-and-send-question', {
         body: {
           ...detectionData,
-          course_context: courseContextRef.current, // Pass course title and topics for better MCQ generation
+          course_context: courseContextRef.current,
         },
       });
 
@@ -356,6 +299,13 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
         onQuestionGenerated?.();
         lastQuestionSentTimeRef.current = Date.now();
+        
+        // Reset reliable timer after successful question send
+        if (autoQuestionEnabled && reliableTimerRef.current) {
+          reliableTimerRef.current.reset();
+          intervalTranscriptRef.current = '';
+          console.log('⏰ Timer reset after question sent');
+        }
       }
     } catch (error: any) {
       console.error('Failed to send question:', error);
@@ -368,7 +318,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   };
 
-  // Auto-question generation
+  // Auto-question generation (core logic)
   const handleAutoQuestionGeneration = async (): Promise<boolean> => {
     try {
       setIsSendingQuestion(true);
@@ -407,9 +357,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
           force_send: autoQuestionForceSend,
-          strict_mode: true, // Always strict mode - guaranteed questions
-          slide_context: slideContextRef.current, // Pass current slide text
-          course_context: courseContextRef.current, // Pass course title and topics for better context
+          strict_mode: true,
+          slide_context: slideContextRef.current,
+          course_context: courseContextRef.current,
         },
       });
 
@@ -438,6 +388,154 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       setIsSendingQuestion(false);
     }
   };
+
+  // Auto-question generation with retry logic
+  const handleAutoQuestionGenerationWithRetry = useCallback(async (): Promise<boolean> => {
+    try {
+      const success = await retryWithBackoff(
+        async () => {
+          const result = await handleAutoQuestionGeneration();
+          if (!result) {
+            throw new Error('Auto-question generation returned false');
+          }
+          return result;
+        },
+        {
+          maxAttempts: 2,
+          baseDelayMs: 2000,
+          maxDelayMs: 5000,
+          onRetry: (attempt, error, nextDelayMs) => {
+            console.log(`🔄 Auto-question retry ${attempt}: ${error.message}. Waiting ${nextDelayMs}ms...`);
+            toast({
+              title: '⏳ Retrying...',
+              description: `Attempt ${attempt + 1} to generate question`,
+            });
+          },
+        }
+      );
+
+      if (success) {
+        playNotificationSound().catch(() => {});
+        console.log('✅ Auto-question sent successfully');
+      }
+
+      return success;
+    } catch (error) {
+      console.error('Auto-question failed after retries:', error);
+      toast({
+        title: '❌ Auto-question failed',
+        description: 'Could not generate question. Will try again next interval.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [toast]);
+
+  // Reliable auto-question timer using Web Worker (throttle-resistant)
+  useEffect(() => {
+    if (!isRecording || !autoQuestionEnabled) {
+      // Stop timer when not recording or auto-question disabled
+      if (reliableTimerRef.current) {
+        reliableTimerRef.current.stop();
+      }
+      return;
+    }
+
+    // Create reliable timer if it doesn't exist
+    if (!reliableTimerRef.current) {
+      console.log('⏰ Creating reliable timer (Web Worker-based)');
+      reliableTimerRef.current = createReliableTimer({
+        onTick: (secondsLeft, elapsedMs) => {
+          setNextAutoQuestionIn(secondsLeft);
+
+          // Broadcast to presenter views
+          broadcast('countdown_tick', {
+            nextAutoQuestionIn: secondsLeft,
+            autoQuestionEnabled: true,
+            isRecording: true,
+            studentCount: studentCountRef.current,
+          });
+
+          // Broadcast to student timer (less frequently to reduce traffic)
+          if (studentTimerChannelRef.current && (secondsLeft % 5 === 0 || secondsLeft <= 10)) {
+            studentTimerChannelRef.current.send({
+              type: 'broadcast',
+              event: 'timer_update',
+              payload: {
+                nextQuestionIn: secondsLeft,
+                intervalMinutes: autoQuestionIntervalRef.current,
+                autoQuestionEnabled: true,
+                isRecording: true,
+              },
+            });
+          }
+        },
+        onIntervalComplete: async () => {
+          if (isGeneratingAutoQuestionRef.current) {
+            console.log('⏭️ Skipping auto-question: already generating');
+            return;
+          }
+
+          console.log('⏰ Reliable timer: Interval complete, generating question');
+          isGeneratingAutoQuestionRef.current = true;
+
+          try {
+            const success = await handleAutoQuestionGenerationWithRetry();
+            if (success) {
+              intervalTranscriptRef.current = '';
+            }
+          } finally {
+            isGeneratingAutoQuestionRef.current = false;
+          }
+        },
+        onError: (error) => {
+          console.error('Reliable timer error:', error);
+        },
+      });
+    }
+
+    // Start the timer with current interval
+    console.log(`⏰ Starting reliable timer: ${autoQuestionInterval} minutes`);
+    reliableTimerRef.current.start(autoQuestionInterval);
+
+    return () => {
+      if (reliableTimerRef.current) {
+        reliableTimerRef.current.stop();
+      }
+    };
+  }, [isRecording, autoQuestionEnabled, autoQuestionInterval, broadcast, handleAutoQuestionGenerationWithRetry]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (reliableTimerRef.current) {
+        reliableTimerRef.current.terminate();
+        reliableTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Reset state when recording stops
+  useEffect(() => {
+    if (!isRecording) {
+      setNextAutoQuestionIn(0);
+      intervalTranscriptRef.current = '';
+      isGeneratingAutoQuestionRef.current = false;
+      resetVoiceCommandCooldown();
+      
+      // Stop and cleanup timer
+      if (reliableTimerRef.current) {
+        reliableTimerRef.current.stop();
+      }
+    }
+  }, [isRecording, resetVoiceCommandCooldown]);
+
+  // Voice command detection - check transcriptChunks for commands
+  useEffect(() => {
+    if (!isRecording || transcriptChunks.length === 0) return;
+    
+    checkTranscriptForCommand(transcriptChunks);
+  }, [isRecording, transcriptChunks, checkTranscriptForCommand]);
 
   // Process audio chunk - use ref to always have latest version
   const processAudioChunk = useCallback(async (audioBlob: Blob) => {
@@ -540,7 +638,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         if (chunks.length > 0) {
           const audioBlob = new Blob(chunks, { type: mimeType });
           console.log('Recording cycle complete, processing audio blob');
-          // Use ref to get latest processAudioChunk
           if (processAudioChunkRef.current) {
             await processAudioChunkRef.current(audioBlob);
           }
@@ -588,8 +685,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const startDeepgramStreaming = useCallback(async () => {
     console.log('🔴 Starting Deepgram WebSocket streaming for real-time transcription');
     
-    // Use Fly.io proxy for Deepgram streaming (bypasses Supabase edge function timeout limits)
-    // Replace with your actual Fly.io app URL after deployment
     const proxyUrl = import.meta.env.VITE_DEEPGRAM_PROXY_URL || 'wss://edvana-deepgram-proxy.fly.dev';
     
     deepgramClientRef.current = new DeepgramStreamingClient({
@@ -625,7 +720,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       await deepgramClientRef.current.connect();
     } catch (error) {
       console.error('Failed to connect Deepgram:', error);
-      // Fallback to chunk-based transcription
       toast({
         title: 'Streaming unavailable',
         description: 'Using chunked transcription instead',
@@ -644,7 +738,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, []);
 
-  // Start recording - TESTING: Always use Deepgram WebSocket streaming via Fly.io proxy
+  // Start recording
   const startRecording = useCallback(async () => {
     try {
       isRecordingRef.current = true;
@@ -654,11 +748,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       intervalTranscriptRef.current = '';
       setFailureCount(0);
 
-      // TESTING: Always use Deepgram WebSocket streaming to test Fly.io proxy
-      console.log('🌊 TESTING MODE: Using Deepgram WebSocket streaming via Fly.io proxy');
-      if (autoQuestionEnabled) {
-        lastAutoQuestionTimeRef.current = Date.now();
-      }
+      console.log('🌊 Using Deepgram WebSocket streaming via Fly.io proxy');
       await startDeepgramStreaming();
 
       broadcast('recording_status', { isRecording: true });
@@ -677,7 +767,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         variant: 'destructive',
       });
     }
-  }, [autoQuestionEnabled, startDeepgramStreaming, broadcast, toast]);
+  }, [startDeepgramStreaming, broadcast, toast]);
 
   // Stop recording - cleans up both modes
   const stopRecording = useCallback(() => {
@@ -708,6 +798,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     // Stop Deepgram streaming
     stopDeepgramStreaming();
 
+    // Stop reliable timer
+    if (reliableTimerRef.current) {
+      reliableTimerRef.current.stop();
+    }
+
     broadcast('recording_status', { isRecording: false });
     toast({ title: 'Recording stopped' });
   }, [broadcast, toast, stopDeepgramStreaming]);
@@ -722,7 +817,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       const hasTranscript = transcriptBufferRef.current && transcriptBufferRef.current.length >= 20;
       const hasSlideContext = slideContextRef.current && slideContextRef.current.length >= 20;
 
-      // Allow manual send if we have either transcript OR slide context
       if (!hasTranscript && !hasSlideContext) {
         toast({
           title: 'Still processing audio',
@@ -759,10 +853,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         source: 'manual_button',
       });
 
-      if (autoQuestionEnabled) {
-        lastAutoQuestionTimeRef.current = Date.now();
-        intervalTranscriptRef.current = '';
-      }
+      // Timer reset is now handled in handleQuestionSend
     } catch (error: any) {
       console.error('Manual send error:', error);
       toast({
@@ -773,7 +864,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     } finally {
       setIsSendingQuestion(false);
     }
-  }, [isSendingQuestion, autoQuestionEnabled, toast]);
+  }, [isSendingQuestion, toast]);
 
   // Test auto-question
   const handleTestAutoQuestion = useCallback(async () => {
@@ -818,9 +909,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_minutes: autoQuestionInterval,
           format_preference: profile?.question_format_preference || 'multiple_choice',
           force_send: true,
-          strict_mode: true, // Always strict mode
+          strict_mode: true,
           slide_context: slideContextRef.current,
-          course_context: courseContextRef.current, // Pass course title and topics for better context
+          course_context: courseContextRef.current,
         },
       });
 
@@ -869,7 +960,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           console.log('🔄 Switching to chunk-based transcription (auto-question ON)');
           stopDeepgramStreaming();
           
-          // Get microphone access for chunk-based recording
           const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: isMobile ? {
@@ -885,7 +975,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             },
           });
           streamRef.current = stream;
-          lastAutoQuestionTimeRef.current = Date.now();
           startRecordingCycle();
         } else {
           // Switching to OFF: stop chunk-based, start Deepgram streaming
@@ -906,6 +995,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
               track.enabled = false;
             });
             streamRef.current = null;
+          }
+          
+          // Stop reliable timer
+          if (reliableTimerRef.current) {
+            reliableTimerRef.current.stop();
           }
           
           // Start Deepgram streaming
