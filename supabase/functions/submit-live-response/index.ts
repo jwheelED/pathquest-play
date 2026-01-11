@@ -207,7 +207,8 @@ async function gradeCodingQuestion(
   studentCode: string,
   expectedSolution: string | null,
   problemStatement: string,
-  language: string | null
+  language: string | null,
+  isSimpleCheckIn: boolean = false
 ): Promise<{ grade: number; feedback: string; understandsConcept: boolean }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   
@@ -220,7 +221,23 @@ async function gradeCodingQuestion(
     };
   }
 
-  const systemPrompt = `You are a LENIENT coding grader focused on CONCEPTUAL UNDERSTANDING, not strict correctness.
+  // Different grading approach for simple check-ins vs full problems
+  const systemPrompt = isSimpleCheckIn 
+    ? `You are grading a SIMPLE coding check-in question. This is a quick conceptual check, NOT a full coding problem.
+
+GRADING RULE: This is essentially PASS/FAIL based on core understanding.
+- If the student demonstrates they understand the concept being tested → 100%
+- If they show partial understanding with minor issues → 100% (be generous!)
+- Only give 0% if they completely missed the concept or didn't attempt
+
+The bar for "understands" is LOW:
+- Used the right construct (loop, function, class, recursion, etc.) = PASS
+- Got the basic structure right even with syntax bugs = PASS
+- Made a reasonable attempt at the concept = PASS
+- Variable naming, formatting, style issues = STILL PASS
+
+Return grade (0 or 100) and brief encouraging feedback.`
+    : `You are a LENIENT coding grader focused on CONCEPTUAL UNDERSTANDING, not strict correctness.
 
 GRADING PHILOSOPHY:
 - Your PRIMARY goal is to determine if the student UNDERSTANDS THE CONCEPT/ALGORITHM
@@ -245,7 +262,7 @@ Student's Code:
 ${studentCode}
 \`\`\`
 
-Grade this with focus on conceptual understanding, being lenient with minor errors.`;
+${isSimpleCheckIn ? "Grade as PASS (100) or FAIL (0) based on whether they understand the core concept." : "Grade this with focus on conceptual understanding, being lenient with minor errors."}`;
 
   try {
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -268,7 +285,7 @@ Grade this with focus on conceptual understanding, being lenient with minor erro
             parameters: {
               type: "object",
               properties: {
-                grade: { type: "number", description: "Grade from 0-100" },
+                grade: { type: "number", description: isSimpleCheckIn ? "Grade: 0 (fail) or 100 (pass)" : "Grade from 0-100" },
                 feedback: { type: "string", description: "Brief constructive feedback" },
                 understands_concept: { type: "boolean", description: "Does student understand the core concept?" }
               },
@@ -291,11 +308,19 @@ Grade this with focus on conceptual understanding, being lenient with minor erro
     
     if (toolCall?.function?.arguments) {
       const result = JSON.parse(toolCall.function.arguments);
-      // Boost grade if concept is understood
-      let finalGrade = Math.min(100, Math.max(0, result.grade));
-      if (result.understands_concept && finalGrade < 90) {
-        finalGrade = Math.max(finalGrade, 90);
+      
+      let finalGrade: number;
+      if (isSimpleCheckIn) {
+        // Binary grading for simple check-ins: 100 if understands, 0 otherwise
+        finalGrade = result.understands_concept ? 100 : 0;
+      } else {
+        // Component-based grading for full problems, with boost for understanding
+        finalGrade = Math.min(100, Math.max(0, result.grade));
+        if (result.understands_concept && finalGrade < 90) {
+          finalGrade = Math.max(finalGrade, 90);
+        }
       }
+      
       return {
         grade: finalGrade,
         feedback: result.feedback || "",
@@ -473,23 +498,26 @@ Deno.serve(async (req) => {
       aiFeedback = gradeResult.feedback;
       isCorrect = aiGrade >= 70; // 70%+ = correct
       console.log(`AI grade: ${aiGrade}, feedback: ${aiFeedback}, isCorrect: ${isCorrect}`);
-    } else if (questionType === "coding") {
+    } else if (questionType === "coding" || questionType === "coding_simple") {
       // For coding: Use AI grading with concept focus
+      // Detect if it's a simple check-in based on question type
+      const isSimpleCheckIn = questionType === "coding_simple";
       const problemStatement = questionText || "Solve the coding problem";
       const expectedSolution = correctAnswer; // May be null
       const language = question.question_content.language || null;
       
-      console.log(`AI grading coding submission for: "${problemStatement}"`);
+      console.log(`AI grading ${isSimpleCheckIn ? 'simple' : 'full'} coding submission for: "${problemStatement}"`);
       const gradeResult = await gradeCodingQuestion(
         answer,
         expectedSolution,
         problemStatement,
-        language
+        language,
+        isSimpleCheckIn
       );
       aiGrade = gradeResult.grade;
       aiFeedback = gradeResult.feedback;
-      isCorrect = aiGrade >= 70; // 70%+ = correct
-      console.log(`Coding grade: ${aiGrade}, understands concept: ${gradeResult.understandsConcept}`);
+      isCorrect = isSimpleCheckIn ? aiGrade === 100 : aiGrade >= 70; // Simple: must be 100, Full: 70%+
+      console.log(`Coding grade: ${aiGrade}, understands concept: ${gradeResult.understandsConcept}, isSimple: ${isSimpleCheckIn}`);
     } else {
       // Default fallback for truly unknown types
       isCorrect = studentAnswer === correctAnswer;

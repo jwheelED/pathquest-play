@@ -151,8 +151,8 @@ export const AutoGradeSettings = () => {
               <Label htmlFor="auto-grade-coding" className="text-base font-medium">
                 Coding Questions
               </Label>
-              <p className="text-sm text-muted-foreground">
-                Concept-focused grading (0-100) evaluates algorithmic understanding, logic, and code quality
+<p className="text-sm text-muted-foreground">
+                Simple check-ins: 100% for core understanding. Full problems: 0-100 component-based grading.
               </p>
             </div>
             <Switch

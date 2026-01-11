@@ -2314,6 +2314,7 @@ export type Database = {
           auto_question_force_send: boolean | null
           auto_question_interval: number | null
           auto_question_strict_mode: boolean | null
+          coding_question_style: string | null
           course_schedule: string | null
           course_title: string | null
           course_topics: string[] | null
@@ -2352,6 +2353,7 @@ export type Database = {
           auto_question_force_send?: boolean | null
           auto_question_interval?: number | null
           auto_question_strict_mode?: boolean | null
+          coding_question_style?: string | null
           course_schedule?: string | null
           course_title?: string | null
           course_topics?: string[] | null
@@ -2390,6 +2392,7 @@ export type Database = {
           auto_question_force_send?: boolean | null
           auto_question_interval?: number | null
           auto_question_strict_mode?: boolean | null
+          coding_question_style?: string | null
           course_schedule?: string | null
           course_title?: string | null
           course_topics?: string[] | null
