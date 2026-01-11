@@ -395,42 +395,45 @@ export function LMSIntegrationSettings() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 bg-background rounded border">
-                  <div>
+                <div className="flex items-start justify-between gap-2 p-2 bg-background rounded border">
+                  <div className="min-w-0 flex-1">
                     <Label className="text-xs text-muted-foreground">OIDC Initiation URL</Label>
-                    <p className="text-sm font-mono">{toolConfig.oidcInitiationUrl}</p>
+                    <p className="text-sm font-mono break-all">{toolConfig.oidcInitiationUrl}</p>
                   </div>
                   <Button 
                     variant="ghost" 
                     size="sm"
+                    className="shrink-0"
                     onClick={() => copyToClipboard(toolConfig.oidcInitiationUrl, 'OIDC URL')}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-background rounded border">
-                  <div>
+                <div className="flex items-start justify-between gap-2 p-2 bg-background rounded border">
+                  <div className="min-w-0 flex-1">
                     <Label className="text-xs text-muted-foreground">Target Link URI (Launch URL)</Label>
-                    <p className="text-sm font-mono">{toolConfig.targetLinkUri}</p>
+                    <p className="text-sm font-mono break-all">{toolConfig.targetLinkUri}</p>
                   </div>
                   <Button 
                     variant="ghost" 
                     size="sm"
+                    className="shrink-0"
                     onClick={() => copyToClipboard(toolConfig.targetLinkUri, 'Launch URL')}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-background rounded border">
-                  <div>
+                <div className="flex items-start justify-between gap-2 p-2 bg-background rounded border">
+                  <div className="min-w-0 flex-1">
                     <Label className="text-xs text-muted-foreground">Public Keyset URL (JWKS)</Label>
-                    <p className="text-sm font-mono">{toolConfig.jwksUrl}</p>
+                    <p className="text-sm font-mono break-all">{toolConfig.jwksUrl}</p>
                   </div>
                   <Button 
                     variant="ghost" 
                     size="sm"
+                    className="shrink-0"
                     onClick={() => copyToClipboard(toolConfig.jwksUrl, 'JWKS URL')}
                   >
                     <Copy className="h-4 w-4" />
