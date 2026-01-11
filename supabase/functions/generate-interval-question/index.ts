@@ -83,6 +83,7 @@ serve(async (req) => {
       slide_context = null, // Current slide text content
       difficulty_preference = 'easy', // Question difficulty: easy, medium, hard
       course_context = null, // Course title and topics for better question context
+      coding_question_style = 'simple', // 'simple' for check-ins, 'full' for LeetCode-style
     } = await req.json();
 
     // Difficulty instructions for prompts
@@ -107,7 +108,7 @@ serve(async (req) => {
       courseInfo += "Use this course context to ensure questions are relevant to the subject matter and use appropriate terminology.\n\n";
     }
 
-    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, difficulty: ${difficulty_preference}, slide_context: ${slide_context?.length || 0} chars, course: ${course_context?.title || 'none'}`);
+    console.log(`📝 Generate interval question - strict_mode: ${strict_mode}, force_send: ${force_send}, difficulty: ${difficulty_preference}, slide_context: ${slide_context?.length || 0} chars, course: ${course_context?.title || 'none'}, coding_style: ${coding_question_style}`);
 
     // In strict mode, use very low minimum content requirements
     const minContentLength = strict_mode ? 10 : (force_send ? 25 : 100);
@@ -181,8 +182,46 @@ serve(async (req) => {
     let prompt: string;
 
     if (format_preference === "coding") {
-      // LeetCode-style coding problem generation
-      prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
+      if (coding_question_style === "simple") {
+        // Simple check-in coding questions - quick conceptual prompts
+        prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
+
+${courseInfo}${primaryContext}
+
+TASK: Generate ONE SIMPLE, QUICK coding task that tests ONE concept from this content.
+
+STYLE: Like a professor asking "Can you quickly write me a..."
+- NOT a full problem with constraints/edge cases
+- Just a direct prompt testing ONE specific concept  
+- Should take 1-3 minutes to write
+- Focus on demonstrating understanding, not perfection
+
+GOOD EXAMPLES:
+- "Write a function that returns the sum of all even numbers in a list"
+- "Create a class with a constructor that takes name and age"
+- "Write a loop that prints numbers 1 to N"
+- "Implement a function to check if a string is a palindrome"
+- "Write a recursive function to calculate factorial"
+
+BAD EXAMPLES (too complex):
+- Full algorithm problems with time/space complexity requirements
+- Problems requiring multiple helper functions
+- Problems with extensive edge case handling
+
+Return JSON:
+{
+  "question_text": "Simple coding prompt (1-2 sentences, starts with 'Write...' or 'Create...' or 'Implement...')",
+  "concept_tested": "The specific concept being tested (e.g., 'for loops', 'recursion', 'classes')",
+  "language": "python" | "javascript" | "java" | "cpp" | "c",
+  "suggested_type": "coding_simple",
+  "confidence": 0.0-1.0,
+  "reasoning": "why this tests a key concept from the lecture"
+}
+
+IMPORTANT: Keep it simple! The goal is to check if students understand the concept, not to challenge them with a hard problem.`;
+      } else {
+        // Full LeetCode-style coding problem generation
+        prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture on programming/computer science.
 
 ${courseInfo}${primaryContext}
 
@@ -216,6 +255,7 @@ Return JSON:
 }
 
 IMPORTANT: The problem should directly relate to concepts taught in the lecture segment. Extract the programming language from the lecture content.`;
+      }
     } else {
       // Original prompt for multiple choice / short answer
       let materialsContext = "";

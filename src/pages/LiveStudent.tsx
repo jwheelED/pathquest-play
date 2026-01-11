@@ -546,10 +546,16 @@ const LiveStudent = () => {
                 </>
               )}
 
-              {/* Coding question */}
-              {currentQuestion.question_content.type === "coding" && (
+              {/* Coding question (both simple and full) */}
+              {(currentQuestion.question_content.type === "coding" || 
+                currentQuestion.question_content.type === "coding_simple") && (
                 <>
                   <div className="space-y-2">
+                    {currentQuestion.question_content.type === "coding_simple" && (
+                      <div className="text-xs text-muted-foreground bg-primary/5 p-2 rounded mb-2">
+                        💡 Quick check-in: Show you understand the concept. Minor errors won't hurt your grade!
+                      </div>
+                    )}
                     <Label className="text-sm text-muted-foreground">
                       Write your code below ({currentQuestion.question_content.language || 'any language'}):
                     </Label>
@@ -593,9 +599,12 @@ const LiveStudent = () => {
                       {aiFeedback && (
                         <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
                       )}
-                      {currentQuestion.question_content.type === "coding" && (
+                      {(currentQuestion.question_content.type === "coding" || 
+                        currentQuestion.question_content.type === "coding_simple") && (
                         <p className="text-xs text-muted-foreground mt-2 italic">
-                          Graded on conceptual understanding, logic, and code quality
+                          {currentQuestion.question_content.type === "coding_simple" 
+                            ? "Graded on core concept understanding" 
+                            : "Graded on conceptual understanding, logic, and code quality"}
                         </p>
                       )}
                     </div>
@@ -622,9 +631,12 @@ const LiveStudent = () => {
                       {aiFeedback && (
                         <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
                       )}
-                      {currentQuestion.question_content.type === "coding" && (
+                      {(currentQuestion.question_content.type === "coding" || 
+                        currentQuestion.question_content.type === "coding_simple") && (
                         <p className="text-xs text-muted-foreground mt-2 italic">
-                          Graded on conceptual understanding, logic, and code quality
+                          {currentQuestion.question_content.type === "coding_simple" 
+                            ? "Graded on core concept understanding" 
+                            : "Graded on conceptual understanding, logic, and code quality"}
                         </p>
                       )}
                     </div>
