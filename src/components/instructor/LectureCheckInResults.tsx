@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText } from "lucide-react";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -640,6 +642,139 @@ export const LectureCheckInResults = () => {
     }
   };
 
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const today = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Lecture Check-In Report", pageWidth / 2, 20, { align: "center" });
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on ${today}`, pageWidth / 2, 28, { align: "center" });
+
+      // Divider
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, 34, pageWidth - 20, 34);
+
+      let yPosition = 45;
+
+      // Loop through each check-in group
+      groupedResults.forEach((group, groupIdx) => {
+        // Check if we need a new page
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        // Check-in header
+        const checkInDate = new Date(group.timestamp).toLocaleString();
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 40);
+        doc.text(`Check-In: ${checkInDate}`, 20, yPosition);
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`${group.assignments.length} student(s)`, 20, yPosition + 6);
+        yPosition += 15;
+
+        // Questions section
+        group.questions.forEach((question, qIdx) => {
+          const stats = calculateQuestionStats(group.assignments, qIdx, question);
+          
+          // Check for page break before question
+          if (yPosition > 230) {
+            doc.addPage();
+            yPosition = 20;
+          }
+          
+          // Question box
+          doc.setFontSize(11);
+          doc.setTextColor(60, 60, 60);
+          const questionLines = doc.splitTextToSize(`Q${qIdx + 1}: ${question.question}`, pageWidth - 40);
+          doc.text(questionLines, 20, yPosition);
+          yPosition += questionLines.length * 5 + 3;
+          
+          // Question stats
+          doc.setFontSize(9);
+          doc.setTextColor(100, 100, 100);
+          const statsText = stats.isManualGradeShortAnswer
+            ? `Completed: ${stats.completed}/${stats.total} | Avg Time: ${stats.avgResponseTime ? formatTime(stats.avgResponseTime) : 'N/A'}`
+            : `Correct: ${stats.correct}/${stats.completed} (${stats.percentage?.toFixed(0) || 0}%) | Avg Time: ${stats.avgResponseTime ? formatTime(stats.avgResponseTime) : 'N/A'}`;
+          doc.text(statsText, 20, yPosition);
+          yPosition += 8;
+
+          // Student responses table
+          const responseData = group.assignments.map(assignment => {
+            // Find the question index within this student's assignment
+            const assignmentContent = assignment.content as any;
+            const assignmentQuestions = assignmentContent?.questions || [];
+            const studentQuestionIdx = assignmentQuestions.findIndex(
+              (q: any) => q.question === question.question
+            );
+            
+            const studentAnswer = studentQuestionIdx >= 0 
+              ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx] || 'No Answer')
+              : 'No Answer';
+            const correctAnswer = question.overriddenAnswer || question.correctAnswer;
+            const isCorrect = studentAnswer === correctAnswer;
+            
+            return [
+              assignment.student_name || 'Unknown',
+              String(studentAnswer).substring(0, 50) + (String(studentAnswer).length > 50 ? '...' : ''),
+              String(correctAnswer || 'N/A').substring(0, 50) + (String(correctAnswer || '').length > 50 ? '...' : ''),
+              isCorrect ? '✓' : '✗',
+              assignment.grade !== null ? `${assignment.grade.toFixed(0)}%` : 'N/A'
+            ];
+          });
+
+          autoTable(doc, {
+            startY: yPosition,
+            head: [['Student', 'Answer', 'Correct Answer', 'Result', 'Grade']],
+            body: responseData,
+            theme: 'striped',
+            headStyles: { 
+              fillColor: [79, 70, 229], 
+              textColor: 255,
+              fontStyle: 'bold',
+              fontSize: 9
+            },
+            bodyStyles: { fontSize: 8 },
+            alternateRowStyles: { fillColor: [245, 245, 250] },
+            margin: { left: 20, right: 20 },
+            tableWidth: 'auto',
+            columnStyles: {
+              0: { cellWidth: 35 },
+              1: { cellWidth: 45 },
+              2: { cellWidth: 45 },
+              3: { cellWidth: 15, halign: 'center' },
+              4: { cellWidth: 20, halign: 'center' }
+            }
+          });
+
+          yPosition = (doc as any).lastAutoTable.finalY + 15;
+        });
+
+        // Add spacing between groups
+        yPosition += 10;
+      });
+
+      // Save PDF
+      doc.save(`lecture-checkin-report-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('PDF exported successfully!');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF');
+    }
+  };
+
   const exportToCSV = () => {
     try {
       // Build CSV content
@@ -774,9 +909,13 @@ export const LectureCheckInResults = () => {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">{refreshing ? 'Syncing...' : 'Refresh'}</span>
             </Button>
+            <Button onClick={exportToPDF} variant="outline" size="sm" className="gap-1">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
             <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-1">
               <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">CSV</span>
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
