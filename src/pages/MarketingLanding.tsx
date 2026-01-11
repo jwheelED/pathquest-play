@@ -29,7 +29,7 @@ const MarketingLanding = () => {
             </span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            AI-powered lecture capture and real-time assessments that help instructors teach smarter and students learn better.
+            Smart lecture capture and real-time assessments that help instructors teach smarter and students learn better.
           </p>
           
           {/* CTA Buttons */}
@@ -76,7 +76,7 @@ const MarketingLanding = () => {
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
                   <Brain className="w-6 h-6 text-primary" />
                 </div>
-                <CardTitle className="text-lg">AI-Powered Check-Ins</CardTitle>
+                <CardTitle className="text-lg">Smart Check-Ins</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>

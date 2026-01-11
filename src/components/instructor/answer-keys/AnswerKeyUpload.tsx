@@ -92,7 +92,7 @@ export function AnswerKeyUpload({ onUploadComplete }: AnswerKeyUploadProps) {
       return answerKey.id;
     },
     onSuccess: (answerKeyId) => {
-      toast.success("Answer key uploaded! AI is parsing your document.");
+      toast.success("Answer key uploaded! Your document is being parsed.");
       setTitle("");
       setSubject("");
       setCourseContext("");
@@ -169,7 +169,7 @@ export function AnswerKeyUpload({ onUploadComplete }: AnswerKeyUploadProps) {
           Upload Answer Key
         </CardTitle>
         <CardDescription>
-          Upload problem sets with solutions for STEM subjects. AI will parse them and generate MCQs with verified answers.
+          Upload problem sets with solutions for STEM subjects. They'll be parsed automatically and MCQs will be generated with verified answers.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

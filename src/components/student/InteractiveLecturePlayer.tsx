@@ -900,11 +900,11 @@ export const InteractiveLecturePlayer = ({
                         )}
                       </div>
                       
-                      {/* Short answer AI feedback */}
+                      {/* Short answer feedback */}
                       {shortAnswerFeedback && (
                         <div className="mt-3 p-3 rounded bg-background/50">
                           <p className="text-sm font-medium mb-1 flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" /> AI Feedback:
+                            <Sparkles className="h-3 w-3" /> Feedback:
                           </p>
                           <p className="text-sm text-muted-foreground">{shortAnswerFeedback}</p>
                         </div>

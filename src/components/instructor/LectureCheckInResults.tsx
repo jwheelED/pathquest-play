@@ -932,7 +932,7 @@ export const LectureCheckInResults = () => {
                       <div className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-lg shadow-sm">
                         <div className="flex items-center gap-2 mb-3">
                           <Sparkles className="h-4 w-4 text-primary" />
-                          <h4 className="text-sm font-semibold">AI Insights</h4>
+                          <h4 className="text-sm font-semibold">Insights</h4>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1">
@@ -960,7 +960,7 @@ export const LectureCheckInResults = () => {
                               </div>
                             ) : (
                               <div className="text-sm text-muted-foreground">
-                                No AI summary generated yet
+                                No summary generated yet
                               </div>
                             )}
                           </div>

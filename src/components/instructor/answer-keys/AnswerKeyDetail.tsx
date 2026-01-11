@@ -367,7 +367,7 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
               </div>
               <div className="flex-1 space-y-3">
                 <div>
-                  <h3 className="font-semibold text-foreground">AI is parsing your answer key...</h3>
+                  <h3 className="font-semibold text-foreground">Your answer key is being parsed...</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     This usually takes 30-60 seconds. You can add problems manually while waiting.
                   </p>
@@ -609,7 +609,7 @@ export function AnswerKeyDetail({ answerKeyId, onBack }: AnswerKeyDetailProps) {
               <FileText className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
               <p className="text-muted-foreground">No MCQs extracted yet</p>
               <p className="text-sm text-muted-foreground mt-1">
-                AI is extracting questions from your file...
+                Questions are being extracted from your file...
               </p>
             </CardContent>
           </Card>

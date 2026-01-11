@@ -281,7 +281,7 @@ export default function StudentTraining() {
                       Get Personalized Practice Questions
                     </h3>
                     <p className="text-muted-foreground">
-                      Upload your study materials (notes, PDFs, images) to automatically generate AI-powered practice questions tailored to your content. No class connection needed!
+                      Upload your study materials (notes, PDFs, images) to automatically generate personalized practice questions tailored to your content. No class connection needed!
                     </p>
                     <div className="flex gap-2 pt-2">
                       <Button 
@@ -325,7 +325,7 @@ export default function StudentTraining() {
                   <Sparkles className="w-7 h-7 text-secondary" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-foreground mb-1">Practice with AI-Generated Questions</h2>
+                  <h2 className="text-xl font-bold text-foreground mb-1">Practice with Smart Questions</h2>
                   <p className="text-muted-foreground text-sm">
                     Questions adapt to your skill level as you practice
                   </p>

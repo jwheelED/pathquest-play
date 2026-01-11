@@ -52,11 +52,11 @@ const TermsOfService = () => {
           <AccordionItem value="service-description" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">2. Description of Service</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
-              <p>Edvana is an AI-powered educational technology platform that provides:</p>
+              <p>Edvana is an educational technology platform that provides:</p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Live lecture transcription and capture</li>
                 <li>Real-time comprehension check-ins and assessments</li>
-                <li>AI-generated personalized questions</li>
+                <li>Personalized questions generated from your content</li>
                 <li>Learning analytics and progress tracking</li>
                 <li>Study material management</li>
                 <li>Instructor dashboards and student engagement tools</li>

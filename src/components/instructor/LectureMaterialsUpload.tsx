@@ -188,8 +188,8 @@ export function LectureMaterialsUpload() {
     onSuccess: (result) => {
       if (result?.isAnswerKey) {
         const successText = result.contentType === "mcqs"
-          ? "Answer key uploaded! AI is extracting MCQs for live matching."
-          : "Answer key uploaded! AI is parsing problems for live matching.";
+          ? "Answer key uploaded! MCQs are being extracted for live matching."
+          : "Answer key uploaded! Problems are being parsed for live matching.";
         toast.success(successText);
       } else {
         toast.success("Material uploaded successfully!");
@@ -299,7 +299,7 @@ export function LectureMaterialsUpload() {
       <CardHeader>
         <CardTitle>Lecture Materials</CardTitle>
         <CardDescription>
-          Upload course materials (slides, PDFs, documents) - AI will use them to generate contextually relevant questions during live lectures
+          Upload course materials (slides, PDFs, documents) - they'll be used to generate contextually relevant questions during live lectures
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -355,7 +355,7 @@ export function LectureMaterialsUpload() {
               </Label>
             </div>
             <p className="text-xs text-muted-foreground ml-6">
-              Enable this for quizzes, tests, or problem sets. AI will process the file for live lecture matching.
+              Enable this for quizzes, tests, or problem sets. The file will be processed for live lecture matching.
             </p>
 
             {parseAsAnswerKey && (
@@ -376,7 +376,7 @@ export function LectureMaterialsUpload() {
                           <span className="font-medium">Ready-Made Quiz Questions</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          File already contains MCQs with answer choices. AI will extract them directly.
+                          File already contains MCQs with answer choices. They'll be extracted directly.
                         </p>
                       </Label>
                     </div>
@@ -388,7 +388,7 @@ export function LectureMaterialsUpload() {
                           <span className="font-medium">Problems with Solutions</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          File contains worked problems. AI will parse them, then you can generate MCQs.
+                          File contains worked problems. They'll be parsed, then you can generate MCQs.
                         </p>
                       </Label>
                     </div>

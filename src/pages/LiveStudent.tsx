@@ -475,10 +475,10 @@ const LiveStudent = () => {
                     <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
                   </div>
                   <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
-                  {/* Show AI grade for short answers */}
+                  {/* Show grade for short answers */}
                   {!isMCQ && aiGrade !== null && (
                     <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
-                      <p className="text-sm font-medium">AI Score: {aiGrade}%</p>
+                      <p className="text-sm font-medium">Score: {aiGrade}%</p>
                       {aiFeedback && (
                         <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
                       )}
@@ -499,10 +499,10 @@ const LiveStudent = () => {
                   <p className="text-muted-foreground">
                     Correct answer: {currentQuestion.question_content.correctAnswer}
                   </p>
-                  {/* Show AI grade for short answers */}
+                  {/* Show grade for short answers */}
                   {!isMCQ && aiGrade !== null && (
                     <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
-                      <p className="text-sm font-medium">AI Score: {aiGrade}%</p>
+                      <p className="text-sm font-medium">Score: {aiGrade}%</p>
                       {aiFeedback && (
                         <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
                       )}
