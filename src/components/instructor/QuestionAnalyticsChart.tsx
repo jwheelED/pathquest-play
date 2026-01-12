@@ -16,6 +16,8 @@ interface QuestionStats {
   percentage: number | null;
   avgResponseTime: number | null;
   isManualGradeShortAnswer: boolean;
+  hasAIGrades?: boolean;
+  avgAIGrade?: number | null;
 }
 
 interface QuestionAnalyticsChartProps {
@@ -32,7 +34,7 @@ export const QuestionAnalyticsChart = ({
   stats,
 }: QuestionAnalyticsChartProps) => {
   const isMultipleChoice = question.type === "multiple_choice" && question.options;
-  const isAutoGradedShortAnswer = question.type === "short_answer" && !stats.isManualGradeShortAnswer;
+  const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
   // Calculate answer distribution for multiple choice
   const answerDistribution = isMultipleChoice
@@ -52,24 +54,42 @@ export const QuestionAnalyticsChart = ({
       })
     : [];
 
-  // Calculate performance data
-  const performanceData = [
-    {
-      name: "Correct",
-      value: stats.correct,
-      fill: "hsl(var(--success))",
-    },
-    {
-      name: "Incorrect",
-      value: stats.completed - stats.correct,
-      fill: "hsl(var(--destructive))",
-    },
-    {
-      name: "Not Answered",
-      value: stats.total - stats.completed,
-      fill: "hsl(var(--warning))",
-    },
-  ].filter((d) => d.value > 0);
+  // Calculate performance data - use AI grades for short answers if available
+  const performanceData = stats.hasAIGrades
+    ? [
+        {
+          name: "Passing (≥70%)",
+          value: stats.correct,
+          fill: "hsl(var(--success))",
+        },
+        {
+          name: "Needs Work (<70%)",
+          value: stats.completed - stats.correct,
+          fill: "hsl(var(--destructive))",
+        },
+        {
+          name: "Not Answered",
+          value: stats.total - stats.completed,
+          fill: "hsl(var(--warning))",
+        },
+      ].filter((d) => d.value > 0)
+    : [
+        {
+          name: "Correct",
+          value: stats.correct,
+          fill: "hsl(var(--success))",
+        },
+        {
+          name: "Incorrect",
+          value: stats.completed - stats.correct,
+          fill: "hsl(var(--destructive))",
+        },
+        {
+          name: "Not Answered",
+          value: stats.total - stats.completed,
+          fill: "hsl(var(--warning))",
+        },
+      ].filter((d) => d.value > 0);
 
   // Calculate grade distribution for auto-graded short answers
   const gradeDistribution = isAutoGradedShortAnswer

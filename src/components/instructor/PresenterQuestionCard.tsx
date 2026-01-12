@@ -18,6 +18,8 @@ interface PresenterQuestionCardProps {
     correctCount: number;
     correctPercentage: number | null;
     avgResponseTime: number | null;
+    avgAIGrade?: number | null;
+    hasAIGrades?: boolean;
   };
   participantCount: number;
 }
@@ -94,17 +96,29 @@ export const PresenterQuestionCard = ({
       </div>
 
       {/* Stats Grid */}
-      {stats.correctPercentage !== null && (
+      {(stats.correctPercentage !== null || stats.hasAIGrades) && (
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Correct Answers</p>
-            <p className="text-3xl font-bold text-primary">
-              {Math.round(stats.correctPercentage)}%
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.correctCount} of {stats.responseCount}
-            </p>
-          </div>
+          {stats.hasAIGrades && stats.avgAIGrade !== null ? (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Average Grade</p>
+              <p className={`text-3xl font-bold ${stats.avgAIGrade >= 70 ? 'text-green-600' : stats.avgAIGrade >= 50 ? 'text-warning' : 'text-destructive'}`}>
+                {stats.avgAIGrade}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                AI-graded responses
+              </p>
+            </div>
+          ) : stats.correctPercentage !== null ? (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Correct Answers</p>
+              <p className="text-3xl font-bold text-primary">
+                {Math.round(stats.correctPercentage)}%
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.correctCount} of {stats.responseCount}
+              </p>
+            </div>
+          ) : null}
           
           <div>
             <p className="text-xs text-muted-foreground mb-1">Avg Response Time</p>
