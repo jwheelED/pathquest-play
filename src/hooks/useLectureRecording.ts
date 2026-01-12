@@ -376,6 +376,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
+        expected_answer: data.expected_answer || "", // Pass expected answer for short answer grading
         extraction_method: 'auto_interval',
         source: 'auto_interval',
       });

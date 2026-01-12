@@ -378,7 +378,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null } = await req.json();
+    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null, expected_answer = "" } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -610,12 +610,13 @@ serve(async (req) => {
         };
       }
     } else {
-      // Short answer format - always manual grade for lecture check-ins
+      // Short answer format - use AI grading if expected answer is available
+      // The expected_answer comes from generate-interval-question via the request
       formattedQuestion = {
         question: question_text,
         type: "short_answer",
-        expectedAnswer: "",
-        gradingMode: "manual_grade",
+        expectedAnswer: expected_answer || "",
+        gradingMode: expected_answer ? "ai_grade" : "manual_grade",
       };
     }
 
