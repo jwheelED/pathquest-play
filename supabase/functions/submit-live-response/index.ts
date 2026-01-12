@@ -101,13 +101,19 @@ function calculateSimilarity(str1: string, str2: string): number {
   return matches / Math.max(words1.size, words2.size);
 }
 
-// AI grading for short answer questions
+// AI grading for short answer questions - with fallback for missing expected answers
 async function gradeShortAnswer(
   studentAnswer: string,
   expectedAnswer: string,
   questionText: string
 ): Promise<{ grade: number; feedback: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  // If no expected answer, grade based on relevance and quality
+  if (!expectedAnswer || expectedAnswer.trim() === "") {
+    console.log("No expected answer provided, grading on relevance/quality");
+    return gradeWithoutExpectedAnswer(studentAnswer, questionText);
+  }
   
   if (!LOVABLE_API_KEY) {
     console.warn("LOVABLE_API_KEY not set, using fallback grading");
@@ -198,6 +204,113 @@ Student Answer: ${studentAnswer}`;
     return {
       grade,
       feedback: grade >= 70 ? "Answer matches expected content." : "Answer differs from expected."
+    };
+  }
+}
+
+// Grade short answer when no expected answer is provided
+// Focuses on relevance, coherence, and depth - generous grading
+async function gradeWithoutExpectedAnswer(
+  studentAnswer: string,
+  questionText: string
+): Promise<{ grade: number; feedback: string }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  if (!LOVABLE_API_KEY) {
+    // No API key and no expected answer - give benefit of doubt
+    return { 
+      grade: 70, 
+      feedback: "Response recorded. Unable to verify automatically." 
+    };
+  }
+
+  const systemPrompt = `You are grading a short answer response where NO expected answer was provided.
+
+GRADING CRITERIA (be GENEROUS - this is a quick check-in, not a formal test):
+1. RELEVANCE (50 points): Does the answer address the question asked?
+2. COHERENCE (30 points): Is the answer well-formed and understandable?
+3. DEPTH (20 points): Does the answer show any thought and understanding?
+
+GRADING PHILOSOPHY:
+- This is a live lecture check-in - students are thinking on their feet
+- If the answer is ON TOPIC and MAKES SENSE, award 80-100 points
+- If the answer is partially relevant, award 60-79 points  
+- If the answer shows effort but misses the point, award 40-59 points
+- Only give low grades (0-39) for off-topic, nonsensical, or clearly lazy responses
+
+IMPORTANT: Without an expected answer, you cannot verify factual accuracy.
+Focus on whether the response is REASONABLE and THOUGHTFUL for the question asked.`;
+
+  const userPrompt = `Question: ${questionText}
+
+Student Answer: ${studentAnswer}
+
+Grade this response based on relevance to the question, coherence, and depth of thought. Be generous with grading.`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "grade_answer",
+            description: "Grade the student's short answer response on relevance and coherence",
+            parameters: {
+              type: "object",
+              properties: {
+                grade: {
+                  type: "number",
+                  description: "Grade from 0-100 (be generous for reasonable answers)"
+                },
+                feedback: {
+                  type: "string",
+                  description: "Brief encouraging feedback (1-2 sentences)"
+                }
+              },
+              required: ["grade", "feedback"],
+              additionalProperties: false
+            }
+          }
+        }],
+        tool_choice: { type: "function", function: { name: "grade_answer" } },
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI grading API error:", response.status);
+      // Fallback: give benefit of doubt
+      return { grade: 70, feedback: "Response recorded." };
+    }
+
+    const data = await response.json();
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (toolCall?.function?.arguments) {
+      const result = JSON.parse(toolCall.function.arguments);
+      return {
+        grade: Math.min(100, Math.max(0, result.grade)),
+        feedback: result.feedback || "Response evaluated."
+      };
+    }
+    
+    return { grade: 70, feedback: "Response recorded." };
+  } catch (error) {
+    console.error("AI grading without expected answer failed:", error);
+    // On error, give benefit of doubt with passing grade
+    return { 
+      grade: 70, 
+      feedback: "Response recorded. Instructor may review." 
     };
   }
 }

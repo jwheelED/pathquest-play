@@ -1020,6 +1020,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             suggested_type: detectionData.suggested_type,
             context: fullContext,
             confidence: detectionData.confidence,
+            expected_answer: detectionData.expected_answer || "", // Pass expected answer for short answer grading
             source: detectionData.source || "manual_button",
             use_answer_key: useAnswerKeyMcqs,
           },

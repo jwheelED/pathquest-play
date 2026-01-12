@@ -301,11 +301,13 @@ CRITERIA:
 - Match the difficulty level specified above
 ${hasSlideContext ? "- Answer choices MUST include correct information from the slide" : "- Avoid questions about examples unless they're core to understanding"}
 - MUST generate a valid question even if content seems limited
+- For short_answer questions: ALWAYS include an expected_answer that captures the key concepts a correct response should contain
 
 Return JSON:
 {
   "question_text": "the question",
   "suggested_type": "multiple_choice" | "short_answer",
+  "expected_answer": "For short_answer: the ideal/correct answer (1-3 sentences) capturing key concepts. For multiple_choice: leave empty.",
   "confidence": 0.0-1.0,
   "reasoning": "why this question tests the key concept"
 }`;
