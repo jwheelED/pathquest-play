@@ -20,6 +20,7 @@ import {
   Monitor,
   PictureInPicture2,
   BookOpen,
+  Award,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -55,6 +56,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStreaming";
+import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -150,6 +152,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [lastAutoQuestionError, setLastAutoQuestionError] = useState<string | null>(null);
   const [lastAutoQuestionErrorTime, setLastAutoQuestionErrorTime] = useState<Date | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
+
+  // Lecture summary state
+  const [showLectureSummary, setShowLectureSummary] = useState(false);
+  const [lectureSummaryData, setLectureSummaryData] = useState<LectureSummaryData | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [lastRecordingDuration, setLastRecordingDuration] = useState(0);
+  const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -2349,7 +2358,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
+    const finalDuration = recordingDuration;
+    const finalQuestionsAsked = dailyQuestionCount;
+    const finalTranscriptChunks = [...transcriptChunks];
+    
     isRecordingRef.current = false;
     setIsRecording(false);
 
@@ -2380,6 +2393,80 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
 
     toast({ title: "Recording stopped" });
+
+    // Generate lecture summary if recording was 10+ minutes (600 seconds)
+    const MIN_DURATION_FOR_SUMMARY = 600; // 10 minutes
+    if (finalDuration >= MIN_DURATION_FOR_SUMMARY && finalTranscriptChunks.length > 0) {
+      console.log("📊 Recording duration qualifies for summary:", finalDuration, "seconds");
+      setLastRecordingDuration(finalDuration);
+      setLastQuestionsAsked(finalQuestionsAsked);
+      setShowLectureSummary(true);
+      setIsGeneratingSummary(true);
+      setLectureSummaryData(null);
+
+      try {
+        // Fetch today's check-in results for this instructor
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
+
+        const today = new Date().toISOString().split("T")[0];
+        const { data: checkIns } = await supabase
+          .from("student_assignments")
+          .select("id, title, content, quiz_responses, grade, student_id")
+          .eq("instructor_id", user.id)
+          .eq("assignment_type", "lecture_checkin")
+          .gte("created_at", today);
+
+        // Format check-in results for the API
+        const checkInResults = (checkIns || []).map((c: any) => {
+          const quizResponses = c.quiz_responses as { answers?: Array<{ isCorrect?: boolean; selected?: string }> } | null;
+          const isCorrect = quizResponses?.answers?.[0]?.isCorrect ?? (c.grade !== null && c.grade >= 70);
+          return {
+            id: c.id,
+            question: c.title || c.content?.substring(0, 100) || "",
+            student_id: c.student_id,
+            is_correct: isCorrect,
+            grade: c.grade,
+          };
+        });
+
+        console.log("📊 Calling generate-live-lecture-summary with", finalTranscriptChunks.length, "chunks and", checkInResults.length, "check-ins");
+
+        const { data, error } = await supabase.functions.invoke("generate-live-lecture-summary", {
+          body: {
+            transcript_chunks: finalTranscriptChunks,
+            recording_duration_seconds: finalDuration,
+            check_in_results: checkInResults,
+            questions_asked: finalQuestionsAsked,
+            course_type: "stem",
+          },
+        });
+
+        if (error) throw error;
+
+        if (data?.success && data?.summary) {
+          console.log("✅ Lecture summary generated:", data.summary.overallScore);
+          setLectureSummaryData(data.summary);
+        } else {
+          throw new Error(data?.error || "Failed to generate summary");
+        }
+      } catch (error) {
+        console.error("Error generating lecture summary:", error);
+        toast({
+          title: "Summary generation failed",
+          description: error instanceof Error ? error.message : "Could not generate teaching summary",
+          variant: "destructive",
+        });
+      } finally {
+        setIsGeneratingSummary(false);
+      }
+    } else if (finalDuration < MIN_DURATION_FOR_SUMMARY && finalDuration > 60) {
+      // Hint that longer recordings get summaries
+      toast({
+        title: "💡 Tip",
+        description: `Record for ${Math.ceil((MIN_DURATION_FOR_SUMMARY - finalDuration) / 60)} more minutes to unlock a teaching summary!`,
+      });
+    }
   };
 
   const processAudioChunk = async (audioBlob: Blob) => {
@@ -3424,6 +3511,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Post-Lecture Teaching Summary Sheet */}
+      <LectureSummarySheet
+        open={showLectureSummary}
+        onOpenChange={setShowLectureSummary}
+        summaryData={lectureSummaryData}
+        isLoading={isGeneratingSummary}
+        recordingDuration={lastRecordingDuration}
+        questionsAsked={lastQuestionsAsked}
+        studentCount={studentCount}
+      />
     </>
   );
 };
