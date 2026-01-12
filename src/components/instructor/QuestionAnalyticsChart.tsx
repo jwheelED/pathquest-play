@@ -67,7 +67,7 @@ export const QuestionAnalyticsChart = ({
     {
       name: "Not Answered",
       value: stats.total - stats.completed,
-      fill: "hsl(var(--muted))",
+      fill: "hsl(var(--warning))",
     },
   ].filter((d) => d.value > 0);
 
