@@ -124,6 +124,18 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
+  // Periodic fetch for long lectures (every 30 seconds) - resilience for realtime drops
+  useEffect(() => {
+    const longLectureInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        console.log('📥 Periodic assignment check (long lecture resilience)');
+        fetchAssignments();
+      }
+    }, 30 * 1000);
+    
+    return () => clearInterval(longLectureInterval);
+  }, []);
+
   // Main realtime subscription with resilience improvements
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;

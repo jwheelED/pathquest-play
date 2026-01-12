@@ -322,6 +322,20 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const handleAutoQuestionGeneration = async (): Promise<boolean> => {
     try {
       setIsSendingQuestion(true);
+      
+      // Refresh auth token before long-interval operations (prevents 401 after 20+ mins)
+      console.log('🔑 Refreshing auth before auto-question generation');
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error('❌ Auth refresh failed:', refreshError);
+        toast({
+          title: '⚠️ Session expired',
+          description: 'Please refresh the page',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      
       const intervalTranscript = intervalTranscriptRef.current;
 
       if (!autoQuestionForceSend && intervalTranscript.length < 50) {
@@ -481,6 +495,22 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           isGeneratingAutoQuestionRef.current = true;
 
           try {
+            // Reconnect broadcast channel if stale (fixes 20-min interval issues)
+            if (studentTimerChannelRef.current) {
+              const status = studentTimerChannelRef.current.state;
+              if (status !== 'joined') {
+                console.log('🔄 Reconnecting stale student timer channel (was:', status, ')');
+                await supabase.removeChannel(studentTimerChannelRef.current);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                  const channelName = `lecture-timer-${user.id}`;
+                  studentTimerChannelRef.current = supabase.channel(channelName);
+                  await studentTimerChannelRef.current.subscribe();
+                  console.log('✅ Student timer channel reconnected');
+                }
+              }
+            }
+            
             const success = await handleAutoQuestionGenerationWithRetry();
             if (success) {
               intervalTranscriptRef.current = '';
@@ -515,6 +545,38 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       }
     };
   }, []);
+
+  // Periodic channel health check (every 5 mins during recording)
+  useEffect(() => {
+    if (!isRecording) return;
+    
+    const healthCheckInterval = setInterval(async () => {
+      console.log('🏥 Checking realtime channel health...');
+      
+      // Check student timer channel
+      if (studentTimerChannelRef.current && studentTimerChannelRef.current.state !== 'joined') {
+        console.log('🔄 Reconnecting stale student timer channel...');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.removeChannel(studentTimerChannelRef.current);
+          const channelName = `lecture-timer-${user.id}`;
+          studentTimerChannelRef.current = supabase.channel(channelName);
+          await studentTimerChannelRef.current.subscribe();
+          console.log('✅ Student timer channel health restored');
+        }
+      }
+      
+      // Refresh auth proactively during long recordings
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.warn('⚠️ Proactive auth refresh failed:', error.message);
+      } else {
+        console.log('🔑 Auth token refreshed proactively');
+      }
+    }, 5 * 60 * 1000); // Every 5 minutes
+    
+    return () => clearInterval(healthCheckInterval);
+  }, [isRecording]);
 
   // Reset state when recording stops
   useEffect(() => {
