@@ -100,17 +100,29 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     prevLiveCheckInsLength.current = liveCheckIns.length;
   }, [liveCheckIns, accordionValue]);
 
-  // Polling fallback when realtime disconnected (5 second interval for faster recovery)
+  // Polling fallback when realtime disconnected (3 second interval for faster recovery)
   useEffect(() => {
     if (realtimeStatus !== 'connected') {
       const pollInterval = setInterval(() => {
         console.log('📡 Polling fallback - fetching assignments...');
         fetchAssignments();
-      }, 5000); // Reduced from 10s to 5s for better UX
+      }, 3000); // Reduced to 3s for better UX when realtime is down
       
       return () => clearInterval(pollInterval);
     }
   }, [realtimeStatus]);
+
+  // Re-fetch when tab becomes visible (user switches back to app)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📱 Tab visible, checking for new assignments...');
+        fetchAssignments();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   // Main realtime subscription with resilience improvements
   useEffect(() => {
@@ -291,14 +303,48 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
       }
     });
 
+    // Step 4: Also listen to instructor broadcast channel for redundant delivery
+    let broadcastChannel: any = null;
+    const setupBroadcastListener = async () => {
+      // Get instructor ID from existing connection
+      let instrId = instructorId;
+      if (!instrId) {
+        const { data } = await supabase
+          .from('instructor_students')
+          .select('instructor_id')
+          .eq('student_id', userId)
+          .limit(1)
+          .maybeSingle();
+        instrId = data?.instructor_id;
+      }
+      
+      if (instrId) {
+        console.log('📢 Setting up broadcast listener for instructor:', instrId);
+        broadcastChannel = supabase
+          .channel(`instructor-${instrId}-questions`)
+          .on('broadcast', { event: 'new-question' }, (payload) => {
+            console.log('📢 Broadcast received from instructor:', payload);
+            // Trigger immediate fetch to get the actual question data
+            fetchAssignments();
+          })
+          .subscribe((status) => {
+            console.log('📢 Broadcast channel status:', status);
+          });
+      }
+    };
+    setupBroadcastListener();
+
     return () => {
       clearTimeout(debounceTimer);
       if (assignmentChannel) {
         supabase.removeChannel(assignmentChannel);
       }
+      if (broadcastChannel) {
+        supabase.removeChannel(broadcastChannel);
+      }
       subscription.unsubscribe();
     };
-  }, [userId, retryCount]);
+  }, [userId, instructorId, retryCount]);
 
   const fetchAssignments = async () => {
     setIsRefreshing(true);
@@ -992,6 +1038,16 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
         <div className="mb-4">
           <LectureCountdownTimer instructorId={instructorId} />
         </div>
+      )}
+
+      {/* Connection status indicator when realtime is down */}
+      {realtimeStatus === 'error' && (
+        <Alert variant="default" className="mb-4 border-amber-500/50 bg-amber-500/10">
+          <WifiOff className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="text-amber-600 dark:text-amber-400">
+            Live updates unavailable. Checking for questions every 3 seconds.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Question Incoming Animation Overlay */}
