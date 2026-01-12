@@ -468,6 +468,54 @@ Return JSON:
       }
     }
 
+    // Log raw response for debugging
+    console.log("📦 Raw AI response parsed:", JSON.stringify(result).substring(0, 500));
+
+    // Normalize question_text field - AI might return "question" instead of "question_text"
+    if (result.question && !result.question_text) {
+      console.log("🔄 Normalizing field: result.question -> result.question_text");
+      result.question_text = result.question;
+    }
+
+    // For non-coding questions, validate that question_text exists
+    if (format_preference !== "coding") {
+      const questionText = result.question_text;
+      
+      if (!questionText || (typeof questionText === "string" && questionText.trim().length === 0)) {
+        console.error("❌ AI response missing question_text:", JSON.stringify(result).substring(0, 300));
+        
+        if (strict_mode) {
+          console.log("🔄 Strict mode: Using fallback due to missing question field");
+          const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+          return new Response(
+            JSON.stringify({
+              success: true,
+              question_text: fallback.question_text,
+              suggested_type: fallback.suggested_type,
+              confidence: 0.4,
+              reasoning: "Fallback question used due to malformed AI response (strict mode)",
+              is_fallback: true,
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "AI response missing required question_text field",
+            raw_response: result,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
     console.log("✅ Auto-question generated:", result.question_text);
     console.log("📊 Confidence:", result.confidence, "| Reasoning:", result.reasoning, "| Source:", contextSource);
 
@@ -540,11 +588,15 @@ Return JSON:
 
     // Return appropriate structure based on format
     if (format_preference === "coding") {
+      // Preserve the AI's suggested_type (coding_simple vs coding) or detect from style
+      const suggestedType = result.suggested_type || 
+        (coding_question_style === "simple" ? "coding_simple" : "coding");
+      
       return new Response(
         JSON.stringify({
           success: true,
           question_text: result,
-          suggested_type: "coding",
+          suggested_type: suggestedType,
           confidence: result.confidence,
           reasoning: result.reasoning,
         }),
