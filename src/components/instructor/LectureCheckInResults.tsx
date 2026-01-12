@@ -345,28 +345,67 @@ export const LectureCheckInResults = () => {
 
     // Calculate stats from deduplicated list
     const uniqueAssignments = Array.from(uniqueStudents.values());
-
-    // For short answer questions requiring manual grading, don't calculate correct/incorrect stats
-    const isManualGradeShortAnswer = question.type === 'short_answer' && 
-      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
-    
     const completed = uniqueAssignments.filter((a) => a.completed);
     
     // Use overridden answer if it exists, otherwise use original correctAnswer
     const correctAnswer = question.overriddenAnswer || question.correctAnswer;
-    const correct = isManualGradeShortAnswer ? [] : completed.filter((a) => {
+
+    // Check if AI grades are available for short answers
+    const aiGrades: number[] = [];
+    if (question.type === 'short_answer') {
+      completed.forEach((a) => {
+        // Check quiz_responses._ai_recommendations first
+        const aiRec = a.quiz_responses?._ai_recommendations;
+        if (aiRec && typeof aiRec === 'object') {
+          // AI recommendations can be an array or object keyed by question index
+          const gradeValue = Array.isArray(aiRec) ? aiRec[0]?.grade : aiRec[questionIndex]?.grade;
+          if (typeof gradeValue === 'number') {
+            aiGrades.push(gradeValue);
+          }
+        }
+        // Also check the assignment.grade field as fallback
+        if (aiGrades.length === 0 && a.grade !== null && a.grade !== undefined) {
+          aiGrades.push(a.grade);
+        }
+      });
+    }
+
+    const hasAIGrades = aiGrades.length > 0;
+    
+    // For short answer with no AI grades and no expected answer, mark as manual
+    const isManualGradeShortAnswer = question.type === 'short_answer' && 
+      !hasAIGrades &&
+      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+    
+    // Calculate correct count based on available data
+    let correct: Assignment[] = [];
+    if (hasAIGrades) {
+      // Use AI grade >= 70 as "correct" threshold
+      correct = completed.filter((a) => {
+        const aiRec = a.quiz_responses?._ai_recommendations;
+        if (aiRec && typeof aiRec === 'object') {
+          const gradeValue = Array.isArray(aiRec) ? aiRec[0]?.grade : aiRec[questionIndex]?.grade;
+          if (typeof gradeValue === 'number') {
+            return gradeValue >= 70;
+          }
+        }
+        return a.grade !== null && a.grade >= 70;
+      });
+    } else if (!isManualGradeShortAnswer) {
       // FIX: Find the question index within THIS student's assignment, not the group index
-      const assignmentContent = a.content as any;
-      const assignmentQuestions = assignmentContent?.questions || [];
-      const studentQuestionIdx = assignmentQuestions.findIndex(
-        (q: any) => q.question === question.question
-      );
-      
-      const response = studentQuestionIdx >= 0 
-        ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
-        : null;
-      return response === correctAnswer;
-    });
+      correct = completed.filter((a) => {
+        const assignmentContent = a.content as any;
+        const assignmentQuestions = assignmentContent?.questions || [];
+        const studentQuestionIdx = assignmentQuestions.findIndex(
+          (q: any) => q.question === question.question
+        );
+        
+        const response = studentQuestionIdx >= 0 
+          ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
+          : null;
+        return response === correctAnswer;
+      });
+    }
 
     // Calculate average response time for completed assignments
     const responseTimes = completed
@@ -377,6 +416,11 @@ export const LectureCheckInResults = () => {
       ? Math.round(responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length)
       : null;
 
+    // Calculate average AI grade if available
+    const avgAIGrade = hasAIGrades
+      ? Math.round(aiGrades.reduce((sum, g) => sum + g, 0) / aiGrades.length)
+      : null;
+
     return {
       total: uniqueAssignments.length,
       completed: completed.length,
@@ -384,6 +428,8 @@ export const LectureCheckInResults = () => {
       percentage: isManualGradeShortAnswer ? null : (completed.length > 0 ? (correct.length / completed.length) * 100 : 0),
       avgResponseTime,
       isManualGradeShortAnswer,
+      hasAIGrades,
+      avgAIGrade,
     };
   };
 
@@ -1032,7 +1078,16 @@ export const LectureCheckInResults = () => {
                         </div>
                         <div className="text-right space-y-2">
                           <div>
-                            {stats.isManualGradeShortAnswer ? (
+                            {stats.hasAIGrades && stats.avgAIGrade !== null ? (
+                              <>
+                                <div className={`text-2xl font-bold ${stats.avgAIGrade >= 70 ? 'text-green-600' : stats.avgAIGrade >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                  {stats.avgAIGrade}%
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Avg AI Grade ({stats.completed} graded)
+                                </div>
+                              </>
+                            ) : stats.isManualGradeShortAnswer ? (
                               <>
                                 <div className="text-sm font-medium text-blue-600 dark:text-blue-400">Manual Review Required</div>
                                 <div className="text-xs text-muted-foreground">
@@ -1220,10 +1275,33 @@ export const LectureCheckInResults = () => {
                               const isCompleted = assignment.completed;
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
-                            // For manual grade short answers, don't show correct/incorrect
-                            const isManualGradeShortAnswer = question.type === 'short_answer' && 
-                              (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
-                            const isCorrect = isManualGradeShortAnswer ? null : studentAnswer === correctAnswerToUse;
+                              // Check for AI grade in quiz_responses._ai_recommendations
+                              const aiRec = assignment.quiz_responses?._ai_recommendations;
+                              let studentAIGrade: number | null = null;
+                              let studentAIFeedback: string | null = null;
+                              
+                              if (aiRec && typeof aiRec === 'object') {
+                                if (Array.isArray(aiRec) && aiRec[0]) {
+                                  studentAIGrade = aiRec[0].grade ?? null;
+                                  studentAIFeedback = aiRec[0].feedback ?? null;
+                                } else if (aiRec[studentQuestionIdx]) {
+                                  studentAIGrade = aiRec[studentQuestionIdx].grade ?? null;
+                                  studentAIFeedback = aiRec[studentQuestionIdx].feedback ?? null;
+                                }
+                              }
+                              
+                              // Also check assignment.grade as fallback
+                              if (studentAIGrade === null && assignment.grade !== null) {
+                                studentAIGrade = assignment.grade;
+                              }
+                              
+                              const hasAIGrade = studentAIGrade !== null;
+                            
+                              // For manual grade short answers without AI grade, show pending
+                              const isManualGradeShortAnswer = question.type === 'short_answer' && 
+                                !hasAIGrade &&
+                                (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+                              const isCorrect = isManualGradeShortAnswer ? null : (hasAIGrade ? studentAIGrade >= 70 : studentAnswer === correctAnswerToUse);
 
                             return (
                               <div
@@ -1237,6 +1315,21 @@ export const LectureCheckInResults = () => {
                                       <Clock className="h-3 w-3" />
                                       Not Answered
                                     </Badge>
+                                   ) : hasAIGrade && question.type === 'short_answer' ? (
+                                    <>
+                                      <Badge 
+                                        variant={studentAIGrade >= 70 ? "default" : "destructive"}
+                                        className={`gap-1 ${studentAIGrade >= 70 ? "bg-green-600" : ""}`}
+                                      >
+                                        {studentAIGrade}%
+                                      </Badge>
+                                      {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                          <Clock className="h-3 w-3" />
+                                          {formatTime(assignment.response_time_seconds)}
+                                        </Badge>
+                                      )}
+                                    </>
                                    ) : isManualGradeShortAnswer ? (
                                     <>
                                       <Badge variant="outline" className="gap-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300">

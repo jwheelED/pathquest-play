@@ -33,6 +33,8 @@ interface ResponseStats {
   correctCount: number;
   correctPercentage: number | null;
   avgResponseTime: number | null;
+  avgAIGrade: number | null;
+  hasAIGrades: boolean;
 }
 
 export const usePresenterData = (sessionCode: string | null) => {
@@ -45,6 +47,8 @@ export const usePresenterData = (sessionCode: string | null) => {
     correctCount: 0,
     correctPercentage: null,
     avgResponseTime: null,
+    avgAIGrade: null,
+    hasAIGrades: false,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +100,8 @@ export const usePresenterData = (sessionCode: string | null) => {
         correctCount: 0,
         correctPercentage: null,
         avgResponseTime: null,
+        avgAIGrade: null,
+        hasAIGrades: false,
       };
     }
 
@@ -109,11 +115,22 @@ export const usePresenterData = (sessionCode: string | null) => {
         ? Math.round(responseTimes.reduce((sum, t) => sum + t, 0) / responseTimes.length)
         : null;
 
+    // Calculate AI grades for short answer questions
+    const aiGrades = responses
+      .map((r) => r.ai_grade)
+      .filter((g): g is number => g !== null && g !== undefined);
+
+    const avgAIGrade = aiGrades.length > 0
+      ? Math.round(aiGrades.reduce((sum, g) => sum + g, 0) / aiGrades.length)
+      : null;
+
     return {
       responseCount: responses.length,
       correctCount,
       correctPercentage: (correctCount / responses.length) * 100,
       avgResponseTime,
+      avgAIGrade,
+      hasAIGrades: aiGrades.length > 0,
     };
   };
 
@@ -136,6 +153,8 @@ export const usePresenterData = (sessionCode: string | null) => {
         correctCount: 0,
         correctPercentage: null,
         avgResponseTime: null,
+        avgAIGrade: null,
+        hasAIGrades: false,
       });
       return;
     }
