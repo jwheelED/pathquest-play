@@ -153,32 +153,34 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg">
-              <div>
-                <p className="text-sm text-muted-foreground">Session Code</p>
-                <p className="text-3xl font-mono font-bold">{activeSession.session_code}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={openPresenterView}>
-                  <Monitor className="mr-2 h-4 w-4" />
-                  Presenter View
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowQR(true)}>
-                  <QrCode className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={copyJoinLink}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Link
-                </Button>
+            <div className="flex flex-col gap-4 p-4 bg-primary/5 rounded-lg">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Session Code</p>
+                  <p className="text-3xl font-mono font-bold">{activeSession.session_code}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={openPresenterView}>
+                    <Monitor className="mr-2 h-4 w-4" />
+                    Presenter View
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowQR(true)}>
+                    <QrCode className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={copyJoinLink}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Link
+                  </Button>
+                </div>
               </div>
             </div>
             
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="h-4 w-4" />
+              <Users className="h-4 w-4 shrink-0" />
               <span>{participantCount} participant{participantCount !== 1 ? 's' : ''} joined</span>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground break-all">
               Students can join at: <span className="font-mono">{joinUrl}</span>
             </p>
           </CardContent>
