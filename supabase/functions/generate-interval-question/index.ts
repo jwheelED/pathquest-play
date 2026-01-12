@@ -418,7 +418,82 @@ Return JSON:
       );
     }
 
-    const aiResponse = await response.json();
+    // Defensive JSON parsing - handle empty/truncated responses
+    let aiResponse;
+    try {
+      const responseText = await response.text();
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error("Empty response body from AI API");
+      }
+      aiResponse = JSON.parse(responseText);
+    } catch (jsonError) {
+      console.error("❌ Failed to parse AI API response:", jsonError);
+      
+      // In strict mode, use fallback on empty/malformed response
+      if (strict_mode) {
+        console.log("🔄 Strict mode: Using fallback due to malformed API response");
+        const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        return new Response(
+          JSON.stringify({
+            success: true,
+            question_text: fallback.question_text,
+            suggested_type: fallback.suggested_type,
+            confidence: 0.4,
+            reasoning: "Fallback question used due to API response parsing error (strict mode)",
+            is_fallback: true,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to parse AI API response",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Validate expected response structure
+    if (!aiResponse?.choices?.[0]?.message?.content) {
+      console.error("❌ Unexpected AI response structure:", JSON.stringify(aiResponse).substring(0, 200));
+      
+      if (strict_mode) {
+        console.log("🔄 Strict mode: Using fallback due to unexpected response structure");
+        const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        return new Response(
+          JSON.stringify({
+            success: true,
+            question_text: fallback.question_text,
+            suggested_type: fallback.suggested_type,
+            confidence: 0.4,
+            reasoning: "Fallback question used due to unexpected API response structure (strict mode)",
+            is_fallback: true,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Unexpected AI response structure",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     let content = aiResponse.choices[0].message.content;
 
     // Enhanced JSON parsing with markdown cleanup
