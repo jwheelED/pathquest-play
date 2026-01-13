@@ -155,12 +155,3 @@ verify_jwt = true
 
 [functions.generate-live-lecture-summary]
 verify_jwt = true
-
-[functions.create-checkout-session]
-verify_jwt = true
-
-[functions.stripe-webhook]
-verify_jwt = false
-
-[functions.customer-portal-session]
-verify_jwt = true
