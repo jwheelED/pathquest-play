@@ -3469,6 +3469,7 @@ export type Database = {
       subscription_tiers: {
         Row: {
           billing_period: string
+          course_limit: number | null
           created_at: string
           description: string | null
           display_name: string
@@ -3478,11 +3479,13 @@ export type Database = {
           name: string
           price_cents: number
           sort_order: number
+          stripe_price_id: string | null
           student_limit: number | null
           updated_at: string
         }
         Insert: {
           billing_period?: string
+          course_limit?: number | null
           created_at?: string
           description?: string | null
           display_name: string
@@ -3492,11 +3495,13 @@ export type Database = {
           name: string
           price_cents?: number
           sort_order?: number
+          stripe_price_id?: string | null
           student_limit?: number | null
           updated_at?: string
         }
         Update: {
           billing_period?: string
+          course_limit?: number | null
           created_at?: string
           description?: string | null
           display_name?: string
@@ -3506,6 +3511,7 @@ export type Database = {
           name?: string
           price_cents?: number
           sort_order?: number
+          stripe_price_id?: string | null
           student_limit?: number | null
           updated_at?: string
         }
@@ -3948,6 +3954,7 @@ export type Database = {
         }[]
       }
       get_student_limit: { Args: { _user_id: string }; Returns: number }
+      get_user_course_limit: { Args: { _user_id: string }; Returns: number }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_subscription_tier: {
         Args: { _user_id: string }

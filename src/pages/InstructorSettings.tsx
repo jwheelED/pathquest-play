@@ -9,6 +9,7 @@ import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
+import { BillingSettings } from "@/components/instructor/BillingSettings";
 
 export default function InstructorSettings() {
   const navigate = useNavigate();
@@ -83,6 +84,7 @@ export default function InstructorSettings() {
         <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl mx-auto">
           {currentUser && (
             <>
+              <BillingSettings />
               <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
               <QuestionDifficultySettings />
               <AdaptiveTutoringSettings />
