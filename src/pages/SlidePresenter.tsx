@@ -6,6 +6,7 @@ import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/Slid
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
 import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
 import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from '@/components/instructor/slides/SlideQuestionPreviewDialog';
+import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components/instructor/VoiceQuestionPreviewDialog';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
@@ -31,11 +32,16 @@ export default function SlidePresenter() {
   const [loading, setLoading] = useState(true);
   const [extractionStage, setExtractionStage] = useState<'idle' | 'capturing' | 'analyzing' | 'sending'>('idle');
   
-  // Preview dialog state
+  // Slide question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewQuestionType, setPreviewQuestionType] = useState<QuestionType>('mcq');
   const [previewExtractedData, setPreviewExtractedData] = useState<ExtractedQuestionData | null>(null);
   const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
+  
+  // Voice question preview dialog state
+  const [isVoicePreviewOpen, setIsVoicePreviewOpen] = useState(false);
+  const [voicePreviewData, setVoicePreviewData] = useState<ExtractedVoiceQuestion | null>(null);
+  const [isSendingVoiceQuestion, setIsSendingVoiceQuestion] = useState(false);
   
   // Selection mode state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -70,6 +76,13 @@ export default function SlidePresenter() {
     }
   }, []);
 
+  // Handle extracted voice question - open preview dialog
+  const handleQuestionExtracted = useCallback((data: ExtractedVoiceQuestion) => {
+    console.log('📋 Voice question extracted, opening preview:', data);
+    setVoicePreviewData(data);
+    setIsVoicePreviewOpen(true);
+  }, []);
+
   // Integrate lecture recording hook with slide context
   const {
     isRecording,
@@ -85,12 +98,14 @@ export default function SlidePresenter() {
     handleManualQuestionSend,
     handleTestAutoQuestion,
     toggleAutoQuestion,
+    sendExtractedQuestion,
   } = useLectureRecording({
     onQuestionGenerated: () => {
       console.log('Question generated from slide presenter');
     },
     slideContext: currentSlideText,
     onVoiceCommand: handleVoiceCommand,
+    onQuestionExtracted: handleQuestionExtracted,
   });
 
   // Update ref when handleManualQuestionSend is available
@@ -276,6 +291,27 @@ export default function SlidePresenter() {
       setIsSendingFromPreview(false);
     }
   }, [previewQuestionType, currentSlideNumber]);
+
+  // Handle confirming and sending voice question from preview dialog
+  const handleConfirmVoiceQuestion = useCallback(async (editedQuestion: ExtractedVoiceQuestion) => {
+    setIsSendingVoiceQuestion(true);
+    
+    try {
+      await sendExtractedQuestion({
+        question_text: editedQuestion.question_text,
+        suggested_type: editedQuestion.suggested_type,
+      });
+      
+      toast.success('Question sent to students!');
+      setIsVoicePreviewOpen(false);
+      setVoicePreviewData(null);
+    } catch (err) {
+      console.error('Error in handleConfirmVoiceQuestion:', err);
+      toast.error('Failed to send question');
+    } finally {
+      setIsSendingVoiceQuestion(false);
+    }
+  }, [sendExtractedQuestion]);
 
   // Update ref when handleSendSlideQuestion is available
   useEffect(() => {
@@ -466,7 +502,7 @@ export default function SlidePresenter() {
           }}
         />
         
-        {/* Question Preview Dialog */}
+        {/* Slide Question Preview Dialog */}
         <SlideQuestionPreviewDialog
           open={isPreviewOpen}
           onOpenChange={setIsPreviewOpen}
@@ -474,6 +510,15 @@ export default function SlidePresenter() {
           extractedData={previewExtractedData}
           onConfirmSend={handleConfirmSendQuestion}
           isSending={isSendingFromPreview}
+        />
+        
+        {/* Voice Question Preview Dialog */}
+        <VoiceQuestionPreviewDialog
+          open={isVoicePreviewOpen}
+          onOpenChange={setIsVoicePreviewOpen}
+          extractedQuestion={voicePreviewData}
+          onConfirmSend={handleConfirmVoiceQuestion}
+          isSending={isSendingVoiceQuestion}
         />
       </div>
     );

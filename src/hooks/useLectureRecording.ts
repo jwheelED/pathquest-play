@@ -39,14 +39,21 @@ export interface LectureRecordingActions {
   toggleAutoQuestion: () => Promise<void>;
 }
 
+export interface ExtractedVoiceQuestion {
+  question_text: string;
+  suggested_type: 'short_answer' | 'multiple_choice';
+}
+
 export interface UseLectureRecordingOptions {
   onQuestionGenerated?: () => void;
   slideContext?: string;
   onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
+  /** Callback when a voice command extracts a question - allows preview before sending */
+  onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
 }
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
@@ -908,6 +915,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return;
       }
 
+      // If onQuestionExtracted callback is provided, call it for preview instead of sending immediately
+      if (onQuestionExtracted) {
+        console.log('📋 Question extracted, opening preview dialog');
+        onQuestionExtracted({
+          question_text: data.question_text,
+          suggested_type: data.suggested_type || 'short_answer',
+        });
+        return;
+      }
+
+      // No callback provided, send immediately (legacy behavior)
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
@@ -927,7 +945,35 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     } finally {
       setIsSendingQuestion(false);
     }
-  }, [isSendingQuestion, toast]);
+  }, [isSendingQuestion, toast, onQuestionExtracted]);
+
+  // Send an extracted question after user confirmation from preview dialog
+  const sendExtractedQuestion = useCallback(async (extractedData: {
+    question_text: string;
+    suggested_type: string;
+  }) => {
+    try {
+      setIsSendingQuestion(true);
+      
+      await handleQuestionSend({
+        question_text: extractedData.question_text,
+        suggested_type: extractedData.suggested_type,
+        confidence: 1.0,
+        extraction_method: 'voice_command',
+        source: 'voice_command',
+      });
+    } catch (error: any) {
+      console.error('Send extracted question error:', error);
+      toast({
+        title: 'Failed',
+        description: error.message || 'Could not send',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setIsSendingQuestion(false);
+    }
+  }, [toast]);
 
   // Test auto-question
   const handleTestAutoQuestion = useCallback(async () => {
@@ -1108,5 +1154,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     handleManualQuestionSend,
     handleTestAutoQuestion,
     toggleAutoQuestion,
+    sendExtractedQuestion,
   };
 }
