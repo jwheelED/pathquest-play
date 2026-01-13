@@ -18,6 +18,10 @@ import { Mic, MessageSquare, ListChecks, Loader2 } from 'lucide-react';
 export interface ExtractedVoiceQuestion {
   question_text: string;
   suggested_type: 'short_answer' | 'multiple_choice';
+  // MCQ fields (pre-generated for editing)
+  options?: string[];
+  correct_answer?: 'A' | 'B' | 'C' | 'D';
+  explanation?: string;
 }
 
 interface VoiceQuestionPreviewDialogProps {
@@ -45,17 +49,40 @@ export function VoiceQuestionPreviewDialog({
     if (extractedQuestion) {
       setQuestionText(extractedQuestion.question_text);
       setQuestionType(extractedQuestion.suggested_type);
-      // Reset MCQ options when a new question is extracted
-      setMcqOptions(['', '', '', '']);
-      setCorrectAnswer('A');
+      
+      // Initialize MCQ options from pre-generated data or reset
+      if (extractedQuestion.options && extractedQuestion.options.length === 4) {
+        setMcqOptions(extractedQuestion.options);
+      } else {
+        setMcqOptions(['', '', '', '']);
+      }
+      
+      // Initialize correct answer from pre-generated data or default
+      if (extractedQuestion.correct_answer) {
+        setCorrectAnswer(extractedQuestion.correct_answer);
+      } else {
+        setCorrectAnswer('A');
+      }
     }
   }, [extractedQuestion]);
 
   const handleConfirm = () => {
-    onConfirmSend({
+    const questionData: ExtractedVoiceQuestion = {
       question_text: questionText,
       suggested_type: questionType,
-    });
+    };
+    
+    // Include MCQ data if this is a multiple choice question
+    if (questionType === 'multiple_choice') {
+      // Only include options if at least one is filled
+      const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
+      if (hasOptions) {
+        questionData.options = mcqOptions;
+        questionData.correct_answer = correctAnswer;
+      }
+    }
+    
+    onConfirmSend(questionData);
   };
 
   const handleOptionChange = (index: number, value: string) => {
@@ -135,7 +162,9 @@ export function VoiceQuestionPreviewDialog({
             <div className="space-y-3">
               <Label>Answer Options</Label>
               <p className="text-xs text-muted-foreground">
-                Add options for students to choose from. Leave blank for AI to generate.
+                {mcqOptions.some(opt => opt.trim() !== '') 
+                  ? "Edit the generated options below. Select the correct answer."
+                  : "Add options for students to choose from, or leave blank for AI to generate."}
               </p>
               <RadioGroup
                 value={correctAnswer}

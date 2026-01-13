@@ -302,12 +302,26 @@ CRITERIA:
 ${hasSlideContext ? "- Answer choices MUST include correct information from the slide" : "- Avoid questions about examples unless they're core to understanding"}
 - MUST generate a valid question even if content seems limited
 - For short_answer questions: ALWAYS include an expected_answer that captures the key concepts a correct response should contain
+- For multiple_choice questions: ALWAYS include options (array of 4 choices) and correct_answer (A, B, C, or D)
 
-Return JSON:
+Return JSON based on question type:
+
+For multiple_choice:
 {
   "question_text": "the question",
-  "suggested_type": "multiple_choice" | "short_answer",
-  "expected_answer": "For short_answer: the ideal/correct answer (1-3 sentences) capturing key concepts. For multiple_choice: leave empty.",
+  "suggested_type": "multiple_choice",
+  "options": ["A. first option", "B. second option", "C. third option", "D. fourth option"],
+  "correct_answer": "A" | "B" | "C" | "D",
+  "explanation": "Brief explanation of why the correct answer is right",
+  "confidence": 0.0-1.0,
+  "reasoning": "why this question tests the key concept"
+}
+
+For short_answer:
+{
+  "question_text": "the question",
+  "suggested_type": "short_answer",
+  "expected_answer": "the ideal/correct answer (1-3 sentences) capturing key concepts",
   "confidence": 0.0-1.0,
   "reasoning": "why this question tests the key concept"
 }`;
@@ -682,14 +696,35 @@ Return JSON:
         },
       );
     } else {
+      // Include MCQ options if available (for preview editing)
+      const responseData: any = {
+        success: true,
+        question_text: result.question_text,
+        suggested_type: result.suggested_type,
+        confidence: result.confidence,
+        reasoning: result.reasoning,
+      };
+      
+      // Add MCQ-specific fields if this is a multiple choice question
+      if (result.suggested_type === "multiple_choice") {
+        if (result.options && Array.isArray(result.options)) {
+          responseData.options = result.options;
+        }
+        if (result.correct_answer) {
+          responseData.correct_answer = result.correct_answer;
+        }
+        if (result.explanation) {
+          responseData.explanation = result.explanation;
+        }
+      }
+      
+      // Add expected_answer for short answer questions
+      if (result.suggested_type === "short_answer" && result.expected_answer) {
+        responseData.expected_answer = result.expected_answer;
+      }
+      
       return new Response(
-        JSON.stringify({
-          success: true,
-          question_text: result.question_text,
-          suggested_type: result.suggested_type,
-          confidence: result.confidence,
-          reasoning: result.reasoning,
-        }),
+        JSON.stringify(responseData),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
