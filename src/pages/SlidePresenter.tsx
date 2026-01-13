@@ -5,6 +5,7 @@ import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
 import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/SlideViewer';
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
 import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
+import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from '@/components/instructor/slides/SlideQuestionPreviewDialog';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
@@ -29,6 +30,12 @@ export default function SlidePresenter() {
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
   const [extractionStage, setExtractionStage] = useState<'idle' | 'capturing' | 'analyzing' | 'sending'>('idle');
+  
+  // Preview dialog state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewQuestionType, setPreviewQuestionType] = useState<QuestionType>('mcq');
+  const [previewExtractedData, setPreviewExtractedData] = useState<ExtractedQuestionData | null>(null);
+  const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
   
   // Selection mode state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -185,16 +192,35 @@ export default function SlidePresenter() {
 
       console.log('✅ Extracted question:', data.data);
 
-      // Stage 3: Sending to students
-      setExtractionStage('sending');
+      // Clear selection after successful extraction
+      if (selection) {
+        slideViewerRef.current?.clearSelection();
+        setHasSelection(false);
+      }
 
-      // Send the extracted question to students via dedicated edge function
-      const extractedData = data.data;
+      // Open preview dialog instead of sending immediately
+      setPreviewQuestionType(questionType as QuestionType);
+      setPreviewExtractedData(data.data);
+      setIsPreviewOpen(true);
+      setExtractionStage('idle');
       
+    } catch (err) {
+      console.error('Error in handleSendSlideQuestion:', err);
+      toast.error('An error occurred while processing the slide');
+      setExtractionStage('idle');
+    }
+  }, [currentSlideNumber]);
+
+  // Handle confirming and sending the question from preview dialog
+  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData) => {
+    setIsSendingFromPreview(true);
+    
+    try {
+      // Send the edited question to students via dedicated edge function
       const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
         body: {
-          questionType,
-          extractedQuestion: extractedData,
+          questionType: previewQuestionType,
+          extractedQuestion: editedData,
           slideNumber: currentSlideNumber,
         },
       });
@@ -202,31 +228,25 @@ export default function SlidePresenter() {
       if (sendError) {
         console.error('Error sending slide question:', sendError);
         toast.error(sendError.message || 'Failed to send question to students');
-        setExtractionStage('idle');
         return;
       }
 
       if (!sendData?.success) {
         toast.error(sendData?.error || 'Failed to send question');
-        setExtractionStage('idle');
         return;
       }
 
-      toast.success(`${questionType.toUpperCase()} question sent to students!`);
-      
-      // Clear selection after successful send
-      if (selection) {
-        slideViewerRef.current?.clearSelection();
-        setHasSelection(false);
-      }
+      toast.success(`${previewQuestionType.toUpperCase()} question sent to students!`);
+      setIsPreviewOpen(false);
+      setPreviewExtractedData(null);
       
     } catch (err) {
-      console.error('Error in handleSendSlideQuestion:', err);
-      toast.error('An error occurred while processing the slide');
+      console.error('Error in handleConfirmSendQuestion:', err);
+      toast.error('An error occurred while sending the question');
     } finally {
-      setExtractionStage('idle');
+      setIsSendingFromPreview(false);
     }
-  }, [currentSlideNumber]);
+  }, [previewQuestionType, currentSlideNumber]);
 
   // Update ref when handleSendSlideQuestion is available
   useEffect(() => {
@@ -415,6 +435,16 @@ export default function SlidePresenter() {
             autoQuestionEnabled,
             nextAutoQuestionIn,
           }}
+        />
+        
+        {/* Question Preview Dialog */}
+        <SlideQuestionPreviewDialog
+          open={isPreviewOpen}
+          onOpenChange={setIsPreviewOpen}
+          questionType={previewQuestionType}
+          extractedData={previewExtractedData}
+          onConfirmSend={handleConfirmSendQuestion}
+          isSending={isSendingFromPreview}
         />
       </div>
     );
