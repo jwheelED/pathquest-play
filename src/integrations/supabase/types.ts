@@ -3478,6 +3478,8 @@ export type Database = {
           is_active: boolean
           name: string
           price_cents: number
+          price_suffix: string | null
+          pricing_model: string | null
           sort_order: number
           stripe_price_id: string | null
           student_limit: number | null
@@ -3494,6 +3496,8 @@ export type Database = {
           is_active?: boolean
           name: string
           price_cents?: number
+          price_suffix?: string | null
+          pricing_model?: string | null
           sort_order?: number
           stripe_price_id?: string | null
           student_limit?: number | null
@@ -3510,6 +3514,8 @@ export type Database = {
           is_active?: boolean
           name?: string
           price_cents?: number
+          price_suffix?: string | null
+          pricing_model?: string | null
           sort_order?: number
           stripe_price_id?: string | null
           student_limit?: number | null
