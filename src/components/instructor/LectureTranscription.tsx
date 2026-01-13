@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStreaming";
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
+import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -159,6 +160,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [lastRecordingDuration, setLastRecordingDuration] = useState(0);
   const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
+
+  // Question preview dialog state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewQuestionData, setPreviewQuestionData] = useState<ExtractedVoiceQuestion | null>(null);
+  const [questionPreviewEnabled, setQuestionPreviewEnabled] = useState(true);
+  const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
+  const pendingQuestionDataRef = useRef<any>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -332,7 +340,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from("profiles")
-          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled")
           .eq("id", user.id)
           .single();
 
@@ -346,6 +354,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           // Default to true if not explicitly set to false
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);
           setStrictModeEnabled(profile.auto_question_strict_mode !== false);
+          // Question preview setting - default to true
+          setQuestionPreviewEnabled(profile.question_preview_enabled !== false);
         }
 
         // Fetch today's question count
@@ -746,7 +756,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("✅ Question extracted via voice command:", data.question_text);
 
-      // Send immediately without confidence threshold
+      // Check if preview is enabled - if so, show dialog instead of sending directly
+      if (questionPreviewEnabled) {
+        console.log("📋 Preview enabled - showing voice question preview");
+        setPreviewQuestionData({
+          question_text: data.question_text,
+          suggested_type: data.suggested_type || 'short_answer',
+        });
+        pendingQuestionDataRef.current = {
+          question_text: data.question_text,
+          suggested_type: data.suggested_type,
+          confidence: 1.0,
+          extraction_method: "voice_command",
+          source: "voice_command",
+        };
+        setIsPreviewOpen(true);
+        // Don't set isSendingQuestion to false yet - preview will handle that
+        return;
+      }
+
+      // Preview disabled - send immediately
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
@@ -839,7 +868,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("✅ Question generated via manual send:", data.question_text);
 
-      // Send immediately
+      // Check if preview is enabled - if so, show dialog instead of sending directly
+      if (questionPreviewEnabled) {
+        console.log("📋 Preview enabled - showing manual question preview");
+        setPreviewQuestionData({
+          question_text: data.question_text,
+          suggested_type: data.suggested_type || 'short_answer',
+        });
+        pendingQuestionDataRef.current = {
+          question_text: data.question_text,
+          suggested_type: data.suggested_type,
+          confidence: 1.0,
+          extraction_method: "manual_button",
+          source: "manual_button",
+        };
+        setIsPreviewOpen(true);
+        // Don't set isSendingQuestion to false yet - preview will handle that
+        return;
+      }
+
+      // Preview disabled - send immediately
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
@@ -868,7 +916,49 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   };
 
-  // Pre-validation before sending question
+  // Handle confirm from preview dialog - sends the question after user approval
+  const handleConfirmPreviewSend = async (editedQuestion: ExtractedVoiceQuestion) => {
+    try {
+      setIsSendingFromPreview(true);
+      
+      // Merge edited question with pending data
+      const questionData = {
+        ...pendingQuestionDataRef.current,
+        question_text: editedQuestion.question_text,
+        suggested_type: editedQuestion.suggested_type,
+      };
+      
+      console.log("📤 Sending question from preview:", questionData);
+      
+      await handleQuestionSend(questionData);
+      
+      // Reset auto-question timer after send
+      if (autoQuestionEnabled) {
+        setLastAutoQuestionTime(Date.now());
+        intervalTranscriptRef.current = "";
+        setIntervalTranscriptLength(0);
+        console.log("🔄 Auto-question timer reset after preview send");
+      }
+      
+      // Close preview and clean up
+      setIsPreviewOpen(false);
+      setPreviewQuestionData(null);
+      pendingQuestionDataRef.current = null;
+      
+    } catch (error: any) {
+      console.error("Preview send error:", error);
+      toast({
+        title: "Failed to send question",
+        description: error.message || "Could not send question",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingFromPreview(false);
+      setIsSendingQuestion(false);
+    }
+  };
+
+
   const validateBeforeSend = async (isAutoQuestion = false): Promise<{ valid: boolean; error?: string }> => {
     try {
       // Check rate limit (skip for auto-questions - they're on a timer)
@@ -3521,6 +3611,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         recordingDuration={lastRecordingDuration}
         questionsAsked={lastQuestionsAsked}
         studentCount={studentCount}
+      />
+
+      {/* Voice/Manual Question Preview Dialog */}
+      <VoiceQuestionPreviewDialog
+        open={isPreviewOpen}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open) {
+            // User canceled - clean up state
+            setPreviewQuestionData(null);
+            pendingQuestionDataRef.current = null;
+            setIsSendingQuestion(false);
+          }
+        }}
+        extractedQuestion={previewQuestionData}
+        onConfirmSend={handleConfirmPreviewSend}
+        isSending={isSendingFromPreview}
       />
     </>
   );
