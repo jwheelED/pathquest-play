@@ -137,27 +137,30 @@ export function VoiceQuestionPreviewDialog({
               <p className="text-xs text-muted-foreground">
                 Add options for students to choose from. Leave blank for AI to generate.
               </p>
-              {['A', 'B', 'C', 'D'].map((letter, index) => (
-                <div key={letter} className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 min-w-[80px]">
-                    <RadioGroupItem
-                      value={letter}
-                      id={`correct-${letter}`}
-                      checked={correctAnswer === letter}
-                      onClick={() => setCorrectAnswer(letter as 'A' | 'B' | 'C' | 'D')}
+              <RadioGroup
+                value={correctAnswer}
+                onValueChange={(value) => setCorrectAnswer(value as 'A' | 'B' | 'C' | 'D')}
+              >
+                {['A', 'B', 'C', 'D'].map((letter, index) => (
+                  <div key={letter} className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-[80px]">
+                      <RadioGroupItem
+                        value={letter}
+                        id={`correct-${letter}`}
+                      />
+                      <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
+                        {letter}
+                      </Label>
+                    </div>
+                    <Input
+                      value={mcqOptions[index]}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      placeholder={`Option ${letter} (optional)`}
+                      className="flex-1"
                     />
-                    <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
-                      {letter}
-                    </Label>
                   </div>
-                  <Input
-                    value={mcqOptions[index]}
-                    onChange={(e) => handleOptionChange(index, e.target.value)}
-                    placeholder={`Option ${letter} (optional)`}
-                    className="flex-1"
-                  />
-                </div>
-              ))}
+                ))}
+              </RadioGroup>
               <p className="text-xs text-muted-foreground">
                 Select the radio button next to the correct answer.
               </p>
