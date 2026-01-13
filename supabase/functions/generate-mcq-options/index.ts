@@ -63,23 +63,13 @@ serve(async (req) => {
 
     console.log("🎯 Generating MCQ options for:", question_text.substring(0, 100));
 
-    const prompt = `Generate multiple choice options for this question: "${question_text}"
-
+    const prompt = `Question: "${question_text}"
 ${context ? `Context: "${context}"` : ""}
 
-Requirements:
-- Create exactly 4 answer options
-- One correct answer
-- Three plausible distractors based on common misconceptions
-- Randomize which option (A, B, C, or D) is correct
-- Keep options concise and clear
+Generate 4 MCQ options. One correct, three plausible distractors. Randomize correct position.
 
-Return JSON:
-{
-  "options": ["A. first option", "B. second option", "C. third option", "D. fourth option"],
-  "correct_answer": "A" | "B" | "C" | "D",
-  "explanation": "Brief explanation of why the correct answer is right"
-}`;
+Return JSON only:
+{"options":["A. ...","B. ...","C. ...","D. ..."],"correct_answer":"A"|"B"|"C"|"D"}`;
 
     const MAX_ATTEMPTS = 3;
     let lastError: Error | null = null;
@@ -87,7 +77,7 @@ Return JSON:
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
       try {
         console.log(`🎯 Attempt ${attempt}/${MAX_ATTEMPTS} for MCQ generation`);
@@ -99,16 +89,16 @@ Return JSON:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-pro-preview",
+            model: "google/gemini-2.5-flash",
             messages: [
               {
                 role: "system",
-                content: "You generate high-quality multiple choice options for educational questions. Return ONLY valid JSON.",
+                content: "Generate MCQ options. Return ONLY valid JSON.",
               },
               { role: "user", content: prompt },
             ],
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: 0.5,
+            max_tokens: 500,
             response_format: { type: "json_object" },
           }),
           signal: controller.signal,
