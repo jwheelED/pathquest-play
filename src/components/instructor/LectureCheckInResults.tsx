@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3 } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
+import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 
@@ -54,6 +55,13 @@ export const LectureCheckInResults = () => {
     summary: string;
     trend: string;
     sentiment?: string;
+    themes?: string[];
+    topResponses?: Array<{
+      studentName: string;
+      grade: number;
+      answerSnippet: string;
+      highlight: string;
+    }>;
     loading: boolean;
     responseCount?: number;
   }>>({});
@@ -471,7 +479,8 @@ export const LectureCheckInResults = () => {
           return {
             answer: studentAnswer,
             isCorrect: studentAnswer === (question.overriddenAnswer || question.correctAnswer),
-            grade: a.grade
+            grade: a.grade,
+            studentName: a.student_name || 'Unknown Student'
           };
         });
 
@@ -496,6 +505,8 @@ export const LectureCheckInResults = () => {
           summary: data.summary,
           trend: data.trend,
           sentiment: data.sentiment,
+          themes: data.themes,
+          topResponses: data.topResponses,
           loading: false,
           responseCount: stats.completed
         }
@@ -1180,36 +1191,47 @@ export const LectureCheckInResults = () => {
                         </div>
                       </div>
 
-                      {/* Toggle Analytics Button */}
-                      <div className="pt-3 flex items-center justify-between border-t">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium">Visual Analytics</span>
-                          {showCharts[`${groupIdx}-${qIdx}`] && (
-                            <Badge variant="secondary" className="text-xs">Visible</Badge>
-                          )}
-                        </div>
-                        <Button
-                          variant={showCharts[`${groupIdx}-${qIdx}`] ? "secondary" : "outline"}
-                          size="sm"
-                          onClick={() => setShowCharts(prev => ({
-                            ...prev,
-                            [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
-                          }))}
-                          className="gap-2"
-                        >
-                          {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
-                        </Button>
-                      </div>
-
-                      {/* Visual Analytics Chart */}
-                      {showCharts[`${groupIdx}-${qIdx}`] && (
-                        <QuestionAnalyticsChart
-                          question={question}
-                          assignments={group.assignments}
-                          questionIndex={qIdx}
-                          stats={stats}
+                      {/* Analytics Section - Different for text-based vs multiple choice */}
+                      {(question.type === 'short_answer' || question.type === 'coding') ? (
+                        /* Short Answer / Coding: Show AI-powered summary analytics instead of charts */
+                        <ShortAnswerAnalytics
+                          summary={questionSummaries[`${groupIdx}-${qIdx}`]}
+                          questionType={question.type}
                         />
+                      ) : (
+                        /* Multiple Choice: Show toggle for visual charts */
+                        <>
+                          <div className="pt-3 flex items-center justify-between border-t">
+                            <div className="flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">Visual Analytics</span>
+                              {showCharts[`${groupIdx}-${qIdx}`] && (
+                                <Badge variant="secondary" className="text-xs">Visible</Badge>
+                              )}
+                            </div>
+                            <Button
+                              variant={showCharts[`${groupIdx}-${qIdx}`] ? "secondary" : "outline"}
+                              size="sm"
+                              onClick={() => setShowCharts(prev => ({
+                                ...prev,
+                                [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
+                              }))}
+                              className="gap-2"
+                            >
+                              {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
+                            </Button>
+                          </div>
+
+                          {/* Visual Analytics Chart */}
+                          {showCharts[`${groupIdx}-${qIdx}`] && (
+                            <QuestionAnalyticsChart
+                              question={question}
+                              assignments={group.assignments}
+                              questionIndex={qIdx}
+                              stats={stats}
+                            />
+                          )}
+                        </>
                       )}
 
                       {/* Question Quality Rating */}
