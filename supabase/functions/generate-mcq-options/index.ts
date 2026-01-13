@@ -1,0 +1,174 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    // Verify authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "No authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify instructor role
+    const { data: roleData, error: roleError } = await supabase.rpc("has_role", {
+      _user_id: user.id,
+      _role: "instructor",
+    });
+
+    if (roleError || !roleData) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Instructor role required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { question_text, context = "" } = await req.json();
+
+    if (!question_text) {
+      return new Response(JSON.stringify({ error: "Missing question_text" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("🎯 Generating MCQ options for:", question_text.substring(0, 100));
+
+    const prompt = `Generate multiple choice options for this question: "${question_text}"
+
+${context ? `Context: "${context}"` : ""}
+
+Requirements:
+- Create exactly 4 answer options
+- One correct answer
+- Three plausible distractors based on common misconceptions
+- Randomize which option (A, B, C, or D) is correct
+- Keep options concise and clear
+
+Return JSON:
+{
+  "options": ["A. first option", "B. second option", "C. third option", "D. fourth option"],
+  "correct_answer": "A" | "B" | "C" | "D",
+  "explanation": "Brief explanation of why the correct answer is right"
+}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-pro-preview",
+          messages: [
+            {
+              role: "system",
+              content: "You generate high-quality multiple choice options for educational questions. Return ONLY valid JSON.",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+          response_format: { type: "json_object" },
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("AI API error:", response.status, errorText);
+        throw new Error(`AI API error: ${response.status}`);
+      }
+
+      const aiResponse = await response.json();
+      let content = aiResponse.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new Error("Empty AI response");
+      }
+
+      // Clean up markdown if present
+      content = content
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      const result = JSON.parse(content);
+
+      if (!result.options || result.options.length !== 4 || !result.correct_answer) {
+        throw new Error("Invalid MCQ options format");
+      }
+
+      console.log("✅ MCQ options generated successfully");
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          options: result.options,
+          correct_answer: result.correct_answer,
+          explanation: result.explanation || "",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === "AbortError") {
+        return new Response(
+          JSON.stringify({ error: "Request timed out" }),
+          {
+            status: 504,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      throw fetchError;
+    }
+  } catch (error) {
+    console.error("Error in generate-mcq-options:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+});
