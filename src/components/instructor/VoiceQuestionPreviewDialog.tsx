@@ -13,7 +13,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { Mic, MessageSquare, ListChecks, Loader2 } from 'lucide-react';
+import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export interface ExtractedVoiceQuestion {
   question_text: string;
@@ -39,10 +41,12 @@ export function VoiceQuestionPreviewDialog({
   onConfirmSend,
   isSending,
 }: VoiceQuestionPreviewDialogProps) {
+  const { toast } = useToast();
   const [questionText, setQuestionText] = useState('');
   const [questionType, setQuestionType] = useState<'short_answer' | 'multiple_choice'>('short_answer');
   const [mcqOptions, setMcqOptions] = useState(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
 
   // Initialize state when extracted question changes
   useEffect(() => {
@@ -66,6 +70,52 @@ export function VoiceQuestionPreviewDialog({
     }
   }, [extractedQuestion]);
 
+  const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
+
+  const handleGenerateOptions = async () => {
+    if (!questionText.trim()) {
+      toast({
+        title: "No question text",
+        description: "Please enter a question first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingOptions(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
+        body: {
+          question_text: questionText,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.options && data.options.length === 4) {
+        setMcqOptions(data.options);
+        if (data.correct_answer) {
+          setCorrectAnswer(data.correct_answer);
+        }
+        toast({
+          title: "Options generated",
+          description: "MCQ options have been generated. You can edit them before sending.",
+        });
+      } else {
+        throw new Error("Invalid response from AI");
+      }
+    } catch (error: any) {
+      console.error("Failed to generate MCQ options:", error);
+      toast({
+        title: "Failed to generate options",
+        description: error.message || "Could not generate MCQ options",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingOptions(false);
+    }
+  };
+
   const handleConfirm = () => {
     const questionData: ExtractedVoiceQuestion = {
       question_text: questionText,
@@ -75,7 +125,6 @@ export function VoiceQuestionPreviewDialog({
     // Include MCQ data if this is a multiple choice question
     if (questionType === 'multiple_choice') {
       // Only include options if at least one is filled
-      const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
       if (hasOptions) {
         questionData.options = mcqOptions;
         questionData.correct_answer = correctAnswer;
@@ -160,11 +209,38 @@ export function VoiceQuestionPreviewDialog({
           {/* MCQ Options (only shown for multiple choice) */}
           {questionType === 'multiple_choice' && (
             <div className="space-y-3">
-              <Label>Answer Options</Label>
+              <div className="flex items-center justify-between">
+                <Label>Answer Options</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateOptions}
+                  disabled={isGeneratingOptions || !questionText.trim()}
+                  className="gap-1.5 text-xs"
+                >
+                  {isGeneratingOptions ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generating...
+                    </>
+                  ) : hasOptions ? (
+                    <>
+                      <RefreshCw className="h-3 w-3" />
+                      Regenerate
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Generate Options
+                    </>
+                  )}
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                {mcqOptions.some(opt => opt.trim() !== '') 
+                {hasOptions 
                   ? "Edit the generated options below. Select the correct answer."
-                  : "Add options for students to choose from, or leave blank for AI to generate."}
+                  : "Click 'Generate Options' to create choices, or add them manually."}
               </p>
               <RadioGroup
                 value={correctAnswer}
@@ -184,7 +260,7 @@ export function VoiceQuestionPreviewDialog({
                     <Input
                       value={mcqOptions[index]}
                       onChange={(e) => handleOptionChange(index, e.target.value)}
-                      placeholder={`Option ${letter} (optional)`}
+                      placeholder={`Option ${letter}`}
                       className="flex-1"
                     />
                   </div>
