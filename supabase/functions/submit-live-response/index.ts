@@ -674,13 +674,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Build grade breakdown for frontend display
+    const gradeBreakdown = aiGrade !== null ? {
+      components: null, // Components are calculated in the grading functions but not stored
+      understandsConcept: null,
+    } : null;
+
     return new Response(
       JSON.stringify({ 
         response, 
         isCorrect, 
         pointsEarned,
         aiGrade,
-        aiFeedback
+        aiFeedback,
+        gradeBreakdown
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

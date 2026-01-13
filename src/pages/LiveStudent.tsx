@@ -4,12 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
+import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
 import ReactMarkdown from "react-markdown";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
@@ -278,9 +279,11 @@ const LiveStudent = () => {
     }
   };
 
-  // AI grade state for short answers
+  // AI grade state for short answers and coding
   const [aiGrade, setAiGrade] = useState<number | null>(null);
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [aiGradeComponents, setAiGradeComponents] = useState<any>(null);
+  const [understandsConcept, setUnderstandsConcept] = useState<boolean | null>(null);
 
   // For short answer questions (with AI grading)
   const handleSubmit = async () => {
@@ -326,14 +329,18 @@ const LiveStudent = () => {
         setIsCorrect(result.data.isCorrect);
         setAiGrade(result.data.aiGrade || null);
         setAiFeedback(result.data.aiFeedback || null);
+        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
         setShowAccountPrompt(true);
         
-        if (result.data.isCorrect) {
-          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
-          toast.success(`Correct${gradeText}! 🎉`);
-        } else {
-          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
-          toast.error(`Incorrect${gradeText}. Try again next time!`);
+        if (result.data.aiGrade !== null) {
+          const gradeText = `${result.data.aiGrade}%`;
+          if (result.data.aiGrade >= 70) {
+            toast.success(`Great work! Score: ${gradeText} 🎉`);
+          } else if (result.data.aiGrade >= 50) {
+            toast.info(`Score: ${gradeText} - Good effort!`);
+          } else {
+            toast.error(`Score: ${gradeText} - Keep practicing!`);
+          }
         }
       } else if (result.error) {
         throw result.error;
@@ -400,15 +407,20 @@ const LiveStudent = () => {
         setIsCorrect(result.data.isCorrect);
         setAiGrade(result.data.aiGrade || null);
         setAiFeedback(result.data.aiFeedback || null);
+        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
+        setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
         
-        if (result.data.isCorrect) {
-          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
-          toast.success(`Good work${gradeText}! 🎉`);
-        } else {
-          const gradeText = result.data.aiGrade ? ` (${result.data.aiGrade}%)` : "";
-          toast.error(`Needs improvement${gradeText}.`);
+        if (result.data.aiGrade !== null) {
+          const gradeText = `${result.data.aiGrade}%`;
+          if (result.data.aiGrade >= 70) {
+            toast.success(`Great work! Score: ${gradeText} 🎉`);
+          } else if (result.data.aiGrade >= 50) {
+            toast.info(`Score: ${gradeText} - Good effort!`);
+          } else {
+            toast.error(`Score: ${gradeText} - Keep practicing!`);
+          }
         }
       } else if (result.error) {
         throw result.error;
@@ -586,67 +598,70 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
-              {isCorrect ? (
+              {/* MCQ Results */}
+              {isMCQ && (
                 <>
-                  <div className="relative">
-                    <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
-                  {/* Show grade for short answers and coding */}
-                  {!isMCQ && aiGrade !== null && (
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
-                      <p className="text-sm font-medium">Score: {aiGrade}%</p>
-                      {aiFeedback && (
-                        <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
-                      )}
-                      {(currentQuestion.question_content.type === "coding" || 
-                        currentQuestion.question_content.type === "coding_simple") && (
-                        <p className="text-xs text-muted-foreground mt-2 italic">
-                          {currentQuestion.question_content.type === "coding_simple" 
-                            ? "Graded on core concept understanding" 
-                            : "Graded on conceptual understanding, logic, and code quality"}
-                        </p>
-                      )}
-                    </div>
+                  {isCorrect ? (
+                    <>
+                      <div className="relative">
+                        <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
+                      <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
+                      <p className="text-muted-foreground">
+                        Correct answer: {currentQuestion.question_content.correctAnswer}
+                      </p>
+                    </>
                   )}
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}
                       multiplier={confidenceMultiplier}
-                      isCorrect={true}
+                      isCorrect={isCorrect ?? false}
                     />
                   )}
                 </>
-              ) : (
-                <>
-                  <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
-                  <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
-                  <p className="text-muted-foreground">
-                    Correct answer: {currentQuestion.question_content.correctAnswer}
-                  </p>
-                  {/* Show grade for short answers and coding */}
-                  {!isMCQ && aiGrade !== null && (
-                    <div className="mt-4 p-4 bg-muted rounded-lg text-left max-w-md mx-auto">
-                      <p className="text-sm font-medium">Score: {aiGrade}%</p>
-                      {aiFeedback && (
-                        <p className="text-sm text-muted-foreground mt-2">{aiFeedback}</p>
-                      )}
-                      {(currentQuestion.question_content.type === "coding" || 
-                        currentQuestion.question_content.type === "coding_simple") && (
-                        <p className="text-xs text-muted-foreground mt-2 italic">
-                          {currentQuestion.question_content.type === "coding_simple" 
-                            ? "Graded on core concept understanding" 
-                            : "Graded on conceptual understanding, logic, and code quality"}
-                        </p>
-                      )}
+              )}
+
+              {/* Short Answer and Coding Results with AI Grade */}
+              {!isMCQ && aiGrade !== null && aiFeedback && (
+                <div className="max-w-lg mx-auto animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                  <AIGradeDisplay
+                    grade={aiGrade}
+                    feedback={aiFeedback}
+                    components={aiGradeComponents}
+                    questionType={currentQuestion.question_content.type as 'short_answer' | 'coding' | 'coding_simple'}
+                    understandsConcept={understandsConcept ?? undefined}
+                  />
+                  {pointsEarned !== 0 && (
+                    <div className="mt-4">
+                      <AnimatedXPDisplay 
+                        points={pointsEarned}
+                        multiplier={confidenceMultiplier}
+                        isCorrect={isCorrect ?? false}
+                      />
                     </div>
                   )}
-                  {pointsEarned < 0 && (
-                    <AnimatedXPDisplay 
-                      points={pointsEarned}
-                      multiplier={confidenceMultiplier}
-                      isCorrect={false}
-                    />
+                </div>
+              )}
+
+              {/* Fallback for non-MCQ without AI grade */}
+              {!isMCQ && aiGrade === null && (
+                <>
+                  {isCorrect ? (
+                    <>
+                      <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                      <p className="text-2xl font-bold text-primary">Submitted!</p>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-16 w-16 text-yellow-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      <p className="text-xl font-bold text-yellow-600">Submitted - Pending Review</p>
+                    </>
                   )}
                 </>
               )}

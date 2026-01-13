@@ -1465,28 +1465,43 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               </div>
                                {isSubmitted && (
                                 <div className="space-y-2">
-                                  {assignment.assignment_type === 'lecture_checkin' ? (
-                                    // Hide feedback for lecture check-ins
-                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">✓ Submitted</p>
-                                      <p className="text-xs text-blue-800 dark:text-blue-300">Your instructor will review your code.</p>
-                                    </div>
-                                  ) : assignment.mode === 'manual_grade' ? (
+                                  {assignment.mode === 'manual_grade' && assignment.assignment_type !== 'lecture_checkin' ? (
                                     <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
                                       <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
                                       <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade your code.</p>
                                     </div>
+                                  ) : assignment.quiz_responses?._ai_recommendations?.[idx] ? (
+                                    <div className={`p-3 rounded border ${
+                                      assignment.quiz_responses._ai_recommendations[idx].grade >= 70 
+                                        ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                        : assignment.quiz_responses._ai_recommendations[idx].grade >= 50
+                                        ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
+                                        : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                                    }`}>
+                                      <p className={`text-sm font-medium ${
+                                        assignment.quiz_responses._ai_recommendations[idx].grade >= 70 
+                                          ? 'text-green-900 dark:text-green-200'
+                                          : assignment.quiz_responses._ai_recommendations[idx].grade >= 50
+                                          ? 'text-yellow-900 dark:text-yellow-200'
+                                          : 'text-red-900 dark:text-red-200'
+                                      }`}>
+                                        Score: {assignment.quiz_responses._ai_recommendations[idx].grade}%
+                                      </p>
+                                      <p className={`text-xs mt-1 ${
+                                        assignment.quiz_responses._ai_recommendations[idx].grade >= 70 
+                                          ? 'text-green-800 dark:text-green-300'
+                                          : assignment.quiz_responses._ai_recommendations[idx].grade >= 50
+                                          ? 'text-yellow-800 dark:text-yellow-300'
+                                          : 'text-red-800 dark:text-red-300'
+                                      }`}>
+                                        {assignment.quiz_responses._ai_recommendations[idx].feedback}
+                                      </p>
+                                    </div>
                                   ) : (
-                                    assignment.quiz_responses?._ai_recommendations?.[idx] && (
-                                      <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
-                                        <p className="text-sm font-medium text-green-900 dark:text-green-200">
-                                          ✅ Score: {assignment.quiz_responses._ai_recommendations[idx].grade}%
-                                        </p>
-                                        <p className="text-xs text-green-800 dark:text-green-300 mt-1">
-                                          {assignment.quiz_responses._ai_recommendations[idx].feedback}
-                                        </p>
-                                      </div>
-                                    )
+                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
+                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                                      <p className="text-xs text-blue-800 dark:text-blue-300">Your response has been recorded.</p>
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1518,14 +1533,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               />
                               {isSubmitted && (
                                 <div className="space-y-2">
-                                  {assignment.assignment_type === 'lecture_checkin' ? (
-                                    // Hide feedback for lecture check-ins
-                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
-                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">✓ Submitted</p>
-                                      <p className="text-xs text-blue-800 dark:text-blue-300">Your instructor will review this answer.</p>
-                                    </div>
-                                  ) : assignment.mode === 'manual_grade' ? (
-                                    // Show pending review for manual grade mode
+                                  {assignment.mode === 'manual_grade' && assignment.assignment_type !== 'lecture_checkin' ? (
+                                    // Show pending review for manual grade mode (non lecture check-ins)
                                     <>
                                       {q.expectedAnswer && (
                                         <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded">
@@ -1538,18 +1547,39 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                         <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade this answer.</p>
                                       </div>
                                     </>
+                                  ) : assignment.quiz_responses?._ai_recommendations?.[idx] ? (
+                                    // Show AI feedback for auto grade mode and lecture check-ins
+                                    <div className={`p-3 rounded border ${
+                                      assignment.quiz_responses._ai_recommendations[idx].grade >= 70 
+                                        ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                        : assignment.quiz_responses._ai_recommendations[idx].grade >= 50
+                                        ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800'
+                                        : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
+                                    }`}>
+                                      <p className={`text-sm font-medium ${
+                                        assignment.quiz_responses._ai_recommendations[idx].grade >= 70 
+                                          ? 'text-green-900 dark:text-green-200'
+                                          : assignment.quiz_responses._ai_recommendations[idx].grade >= 50
+                                          ? 'text-yellow-900 dark:text-yellow-200'
+                                          : 'text-red-900 dark:text-red-200'
+                                      }`}>
+                                        Score: {assignment.quiz_responses._ai_recommendations[idx].grade}%
+                                      </p>
+                                      <p className={`text-xs mt-1 ${
+                                        assignment.quiz_responses._ai_recommendations[idx].grade >= 70 
+                                          ? 'text-green-800 dark:text-green-300'
+                                          : assignment.quiz_responses._ai_recommendations[idx].grade >= 50
+                                          ? 'text-yellow-800 dark:text-yellow-300'
+                                          : 'text-red-800 dark:text-red-300'
+                                      }`}>
+                                        {assignment.quiz_responses._ai_recommendations[idx].feedback}
+                                      </p>
+                                    </div>
                                   ) : (
-                                    // Show AI feedback for auto grade mode
-                                    assignment.quiz_responses?._ai_recommendations?.[idx] && (
-                                      <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded border border-green-200 dark:border-green-800">
-                                        <p className="text-sm font-medium text-green-900 dark:text-green-200">
-                                          ✅ Score: {assignment.quiz_responses._ai_recommendations[idx].grade}%
-                                        </p>
-                                        <p className="text-xs text-green-800 dark:text-green-300 mt-1">
-                                          {assignment.quiz_responses._ai_recommendations[idx].feedback}
-                                        </p>
-                                      </div>
-                                    )
+                                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded border border-blue-200 dark:border-blue-800">
+                                      <p className="text-sm font-medium text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                                      <p className="text-xs text-blue-800 dark:text-blue-300">Your response has been recorded.</p>
+                                    </div>
                                   )}
                                 </div>
                               )}
