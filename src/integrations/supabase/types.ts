@@ -2339,6 +2339,7 @@ export type Database = {
           question_difficulty_preference: string | null
           question_format_preference: string | null
           question_preset: string | null
+          question_preview_enabled: boolean | null
           study_days: string[] | null
           style_mix: Json | null
           transcription_model: string
@@ -2378,6 +2379,7 @@ export type Database = {
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
           question_preset?: string | null
+          question_preview_enabled?: boolean | null
           study_days?: string[] | null
           style_mix?: Json | null
           transcription_model?: string
@@ -2417,6 +2419,7 @@ export type Database = {
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
           question_preset?: string | null
+          question_preview_enabled?: boolean | null
           study_days?: string[] | null
           style_mix?: Json | null
           transcription_model?: string

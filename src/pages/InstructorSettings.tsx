@@ -10,6 +10,7 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
+import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
 
 export default function InstructorSettings() {
   const navigate = useNavigate();
@@ -86,6 +87,7 @@ export default function InstructorSettings() {
             <>
               <BillingSettings />
               <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
+              <QuestionPreviewSettings />
               <QuestionDifficultySettings />
               <AdaptiveTutoringSettings />
               <AutoGradeSettings />
