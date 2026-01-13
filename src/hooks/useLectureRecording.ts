@@ -121,9 +121,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Reliable timer ref for auto-questions (Web Worker-based, throttle-resistant)
   const reliableTimerRef = useRef<ReliableTimer | null>(null);
   
-  // Pending question ref for preview flow - stores question data while preview dialog is shown
-  const pendingQuestionRef = useRef<any>(null);
-  
   // Refs for values that the timer needs (avoids stale closures)
   const studentCountRef = useRef(studentCount);
   const autoQuestionIntervalRef = useRef(autoQuestionInterval);
@@ -406,29 +403,15 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return false;
       }
 
-      const questionData = {
+      // Auto-generated questions always send directly - no preview
+      await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
-        expected_answer: data.expected_answer || "", // Pass expected answer for short answer grading
+        expected_answer: data.expected_answer || "",
         extraction_method: 'auto_interval',
         source: 'auto_interval',
-      };
-
-      // Check if preview is enabled - if so, show preview dialog instead of sending directly
-      if (questionPreviewEnabledRef.current && onQuestionExtracted) {
-        console.log('📋 Preview enabled - showing auto-question preview');
-        onQuestionExtracted({
-          question_text: data.question_text,
-          suggested_type: data.suggested_type,
-        });
-        // Store the full question data for when user confirms
-        pendingQuestionRef.current = questionData;
-        return true;
-      }
-
-      // Preview disabled - send directly
-      await handleQuestionSend(questionData);
+      });
 
       return true;
     } catch (error) {
@@ -984,29 +967,16 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     try {
       setIsSendingQuestion(true);
       
-      // Check if there's a pending auto-generated question with full metadata
-      if (pendingQuestionRef.current) {
-        console.log('📋 Sending pending auto-question from preview');
-        await handleQuestionSend({
-          ...pendingQuestionRef.current,
-          // Allow user edits from preview to override
-          question_text: extractedData.question_text,
-          suggested_type: extractedData.suggested_type,
-        });
-        pendingQuestionRef.current = null; // Clear after sending
-      } else {
-        // Voice command or manual - no pending data
-        await handleQuestionSend({
-          question_text: extractedData.question_text,
-          suggested_type: extractedData.suggested_type,
-          confidence: 1.0,
-          extraction_method: 'voice_command',
-          source: 'voice_command',
-        });
-      }
+      // Voice command or manual button - send with preview data
+      await handleQuestionSend({
+        question_text: extractedData.question_text,
+        suggested_type: extractedData.suggested_type,
+        confidence: 1.0,
+        extraction_method: 'voice_command',
+        source: 'voice_command',
+      });
     } catch (error: any) {
       console.error('Send extracted question error:', error);
-      pendingQuestionRef.current = null; // Clear on error too
       toast({
         title: 'Failed',
         description: error.message || 'Could not send',
