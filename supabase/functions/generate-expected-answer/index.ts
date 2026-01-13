@@ -22,17 +22,23 @@ serve(async (req) => {
 
     console.log("Generating expected answer for question:", question_text.substring(0, 100));
 
-    const systemPrompt = `You are an educational AI assistant. Generate an ideal expected answer for a short answer question that will be used for grading reference.
+    const systemPrompt = `You are an educational AI assistant. Generate the correct, factual answer to a question.
+
+IMPORTANT: Provide the ACTUAL CORRECT ANSWER, not instructions or meta-text.
+
+Examples:
+- Question: "How many bones are in the human body?" → expected_answer: "There are 206 bones in the human body."
+- Question: "What is the capital of France?" → expected_answer: "Paris is the capital of France."
+- Question: "What is photosynthesis?" → expected_answer: "Photosynthesis is the process by which plants convert sunlight, water, and carbon dioxide into glucose and oxygen."
 
 The expected answer should:
-1. Be 1-3 sentences long
-2. Capture the key concepts a correct response should contain
-3. Be clear and specific enough to serve as a grading rubric
-4. Focus on the essential knowledge being tested
+1. Be a direct, factual response (1-3 sentences)
+2. State the correct answer clearly
+3. Be suitable as a grading reference
 
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON:
 {
-  "expected_answer": "The ideal answer here"
+  "expected_answer": "The actual correct answer here"
 }`;
 
     const userPrompt = context 
