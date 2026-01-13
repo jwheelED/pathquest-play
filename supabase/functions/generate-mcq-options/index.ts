@@ -81,60 +81,90 @@ Return JSON:
   "explanation": "Brief explanation of why the correct answer is right"
 }`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const MAX_ATTEMPTS = 3;
+    let lastError: Error | null = null;
+    let result = null;
 
-    try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-pro-preview",
-          messages: [
-            {
-              role: "system",
-              content: "You generate high-quality multiple choice options for educational questions. Return ONLY valid JSON.",
-            },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 1000,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("AI API error:", response.status, errorText);
-        throw new Error(`AI API error: ${response.status}`);
+      try {
+        console.log(`🎯 Attempt ${attempt}/${MAX_ATTEMPTS} for MCQ generation`);
+        
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-pro-preview",
+            messages: [
+              {
+                role: "system",
+                content: "You generate high-quality multiple choice options for educational questions. Return ONLY valid JSON.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.7,
+            max_tokens: 1000,
+            response_format: { type: "json_object" },
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`AI API error (attempt ${attempt}):`, response.status, errorText);
+          lastError = new Error(`AI API error: ${response.status}`);
+          continue; // Retry
+        }
+
+        const aiResponse = await response.json();
+        let content = aiResponse.choices[0]?.message?.content;
+
+        if (!content) {
+          console.warn(`Empty AI response on attempt ${attempt}`);
+          lastError = new Error("Empty AI response");
+          continue; // Retry
+        }
+
+        // Clean up markdown if present
+        content = content
+          .replace(/```json\s*/g, "")
+          .replace(/```\s*/g, "")
+          .trim();
+
+        const parsed = JSON.parse(content);
+
+        if (!parsed.options || parsed.options.length !== 4 || !parsed.correct_answer) {
+          console.warn(`Invalid MCQ format on attempt ${attempt}:`, parsed);
+          lastError = new Error("Invalid MCQ options format");
+          continue; // Retry
+        }
+
+        // Success!
+        result = parsed;
+        console.log(`✅ MCQ options generated successfully on attempt ${attempt}`);
+        break;
+
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === "AbortError") {
+          console.warn(`Request timed out on attempt ${attempt}`);
+          lastError = new Error("Request timed out");
+        } else {
+          console.error(`Fetch error on attempt ${attempt}:`, fetchError);
+          lastError = fetchError;
+        }
+        // Continue to next attempt
       }
+    }
 
-      const aiResponse = await response.json();
-      let content = aiResponse.choices[0]?.message?.content;
-
-      if (!content) {
-        throw new Error("Empty AI response");
-      }
-
-      // Clean up markdown if present
-      content = content
-        .replace(/```json\s*/g, "")
-        .replace(/```\s*/g, "")
-        .trim();
-
-      const result = JSON.parse(content);
-
-      if (!result.options || result.options.length !== 4 || !result.correct_answer) {
-        throw new Error("Invalid MCQ options format");
-      }
-
-      console.log("✅ MCQ options generated successfully");
-
+    // If we have a result, return it
+    if (result) {
       return new Response(
         JSON.stringify({
           success: true,
@@ -146,19 +176,27 @@ Return JSON:
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === "AbortError") {
-        return new Response(
-          JSON.stringify({ error: "Request timed out" }),
-          {
-            status: 504,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-      throw fetchError;
     }
+
+    // All attempts failed - return placeholder options so user can edit manually
+    console.warn("⚠️ All attempts failed, returning placeholder options");
+    return new Response(
+      JSON.stringify({
+        success: true,
+        options: [
+          "A. [Please edit this option]",
+          "B. [Please edit this option]",
+          "C. [Please edit this option]",
+          "D. [Please edit this option]"
+        ],
+        correct_answer: "A",
+        explanation: "AI generation failed after retries. Please edit these placeholder options manually.",
+        is_placeholder: true,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("Error in generate-mcq-options:", error);
     return new Response(
