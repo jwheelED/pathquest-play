@@ -23,8 +23,8 @@ serve(async (req) => {
     const correctCount = studentResponses.filter((r: any) => r.isCorrect).length;
     const correctPercentage = completedCount > 0 ? Math.round((correctCount / completedCount) * 100) : 0;
 
-    // Determine if this is a humanities course
-    const isHumanities = courseType === 'humanities';
+    // Check if this is a short answer or coding question (text-based)
+    const isTextBased = questionType === "short_answer" || questionType === "coding";
 
     // Build analysis data based on question type
     let analysisData = "";
@@ -50,77 +50,90 @@ ${Object.entries(distribution)
     return `${opt}${isCorrect}: ${count} students (${percentage}%)`;
   })
   .join("\n")}`;
-    } else if (questionType === "short_answer") {
-      // For humanities short answers, include actual response texts for sentiment analysis
-      if (isHumanities) {
-        const responseTexts = studentResponses
-          .filter((r: any) => r.answer && typeof r.answer === 'string')
-          .map((r: any) => `- "${r.answer.slice(0, 200)}"`)
-          .slice(0, 15) // Limit to 15 responses for token efficiency
-          .join('\n');
-        
-        analysisData = `Student Responses (sample for sentiment analysis):
-${responseTexts || "No text responses available."}`;
-      } else {
-        // STEM: Analyze grades if available
-        const gradesWithValues = studentResponses.filter((r: any) => r.grade != null);
+    } else if (isTextBased) {
+      // For short answer and coding: Include responses with grades and student names for analysis
+      const responsesWithGrades = studentResponses
+        .filter((r: any) => r.answer && typeof r.answer === 'string' && r.grade != null)
+        .sort((a: any, b: any) => (b.grade || 0) - (a.grade || 0))
+        .slice(0, 20); // Top 20 responses for analysis
 
-        if (gradesWithValues.length > 0) {
-          const avgGrade = Math.round(
-            gradesWithValues.reduce((sum: number, r: any) => sum + r.grade, 0) / gradesWithValues.length,
-          );
+      const responseTexts = responsesWithGrades
+        .map((r: any) => `- [Grade: ${r.grade}%] "${r.answer.slice(0, 300)}" (Student: ${r.studentName || 'Unknown'})`)
+        .join('\n');
+      
+      // Calculate grade distribution
+      const gradesWithValues = studentResponses.filter((r: any) => r.grade != null);
+      const avgGrade = gradesWithValues.length > 0
+        ? Math.round(gradesWithValues.reduce((sum: number, r: any) => sum + r.grade, 0) / gradesWithValues.length)
+        : 0;
 
-          const gradeRanges = {
-            "90-100%": 0,
-            "80-89%": 0,
-            "70-79%": 0,
-            "60-69%": 0,
-            "Below 60%": 0,
-          };
+      const gradeRanges = {
+        "90-100% (Excellent)": 0,
+        "70-89% (Good)": 0,
+        "50-69% (Passing)": 0,
+        "Below 50% (Needs Work)": 0,
+      };
 
-          gradesWithValues.forEach((r: any) => {
-            if (r.grade >= 90) gradeRanges["90-100%"]++;
-            else if (r.grade >= 80) gradeRanges["80-89%"]++;
-            else if (r.grade >= 70) gradeRanges["70-79%"]++;
-            else if (r.grade >= 60) gradeRanges["60-69%"]++;
-            else gradeRanges["Below 60%"]++;
-          });
+      gradesWithValues.forEach((r: any) => {
+        if (r.grade >= 90) gradeRanges["90-100% (Excellent)"]++;
+        else if (r.grade >= 70) gradeRanges["70-89% (Good)"]++;
+        else if (r.grade >= 50) gradeRanges["50-69% (Passing)"]++;
+        else gradeRanges["Below 50% (Needs Work)"]++;
+      });
 
-          analysisData = `Grade Distribution (Average: ${avgGrade}%):
+      analysisData = `Grade Distribution (Average: ${avgGrade}%):
 ${Object.entries(gradeRanges)
   .filter(([_, count]) => count > 0)
   .map(([range, count]) => `${range}: ${count} students`)
-  .join("\n")}`;
-        } else {
-          analysisData = "Responses received but not yet graded.";
-        }
-      }
+  .join("\n")}
+
+Student Responses (sorted by grade):
+${responseTexts || "No graded responses available."}`;
     }
 
-    // Build AI prompt - use different prompts for Humanities vs STEM
+    // Build AI prompt - different for text-based vs multiple choice
     let systemPrompt: string;
-    let additionalInstructions = "";
 
-    if (isHumanities && questionType === "short_answer") {
-      // Humanities-specific sentiment analysis prompt
-      systemPrompt = `You are an educational analytics expert specializing in humanities education.
+    if (isTextBased) {
+      // Enhanced prompt for short answer and coding questions
+      systemPrompt = `You are an educational analytics expert analyzing student responses to ${questionType === 'coding' ? 'coding' : 'short answer'} questions.
 
-FORMAT REQUIREMENTS:
-- Line 1 (Summary): Overall engagement and analytical depth assessment (max 20 words)
-- Line 2 (Trend): Key themes or perspectives emerging from responses (max 20 words)
-- Line 3 (Sentiment): "Sentiment: [Positive/Neutral/Mixed/Negative] - [brief reason]"
+FORMAT REQUIREMENTS - Respond with EXACTLY this JSON structure:
+{
+  "summary": "Overall performance summary (max 20 words)",
+  "trend": "Key patterns or common approaches (max 20 words)",
+  "sentiment": "Positive|Neutral|Mixed|Negative - brief reason",
+  "themes": ["theme1", "theme2", "theme3"],
+  "topResponses": [
+    {
+      "studentName": "Student Name",
+      "grade": 95,
+      "answerSnippet": "First 150 chars of their answer...",
+      "highlight": "What made this answer excellent (max 15 words)"
+    }
+  ]
+}
 
-ANALYZE:
-- Emotional tone across responses (enthusiasm, skepticism, confusion, insight)
-- Depth of critical thinking (surface-level vs. analytical)
-- Common perspectives or disagreements
-- Level of engagement with the material
+ANALYSIS GUIDELINES:
+1. Summary: Focus on overall class performance and understanding level
+2. Trend: Identify common approaches, misconceptions, or patterns
+3. Sentiment: Assess overall engagement and effort level from responses
+4. Themes: Extract 2-4 common themes or topics from answers
+5. Top Responses: Select 3-5 best answers (highest grades), explain what made them good
 
-Focus on giving actionable teaching insights for humanities educators.`;
-      
-      additionalInstructions = "Analyze the sentiment and themes in student responses. Look for engagement levels, critical thinking depth, and common perspectives.";
+${questionType === 'coding' ? 
+`For coding responses, evaluate:
+- Code correctness and logic
+- Coding style and best practices
+- Problem-solving approach` : 
+`For short answer responses, evaluate:
+- Conceptual understanding
+- Clarity of explanation
+- Depth of analysis`}
+
+Return ONLY valid JSON, no markdown formatting.`;
     } else {
-      // Standard STEM prompt
+      // Standard prompt for multiple choice
       systemPrompt = `You are an educational analytics expert. Generate concise, actionable summaries of student performance on quiz questions.
 
 FORMAT REQUIREMENTS:
@@ -130,35 +143,27 @@ FORMAT REQUIREMENTS:
 FOCUS ON:
 - Percentage of correct vs incorrect answers
 - Common misconceptions (for multiple choice, which wrong answers were popular)
-- Quality patterns (for short answer with grades)
 - Response patterns and notable behaviors
 
 BE SPECIFIC with numbers and percentages. Keep it brief and actionable.`;
-
-      if (questionType === "multiple_choice") {
-        additionalInstructions = "Focus on which wrong answers were chosen and why they might be confusing.";
-      } else if (questionType === "short_answer") {
-        additionalInstructions = "Analyze grade distribution and what patterns emerge from student responses.";
-      }
     }
 
     const userPrompt = `Question: "${question}"
 Question Type: ${questionType}
 ${questionType === "multiple_choice" ? `Correct Answer: ${correctAnswer}` : ""}
-${isHumanities ? "Course Type: Humanities" : ""}
 
 STUDENT RESPONSES:
 Total Students: ${totalStudents}
 Completed: ${completedCount}
-${!isHumanities || questionType === "multiple_choice" ? `Correct: ${correctCount} (${correctPercentage}%)` : ""}
+${questionType === "multiple_choice" ? `Correct: ${correctCount} (${correctPercentage}%)` : ""}
 
 ${analysisData}
 
-${additionalInstructions}
+${isTextBased ? 
+`Analyze these responses and return JSON with summary, trend, sentiment, themes, and the top 3-5 best student responses with their names and what made their answers excellent.` : 
+`Generate a 2-line summary (Summary + Trend).`}`;
 
-Generate a ${isHumanities && questionType === "short_answer" ? "3-line summary (Summary + Trend + Sentiment)" : "2-line summary (Summary + Trend)"}.`;
-
-    console.log("Calling Lovable AI for summary generation...", { isHumanities, questionType });
+    console.log("Calling Lovable AI for summary generation...", { questionType, isTextBased });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -208,37 +213,69 @@ Generate a ${isHumanities && questionType === "short_answer" ? "3-line summary (
 
     console.log("AI generated text:", generatedText);
 
-    // Parse the generated text to extract summary, trend, and sentiment
-    const lines = generatedText.split("\n").filter((line: string) => line.trim());
-    let summary = "";
-    let trend = "";
-    let sentiment = "";
+    // Parse the response differently for text-based vs multiple choice
+    if (isTextBased) {
+      try {
+        // Clean the response - remove markdown code blocks if present
+        let cleanedText = generatedText.trim();
+        if (cleanedText.startsWith('```json')) {
+          cleanedText = cleanedText.slice(7);
+        } else if (cleanedText.startsWith('```')) {
+          cleanedText = cleanedText.slice(3);
+        }
+        if (cleanedText.endsWith('```')) {
+          cleanedText = cleanedText.slice(0, -3);
+        }
+        cleanedText = cleanedText.trim();
 
-    for (const line of lines) {
-      if (line.toLowerCase().startsWith("summary:")) {
-        summary = line.trim();
-      } else if (line.toLowerCase().startsWith("trend:")) {
-        trend = line.trim();
-      } else if (line.toLowerCase().startsWith("sentiment:")) {
-        sentiment = line.trim();
+        const parsed = JSON.parse(cleanedText);
+        
+        return new Response(JSON.stringify({
+          summary: parsed.summary || `Summary: ${completedCount} responses analyzed.`,
+          trend: parsed.trend || "Trend: Review individual responses for details.",
+          sentiment: parsed.sentiment || "Neutral - Unable to determine sentiment",
+          themes: parsed.themes || [],
+          topResponses: parsed.topResponses || [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (parseError) {
+        console.error("Error parsing JSON response:", parseError);
+        // Fallback to extracting what we can
+        return new Response(JSON.stringify({
+          summary: `Summary: ${completedCount} responses analyzed with varying quality.`,
+          trend: "Trend: Unable to parse detailed analysis. Review manually.",
+          sentiment: "Neutral",
+          themes: [],
+          topResponses: [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-    }
+    } else {
+      // Parse the generated text for multiple choice (original logic)
+      const lines = generatedText.split("\n").filter((line: string) => line.trim());
+      let summary = "";
+      let trend = "";
 
-    // Fallback if parsing fails
-    if (!summary || !trend) {
-      summary = `Summary: ${correctPercentage}% of students answered correctly.`;
-      trend = `Trend: ${completedCount} out of ${totalStudents} students responded.`;
-    }
+      for (const line of lines) {
+        if (line.toLowerCase().startsWith("summary:")) {
+          summary = line.trim();
+        } else if (line.toLowerCase().startsWith("trend:")) {
+          trend = line.trim();
+        }
+      }
 
-    // Return sentiment only for humanities courses
-    const result: any = { summary, trend };
-    if (isHumanities && sentiment) {
-      result.sentiment = sentiment;
-    }
+      // Fallback if parsing fails
+      if (!summary || !trend) {
+        summary = `Summary: ${correctPercentage}% of students answered correctly.`;
+        trend = `Trend: ${completedCount} out of ${totalStudents} students responded.`;
+      }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      return new Response(JSON.stringify({ summary, trend }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } catch (error) {
     console.error("Error in generate-question-summary:", error);
     return new Response(
