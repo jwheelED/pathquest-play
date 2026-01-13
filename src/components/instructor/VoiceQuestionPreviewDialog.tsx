@@ -24,6 +24,8 @@ export interface ExtractedVoiceQuestion {
   options?: string[];
   correct_answer?: 'A' | 'B' | 'C' | 'D';
   explanation?: string;
+  // Short answer expected answer (for grading reference)
+  expected_answer?: string;
 }
 
 interface VoiceQuestionPreviewDialogProps {
@@ -47,6 +49,7 @@ export function VoiceQuestionPreviewDialog({
   const [mcqOptions, setMcqOptions] = useState(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
+  const [expectedAnswer, setExpectedAnswer] = useState('');
 
   // Initialize state when extracted question changes
   useEffect(() => {
@@ -66,6 +69,13 @@ export function VoiceQuestionPreviewDialog({
         setCorrectAnswer(extractedQuestion.correct_answer);
       } else {
         setCorrectAnswer('A');
+      }
+
+      // Initialize expected answer for short answer questions
+      if (extractedQuestion.expected_answer) {
+        setExpectedAnswer(extractedQuestion.expected_answer);
+      } else {
+        setExpectedAnswer('');
       }
     }
   }, [extractedQuestion]);
@@ -176,6 +186,11 @@ export function VoiceQuestionPreviewDialog({
         questionData.correct_answer = correctAnswer;
       }
     }
+
+    // Include expected answer for short answer questions
+    if (questionType === 'short_answer' && expectedAnswer.trim()) {
+      questionData.expected_answer = expectedAnswer;
+    }
     
     onConfirmSend(questionData);
   };
@@ -251,6 +266,23 @@ export function VoiceQuestionPreviewDialog({
               className="min-h-[100px]"
             />
           </div>
+
+          {/* Expected Answer (only shown for short answer) */}
+          {questionType === 'short_answer' && (
+            <div className="space-y-2">
+              <Label htmlFor="expected-answer">Expected Answer (for grading reference)</Label>
+              <Textarea
+                id="expected-answer"
+                value={expectedAnswer}
+                onChange={(e) => setExpectedAnswer(e.target.value)}
+                placeholder="Enter the expected/ideal answer for grading..."
+                className="min-h-[80px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                This will be used as a reference when grading student responses.
+              </p>
+            </div>
+          )}
 
           {/* MCQ Options (only shown for multiple choice) */}
           {questionType === 'multiple_choice' && (
