@@ -198,9 +198,38 @@ export default function SlidePresenter() {
         setHasSelection(false);
       }
 
-      // Open preview dialog instead of sending immediately
+      // Transform the edge function response to match dialog's expected format
+      const transformedData: ExtractedQuestionData = {};
+      const rawData = data.data;
+      
+      if (questionType === 'mcq') {
+        transformedData.mcq = {
+          question: rawData.question || '',
+          options: rawData.options || ['', '', '', ''],
+          correct_answer: rawData.correctAnswer || 'A',
+          explanation: rawData.explanation || '',
+        };
+      } else if (questionType === 'short_answer') {
+        transformedData.short_answer = {
+          question: rawData.question || '',
+          expected_answer: rawData.expectedAnswer || '',
+          explanation: rawData.explanation || '',
+        };
+      } else if (questionType === 'coding') {
+        transformedData.coding = {
+          problem: rawData.question || rawData.problem || '',
+          function_name: rawData.functionName || '',
+          parameters: rawData.parameters || '',
+          return_type: rawData.returnType || '',
+          examples: rawData.examples?.map((e: { input: string; output: string }) => `Input: ${e.input}, Output: ${e.output}`) || [],
+          constraints: rawData.constraints ? [rawData.constraints] : [],
+          starter_code: rawData.starterCode || '',
+        };
+      }
+
+      // Open preview dialog with transformed data
       setPreviewQuestionType(questionType as QuestionType);
-      setPreviewExtractedData(data.data);
+      setPreviewExtractedData(transformedData);
       setIsPreviewOpen(true);
       setExtractionStage('idle');
       
