@@ -405,8 +405,9 @@ serve(async (req) => {
       return "manual_grade";
     };
 
-    // Use instructor's actual format preference
-    const finalType = instructorPreference;
+    // Prioritize explicitly passed type (from preview dialog), fall back to instructor preference
+    const finalType = suggested_type || instructorPreference;
+    console.log(`📝 Final question type: ${finalType} (suggested: ${suggested_type}, preference: ${instructorPreference})`);
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
