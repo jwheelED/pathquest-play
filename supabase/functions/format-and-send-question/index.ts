@@ -378,7 +378,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null, expected_answer = "" } = await req.json();
+    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null, expected_answer = "", options = null, correct_answer = null, explanation = null } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -587,7 +587,7 @@ serve(async (req) => {
         };
       }
     } else if (finalType === "multiple_choice") {
-      // Use answer key MCQ if available, otherwise generate with AI
+      // Priority: 1) Answer key MCQ, 2) Pre-generated options from preview, 3) Generate with AI
       if (answerKeyMcq) {
         console.log("📚 Using verified answer key MCQ");
         formattedQuestion = {
@@ -600,7 +600,20 @@ serve(async (req) => {
           answerKeyProblemId: answerKeyMcq.problemId,
           answerKeyMcqId: answerKeyMcq.mcqId,
         };
+      } else if (options && Array.isArray(options) && options.length === 4 && correct_answer) {
+        // Use pre-generated options from preview dialog (allows instructor editing)
+        console.log("📝 Using pre-generated MCQ options from preview dialog");
+        formattedQuestion = {
+          question: question_text,
+          type: "multiple_choice",
+          options: options,
+          correctAnswer: correct_answer,
+          explanation: explanation || "",
+          source: "preview_edited",
+        };
       } else {
+        // Fallback: generate with AI
+        console.log("🤖 Generating MCQ options with AI");
         const mcq = await generateMCQ(question_text, context || "", course_context);
         formattedQuestion = {
           question: mcq.question,

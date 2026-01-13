@@ -762,6 +762,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         setPreviewQuestionData({
           question_text: data.question_text,
           suggested_type: data.suggested_type || 'short_answer',
+          // Include pre-generated MCQ options if available
+          options: data.options,
+          correct_answer: data.correct_answer,
+          explanation: data.explanation,
         });
         pendingQuestionDataRef.current = {
           question_text: data.question_text,
@@ -769,6 +773,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           confidence: 1.0,
           extraction_method: "voice_command",
           source: "voice_command",
+          // Also store MCQ data in pending ref
+          options: data.options,
+          correct_answer: data.correct_answer,
+          explanation: data.explanation,
         };
         setIsPreviewOpen(true);
         // Don't set isSendingQuestion to false yet - preview will handle that
@@ -874,6 +882,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         setPreviewQuestionData({
           question_text: data.question_text,
           suggested_type: data.suggested_type || 'short_answer',
+          // Include pre-generated MCQ options if available
+          options: data.options,
+          correct_answer: data.correct_answer,
+          explanation: data.explanation,
         });
         pendingQuestionDataRef.current = {
           question_text: data.question_text,
@@ -881,6 +893,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           confidence: 1.0,
           extraction_method: "manual_button",
           source: "manual_button",
+          // Also store MCQ data in pending ref
+          options: data.options,
+          correct_answer: data.correct_answer,
+          explanation: data.explanation,
         };
         setIsPreviewOpen(true);
         // Don't set isSendingQuestion to false yet - preview will handle that
@@ -921,11 +937,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     try {
       setIsSendingFromPreview(true);
       
-      // Merge edited question with pending data
+      // Merge edited question with pending data, including MCQ options if provided
       const questionData = {
         ...pendingQuestionDataRef.current,
         question_text: editedQuestion.question_text,
         suggested_type: editedQuestion.suggested_type,
+        // Include MCQ data if provided from preview dialog
+        options: editedQuestion.options,
+        correct_answer: editedQuestion.correct_answer,
       };
       
       console.log("📤 Sending question from preview:", questionData);
@@ -1122,6 +1141,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             expected_answer: detectionData.expected_answer || "", // Pass expected answer for short answer grading
             source: detectionData.source || "manual_button",
             use_answer_key: useAnswerKeyMcqs,
+            // Pass pre-generated MCQ options if available (from preview dialog)
+            options: detectionData.options,
+            correct_answer: detectionData.correct_answer,
+            explanation: detectionData.explanation,
           },
         });
       });
