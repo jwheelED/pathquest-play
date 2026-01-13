@@ -8,6 +8,7 @@ import { Upload, FileImage, X, Loader2, FileType } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getOrgId } from '@/hooks/useOrgId';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SlideUploaderProps {
   onComplete: () => void;
@@ -22,6 +23,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
+  const queryClient = useQueryClient();
 
   const allowedTypes = [
     'application/pdf',
@@ -132,9 +134,10 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
         const fileName = `${Date.now()}.${fileExt}`;
         filePath = `${user.id}/slides/${fileName}`;
 
+        // Use upsert option in case there's a leftover file from a failed deletion
         const { error: uploadError } = await supabase.storage
           .from('lecture-materials')
-          .upload(filePath, selectedFile);
+          .upload(filePath, selectedFile, { upsert: true });
 
         if (uploadError) throw uploadError;
 
@@ -163,6 +166,12 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
 
       setUploadProgress(100);
       toast.success(isPptxFile(selectedFile) ? 'PowerPoint converted and uploaded!' : 'Slides uploaded successfully!');
+      
+      // Invalidate queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+      queryClient.invalidateQueries({ queryKey: ["slides"] });
+      queryClient.invalidateQueries({ queryKey: ["presentations"] });
+      
       onComplete();
     } catch (error: any) {
       console.error('Upload error:', error);

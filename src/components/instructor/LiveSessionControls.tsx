@@ -89,6 +89,24 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
       setActiveSession(data.session);
       onSessionChange(data.session.id);
       setSessionTitle("");
+      
+      // Play audio notification for session start
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 880;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } catch (e) {
+        // Audio not critical
+      }
+      
       toast.success(`Session started! Code: ${data.session.session_code}`);
       setShowQR(true);
     } catch (error: any) {
@@ -187,23 +205,54 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
         </Card>
 
         <Dialog open={showQR} onOpenChange={setShowQR}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Join Session</DialogTitle>
+              <DialogTitle className="text-center text-xl">🎓 Live Session Started!</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 text-center">
-              <div className="p-8 bg-white rounded-lg inline-block">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${joinUrl}`}
-                  alt="QR Code"
-                  className="w-64 h-64"
-                />
+            <div className="space-y-6 text-center py-4">
+              {/* Prominent Session Code */}
+              <div className="p-6 bg-primary/10 rounded-xl border-2 border-primary/30">
+                <p className="text-sm text-muted-foreground mb-2">Students enter this code:</p>
+                <div className="flex items-center justify-center gap-3">
+                  <p className="text-5xl font-mono font-bold tracking-widest text-primary">
+                    {activeSession.session_code}
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeSession.session_code);
+                      toast.success("Code copied!");
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <p className="font-semibold text-lg">Session Code</p>
-                <p className="text-4xl font-mono font-bold">{activeSession.session_code}</p>
+
+              {/* QR Code */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">Or scan to join:</p>
+                <div className="p-4 bg-white rounded-lg inline-block shadow-md">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${joinUrl}`}
+                    alt="QR Code"
+                    className="w-48 h-48"
+                  />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">{joinUrl}</p>
+
+              {/* Join URL */}
+              <div className="flex items-center justify-center gap-2 p-3 bg-muted rounded-lg">
+                <span className="text-sm font-mono truncate">{joinUrl}</span>
+                <Button variant="ghost" size="sm" onClick={copyJoinLink}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Keep this window visible or use the Presenter View button for easy access
+              </p>
             </div>
           </DialogContent>
         </Dialog>

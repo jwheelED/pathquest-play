@@ -211,8 +211,12 @@ export function LectureMaterialsUpload() {
     },
   });
 
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const deleteMutation = useMutation({
     mutationFn: async (material: LectureMaterial) => {
+      setIsDeleting(true);
+      
       const { error: storageError } = await supabase.storage
         .from("lecture-materials")
         .remove([material.file_path]);
@@ -225,12 +229,24 @@ export function LectureMaterialsUpload() {
         .eq("id", material.id);
 
       if (dbError) throw dbError;
+      
+      // Wait briefly for Supabase storage to propagate deletion
+      await new Promise(resolve => setTimeout(resolve, 500));
     },
     onSuccess: () => {
       toast.success("Material deleted successfully!");
+      // Invalidate all related queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+      queryClient.invalidateQueries({ queryKey: ["slides"] });
+      queryClient.invalidateQueries({ queryKey: ["presentations"] });
+      
+      // Add slight delay before re-enabling uploads
+      setTimeout(() => {
+        setIsDeleting(false);
+      }, 500);
     },
     onError: (error: any) => {
+      setIsDeleting(false);
       toast.error(error.message || "Failed to delete material");
     },
   });
@@ -417,13 +433,18 @@ export function LectureMaterialsUpload() {
 
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || !title.trim() || uploading || isParsing || (parseAsAnswerKey && !answerKeySubject)}
+            disabled={!selectedFile || !title.trim() || uploading || isParsing || isDeleting || (parseAsAnswerKey && !answerKeySubject)}
             className="w-full"
           >
             {uploading || isParsing ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 {isParsing ? "Parsing..." : "Uploading..."}
+              </>
+            ) : isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Please wait...
               </>
             ) : (
               <>
