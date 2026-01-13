@@ -16,6 +16,8 @@ interface SubscriptionTier {
   features: unknown[];
   student_limit: number | null;
   course_limit: number | null;
+  pricing_model: string | null;
+  price_suffix: string | null;
 }
 
 interface Subscription {
@@ -245,12 +247,17 @@ export function BillingSettings() {
                       </h4>
                       <p className="text-2xl font-bold mt-1">
                         {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
-                        {!isFreeTier && (
+                        {!isFreeTier && tier.price_suffix && (
                           <span className="text-sm font-normal text-muted-foreground">
-                            /semester
+                            {tier.price_suffix}
                           </span>
                         )}
                       </p>
+                      {tier.pricing_model === 'per_seat' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Billed based on active student count
+                        </p>
+                      )}
                     </div>
                     {isCurrentTier && (
                       <Badge variant="secondary" className="bg-primary text-primary-foreground">
