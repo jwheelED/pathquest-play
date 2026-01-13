@@ -94,6 +94,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const [autoQuestionForceSend, setAutoQuestionForceSend] = useState(true);
   const [nextAutoQuestionIn, setNextAutoQuestionIn] = useState(0);
   
+  // Question preview setting - when false, questions send immediately without preview
+  const [questionPreviewEnabled, setQuestionPreviewEnabled] = useState(true);
+  const questionPreviewEnabledRef = useRef(true);
+  
   // Update slide context ref when prop changes
   useEffect(() => {
     slideContextRef.current = slideContext || '';
@@ -163,10 +167,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
         if (students) setStudentCount(students.length);
 
-        // Fetch profile settings including course context
+        // Fetch profile settings including course context and preview preference
         const { data: profile } = await supabase
           .from('profiles')
-          .select('auto_question_enabled, auto_question_interval, auto_question_force_send, course_title, course_topics')
+          .select('auto_question_enabled, auto_question_interval, auto_question_force_send, course_title, course_topics, question_preview_enabled')
           .eq('id', user.id)
           .single();
 
@@ -174,6 +178,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           setAutoQuestionEnabled(profile.auto_question_enabled || false);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);
+          
+          // Question preview preference
+          const previewEnabled = profile.question_preview_enabled !== false;
+          setQuestionPreviewEnabled(previewEnabled);
+          questionPreviewEnabledRef.current = previewEnabled;
+          console.log('👁️ Question preview enabled:', previewEnabled);
           
           // Store course context for AI question generation
           courseContextRef.current = {
@@ -915,9 +925,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return;
       }
 
-      // If onQuestionExtracted callback is provided, call it for preview instead of sending immediately
-      if (onQuestionExtracted) {
-        console.log('📋 Question extracted, opening preview dialog');
+      // If preview is enabled AND callback is provided, show preview dialog
+      if (questionPreviewEnabledRef.current && onQuestionExtracted) {
+        console.log('📋 Question extracted, opening preview dialog (preview enabled)');
         onQuestionExtracted({
           question_text: data.question_text,
           suggested_type: data.suggested_type || 'short_answer',
@@ -925,7 +935,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return;
       }
 
-      // No callback provided, send immediately (legacy behavior)
+      // Preview disabled or no callback - send immediately
+      console.log('📤 Sending question immediately (preview disabled or no callback)');
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
