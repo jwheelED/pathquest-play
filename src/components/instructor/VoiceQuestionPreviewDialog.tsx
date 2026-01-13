@@ -72,6 +72,52 @@ export function VoiceQuestionPreviewDialog({
 
   const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
 
+  // Auto-generate options when switching to MCQ with empty options
+  useEffect(() => {
+    const optionsEmpty = !mcqOptions.some(opt => opt.trim() !== '');
+    const shouldAutoGenerate = 
+      questionType === 'multiple_choice' && 
+      optionsEmpty && 
+      questionText.trim() !== '' &&
+      !isGeneratingOptions;
+      
+    if (shouldAutoGenerate) {
+      // Trigger the generation
+      handleGenerateOptionsAuto();
+    }
+  }, [questionType]);
+
+  const handleGenerateOptionsAuto = async () => {
+    if (!questionText.trim() || isGeneratingOptions) return;
+
+    setIsGeneratingOptions(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
+        body: {
+          question_text: questionText,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.options && data.options.length === 4) {
+        setMcqOptions(data.options);
+        if (data.correct_answer) {
+          setCorrectAnswer(data.correct_answer);
+        }
+        toast({
+          title: "Options generated",
+          description: "MCQ options have been generated. You can edit them before sending.",
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to auto-generate MCQ options:", error);
+      // Silent fail for auto-generation, user can click regenerate
+    } finally {
+      setIsGeneratingOptions(false);
+    }
+  };
+
   const handleGenerateOptions = async () => {
     if (!questionText.trim()) {
       toast({
