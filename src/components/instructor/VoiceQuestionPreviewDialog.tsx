@@ -50,6 +50,7 @@ export function VoiceQuestionPreviewDialog({
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
   const [expectedAnswer, setExpectedAnswer] = useState('');
+  const [isGeneratingExpectedAnswer, setIsGeneratingExpectedAnswer] = useState(false);
 
   // Initialize state when extracted question changes
   useEffect(() => {
@@ -96,6 +97,88 @@ export function VoiceQuestionPreviewDialog({
       handleGenerateOptionsAuto();
     }
   }, [questionType]);
+
+  // Auto-generate expected answer when switching to Short Answer with empty expected answer
+  useEffect(() => {
+    const shouldAutoGenerate = 
+      questionType === 'short_answer' && 
+      expectedAnswer.trim() === '' && 
+      questionText.trim() !== '' &&
+      !isGeneratingExpectedAnswer;
+      
+    if (shouldAutoGenerate) {
+      handleGenerateExpectedAnswerAuto();
+    }
+  }, [questionType]);
+
+  const handleGenerateExpectedAnswerAuto = async () => {
+    if (!questionText.trim() || isGeneratingExpectedAnswer) return;
+
+    setIsGeneratingExpectedAnswer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
+        body: {
+          question_text: questionText,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.expected_answer) {
+        setExpectedAnswer(data.expected_answer);
+        toast({
+          title: "Expected answer generated",
+          description: "You can edit the expected answer before sending.",
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to auto-generate expected answer:", error);
+      // Silent fail for auto-generation, user can click regenerate
+    } finally {
+      setIsGeneratingExpectedAnswer(false);
+    }
+  };
+
+  const handleGenerateExpectedAnswer = async () => {
+    if (!questionText.trim()) {
+      toast({
+        title: "No question text",
+        description: "Please enter a question first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingExpectedAnswer(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
+        body: {
+          question_text: questionText,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.expected_answer) {
+        setExpectedAnswer(data.expected_answer);
+        toast({
+          title: "Expected answer generated",
+          description: "You can edit the expected answer before sending.",
+        });
+      } else {
+        throw new Error("Invalid response from AI");
+      }
+    } catch (error: any) {
+      console.error("Failed to generate expected answer:", error);
+      toast({
+        title: "Failed to generate expected answer",
+        description: error.message || "Could not generate expected answer",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingExpectedAnswer(false);
+    }
+  };
 
   const handleGenerateOptionsAuto = async () => {
     if (!questionText.trim() || isGeneratingOptions) return;
@@ -270,7 +353,34 @@ export function VoiceQuestionPreviewDialog({
           {/* Expected Answer (only shown for short answer) */}
           {questionType === 'short_answer' && (
             <div className="space-y-2">
-              <Label htmlFor="expected-answer">Expected Answer (for grading reference)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="expected-answer">Expected Answer (for grading reference)</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateExpectedAnswer}
+                  disabled={isGeneratingExpectedAnswer || !questionText.trim()}
+                  className="gap-1.5 text-xs"
+                >
+                  {isGeneratingExpectedAnswer ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Generating...
+                    </>
+                  ) : expectedAnswer.trim() ? (
+                    <>
+                      <RefreshCw className="h-3 w-3" />
+                      Regenerate
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              </div>
               <Textarea
                 id="expected-answer"
                 value={expectedAnswer}
