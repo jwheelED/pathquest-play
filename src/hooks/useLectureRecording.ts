@@ -138,6 +138,15 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     autoQuestionIntervalRef.current = autoQuestionInterval;
   }, [autoQuestionInterval]);
 
+  // Refs for callbacks to avoid timer reset on callback recreation
+  const handleAutoQuestionGenerationWithRetryRef = useRef<() => Promise<boolean>>();
+  const broadcastRef = useRef<typeof broadcast>();
+
+  // Keep callback refs updated
+  useEffect(() => {
+    broadcastRef.current = broadcast;
+  }, [broadcast]);
+
   // Helper to get question preview
   const getQuestionPreview = (questionText: any, maxLength = 60): string => {
     if (typeof questionText === 'string') {
@@ -464,6 +473,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, [toast]);
 
+  // Keep callback ref updated (must be after the function definition)
+  useEffect(() => {
+    handleAutoQuestionGenerationWithRetryRef.current = handleAutoQuestionGenerationWithRetry;
+  }, [handleAutoQuestionGenerationWithRetry]);
+
   // Reliable auto-question timer using Web Worker (throttle-resistant)
   useEffect(() => {
     if (!isRecording || !autoQuestionEnabled) {
@@ -481,8 +495,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         onTick: (secondsLeft, elapsedMs) => {
           setNextAutoQuestionIn(secondsLeft);
 
-          // Broadcast to presenter views
-          broadcast('countdown_tick', {
+          // Broadcast to presenter views (use ref to avoid stale closure)
+          broadcastRef.current?.('countdown_tick', {
             nextAutoQuestionIn: secondsLeft,
             autoQuestionEnabled: true,
             isRecording: true,
@@ -529,7 +543,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
               }
             }
             
-            const success = await handleAutoQuestionGenerationWithRetry();
+            const success = await handleAutoQuestionGenerationWithRetryRef.current?.() ?? false;
             if (success) {
               intervalTranscriptRef.current = '';
             }
@@ -552,7 +566,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         reliableTimerRef.current.stop();
       }
     };
-  }, [isRecording, autoQuestionEnabled, autoQuestionInterval, broadcast, handleAutoQuestionGenerationWithRetry]);
+  }, [isRecording, autoQuestionEnabled, autoQuestionInterval]);
 
   // Cleanup timer on unmount
   useEffect(() => {
