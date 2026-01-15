@@ -511,16 +511,24 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
           // Broadcast to student timer (less frequently to reduce traffic)
           if (studentTimerChannelRef.current && (secondsLeft % 5 === 0 || secondsLeft <= 10)) {
-            studentTimerChannelRef.current.send({
-              type: 'broadcast',
-              event: 'timer_update',
-              payload: {
-                nextQuestionIn: secondsLeft,
-                intervalMinutes: autoQuestionIntervalRef.current,
-                autoQuestionEnabled: true,
-                isRecording: true,
-              },
-            });
+            try {
+              // Only send if channel is in a good state
+              if (studentTimerChannelRef.current.state === 'joined') {
+                studentTimerChannelRef.current.send({
+                  type: 'broadcast',
+                  event: 'timer_update',
+                  payload: {
+                    nextQuestionIn: secondsLeft,
+                    intervalMinutes: autoQuestionIntervalRef.current,
+                    autoQuestionEnabled: true,
+                    isRecording: true,
+                  },
+                });
+              }
+            } catch (err) {
+              console.warn('⚠️ Failed to broadcast timer to students:', err);
+              // Don't throw - timer should continue regardless
+            }
           }
         },
         onIntervalComplete: async () => {
@@ -565,11 +573,13 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       });
     }
 
-    // Start the timer with current interval
-    console.log(`⏰ Starting reliable timer: ${autoQuestionInterval} minutes`);
-    // Clear snapshot for new interval, but preserve any existing transcript as snapshot
-    intervalTranscriptSnapshotRef.current = intervalTranscriptRef.current || '';
-    reliableTimerRef.current.start(autoQuestionInterval);
+    // Start or continue the timer with current interval (won't reset if already running same interval)
+    console.log(`⏰ Timer check: ${autoQuestionInterval} minutes`);
+    // Only update snapshot if timer is actually starting fresh
+    if (!reliableTimerRef.current.isRunning() || reliableTimerRef.current.getCurrentInterval() !== autoQuestionInterval) {
+      intervalTranscriptSnapshotRef.current = intervalTranscriptRef.current || '';
+    }
+    reliableTimerRef.current.continueOrStart(autoQuestionInterval);
 
     return () => {
       if (reliableTimerRef.current) {
