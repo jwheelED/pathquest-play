@@ -66,7 +66,7 @@ interface LectureTranscriptionProps {
 // Constants for memory and resource management
 const MAX_BUFFER_SIZE = 50000; // 50K characters max
 const KEEP_RECENT_SIZE = 40000; // Keep 40K most recent
-const RESTART_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const RESTART_INTERVAL = 0; // Disabled - was causing auto-question timer resets
 const TOKEN_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes
 const MAX_RECORDING_CYCLES = 50; // Force restart after 50 cycles (~8.5 min)
 const MAX_CONSECUTIVE_FAILURES = 5; // Increased from 3 to 5
@@ -1896,33 +1896,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   // Periodic system restart for resource cleanup
+  // Periodic restart DISABLED - it was causing auto-question timer resets
+  // Resource cleanup is handled by:
+  // 1. Rolling transcript buffer (MAX_BUFFER_SIZE)
+  // 2. Deepgram connection health checks
+  // 3. Cycle-based cleanup (MAX_RECORDING_CYCLES)
   useEffect(() => {
-    if (!isRecording) return;
-
-    const restartTimer = setTimeout(() => {
-      // Don't restart if auto-question is about to trigger (within 30 seconds)
-      if (autoQuestionEnabled && lastAutoQuestionTime > 0) {
-        const intervalMs = autoQuestionInterval * 60 * 1000;
-        const timeToNextQuestion = intervalMs - (Date.now() - lastAutoQuestionTime);
-        if (timeToNextQuestion < 30000 && timeToNextQuestion > 0) {
-          console.log("⏰ Delaying restart - auto-question imminent in", Math.round(timeToNextQuestion / 1000), "s");
-          return;
-        }
-      }
-
-      console.log("🔄 Performing periodic restart for resource cleanup");
-      toast({
-        title: "System refresh",
-        description: "Refreshing audio system for optimal performance",
-      });
-      const wasRecording = isRecording;
-      stopRecording();
-      if (wasRecording) {
-        setTimeout(() => startRecording(), 1000);
-      }
-    }, RESTART_INTERVAL);
-
-    return () => clearTimeout(restartTimer);
+    // Intentionally empty - restart logic disabled
+    return;
   }, [isRecording]);
 
   // Token refresh for extended sessions
