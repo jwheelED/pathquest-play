@@ -120,6 +120,13 @@ serve(async (req) => {
       console.log(`📎 Combined retry context: ${retry_context.length} previous attempts + current`);
     }
 
+    // Limit transcript to prevent AI token overflow - use most recent content
+    const MAX_TRANSCRIPT_FOR_AI = 8000;
+    if (fullTranscript.length > MAX_TRANSCRIPT_FOR_AI) {
+      console.log(`✂️ Trimming transcript from ${fullTranscript.length} to ${MAX_TRANSCRIPT_FOR_AI} chars (most recent content)`);
+      fullTranscript = fullTranscript.slice(-MAX_TRANSCRIPT_FOR_AI);
+    }
+
     // Check if we have enough content from transcript OR slide context
     const hasSlideContext = slide_context && slide_context.trim().length > 20;
     const hasTranscript = fullTranscript && fullTranscript.length >= minContentLength;
@@ -365,7 +372,7 @@ For short_answer:
             { role: "user", content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 2000,
+          max_tokens: 3000,  // Increased from 2000 to prevent truncation
           response_format: { type: "json_object" },
         }),
         signal: controller.signal,
@@ -489,6 +496,35 @@ For short_answer:
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Check if response was truncated due to token limits
+    const finishReason = aiResponse?.choices?.[0]?.finish_reason;
+    if (finishReason === "length" || (typeof finishReason === "string" && finishReason.startsWith("lengt"))) {
+      console.error("⚠️ AI response was truncated (finish_reason: length). Input may be too long.");
+      
+      // Try to extract partial content if available
+      const partialContent = aiResponse?.choices?.[0]?.message?.content;
+      if (!partialContent || partialContent.length < 50) {
+        if (strict_mode) {
+          console.log("🔄 Strict mode: Using fallback due to truncated response");
+          const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+          return new Response(
+            JSON.stringify({
+              success: true,
+              question_text: fallback.question_text,
+              suggested_type: fallback.suggested_type,
+              confidence: 0.4,
+              reasoning: "Fallback used - AI response truncated (input too long). Consider shorter intervals.",
+              is_fallback: true,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else {
+        console.log("📎 Attempting to salvage truncated response:", partialContent.substring(0, 200));
+        // Continue with parsing - some questions might still be valid
+      }
     }
 
     // Validate expected response structure
