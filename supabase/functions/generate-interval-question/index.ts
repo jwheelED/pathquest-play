@@ -304,11 +304,26 @@ ${hasSlideContext ? "- Answer choices MUST include correct information from the 
 - For short_answer questions: ALWAYS include an expected_answer that captures the key concepts a correct response should contain
 - For multiple_choice questions: ALWAYS include options (array of 4 choices) and correct_answer (A, B, C, or D)
 
+MATHEMATICS FORMATTING (CRITICAL FOR STEM):
+- For ANY mathematical expressions, use LaTeX notation
+- Inline math: wrap with $...$ (e.g., $x^2 + 3x$)
+- Display math: wrap with $$...$$ for complex equations
+- This applies to: limits, integrals, derivatives, fractions, exponents, Greek letters, etc.
+- Use proper LaTeX commands: \\frac{a}{b}, \\lim_{x \\to 0}, \\int_a^b, \\sum, \\sqrt{x}, etc.
+- MCQ options containing math MUST also use LaTeX notation
+
+EXAMPLE MATH QUESTION:
+{
+  "question_text": "What is $\\lim_{h \\to 0} \\frac{(x+h)^2 - x^2}{h}$?",
+  "options": ["A. $2x$", "B. $x^2$", "C. $2x + h$", "D. $x$"],
+  "correct_answer": "A"
+}
+
 Return JSON based on question type:
 
 For multiple_choice:
 {
-  "question_text": "the question",
+  "question_text": "the question (use LaTeX for any math)",
   "suggested_type": "multiple_choice",
   "options": ["A. first option", "B. second option", "C. third option", "D. fourth option"],
   "correct_answer": "A" | "B" | "C" | "D",
@@ -319,7 +334,7 @@ For multiple_choice:
 
 For short_answer:
 {
-  "question_text": "the question",
+  "question_text": "the question (use LaTeX for any math)",
   "suggested_type": "short_answer",
   "expected_answer": "the ideal/correct answer (1-3 sentences) capturing key concepts",
   "confidence": 0.0-1.0,

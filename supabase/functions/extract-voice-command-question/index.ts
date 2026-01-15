@@ -51,6 +51,58 @@ PUNCTUATION FIXES:
 ✅ "which detective would you want investigating a case for you" → "which detective would you want investigating a case for you?"
 ✅ "what is the capital of France" → "what is the capital of France?"
 
+MATHEMATICS HANDLING - CRITICAL FOR STEM LECTURES:
+When you detect spoken mathematics in the transcript, convert ALL mathematical expressions to proper LaTeX notation.
+Wrap equations in $...$ for inline math or $$...$$ for display math (complex/centered equations).
+
+SPOKEN MATH → LATEX CONVERSION PATTERNS:
+- "limit as h approaches zero" → $\\lim_{h \\to 0}$
+- "limit as x approaches infinity" → $\\lim_{x \\to \\infty}$
+- "x plus h quantity squared" or "(x + h) squared" → $(x+h)^2$
+- "all over h" or "divided by h" → use \\frac{numerator}{h}
+- "x squared" → $x^2$
+- "x cubed" → $x^3$
+- "x to the n" or "x to the power n" → $x^n$
+- "square root of x" → $\\sqrt{x}$
+- "cube root of x" → $\\sqrt[3]{x}$
+- "the integral from a to b" → $\\int_a^b$
+- "the derivative of f" → $\\frac{df}{dx}$ or $f'(x)$
+- "d y d x" or "dy dx" → $\\frac{dy}{dx}$
+- "partial derivative" → $\\frac{\\partial f}{\\partial x}$
+- "sum from n equals 1 to infinity" → $\\sum_{n=1}^{\\infty}$
+- "product from" → $\\prod$
+- "f of x" → $f(x)$
+- "sine of x" / "sin x" → $\\sin(x)$
+- "cosine" / "cos" → $\\cos$
+- "tangent" / "tan" → $\\tan$
+- "log of x" / "log x" → $\\log(x)$
+- "natural log" / "ln" → $\\ln(x)$
+- "e to the x" → $e^x$
+- "pi" → $\\pi$
+- "theta" → $\\theta$
+- "alpha", "beta", "gamma", etc. → $\\alpha$, $\\beta$, $\\gamma$
+- "infinity" → $\\infty$
+- "plus or minus" → $\\pm$
+- "not equal to" → $\\neq$
+- "less than or equal to" → $\\leq$
+- "greater than or equal to" → $\\geq$
+- "approximately equal" → $\\approx$
+- "vector x" → $\\vec{x}$
+- "matrix" → use \\begin{matrix}...\\end{matrix}
+
+EXAMPLE CONVERSIONS:
+Spoken: "what is the limit as h approaches zero of x plus h quantity squared minus x squared all over h"
+Output: "What is $\\lim_{h \\to 0} \\frac{(x+h)^2 - x^2}{h}$?"
+
+Spoken: "find the derivative of x squared plus 3x"
+Output: "Find the derivative of $x^2 + 3x$."
+
+Spoken: "evaluate the integral from 0 to pi of sine x dx"
+Output: "Evaluate $\\int_0^{\\pi} \\sin(x) \\, dx$."
+
+Spoken: "what is the sum from n equals 1 to infinity of 1 over n squared"
+Output: "What is $\\sum_{n=1}^{\\infty} \\frac{1}{n^2}$?"
+
 If you cannot find a COMPLETE question, respond with exactly: NO_QUESTION_FOUND`;
 
     const userPrompt = `Extract the COMPLETE question from this transcript:
