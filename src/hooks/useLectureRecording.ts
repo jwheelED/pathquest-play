@@ -121,6 +121,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Reliable timer ref for auto-questions (Web Worker-based, throttle-resistant)
   const reliableTimerRef = useRef<ReliableTimer | null>(null);
   
+  // Rolling transcript buffer settings - prevents memory issues on long intervals
+  const TRANSCRIPT_MAX_LENGTH = 20000; // ~4000 words, enough for 30+ mins of lecture
+  const intervalTranscriptSnapshotRef = useRef<string>(''); // Backup snapshot for recovery
+  const transcriptChunkCountRef = useRef(0); // Track chunks for batched state updates
+  
   // Refs for values that the timer needs (avoids stale closures)
   const studentCountRef = useRef(studentCount);
   const autoQuestionIntervalRef = useRef(autoQuestionInterval);
@@ -362,7 +367,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return false;
       }
       
-      const intervalTranscript = intervalTranscriptRef.current;
+      // Use current interval transcript, with snapshot as backup
+      const intervalTranscript = intervalTranscriptRef.current || intervalTranscriptSnapshotRef.current;
 
       if (!autoQuestionForceSend && intervalTranscript.length < 50) {
         toast({
@@ -545,7 +551,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             
             const success = await handleAutoQuestionGenerationWithRetryRef.current?.() ?? false;
             if (success) {
+              // Clear both transcript refs only after successful question
               intervalTranscriptRef.current = '';
+              intervalTranscriptSnapshotRef.current = '';
             }
           } finally {
             isGeneratingAutoQuestionRef.current = false;
@@ -559,6 +567,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
     // Start the timer with current interval
     console.log(`⏰ Starting reliable timer: ${autoQuestionInterval} minutes`);
+    // Clear snapshot for new interval, but preserve any existing transcript as snapshot
+    intervalTranscriptSnapshotRef.current = intervalTranscriptRef.current || '';
     reliableTimerRef.current.start(autoQuestionInterval);
 
     return () => {
@@ -787,10 +797,26 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       onTranscript: (data: DeepgramTranscript) => {
         if (data.isFinal && data.text.trim()) {
           console.log('📝 Deepgram final transcript:', data.text);
-          setTranscriptChunks(prev => [...prev, data.text]);
-          setLastTranscript(data.text);
+          
+          // Append to rolling buffers
           transcriptBufferRef.current += ' ' + data.text;
           intervalTranscriptRef.current += ' ' + data.text;
+          
+          // Trim interval transcript if exceeding max length (keep most recent content)
+          if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
+            intervalTranscriptRef.current = intervalTranscriptRef.current.slice(-TRANSCRIPT_MAX_LENGTH);
+            console.log('✂️ Trimmed interval transcript to max length');
+          }
+          
+          // Update React state less frequently to reduce re-renders (every 5 chunks)
+          transcriptChunkCountRef.current++;
+          setLastTranscript(data.text);
+          
+          if (transcriptChunkCountRef.current % 5 === 0) {
+            // Batch update - show last few transcripts for display
+            const recentText = intervalTranscriptRef.current.slice(-2000);
+            setTranscriptChunks([recentText]);
+          }
         }
       },
       onError: (error) => {

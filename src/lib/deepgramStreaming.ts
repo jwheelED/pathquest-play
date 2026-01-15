@@ -49,6 +49,10 @@ export class DeepgramStreamingClient {
   
   // Flag to track if using Fly.io proxy (which doesn't have timeout limits)
   private usesFlyProxy: boolean = false;
+  
+  // Long session health monitoring (detect stale connections)
+  private longSessionHealthInterval: number | null = null;
+  private lastTranscriptTime: number = 0;
 
   constructor(private config: DeepgramStreamingConfig) {}
 
@@ -103,6 +107,7 @@ export class DeepgramStreamingClient {
         
         // Start connection duration tracking
         this.connectionStartTime = Date.now();
+        this.lastTranscriptTime = Date.now(); // Initialize for health monitoring
         
         // Only set up proactive reconnection for Supabase Edge Functions (which have ~60s timeout)
         // Fly.io proxy has NO timeout, so we skip proactive reconnect entirely
@@ -119,6 +124,19 @@ export class DeepgramStreamingClient {
           }, 5000); // Check every 5 seconds
         } else {
           console.log("🔗 Fly.io proxy mode: persistent connection, no proactive reconnect needed");
+          
+          // For Fly.io proxy, set up long session health monitoring
+          // Detect if no transcripts received for 60s (possible stale connection)
+          this.longSessionHealthInterval = window.setInterval(() => {
+            const timeSinceLastTranscript = Date.now() - this.lastTranscriptTime;
+            const connectionAge = Date.now() - this.connectionStartTime;
+            
+            // Only check after at least 30 seconds of connection
+            if (connectionAge > 30000 && timeSinceLastTranscript > 60000) {
+              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s - connection may be stale`);
+              // Don't auto-reconnect, just log warning - user might be paused
+            }
+          }, 30000); // Check every 30 seconds
         }
       };
 
@@ -315,6 +333,9 @@ export class DeepgramStreamingClient {
   }
 
   private handleTranscript(data: any): void {
+    // Track last transcript time for health monitoring
+    this.lastTranscriptTime = Date.now();
+    
     const channel = data.channel;
     if (!channel?.alternatives?.[0]) return;
 
@@ -467,6 +488,12 @@ export class DeepgramStreamingClient {
     if (this.proactiveReconnectTimer !== null) {
       clearInterval(this.proactiveReconnectTimer);
       this.proactiveReconnectTimer = null;
+    }
+    
+    // Clear long session health interval
+    if (this.longSessionHealthInterval !== null) {
+      clearInterval(this.longSessionHealthInterval);
+      this.longSessionHealthInterval = null;
     }
     
     this.stopAudioCapture();
