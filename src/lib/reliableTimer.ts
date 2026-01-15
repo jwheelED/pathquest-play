@@ -84,6 +84,9 @@ export interface ReliableTimer {
   reset: () => void;
   terminate: () => void;
   isRunning: () => boolean;
+  getCurrentInterval: () => number;
+  getElapsedMs: () => number;
+  continueOrStart: (intervalMinutes: number) => void;
 }
 
 /**
@@ -271,5 +274,35 @@ export function createReliableTimer(callbacks: ReliableTimerCallbacks): Reliable
     },
     
     isRunning: () => running,
+    
+    getCurrentInterval: () => currentIntervalMs / 60 / 1000,
+    
+    getElapsedMs: () => {
+      if (usesFallback) {
+        return Date.now() - fallbackStartTime;
+      }
+      // For worker-based timer, we track via state
+      return 0; // Worker handles internally
+    },
+    
+    continueOrStart: (intervalMinutes: number) => {
+      const newIntervalMs = intervalMinutes * 60 * 1000;
+      
+      // If already running with the same interval, don't restart
+      if (running && currentIntervalMs === newIntervalMs) {
+        console.log(`⏰ Timer already running at ${intervalMinutes} min, continuing...`);
+        return;
+      }
+      
+      // Otherwise start fresh
+      currentIntervalMs = newIntervalMs;
+      running = true;
+      
+      if (worker && !usesFallback) {
+        worker.postMessage({ type: 'start', interval: currentIntervalMs });
+      } else {
+        startFallbackTimer();
+      }
+    },
   };
 }
