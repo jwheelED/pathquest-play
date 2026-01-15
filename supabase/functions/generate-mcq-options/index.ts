@@ -68,6 +68,16 @@ ${context ? `Context: "${context}"` : ""}
 
 Generate 4 MCQ options. One correct, three plausible distractors. Randomize correct position.
 
+MATHEMATICS FORMATTING:
+- If the question contains mathematical expressions, options MUST also use proper LaTeX notation
+- Use $...$ for inline math in options
+- Examples for a calculus question:
+  A. $2x$
+  B. $x^2$  
+  C. $\\frac{1}{x}$
+  D. $2x + h$
+- Ensure LaTeX is properly escaped with double backslashes
+
 Return JSON only:
 {"options":["A. ...","B. ...","C. ...","D. ..."],"correct_answer":"A"|"B"|"C"|"D"}`;
 

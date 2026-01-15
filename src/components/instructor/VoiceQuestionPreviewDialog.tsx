@@ -13,9 +13,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { MathRenderer } from '@/components/ui/math-renderer';
 
 export interface ExtractedVoiceQuestion {
   question_text: string;
@@ -51,6 +52,7 @@ export function VoiceQuestionPreviewDialog({
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
   const [expectedAnswer, setExpectedAnswer] = useState('');
   const [isGeneratingExpectedAnswer, setIsGeneratingExpectedAnswer] = useState(false);
+  const [showMathPreview, setShowMathPreview] = useState(false);
 
   // Initialize state when extracted question changes
   useEffect(() => {
@@ -337,17 +339,40 @@ export function VoiceQuestionPreviewDialog({
 
           {/* Question Text */}
           <div className="space-y-2">
-            <Label htmlFor="question-text" className="flex items-center gap-2">
-              {getTypeIcon()}
-              {getTypeLabel()} Question
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="question-text" className="flex items-center gap-2">
+                {getTypeIcon()}
+                {getTypeLabel()} Question
+              </Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMathPreview(!showMathPreview)}
+                className="gap-1.5 text-xs"
+              >
+                <Eye className="h-3 w-3" />
+                {showMathPreview ? 'Hide' : 'Show'} Preview
+              </Button>
+            </div>
             <Textarea
               id="question-text"
               value={questionText}
               onChange={(e) => setQuestionText(e.target.value)}
-              placeholder="Enter the question..."
-              className="min-h-[100px]"
+              placeholder="Enter the question... (use $...$ for inline math, $$...$$ for display math)"
+              className="min-h-[100px] font-mono text-sm"
             />
+            {showMathPreview && questionText && (
+              <div className="p-3 rounded-lg border bg-muted/30">
+                <Label className="text-xs text-muted-foreground mb-2 block">Math Preview:</Label>
+                <div className="text-base">
+                  <MathRenderer content={questionText} />
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              💡 Tip: Use $...$ for inline math (e.g., $x^2$) and $$...$$ for display equations
+            </p>
           </div>
 
           {/* Expected Answer (only shown for short answer) */}

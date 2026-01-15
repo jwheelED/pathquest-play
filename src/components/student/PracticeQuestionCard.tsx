@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Check, X, ChevronRight, Lightbulb, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { MathRenderer } from '@/components/ui/math-renderer';
 
 interface Question {
   id: string;
@@ -125,7 +126,7 @@ export function PracticeQuestionCard({
       {/* Question */}
       <div className="p-6">
         <p className="text-lg font-medium text-foreground leading-relaxed mb-6">
-          {question.question_text}
+          <MathRenderer content={question.question_text} />
         </p>
 
         {/* Options */}
@@ -169,7 +170,7 @@ export function PracticeQuestionCard({
                        isSubmitted && isSelected && !isCorrect ? <X className="w-4 h-4" /> :
                        option.label}
                     </span>
-                    <span className="text-foreground pt-1">{option.text}</span>
+                    <span className="text-foreground pt-1"><MathRenderer content={option.text} /></span>
                   </div>
                 </button>
               );
@@ -196,9 +197,9 @@ export function PracticeQuestionCard({
             
             {showExplanation && (
               <div className="p-4 rounded-xl bg-muted/50 border border-border">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {question.explanation}
-                </p>
+                <div className="text-sm text-muted-foreground leading-relaxed">
+                  <MathRenderer content={question.explanation} />
+                </div>
               </div>
             )}
           </div>

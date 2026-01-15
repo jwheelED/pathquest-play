@@ -12,6 +12,7 @@ import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/Confid
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
 import ReactMarkdown from "react-markdown";
+import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
 
@@ -492,7 +493,9 @@ const LiveStudent = () => {
         )}
       <Card key={currentQuestion.id} className="w-full animate-fade-in">
         <CardHeader>
-          <CardTitle className="text-2xl">{currentQuestion.question_content.question}</CardTitle>
+          <CardTitle className="text-2xl">
+            <MathRenderer content={currentQuestion.question_content.question} />
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {!hasAnswered ? (
@@ -507,7 +510,7 @@ const LiveStudent = () => {
                           <div key={index} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
                             <RadioGroupItem value={option} id={`option-${index}`} />
                             <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
-                              {option}
+                              <MathRenderer content={option} />
                             </Label>
                           </div>
                         ))}
@@ -613,7 +616,7 @@ const LiveStudent = () => {
                       <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
                       <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
                       <p className="text-muted-foreground">
-                        Correct answer: {currentQuestion.question_content.correctAnswer}
+                        Correct answer: <MathRenderer content={currentQuestion.question_content.correctAnswer} />
                       </p>
                     </>
                   )}
@@ -692,7 +695,7 @@ const LiveStudent = () => {
                     🎓 AI Explanation
                   </h4>
                   <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown>{explanation}</ReactMarkdown>
+                    <MathRenderer content={explanation} />
                   </div>
                 </div>
               )}
