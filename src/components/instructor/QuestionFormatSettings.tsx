@@ -56,6 +56,14 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
 
       if (error) throw error;
 
+      // Verify the update worked
+      const { data: verifyData } = await supabase
+        .from('profiles')
+        .select('question_format_preference, coding_question_style')
+        .eq('id', instructorId)
+        .single();
+      console.log('✅ Settings verified after save:', verifyData);
+
       toast({
         title: "✅ Preference saved",
         description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : 'Coding'}`,
