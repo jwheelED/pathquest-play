@@ -376,7 +376,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Testimonials - Enhanced with ratings */}
+      {/* Testimonials - Enhanced */}
       <section 
         ref={testimonialsRef.ref}
         className="relative z-10 py-20 px-4"
@@ -386,23 +386,12 @@ const Index = () => {
         }`}>
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
-              Loved by Educators & Students
+              Early Feedback from Educators & Students
             </h2>
-            <div className="flex items-center justify-center gap-1 mt-4">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-6 h-6 fill-achievement text-achievement" />
-              ))}
-              <span className="ml-2 text-muted-foreground">4.9 out of 5</span>
-            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
             <div className="headspace-card p-8 hover:shadow-xl transition-all duration-300">
-              <div className="flex items-center gap-1 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-achievement text-achievement" />
-                ))}
-              </div>
               <div className="text-4xl mb-4 text-primary">"</div>
               <p className="text-lg text-foreground leading-relaxed mb-6">
                 I demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.
@@ -419,11 +408,6 @@ const Index = () => {
             </div>
 
             <div className="headspace-card p-8 md:mt-8 hover:shadow-xl transition-all duration-300">
-              <div className="flex items-center gap-1 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-achievement text-achievement" />
-                ))}
-              </div>
               <div className="text-4xl mb-4 text-secondary">"</div>
               <p className="text-lg text-foreground leading-relaxed mb-6">
                 It was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!
@@ -488,12 +472,6 @@ const Index = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Transform your classroom with AI-powered engagement and real-time insights.
               </p>
-              <div className="flex items-center gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-achievement text-achievement" />
-                ))}
-                <span className="ml-2 text-sm text-muted-foreground">4.9/5 from 1000+ reviews</span>
-              </div>
             </div>
 
             {/* Quick Links */}
