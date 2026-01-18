@@ -29,6 +29,26 @@ const FALLBACK_QUESTIONS = [
   },
 ];
 
+// Better fallback questions for longer intervals (20-30 mins)
+const LONG_INTERVAL_FALLBACK_QUESTIONS = [
+  {
+    question_text: "What was the most important concept covered in the last section of the lecture?",
+    suggested_type: "short_answer",
+  },
+  {
+    question_text: "Summarize the main learning objective from the past 20-30 minutes.",
+    suggested_type: "short_answer",
+  },
+  {
+    question_text: "What key principle or theory was discussed most extensively in this section?",
+    suggested_type: "short_answer",
+  },
+  {
+    question_text: "Which concept from this lecture segment do you think will be most important for the exam?",
+    suggested_type: "short_answer",
+  },
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -135,14 +155,18 @@ serve(async (req) => {
       // In strict mode with no content at all, use a fallback question
       if (strict_mode) {
         console.log(`🔄 Strict mode: Using fallback question (transcript: ${fullTranscript?.length || 0} chars, slide: ${slide_context?.length || 0} chars)`);
-        const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        
+        // Use interval-appropriate fallback questions
+        const fallbackSet = interval_minutes >= 20 ? LONG_INTERVAL_FALLBACK_QUESTIONS : FALLBACK_QUESTIONS;
+        const fallback = fallbackSet[Math.floor(Math.random() * fallbackSet.length)];
+        
         return new Response(
           JSON.stringify({
             success: true,
             question_text: fallback.question_text,
             suggested_type: fallback.suggested_type,
             confidence: 0.5,
-            reasoning: "Fallback question used due to minimal lecture content (strict mode)",
+            reasoning: `Fallback question used due to minimal lecture content (strict mode, ${interval_minutes} min interval)`,
             is_fallback: true,
           }),
           {
@@ -394,14 +418,15 @@ For short_answer:
         // In strict mode, return fallback on timeout
         if (strict_mode) {
           console.log("⏱️ Timeout in strict mode - using fallback");
-          const fallback = FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+          const fallbackSet = interval_minutes >= 20 ? LONG_INTERVAL_FALLBACK_QUESTIONS : FALLBACK_QUESTIONS;
+          const fallback = fallbackSet[Math.floor(Math.random() * fallbackSet.length)];
           return new Response(
             JSON.stringify({
               success: true,
               question_text: fallback.question_text,
               suggested_type: fallback.suggested_type,
               confidence: 0.4,
-              reasoning: "Fallback question used due to AI timeout (strict mode)",
+              reasoning: `Fallback question used due to AI timeout (strict mode, ${interval_minutes} min interval)`,
               is_fallback: true,
             }),
             {
