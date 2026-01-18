@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { InstructorOverview } from "@/components/instructor/InstructorOverview";
+import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
