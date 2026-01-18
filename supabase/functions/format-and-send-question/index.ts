@@ -538,9 +538,27 @@ serve(async (req) => {
     let formatStartTime = Date.now();
     console.log("⏱️ Starting question formatting...");
 
-    if (finalType === "coding") {
-      // For coding questions, check if we have structured problem data
-      if (
+    if (finalType === "coding" || finalType === "coding_simple") {
+      const isSimpleCoding = finalType === "coding_simple";
+      
+      if (isSimpleCoding) {
+        // Simple coding check-in - minimal structure, just show mini IDE with the question
+        console.log("📝 Creating simple coding check-in (mini IDE)");
+        formattedQuestion = {
+          question: typeof question_text === "string" ? question_text : question_text.question_text || question_text.problemStatement || String(question_text),
+          type: "coding_simple",
+          language: "python", // Default to python for simple check-ins
+          difficulty: "Easy",
+          functionSignature: "",
+          constraints: [],
+          examples: [],
+          hints: ["Focus on demonstrating the concept - minor syntax errors are okay!"],
+          starterCode: "",
+          testCases: [],
+          expectedAnswer: expected_answer || "",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade",
+        };
+      } else if (
         question_text &&
         typeof question_text === "object" &&
         "problemStatement" in question_text &&
