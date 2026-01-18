@@ -405,8 +405,28 @@ serve(async (req) => {
       return "manual_grade";
     };
 
-    // Prioritize explicitly passed type (from preview dialog), fall back to instructor preference
-    const finalType = suggested_type || instructorPreference;
+    // Determine final question type - prioritize instructor's coding preference
+    let finalType: string;
+    if (instructorPreference === "coding") {
+      // When instructor prefers coding, fetch their coding style and use it
+      const { data: codingPref } = await supabase
+        .from("profiles")
+        .select("coding_question_style")
+        .eq("id", user.id)
+        .single();
+      
+      const codingStyle = codingPref?.coding_question_style || "simple";
+      // Map coding preference to finalType - suggested_type can override if already coding
+      if (suggested_type === "coding" || suggested_type === "coding_simple") {
+        finalType = suggested_type;
+      } else {
+        finalType = codingStyle === "simple" ? "coding_simple" : "coding";
+      }
+      console.log(`🔧 Instructor prefers coding (style: ${codingStyle}), forcing type: ${finalType}`);
+    } else {
+      // Use suggested type or fall back to instructor preference
+      finalType = suggested_type || instructorPreference;
+    }
     console.log(`📝 Final question type: ${finalType} (suggested: ${suggested_type}, preference: ${instructorPreference})`);
 
     if (!question_text || !suggested_type) {

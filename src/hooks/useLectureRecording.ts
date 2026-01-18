@@ -383,11 +383,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('question_format_preference')
+        .select('question_format_preference, coding_question_style')
         .eq('id', user.id)
         .single();
 
       const formatPreference = profile?.question_format_preference || 'multiple_choice';
+      const codingStyle = profile?.coding_question_style || 'simple';
 
       toast({
         title: '⏰ Auto-question!',
@@ -402,6 +403,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_transcript: intervalTranscript,
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
+          coding_question_style: codingStyle,
           force_send: autoQuestionForceSend,
           strict_mode: true,
           slide_context: slideContextRef.current,
@@ -1071,7 +1073,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('question_format_preference')
+        .select('question_format_preference, coding_question_style')
         .eq('id', user.id)
         .single();
 
@@ -1080,6 +1082,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_transcript: intervalTranscript,
           interval_minutes: autoQuestionInterval,
           format_preference: profile?.question_format_preference || 'multiple_choice',
+          coding_question_style: profile?.coding_question_style || 'simple',
           force_send: true,
           strict_mode: true,
           slide_context: slideContextRef.current,

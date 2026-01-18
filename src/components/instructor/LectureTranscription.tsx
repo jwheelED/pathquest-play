@@ -853,11 +853,20 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("📝 Manual send - generating question from transcript:", recentTranscript.length, "chars");
 
+      // Fetch instructor's preference for question format
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('question_format_preference, coding_question_style')
+        .eq('id', user?.id)
+        .single();
+
       const { data, error } = await supabase.functions.invoke("generate-interval-question", {
         body: { 
           interval_transcript: recentTranscript,
           interval_minutes: 1,
-          format_preference: "multiple_choice",
+          format_preference: profile?.question_format_preference || "multiple_choice",
+          coding_question_style: profile?.coding_question_style || "simple",
           force_send: true,
           strict_mode: true
         },
