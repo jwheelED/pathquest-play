@@ -405,10 +405,13 @@ serve(async (req) => {
       return "manual_grade";
     };
 
-    // Prioritize instructor preference (from settings), unless explicitly overridden in preview dialog
-    // For voice commands and auto-questions, always respect the instructor's format preference
-    const finalType = instructorPreference || suggested_type;
-    console.log(`📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type})`);
+    // Determine final question type with smart priority:
+    // 1. If pre-generated options provided (from preview dialog editing), respect the suggested_type
+    // 2. Otherwise, always use instructor's preference from settings
+    // This ensures preview dialog overrides work, but voice commands/auto-questions respect settings
+    const hasPreGeneratedOptions = (options && Array.isArray(options) && options.length === 4 && correct_answer);
+    const finalType = hasPreGeneratedOptions ? (suggested_type || instructorPreference) : instructorPreference;
+    console.log(`📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type}, has_preview_options: ${hasPreGeneratedOptions})`);
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
