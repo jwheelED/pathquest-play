@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { InstructorOverview } from "@/components/instructor/InstructorOverview";
+import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
@@ -569,7 +570,10 @@ export default function InstructorDashboard() {
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as TabValue)}
       headerActions={
-        <QuickActions actions={quickActions} className="hidden lg:flex" />
+        <>
+          <CourseSelector />
+          <QuickActions actions={quickActions} className="hidden lg:flex" />
+        </>
       }
     >
       <div className="flex min-h-[calc(100vh-12rem)]">

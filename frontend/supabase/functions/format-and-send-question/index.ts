@@ -19,24 +19,59 @@ const generateMCQ = async (questionText: string, context: string, courseContext?
     courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
   }
   
+  // Detect if this is a math question (contains LaTeX)
+  const isMathQuestion = questionText.includes('$') || questionText.includes('\\');
+  
+  const mathGuidance = isMathQuestion ? `
+
+🧮 MATHEMATICS QUESTION DETECTED - SPECIAL INSTRUCTIONS:
+
+This question contains mathematical expressions in LaTeX notation. Generate a high-quality math MCQ.
+
+DISTRACTOR GENERATION FOR MATH QUESTIONS:
+1. **Common Calculation Errors**: Include answers from typical mistakes (wrong sign, forgot constant, etc.)
+2. **Partial Solutions**: Show answers from incomplete work (stopped midway, forgot a step)
+3. **Conceptual Misunderstandings**: Include answers from common misconceptions about the concept
+4. **Order of Operations Errors**: Show what happens if operations done in wrong order
+
+EXAMPLE - For calculus derivative question like: "What is $\\lim_{h \\to 0} \\frac{(x+h)^2 - x^2}{h}$?"
+
+GOOD DISTRACTORS (realistic errors):
+- $x$ (forgot the coefficient 2)
+- $2$ (treated x as constant)
+- $x^2$ (didn't simplify the limit)
+- $2x + h$ (didn't take limit as h→0)
+
+BAD DISTRACTORS (nonsensical):
+- $5x^3$ (unrelated to the problem)
+- $\\sin(x)$ (wrong function entirely)
+
+FORMATTING RULES:
+- ALL math expressions in options MUST use LaTeX: $...$ or $$...$$
+- Keep notation consistent with the question
+- Use \\frac{}{} for fractions, \\lim_{} for limits, ^ for exponents
+- Greek letters: \\theta, \\pi, \\alpha, etc.` : '';
+  
   const prompt = `The professor asked: "${questionText}"
 
-Context from lecture: "${context}"${courseInfo}
+Context from lecture: "${context}"${courseInfo}${mathGuidance}
 
 Generate a multiple choice question with 4 options:
 - One correct answer
-- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ''}
+- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ''}${isMathQuestion ? ' and typical calculation errors' : ''}
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
-- Keep it concise and clear
+- Keep it concise and clear${isMathQuestion ? '\n- Use LaTeX notation ($...$) for ALL mathematical expressions in options' : ''}
 ${courseContext?.topics?.length ? `- Consider these key topics when creating distractors: ${courseContext.topics.join(", ")}` : ''}
+
+${isMathQuestion ? 'CRITICAL FOR MATH: Each distractor should represent a specific type of error a student might make.' : ''}
 
 Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
-  "question": "the question text",
+  "question": "the question text (preserve LaTeX formatting)",
   "options": ["A. first option text", "B. second option text", "C. third option text", "D. fourth option text"],
   "correctAnswer": "A" | "B" | "C" | "D",
-  "explanation": "Why this is correct and others are wrong"
+  "explanation": "Why this is correct and explain what mistakes lead to each wrong answer"
 }`;
 
   // Add timeout handling (30 seconds)
