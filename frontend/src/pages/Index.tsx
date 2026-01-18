@@ -8,9 +8,7 @@ import step1Image from "@/assets/step1-live-lecture.png";
 import step2Image from "@/assets/step2-question.png";
 import step3Image from "@/assets/step3-feedback.png";
 import { useScrollAnimation, useScrollPosition } from "@/hooks/useScrollAnimation";
-import { StatsSection } from "@/components/StatsSection";
 import { StickyCtaBar } from "@/components/StickyCtaBar";
-import { ActivityFeed } from "@/components/ActivityFeed";
 
 const Index = () => {
   const [session, setSession] = useState(null);
@@ -20,7 +18,6 @@ const Index = () => {
   const { scrollY } = useScrollPosition();
   
   // Scroll animation refs for each section
-  const statsRef = useScrollAnimation(0.2);
   const step1Ref = useScrollAnimation(0.2);
   const step2Ref = useScrollAnimation(0.2);
   const step3Ref = useScrollAnimation(0.2);
@@ -205,24 +202,7 @@ const Index = () => {
                 Secure & Private
               </div>
             </div>
-
-            {/* Activity Feed */}
-            <div className="pt-8 flex justify-center animate-fade-in stagger-5">
-              <ActivityFeed />
-            </div>
           </div>
-        </div>
-      </section>
-
-      {/* Stats Section - NEW */}
-      <section className="relative z-10 py-16 px-4 bg-muted/30">
-        <div 
-          ref={statsRef.ref}
-          className={`container mx-auto max-w-6xl transition-all duration-1000 ${
-            statsRef.isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-          }`}
-        >
-          <StatsSection />
         </div>
       </section>
 
