@@ -570,7 +570,10 @@ export default function InstructorDashboard() {
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as TabValue)}
       headerActions={
-        <QuickActions actions={quickActions} className="hidden lg:flex" />
+        <>
+          <CourseSelector />
+          <QuickActions actions={quickActions} className="hidden lg:flex" />
+        </>
       }
     >
       <div className="flex min-h-[calc(100vh-12rem)]">
