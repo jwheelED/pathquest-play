@@ -405,6 +405,7 @@ serve(async (req) => {
       return "manual_grade";
     };
 
+<<<<<<< HEAD:frontend/supabase/functions/format-and-send-question/index.ts
     // Determine final question type with smart priority:
     // 1. If pre-generated options provided (from preview dialog editing), respect the suggested_type
     // 2. Otherwise, always use instructor's preference from settings
@@ -412,6 +413,31 @@ serve(async (req) => {
     const hasPreGeneratedOptions = (options && Array.isArray(options) && options.length === 4 && correct_answer);
     const finalType = hasPreGeneratedOptions ? (suggested_type || instructorPreference) : instructorPreference;
     console.log(`📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type}, has_preview_options: ${hasPreGeneratedOptions})`);
+=======
+    // Determine final question type - prioritize instructor's coding preference
+    let finalType: string;
+    if (instructorPreference === "coding") {
+      // When instructor prefers coding, fetch their coding style and use it
+      const { data: codingPref } = await supabase
+        .from("profiles")
+        .select("coding_question_style")
+        .eq("id", user.id)
+        .single();
+      
+      const codingStyle = codingPref?.coding_question_style || "simple";
+      // Map coding preference to finalType - suggested_type can override if already coding
+      if (suggested_type === "coding" || suggested_type === "coding_simple") {
+        finalType = suggested_type;
+      } else {
+        finalType = codingStyle === "simple" ? "coding_simple" : "coding";
+      }
+      console.log(`🔧 Instructor prefers coding (style: ${codingStyle}), forcing type: ${finalType}`);
+    } else {
+      // Use suggested type or fall back to instructor preference
+      finalType = suggested_type || instructorPreference;
+    }
+    console.log(`📝 Final question type: ${finalType} (suggested: ${suggested_type}, preference: ${instructorPreference})`);
+>>>>>>> a32f90d5aa821f434c5eff9069642087de5aaa42:supabase/functions/format-and-send-question/index.ts
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -542,9 +568,27 @@ serve(async (req) => {
     let formatStartTime = Date.now();
     console.log("⏱️ Starting question formatting...");
 
-    if (finalType === "coding") {
-      // For coding questions, check if we have structured problem data
-      if (
+    if (finalType === "coding" || finalType === "coding_simple") {
+      const isSimpleCoding = finalType === "coding_simple";
+      
+      if (isSimpleCoding) {
+        // Simple coding check-in - minimal structure, just show mini IDE with the question
+        console.log("📝 Creating simple coding check-in (mini IDE)");
+        formattedQuestion = {
+          question: typeof question_text === "string" ? question_text : question_text.question_text || question_text.problemStatement || String(question_text),
+          type: "coding_simple",
+          language: "python", // Default to python for simple check-ins
+          difficulty: "Easy",
+          functionSignature: "",
+          constraints: [],
+          examples: [],
+          hints: ["Focus on demonstrating the concept - minor syntax errors are okay!"],
+          starterCode: "",
+          testCases: [],
+          expectedAnswer: expected_answer || "",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade",
+        };
+      } else if (
         question_text &&
         typeof question_text === "object" &&
         "problemStatement" in question_text &&

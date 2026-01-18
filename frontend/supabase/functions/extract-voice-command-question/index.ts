@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,38 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // Fetch instructor preferences to respect their coding settings
+    const authHeader = req.headers.get("Authorization");
+    let instructorPreference = "multiple_choice";
+    let codingQuestionStyle = "full";
+
+    if (authHeader) {
+      try {
+        const supabase = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_ANON_KEY")!,
+          { global: { headers: { Authorization: authHeader } } }
+        );
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("question_format_preference, coding_question_style")
+            .eq("id", user.id)
+            .single();
+          
+          if (profile) {
+            instructorPreference = profile.question_format_preference || "multiple_choice";
+            codingQuestionStyle = profile.coding_question_style || "full";
+            console.log(`👤 Instructor preference: ${instructorPreference}, coding style: ${codingQuestionStyle}`);
+          }
+        }
+      } catch (e) {
+        console.log("Could not fetch instructor preferences, using defaults");
+      }
     }
 
     const { recentTranscript } = await req.json();
@@ -253,25 +286,44 @@ Return ONLY the complete question text, nothing else.`;
 
     console.log("✅ Extracted question:", cleanedQuestion);
 
-    // Determine question type based on content
-    let suggestedType = "multiple_choice";
+    // Determine question type - RESPECT instructor preference
     const lowerQuestion = cleanedQuestion.toLowerCase();
-
-    if (
+    
+    // Check for explicit coding indicators in the question
+    const hasCodingKeywords = 
       lowerQuestion.includes("code") ||
       lowerQuestion.includes("program") ||
       lowerQuestion.includes("function") ||
-      lowerQuestion.includes("implement")
-    ) {
-      suggestedType = "coding";
+      lowerQuestion.includes("implement") ||
+      lowerQuestion.includes("write a class") ||
+      lowerQuestion.includes("create a class") ||
+      lowerQuestion.includes("define a method");
+    
+    // Determine suggested type based on instructor preference + question content
+    let suggestedType: string;
+    
+    if (hasCodingKeywords) {
+      // Explicit coding keywords detected - use instructor's coding style preference
+      suggestedType = codingQuestionStyle === "simple" ? "coding_simple" : "coding";
+      console.log(`🔧 Coding keywords detected, using style: ${suggestedType}`);
+    } else if (instructorPreference === "coding") {
+      // Instructor prefers coding questions - use their style
+      suggestedType = codingQuestionStyle === "simple" ? "coding_simple" : "coding";
+      console.log(`🔧 Instructor prefers coding, using style: ${suggestedType}`);
     } else if (
       lowerQuestion.includes("explain") ||
       lowerQuestion.includes("describe") ||
       lowerQuestion.includes("why") ||
       lowerQuestion.includes("how")
     ) {
-      suggestedType = "short_answer";
+      // Short answer indicators
+      suggestedType = instructorPreference === "short_answer" ? "short_answer" : instructorPreference;
+    } else {
+      // Default to instructor's preference
+      suggestedType = instructorPreference;
     }
+    
+    console.log(`📝 Final suggested type: ${suggestedType} (instructor pref: ${instructorPreference})`);
 
     return new Response(
       JSON.stringify({

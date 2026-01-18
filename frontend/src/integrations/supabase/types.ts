@@ -4002,7 +4002,7 @@ export type Database = {
         Returns: string
       }
       update_assignment_grade: {
-        Args: { p_assignment_id: string; p_short_answer_grades: Json }
+        Args: { p_assignment_id: string; p_short_answer_grades?: Json }
         Returns: Json
       }
       validate_admin_code: { Args: { _code: string }; Returns: string }
