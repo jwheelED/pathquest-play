@@ -64,60 +64,64 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
       if (!isOpen) resetForm();
       onOpenChange(isOpen);
     }}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Course</DialogTitle>
           <DialogDescription>
-            Add a new course to your instructor account. Each course gets a unique join code.
+            Add a new course to your account. Each gets a unique join code.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Course Title *</Label>
+        <div className="space-y-3 py-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="title" className="text-sm">Course Title *</Label>
             <Input
               id="title"
               placeholder="e.g., Introduction to Computer Science"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              className="h-9"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-sm">Description</Label>
             <Textarea
               id="description"
               placeholder="Brief course description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
+              className="text-sm resize-none"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="schedule">Class Schedule</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="schedule" className="text-sm">Class Schedule</Label>
             <Input
               id="schedule"
               placeholder="e.g., Mon/Wed/Fri 10:00-11:30 AM"
               value={schedule}
               onChange={(e) => setSchedule(e.target.value)}
+              className="h-9"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="topics">Key Topics (comma-separated)</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="topics" className="text-sm">Key Topics (comma-separated)</Label>
             <Textarea
               id="topics"
               placeholder="e.g., algorithms, data structures, python"
               value={topics}
               onChange={(e) => setTopics(e.target.value)}
               rows={2}
+              className="text-sm resize-none"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Course Category</Label>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-sm">Course Category</Label>
+            <div className="grid grid-cols-2 gap-2">
               <Card 
                 className={cn(
                   "cursor-pointer transition-all hover:shadow-md",
@@ -125,9 +129,9 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
                 )}
                 onClick={() => setCourseType("stem")}
               >
-                <CardContent className="p-4 text-center">
-                  <Code className="h-8 w-8 mx-auto text-blue-500 mb-2" />
-                  <p className="font-medium text-sm">STEM / Technical</p>
+                <CardContent className="p-3 text-center">
+                  <Code className="h-6 w-6 mx-auto text-blue-500 mb-1" />
+                  <p className="font-medium text-xs">STEM / Technical</p>
                 </CardContent>
               </Card>
               
@@ -138,9 +142,9 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
                 )}
                 onClick={() => setCourseType("humanities")}
               >
-                <CardContent className="p-4 text-center">
-                  <BookOpen className="h-8 w-8 mx-auto text-amber-500 mb-2" />
-                  <p className="font-medium text-sm">Humanities</p>
+                <CardContent className="p-3 text-center">
+                  <BookOpen className="h-6 w-6 mx-auto text-amber-500 mb-1" />
+                  <p className="font-medium text-xs">Humanities</p>
                 </CardContent>
               </Card>
             </div>
@@ -148,10 +152,10 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} size="sm">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!title.trim() || loading}>
+          <Button onClick={handleSubmit} disabled={!title.trim() || loading} size="sm">
             {loading ? "Creating..." : "Create Course"}
           </Button>
         </DialogFooter>
