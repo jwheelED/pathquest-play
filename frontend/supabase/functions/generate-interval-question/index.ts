@@ -278,6 +278,16 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
         materialsContext += "\nUse these materials to provide additional context and ensure questions align with course content.\n";
       }
 
+      // Special instructions for longer intervals (20-30 minutes)
+      const longIntervalGuidance = interval_minutes >= 20 
+        ? `\n⚠️ LONG INTERVAL GUIDANCE (${interval_minutes} minutes):
+- This is a LONGER content segment, so prioritize the SINGLE MOST IMPORTANT concept
+- Focus on core learning objectives, not minor details
+- Choose a concept that was emphasized multiple times or given significant time
+- Avoid questions about tangential examples or brief mentions
+- The question should test understanding of a MAJOR concept from this extended segment`
+        : "";
+
       // Special instructions when slide context is available
       const slideInstructions = hasSlideContext 
         ? `\nCRITICAL: The current slide content is the PRIMARY source for this question. 
@@ -289,25 +299,25 @@ IMPORTANT: The problem should directly relate to concepts taught in the lecture 
 - If the slide shows examples, ask about those specific examples`
         : "";
 
-      prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.
+      prompt = `You are analyzing a ${interval_minutes}-minute segment of a university lecture.${longIntervalGuidance}
 
 ${courseInfo}${primaryContext}${materialsContext}${slideInstructions}
 
 DIFFICULTY: ${difficultyInstruction}
 
 TASK: Generate ONE high-quality question that:
-1. Tests the MOST IMPORTANT concept from this content
+1. Tests the MOST IMPORTANT concept from this content${interval_minutes >= 20 ? " (prioritize concepts emphasized or repeated multiple times)" : ""}
 2. Is clearly answerable based on what was just taught
 3. Matches the specified difficulty level
-4. Avoids trivial or overly specific details
+4. Avoids trivial or overly specific details${interval_minutes >= 20 ? " - focus on CORE concepts only" : ""}
 ${hasSlideContext ? "5. DIRECTLY relates to content visible on the current slide" : "5. Focus on the lecture content"}
 
 CRITERIA:
-- Focus on main concepts, not minor details
+- Focus on main concepts, not minor details${interval_minutes >= 20 ? " (extra critical for long intervals - pick THE most important concept)" : ""}
 - Question should be fair and clear
 - Match the difficulty level specified above
 ${hasSlideContext ? "- Answer choices MUST include correct information from the slide" : "- Avoid questions about examples unless they're core to understanding"}
-- MUST generate a valid question even if content seems limited
+- MUST generate a valid question even if content seems limited${interval_minutes >= 20 ? "\n- For LONG intervals: Identify what concept got the MOST coverage/emphasis" : ""}
 - For short_answer questions: ALWAYS include an expected_answer that captures the key concepts a correct response should contain
 - For multiple_choice questions: ALWAYS include options (array of 4 choices) and correct_answer (A, B, C, or D)
 
