@@ -405,18 +405,20 @@ serve(async (req) => {
       return "manual_grade";
     };
 
-<<<<<<< HEAD:frontend/supabase/functions/format-and-send-question/index.ts
     // Determine final question type with smart priority:
     // 1. If pre-generated options provided (from preview dialog editing), respect the suggested_type
-    // 2. Otherwise, always use instructor's preference from settings
-    // This ensures preview dialog overrides work, but voice commands/auto-questions respect settings
+    // 2. If instructor prefers coding, use their coding style preference (simple vs full)
+    // 3. Otherwise, use instructor's preference from settings
+    // This ensures preview dialog overrides work, voice commands respect settings, and coding style is handled
     const hasPreGeneratedOptions = (options && Array.isArray(options) && options.length === 4 && correct_answer);
-    const finalType = hasPreGeneratedOptions ? (suggested_type || instructorPreference) : instructorPreference;
-    console.log(`📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type}, has_preview_options: ${hasPreGeneratedOptions})`);
-=======
-    // Determine final question type - prioritize instructor's coding preference
+    
     let finalType: string;
-    if (instructorPreference === "coding") {
+    
+    if (hasPreGeneratedOptions && suggested_type) {
+      // Preview dialog with edited options - respect user's explicit choice
+      finalType = suggested_type;
+      console.log(`📝 Using preview dialog type: ${finalType}`);
+    } else if (instructorPreference === "coding") {
       // When instructor prefers coding, fetch their coding style and use it
       const { data: codingPref } = await supabase
         .from("profiles")
@@ -433,11 +435,12 @@ serve(async (req) => {
       }
       console.log(`🔧 Instructor prefers coding (style: ${codingStyle}), forcing type: ${finalType}`);
     } else {
-      // Use suggested type or fall back to instructor preference
-      finalType = suggested_type || instructorPreference;
+      // For non-coding preferences, use instructor preference
+      finalType = instructorPreference;
+      console.log(`📝 Using instructor preference: ${finalType}`);
     }
-    console.log(`📝 Final question type: ${finalType} (suggested: ${suggested_type}, preference: ${instructorPreference})`);
->>>>>>> a32f90d5aa821f434c5eff9069642087de5aaa42:supabase/functions/format-and-send-question/index.ts
+    
+    console.log(`📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type}, has_preview_options: ${hasPreGeneratedOptions})`);
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
