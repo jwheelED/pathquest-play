@@ -540,6 +540,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           }
 
           console.log('⏰ Reliable timer: Interval complete, generating question');
+          
+          // Create snapshot of transcript BEFORE generation (prevents loss during processing)
+          intervalTranscriptSnapshotRef.current = intervalTranscriptRef.current;
+          console.log(`📸 Transcript snapshot created: ${intervalTranscriptSnapshotRef.current.length} chars`);
+          
           isGeneratingAutoQuestionRef.current = true;
 
           try {
