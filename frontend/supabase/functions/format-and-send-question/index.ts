@@ -647,7 +647,7 @@ serve(async (req) => {
           starterCode: codingProblem.starterCode || "",
           testCases: codingProblem.testCases || [],
           expectedAnswer: "",
-          gradingMode: "manual_grade",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade", // FIXED: Use auto-grade pref
         };
       } else {
         // Fallback: Generate structured problem from simple question text
@@ -669,7 +669,7 @@ serve(async (req) => {
           starterCode: codingProblem.starterCode || "",
           testCases: codingProblem.testCases || [],
           expectedAnswer: "",
-          gradingMode: "manual_grade",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade", // FIXED: Use auto-grade pref
         };
       }
     } else if (finalType === "multiple_choice") {
