@@ -587,13 +587,25 @@ Deno.serve(async (req) => {
     const correctAnswer = question.question_content.correctAnswer || question.question_content.correct_answer;
     const questionType = question.question_content.type;
     const questionText = question.question_content.question || "";
+    const gradingMode = question.question_content.gradingMode || "manual_grade"; // Check grading mode!
+    
+    console.log(`📊 Question type: ${questionType}, Grading mode: ${gradingMode}`);
     
     let isCorrect = false;
     let aiGrade: number | null = null;
     let aiFeedback: string | null = null;
     let studentAnswer = answer;
+    let gradePending = false; // Flag for manual grading
     
-    if (questionType === "multiple_choice") {
+    // Only perform auto-grading if gradingMode is "auto_grade" or "ai_grade"
+    const shouldAutoGrade = gradingMode === "auto_grade" || gradingMode === "ai_grade";
+    
+    if (!shouldAutoGrade) {
+      // Manual grading mode - just store the answer
+      console.log(`⏱️ Manual grading mode - answer stored, grade pending`);
+      gradePending = true;
+      // Don't grade - instructor will review later
+    } else if (questionType === "multiple_choice") {
       // For MCQ: Extract letter prefix from answer (e.g., "A. Some text" → "A")
       if (typeof answer === "string") {
         const letterMatch = answer.match(/^([A-D])\./);
