@@ -647,7 +647,7 @@ serve(async (req) => {
           starterCode: codingProblem.starterCode || "",
           testCases: codingProblem.testCases || [],
           expectedAnswer: "",
-          gradingMode: "manual_grade",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade", // FIXED: Use auto-grade pref
         };
       } else {
         // Fallback: Generate structured problem from simple question text
@@ -669,7 +669,7 @@ serve(async (req) => {
           starterCode: codingProblem.starterCode || "",
           testCases: codingProblem.testCases || [],
           expectedAnswer: "",
-          gradingMode: "manual_grade",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade", // FIXED: Use auto-grade pref
         };
       }
     } else if (finalType === "multiple_choice") {
@@ -696,6 +696,7 @@ serve(async (req) => {
           correctAnswer: correct_answer,
           explanation: explanation || "",
           source: "preview_edited",
+          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
         };
       } else {
         // Fallback: generate with AI
@@ -707,16 +708,16 @@ serve(async (req) => {
           options: mcq.options,
           correctAnswer: mcq.correctAnswer,
           explanation: mcq.explanation,
+          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
         };
       }
     } else {
-      // Short answer format - use AI grading if expected answer is available
-      // The expected_answer comes from generate-interval-question via the request
+      // Short answer format - use AI grading if auto-grade enabled AND expected answer available
       formattedQuestion = {
         question: question_text,
         type: "short_answer",
         expectedAnswer: expected_answer || "",
-        gradingMode: expected_answer ? "ai_grade" : "manual_grade",
+        gradingMode: (autoGradePrefs.short_answer && expected_answer) ? "auto_grade" : "manual_grade", // FIXED: Check auto-grade pref
       };
     }
 
