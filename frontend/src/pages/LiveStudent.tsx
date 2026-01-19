@@ -82,6 +82,7 @@ const LiveStudent = () => {
     setConfidenceLevel(null);
     setConfidenceMultiplier(1);
     setPointsEarned(0);
+    setGradePending(false); // Reset pending state
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
@@ -285,6 +286,7 @@ const LiveStudent = () => {
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [aiGradeComponents, setAiGradeComponents] = useState<any>(null);
   const [understandsConcept, setUnderstandsConcept] = useState<boolean | null>(null);
+  const [gradePending, setGradePending] = useState<boolean>(false); // NEW: Track if grade is pending
 
   // For short answer questions (with AI grading)
   const handleSubmit = async () => {
@@ -331,9 +333,13 @@ const LiveStudent = () => {
         setAiGrade(result.data.aiGrade || null);
         setAiFeedback(result.data.aiFeedback || null);
         setAiGradeComponents(result.data.gradeBreakdown?.components || null);
+        setGradePending(result.data.gradePending || false); // NEW: Set pending state
         setShowAccountPrompt(true);
         
-        if (result.data.aiGrade !== null) {
+        // Show appropriate feedback based on grading mode
+        if (result.data.gradePending) {
+          toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
+        } else if (result.data.aiGrade !== null) {
           const gradeText = `${result.data.aiGrade}%`;
           if (result.data.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
@@ -565,22 +571,55 @@ const LiveStudent = () => {
               {(currentQuestion.question_content.type === "coding" || 
                 currentQuestion.question_content.type === "coding_simple") && (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {currentQuestion.question_content.type === "coding_simple" && (
-                      <div className="text-xs text-muted-foreground bg-primary/5 p-2 rounded mb-2">
-                        💡 Quick check-in: Show you understand the concept. Minor errors won't hurt your grade!
+                      <div className="text-sm bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">💡</span>
+                          <div>
+                            <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                              Quick Concept Check-In
+                            </p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              Show you understand the concept. Minor syntax errors won't hurt your grade! Focus on demonstrating the core idea.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
-                    <Label className="text-sm text-muted-foreground">
-                      Write your code below ({currentQuestion.question_content.language || 'any language'}):
+                    
+                    {currentQuestion.question_content.type === "coding" && (
+                      <div className="text-sm bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">⚡</span>
+                          <div>
+                            <p className="font-medium text-purple-900 dark:text-purple-100 mb-1">
+                              Full Coding Challenge
+                            </p>
+                            <p className="text-xs text-purple-700 dark:text-purple-300">
+                              Write complete, working code. Your solution will be tested for correctness and efficiency.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Label className="text-sm font-medium">
+                      Write your code in {currentQuestion.question_content.language || 'Python'}:
                     </Label>
+                    
                     <CodeEditor
                       value={codeAnswer}
                       onChange={setCodeAnswer}
                       language={currentQuestion.question_content.language || 'python'}
-                      placeholder="// Write your solution here..."
+                      placeholder={currentQuestion.question_content.type === "coding_simple" 
+                        ? `# Quick check-in - show the core concept\n# Example: Write a for loop\n\n` 
+                        : `# Write your complete solution here\n\n`}
+                      height={currentQuestion.question_content.type === "coding_simple" ? "200px" : "300px"}
+                      simpleMode={currentQuestion.question_content.type === "coding_simple"}
                     />
                   </div>
+                  
                   <Button 
                     onClick={handleCodingSubmit} 
                     className="w-full" 
@@ -590,10 +629,16 @@ const LiveStudent = () => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Grading your code...
+                        {currentQuestion.question_content.type === "coding_simple" 
+                          ? "Checking your understanding..." 
+                          : "Testing your code..."}
                       </>
                     ) : (
-                      "Submit Code"
+                      <>
+                        {currentQuestion.question_content.type === "coding_simple" 
+                          ? "Submit Check-In" 
+                          : "Submit Solution"}
+                      </>
                     )}
                   </Button>
                 </>
@@ -652,18 +697,32 @@ const LiveStudent = () => {
                 </div>
               )}
 
-              {/* Fallback for non-MCQ without AI grade */}
+              {/* Fallback for non-MCQ without AI grade - Show pending or submitted status */}
               {!isMCQ && aiGrade === null && (
                 <>
-                  {isCorrect ? (
+                  {gradePending ? (
                     <>
-                      <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
-                      <p className="text-2xl font-bold text-primary">Submitted!</p>
+                      <div className="relative">
+                        <AlertCircle className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
+                        <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-2xl">⏱️</span>
+                        </div>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Answer Submitted
+                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                        <p className="text-blue-800 font-medium mb-1">⏰ Awaiting Grade</p>
+                        <p className="text-sm text-blue-600">
+                          Your instructor will review your submission and provide feedback soon.
+                        </p>
+                      </div>
                     </>
                   ) : (
                     <>
-                      <AlertCircle className="h-16 w-16 text-yellow-500 mx-auto animate-in zoom-in-50 duration-300" />
-                      <p className="text-xl font-bold text-yellow-600">Submitted - Pending Review</p>
+                      <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                      <p className="text-2xl font-bold text-primary">Submitted!</p>
+                      <p className="text-muted-foreground">Your answer has been recorded.</p>
                     </>
                   )}
                 </>
