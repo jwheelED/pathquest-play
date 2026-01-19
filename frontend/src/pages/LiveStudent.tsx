@@ -571,22 +571,55 @@ const LiveStudent = () => {
               {(currentQuestion.question_content.type === "coding" || 
                 currentQuestion.question_content.type === "coding_simple") && (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {currentQuestion.question_content.type === "coding_simple" && (
-                      <div className="text-xs text-muted-foreground bg-primary/5 p-2 rounded mb-2">
-                        💡 Quick check-in: Show you understand the concept. Minor errors won't hurt your grade!
+                      <div className="text-sm bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">💡</span>
+                          <div>
+                            <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                              Quick Concept Check-In
+                            </p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              Show you understand the concept. Minor syntax errors won't hurt your grade! Focus on demonstrating the core idea.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
-                    <Label className="text-sm text-muted-foreground">
-                      Write your code below ({currentQuestion.question_content.language || 'any language'}):
+                    
+                    {currentQuestion.question_content.type === "coding" && (
+                      <div className="text-sm bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">⚡</span>
+                          <div>
+                            <p className="font-medium text-purple-900 dark:text-purple-100 mb-1">
+                              Full Coding Challenge
+                            </p>
+                            <p className="text-xs text-purple-700 dark:text-purple-300">
+                              Write complete, working code. Your solution will be tested for correctness and efficiency.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Label className="text-sm font-medium">
+                      Write your code in {currentQuestion.question_content.language || 'Python'}:
                     </Label>
+                    
                     <CodeEditor
                       value={codeAnswer}
                       onChange={setCodeAnswer}
                       language={currentQuestion.question_content.language || 'python'}
-                      placeholder="// Write your solution here..."
+                      placeholder={currentQuestion.question_content.type === "coding_simple" 
+                        ? `# Quick check-in - show the core concept\n# Example: Write a for loop\n\n` 
+                        : `# Write your complete solution here\n\n`}
+                      height={currentQuestion.question_content.type === "coding_simple" ? "200px" : "300px"}
+                      simpleMode={currentQuestion.question_content.type === "coding_simple"}
                     />
                   </div>
+                  
                   <Button 
                     onClick={handleCodingSubmit} 
                     className="w-full" 
@@ -596,10 +629,16 @@ const LiveStudent = () => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Grading your code...
+                        {currentQuestion.question_content.type === "coding_simple" 
+                          ? "Checking your understanding..." 
+                          : "Testing your code..."}
                       </>
                     ) : (
-                      "Submit Code"
+                      <>
+                        {currentQuestion.question_content.type === "coding_simple" 
+                          ? "Submit Check-In" 
+                          : "Submit Solution"}
+                      </>
                     )}
                   </Button>
                 </>
