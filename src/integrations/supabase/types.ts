@@ -1,0 +1,4169 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
+  }
+  public: {
+    Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          points_reward: number
+          requirement_type: string
+          requirement_value: number
+          tier: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          icon: string
+          id?: string
+          name: string
+          points_reward?: number
+          requirement_type: string
+          requirement_value: number
+          tier?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          points_reward?: number
+          requirement_type?: string
+          requirement_value?: number
+          tier?: string
+        }
+        Relationships: []
+      }
+      adaptive_difficulty: {
+        Row: {
+          consecutive_correct: number
+          consecutive_incorrect: number
+          created_at: string
+          current_difficulty: string
+          difficulty_history: Json | null
+          id: string
+          last_difficulty_change: string | null
+          org_id: string | null
+          success_rate_by_level: Json | null
+          total_questions_at_level: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consecutive_correct?: number
+          consecutive_incorrect?: number
+          created_at?: string
+          current_difficulty?: string
+          difficulty_history?: Json | null
+          id?: string
+          last_difficulty_change?: string | null
+          org_id?: string | null
+          success_rate_by_level?: Json | null
+          total_questions_at_level?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consecutive_correct?: number
+          consecutive_incorrect?: number
+          created_at?: string
+          current_difficulty?: string
+          difficulty_history?: Json | null
+          id?: string
+          last_difficulty_change?: string | null
+          org_id?: string | null
+          success_rate_by_level?: Json | null
+          total_questions_at_level?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_difficulty_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_instructors: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          instructor_id: string
+          org_id: string | null
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_instructors_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_explanation_cache: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          explanation: string
+          id: string
+          last_used_at: string
+          question_hash: string
+          usage_count: number
+          wrong_answer: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          explanation: string
+          id?: string
+          last_used_at?: string
+          question_hash: string
+          usage_count?: number
+          wrong_answer: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          explanation?: string
+          id?: string
+          last_used_at?: string
+          question_hash?: string
+          usage_count?: number
+          wrong_answer?: string
+        }
+        Relationships: []
+      }
+      ai_quality_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          rating: string
+          rating_type: string
+          reference_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating: string
+          rating_type: string
+          reference_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          rating?: string
+          rating_type?: string
+          reference_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      answer_key_mcqs: {
+        Row: {
+          answer_key_id: string | null
+          correct_answer: string
+          correct_answer_latex: string | null
+          created_at: string
+          distractors: Json
+          explanation: string | null
+          explanation_latex: string | null
+          id: string
+          problem_id: string
+          question_latex: string | null
+          question_text: string
+          source_type: string | null
+          updated_at: string
+          usage_count: number | null
+          verified: boolean | null
+        }
+        Insert: {
+          answer_key_id?: string | null
+          correct_answer: string
+          correct_answer_latex?: string | null
+          created_at?: string
+          distractors?: Json
+          explanation?: string | null
+          explanation_latex?: string | null
+          id?: string
+          problem_id: string
+          question_latex?: string | null
+          question_text: string
+          source_type?: string | null
+          updated_at?: string
+          usage_count?: number | null
+          verified?: boolean | null
+        }
+        Update: {
+          answer_key_id?: string | null
+          correct_answer?: string
+          correct_answer_latex?: string | null
+          created_at?: string
+          distractors?: Json
+          explanation?: string | null
+          explanation_latex?: string | null
+          id?: string
+          problem_id?: string
+          question_latex?: string | null
+          question_text?: string
+          source_type?: string | null
+          updated_at?: string
+          usage_count?: number | null
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_key_mcqs_answer_key_id_fkey"
+            columns: ["answer_key_id"]
+            isOneToOne: false
+            referencedRelation: "instructor_answer_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_mcqs_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "answer_key_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      answer_key_problems: {
+        Row: {
+          answer_key_id: string
+          created_at: string
+          difficulty: string | null
+          final_answer: string | null
+          final_answer_latex: string | null
+          has_solution: boolean | null
+          id: string
+          keywords: string[] | null
+          order_index: number | null
+          problem_latex: string | null
+          problem_number: string | null
+          problem_text: string
+          solution_latex: string | null
+          solution_steps: Json | null
+          solution_text: string | null
+          topic_tags: string[] | null
+          units: string | null
+          updated_at: string
+          verification_notes: string | null
+          verified_by_instructor: boolean | null
+        }
+        Insert: {
+          answer_key_id: string
+          created_at?: string
+          difficulty?: string | null
+          final_answer?: string | null
+          final_answer_latex?: string | null
+          has_solution?: boolean | null
+          id?: string
+          keywords?: string[] | null
+          order_index?: number | null
+          problem_latex?: string | null
+          problem_number?: string | null
+          problem_text: string
+          solution_latex?: string | null
+          solution_steps?: Json | null
+          solution_text?: string | null
+          topic_tags?: string[] | null
+          units?: string | null
+          updated_at?: string
+          verification_notes?: string | null
+          verified_by_instructor?: boolean | null
+        }
+        Update: {
+          answer_key_id?: string
+          created_at?: string
+          difficulty?: string | null
+          final_answer?: string | null
+          final_answer_latex?: string | null
+          has_solution?: boolean | null
+          id?: string
+          keywords?: string[] | null
+          order_index?: number | null
+          problem_latex?: string | null
+          problem_number?: string | null
+          problem_text?: string
+          solution_latex?: string | null
+          solution_steps?: Json | null
+          solution_text?: string | null
+          topic_tags?: string[] | null
+          units?: string | null
+          updated_at?: string
+          verification_notes?: string | null
+          verified_by_instructor?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_key_problems_answer_key_id_fkey"
+            columns: ["answer_key_id"]
+            isOneToOne: false
+            referencedRelation: "instructor_answer_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      answer_key_usage_log: {
+        Row: {
+          id: string
+          instructor_id: string
+          match_confidence: number | null
+          match_keywords: string[] | null
+          mcq_id: string | null
+          problem_id: string | null
+          session_id: string | null
+          transcript_snippet: string | null
+          used_at: string
+        }
+        Insert: {
+          id?: string
+          instructor_id: string
+          match_confidence?: number | null
+          match_keywords?: string[] | null
+          mcq_id?: string | null
+          problem_id?: string | null
+          session_id?: string | null
+          transcript_snippet?: string | null
+          used_at?: string
+        }
+        Update: {
+          id?: string
+          instructor_id?: string
+          match_confidence?: number | null
+          match_keywords?: string[] | null
+          mcq_id?: string | null
+          problem_id?: string | null
+          session_id?: string | null
+          transcript_snippet?: string | null
+          used_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_key_usage_log_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_usage_log_mcq_id_fkey"
+            columns: ["mcq_id"]
+            isOneToOne: false
+            referencedRelation: "answer_key_mcqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_usage_log_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "answer_key_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answer_key_usage_log_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      answer_version_history: {
+        Row: {
+          answer_copied: boolean | null
+          answer_copy_count: number | null
+          answer_copy_events: Json | null
+          assignment_id: string
+          created_at: string
+          editing_events_after_first_paste: number | null
+          final_answer_length: number | null
+          first_interaction_at: string | null
+          first_interaction_size: number | null
+          first_interaction_type: string | null
+          id: string
+          longest_absence_seconds: number
+          pasted_count: number
+          question_copied: boolean | null
+          question_copied_at: string | null
+          question_displayed_at: string | null
+          student_id: string
+          switched_away_immediately: boolean
+          tab_switch_count: number
+          tab_switches: Json
+          total_time_away_seconds: number
+          typed_count: number
+          updated_at: string
+          version_events: Json
+        }
+        Insert: {
+          answer_copied?: boolean | null
+          answer_copy_count?: number | null
+          answer_copy_events?: Json | null
+          assignment_id: string
+          created_at?: string
+          editing_events_after_first_paste?: number | null
+          final_answer_length?: number | null
+          first_interaction_at?: string | null
+          first_interaction_size?: number | null
+          first_interaction_type?: string | null
+          id?: string
+          longest_absence_seconds?: number
+          pasted_count?: number
+          question_copied?: boolean | null
+          question_copied_at?: string | null
+          question_displayed_at?: string | null
+          student_id: string
+          switched_away_immediately?: boolean
+          tab_switch_count?: number
+          tab_switches?: Json
+          total_time_away_seconds?: number
+          typed_count?: number
+          updated_at?: string
+          version_events?: Json
+        }
+        Update: {
+          answer_copied?: boolean | null
+          answer_copy_count?: number | null
+          answer_copy_events?: Json | null
+          assignment_id?: string
+          created_at?: string
+          editing_events_after_first_paste?: number | null
+          final_answer_length?: number | null
+          first_interaction_at?: string | null
+          first_interaction_size?: number | null
+          first_interaction_type?: string | null
+          id?: string
+          longest_absence_seconds?: number
+          pasted_count?: number
+          question_copied?: boolean | null
+          question_copied_at?: string | null
+          question_displayed_at?: string | null
+          student_id?: string
+          switched_away_immediately?: boolean
+          tab_switch_count?: number
+          tab_switches?: Json
+          total_time_away_seconds?: number
+          typed_count?: number
+          updated_at?: string
+          version_events?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answer_version_history_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "student_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_streaks: {
+        Row: {
+          created_at: string
+          current_streak: number
+          id: string
+          last_correct_date: string | null
+          longest_streak: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_correct_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_correct_date?: string | null
+          longest_streak?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      content_drafts: {
+        Row: {
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          code_example: string | null
+          created_at: string
+          demo_snippets: Json | null
+          id: string
+          instructor_id: string
+          org_id: string | null
+          slide_text: string
+          status: Database["public"]["Enums"]["draft_status"]
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          code_example?: string | null
+          created_at?: string
+          demo_snippets?: Json | null
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          slide_text: string
+          status?: Database["public"]["Enums"]["draft_status"]
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_type?: Database["public"]["Enums"]["assignment_type"]
+          code_example?: string | null
+          created_at?: string
+          demo_snippets?: Json | null
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          slide_text?: string
+          status?: Database["public"]["Enums"]["draft_status"]
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_drafts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courses: {
+        Row: {
+          archived_at: string | null
+          course_code: string
+          course_type: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          instructor_id: string
+          is_active: boolean | null
+          org_id: string | null
+          schedule: string | null
+          title: string
+          topics: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          course_code?: string
+          course_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          instructor_id: string
+          is_active?: boolean | null
+          org_id?: string | null
+          schedule?: string | null
+          title: string
+          topics?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          course_code?: string
+          course_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          instructor_id?: string
+          is_active?: boolean | null
+          org_id?: string | null
+          schedule?: string | null
+          title?: string
+          topics?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_challenges: {
+        Row: {
+          challenge_date: string
+          challenge_type: string
+          coins_reward: number
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          current_progress: number
+          id: string
+          org_id: string | null
+          target_value: number
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          challenge_date?: string
+          challenge_type: string
+          coins_reward?: number
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_progress?: number
+          id?: string
+          org_id?: string | null
+          target_value: number
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          challenge_date?: string
+          challenge_type?: string
+          coins_reward?: number
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_progress?: number
+          id?: string
+          org_id?: string | null
+          target_value?: number
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_challenges_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagram_generations: {
+        Row: {
+          concept_context: string
+          created_at: string
+          id: string
+          image_data: string
+          question_text: string | null
+          student_id: string
+        }
+        Insert: {
+          concept_context: string
+          created_at?: string
+          id?: string
+          image_data: string
+          question_text?: string | null
+          student_id: string
+        }
+        Update: {
+          concept_context?: string
+          created_at?: string
+          id?: string
+          image_data?: string
+          question_text?: string | null
+          student_id?: string
+        }
+        Relationships: []
+      }
+      grade_sync_log: {
+        Row: {
+          activity_progress: string | null
+          assignment_id: string
+          assignment_type: string
+          context_id: string | null
+          error_message: string | null
+          grading_progress: string | null
+          id: string
+          lms_response: Json | null
+          lti_user_id: string | null
+          retry_count: number | null
+          score_given: number
+          score_maximum: number
+          student_id: string
+          sync_status: string
+          synced_at: string
+        }
+        Insert: {
+          activity_progress?: string | null
+          assignment_id: string
+          assignment_type: string
+          context_id?: string | null
+          error_message?: string | null
+          grading_progress?: string | null
+          id?: string
+          lms_response?: Json | null
+          lti_user_id?: string | null
+          retry_count?: number | null
+          score_given: number
+          score_maximum?: number
+          student_id: string
+          sync_status?: string
+          synced_at?: string
+        }
+        Update: {
+          activity_progress?: string | null
+          assignment_id?: string
+          assignment_type?: string
+          context_id?: string | null
+          error_message?: string | null
+          grading_progress?: string | null
+          id?: string
+          lms_response?: Json | null
+          lti_user_id?: string | null
+          retry_count?: number | null
+          score_given?: number
+          score_maximum?: number
+          student_id?: string
+          sync_status?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_sync_log_context_id_fkey"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "lti_contexts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_answer_keys: {
+        Row: {
+          content_type: string | null
+          course_context: string | null
+          course_id: string | null
+          created_at: string
+          file_name: string | null
+          file_path: string | null
+          file_type: string | null
+          id: string
+          instructor_id: string
+          org_id: string | null
+          problem_count: number | null
+          status: string
+          subject: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_type?: string | null
+          course_context?: string | null
+          course_id?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          problem_count?: number | null
+          status?: string
+          subject: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string | null
+          course_context?: string | null
+          course_id?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_type?: string | null
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          problem_count?: number | null
+          status?: string
+          subject?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_answer_keys_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_answer_keys_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_answer_keys_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          invited_by: string | null
+          org_id: string
+          status: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          invited_by?: string | null
+          org_id: string
+          status?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          invited_by?: string | null
+          org_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_invites_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_students: {
+        Row: {
+          course_id: string | null
+          created_at: string | null
+          id: string
+          instructor_id: string
+          org_id: string | null
+          student_id: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string | null
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          student_id: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string | null
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_instructor_students_course"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_students_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_usage_tracking: {
+        Row: {
+          created_at: string
+          id: string
+          instructor_id: string
+          minutes_limit: number
+          minutes_used: number
+          org_id: string | null
+          updated_at: string
+          usage_month: string
+          warning_100_sent: boolean
+          warning_75_sent: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructor_id: string
+          minutes_limit?: number
+          minutes_used?: number
+          org_id?: string | null
+          updated_at?: string
+          usage_month?: string
+          warning_100_sent?: boolean
+          warning_75_sent?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          minutes_limit?: number
+          minutes_used?: number
+          org_id?: string | null
+          updated_at?: string
+          usage_month?: string
+          warning_100_sent?: boolean
+          warning_75_sent?: boolean
+        }
+        Relationships: []
+      }
+      lecture_concept_map: {
+        Row: {
+          concept_name: string
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          end_timestamp: number
+          id: string
+          lecture_video_id: string
+          prerequisites: string[] | null
+          start_timestamp: number
+        }
+        Insert: {
+          concept_name: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          end_timestamp: number
+          id?: string
+          lecture_video_id: string
+          prerequisites?: string[] | null
+          start_timestamp: number
+        }
+        Update: {
+          concept_name?: string
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          end_timestamp?: number
+          id?: string
+          lecture_video_id?: string
+          prerequisites?: string[] | null
+          start_timestamp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_concept_map_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_materials: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          instructor_id: string
+          org_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_materials_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_materials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_medical_entities: {
+        Row: {
+          clinical_context: Json | null
+          created_at: string
+          description: string | null
+          end_timestamp: number | null
+          entity_name: string
+          entity_type: string
+          id: string
+          lecture_video_id: string
+          related_entities: string[] | null
+          start_timestamp: number | null
+        }
+        Insert: {
+          clinical_context?: Json | null
+          created_at?: string
+          description?: string | null
+          end_timestamp?: number | null
+          entity_name: string
+          entity_type: string
+          id?: string
+          lecture_video_id: string
+          related_entities?: string[] | null
+          start_timestamp?: number | null
+        }
+        Update: {
+          clinical_context?: Json | null
+          created_at?: string
+          description?: string | null
+          end_timestamp?: number | null
+          entity_name?: string
+          entity_type?: string
+          id?: string
+          lecture_video_id?: string
+          related_entities?: string[] | null
+          start_timestamp?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_medical_entities_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_pause_points: {
+        Row: {
+          cognitive_load_score: number | null
+          created_at: string
+          difficulty_type: string | null
+          follow_up_questions: Json | null
+          id: string
+          is_active: boolean | null
+          lecture_video_id: string
+          order_index: number
+          pause_timestamp: number
+          question_content: Json
+          question_type: string
+          reason: string | null
+          why_not_other_choices: Json | null
+        }
+        Insert: {
+          cognitive_load_score?: number | null
+          created_at?: string
+          difficulty_type?: string | null
+          follow_up_questions?: Json | null
+          id?: string
+          is_active?: boolean | null
+          lecture_video_id: string
+          order_index: number
+          pause_timestamp: number
+          question_content: Json
+          question_type: string
+          reason?: string | null
+          why_not_other_choices?: Json | null
+        }
+        Update: {
+          cognitive_load_score?: number | null
+          created_at?: string
+          difficulty_type?: string | null
+          follow_up_questions?: Json | null
+          id?: string
+          is_active?: boolean | null
+          lecture_video_id?: string
+          order_index?: number
+          pause_timestamp?: number
+          question_content?: Json
+          question_type?: string
+          reason?: string | null
+          why_not_other_choices?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_pause_points_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_questions: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          id: string
+          instructor_id: string
+          org_id: string | null
+          questions: Json
+          status: string
+          transcript_snippet: string
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          questions: Json
+          status?: string
+          transcript_snippet: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          questions?: Json
+          status?: string
+          transcript_snippet?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_questions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_videos: {
+        Row: {
+          cognitive_analysis: Json | null
+          course_id: string | null
+          created_at: string
+          description: string | null
+          domain_type: string | null
+          duration_seconds: number | null
+          error_message: string | null
+          extracted_entities: Json | null
+          id: string
+          instructor_id: string
+          org_id: string | null
+          published: boolean | null
+          question_count: number | null
+          status: string | null
+          title: string
+          transcript: Json | null
+          updated_at: string
+          video_path: string
+          video_url: string | null
+        }
+        Insert: {
+          cognitive_analysis?: Json | null
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          domain_type?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          extracted_entities?: Json | null
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          published?: boolean | null
+          question_count?: number | null
+          status?: string | null
+          title: string
+          transcript?: Json | null
+          updated_at?: string
+          video_path: string
+          video_url?: string | null
+        }
+        Update: {
+          cognitive_analysis?: Json | null
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          domain_type?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          extracted_entities?: Json | null
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          published?: boolean | null
+          question_count?: number | null
+          status?: string | null
+          title?: string
+          transcript?: Json | null
+          updated_at?: string
+          video_path?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_videos_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_videos_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_videos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_mastery: {
+        Row: {
+          attempt_count: number
+          created_at: string | null
+          id: string
+          is_mastered: boolean
+          last_attempt_date: string | null
+          lesson_id: string
+          mastery_threshold: number
+          successful_attempts: number
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string | null
+          id?: string
+          is_mastered?: boolean
+          last_attempt_date?: string | null
+          lesson_id: string
+          mastery_threshold?: number
+          successful_attempts?: number
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string | null
+          id?: string
+          is_mastered?: boolean
+          last_attempt_date?: string | null
+          lesson_id?: string
+          mastery_threshold?: number
+          successful_attempts?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_mastery_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_progress: {
+        Row: {
+          completed: boolean
+          created_at: string | null
+          id: string
+          lesson_id: string
+          org_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string | null
+          id?: string
+          lesson_id: string
+          org_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string | null
+          id?: string
+          lesson_id?: string
+          org_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lessons: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          step_number: number
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          step_number: number
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          step_number?: number
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      live_participants: {
+        Row: {
+          id: string
+          joined_at: string
+          last_seen_at: string
+          nickname: string
+          session_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          last_seen_at?: string
+          nickname: string
+          session_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          last_seen_at?: string
+          nickname?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_questions: {
+        Row: {
+          id: string
+          instructor_id: string
+          question_content: Json
+          question_number: number
+          sent_at: string
+          session_id: string
+        }
+        Insert: {
+          id?: string
+          instructor_id: string
+          question_content: Json
+          question_number: number
+          sent_at?: string
+          session_id: string
+        }
+        Update: {
+          id?: string
+          instructor_id?: string
+          question_content?: Json
+          question_number?: number
+          sent_at?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_responses: {
+        Row: {
+          ai_feedback: string | null
+          ai_grade: number | null
+          answer: string
+          confidence_level: string | null
+          confidence_multiplier: number | null
+          id: string
+          is_correct: boolean
+          participant_id: string
+          points_earned: number | null
+          question_id: string
+          responded_at: string
+          response_time_ms: number | null
+        }
+        Insert: {
+          ai_feedback?: string | null
+          ai_grade?: number | null
+          answer: string
+          confidence_level?: string | null
+          confidence_multiplier?: number | null
+          id?: string
+          is_correct: boolean
+          participant_id: string
+          points_earned?: number | null
+          question_id: string
+          responded_at?: string
+          response_time_ms?: number | null
+        }
+        Update: {
+          ai_feedback?: string | null
+          ai_grade?: number | null
+          answer?: string
+          confidence_level?: string | null
+          confidence_multiplier?: number | null
+          id?: string
+          is_correct?: boolean
+          participant_id?: string
+          points_earned?: number | null
+          question_id?: string
+          responded_at?: string
+          response_time_ms?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_responses_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "live_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_responses_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "live_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_sessions: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          ends_at: string
+          id: string
+          instructor_id: string
+          is_active: boolean
+          org_id: string | null
+          session_code: string
+          title: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          ends_at?: string
+          id?: string
+          instructor_id: string
+          is_active?: boolean
+          org_id?: string | null
+          session_code: string
+          title: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          ends_at?: string
+          id?: string
+          instructor_id?: string
+          is_active?: boolean
+          org_id?: string | null
+          session_code?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sessions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sessions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_contexts: {
+        Row: {
+          context_id: string
+          context_title: string | null
+          created_at: string
+          id: string
+          instructor_id: string
+          lineitem_url: string | null
+          lineitems_url: string | null
+          platform_id: string
+          resource_link_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          context_id: string
+          context_title?: string | null
+          created_at?: string
+          id?: string
+          instructor_id: string
+          lineitem_url?: string | null
+          lineitems_url?: string | null
+          platform_id: string
+          resource_link_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          context_id?: string
+          context_title?: string | null
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          lineitem_url?: string | null
+          lineitems_url?: string | null
+          platform_id?: string
+          resource_link_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_contexts_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_platforms: {
+        Row: {
+          ags_scopes: string[] | null
+          auth_url: string
+          client_id: string
+          created_at: string
+          deployment_id: string | null
+          id: string
+          is_active: boolean | null
+          issuer: string
+          jwks_url: string
+          org_id: string | null
+          platform_name: string
+          platform_type: string
+          token_url: string
+          updated_at: string
+        }
+        Insert: {
+          ags_scopes?: string[] | null
+          auth_url: string
+          client_id: string
+          created_at?: string
+          deployment_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          issuer: string
+          jwks_url: string
+          org_id?: string | null
+          platform_name: string
+          platform_type: string
+          token_url: string
+          updated_at?: string
+        }
+        Update: {
+          ags_scopes?: string[] | null
+          auth_url?: string
+          client_id?: string
+          created_at?: string
+          deployment_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          issuer?: string
+          jwks_url?: string
+          org_id?: string | null
+          platform_name?: string
+          platform_type?: string
+          token_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_platforms_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_session_tokens: {
+        Row: {
+          context_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          is_instructor: boolean
+          platform_id: string
+          redirect_path: string
+          token: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          context_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_instructor?: boolean
+          platform_id: string
+          redirect_path?: string
+          token: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          context_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_instructor?: boolean
+          platform_id?: string
+          redirect_path?: string
+          token?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_session_tokens_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_token_cache: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          platform_id: string
+          scope: string | null
+          token_type: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          platform_id: string
+          scope?: string | null
+          token_type?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          platform_id?: string
+          scope?: string | null
+          token_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_token_cache_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lti_tool_keys: {
+        Row: {
+          algorithm: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          kid: string
+          private_key: string
+          public_key: string
+        }
+        Insert: {
+          algorithm?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          kid: string
+          private_key: string
+          public_key: string
+        }
+        Update: {
+          algorithm?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          kid?: string
+          private_key?: string
+          public_key?: string
+        }
+        Relationships: []
+      }
+      lti_users: {
+        Row: {
+          created_at: string
+          edvana_user_id: string | null
+          email: string | null
+          id: string
+          lti_user_id: string
+          name: string | null
+          platform_id: string
+          roles: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          edvana_user_id?: string | null
+          email?: string | null
+          id?: string
+          lti_user_id: string
+          name?: string | null
+          platform_id: string
+          roles?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          edvana_user_id?: string | null
+          email?: string | null
+          id?: string
+          lti_user_id?: string
+          name?: string | null
+          platform_id?: string
+          roles?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lti_users_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "lti_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          org_id: string | null
+          read: boolean | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          org_id?: string | null
+          read?: boolean | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          org_id?: string | null
+          read?: boolean | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_domains: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          domain: string
+          id: string
+          org_id: string
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          domain: string
+          id?: string
+          org_id: string
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          domain?: string
+          id?: string
+          org_id?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_domains_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_domains_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          admin_code: string
+          created_at: string | null
+          id: string
+          instructor_invite_code: string
+          name: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          admin_code: string
+          created_at?: string | null
+          id?: string
+          instructor_invite_code: string
+          name: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          admin_code?: string
+          created_at?: string | null
+          id?: string
+          instructor_invite_code?: string
+          name?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      personalized_questions: {
+        Row: {
+          correct_answer: string
+          created_at: string | null
+          difficulty: string
+          explanation: string
+          id: string
+          instructor_id: string | null
+          options: Json | null
+          org_id: string | null
+          points_reward: number
+          question_text: string
+          question_type: string
+          source_material_id: string | null
+          times_attempted: number | null
+          times_correct: number | null
+          topic_tags: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string | null
+          difficulty: string
+          explanation: string
+          id?: string
+          instructor_id?: string | null
+          options?: Json | null
+          org_id?: string | null
+          points_reward?: number
+          question_text: string
+          question_type: string
+          source_material_id?: string | null
+          times_attempted?: number | null
+          times_correct?: number | null
+          topic_tags?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string | null
+          difficulty?: string
+          explanation?: string
+          id?: string
+          instructor_id?: string | null
+          options?: Json | null
+          org_id?: string | null
+          points_reward?: number
+          question_text?: string
+          question_type?: string
+          source_material_id?: string | null
+          times_attempted?: number | null
+          times_correct?: number | null
+          topic_tags?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personalized_questions_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personalized_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personalized_questions_source_material_id_fkey"
+            columns: ["source_material_id"]
+            isOneToOne: false
+            referencedRelation: "student_study_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pilot_rebates: {
+        Row: {
+          claimed_at: string | null
+          created_at: string
+          eligible_until: string
+          id: string
+          institutional_subscription_id: string | null
+          instructor_id: string
+          original_amount_cents: number
+          refund_amount_cents: number | null
+          status: string
+          stripe_payment_intent_id: string
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          created_at?: string
+          eligible_until: string
+          id?: string
+          institutional_subscription_id?: string | null
+          instructor_id: string
+          original_amount_cents: number
+          refund_amount_cents?: number | null
+          status?: string
+          stripe_payment_intent_id: string
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          created_at?: string
+          eligible_until?: string
+          id?: string
+          institutional_subscription_id?: string | null
+          instructor_id?: string
+          original_amount_cents?: number
+          refund_amount_cents?: number | null
+          status?: string
+          stripe_payment_intent_id?: string
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pilot_rebates_institutional_subscription_id_fkey"
+            columns: ["institutional_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pilot_rebates_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pilot_rebates_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      practice_goals: {
+        Row: {
+          completed: boolean
+          created_at: string
+          current_progress: number
+          deadline: string
+          goal_type: string
+          id: string
+          org_id: string | null
+          target_value: number
+          updated_at: string
+          user_id: string
+          xp_reward: number
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          current_progress?: number
+          deadline: string
+          goal_type: string
+          id?: string
+          org_id?: string | null
+          target_value: number
+          updated_at?: string
+          user_id: string
+          xp_reward?: number
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          current_progress?: number
+          deadline?: string
+          goal_type?: string
+          id?: string
+          org_id?: string | null
+          target_value?: number
+          updated_at?: string
+          user_id?: string
+          xp_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_goals_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      practice_sessions: {
+        Row: {
+          coins_earned: number
+          confidence_level: string
+          confidence_multiplier: number
+          created_at: string | null
+          id: string
+          is_correct: boolean
+          org_id: string | null
+          problem_id: string
+          problem_text: string
+          time_spent_seconds: number | null
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          coins_earned: number
+          confidence_level: string
+          confidence_multiplier: number
+          created_at?: string | null
+          id?: string
+          is_correct: boolean
+          org_id?: string | null
+          problem_id: string
+          problem_text: string
+          time_spent_seconds?: number | null
+          user_id: string
+          xp_earned: number
+        }
+        Update: {
+          coins_earned?: number
+          confidence_level?: string
+          confidence_multiplier?: number
+          created_at?: string | null
+          id?: string
+          is_correct?: boolean
+          org_id?: string | null
+          problem_id?: string
+          problem_text?: string
+          time_spent_seconds?: number | null
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_sessions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      problem_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          is_correct: boolean
+          problem_id: string
+          time_spent_seconds: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_correct: boolean
+          problem_id: string
+          time_spent_seconds?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          problem_id?: string
+          time_spent_seconds?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems_student_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "problem_attempts_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "student_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          admin_code: string | null
+          auto_grade_coding: boolean | null
+          auto_grade_mcq: boolean | null
+          auto_grade_model: string
+          auto_grade_short_answer: boolean | null
+          auto_question_enabled: boolean | null
+          auto_question_force_send: boolean | null
+          auto_question_interval: number | null
+          auto_question_strict_mode: boolean | null
+          coding_question_style: string | null
+          course_schedule: string | null
+          course_title: string | null
+          course_topics: string[] | null
+          created_at: string | null
+          daily_question_limit: number | null
+          detection_model: string
+          difficulty_mix: Json | null
+          exam_style_preference: string | null
+          experience_level: string | null
+          full_name: string | null
+          generation_model: string
+          goals: string[] | null
+          id: string
+          instructor_code: string | null
+          interval_question_model: string
+          last_auto_question_at: string | null
+          lecture_preferences: Json | null
+          medical_specialty: string | null
+          onboarded: boolean | null
+          org_id: string | null
+          professor_type: Database["public"]["Enums"]["professor_type"] | null
+          question_difficulty_preference: string | null
+          question_format_preference: string | null
+          question_preset: string | null
+          question_preview_enabled: boolean | null
+          study_days: string[] | null
+          style_mix: Json | null
+          transcription_model: string
+        }
+        Insert: {
+          admin_code?: string | null
+          auto_grade_coding?: boolean | null
+          auto_grade_mcq?: boolean | null
+          auto_grade_model?: string
+          auto_grade_short_answer?: boolean | null
+          auto_question_enabled?: boolean | null
+          auto_question_force_send?: boolean | null
+          auto_question_interval?: number | null
+          auto_question_strict_mode?: boolean | null
+          coding_question_style?: string | null
+          course_schedule?: string | null
+          course_title?: string | null
+          course_topics?: string[] | null
+          created_at?: string | null
+          daily_question_limit?: number | null
+          detection_model?: string
+          difficulty_mix?: Json | null
+          exam_style_preference?: string | null
+          experience_level?: string | null
+          full_name?: string | null
+          generation_model?: string
+          goals?: string[] | null
+          id: string
+          instructor_code?: string | null
+          interval_question_model?: string
+          last_auto_question_at?: string | null
+          lecture_preferences?: Json | null
+          medical_specialty?: string | null
+          onboarded?: boolean | null
+          org_id?: string | null
+          professor_type?: Database["public"]["Enums"]["professor_type"] | null
+          question_difficulty_preference?: string | null
+          question_format_preference?: string | null
+          question_preset?: string | null
+          question_preview_enabled?: boolean | null
+          study_days?: string[] | null
+          style_mix?: Json | null
+          transcription_model?: string
+        }
+        Update: {
+          admin_code?: string | null
+          auto_grade_coding?: boolean | null
+          auto_grade_mcq?: boolean | null
+          auto_grade_model?: string
+          auto_grade_short_answer?: boolean | null
+          auto_question_enabled?: boolean | null
+          auto_question_force_send?: boolean | null
+          auto_question_interval?: number | null
+          auto_question_strict_mode?: boolean | null
+          coding_question_style?: string | null
+          course_schedule?: string | null
+          course_title?: string | null
+          course_topics?: string[] | null
+          created_at?: string | null
+          daily_question_limit?: number | null
+          detection_model?: string
+          difficulty_mix?: Json | null
+          exam_style_preference?: string | null
+          experience_level?: string | null
+          full_name?: string | null
+          generation_model?: string
+          goals?: string[] | null
+          id?: string
+          instructor_code?: string | null
+          interval_question_model?: string
+          last_auto_question_at?: string | null
+          lecture_preferences?: Json | null
+          medical_specialty?: string | null
+          onboarded?: boolean | null
+          org_id?: string | null
+          professor_type?: Database["public"]["Enums"]["professor_type"] | null
+          question_difficulty_preference?: string | null
+          question_format_preference?: string | null
+          question_preset?: string | null
+          question_preview_enabled?: boolean | null
+          study_days?: string[] | null
+          style_mix?: Json | null
+          transcription_model?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_reports: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          pause_point_id: string
+          report_type: string
+          resolved_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          student_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          pause_point_id: string
+          report_type: string
+          resolved_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          student_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          pause_point_id?: string
+          report_type?: string
+          resolved_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_reports_pause_point_id_fkey"
+            columns: ["pause_point_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_pause_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_send_logs: {
+        Row: {
+          ai_confidence: number | null
+          batch_count: number | null
+          created_at: string | null
+          error_message: string | null
+          error_type: string | null
+          failed_sends: number
+          id: string
+          instructor_id: string
+          processing_time_ms: number | null
+          question_text: string
+          question_type: string
+          source: string
+          student_count: number
+          success: boolean
+          successful_sends: number
+        }
+        Insert: {
+          ai_confidence?: number | null
+          batch_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          failed_sends?: number
+          id?: string
+          instructor_id: string
+          processing_time_ms?: number | null
+          question_text: string
+          question_type: string
+          source: string
+          student_count: number
+          success: boolean
+          successful_sends?: number
+        }
+        Update: {
+          ai_confidence?: number | null
+          batch_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          failed_sends?: number
+          id?: string
+          instructor_id?: string
+          processing_time_ms?: number | null
+          question_text?: string
+          question_type?: string
+          source?: string
+          student_count?: number
+          success?: boolean
+          successful_sends?: number
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          count: number
+          created_at: string
+          id: string
+          key: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          created_at?: string
+          id?: string
+          key: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          id?: string
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      remediation_history: {
+        Row: {
+          ai_explanation: string
+          created_at: string
+          follow_up_answered: boolean | null
+          follow_up_correct: boolean | null
+          follow_up_question: Json | null
+          id: string
+          lecture_video_id: string
+          misconception_detected: string
+          missing_concept: string | null
+          pause_point_id: string | null
+          remediation_end_timestamp: number | null
+          remediation_timestamp: number
+          resolved: boolean | null
+          resolved_at: string | null
+          student_id: string
+        }
+        Insert: {
+          ai_explanation: string
+          created_at?: string
+          follow_up_answered?: boolean | null
+          follow_up_correct?: boolean | null
+          follow_up_question?: Json | null
+          id?: string
+          lecture_video_id: string
+          misconception_detected: string
+          missing_concept?: string | null
+          pause_point_id?: string | null
+          remediation_end_timestamp?: number | null
+          remediation_timestamp: number
+          resolved?: boolean | null
+          resolved_at?: string | null
+          student_id: string
+        }
+        Update: {
+          ai_explanation?: string
+          created_at?: string
+          follow_up_answered?: boolean | null
+          follow_up_correct?: boolean | null
+          follow_up_question?: Json | null
+          id?: string
+          lecture_video_id?: string
+          misconception_detected?: string
+          missing_concept?: string | null
+          pause_point_id?: string | null
+          remediation_end_timestamp?: number | null
+          remediation_timestamp?: number
+          resolved?: boolean | null
+          resolved_at?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remediation_history_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_history_pause_point_id_fkey"
+            columns: ["pause_point_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_pause_points"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remediation_history_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_allocations: {
+        Row: {
+          allocated_at: string
+          allocated_by: string | null
+          allocated_seats: number
+          id: string
+          instructor_id: string
+          notes: string | null
+          seat_license_id: string
+        }
+        Insert: {
+          allocated_at?: string
+          allocated_by?: string | null
+          allocated_seats?: number
+          id?: string
+          instructor_id: string
+          notes?: string | null
+          seat_license_id: string
+        }
+        Update: {
+          allocated_at?: string
+          allocated_by?: string | null
+          allocated_seats?: number
+          id?: string
+          instructor_id?: string
+          notes?: string | null
+          seat_license_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_allocations_allocated_by_fkey"
+            columns: ["allocated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_allocations_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_allocations_seat_license_id_fkey"
+            columns: ["seat_license_id"]
+            isOneToOne: false
+            referencedRelation: "seat_licenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seat_licenses: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          price_per_seat_cents: number
+          subscription_id: string
+          total_seats: number
+          updated_at: string
+          used_seats: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          price_per_seat_cents: number
+          subscription_id: string
+          total_seats: number
+          updated_at?: string
+          used_seats?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          price_per_seat_cents?: number
+          subscription_id?: string
+          total_seats?: number
+          updated_at?: string
+          used_seats?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seat_licenses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seat_licenses_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spaced_repetition: {
+        Row: {
+          created_at: string
+          ease_factor: number
+          id: string
+          interval_days: number
+          last_reviewed_date: string | null
+          next_review_date: string
+          problem_id: string
+          repetition_number: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ease_factor?: number
+          id?: string
+          interval_days?: number
+          last_reviewed_date?: string | null
+          next_review_date?: string
+          problem_id: string
+          repetition_number?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ease_factor?: number
+          id?: string
+          interval_days?: number
+          last_reviewed_date?: string | null
+          next_review_date?: string
+          problem_id?: string
+          repetition_number?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spaced_repetition_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaced_repetition_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "stem_problems_student_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spaced_repetition_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "student_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stem_problems: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          difficulty: string
+          explanation: string | null
+          id: string
+          options: Json | null
+          points_reward: number
+          problem_text: string
+          subject: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          difficulty: string
+          explanation?: string | null
+          id?: string
+          options?: Json | null
+          points_reward?: number
+          problem_text: string
+          subject: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          difficulty?: string
+          explanation?: string | null
+          id?: string
+          options?: Json | null
+          points_reward?: number
+          problem_text?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      student_assignments: {
+        Row: {
+          ai_summary: Json | null
+          answers_released: boolean
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          auto_delete_at: string | null
+          auto_release_at: string | null
+          auto_release_enabled: boolean | null
+          auto_release_minutes: number | null
+          completed: boolean
+          content: Json
+          course_id: string | null
+          created_at: string
+          draft_id: string | null
+          grade: number | null
+          id: string
+          instructor_id: string
+          mode: Database["public"]["Enums"]["assignment_mode"]
+          opened_at: string | null
+          org_id: string | null
+          quiz_responses: Json | null
+          release_method: string | null
+          response_time_seconds: number | null
+          saved_by_student: boolean | null
+          student_id: string
+          title: string
+        }
+        Insert: {
+          ai_summary?: Json | null
+          answers_released?: boolean
+          assignment_type: Database["public"]["Enums"]["assignment_type"]
+          auto_delete_at?: string | null
+          auto_release_at?: string | null
+          auto_release_enabled?: boolean | null
+          auto_release_minutes?: number | null
+          completed?: boolean
+          content: Json
+          course_id?: string | null
+          created_at?: string
+          draft_id?: string | null
+          grade?: number | null
+          id?: string
+          instructor_id: string
+          mode: Database["public"]["Enums"]["assignment_mode"]
+          opened_at?: string | null
+          org_id?: string | null
+          quiz_responses?: Json | null
+          release_method?: string | null
+          response_time_seconds?: number | null
+          saved_by_student?: boolean | null
+          student_id: string
+          title: string
+        }
+        Update: {
+          ai_summary?: Json | null
+          answers_released?: boolean
+          assignment_type?: Database["public"]["Enums"]["assignment_type"]
+          auto_delete_at?: string | null
+          auto_release_at?: string | null
+          auto_release_enabled?: boolean | null
+          auto_release_minutes?: number | null
+          completed?: boolean
+          content?: Json
+          course_id?: string | null
+          created_at?: string
+          draft_id?: string | null
+          grade?: number | null
+          id?: string
+          instructor_id?: string
+          mode?: Database["public"]["Enums"]["assignment_mode"]
+          opened_at?: string | null
+          org_id?: string | null
+          quiz_responses?: Json | null
+          release_method?: string | null
+          response_time_seconds?: number | null
+          saved_by_student?: boolean | null
+          student_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_assignments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_assignments_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "content_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_assignments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_concept_mastery: {
+        Row: {
+          concept_name: string
+          correct_attempts: number | null
+          created_at: string | null
+          decay_factor: number | null
+          error_patterns: Json | null
+          id: string
+          last_practiced_at: string | null
+          mastery_level: string | null
+          next_review_at: string | null
+          org_id: string | null
+          performance_by_type: Json | null
+          related_lectures: string[] | null
+          strength_score: number | null
+          student_id: string
+          total_attempts: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          concept_name: string
+          correct_attempts?: number | null
+          created_at?: string | null
+          decay_factor?: number | null
+          error_patterns?: Json | null
+          id?: string
+          last_practiced_at?: string | null
+          mastery_level?: string | null
+          next_review_at?: string | null
+          org_id?: string | null
+          performance_by_type?: Json | null
+          related_lectures?: string[] | null
+          strength_score?: number | null
+          student_id: string
+          total_attempts?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          concept_name?: string
+          correct_attempts?: number | null
+          created_at?: string | null
+          decay_factor?: number | null
+          error_patterns?: Json | null
+          id?: string
+          last_practiced_at?: string | null
+          mastery_level?: string | null
+          next_review_at?: string | null
+          org_id?: string | null
+          performance_by_type?: Json | null
+          related_lectures?: string[] | null
+          strength_score?: number | null
+          student_id?: string
+          total_attempts?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_concept_mastery_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_connection_health: {
+        Row: {
+          checked_at: string | null
+          id: string
+          instructor_id: string
+          student_count: number
+        }
+        Insert: {
+          checked_at?: string | null
+          id?: string
+          instructor_id: string
+          student_count: number
+        }
+        Update: {
+          checked_at?: string | null
+          id?: string
+          instructor_id?: string
+          student_count?: number
+        }
+        Relationships: []
+      }
+      student_error_patterns: {
+        Row: {
+          concept_a: string
+          concept_b: string | null
+          created_at: string | null
+          error_type: string
+          id: string
+          last_occurred_at: string | null
+          occurrence_count: number | null
+          org_id: string | null
+          resolution_method: string | null
+          resolved: boolean | null
+          student_id: string
+        }
+        Insert: {
+          concept_a: string
+          concept_b?: string | null
+          created_at?: string | null
+          error_type: string
+          id?: string
+          last_occurred_at?: string | null
+          occurrence_count?: number | null
+          org_id?: string | null
+          resolution_method?: string | null
+          resolved?: boolean | null
+          student_id: string
+        }
+        Update: {
+          concept_a?: string
+          concept_b?: string | null
+          created_at?: string | null
+          error_type?: string
+          id?: string
+          last_occurred_at?: string | null
+          occurrence_count?: number | null
+          org_id?: string | null
+          resolution_method?: string | null
+          resolved?: boolean | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_error_patterns_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_lecture_progress: {
+        Row: {
+          completed_at: string | null
+          completed_pause_points: string[] | null
+          id: string
+          lecture_video_id: string
+          org_id: string | null
+          response_times: Json | null
+          responses: Json | null
+          started_at: string
+          student_id: string
+          total_points_earned: number | null
+          video_position: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_pause_points?: string[] | null
+          id?: string
+          lecture_video_id: string
+          org_id?: string | null
+          response_times?: Json | null
+          responses?: Json | null
+          started_at?: string
+          student_id: string
+          total_points_earned?: number | null
+          video_position?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          completed_pause_points?: string[] | null
+          id?: string
+          lecture_video_id?: string
+          org_id?: string | null
+          response_times?: Json | null
+          responses?: Json | null
+          started_at?: string
+          student_id?: string
+          total_points_earned?: number | null
+          video_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_lecture_progress_lecture_video_id_fkey"
+            columns: ["lecture_video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_lecture_progress_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_lecture_progress_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_paste_events: {
+        Row: {
+          assignment_id: string
+          assignment_title: string | null
+          created_at: string | null
+          id: string
+          pasted_at: string | null
+          pasted_text_length: number
+          student_id: string
+          student_name: string | null
+        }
+        Insert: {
+          assignment_id: string
+          assignment_title?: string | null
+          created_at?: string | null
+          id?: string
+          pasted_at?: string | null
+          pasted_text_length: number
+          student_id: string
+          student_name?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          assignment_title?: string | null
+          created_at?: string | null
+          id?: string
+          pasted_at?: string | null
+          pasted_text_length?: number
+          student_id?: string
+          student_name?: string | null
+        }
+        Relationships: []
+      }
+      student_study_materials: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          description: string | null
+          file_path: string | null
+          id: string
+          instructor_id: string | null
+          last_used_at: string | null
+          material_type: string
+          org_id: string | null
+          questions_generated: number | null
+          subject_tags: string[] | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          instructor_id?: string | null
+          last_used_at?: string | null
+          material_type: string
+          org_id?: string | null
+          questions_generated?: number | null
+          subject_tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          description?: string | null
+          file_path?: string | null
+          id?: string
+          instructor_id?: string | null
+          last_used_at?: string | null
+          material_type?: string
+          org_id?: string | null
+          questions_generated?: number | null
+          subject_tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_study_materials_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_study_materials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          org_id: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          org_id?: string | null
+          role?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          org_id?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "study_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_group_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_group_questions: {
+        Row: {
+          group_id: string
+          id: string
+          org_id: string | null
+          question_id: string
+          shared_at: string
+          shared_by: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          org_id?: string | null
+          question_id: string
+          shared_at?: string
+          shared_by: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          org_id?: string | null
+          question_id?: string
+          shared_at?: string
+          shared_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_group_questions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "study_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_group_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "study_group_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "personalized_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          invite_code: string
+          name: string
+          org_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          invite_code: string
+          name: string
+          org_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          invite_code?: string
+          name?: string
+          org_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_groups_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_plan_daily_tasks: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          content_reference: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          order_index: number
+          plan_id: string
+          scheduled_date: string
+          task_type: string
+          title: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          content_reference?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          plan_id: string
+          scheduled_date: string
+          task_type: string
+          title: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          content_reference?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          plan_id?: string
+          scheduled_date?: string
+          task_type?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_plan_daily_tasks_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "study_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      study_plans: {
+        Row: {
+          concepts_mastered: number | null
+          created_at: string
+          exam_date: string
+          goal_type: string | null
+          id: string
+          material_ids: string[] | null
+          org_id: string | null
+          start_date: string
+          status: string
+          title: string
+          total_concepts: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          concepts_mastered?: number | null
+          created_at?: string
+          exam_date: string
+          goal_type?: string | null
+          id?: string
+          material_ids?: string[] | null
+          org_id?: string | null
+          start_date?: string
+          status?: string
+          title: string
+          total_concepts?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          concepts_mastered?: number | null
+          created_at?: string
+          exam_date?: string
+          goal_type?: string | null
+          id?: string
+          material_ids?: string[] | null
+          org_id?: string | null
+          start_date?: string
+          status?: string
+          title?: string
+          total_concepts?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_plans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_tiers: {
+        Row: {
+          billing_period: string
+          course_limit: number | null
+          created_at: string
+          description: string | null
+          display_name: string
+          features: Json
+          id: string
+          is_active: boolean
+          name: string
+          price_cents: number
+          price_suffix: string | null
+          pricing_model: string | null
+          sort_order: number
+          stripe_price_id: string | null
+          student_limit: number | null
+          updated_at: string
+        }
+        Insert: {
+          billing_period?: string
+          course_limit?: number | null
+          created_at?: string
+          description?: string | null
+          display_name: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          price_cents?: number
+          price_suffix?: string | null
+          pricing_model?: string | null
+          sort_order?: number
+          stripe_price_id?: string | null
+          student_limit?: number | null
+          updated_at?: string
+        }
+        Update: {
+          billing_period?: string
+          course_limit?: number | null
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_cents?: number
+          price_suffix?: string | null
+          pricing_model?: string | null
+          sort_order?: number
+          stripe_price_id?: string | null
+          student_limit?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          metadata: Json | null
+          org_id: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          metadata?: Json | null
+          org_id?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_records: {
+        Row: {
+          created_at: string
+          id: string
+          metric_type: string
+          org_id: string | null
+          period_end: string
+          period_start: string
+          updated_at: string
+          usage_count: number
+          usage_limit: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metric_type: string
+          org_id?: string | null
+          period_end: string
+          period_start: string
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metric_type?: string
+          org_id?: string | null
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+          usage_count?: number
+          usage_limit?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usage_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          id: string
+          org_id: string | null
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          id?: string
+          org_id?: string | null
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          id?: string
+          org_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_stats: {
+        Row: {
+          biggest_loss: number | null
+          biggest_win: number | null
+          coins: number
+          confidence_accuracy: Json | null
+          created_at: string
+          current_streak: number
+          experience_points: number
+          id: string
+          last_activity_date: string | null
+          level: number
+          longest_streak: number
+          org_id: string | null
+          successful_gambles: number | null
+          total_gambles: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          biggest_loss?: number | null
+          biggest_win?: number | null
+          coins?: number
+          confidence_accuracy?: Json | null
+          created_at?: string
+          current_streak?: number
+          experience_points?: number
+          id?: string
+          last_activity_date?: string | null
+          level?: number
+          longest_streak?: number
+          org_id?: string | null
+          successful_gambles?: number | null
+          total_gambles?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          biggest_loss?: number | null
+          biggest_win?: number | null
+          coins?: number
+          confidence_accuracy?: Json | null
+          created_at?: string
+          current_streak?: number
+          experience_points?: number
+          id?: string
+          last_activity_date?: string | null
+          level?: number
+          longest_streak?: number
+          org_id?: string | null
+          successful_gambles?: number | null
+          total_gambles?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_stats_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          age: number | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string | null
+          phone: string | null
+          user_id: string | null
+        }
+        Insert: {
+          age?: number | null
+          created_at?: string | null
+          email?: string | null
+          id: string
+          name?: string | null
+          phone?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          age?: number | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      stem_problems_student_view: {
+        Row: {
+          created_at: string | null
+          difficulty: string | null
+          id: string | null
+          options: Json | null
+          points_reward: number | null
+          problem_text: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      student_problems: {
+        Row: {
+          created_at: string | null
+          difficulty: string | null
+          id: string | null
+          options: Json | null
+          points_reward: number | null
+          problem_text: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          options?: Json | null
+          points_reward?: number | null
+          problem_text?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      add_lecture_minutes: {
+        Args: { p_instructor_id: string; p_minutes: number }
+        Returns: {
+          minutes_limit: number
+          new_total: number
+          usage_percent: number
+          warning_level: string
+          warning_triggered: boolean
+        }[]
+      }
+      assign_oauth_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      auto_release_expired_answers: { Args: never; Returns: number }
+      calculate_auto_release_time: {
+        Args: { p_created_at: string; p_minutes: number }
+        Returns: string
+      }
+      calculate_mastery_threshold: {
+        Args: { p_lesson_id: string; p_user_id: string }
+        Returns: number
+      }
+      can_manage_group: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_record_lecture: {
+        Args: { p_instructor_id: string }
+        Returns: boolean
+      }
+      can_view_user: {
+        Args: { _target_user_id: string; _viewer_id: string }
+        Returns: boolean
+      }
+      cleanup_expired_lti_tokens: { Args: never; Returns: number }
+      cleanup_old_question_logs: { Args: never; Returns: number }
+      cleanup_old_rate_limits: { Args: never; Returns: number }
+      cleanup_unsaved_lecture_checkins: { Args: never; Returns: number }
+      connect_instructor_to_admin: {
+        Args: { _admin_code: string }
+        Returns: string
+      }
+      generate_admin_code: { Args: never; Returns: string }
+      generate_course_code: { Args: never; Returns: string }
+      generate_group_invite_code: { Args: never; Returns: string }
+      generate_instructor_code: { Args: never; Returns: string }
+      generate_org_invite_code: { Args: never; Returns: string }
+      generate_session_code: { Args: never; Returns: string }
+      get_adaptive_difficulty: {
+        Args: { p_user_id: string }
+        Returns: {
+          consecutive_correct: number
+          consecutive_incorrect: number
+          current_difficulty: string
+          difficulty_history: Json
+          success_rate_by_level: Json
+          total_questions_at_level: Json
+        }[]
+      }
+      get_current_usage: {
+        Args: { p_instructor_id: string }
+        Returns: {
+          minutes_limit: number
+          minutes_used: number
+          usage_percent: number
+          warning_level: string
+        }[]
+      }
+      get_problem_answer: {
+        Args: { problem_id: string }
+        Returns: {
+          correct_answer: string
+          explanation: string
+        }[]
+      }
+      get_question_success_rate: {
+        Args: { p_days?: number; p_instructor_id: string }
+        Returns: {
+          avg_processing_time_ms: number
+          failed_questions: number
+          most_common_error: string
+          success_rate: number
+          successful_questions: number
+          total_questions: number
+        }[]
+      }
+      get_student_limit: { Args: { _user_id: string }; Returns: number }
+      get_user_course_limit: { Args: { _user_id: string }; Returns: number }
+      get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      get_user_subscription_tier: {
+        Args: { _user_id: string }
+        Returns: string
+      }
+      has_feature_access: {
+        Args: { _feature: string; _user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_group_member: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      join_group_by_code: { Args: { _invite_code: string }; Returns: string }
+      set_auto_release_timer: {
+        Args: { p_assignment_ids: string[]; p_minutes: number }
+        Returns: undefined
+      }
+      submit_quiz: {
+        Args: { p_assignment_id: string; p_user_answers: Json }
+        Returns: Json
+      }
+      update_adaptive_difficulty: {
+        Args: {
+          p_current_difficulty: string
+          p_user_id: string
+          p_was_correct: boolean
+        }
+        Returns: string
+      }
+      update_assignment_grade: {
+        Args: { p_assignment_id: string; p_short_answer_grades?: Json }
+        Returns: Json
+      }
+      validate_admin_code: { Args: { _code: string }; Returns: string }
+      validate_course_code: {
+        Args: { code: string }
+        Returns: {
+          course_id: string
+          course_title: string
+          instructor_id: string
+        }[]
+      }
+      validate_instructor_code: { Args: { code: string }; Returns: string }
+      validate_org_invite_code: { Args: { _code: string }; Returns: string }
+    }
+    Enums: {
+      app_role: "admin" | "instructor" | "student"
+      assignment_mode:
+        | "hints_only"
+        | "hints_solutions"
+        | "auto_grade"
+        | "manual_grade"
+      assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
+      draft_status: "draft" | "approved" | "published"
+      professor_type: "stem" | "humanities" | "medical"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["admin", "instructor", "student"],
+      assignment_mode: [
+        "hints_only",
+        "hints_solutions",
+        "auto_grade",
+        "manual_grade",
+      ],
+      assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
+      draft_status: ["draft", "approved", "published"],
+      professor_type: ["stem", "humanities", "medical"],
+    },
+  },
+} as const

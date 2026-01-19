@@ -1235,7 +1235,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                         const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
                         
                         // Handle coding questions
-                        if (q.type === 'coding') {
+                        if (q.type === 'coding' || q.type === 'coding_simple') {
+                          const isSimpleCoding = q.type === 'coding_simple';
                           const codeAnswer = textAnswers[assignment.id]?.[idx] || '';
                           const executionKey = `${assignment.id}-${idx}`;
                           const executionResult = codeExecutionResults[executionKey];
@@ -1254,7 +1255,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-semibold text-lg">Question {idx + 1}</h4>
-                                  {q.difficulty && (
+                                  {!isSimpleCoding && q.difficulty && (
                                     <Badge variant="outline" className={`capitalize ${difficultyColors[q.difficulty.toLowerCase()] || 'bg-muted'}`}>
                                       {q.difficulty}
                                     </Badge>
@@ -1268,16 +1269,23 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                 )}
                               </div>
 
-                              <ScrollArea className="max-h-[600px] pr-4">
+                              {/* Simple coding friendly message */}
+                              {isSimpleCoding && (
+                                <div className="text-sm text-muted-foreground bg-primary/5 p-3 rounded-lg border border-primary/10">
+                                  💡 <span className="font-medium">Quick check-in:</span> Show you understand the concept. Minor syntax errors won't hurt your grade!
+                                </div>
+                              )}
+
+                              <ScrollArea className={isSimpleCoding ? "max-h-[400px] pr-4" : "max-h-[600px] pr-4"}>
                                 <div className="space-y-4">
                                   {/* Problem Statement */}
                                   <div className="space-y-2">
-                                    <h5 className="font-medium text-foreground">Problem Statement</h5>
+                                    <h5 className="font-medium text-foreground">{isSimpleCoding ? 'Question' : 'Problem Statement'}</h5>
                                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{q.question}</p>
                                   </div>
 
-                                  {/* Constraints */}
-                                  {q.constraints && q.constraints.length > 0 && (
+                                  {/* Constraints - only for full coding */}
+                                  {!isSimpleCoding && q.constraints && q.constraints.length > 0 && (
                                     <div className="space-y-2 bg-muted/30 p-3 rounded-lg">
                                       <h5 className="font-medium text-foreground flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4" />
@@ -1303,8 +1311,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     </div>
                                   )}
 
-                                  {/* Examples */}
-                                  {q.examples && q.examples.length > 0 && (
+                                  {/* Examples - only for full coding */}
+                                  {!isSimpleCoding && q.examples && q.examples.length > 0 && (
                                     <div className="space-y-3">
                                       <h5 className="font-medium text-foreground flex items-center gap-2">
                                         <BookOpen className="w-4 h-4" />
@@ -1334,8 +1342,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     </div>
                                   )}
 
-                                  {/* Hints (Collapsible) */}
-                                  {q.hints && q.hints.length > 0 && (
+                                  {/* Hints (Collapsible) - only for full coding */}
+                                  {!isSimpleCoding && q.hints && q.hints.length > 0 && (
                                     <Collapsible className="space-y-2">
                                       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                                         <Lightbulb className="w-4 h-4" />
@@ -1354,8 +1362,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     </Collapsible>
                                   )}
 
-                                  {/* Function Signature */}
-                                  {q.functionSignature && (
+                                  {/* Function Signature - only for full coding */}
+                                  {!isSimpleCoding && q.functionSignature && (
                                     <div className="space-y-2">
                                       <h5 className="font-medium text-foreground">Function Signature</h5>
                                       <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
