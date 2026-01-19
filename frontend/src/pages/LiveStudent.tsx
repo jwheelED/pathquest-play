@@ -658,18 +658,32 @@ const LiveStudent = () => {
                 </div>
               )}
 
-              {/* Fallback for non-MCQ without AI grade */}
+              {/* Fallback for non-MCQ without AI grade - Show pending or submitted status */}
               {!isMCQ && aiGrade === null && (
                 <>
-                  {isCorrect ? (
+                  {gradePending ? (
                     <>
-                      <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
-                      <p className="text-2xl font-bold text-primary">Submitted!</p>
+                      <div className="relative">
+                        <AlertCircle className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
+                        <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-2xl">⏱️</span>
+                        </div>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Answer Submitted
+                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                        <p className="text-blue-800 font-medium mb-1">⏰ Awaiting Grade</p>
+                        <p className="text-sm text-blue-600">
+                          Your instructor will review your submission and provide feedback soon.
+                        </p>
+                      </div>
                     </>
                   ) : (
                     <>
-                      <AlertCircle className="h-16 w-16 text-yellow-500 mx-auto animate-in zoom-in-50 duration-300" />
-                      <p className="text-xl font-bold text-yellow-600">Submitted - Pending Review</p>
+                      <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                      <p className="text-2xl font-bold text-primary">Submitted!</p>
+                      <p className="text-muted-foreground">Your answer has been recorded.</p>
                     </>
                   )}
                 </>
