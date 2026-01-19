@@ -699,7 +699,9 @@ Deno.serve(async (req) => {
         pointsEarned,
         aiGrade,
         aiFeedback,
-        gradeBreakdown
+        gradeBreakdown,
+        gradePending, // NEW: Tell frontend if grade is pending
+        gradingMode   // NEW: Tell frontend the grading mode
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
