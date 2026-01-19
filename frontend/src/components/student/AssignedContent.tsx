@@ -564,7 +564,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     // Combine both answer types
     const allAnswers: Record<number, string> = {};
     questions.forEach((q: any, idx: number) => {
-      if (q.type === 'short_answer' || q.type === 'coding') {
+      if (q.type === 'short_answer' || q.type === 'coding' || q.type === 'coding_simple') {
         allAnswers[idx] = textAns[idx] || '';
       } else {
         allAnswers[idx] = mcAnswers[idx] || '';
@@ -720,7 +720,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
       resetTracking();
       
       // If there are short answers or coding questions, handle auto-grading or recommendations
-      const hasCodingQuestions = questions.some((q: any) => q.type === 'coding');
+      const hasCodingQuestions = questions.some((q: any) => q.type === 'coding' || q.type === 'coding_simple');
       const needsGrading = result.has_short_answer || hasCodingQuestions;
       
       if (needsGrading) {
@@ -789,6 +789,31 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                     ? `All ${executionResult.totalCount} test cases passed! ✅`
                     : `${executionResult.passedCount}/${executionResult.totalCount} test cases passed (${grade}%)`
                 };
+              }
+            } else if (q.type === 'coding_simple') {
+              // For simple coding check-ins, use AI grading (lenient, concept-focused)
+              const studentAnswer = allAnswers[idx];
+              try {
+                const { data: gradeData, error: gradeError } = await supabase.functions.invoke(
+                  'auto-grade-short-answer',
+                  {
+                    body: {
+                      studentAnswer,
+                      expectedAnswer: q.expectedAnswer || q.correct_answer || '',
+                      question: q.question,
+                      isCodingQuestion: true
+                    }
+                  }
+                );
+
+                if (!gradeError && gradeData) {
+                  recommendedGrades[idx] = {
+                    grade: gradeData.grade,
+                    feedback: gradeData.feedback
+                  };
+                }
+              } catch (gradeErr) {
+                console.error('Failed to auto-grade coding_simple question', idx, gradeErr);
               }
             }
           }
