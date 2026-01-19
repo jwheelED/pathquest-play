@@ -82,6 +82,7 @@ const LiveStudent = () => {
     setConfidenceLevel(null);
     setConfidenceMultiplier(1);
     setPointsEarned(0);
+    setGradePending(false); // Reset pending state
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
@@ -285,6 +286,7 @@ const LiveStudent = () => {
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [aiGradeComponents, setAiGradeComponents] = useState<any>(null);
   const [understandsConcept, setUnderstandsConcept] = useState<boolean | null>(null);
+  const [gradePending, setGradePending] = useState<boolean>(false); // NEW: Track if grade is pending
 
   // For short answer questions (with AI grading)
   const handleSubmit = async () => {
@@ -331,9 +333,13 @@ const LiveStudent = () => {
         setAiGrade(result.data.aiGrade || null);
         setAiFeedback(result.data.aiFeedback || null);
         setAiGradeComponents(result.data.gradeBreakdown?.components || null);
+        setGradePending(result.data.gradePending || false); // NEW: Set pending state
         setShowAccountPrompt(true);
         
-        if (result.data.aiGrade !== null) {
+        // Show appropriate feedback based on grading mode
+        if (result.data.gradePending) {
+          toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
+        } else if (result.data.aiGrade !== null) {
           const gradeText = `${result.data.aiGrade}%`;
           if (result.data.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
