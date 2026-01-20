@@ -6,7 +6,7 @@ import { ArrowLeft, BookOpen, Calendar, Sparkles } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
-import { FlowStateCard } from "@/components/student/FlowStateCard";
+// FlowStateCard removed
 import { FloatingDecorations } from "@/components/student/FloatingDecorations";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
@@ -102,13 +102,7 @@ export default function ClassDashboard() {
     navigate("/");
   };
 
-  const handleAnswerResult = (isCorrect: boolean, grade: number) => {
-    window.dispatchEvent(
-      new CustomEvent("flowstate:answer", {
-        detail: { isCorrect, grade },
-      })
-    );
-  };
+  // Flow state removed
 
   if (loading) {
     return (
@@ -214,10 +208,6 @@ export default function ClassDashboard() {
             </div>
           )}
 
-          {/* Flow State Visualization */}
-          <div className={`col-span-1 ${courseInfo ? 'lg:col-span-7' : 'lg:col-span-12'} animate-fade-in stagger-1`}>
-            <FlowStateCard userId={user.id} instructorId={instructorId} />
-          </div>
 
           {/* Interactive Pre-Recorded Lectures */}
           <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-2">
@@ -229,7 +219,6 @@ export default function ClassDashboard() {
             <AssignedContent 
               userId={user.id} 
               instructorId={instructorId}
-              onAnswerResult={handleAnswerResult}
             />
           </div>
         </div>
