@@ -436,7 +436,7 @@ serve(async (req) => {
     const getAssignmentMode = (questionType: string): string => {
       if (questionType === "multiple_choice" && autoGradePrefs.mcq) return "auto_grade";
       if (questionType === "short_answer" && autoGradePrefs.short_answer) return "auto_grade";
-      if (questionType === "coding" && autoGradePrefs.coding) return "auto_grade";
+      if ((questionType === "coding" || questionType === "coding_simple") && autoGradePrefs.coding) return "auto_grade";
       return "manual_grade";
     };
 
