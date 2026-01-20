@@ -778,17 +778,18 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                 };
               }
             } else if (q.type === 'coding_simple') {
-              // For simple coding check-ins, use AI grading (lenient, concept-focused)
+              // For simple coding check-ins, use lenient AI grading (concept-focused)
               const studentAnswer = allAnswers[idx];
               try {
                 const { data: gradeData, error: gradeError } = await supabase.functions.invoke(
-                  'auto-grade-short-answer',
+                  'auto-grade-coding',
                   {
                     body: {
-                      studentAnswer,
-                      expectedAnswer: q.expectedAnswer || q.correct_answer || '',
-                      question: q.question,
-                      isCodingQuestion: true
+                      studentCode: studentAnswer,
+                      problemStatement: q.question,
+                      expectedSolution: q.expectedAnswer || q.correct_answer || '',
+                      language: q.language || 'python',
+                      functionSignature: q.functionSignature || ''
                     }
                   }
                 );
