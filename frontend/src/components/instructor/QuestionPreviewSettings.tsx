@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export function QuestionPreviewSettings() {
-  const [previewEnabled, setPreviewEnabled] = useState(true);
+  const [previewEnabled, setPreviewEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -26,7 +26,7 @@ export function QuestionPreviewSettings() {
       .single();
 
     if (data) {
-      setPreviewEnabled(data.question_preview_enabled ?? true);
+      setPreviewEnabled(data.question_preview_enabled ?? false);
     }
     setLoading(false);
   };
