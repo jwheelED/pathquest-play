@@ -57,18 +57,73 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
-  // Voice command detection hook
+  // Voice command detection hook (for chunked mode fallback)
   const { checkTranscriptForCommand, resetCooldown: resetVoiceCommandCooldown } = useVoiceCommandDetection({
     cooldownMs: 5000,
     onCommandDetected: (type) => {
       if (type && onVoiceCommand) {
-        console.log(`🎤 Voice command detected: ${type}`);
+        console.log(`🎤 Voice command detected (chunked mode): ${type}`);
         setVoiceCommandDetected(true);
         setTimeout(() => setVoiceCommandDetected(false), 2000);
         onVoiceCommand(type);
       }
     },
   });
+  
+  // Direct voice command detection for streaming mode (bypasses broken chunked array tracking)
+  const voiceCommandCooldownRef = useRef<number>(0);
+  
+  const VOICE_COMMAND_PATTERNS = {
+    send_question: [
+      /send\s+(the\s+|a\s+|this\s+)?question(\s+now)?/i,
+      /question\s+now/i,
+      /send\s+now/i,
+    ],
+    send_slide_question: [
+      /send\s+(this\s+)?slide(\s+question)?(\s+now)?/i,
+      /send\s+slide\s+question/i,
+    ],
+  };
+  
+  const detectVoiceCommandDirect = useCallback((text: string): 'send_question' | 'send_slide_question' | null => {
+    if (!text || text.length < 5) return null;
+    
+    const normalizedText = text.toLowerCase().trim();
+    const now = Date.now();
+    
+    // 5 second cooldown to prevent duplicate triggers
+    if (now - voiceCommandCooldownRef.current < 5000) {
+      console.log('🔇 Voice command on cooldown, ignoring');
+      return null;
+    }
+    
+    // Check slide patterns first (more specific)
+    for (const pattern of VOICE_COMMAND_PATTERNS.send_slide_question) {
+      if (pattern.test(normalizedText)) {
+        voiceCommandCooldownRef.current = now;
+        console.log(`🎤 DIRECT: Detected 'send_slide_question' in: "${text}"`);
+        return 'send_slide_question';
+      }
+    }
+    
+    // Check question patterns
+    for (const pattern of VOICE_COMMAND_PATTERNS.send_question) {
+      if (pattern.test(normalizedText)) {
+        voiceCommandCooldownRef.current = now;
+        console.log(`🎤 DIRECT: Detected 'send_question' in: "${text}"`);
+        return 'send_question';
+      }
+    }
+    
+    // Fuzzy matching for common variations
+    if (normalizedText.includes('send question') || normalizedText.includes('question now')) {
+      voiceCommandCooldownRef.current = now;
+      console.log(`🎤 DIRECT: Fuzzy match 'send_question' in: "${text}"`);
+      return 'send_question';
+    }
+    
+    return null;
+  }, []);
   
   // Store slide context in a ref so it's always current
   const slideContextRef = useRef<string>('');
@@ -818,6 +873,18 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           // Append to rolling buffers
           transcriptBufferRef.current += ' ' + data.text;
           intervalTranscriptRef.current += ' ' + data.text;
+          
+          // === DIRECT VOICE COMMAND DETECTION ===
+          // Check each transcript chunk immediately for voice commands
+          // This bypasses the broken array-index tracking in useVoiceCommandDetection
+          const command = detectVoiceCommandDirect(data.text);
+          if (command && onVoiceCommand) {
+            console.log(`🎤 Voice command triggered from streaming: ${command}`);
+            setVoiceCommandDetected(true);
+            setTimeout(() => setVoiceCommandDetected(false), 2000);
+            onVoiceCommand(command);
+          }
+          // === END DIRECT VOICE COMMAND DETECTION ===
           
           // Trim interval transcript if exceeding max length (keep most recent content)
           if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
