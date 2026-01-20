@@ -838,6 +838,30 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
           }
 
           const finalGrade = (gradeResult as any)?.grade;
+
+          // Store AI recommendations in quiz_responses for immediate display
+          const updatedResponses = {
+            ...allAnswers,
+            _ai_recommendations: recommendedGrades
+          };
+
+          await supabase
+            .from('student_assignments')
+            .update({ quiz_responses: updatedResponses })
+            .eq('id', assignment.id);
+
+          // Update local state immediately so UI shows feedback without waiting for refetch
+          setAssignments(prev => prev.map(a => 
+            a.id === assignment.id 
+              ? {
+                  ...a,
+                  answers_released: true,
+                  grade: finalGrade,
+                  quiz_responses: updatedResponses
+                }
+              : a
+          ));
+
           toast({ 
             title: "✅ Quiz Submitted Successfully!",
             description: finalGrade ? `Final grade: ${finalGrade.toFixed(1)}%` : "Your answers have been submitted."
