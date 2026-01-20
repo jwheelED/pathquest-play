@@ -590,6 +590,7 @@ Deno.serve(async (req) => {
     const gradingMode = question.question_content.gradingMode || "manual_grade"; // Check grading mode!
     
     console.log(`📊 Question type: ${questionType}, Grading mode: ${gradingMode}`);
+    console.log(`🔍 Full question_content:`, JSON.stringify(question.question_content, null, 2).substring(0, 500));
     
     let isCorrect = false;
     let aiGrade: number | null = null;
@@ -599,6 +600,8 @@ Deno.serve(async (req) => {
     
     // Only perform auto-grading if gradingMode is "auto_grade" or "ai_grade"
     const shouldAutoGrade = gradingMode === "auto_grade" || gradingMode === "ai_grade";
+    
+    console.log(`🤖 Should auto-grade? ${shouldAutoGrade} (gradingMode: ${gradingMode})`);
     
     if (!shouldAutoGrade) {
       // Manual grading mode - just store the answer
