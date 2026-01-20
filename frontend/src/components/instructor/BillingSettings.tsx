@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle, Users, BookOpen, Zap, TrendingUp, Award } from "lucide-react";
 import { format } from "date-fns";
 
 interface SubscriptionTier {
@@ -147,6 +147,40 @@ export function BillingSettings() {
       style: 'currency',
       currency: 'USD',
     }).format(cents / 100);
+  };
+
+  // Enhanced descriptions for each tier
+  const getTierEnhancements = (tierName: string) => {
+    const enhancements: Record<string, {
+      tagline: string;
+      icon: typeof Users;
+      highlights: string[];
+      bestFor: string;
+      gradient: string;
+    }> = {
+      free: {
+        tagline: "Perfect for trying out Edvana",
+        icon: BookOpen,
+        highlights: ["No credit card required", "Full AI grading features", "Real-time transcription"],
+        bestFor: "Small classes or testing the platform",
+        gradient: "from-blue-500/10 to-cyan-500/10"
+      },
+      instructor: {
+        tagline: "Most popular for individual instructors",
+        icon: Sparkles,
+        highlights: ["Unlimited AI-powered questions", "Advanced analytics", "Priority support"],
+        bestFor: "Teachers with multiple classes",
+        gradient: "from-amber-500/10 to-orange-500/10"
+      },
+      institutional: {
+        tagline: "Enterprise-grade for departments",
+        icon: Crown,
+        highlights: ["White-label options", "Custom integrations", "Dedicated account manager"],
+        bestFor: "Universities and large institutions",
+        gradient: "from-purple-500/10 to-pink-500/10"
+      }
+    };
+    return enhancements[tierName] || enhancements.free;
   };
 
   if (loading) {
