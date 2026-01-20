@@ -712,11 +712,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       const isAutoGrade = result.assignment_mode === 'auto_grade';
       
       if (needsGrading) {
-        
-        toast({
-          title: isAutoGrade ? "Auto-grading your answers..." : "Getting AI recommendations...",
-          description: isAutoGrade ? "Please wait while we grade your responses" : "Generating recommended grades for instructor review"
-        });
+        // Don't show premature toast - wait for grading to complete before showing result
 
         let totalShortAnswerGrade = 0;
         let shortAnswerCount = 0;
