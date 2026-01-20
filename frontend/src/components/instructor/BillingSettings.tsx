@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle, Users, BookOpen, Zap, TrendingUp, Award } from "lucide-react";
 import { format } from "date-fns";
 
 interface SubscriptionTier {
@@ -149,6 +149,40 @@ export function BillingSettings() {
     }).format(cents / 100);
   };
 
+  // Enhanced descriptions for each tier
+  const getTierEnhancements = (tierName: string) => {
+    const enhancements: Record<string, {
+      tagline: string;
+      icon: typeof Users;
+      highlights: string[];
+      bestFor: string;
+      gradient: string;
+    }> = {
+      free: {
+        tagline: "Perfect for trying out Edvana",
+        icon: BookOpen,
+        highlights: ["No credit card required", "Full AI grading features", "Real-time transcription"],
+        bestFor: "Small classes or testing the platform",
+        gradient: "from-blue-500/10 to-cyan-500/10"
+      },
+      instructor: {
+        tagline: "Most popular for individual instructors",
+        icon: Sparkles,
+        highlights: ["Unlimited AI-powered questions", "Advanced analytics", "Priority support"],
+        bestFor: "Teachers with multiple classes",
+        gradient: "from-amber-500/10 to-orange-500/10"
+      },
+      institutional: {
+        tagline: "Enterprise-grade for departments",
+        icon: Crown,
+        highlights: ["White-label options", "Custom integrations", "Dedicated account manager"],
+        bestFor: "Universities and large institutions",
+        gradient: "from-purple-500/10 to-pink-500/10"
+      }
+    };
+    return enhancements[tierName] || enhancements.free;
+  };
+
   if (loading) {
     return (
       <Card>
@@ -219,104 +253,184 @@ export function BillingSettings() {
 
         {/* Available Plans */}
         <div>
-          <h3 className="font-medium mb-4">Available Plans</h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold mb-2">Choose Your Plan</h3>
+            <p className="text-sm text-muted-foreground">
+              All plans include AI-powered grading, real-time transcription, and live engagement tools.
+              Upgrade anytime as your needs grow.
+            </p>
+          </div>
+          
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {tiers.map((tier) => {
               const isCurrentTier = tier.name === currentTier;
               const isFreeTier = tier.name === 'free';
+              const enhancements = getTierEnhancements(tier.name);
+              const IconComponent = enhancements.icon;
               
               return (
                 <div
                   key={tier.id}
-                  className={`rounded-lg border p-4 ${
+                  className={`relative rounded-xl border-2 overflow-hidden transition-all duration-300 ${
                     isCurrentTier 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  } transition-colors`}
+                      ? 'border-primary shadow-lg scale-[1.02]' 
+                      : 'border-border hover:border-primary/50 hover:shadow-md'
+                  }`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold flex items-center gap-2">
-                        {tier.display_name}
-                        {tier.name === 'instructor' && (
-                          <Sparkles className="h-4 w-4 text-amber-500" />
+                  {/* Gradient Background */}
+                  <div className={`absolute inset-0 bg-gradient-to-br ${enhancements.gradient} opacity-50`} />
+                  
+                  {/* Popular Badge */}
+                  {tier.name === 'instructor' && (
+                    <div className="absolute top-4 right-4">
+                      <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        Most Popular
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  <div className="relative p-6">
+                    {/* Header */}
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`p-2 rounded-lg ${
+                          isFreeTier ? 'bg-blue-100 dark:bg-blue-900' :
+                          tier.name === 'instructor' ? 'bg-amber-100 dark:bg-amber-900' :
+                          'bg-purple-100 dark:bg-purple-900'
+                        }`}>
+                          <IconComponent className={`h-5 w-5 ${
+                            isFreeTier ? 'text-blue-600 dark:text-blue-400' :
+                            tier.name === 'instructor' ? 'text-amber-600 dark:text-amber-400' :
+                            'text-purple-600 dark:text-purple-400'
+                          }`} />
+                        </div>
+                        {isCurrentTier && (
+                          <Badge variant="secondary" className="bg-primary text-primary-foreground">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Current Plan
+                          </Badge>
                         )}
-                        {tier.name === 'institutional' && (
-                          <Crown className="h-4 w-4 text-primary" />
+                      </div>
+                      
+                      <h4 className="text-2xl font-bold">{tier.display_name}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{enhancements.tagline}</p>
+                    </div>
+
+                    {/* Pricing */}
+                    <div className="mb-4">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-bold">
+                          {isFreeTier ? '$0' : formatPrice(tier.price_cents).split('.')[0]}
+                        </span>
+                        {!isFreeTier && (
+                          <>
+                            <span className="text-lg text-muted-foreground">
+                              {formatPrice(tier.price_cents).includes('.') ? `.${formatPrice(tier.price_cents).split('.')[1]}` : ''}
+                            </span>
+                            {tier.price_suffix && (
+                              <span className="text-sm text-muted-foreground ml-1">
+                                {tier.price_suffix}
+                              </span>
+                            )}
+                          </>
                         )}
-                      </h4>
-                      <p className="text-2xl font-bold mt-1">
-                        {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
-                        {!isFreeTier && tier.price_suffix && (
-                          <span className="text-sm font-normal text-muted-foreground">
-                            {tier.price_suffix}
-                          </span>
-                        )}
-                      </p>
+                      </div>
                       {tier.pricing_model === 'per_seat' && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Billed based on active student count
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          Pay only for active students
                         </p>
                       )}
                     </div>
+
+                    {/* Best For */}
+                    <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">BEST FOR</p>
+                      <p className="text-sm font-medium">{enhancements.bestFor}</p>
+                    </div>
+
+                    {/* Features */}
+                    <div className="space-y-2.5 mb-4">
+                      {/* Core Limits */}
+                      <div className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>
+                          <strong>{tier.student_limit === null ? 'Unlimited' : tier.student_limit}</strong> students per course
+                        </span>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>
+                          <strong>{tier.course_limit === null ? 'Unlimited' : tier.course_limit}</strong> {tier.course_limit === 1 ? 'course' : 'courses'}
+                        </span>
+                      </div>
+                      
+                      {/* Key Highlights */}
+                      {enhancements.highlights.map((highlight, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-sm">
+                          <Zap className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                          <span>{highlight}</span>
+                        </div>
+                      ))}
+                      
+                      {/* Additional Features */}
+                      {tier.features.map((feature, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>{String(feature)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Action Button */}
+                    {!isCurrentTier && !isFreeTier && (
+                      <Button 
+                        className={`w-full ${
+                          tier.name === 'instructor' 
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' 
+                            : ''
+                        }`}
+                        size="lg"
+                        onClick={() => handleUpgrade(tier.name)}
+                        disabled={upgrading === tier.name}
+                      >
+                        {upgrading === tier.name ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Upgrade Now
+                          </>
+                        )}
+                      </Button>
+                    )}
                     {isCurrentTier && (
-                      <Badge variant="secondary" className="bg-primary text-primary-foreground">
-                        Current
-                      </Badge>
+                      <div className="flex items-center justify-center gap-2 text-sm font-medium text-primary py-3 bg-primary/10 rounded-lg">
+                        <Award className="h-4 w-4" />
+                        You're on this plan
+                      </div>
+                    )}
+                    {!isCurrentTier && isFreeTier && (
+                      <div className="text-center py-3 text-sm text-muted-foreground">
+                        No credit card required
+                      </div>
                     )}
                   </div>
-
-                  {tier.description && (
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {tier.description}
-                    </p>
-                  )}
-
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      {tier.student_limit === null ? 'Unlimited students' : `Up to ${tier.student_limit} students`}
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
-                    </li>
-                    {tier.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        {String(feature)}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {!isCurrentTier && !isFreeTier && (
-                    <Button 
-                      className="w-full"
-                      onClick={() => handleUpgrade(tier.name)}
-                      disabled={upgrading === tier.name}
-                    >
-                      {upgrading === tier.name ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Upgrade to {tier.display_name}
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  {isCurrentTier && (
-                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Your current plan
-                    </div>
-                  )}
                 </div>
               );
             })}
+          </div>
+          
+          {/* Help Text */}
+          <div className="mt-6 p-4 rounded-lg bg-muted/30 border">
+            <p className="text-sm text-muted-foreground">
+              💡 <strong>Not sure which plan?</strong> Start with the Free plan to explore all features.
+              You can upgrade anytime as your courses grow. All plans include our core AI features.
+            </p>
           </div>
         </div>
 

@@ -427,10 +427,13 @@ serve(async (req) => {
 
     // Auto-grading preferences
     const autoGradePrefs = {
-      short_answer: profileData?.auto_grade_short_answer || false,
-      coding: profileData?.auto_grade_coding || false,
-      mcq: profileData?.auto_grade_mcq !== false, // Default to true
+      short_answer: profileData?.auto_grade_short_answer !== false, // Default to true (enabled)
+      coding: profileData?.auto_grade_coding !== false, // Default to true (enabled)
+      mcq: profileData?.auto_grade_mcq !== false, // Default to true (enabled)
     };
+    
+    console.log(`🎯 Auto-grade preferences:`, autoGradePrefs);
+    console.log(`📊 Profile auto-grade values: MCQ=${profileData?.auto_grade_mcq}, Coding=${profileData?.auto_grade_coding}, ShortAnswer=${profileData?.auto_grade_short_answer}`);
 
     // Determine assignment mode based on question type and preferences
     // CRITICAL: coding_simple ALWAYS auto-grades - it's designed for quick conceptual checks
