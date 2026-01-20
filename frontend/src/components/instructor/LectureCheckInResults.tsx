@@ -1581,6 +1581,111 @@ export const LectureCheckInResults = () => {
                             </div>
                           </div>
                         )}
+
+                        {/* Coding question review section - shows student code with syntax highlighting */}
+                        {(question.type === "coding_simple" || question.type === "coding") && (
+                          <div className="mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
+                            <p className="text-xs font-medium mb-2 text-emerald-900 dark:text-emerald-200">
+                              💻 Student Code Submissions & Grades:
+                            </p>
+                            <div className="space-y-3">
+                              {(() => {
+                                // Filter assignments to only those containing this specific question
+                                const questionAssignments = group.assignments.filter((a) => {
+                                  const content = a.content as any;
+                                  const assignmentQuestions = content?.questions || [];
+                                  return assignmentQuestions.some((q: any) => q.question === question.question);
+                                });
+
+                                // Deduplicate students - keep only the latest submission per student
+                                const uniqueStudents = new Map<string, Assignment>();
+                                questionAssignments.forEach((assignment) => {
+                                  const existing = uniqueStudents.get(assignment.student_id);
+                                  if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+                                    uniqueStudents.set(assignment.student_id, assignment);
+                                  }
+                                });
+                                
+                                return Array.from(uniqueStudents.values()).map((assignment) => {
+                                  // Find the question index within THIS student's assignment
+                                  const assignmentContent = assignment.content as any;
+                                  const assignmentQuestions = assignmentContent?.questions || [];
+                                  const studentQuestionIdx = assignmentQuestions.findIndex(
+                                    (q: any) => q.question === question.question
+                                  );
+                                  
+                                  const studentAnswer = studentQuestionIdx >= 0 
+                                    ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
+                                    : null;
+                                  const isCompleted = assignment.completed;
+                                  
+                                  // Get AI grade from _ai_recommendations
+                                  const aiRec = assignment.quiz_responses?._ai_recommendations;
+                                  let grade: number | null = null;
+                                  let feedback: string | null = null;
+                                  
+                                  if (aiRec && typeof aiRec === 'object') {
+                                    if (Array.isArray(aiRec) && aiRec[studentQuestionIdx]) {
+                                      grade = aiRec[studentQuestionIdx].grade ?? null;
+                                      feedback = aiRec[studentQuestionIdx].feedback ?? null;
+                                    } else if (aiRec[studentQuestionIdx]) {
+                                      grade = aiRec[studentQuestionIdx].grade ?? null;
+                                      feedback = aiRec[studentQuestionIdx].feedback ?? null;
+                                    }
+                                  }
+                                  
+                                  // Fallback to assignment.grade
+                                  if (grade === null && assignment.grade !== null) {
+                                    grade = assignment.grade;
+                                  }
+
+                                  return (
+                                    <div key={assignment.id} className="bg-white dark:bg-gray-900 p-3 rounded border">
+                                      <div className="flex items-start justify-between gap-2 mb-2">
+                                        <span className="font-medium text-sm">{assignment.student_name}</span>
+                                        <div className="flex items-center gap-2">
+                                          {!isCompleted && (
+                                            <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                              <Clock className="h-3 w-3 mr-1" />
+                                              Not Answered
+                                            </Badge>
+                                          )}
+                                          {isCompleted && grade !== null && (
+                                            <Badge variant="default" className={grade >= 70 ? "bg-green-600" : "bg-red-600"}>
+                                              {grade}%
+                                            </Badge>
+                                          )}
+                                          {isCompleted && grade === null && (
+                                            <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                              Grading...
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {isCompleted && studentAnswer && (
+                                        <>
+                                          <pre className="text-xs p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto font-mono whitespace-pre-wrap mb-2">
+                                            {studentAnswer}
+                                          </pre>
+                                          {feedback && (
+                                            <div className="p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded text-xs">
+                                              <span className="font-semibold text-blue-900 dark:text-blue-200">🤖 AI Feedback: </span>
+                                              <span className="text-blue-800 dark:text-blue-300">{feedback}</span>
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                      {isCompleted && !studentAnswer && (
+                                        <p className="text-xs text-muted-foreground italic">No code submitted</p>
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

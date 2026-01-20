@@ -34,7 +34,10 @@ export const QuestionAnalyticsChart = ({
   stats,
 }: QuestionAnalyticsChartProps) => {
   const isMultipleChoice = question.type === "multiple_choice" && question.options;
-  const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
+  const isCodingQuestion = question.type === "coding_simple" || question.type === "coding";
+  const isAutoGradedWrittenAnswer = 
+    (question.type === "short_answer" || isCodingQuestion) && 
+    (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
   // Calculate answer distribution for multiple choice
   const answerDistribution = isMultipleChoice
@@ -91,8 +94,8 @@ export const QuestionAnalyticsChart = ({
         },
       ].filter((d) => d.value > 0);
 
-  // Calculate grade distribution for auto-graded short answers
-  const gradeDistribution = isAutoGradedShortAnswer
+  // Calculate grade distribution for auto-graded short answers and coding questions
+  const gradeDistribution = isAutoGradedWrittenAnswer
     ? [
         {
           range: "90-100 (Excellent)",
@@ -178,8 +181,8 @@ export const QuestionAnalyticsChart = ({
           </div>
         )}
 
-        {/* Grade Distribution Chart (Auto-Graded Short Answer) */}
-        {isAutoGradedShortAnswer && gradeDistribution.length > 0 && (
+        {/* Grade Distribution Chart (Auto-Graded Short Answer & Coding) */}
+        {isAutoGradedWrittenAnswer && gradeDistribution.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium">Grade Distribution</p>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
