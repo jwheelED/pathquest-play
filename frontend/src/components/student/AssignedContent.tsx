@@ -709,9 +709,9 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       // If there are short answers or coding questions, handle auto-grading or recommendations
       const hasCodingQuestions = questions.some((q: any) => q.type === 'coding' || q.type === 'coding_simple');
       const needsGrading = result.has_short_answer || hasCodingQuestions;
+      const isAutoGrade = result.assignment_mode === 'auto_grade';
       
       if (needsGrading) {
-        const isAutoGrade = result.assignment_mode === 'auto_grade';
         
         toast({
           title: isAutoGrade ? "Auto-grading your answers..." : "Getting AI recommendations...",
