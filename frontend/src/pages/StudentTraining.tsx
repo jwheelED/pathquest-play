@@ -307,10 +307,6 @@ export default function StudentTraining() {
             {user?.id && <ReviewDashboard userId={user.id} />}
           </div>
 
-          {/* Leaderboard */}
-          <div className="col-span-1 lg:col-span-6 animate-fade-in stagger-2">
-            {user?.id && <Leaderboard userId={user.id} />}
-          </div>
 
           {/* Study Groups Section */}
           <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-3">
