@@ -427,9 +427,9 @@ serve(async (req) => {
 
     // Auto-grading preferences
     const autoGradePrefs = {
-      short_answer: profileData?.auto_grade_short_answer || false,
-      coding: profileData?.auto_grade_coding || false,
-      mcq: profileData?.auto_grade_mcq !== false, // Default to true
+      short_answer: profileData?.auto_grade_short_answer !== false, // Default to true (enabled)
+      coding: profileData?.auto_grade_coding !== false, // Default to true (enabled)
+      mcq: profileData?.auto_grade_mcq !== false, // Default to true (enabled)
     };
 
     // Determine assignment mode based on question type and preferences
