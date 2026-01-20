@@ -431,6 +431,9 @@ serve(async (req) => {
       coding: profileData?.auto_grade_coding !== false, // Default to true (enabled)
       mcq: profileData?.auto_grade_mcq !== false, // Default to true (enabled)
     };
+    
+    console.log(`🎯 Auto-grade preferences:`, autoGradePrefs);
+    console.log(`📊 Profile auto-grade values: MCQ=${profileData?.auto_grade_mcq}, Coding=${profileData?.auto_grade_coding}, ShortAnswer=${profileData?.auto_grade_short_answer}`);
 
     // Determine assignment mode based on question type and preferences
     const getAssignmentMode = (questionType: string): string => {
