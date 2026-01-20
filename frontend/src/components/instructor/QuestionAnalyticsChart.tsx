@@ -201,8 +201,8 @@ export const QuestionAnalyticsChart = ({
           </div>
         )}
 
-        {/* Performance Overview Pie Chart */}
-        {performanceData.length > 0 && (
+        {/* Performance Overview Pie Chart - Only for MCQ, not for written/coding answers */}
+        {performanceData.length > 0 && !isAutoGradedWrittenAnswer && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium">Performance Overview</p>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
