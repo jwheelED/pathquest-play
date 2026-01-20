@@ -870,13 +870,25 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
             console.error('Failed to store recommendations:', updateError);
           }
 
-          toast({ 
-            title: "✅ Quiz Submitted Successfully!",
-            description: "Your answers have been submitted for review."
-          });
+          // Show immediate grade if we have AI grades
+          const totalGrade = recommendedGrades.length > 0
+            ? Math.round(recommendedGrades.reduce((sum, g) => sum + (g.grade || 0), 0) / recommendedGrades.length)
+            : null;
+          
+          if (totalGrade !== null) {
+            toast({ 
+              title: `✅ Graded: ${totalGrade}%`,
+              description: totalGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
+            });
+          } else {
+            toast({ 
+              title: "✅ Quiz Submitted Successfully!",
+              description: "Your answers have been submitted for review."
+            });
+          }
         }
       } else {
-        // All submissions show same message without scores
+        // Non-auto-grade submissions
         toast({ 
           title: "✅ Quiz Submitted Successfully!",
           description: "Your answers have been submitted for review."
