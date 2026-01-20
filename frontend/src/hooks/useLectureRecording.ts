@@ -952,6 +952,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     try {
       setIsSendingQuestion(true);
 
+      // Wait briefly for transcript buffer to catch up (voice command itself was just transcribed)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const hasTranscript = transcriptBufferRef.current && transcriptBufferRef.current.length >= 20;
       const hasSlideContext = slideContextRef.current && slideContextRef.current.length >= 20;
 
