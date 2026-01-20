@@ -611,11 +611,6 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
-      // Emit answer result for flow state visualization
-      if (onAnswerResult && result.grade !== null) {
-        const isCorrect = result.grade >= 80;
-        onAnswerResult(isCorrect, result.grade);
-      }
       
       // Save version history for cheat detection
       // For short answers and MCQ, check for version history data from any question
