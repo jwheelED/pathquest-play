@@ -1350,20 +1350,38 @@ export const LectureCheckInResults = () => {
                                       Not Answered
                                     </Badge>
                                    ) : hasAIGrade && (question.type === 'short_answer' || isCodingSimple) ? (
-                                    <>
-                                      <Badge 
-                                        variant={studentAIGrade >= 70 ? "default" : "destructive"}
-                                        className={`gap-1 ${studentAIGrade >= 70 ? "bg-green-600" : ""}`}
-                                      >
-                                        {studentAIGrade}%
-                                      </Badge>
-                                      {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
-                                        <Badge variant="outline" className="gap-1 text-xs">
-                                          <Clock className="h-3 w-3" />
-                                          {formatTime(assignment.response_time_seconds)}
+                                    <div className="flex flex-col items-end gap-1">
+                                      <div className="flex items-center gap-2">
+                                        <Badge 
+                                          variant={studentAIGrade >= 70 ? "default" : "destructive"}
+                                          className={`gap-1 ${studentAIGrade >= 70 ? "bg-green-600" : ""}`}
+                                        >
+                                          {studentAIGrade}%
                                         </Badge>
+                                        {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
+                                          <Badge variant="outline" className="gap-1 text-xs">
+                                            <Clock className="h-3 w-3" />
+                                            {formatTime(assignment.response_time_seconds)}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {/* Code viewer for coding questions */}
+                                      {isCodingSimple && studentAnswer && (
+                                        <details className="text-xs w-full max-w-md">
+                                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground text-right">
+                                            View Code
+                                          </summary>
+                                          <pre className="mt-2 p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap text-left">
+                                            {studentAnswer}
+                                          </pre>
+                                          {studentAIFeedback && (
+                                            <p className="mt-1 text-xs text-muted-foreground italic text-left">
+                                              {studentAIFeedback}
+                                            </p>
+                                          )}
+                                        </details>
                                       )}
-                                    </>
+                                    </div>
                                    ) : isManualGradeShortAnswer || (isCodingSimple && !hasAIGrade) ? (
                                     <>
                                       <Badge variant="outline" className="gap-1 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300">

@@ -803,36 +803,39 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
           }
         }
 
-        if (isAutoGrade) {
-          // Use secure RPC to update grade server-side (prevents grade manipulation)
-          const { data: gradeResult, error: gradeError } = await supabase
-            .rpc('update_assignment_grade', {
-              p_assignment_id: assignment.id,
-              p_short_answer_grades: recommendedGrades
-            });
+        // Calculate average grade from all graded questions
+        const gradeValues = Object.values(recommendedGrades).map(g => g.grade || 0);
+        const avgGrade = gradeValues.length > 0
+          ? Math.round(gradeValues.reduce((sum, g) => sum + g, 0) / gradeValues.length)
+          : null;
 
-          if (gradeError) {
-            console.error('Failed to update grade:', gradeError);
+        // Store AI recommendations in quiz_responses
+        const updatedResponses = {
+          ...allAnswers,
+          _ai_recommendations: recommendedGrades
+        };
+
+        if (isAutoGrade && avgGrade !== null) {
+          // Direct save: Update grade, quiz_responses, and release answers in one call
+          const { error: saveError } = await supabase
+            .from('student_assignments')
+            .update({ 
+              grade: avgGrade,
+              quiz_responses: updatedResponses,
+              answers_released: true,
+              release_method: 'auto_grade'
+            })
+            .eq('id', assignment.id);
+
+          if (saveError) {
+            console.error('Failed to save grade:', saveError);
             toast({ 
-              title: "Error updating grade",
+              title: "Error saving grade",
               description: "Please try again or contact your instructor.",
               variant: "destructive"
             });
             return;
           }
-
-          const finalGrade = (gradeResult as any)?.grade;
-
-          // Store AI recommendations in quiz_responses for immediate display
-          const updatedResponses = {
-            ...allAnswers,
-            _ai_recommendations: recommendedGrades
-          };
-
-          await supabase
-            .from('student_assignments')
-            .update({ quiz_responses: updatedResponses })
-            .eq('id', assignment.id);
 
           // Update local state immediately so UI shows feedback without waiting for refetch
           setAssignments(prev => prev.map(a => 
@@ -840,23 +843,19 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
               ? {
                   ...a,
                   answers_released: true,
-                  grade: finalGrade,
-                  quiz_responses: updatedResponses
+                  grade: avgGrade,
+                  quiz_responses: updatedResponses,
+                  release_method: 'auto_grade'
                 }
               : a
           ));
 
           toast({ 
-            title: "✅ Quiz Submitted Successfully!",
-            description: finalGrade ? `Final grade: ${finalGrade.toFixed(1)}%` : "Your answers have been submitted."
+            title: `✅ Graded: ${avgGrade}%`,
+            description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
           });
         } else {
-          // For manual_grade mode, store recommended grades in quiz_responses
-          const updatedResponses = {
-            ...allAnswers,
-            _ai_recommendations: recommendedGrades
-          };
-
+          // For manual_grade mode or no grades, just store recommendations
           const { error: updateError } = await supabase
             .from('student_assignments')
             .update({ quiz_responses: updatedResponses })
@@ -865,17 +864,11 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
           if (updateError) {
             console.error('Failed to store recommendations:', updateError);
           }
-
-          // Show immediate grade if we have AI grades
-          const gradeValues = Object.values(recommendedGrades).map(g => g.grade || 0);
-          const totalGrade = gradeValues.length > 0
-            ? Math.round(gradeValues.reduce((sum, g) => sum + g, 0) / gradeValues.length)
-            : null;
           
-          if (totalGrade !== null) {
+          if (avgGrade !== null) {
             toast({ 
-              title: `✅ Graded: ${totalGrade}%`,
-              description: totalGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
+              title: `✅ Graded: ${avgGrade}%`,
+              description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
             });
           } else {
             toast({ 
