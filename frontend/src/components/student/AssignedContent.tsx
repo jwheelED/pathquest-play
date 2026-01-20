@@ -39,7 +39,7 @@ interface Assignment {
 interface AssignedContentProps {
   userId: string;
   instructorId?: string; // Optional: filter by instructor
-  onAnswerResult?: (isCorrect: boolean, grade: number) => void;
+  // onAnswerResult removed - Flow State no longer used
 }
 
 // Confidence data for each assignment
@@ -49,7 +49,7 @@ interface ConfidenceData {
   locked: boolean;
 }
 
-export const AssignedContent = ({ userId, instructorId, onAnswerResult }: AssignedContentProps) => {
+export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
@@ -233,18 +233,10 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             const oldAssignment = payload.old as Assignment;
             const updatedAssignment = payload.new as Assignment;
             
-            // Immediate update for answers_released
-            if ('answers_released' in updatedAssignment) {
-              setAssignments(prev => 
-                prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
-              );
-              
-              if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
-                sonnerToast.success("Answers Released!", {
-                  description: `Answers for "${updatedAssignment.title}" are now available`
-                });
-              }
-            }
+            // Update assignment in state
+            setAssignments(prev => 
+              prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+            );
             
             // Show toast notification when grade is posted
             if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
@@ -1699,7 +1691,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                 const isCorrect = studentAnswer === correctAnswer;
                                 const isThisOptionCorrect = optionLetter === correctAnswer;
                                 const isStudentChoice = optionLetter === studentAnswer;
-                                const showFeedback = isSubmitted && assignment.answers_released;
+                                const showFeedback = isSubmitted; // Always show feedback immediately after submission
                                 
                                 return (
                                   <button
@@ -1733,15 +1725,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               })}
                             </div>
                             
-                            {isSubmitted && !assignment.answers_released && (
-                              <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                                  ✓ Submitted - Awaiting answer release
-                                </p>
-                              </div>
-                            )}
                             
-                            {isSubmitted && assignment.answers_released && (
+                            {isSubmitted && (
                               <div className="space-y-3">
                                 <div className={`p-3 rounded border-2 ${
                                   (assignment.quiz_responses?.[idx] === q.correctAnswer)
@@ -1817,7 +1802,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               </div>
                             )}
                             
-                            {assignment.mode === "hints_solutions" && isSubmitted && assignment.answers_released && (
+                            {assignment.mode === "hints_solutions" && isSubmitted && (
                               <div className="bg-primary/5 p-3 rounded space-y-1">
                                 <p className="text-xs font-semibold">Explanation:</p>
                                 <p className="text-xs text-muted-foreground">{q.solution}</p>
@@ -1872,29 +1857,21 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                       
                       {assignment.completed && (
                         <div className="space-y-3">
-                          {/* Hide scores until instructor releases answers */}
-                          {!assignment.answers_released && !assignment.quiz_responses?._ai_recommendations ? (
-                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
-                              <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Awaiting Answer Release</p>
-                              <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor will release answers and scores when ready</p>
-                            </div>
-                          ) : assignment.assignment_type === 'lecture_checkin' ? (
+                          {/* Always show scores immediately after submission */}
+                          {assignment.assignment_type === 'lecture_checkin' ? (
                             <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
                               <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">✓ Submitted</p>
-                              <p className="text-sm text-blue-800 dark:text-blue-300">Your instructor has reviewed your response</p>
+                              <p className="text-sm text-blue-800 dark:text-blue-300">Your response has been recorded</p>
+                            </div>
+                          ) : assignment.grade !== undefined && assignment.grade !== null ? (
+                            <div className="bg-primary/10 p-4 rounded-lg text-center">
+                              <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
                             </div>
                           ) : (
-                            // Show scores only after answers are released
-                            assignment.grade !== undefined && assignment.grade !== null ? (
-                              <div className="bg-primary/10 p-4 rounded-lg text-center">
-                                <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
-                              </div>
-                            ) : (
-                              <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
-                                <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Pending Review</p>
-                                <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor is reviewing your answers</p>
-                              </div>
-                            )
+                            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
+                              <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                              <p className="text-sm text-blue-800 dark:text-blue-300">Your response has been recorded</p>
+                            </div>
                           )}
                           
                           {/* Save button for lecture check-ins */}
