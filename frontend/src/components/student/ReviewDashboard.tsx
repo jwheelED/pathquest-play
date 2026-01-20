@@ -140,23 +140,7 @@ export const ReviewDashboard = ({ userId, onStartReview }: ReviewDashboardProps)
   );
 
   if (!hasContent) {
-    return (
-      <Card className="headspace-card">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">You're All Caught Up!</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                No reviews due today. Keep learning!
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-    );
+    return null;
   }
 
   return (
