@@ -895,8 +895,10 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
         });
       }
       
-      // Refresh assignments to show updated state
-      await fetchAssignments();
+      // Only refetch for non-auto-grade mode - auto-grade already updated local state
+      if (!isAutoGrade) {
+        await fetchAssignments();
+      }
 
       // For lecture check-ins, update streak tracking and trigger achievement check
       if (assignment.assignment_type === 'lecture_checkin') {
@@ -1871,7 +1873,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                       {assignment.completed && (
                         <div className="space-y-3">
                           {/* Hide scores until instructor releases answers */}
-                          {!assignment.answers_released ? (
+                          {!assignment.answers_released && !assignment.quiz_responses?._ai_recommendations ? (
                             <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
                               <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Awaiting Answer Release</p>
                               <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor will release answers and scores when ready</p>
