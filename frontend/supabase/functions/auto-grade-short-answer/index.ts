@@ -46,12 +46,10 @@ serve(async (req) => {
       });
     }
 
-    if (!expectedAnswer || typeof expectedAnswer !== "string") {
-      return new Response(JSON.stringify({ error: "expectedAnswer must be a non-empty string" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Allow empty expectedAnswer - AI will infer from question context
+    const effectiveExpectedAnswer = (expectedAnswer && typeof expectedAnswer === "string" && expectedAnswer.trim()) 
+      ? expectedAnswer 
+      : "(Evaluate based on question context - infer the correct answer from the question itself)";
 
     if (question && typeof question !== "string") {
       return new Response(JSON.stringify({ error: "question must be a string" }), {
@@ -165,7 +163,7 @@ IMPORTANT: Be thorough and fair. Students deserve detailed feedback on each comp
 
     const userPrompt = `Question: ${question || "Not provided"}
 
-Expected Answer: ${expectedAnswer}
+Expected Answer: ${effectiveExpectedAnswer}
 
 Student's Answer: ${studentAnswer}
 
