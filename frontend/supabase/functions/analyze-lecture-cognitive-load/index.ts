@@ -459,7 +459,7 @@ ${transcriptText}`;
             'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-2.5-pro',
+            model: 'google/gemini-3-pro-preview',
             messages: [
               { 
                 role: 'system', 
@@ -779,7 +779,7 @@ Rules:
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro', // Use Pro for better question quality
+        model: 'google/gemini-3-pro-preview', // Use Pro for better question quality
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Analyze this lecture transcript and identify ${questionCount} optimal pause points with Bloom's Taxonomy levels:\n\n${transcriptText}` }
@@ -1133,7 +1133,7 @@ Return JSON:
               'Authorization': `Bearer ${LOVABLE_API_KEY}`,
             },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-pro',
+              model: 'google/gemini-3-pro-preview',
               messages: [
                 { role: 'system', content: `You are an expert USMLE question writer who creates questions at specific Bloom's Taxonomy levels. 
                 
