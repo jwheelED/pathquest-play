@@ -42,6 +42,7 @@ Deno.serve({ port: PORT }, (req) => {
       url.searchParams.set("model", "nova-2");
       url.searchParams.set("language", "en");
       url.searchParams.set("smart_format", "true");
+      url.searchParams.set("numerals", "true"); // Convert spoken numbers to digits
       url.searchParams.set("interim_results", "true");
       url.searchParams.set("punctuate", "true");
       url.searchParams.set("diarize", "true");
@@ -49,6 +50,22 @@ Deno.serve({ port: PORT }, (req) => {
       url.searchParams.set("channels", "1");
       url.searchParams.set("utterance_end_ms", "1000");
       url.searchParams.set("vad_events", "true");
+      
+      // Math/STEM keyword boosting to improve accuracy for technical terms
+      const mathKeywords = [
+        "derivative:2", "integral:2", "equation:2", "variable:2",
+        "coefficient:2", "exponent:2", "logarithm:2", "polynomial:2",
+        "quadratic:2", "calculus:2", "algebra:2", "trigonometry:2",
+        "sine:2", "cosine:2", "tangent:2", "function:2",
+        "limit:2", "infinity:2", "summation:2", "sigma:2",
+        "delta:2", "theta:2", "pi:2", "squared:2", "cubed:2",
+        "x:1", "y:1", "z:1", "f of x:2", "g of x:2",
+        "plus:1", "minus:1", "times:1", "divided by:1", "equals:1",
+        "greater than:1", "less than:1", "approximately:1",
+        "fraction:2", "numerator:2", "denominator:2",
+        "matrix:2", "vector:2", "scalar:2", "determinant:2"
+      ];
+      url.searchParams.set("keywords", mathKeywords.join(","));
 
       console.log("🔗 Connecting to Deepgram...");
 

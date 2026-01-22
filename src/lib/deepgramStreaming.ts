@@ -349,8 +349,27 @@ export class DeepgramStreamingClient {
       return;
     }
 
-    // Extract speaker information from words
+    // Filter out low-confidence transcripts (likely hallucinations)
+    // Only apply to final transcripts to allow interim results through
+    if (isFinal && confidence < 0.7) {
+      console.warn(`⚠️ Rejecting low-confidence transcript (${(confidence * 100).toFixed(1)}%):`, 
+        transcript.substring(0, 50));
+      return;
+    }
+
+    // Detect and reject repetitive hallucination patterns
     const words: DeepgramWord[] = alternative.words || [];
+    const textWords = transcript.toLowerCase().split(/\s+/);
+    const uniqueWords = new Set(textWords);
+    const repetitionRatio = uniqueWords.size / textWords.length;
+    
+    if (textWords.length > 10 && repetitionRatio < 0.3) {
+      console.warn(`⚠️ Rejecting repetitive pattern (${(repetitionRatio * 100).toFixed(0)}% unique):`, 
+        transcript.substring(0, 50));
+      return;
+    }
+
+    // Extract speaker information from words
     const speakerMap = new Map<number, { words: string[]; confidence: number[] }>();
 
     words.forEach((word) => {
@@ -382,7 +401,7 @@ export class DeepgramStreamingClient {
           ? ` [Speaker ${speakers[0].id}]`
           : "";
 
-    console.log(`${logPrefix}${speakerInfo}:`, transcript.substring(0, 100));
+    console.log(`${logPrefix}${speakerInfo} (${(confidence * 100).toFixed(0)}%):`, transcript.substring(0, 100));
 
     // Call the transcript handler
     this.config.onTranscript({
