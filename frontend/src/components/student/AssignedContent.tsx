@@ -16,6 +16,7 @@ import { playNotificationSound } from "@/lib/audioNotification";
 import { ConfidenceSelector, ConfidenceLevel } from "./ConfidenceSelector";
 import ReactMarkdown from "react-markdown";
 import { LectureCountdownTimer } from "./LectureCountdownTimer";
+import { MathRenderer } from "@/components/ui/math-renderer";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
@@ -1666,7 +1667,10 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                                 }
                               }));
                             }}>
-                              <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                              <h4 className="font-semibold flex items-start gap-1">
+                                <span className="shrink-0">Question {idx + 1}:</span>
+                                <span className="flex-1"><MathRenderer content={q.question} /></span>
+                              </h4>
                             </div>
                             
                             {/* Hidden tracker for cheat detection on MCQ */}
@@ -1720,7 +1724,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                                     } ${isSubmitted ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                                   >
                                     <div className="flex items-start justify-between gap-2">
-                                      <span className="text-sm flex-1">{opt}</span>
+                                      <span className="text-sm flex-1"><MathRenderer content={opt} /></span>
                                       {showFeedback && isThisOptionCorrect && (
                                         <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
                                       )}
