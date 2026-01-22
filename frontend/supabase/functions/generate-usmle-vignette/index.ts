@@ -178,7 +178,7 @@ Generate a ${difficulty} difficulty ${questionType} question testing understandi
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro', // Using Pro for high-quality medical content
+        model: 'google/gemini-3-pro-preview', // Using Pro for high-quality medical content
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
