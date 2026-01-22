@@ -58,6 +58,7 @@ import {
 import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStreaming";
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
+import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -2212,21 +2213,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         
         // Only add final transcripts to the chunks array for display
         if (isFinal) {
-          setTranscriptChunks((prev) => [...prev, newText]);
-          setLastTranscript(newText);
+          // Sanitize transcript to filter hallucinations
+          const cleanText = sanitizeTranscript(newText);
+          if (!cleanText) {
+            console.log('🚫 Hallucination filtered, skipping...');
+            return;
+          }
           
-          // Accumulate in transcript buffer
+          setTranscriptChunks((prev) => [...prev, cleanText]);
+          setLastTranscript(cleanText);
+          
+          // Accumulate clean text in transcript buffer
           if (transcriptBufferRef.current) {
-            transcriptBufferRef.current += " " + newText;
+            transcriptBufferRef.current += " " + cleanText;
           } else {
-            transcriptBufferRef.current = newText;
+            transcriptBufferRef.current = cleanText;
           }
           
           // Also accumulate in interval transcript for auto-questions
           if (intervalTranscriptRef.current) {
-            intervalTranscriptRef.current += " " + newText;
+            intervalTranscriptRef.current += " " + cleanText;
           } else {
-            intervalTranscriptRef.current = newText;
+            intervalTranscriptRef.current = cleanText;
           }
           
           // Update interval transcript length for UI
@@ -2235,8 +2243,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           // Reset failure count on successful transcript
           setFailureCount(0);
         } else {
-          // For interim results, just update the last transcript for UI feedback
-          setLastTranscript(newText);
+          // For interim results, also sanitize to avoid showing hallucinations in real-time
+          const cleanText = sanitizeTranscript(newText);
+          if (cleanText) {
+            setLastTranscript(cleanText);
+          }
         }
       },
       onError: (error: string) => {

@@ -1626,7 +1626,9 @@ export const LectureCheckInResults = () => {
                   <>
                     <div className="p-3 bg-muted rounded-lg text-sm">
                       <p className="font-medium mb-1">Question:</p>
-                      <p className="text-foreground">{selectedOverride.group.questions[selectedOverride.questionIdx]?.question}</p>
+                      <div className="text-foreground">
+                        <MathRenderer content={selectedOverride.group.questions[selectedOverride.questionIdx]?.question || ''} />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Select Correct Answer:</label>
@@ -1639,7 +1641,7 @@ export const LectureCheckInResults = () => {
                             const letter = String.fromCharCode(65 + idx);
                             return (
                               <SelectItem key={letter} value={letter}>
-                                {letter}. {opt}
+                                <span className="flex items-center gap-1">{letter}. <MathRenderer content={opt} /></span>
                               </SelectItem>
                             );
                           })}

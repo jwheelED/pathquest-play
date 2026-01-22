@@ -16,6 +16,14 @@ const HALLUCINATION_PATTERNS = [
   /hit that subscribe/gi,
   /welcome back to/gi,
   /(.{5,30})\1{3,}/gi,  // Any phrase repeated 3+ times
+  // Math-specific hallucination patterns
+  /\bx\s+x\s+x\s+x/gi,  // Repeated "x x x x"
+  /\bone\s+one\s+one\s+one/gi,  // Repeated "one one one one"
+  /\btwo\s+two\s+two\s+two/gi,  // Repeated numbers
+  /\bplus\s+plus\s+plus/gi,  // Repeated operators
+  /\bminus\s+minus\s+minus/gi,
+  /\btimes\s+times\s+times/gi,
+  /\bequals\s+equals\s+equals/gi,
 ];
 
 /**

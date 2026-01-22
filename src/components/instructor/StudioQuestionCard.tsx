@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Check, Pencil, RefreshCw, Trash2, ChevronDown, Loader2, X, Save } from "lucide-react";
+import { MathRenderer } from "@/components/ui/math-renderer";
 
 export interface StudioQuestion {
   id: string;
@@ -177,7 +178,7 @@ export function StudioQuestionCard({
                         }`}
                       >
                         <span className="font-medium">{String.fromCharCode(65 + idx)})</span>
-                        <span>{opt}</span>
+                        <span><MathRenderer content={opt} /></span>
                         {opt === question.correct_answer && (
                           <Check className="h-3 w-3 text-emerald-600 ml-auto" />
                         )}

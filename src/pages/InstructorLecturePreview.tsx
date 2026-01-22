@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { InteractiveLecturePlayer } from '@/components/student/InteractiveLecturePlayer';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { MathRenderer } from '@/components/ui/math-renderer';
 
 interface LectureVideo {
   id: string;
@@ -287,9 +288,9 @@ export default function InstructorLecturePreview() {
                             </div>
 
                             {/* Question text */}
-                            <p className="text-sm font-medium line-clamp-2">
-                              {point.question_content.question}
-                            </p>
+                            <div className="text-sm font-medium line-clamp-2">
+                              <MathRenderer content={point.question_content.question} />
+                            </div>
 
                             {/* Reason tag */}
                             {point.reason && (
@@ -321,7 +322,7 @@ export default function InstructorLecturePreview() {
                                             : "bg-muted/30"
                                         )}
                                       >
-                                        {opt}
+                                        <MathRenderer content={opt} />
                                         {opt.startsWith(point.question_content.correctAnswer || '') && (
                                           <CheckCircle2 className="h-3 w-3 inline ml-1" />
                                         )}
@@ -335,9 +336,9 @@ export default function InstructorLecturePreview() {
                                   <p className="text-xs font-medium text-muted-foreground">
                                     {point.question_type === 'multiple_choice' ? 'Correct Answer:' : 'Expected Answer:'}
                                   </p>
-                                  <p className="text-xs p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
-                                    {point.question_content.correctAnswer || point.question_content.expectedAnswer || 'Not specified'}
-                                  </p>
+                                  <div className="text-xs p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                                    <MathRenderer content={point.question_content.correctAnswer || point.question_content.expectedAnswer || 'Not specified'} />
+                                  </div>
                                 </div>
 
                                 {/* Explanation */}
