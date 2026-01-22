@@ -9,6 +9,7 @@ import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStrea
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
+import { sanitizeTranscript } from '@/lib/transcriptSanitizer';
 
 // Constants
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -813,11 +814,18 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       proxyUrl,
       onTranscript: (data: DeepgramTranscript) => {
         if (data.isFinal && data.text.trim()) {
-          console.log('📝 Deepgram final transcript:', data.text);
+          // Sanitize transcript to filter out hallucinations
+          const cleanText = sanitizeTranscript(data.text);
+          if (!cleanText) {
+            console.log('🚫 Skipping hallucinated transcript');
+            return;
+          }
+          
+          console.log('📝 Deepgram final transcript:', cleanText);
           
           // Append to rolling buffers
-          transcriptBufferRef.current += ' ' + data.text;
-          intervalTranscriptRef.current += ' ' + data.text;
+          transcriptBufferRef.current += ' ' + cleanText;
+          intervalTranscriptRef.current += ' ' + cleanText;
           
           // Trim interval transcript if exceeding max length (keep most recent content)
           if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
@@ -827,7 +835,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
           transcriptChunkCountRef.current++;
-          setLastTranscript(data.text);
+          setLastTranscript(cleanText);
           
           if (transcriptChunkCountRef.current % 5 === 0) {
             // Batch update - show last few transcripts for display
