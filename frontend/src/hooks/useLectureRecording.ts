@@ -59,7 +59,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   
   // Voice command detection hook (for chunked mode fallback)
   const { checkTranscriptForCommand, resetCooldown: resetVoiceCommandCooldown } = useVoiceCommandDetection({
-    cooldownMs: 5000,
+    cooldownMs: 15000,
     onCommandDetected: (type) => {
       if (type && onVoiceCommand) {
         console.log(`🎤 Voice command detected (chunked mode): ${type}`);
@@ -91,8 +91,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     const normalizedText = text.toLowerCase().trim();
     const now = Date.now();
     
-    // 5 second cooldown to prevent duplicate triggers
-    if (now - voiceCommandCooldownRef.current < 5000) {
+    // 15 second cooldown to prevent duplicate triggers
+    if (now - voiceCommandCooldownRef.current < 15000) {
       console.log('🔇 Voice command on cooldown, ignoring');
       return null;
     }
