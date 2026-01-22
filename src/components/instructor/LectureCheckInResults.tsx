@@ -14,6 +14,7 @@ import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
 import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { MathRenderer } from "@/components/ui/math-renderer";
 
 interface Assignment {
   id: string;
@@ -1069,7 +1070,9 @@ export const LectureCheckInResults = () => {
                       )}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <p className="font-medium mb-2">{question.question}</p>
+                          <div className="font-medium mb-2">
+                            <MathRenderer content={question.question} />
+                          </div>
                           {question.options && (
                             <ul className="text-sm text-muted-foreground space-y-1">
                               {question.options.map((opt: string, oIdx: number) => {
@@ -1078,9 +1081,11 @@ export const LectureCheckInResults = () => {
                                 return (
                                   <li
                                     key={oIdx}
-                                    className={isCorrect ? "font-medium text-green-600 dark:text-green-500" : ""}
+                                    className={`flex items-start gap-1 ${isCorrect ? "font-medium text-green-600 dark:text-green-500" : ""}`}
                                   >
-                                    <span className="font-bold">{letter}.</span> {opt} {isCorrect && "✓"}
+                                    <span className="font-bold shrink-0">{letter}.</span>
+                                    <span className="flex-1"><MathRenderer content={opt} /></span>
+                                    {isCorrect && <span className="shrink-0">✓</span>}
                                   </li>
                                 );
                               })}
