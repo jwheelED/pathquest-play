@@ -458,24 +458,33 @@ export function VoiceQuestionPreviewDialog({
               <RadioGroup
                 value={correctAnswer}
                 onValueChange={(value) => setCorrectAnswer(value as 'A' | 'B' | 'C' | 'D')}
+                className="space-y-3"
               >
                 {['A', 'B', 'C', 'D'].map((letter, index) => (
-                  <div key={letter} className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 min-w-[80px]">
-                      <RadioGroupItem
-                        value={letter}
-                        id={`correct-${letter}`}
+                  <div key={letter} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-[80px]">
+                        <RadioGroupItem
+                          value={letter}
+                          id={`correct-${letter}`}
+                        />
+                        <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
+                          {letter}
+                        </Label>
+                      </div>
+                      <Input
+                        value={mcqOptions[index]}
+                        onChange={(e) => handleOptionChange(index, e.target.value)}
+                        placeholder={`Option ${letter}`}
+                        className="flex-1"
                       />
-                      <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
-                        {letter}
-                      </Label>
                     </div>
-                    <Input
-                      value={mcqOptions[index]}
-                      onChange={(e) => handleOptionChange(index, e.target.value)}
-                      placeholder={`Option ${letter}`}
-                      className="flex-1"
-                    />
+                    {/* Math preview for this option */}
+                    {showMathPreview && mcqOptions[index] && (
+                      <div className="ml-[88px] p-2 rounded border bg-muted/30 text-sm">
+                        <MathRenderer content={mcqOptions[index]} />
+                      </div>
+                    )}
                   </div>
                 ))}
               </RadioGroup>

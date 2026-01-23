@@ -193,7 +193,7 @@ export const LectureCheckInResults = () => {
     setLastUpdated(new Date());
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [selectedCourse]);
 
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
@@ -203,18 +203,18 @@ export const LectureCheckInResults = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !selectedCourse?.id) return;
 
-      // Set up real-time subscription for assignment updates - filtered by instructor
+      // Set up real-time subscription for assignment updates - filtered by instructor and course
       channel = supabase
-        .channel("instructor-checkin-results")
+        .channel(`instructor-checkin-results-${selectedCourse.id}`)
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "student_assignments",
-            filter: `instructor_id=eq.${user.id}`,
+            filter: `instructor_id=eq.${user.id},course_id=eq.${selectedCourse.id}`,
           },
           (payload) => {
             // Handle INSERT (new questions) and UPDATE (student answers)
@@ -250,7 +250,7 @@ export const LectureCheckInResults = () => {
         supabase.removeChannel(channel);
       }
     };
-  }, [fetchResults]);
+  }, [fetchResults, selectedCourse]);
 
   // Lightweight polling fallback using timeout chain to prevent stale closures
   useEffect(() => {
