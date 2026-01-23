@@ -436,7 +436,10 @@ serve(async (req) => {
     console.log(`📊 Profile auto-grade values: MCQ=${profileData?.auto_grade_mcq}, Coding=${profileData?.auto_grade_coding}, ShortAnswer=${profileData?.auto_grade_short_answer}`);
 
     // Determine assignment mode based on question type and preferences
+    // CRITICAL: coding_simple ALWAYS auto-grades - it's designed for quick conceptual checks
     const getAssignmentMode = (questionType: string): string => {
+      // coding_simple ALWAYS uses auto-grade regardless of instructor preference
+      if (questionType === "coding_simple") return "auto_grade";
       if (questionType === "multiple_choice" && autoGradePrefs.mcq) return "auto_grade";
       if (questionType === "short_answer" && autoGradePrefs.short_answer) return "auto_grade";
       if (questionType === "coding" && autoGradePrefs.coding) return "auto_grade";

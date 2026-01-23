@@ -16,6 +16,7 @@ import { playNotificationSound } from "@/lib/audioNotification";
 import { ConfidenceSelector, ConfidenceLevel } from "./ConfidenceSelector";
 import ReactMarkdown from "react-markdown";
 import { LectureCountdownTimer } from "./LectureCountdownTimer";
+import { MathRenderer } from "@/components/ui/math-renderer";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
@@ -39,7 +40,7 @@ interface Assignment {
 interface AssignedContentProps {
   userId: string;
   instructorId?: string; // Optional: filter by instructor
-  onAnswerResult?: (isCorrect: boolean, grade: number) => void;
+  // onAnswerResult removed - Flow State no longer used
 }
 
 // Confidence data for each assignment
@@ -49,7 +50,7 @@ interface ConfidenceData {
   locked: boolean;
 }
 
-export const AssignedContent = ({ userId, instructorId, onAnswerResult }: AssignedContentProps) => {
+export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
@@ -233,18 +234,10 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             const oldAssignment = payload.old as Assignment;
             const updatedAssignment = payload.new as Assignment;
             
-            // Immediate update for answers_released
-            if ('answers_released' in updatedAssignment) {
-              setAssignments(prev => 
-                prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
-              );
-              
-              if (updatedAssignment.answers_released && !oldAssignment.answers_released) {
-                sonnerToast.success("Answers Released!", {
-                  description: `Answers for "${updatedAssignment.title}" are now available`
-                });
-              }
-            }
+            // Update assignment in state
+            setAssignments(prev => 
+              prev.map(a => a.id === updatedAssignment.id ? updatedAssignment : a)
+            );
             
             // Show toast notification when grade is posted
             if (updatedAssignment.grade !== null && updatedAssignment.grade !== undefined && oldAssignment.grade !== updatedAssignment.grade) {
@@ -564,7 +557,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
     // Combine both answer types
     const allAnswers: Record<number, string> = {};
     questions.forEach((q: any, idx: number) => {
-      if (q.type === 'short_answer' || q.type === 'coding') {
+      if (q.type === 'short_answer' || q.type === 'coding' || q.type === 'coding_simple') {
         allAnswers[idx] = textAns[idx] || '';
       } else {
         allAnswers[idx] = mcAnswers[idx] || '';
@@ -619,11 +612,6 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
 
       setSubmittedQuizzes(prev => ({ ...prev, [assignment.id]: true }));
       
-      // Emit answer result for flow state visualization
-      if (onAnswerResult && result.grade !== null) {
-        const isCorrect = result.grade >= 80;
-        onAnswerResult(isCorrect, result.grade);
-      }
       
       // Save version history for cheat detection
       // For short answers and MCQ, check for version history data from any question
@@ -720,11 +708,11 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
       resetTracking();
       
       // If there are short answers or coding questions, handle auto-grading or recommendations
-      const hasCodingQuestions = questions.some((q: any) => q.type === 'coding');
+      const hasCodingQuestions = questions.some((q: any) => q.type === 'coding' || q.type === 'coding_simple');
       const needsGrading = result.has_short_answer || hasCodingQuestions;
+      const isAutoGrade = result.assignment_mode === 'auto_grade';
       
       if (needsGrading) {
-        const isAutoGrade = result.assignment_mode === 'auto_grade';
         
         toast({
           title: isAutoGrade ? "Auto-grading your answers..." : "Getting AI recommendations...",
@@ -790,6 +778,32 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                     : `${executionResult.passedCount}/${executionResult.totalCount} test cases passed (${grade}%)`
                 };
               }
+            } else if (q.type === 'coding_simple') {
+              // For simple coding check-ins, use lenient AI grading (concept-focused)
+              const studentAnswer = allAnswers[idx];
+              try {
+                const { data: gradeData, error: gradeError } = await supabase.functions.invoke(
+                  'auto-grade-coding',
+                  {
+                    body: {
+                      studentCode: studentAnswer,
+                      problemStatement: q.question,
+                      expectedSolution: q.expectedAnswer || q.correct_answer || '',
+                      language: q.language || 'python',
+                      functionSignature: q.functionSignature || ''
+                    }
+                  }
+                );
+
+                if (!gradeError && gradeData) {
+                  recommendedGrades[idx] = {
+                    grade: gradeData.grade,
+                    feedback: gradeData.feedback
+                  };
+                }
+              } catch (gradeErr) {
+                console.error('Failed to auto-grade coding_simple question', idx, gradeErr);
+              }
             }
           }
         }
@@ -813,6 +827,30 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
           }
 
           const finalGrade = (gradeResult as any)?.grade;
+
+          // Store AI recommendations in quiz_responses for immediate display
+          const updatedResponses = {
+            ...allAnswers,
+            _ai_recommendations: recommendedGrades
+          };
+
+          await supabase
+            .from('student_assignments')
+            .update({ quiz_responses: updatedResponses })
+            .eq('id', assignment.id);
+
+          // Update local state immediately so UI shows feedback without waiting for refetch
+          setAssignments(prev => prev.map(a => 
+            a.id === assignment.id 
+              ? {
+                  ...a,
+                  answers_released: true,
+                  grade: finalGrade,
+                  quiz_responses: updatedResponses
+                }
+              : a
+          ));
+
           toast({ 
             title: "✅ Quiz Submitted Successfully!",
             description: finalGrade ? `Final grade: ${finalGrade.toFixed(1)}%` : "Your answers have been submitted."
@@ -833,21 +871,35 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
             console.error('Failed to store recommendations:', updateError);
           }
 
-          toast({ 
-            title: "✅ Quiz Submitted Successfully!",
-            description: "Your answers have been submitted for review."
-          });
+          // Show immediate grade if we have AI grades
+          const totalGrade = recommendedGrades.length > 0
+            ? Math.round(recommendedGrades.reduce((sum, g) => sum + (g.grade || 0), 0) / recommendedGrades.length)
+            : null;
+          
+          if (totalGrade !== null) {
+            toast({ 
+              title: `✅ Graded: ${totalGrade}%`,
+              description: totalGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
+            });
+          } else {
+            toast({ 
+              title: "✅ Quiz Submitted Successfully!",
+              description: "Your answers have been submitted for review."
+            });
+          }
         }
       } else {
-        // All submissions show same message without scores
+        // Non-auto-grade submissions
         toast({ 
           title: "✅ Quiz Submitted Successfully!",
           description: "Your answers have been submitted for review."
         });
       }
       
-      // Refresh assignments to show updated state
-      await fetchAssignments();
+      // Only refetch for non-auto-grade mode - auto-grade already updated local state
+      if (!isAutoGrade) {
+        await fetchAssignments();
+      }
 
       // For lecture check-ins, update streak tracking and trigger achievement check
       if (assignment.assignment_type === 'lecture_checkin') {
@@ -1235,7 +1287,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                         const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
                         
                         // Handle coding questions
-                        if (q.type === 'coding') {
+                        if (q.type === 'coding' || q.type === 'coding_simple') {
+                          const isSimpleCoding = q.type === 'coding_simple';
                           const codeAnswer = textAnswers[assignment.id]?.[idx] || '';
                           const executionKey = `${assignment.id}-${idx}`;
                           const executionResult = codeExecutionResults[executionKey];
@@ -1254,7 +1307,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-semibold text-lg">Question {idx + 1}</h4>
-                                  {q.difficulty && (
+                                  {!isSimpleCoding && q.difficulty && (
                                     <Badge variant="outline" className={`capitalize ${difficultyColors[q.difficulty.toLowerCase()] || 'bg-muted'}`}>
                                       {q.difficulty}
                                     </Badge>
@@ -1268,16 +1321,23 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                 )}
                               </div>
 
-                              <ScrollArea className="max-h-[600px] pr-4">
+                              {/* Simple coding friendly message */}
+                              {isSimpleCoding && (
+                                <div className="text-sm text-muted-foreground bg-primary/5 p-3 rounded-lg border border-primary/10">
+                                  💡 <span className="font-medium">Quick check-in:</span> Show you understand the concept. Minor syntax errors won't hurt your grade!
+                                </div>
+                              )}
+
+                              <ScrollArea className={isSimpleCoding ? "max-h-[400px] pr-4" : "max-h-[600px] pr-4"}>
                                 <div className="space-y-4">
                                   {/* Problem Statement */}
                                   <div className="space-y-2">
-                                    <h5 className="font-medium text-foreground">Problem Statement</h5>
+                                    <h5 className="font-medium text-foreground">{isSimpleCoding ? 'Question' : 'Problem Statement'}</h5>
                                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{q.question}</p>
                                   </div>
 
-                                  {/* Constraints */}
-                                  {q.constraints && q.constraints.length > 0 && (
+                                  {/* Constraints - only for full coding */}
+                                  {!isSimpleCoding && q.constraints && q.constraints.length > 0 && (
                                     <div className="space-y-2 bg-muted/30 p-3 rounded-lg">
                                       <h5 className="font-medium text-foreground flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4" />
@@ -1303,8 +1363,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     </div>
                                   )}
 
-                                  {/* Examples */}
-                                  {q.examples && q.examples.length > 0 && (
+                                  {/* Examples - only for full coding */}
+                                  {!isSimpleCoding && q.examples && q.examples.length > 0 && (
                                     <div className="space-y-3">
                                       <h5 className="font-medium text-foreground flex items-center gap-2">
                                         <BookOpen className="w-4 h-4" />
@@ -1334,8 +1394,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     </div>
                                   )}
 
-                                  {/* Hints (Collapsible) */}
-                                  {q.hints && q.hints.length > 0 && (
+                                  {/* Hints (Collapsible) - only for full coding */}
+                                  {!isSimpleCoding && q.hints && q.hints.length > 0 && (
                                     <Collapsible className="space-y-2">
                                       <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                                         <Lightbulb className="w-4 h-4" />
@@ -1354,8 +1414,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     </Collapsible>
                                   )}
 
-                                  {/* Function Signature */}
-                                  {q.functionSignature && (
+                                  {/* Function Signature - only for full coding */}
+                                  {!isSimpleCoding && q.functionSignature && (
                                     <div className="space-y-2">
                                       <h5 className="font-medium text-foreground">Function Signature</h5>
                                       <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
@@ -1607,7 +1667,10 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                 }
                               }));
                             }}>
-                              <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
+                              <h4 className="font-semibold flex items-start gap-1">
+                                <span className="shrink-0">Question {idx + 1}:</span>
+                                <span className="flex-1"><MathRenderer content={q.question} /></span>
+                              </h4>
                             </div>
                             
                             {/* Hidden tracker for cheat detection on MCQ */}
@@ -1640,7 +1703,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                 const isCorrect = studentAnswer === correctAnswer;
                                 const isThisOptionCorrect = optionLetter === correctAnswer;
                                 const isStudentChoice = optionLetter === studentAnswer;
-                                const showFeedback = isSubmitted && assignment.answers_released;
+                                const showFeedback = isSubmitted; // Always show feedback immediately after submission
                                 
                                 return (
                                   <button
@@ -1661,7 +1724,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                                     } ${isSubmitted ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                                   >
                                     <div className="flex items-start justify-between gap-2">
-                                      <span className="text-sm flex-1">{opt}</span>
+                                      <span className="text-sm flex-1"><MathRenderer content={opt} /></span>
                                       {showFeedback && isThisOptionCorrect && (
                                         <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
                                       )}
@@ -1674,15 +1737,8 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               })}
                             </div>
                             
-                            {isSubmitted && !assignment.answers_released && (
-                              <div className="p-3 rounded bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                                <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                                  ✓ Submitted - Awaiting answer release
-                                </p>
-                              </div>
-                            )}
                             
-                            {isSubmitted && assignment.answers_released && (
+                            {isSubmitted && (
                               <div className="space-y-3">
                                 <div className={`p-3 rounded border-2 ${
                                   (assignment.quiz_responses?.[idx] === q.correctAnswer)
@@ -1758,7 +1814,7 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                               </div>
                             )}
                             
-                            {assignment.mode === "hints_solutions" && isSubmitted && assignment.answers_released && (
+                            {assignment.mode === "hints_solutions" && isSubmitted && (
                               <div className="bg-primary/5 p-3 rounded space-y-1">
                                 <p className="text-xs font-semibold">Explanation:</p>
                                 <p className="text-xs text-muted-foreground">{q.solution}</p>
@@ -1813,29 +1869,21 @@ export const AssignedContent = ({ userId, instructorId, onAnswerResult }: Assign
                       
                       {assignment.completed && (
                         <div className="space-y-3">
-                          {/* Hide scores until instructor releases answers */}
-                          {!assignment.answers_released ? (
-                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
-                              <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Awaiting Answer Release</p>
-                              <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor will release answers and scores when ready</p>
-                            </div>
-                          ) : assignment.assignment_type === 'lecture_checkin' ? (
+                          {/* Always show scores immediately after submission */}
+                          {assignment.assignment_type === 'lecture_checkin' ? (
                             <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
                               <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">✓ Submitted</p>
-                              <p className="text-sm text-blue-800 dark:text-blue-300">Your instructor has reviewed your response</p>
+                              <p className="text-sm text-blue-800 dark:text-blue-300">Your response has been recorded</p>
+                            </div>
+                          ) : assignment.grade !== undefined && assignment.grade !== null ? (
+                            <div className="bg-primary/10 p-4 rounded-lg text-center">
+                              <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
                             </div>
                           ) : (
-                            // Show scores only after answers are released
-                            assignment.grade !== undefined && assignment.grade !== null ? (
-                              <div className="bg-primary/10 p-4 rounded-lg text-center">
-                                <p className="text-lg font-semibold">Your Score: {(assignment.grade || 0).toFixed(0)}%</p>
-                              </div>
-                            ) : (
-                              <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg text-center border border-yellow-200 dark:border-yellow-800">
-                                <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-200">⏳ Pending Review</p>
-                                <p className="text-sm text-yellow-800 dark:text-yellow-300">Your instructor is reviewing your answers</p>
-                              </div>
-                            )
+                            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg text-center border border-blue-200 dark:border-blue-800">
+                              <p className="text-lg font-semibold text-blue-900 dark:text-blue-200">✓ Submitted</p>
+                              <p className="text-sm text-blue-800 dark:text-blue-300">Your response has been recorded</p>
+                            </div>
                           )}
                           
                           {/* Save button for lecture check-ins */}

@@ -112,7 +112,7 @@ Rules:
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-pro', // Using Pro for better medical reasoning
+        model: 'google/gemini-3-pro-preview', // Using Pro for better medical reasoning
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Extract medical entities from this lecture transcript:\n\n${transcriptText}` }

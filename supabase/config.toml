@@ -1,0 +1,19 @@
+project_id = "otsmjgrhyteyvpufkwdh"
+
+[functions.auto-grade-coding]
+verify_jwt = false
+
+[functions.auto-grade-short-answer]
+verify_jwt = false
+
+[functions.extract-voice-command-question]
+verify_jwt = false
+
+[functions.format-and-send-question]
+verify_jwt = false
+
+[functions.extract-slide-question]
+verify_jwt = false
+
+[functions.send-slide-question]
+verify_jwt = false
