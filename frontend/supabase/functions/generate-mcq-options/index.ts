@@ -91,7 +91,7 @@ Return JSON only:
 
       try {
         console.log(`🎯 Attempt ${attempt}/${MAX_ATTEMPTS} for MCQ generation`);
-        
+
         const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -99,7 +99,7 @@ Return JSON only:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "google/gemini-2.5-flash",
             messages: [
               {
                 role: "system",
@@ -149,7 +149,6 @@ Return JSON only:
         result = parsed;
         console.log(`✅ MCQ options generated successfully on attempt ${attempt}`);
         break;
-
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         if (fetchError.name === "AbortError") {
@@ -174,7 +173,7 @@ Return JSON only:
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -187,7 +186,7 @@ Return JSON only:
           "A. [Please edit this option]",
           "B. [Please edit this option]",
           "C. [Please edit this option]",
-          "D. [Please edit this option]"
+          "D. [Please edit this option]",
         ],
         correct_answer: "A",
         explanation: "AI generation failed after retries. Please edit these placeholder options manually.",
@@ -195,7 +194,7 @@ Return JSON only:
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error) {
     console.error("Error in generate-mcq-options:", error);
@@ -206,7 +205,7 @@ Return JSON only:
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });
