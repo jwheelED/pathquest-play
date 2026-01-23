@@ -66,10 +66,10 @@ function splitMathContent(content: string): ContentPart[] {
   let match;
 
   while ((match = mathRegex.exec(content)) !== null) {
-    // Add text before the math
+    // Add text before the math (preserve all text including whitespace)
     if (match.index > lastIndex) {
       const textContent = content.slice(lastIndex, match.index);
-      if (textContent.trim()) {
+      if (textContent) {
         parts.push({ type: 'text', content: textContent });
       }
     }
@@ -102,10 +102,10 @@ function splitMathContent(content: string): ContentPart[] {
     lastIndex = match.index + match[0].length;
   }
 
-  // Add remaining text
+  // Add remaining text (preserve all text including whitespace)
   if (lastIndex < content.length) {
     const textContent = content.slice(lastIndex);
-    if (textContent.trim()) {
+    if (textContent) {
       parts.push({ type: 'text', content: textContent });
     }
   }
