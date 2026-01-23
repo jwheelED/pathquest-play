@@ -25,7 +25,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
   const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
   const queryClient = useQueryClient();
 
-  const MAX_PPTX_SIZE = 10 * 1024 * 1024; // 10MB for Cloudinary free tier
+  const MAX_PPTX_SIZE = 100 * 1024 * 1024; // 100MB for CloudConvert
   const MAX_PDF_SIZE = 200 * 1024 * 1024; // 200MB for direct upload
 
   const allowedTypes = [
@@ -57,7 +57,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
     // Check file size based on type
     if (isPptxFile(file)) {
       if (file.size > MAX_PPTX_SIZE) {
-        toast.error('PowerPoint files must be under 10MB for conversion. Try reducing image sizes or upload as PDF instead.');
+        toast.error('PowerPoint files must be under 100MB for conversion.');
         return;
       }
     } else if (file.size > MAX_PDF_SIZE) {
@@ -204,7 +204,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       // Check file size based on type
       if (isPptxFile(file)) {
         if (file.size > MAX_PPTX_SIZE) {
-          toast.error('PowerPoint files must be under 10MB for conversion. Try reducing image sizes or upload as PDF instead.');
+          toast.error('PowerPoint files must be under 100MB for conversion.');
           return;
         }
       } else if (file.size > MAX_PDF_SIZE) {
@@ -303,7 +303,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
               <Upload className="h-12 w-12 text-muted-foreground mx-auto" />
               <div>
                 <p className="font-medium">Drag and drop your PDF or PowerPoint here</p>
-                <p className="text-sm text-muted-foreground">PDF up to 200MB • PowerPoint up to 10MB</p>
+                <p className="text-sm text-muted-foreground">PDF up to 200MB • PowerPoint up to 100MB</p>
               </div>
               <Input
                 type="file"
