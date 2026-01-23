@@ -37,12 +37,19 @@ serve(async (req) => {
       );
     }
 
-    // Create Cloudinary upload signature
+    // Create signature for authenticated upload (signed upload - no preset needed)
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = 'pptx_conversions';
     
-    // Upload PPTX to Cloudinary as raw file
-    const formData = new FormData();
+    // Build signature string (alphabetical order of params) for SHA-1 signing
+    const signatureString = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+    
+    // Generate SHA-1 signature using Web Crypto API
+    const encoder = new TextEncoder();
+    const data = encoder.encode(signatureString);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
     // Convert base64 to blob
     const binaryString = atob(fileBase64);
@@ -52,14 +59,15 @@ serve(async (req) => {
     }
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
     
+    // Build FormData with signed params (no upload_preset needed)
+    const formData = new FormData();
     formData.append('file', blob, fileName);
-    formData.append('upload_preset', 'ml_default');
-    formData.append('resource_type', 'raw');
-    formData.append('folder', folder);
     formData.append('api_key', apiKey);
     formData.append('timestamp', timestamp.toString());
+    formData.append('signature', signature);
+    formData.append('folder', folder);
 
-    console.log('📤 Uploading PPTX to Cloudinary...');
+    console.log('📤 Uploading PPTX to Cloudinary (signed upload)...');
     
     // Upload the PPTX file
     const uploadResponse = await fetch(
@@ -94,15 +102,15 @@ serve(async (req) => {
     console.log('📥 Fetching converted PDF from:', pdfDeliveryUrl);
 
     // Try fetching the PDF (Cloudinary auto-converts on delivery)
-    const pdfResponse = await fetch(pdfDeliveryUrl);
+    let pdfResponse = await fetch(pdfDeliveryUrl);
     
     if (!pdfResponse.ok) {
       // Fallback: Try the raw URL with format conversion
       const altPdfUrl = `https://res.cloudinary.com/${cloudName}/raw/upload/fl_attachment/${publicId}.pdf`;
       console.log('Trying alternative URL:', altPdfUrl);
       
-      const altResponse = await fetch(altPdfUrl);
-      if (!altResponse.ok) {
+      pdfResponse = await fetch(altPdfUrl);
+      if (!pdfResponse.ok) {
         console.error('PDF conversion/fetch failed');
         return new Response(
           JSON.stringify({ error: 'Failed to convert PPTX to PDF. The file may be corrupted or password-protected.' }),
