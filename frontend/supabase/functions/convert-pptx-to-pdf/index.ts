@@ -81,6 +81,21 @@ serve(async (req) => {
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
       console.error('Cloudinary upload failed:', errorText);
+      
+      // Parse error to provide better user feedback
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error?.message?.toLowerCase().includes('file size too large') || 
+            errorData.error?.message?.toLowerCase().includes('too large')) {
+          return new Response(
+            JSON.stringify({ error: 'PowerPoint file is too large (max 10MB). Please reduce file size or convert to PDF manually.' }),
+            { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (e) {
+        // Ignore parse errors, use generic message
+      }
+      
       return new Response(
         JSON.stringify({ error: 'Failed to upload file to conversion service' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
