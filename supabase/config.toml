@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.send-slide-question]
 verify_jwt = false
+
+[functions.convert-pptx-to-pdf]
+verify_jwt = false
