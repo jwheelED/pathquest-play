@@ -16,10 +16,10 @@ serve(async (req) => {
     const { question_text, context } = await req.json();
 
     if (!question_text) {
-      return new Response(
-        JSON.stringify({ error: "question_text is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "question_text is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log("Generating expected answer for question:", question_text.substring(0, 100));
@@ -43,17 +43,15 @@ Return ONLY valid JSON:
   "expected_answer": "The actual correct answer here"
 }`;
 
-    const userPrompt = context 
-      ? `Context: ${context}\n\nQuestion: ${question_text}`
-      : `Question: ${question_text}`;
+    const userPrompt = context ? `Context: ${context}\n\nQuestion: ${question_text}` : `Question: ${question_text}`;
 
     let lastError: Error | null = null;
-    
+
     // Retry up to 3 times
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         console.log(`Attempt ${attempt} to generate expected answer`);
-        
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -64,10 +62,10 @@ Return ONLY valid JSON:
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "google/gemini-2.5-flash",
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt }
+              { role: "user", content: userPrompt },
             ],
             temperature: 0.7,
             max_tokens: 500,
@@ -97,7 +95,7 @@ Return ONLY valid JSON:
 
         // Clean and parse the response
         let cleanedContent = content.trim();
-        
+
         // Remove markdown code blocks if present
         if (cleanedContent.startsWith("```json")) {
           cleanedContent = cleanedContent.slice(7);
@@ -111,7 +109,7 @@ Return ONLY valid JSON:
 
         const parsed = JSON.parse(cleanedContent);
 
-        if (!parsed.expected_answer || typeof parsed.expected_answer !== 'string') {
+        if (!parsed.expected_answer || typeof parsed.expected_answer !== "string") {
           console.error(`Invalid response format (attempt ${attempt}):`, parsed);
           lastError = new Error("Invalid response format");
           continue;
@@ -119,17 +117,15 @@ Return ONLY valid JSON:
 
         console.log("Successfully generated expected answer");
 
-        return new Response(
-          JSON.stringify({ expected_answer: parsed.expected_answer }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-
+        return new Response(JSON.stringify({ expected_answer: parsed.expected_answer }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       } catch (error) {
         console.error(`Error on attempt ${attempt}:`, error);
         lastError = error as Error;
-        
+
         if (attempt < 3) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
         }
       }
     }
@@ -137,19 +133,18 @@ Return ONLY valid JSON:
     // All retries failed - return a helpful fallback
     console.error("All attempts failed, returning placeholder");
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         expected_answer: "Please provide the key concepts and correct explanation for this question.",
-        is_placeholder: true 
+        is_placeholder: true,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error: unknown) {
     console.error("Error in generate-expected-answer:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
