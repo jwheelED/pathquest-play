@@ -93,7 +93,7 @@ Note: wrong_answer_explanations should only contain entries for incorrect option
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-pro-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate 5 practice questions for ${courseTitle}. ${topicsContext}` },
