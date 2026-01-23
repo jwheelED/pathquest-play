@@ -24,20 +24,20 @@ serve(async (req) => {
 
     if (authHeader) {
       try {
-        const supabase = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_ANON_KEY")!,
-          { global: { headers: { Authorization: authHeader } } }
-        );
-        
-        const { data: { user } } = await supabase.auth.getUser();
+        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: authHeader } },
+        });
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (user) {
           const { data: profile } = await supabase
             .from("profiles")
             .select("question_format_preference, coding_question_style")
             .eq("id", user.id)
             .single();
-          
+
           if (profile) {
             instructorPreference = profile.question_format_preference || "multiple_choice";
             codingQuestionStyle = profile.coding_question_style || "full";
@@ -67,23 +67,32 @@ serve(async (req) => {
       /send\s+it(\s+now)?/gi,
       /send\s+this(\s+now)?/gi,
     ];
-    
+
     for (const pattern of commandPatterns) {
-      cleanedTranscript = cleanedTranscript.replace(pattern, '');
+      cleanedTranscript = cleanedTranscript.replace(pattern, "");
     }
     cleanedTranscript = cleanedTranscript.trim();
 
     console.log("🎤 Voice command triggered - extracting question from:", cleanedTranscript.substring(0, 100));
-    console.log("📏 Cleaned transcript length:", cleanedTranscript.length, "characters (original:", recentTranscript.length, ")");
+    console.log(
+      "📏 Cleaned transcript length:",
+      cleanedTranscript.length,
+      "characters (original:",
+      recentTranscript.length,
+      ")",
+    );
 
     if (cleanedTranscript.length < 15) {
-      return new Response(JSON.stringify({ 
-        error: "Not enough content before the voice command. Please speak more of your question first.",
-        success: false,
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Not enough content before the voice command. Please speak more of your question first.",
+          success: false,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const systemPrompt = `You are an expert at extracting questions from lecture transcripts with PERFECT accuracy.
@@ -180,7 +189,7 @@ Return ONLY the complete question text, nothing else.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -210,8 +219,21 @@ Return ONLY the complete question text, nothing else.`;
       if (!extractedQuestion.endsWith("?") && !extractedQuestion.endsWith(".") && !extractedQuestion.endsWith("!")) {
         const lowerQ = extractedQuestion.toLowerCase();
         const hasQuestionWord = [
-          "what", "how", "why", "which", "who", "when", "where",
-          "can", "could", "would", "should", "is", "are", "do", "does"
+          "what",
+          "how",
+          "why",
+          "which",
+          "who",
+          "when",
+          "where",
+          "can",
+          "could",
+          "would",
+          "should",
+          "is",
+          "are",
+          "do",
+          "does",
         ].some((word) => lowerQ.startsWith(word + " "));
 
         if (hasQuestionWord) {
@@ -313,9 +335,9 @@ Return ONLY the complete question text, nothing else.`;
 
     // Determine question type - RESPECT instructor preference
     const lowerQuestion = cleanedQuestion.toLowerCase();
-    
+
     // Check for explicit coding indicators in the question
-    const hasCodingKeywords = 
+    const hasCodingKeywords =
       lowerQuestion.includes("code") ||
       lowerQuestion.includes("program") ||
       lowerQuestion.includes("function") ||
@@ -323,26 +345,26 @@ Return ONLY the complete question text, nothing else.`;
       lowerQuestion.includes("write a class") ||
       lowerQuestion.includes("create a class") ||
       lowerQuestion.includes("define a method");
-    
+
     // Determine suggested type - INSTRUCTOR CODING PREFERENCE ALWAYS WINS
     let suggestedType: string;
-    
+
     // PRIORITY 1: Instructor coding preference ALWAYS wins
     if (instructorPreference === "coding") {
       suggestedType = codingQuestionStyle === "simple" ? "coding_simple" : "coding";
       console.log(`🔧 Instructor prefers coding, forcing type: ${suggestedType}`);
-    } 
+    }
     // PRIORITY 2: Explicit coding keywords in question
     else if (hasCodingKeywords) {
       suggestedType = codingQuestionStyle === "simple" ? "coding_simple" : "coding";
       console.log(`🔧 Coding keywords detected, using style: ${suggestedType}`);
-    } 
+    }
     // PRIORITY 3: Use instructor preference (short_answer, multiple_choice, etc.)
     else {
       suggestedType = instructorPreference;
       console.log(`📝 Using instructor preference: ${suggestedType}`);
     }
-    
+
     console.log(`📝 Final suggested type: ${suggestedType} (instructor pref: ${instructorPreference})`);
 
     return new Response(
