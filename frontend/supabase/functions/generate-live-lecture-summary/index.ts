@@ -61,13 +61,14 @@ serve(async (req) => {
       });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -94,20 +95,24 @@ serve(async (req) => {
 
     // Combine transcript chunks
     const fullTranscript = transcript_chunks.join(" ").trim();
-    const wordCount = fullTranscript.split(/\s+/).filter(w => w.length > 0).length;
+    const wordCount = fullTranscript.split(/\s+/).filter((w) => w.length > 0).length;
     const durationMinutes = recording_duration_seconds / 60;
     const avgWPM = durationMinutes > 0 ? Math.round(wordCount / durationMinutes) : 0;
 
     // Calculate student performance metrics
     const totalResponses = check_in_results.length;
-    const correctResponses = check_in_results.filter(r => r.is_correct).length;
+    const correctResponses = check_in_results.filter((r) => r.is_correct).length;
     const overallAccuracy = totalResponses > 0 ? Math.round((correctResponses / totalResponses) * 100) : 0;
 
     // Group responses by question to find struggling areas
     const questionStats: Map<string, { total: number; correct: number; question: string }> = new Map();
     for (const result of check_in_results) {
       const key = result.question || result.id;
-      const existing = questionStats.get(key) || { total: 0, correct: 0, question: result.question || "Unknown question" };
+      const existing = questionStats.get(key) || {
+        total: 0,
+        correct: 0,
+        question: result.question || "Unknown question",
+      };
       existing.total++;
       if (result.is_correct) existing.correct++;
       questionStats.set(key, existing);
@@ -118,7 +123,7 @@ serve(async (req) => {
         question: stats.question.substring(0, 100),
         accuracy: stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0,
       }))
-      .filter(q => q.accuracy < 70)
+      .filter((q) => q.accuracy < 70)
       .sort((a, b) => a.accuracy - b.accuracy)
       .slice(0, 5);
 
@@ -129,9 +134,7 @@ serve(async (req) => {
     }
 
     // Truncate transcript for API (keep last ~8000 chars for context)
-    const truncatedTranscript = fullTranscript.length > 8000 
-      ? fullTranscript.slice(-8000) 
-      : fullTranscript;
+    const truncatedTranscript = fullTranscript.length > 8000 ? fullTranscript.slice(-8000) : fullTranscript;
 
     const systemPrompt = `You are an expert teaching coach analyzing a lecture. Provide actionable, specific feedback to help the instructor improve. Be encouraging but honest.
 
@@ -153,9 +156,11 @@ Course type: ${course_type}`;
 - Student accuracy: ${overallAccuracy}% (${correctResponses}/${totalResponses} correct)
 
 ## Struggling Questions (lowest accuracy)
-${strugglingQuestions.length > 0 
-  ? strugglingQuestions.map(q => `- "${q.question}..." - ${q.accuracy}% accuracy`).join("\n")
-  : "No low-accuracy questions detected"}
+${
+  strugglingQuestions.length > 0
+    ? strugglingQuestions.map((q) => `- "${q.question}..." - ${q.accuracy}% accuracy`).join("\n")
+    : "No low-accuracy questions detected"
+}
 
 ## Transcript Excerpt (most recent content)
 ${truncatedTranscript}
@@ -169,7 +174,7 @@ Provide your analysis as a JSON object with this structure:
   "commonMisconceptions": ["potential misconception 1", ...],
   "recommendations": ["specific action 1", "specific action 2", ...],
   "reteachingSuggestions": [{"topic": "topic name", "reason": "why it needs review"}],
-  "sentiment": "${course_type === 'humanities' ? 'brief note on student engagement' : ''}"
+  "sentiment": "${course_type === "humanities" ? "brief note on student engagement" : ""}"
 }`;
 
     console.log("🤖 Calling AI for lecture analysis...");
@@ -181,7 +186,7 @@ Provide your analysis as a JSON object with this structure:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -193,14 +198,14 @@ Provide your analysis as a JSON object with this structure:
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("AI API error:", aiResponse.status, errorText);
-      
+
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded, please try again later" }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      
+
       throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
@@ -228,7 +233,7 @@ Provide your analysis as a JSON object with this structure:
           "Continue monitoring student understanding through check-in questions",
           "Consider adjusting speaking pace based on content complexity",
         ],
-        reteachingSuggestions: strugglingQuestions.map(q => ({
+        reteachingSuggestions: strugglingQuestions.map((q) => ({
           topic: q.question.substring(0, 50),
           reason: `Only ${q.accuracy}% of students answered correctly`,
         })),
@@ -273,7 +278,7 @@ Provide your analysis as a JSON object with this structure:
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });

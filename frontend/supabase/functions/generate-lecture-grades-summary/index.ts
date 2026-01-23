@@ -2,13 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -19,10 +19,9 @@ serve(async (req) => {
     console.log(`Students: ${studentProgress?.length || 0}, Questions: ${pausePoints?.length || 0}`);
 
     if (!studentProgress || studentProgress.length === 0) {
-      return new Response(
-        JSON.stringify({ summary: "No student data available to analyze." }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ summary: "No student data available to analyze." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Analyze student performance data
@@ -47,23 +46,23 @@ Keep the summary to 150-200 words. Use markdown formatting with bullet points fo
 
 **Class Statistics:**
 - Total Students: ${analysisData.totalStudents}
-- Completed: ${analysisData.completedStudents} (${Math.round(analysisData.completedStudents / analysisData.totalStudents * 100)}%)
-- Average Score: ${analysisData.avgScore !== null ? `${analysisData.avgScore}%` : 'N/A'}
+- Completed: ${analysisData.completedStudents} (${Math.round((analysisData.completedStudents / analysisData.totalStudents) * 100)}%)
+- Average Score: ${analysisData.avgScore !== null ? `${analysisData.avgScore}%` : "N/A"}
 
 **Question Performance:**
-${analysisData.questionStats.map((q, i) => 
-  `Q${i + 1} (${q.type}): ${q.correctRate}% correct - "${q.questionText.substring(0, 80)}..."`
-).join('\n')}
+${analysisData.questionStats
+  .map((q, i) => `Q${i + 1} (${q.type}): ${q.correctRate}% correct - "${q.questionText.substring(0, 80)}..."`)
+  .join("\n")}
 
 **Common Wrong Answers:**
-${analysisData.commonWrongAnswers.map(w => 
-  `- Q${w.questionIndex}: "${w.wrongAnswer}" (${w.count} students)`
-).join('\n') || 'None identified'}
+${
+  analysisData.commonWrongAnswers
+    .map((w) => `- Q${w.questionIndex}: "${w.wrongAnswer}" (${w.count} students)`)
+    .join("\n") || "None identified"
+}
 
 **Low Performing Students:**
-${analysisData.lowPerformers.map(s => 
-  `- ${s.name}: ${s.score}%`
-).join('\n') || 'None below 40%'}
+${analysisData.lowPerformers.map((s) => `- ${s.name}: ${s.score}%`).join("\n") || "None below 40%"}
 
 Please provide a summary with:
 1. Performance overview
@@ -75,13 +74,13 @@ Please provide a summary with:
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user", content: userPrompt },
         ],
         max_tokens: 500,
         temperature: 0.7,
@@ -99,24 +98,22 @@ Please provide a summary with:
 
     console.log("Summary generated successfully");
 
-    return new Response(
-      JSON.stringify({ summary }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(JSON.stringify({ summary }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Error generating grades summary:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
 
 function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
   const totalStudents = studentProgress.length;
-  const completedStudents = studentProgress.filter(p => p.completed_at).length;
+  const completedStudents = studentProgress.filter((p) => p.completed_at).length;
 
   // Calculate question-level stats
   const questionStats: any[] = [];
@@ -127,19 +124,17 @@ function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
     let total = 0;
     const wrongAnswers = new Map<string, number>();
 
-    studentProgress.forEach(progress => {
+    studentProgress.forEach((progress) => {
       if (!progress.responses) return;
-      
-      const responses = typeof progress.responses === 'string' 
-        ? JSON.parse(progress.responses) 
-        : progress.responses;
-      
+
+      const responses = typeof progress.responses === "string" ? JSON.parse(progress.responses) : progress.responses;
+
       const response = responses[pp.id];
       if (!response) return;
 
       total++;
       const isCorrect = response.correct || (response.grade && response.grade >= 70);
-      
+
       if (isCorrect) {
         correct++;
       } else if (response.answer) {
@@ -148,16 +143,15 @@ function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
       }
     });
 
-    const questionContent = typeof pp.question_content === 'string'
-      ? JSON.parse(pp.question_content)
-      : pp.question_content;
+    const questionContent =
+      typeof pp.question_content === "string" ? JSON.parse(pp.question_content) : pp.question_content;
 
     questionStats.push({
       questionText: questionContent.question || "Question",
       type: pp.question_type,
       correctRate: total > 0 ? Math.round((correct / total) * 100) : 0,
       total,
-      correct
+      correct,
     });
 
     wrongAnswersByQuestion.set(idx + 1, wrongAnswers);
@@ -167,11 +161,12 @@ function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
   const commonWrongAnswers: any[] = [];
   wrongAnswersByQuestion.forEach((wrongAnswers, questionIndex) => {
     wrongAnswers.forEach((count, answer) => {
-      if (count >= 2) { // At least 2 students made same mistake
+      if (count >= 2) {
+        // At least 2 students made same mistake
         commonWrongAnswers.push({
           questionIndex,
           wrongAnswer: answer.substring(0, 50),
-          count
+          count,
         });
       }
     });
@@ -186,13 +181,11 @@ function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
   let totalScore = 0;
   let scoreCount = 0;
 
-  studentProgress.forEach(progress => {
+  studentProgress.forEach((progress) => {
     if (!progress.responses) return;
-    
-    const responses = typeof progress.responses === 'string' 
-      ? JSON.parse(progress.responses) 
-      : progress.responses;
-    
+
+    const responses = typeof progress.responses === "string" ? JSON.parse(progress.responses) : progress.responses;
+
     let studentTotal = 0;
     let studentCount = 0;
 
@@ -215,7 +208,7 @@ function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
   });
 
   const avgScore = scoreCount > 0 ? Math.round(totalScore / scoreCount) : null;
-  const lowPerformers = studentScores.filter(s => s.score < 40).slice(0, 5);
+  const lowPerformers = studentScores.filter((s) => s.score < 40).slice(0, 5);
 
   return {
     totalStudents,
@@ -223,6 +216,6 @@ function analyzeStudentPerformance(studentProgress: any[], pausePoints: any[]) {
     avgScore,
     questionStats,
     commonWrongAnswers: topWrongAnswers,
-    lowPerformers
+    lowPerformers,
   };
 }

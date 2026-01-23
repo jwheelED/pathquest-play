@@ -3,78 +3,80 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+      return new Response(JSON.stringify({ error: "Not authenticated" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+      return new Response(JSON.stringify({ error: "Not authenticated" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Verify instructor role
-    const { data: hasRole } = await supabase.rpc('has_role', { _role: 'instructor', _user_id: user.id });
+    const { data: hasRole } = await supabase.rpc("has_role", { _role: "instructor", _user_id: user.id });
     if (!hasRole) {
-      return new Response(JSON.stringify({ error: 'Not authorized' }), {
+      return new Response(JSON.stringify({ error: "Not authorized" }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { slideImage, questionType, difficulty_preference } = await req.json();
 
     if (!slideImage) {
-      return new Response(JSON.stringify({ error: 'Slide image is required' }), {
+      return new Response(JSON.stringify({ error: "Slide image is required" }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const validTypes = ['mcq', 'short_answer', 'coding'];
-    const type = validTypes.includes(questionType) ? questionType : 'mcq';
-    const difficulty = ['easy', 'medium', 'hard'].includes(difficulty_preference) ? difficulty_preference : 'easy';
+    const validTypes = ["mcq", "short_answer", "coding"];
+    const type = validTypes.includes(questionType) ? questionType : "mcq";
+    const difficulty = ["easy", "medium", "hard"].includes(difficulty_preference) ? difficulty_preference : "easy";
 
     // Difficulty instructions for prompt
     const difficultyInstructions = {
       easy: "Generate an EASY question: focus on basic recall, simple definitions, or straightforward facts visible on the slide. The answer should be directly stated on the slide.",
-      medium: "Generate a MEDIUM difficulty question: require understanding and application of concepts. Students should need to think about the content, not just recall it.",
-      hard: "Generate a HARD question: require analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations."
+      medium:
+        "Generate a MEDIUM difficulty question: require understanding and application of concepts. Students should need to think about the content, not just recall it.",
+      hard: "Generate a HARD question: require analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.",
     };
 
     console.log(`📋 Extracting ${type} question from slide image (${slideImage.length} chars)`);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     // Build the prompt based on question type
-    let extractionPrompt = '';
-    
-    if (type === 'mcq') {
+    let extractionPrompt = "";
+
+    if (type === "mcq") {
       extractionPrompt = `You are analyzing a slide image to extract or generate a multiple choice question.
 
 ${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
@@ -110,7 +112,7 @@ If the slide has no meaningful educational content, return:
 {"found": false, "error": "No suitable content found on this slide"}
 
 Return ONLY valid JSON, no other text.`;
-    } else if (type === 'short_answer') {
+    } else if (type === "short_answer") {
       extractionPrompt = `You are analyzing a slide image to extract or generate a short answer question.
 
 ${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
@@ -141,7 +143,7 @@ If the slide has no meaningful educational content, return:
 {"found": false, "error": "No suitable content found on this slide"}
 
 Return ONLY valid JSON, no other text.`;
-    } else if (type === 'coding') {
+    } else if (type === "coding") {
       extractionPrompt = `You are analyzing a slide image that contains a coding problem or challenge.
 
 Extract the problem and return it in this exact JSON format:
@@ -165,41 +167,41 @@ Return ONLY valid JSON, no other text.`;
     }
 
     // Call Gemini with vision
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: "google/gemini-2.5-flash",
         messages: [
           {
-            role: 'user',
+            role: "user",
             content: [
-              { type: 'text', text: extractionPrompt },
-              { 
-                type: 'image_url', 
-                image_url: { 
-                  url: slideImage.startsWith('data:') ? slideImage : `data:image/png;base64,${slideImage}`
-                } 
-              }
-            ]
-          }
+              { type: "text", text: extractionPrompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: slideImage.startsWith("data:") ? slideImage : `data:image/png;base64,${slideImage}`,
+                },
+              },
+            ],
+          },
         ],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
+      console.error("AI gateway error:", response.status, errorText);
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    
-    console.log('📋 AI response:', content.substring(0, 500));
+    const content = data.choices?.[0]?.message?.content || "";
+
+    console.log("📋 AI response:", content.substring(0, 500));
 
     // Parse the JSON response
     let extractedData;
@@ -209,45 +211,56 @@ Return ONLY valid JSON, no other text.`;
       if (jsonMatch) {
         extractedData = JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error('No JSON found in response');
+        throw new Error("No JSON found in response");
       }
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      return new Response(JSON.stringify({ 
-        error: 'Failed to parse question from slide',
-        details: content.substring(0, 200)
-      }), {
-        status: 422,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.error("Failed to parse AI response:", parseError);
+      return new Response(
+        JSON.stringify({
+          error: "Failed to parse question from slide",
+          details: content.substring(0, 200),
+        }),
+        {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     if (!extractedData.found) {
-      return new Response(JSON.stringify({ 
-        error: extractedData.error || 'No question found on this slide'
-      }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          error: extractedData.error || "No question found on this slide",
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    console.log('✅ Successfully extracted question:', extractedData.question?.substring(0, 100));
+    console.log("✅ Successfully extracted question:", extractedData.question?.substring(0, 100));
 
-    return new Response(JSON.stringify({
-      success: true,
-      questionType: type,
-      data: extractedData,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        questionType: type,
+        data: extractedData,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
-    console.error('Error in extract-slide-question:', error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error in extract-slide-question:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

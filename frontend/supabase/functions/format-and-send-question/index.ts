@@ -9,7 +9,11 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-const generateMCQ = async (questionText: string, context: string, courseContext?: { title: string; topics: string[] } | null) => {
+const generateMCQ = async (
+  questionText: string,
+  context: string,
+  courseContext?: { title: string; topics: string[] } | null,
+) => {
   // Build course context for prompt
   let courseInfo = "";
   if (courseContext?.title) {
@@ -18,11 +22,12 @@ const generateMCQ = async (questionText: string, context: string, courseContext?
   if (courseContext?.topics?.length) {
     courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
   }
-  
+
   // Detect if this is a math question (contains LaTeX)
-  const isMathQuestion = questionText.includes('$') || questionText.includes('\\');
-  
-  const mathGuidance = isMathQuestion ? `
+  const isMathQuestion = questionText.includes("$") || questionText.includes("\\");
+
+  const mathGuidance = isMathQuestion
+    ? `
 
 🧮 MATHEMATICS QUESTION DETECTED - SPECIAL INSTRUCTIONS:
 
@@ -50,21 +55,22 @@ FORMATTING RULES:
 - ALL math expressions in options MUST use LaTeX: $...$ or $$...$$
 - Keep notation consistent with the question
 - Use \\frac{}{} for fractions, \\lim_{} for limits, ^ for exponents
-- Greek letters: \\theta, \\pi, \\alpha, etc.` : '';
-  
+- Greek letters: \\theta, \\pi, \\alpha, etc.`
+    : "";
+
   const prompt = `The professor asked: "${questionText}"
 
 Context from lecture: "${context}"${courseInfo}${mathGuidance}
 
 Generate a multiple choice question with 4 options:
 - One correct answer
-- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ''}${isMathQuestion ? ' and typical calculation errors' : ''}
+- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""}${isMathQuestion ? " and typical calculation errors" : ""}
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
-- Keep it concise and clear${isMathQuestion ? '\n- Use LaTeX notation ($...$) for ALL mathematical expressions in options' : ''}
-${courseContext?.topics?.length ? `- Consider these key topics when creating distractors: ${courseContext.topics.join(", ")}` : ''}
+- Keep it concise and clear${isMathQuestion ? "\n- Use LaTeX notation ($...$) for ALL mathematical expressions in options" : ""}
+${courseContext?.topics?.length ? `- Consider these key topics when creating distractors: ${courseContext.topics.join(", ")}` : ""}
 
-${isMathQuestion ? 'CRITICAL FOR MATH: Each distractor should represent a specific type of error a student might make.' : ''}
+${isMathQuestion ? "CRITICAL FOR MATH: Each distractor should represent a specific type of error a student might make." : ""}
 
 Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
@@ -86,7 +92,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
@@ -143,7 +149,11 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   }
 };
 
-const generateCodingQuestion = async (questionText: string, context: string, courseContext?: { title: string; topics: string[] } | null) => {
+const generateCodingQuestion = async (
+  questionText: string,
+  context: string,
+  courseContext?: { title: string; topics: string[] } | null,
+) => {
   // Build course context for prompt
   let courseInfo = "";
   if (courseContext?.title) {
@@ -152,7 +162,7 @@ const generateCodingQuestion = async (questionText: string, context: string, cou
   if (courseContext?.topics?.length) {
     courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
   }
-  
+
   const prompt = `Based on the lecture content, create a LeetCode-style coding problem.
 
 PROFESSOR'S QUESTION/TOPIC: "${questionText}"
@@ -218,7 +228,7 @@ CRITICAL REQUIREMENTS:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
@@ -413,7 +423,19 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null, expected_answer = "", options = null, correct_answer = null, explanation = null, course_id = null } = await req.json();
+    const {
+      question_text,
+      suggested_type,
+      context,
+      source = "manual_button",
+      use_answer_key = false,
+      course_context = null,
+      expected_answer = "",
+      options = null,
+      correct_answer = null,
+      explanation = null,
+      course_id = null,
+    } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -431,9 +453,11 @@ serve(async (req) => {
       coding: profileData?.auto_grade_coding !== false, // Default to true (enabled)
       mcq: profileData?.auto_grade_mcq !== false, // Default to true (enabled)
     };
-    
+
     console.log(`🎯 Auto-grade preferences:`, autoGradePrefs);
-    console.log(`📊 Profile auto-grade values: MCQ=${profileData?.auto_grade_mcq}, Coding=${profileData?.auto_grade_coding}, ShortAnswer=${profileData?.auto_grade_short_answer}`);
+    console.log(
+      `📊 Profile auto-grade values: MCQ=${profileData?.auto_grade_mcq}, Coding=${profileData?.auto_grade_coding}, ShortAnswer=${profileData?.auto_grade_short_answer}`,
+    );
 
     // Determine assignment mode based on question type and preferences
     // CRITICAL: coding_simple ALWAYS auto-grades - it's designed for quick conceptual checks
@@ -451,10 +475,10 @@ serve(async (req) => {
     // 2. If instructor prefers coding, use their coding style preference (simple vs full)
     // 3. Otherwise, use instructor's preference from settings
     // This ensures preview dialog overrides work, voice commands respect settings, and coding style is handled
-    const hasPreGeneratedOptions = (options && Array.isArray(options) && options.length === 4 && correct_answer);
-    
+    const hasPreGeneratedOptions = options && Array.isArray(options) && options.length === 4 && correct_answer;
+
     let finalType: string;
-    
+
     if (hasPreGeneratedOptions && suggested_type) {
       // Preview dialog with edited options - respect user's explicit choice
       finalType = suggested_type;
@@ -466,7 +490,7 @@ serve(async (req) => {
         .select("coding_question_style")
         .eq("id", user.id)
         .single();
-      
+
       const codingStyle = codingPref?.coding_question_style || "simple";
       // Map coding preference to finalType - suggested_type can override if already coding
       if (suggested_type === "coding" || suggested_type === "coding_simple") {
@@ -480,8 +504,10 @@ serve(async (req) => {
       finalType = instructorPreference;
       console.log(`📝 Using instructor preference: ${finalType}`);
     }
-    
-    console.log(`📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type}, has_preview_options: ${hasPreGeneratedOptions})`);
+
+    console.log(
+      `📝 Final question type: ${finalType} (preference: ${instructorPreference}, suggested: ${suggested_type}, has_preview_options: ${hasPreGeneratedOptions})`,
+    );
 
     if (!question_text || !suggested_type) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -495,7 +521,7 @@ serve(async (req) => {
     let answerKeyMcq: any = null;
     if (use_answer_key && context && instructorPreference === "multiple_choice") {
       console.log("🔑 Checking for answer key match...");
-      
+
       try {
         // Get instructor's verified problems with MCQs
         const { data: answerKeys } = await supabase
@@ -503,14 +529,15 @@ serve(async (req) => {
           .select("id")
           .eq("instructor_id", user.id)
           .eq("status", "parsed");
-        
+
         if (answerKeys && answerKeys.length > 0) {
-          const answerKeyIds = answerKeys.map(k => k.id);
-          
+          const answerKeyIds = answerKeys.map((k) => k.id);
+
           // Get verified problems with their MCQs
           const { data: problems } = await supabase
             .from("answer_key_problems")
-            .select(`
+            .select(
+              `
               id,
               problem_text,
               final_answer,
@@ -523,44 +550,48 @@ serve(async (req) => {
                 distractors,
                 explanation
               )
-            `)
+            `,
+            )
             .in("answer_key_id", answerKeyIds)
             .eq("verified_by_instructor", true);
-          
+
           if (problems && problems.length > 0) {
             // Simple keyword matching against context
             const contextLower = context.toLowerCase();
             let bestMatch: any = null;
             let bestScore = 0;
-            
+
             for (const problem of problems) {
               const keywords = problem.keywords || [];
               const tags = problem.topic_tags || [];
               const allTerms = [...keywords, ...tags];
-              
+
               let matchCount = 0;
               for (const term of allTerms) {
                 if (contextLower.includes(term.toLowerCase())) {
                   matchCount++;
                 }
               }
-              
+
               // Also check if problem text appears in context
-              const problemWords = problem.problem_text.toLowerCase().split(/\s+/).filter((w: string) => w.length > 4);
+              const problemWords = problem.problem_text
+                .toLowerCase()
+                .split(/\s+/)
+                .filter((w: string) => w.length > 4);
               for (const word of problemWords.slice(0, 5)) {
                 if (contextLower.includes(word)) {
                   matchCount += 0.5;
                 }
               }
-              
+
               const score = allTerms.length > 0 ? matchCount / allTerms.length : 0;
-              
+
               if (score > bestScore && score >= 0.3 && (problem as any).answer_key_mcqs?.length > 0) {
                 bestScore = score;
                 bestMatch = problem;
               }
             }
-            
+
             if (bestMatch && (bestMatch as any).answer_key_mcqs?.[0]) {
               const mcq = (bestMatch as any).answer_key_mcqs[0];
               answerKeyMcq = {
@@ -573,7 +604,7 @@ serve(async (req) => {
                 confidence: bestScore,
               };
               console.log(`✅ Answer key match found! Confidence: ${(bestScore * 100).toFixed(0)}%`);
-              
+
               // Log usage
               await supabase.from("answer_key_usage_log").insert({
                 instructor_id: user.id,
@@ -599,12 +630,7 @@ serve(async (req) => {
         ? question_text.substring(0, 50)
         : question_text.question_text || question_text.title || "Structured problem";
 
-    console.log(
-      "📝 Formatting question as:",
-      finalType,
-      "-",
-      questionPreview,
-    );
+    console.log("📝 Formatting question as:", finalType, "-", questionPreview);
 
     let formattedQuestion: any;
 
@@ -614,12 +640,15 @@ serve(async (req) => {
 
     if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
-      
+
       if (isSimpleCoding) {
         // Simple coding check-in - minimal structure, just show mini IDE with the question
         console.log("📝 Creating simple coding check-in (mini IDE)");
         formattedQuestion = {
-          question: typeof question_text === "string" ? question_text : question_text.question_text || question_text.problemStatement || String(question_text),
+          question:
+            typeof question_text === "string"
+              ? question_text
+              : question_text.question_text || question_text.problemStatement || String(question_text),
           type: "coding_simple",
           language: "python", // Default to python for simple check-ins
           difficulty: "Easy",
@@ -723,7 +752,7 @@ serve(async (req) => {
         question: question_text,
         type: "short_answer",
         expectedAnswer: expected_answer || "",
-        gradingMode: (autoGradePrefs.short_answer && expected_answer) ? "auto_grade" : "manual_grade", // FIXED: Check auto-grade pref
+        gradingMode: autoGradePrefs.short_answer && expected_answer ? "auto_grade" : "manual_grade", // FIXED: Check auto-grade pref
       };
     }
 
@@ -758,14 +787,12 @@ serve(async (req) => {
       const questionNumber = (questionCount || 0) + 1;
 
       // Insert into live_questions for anonymous participants
-      const { error: liveInsertError } = await supabase
-        .from("live_questions")
-        .insert({
-          session_id: liveSession.id,
-          instructor_id: user.id,
-          question_content: formattedQuestion,
-          question_number: questionNumber,
-        });
+      const { error: liveInsertError } = await supabase.from("live_questions").insert({
+        session_id: liveSession.id,
+        instructor_id: user.id,
+        question_content: formattedQuestion,
+        question_number: questionNumber,
+      });
 
       if (liveInsertError) {
         console.error("❌ Failed to insert live question:", liveInsertError);
@@ -789,7 +816,7 @@ serve(async (req) => {
       let registeredStudentCount = 0;
       if (studentLinks && studentLinks.length > 0) {
         console.log(`📚 Also sending to ${studentLinks.length} registered students`);
-        
+
         const assignmentMode = getAssignmentMode(finalType);
         const assignments = studentLinks.map((link) => ({
           instructor_id: user.id,
@@ -808,9 +835,7 @@ serve(async (req) => {
           auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         }));
 
-        const { error: assignmentError } = await supabase
-          .from("student_assignments")
-          .insert(assignments);
+        const { error: assignmentError } = await supabase.from("student_assignments").insert(assignments);
 
         if (assignmentError) {
           console.error("❌ Failed to send to registered students:", assignmentError.message);

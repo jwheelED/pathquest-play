@@ -1,33 +1,34 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: req.headers.get("Authorization")! } },
+    });
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { 
+    const {
       lectureVideoId,
       pausePointId,
       misconception,
@@ -35,10 +36,10 @@ serve(async (req) => {
       rootCause,
       originalQuestion,
       correctAnswer,
-      studentAnswer
+      studentAnswer,
     } = await req.json();
 
-    console.log('Generating remediation for:', { misconception, missingConcept });
+    console.log("Generating remediation for:", { misconception, missingConcept });
 
     const systemPrompt = `You are an expert educational AI that creates personalized remediation content.
 Your task is to:
@@ -79,19 +80,19 @@ Root cause: ${rootCause}
 
 Generate a personalized explanation and follow-up question to help them understand.`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://edvana.app',
-        'X-Title': 'Edvana Education Platform',
+        Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://edvana.app",
+        "X-Title": "Edvana Education Platform",
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: "google/gemini-2.5-flash",
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
         temperature: 0.5,
         max_tokens: 800,
@@ -100,36 +101,38 @@ Generate a personalized explanation and follow-up question to help them understa
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI API error:', errorText);
+      console.error("AI API error:", errorText);
       throw new Error(`AI API error: ${response.status}`);
     }
 
     const aiData = await response.json();
-    const content = aiData.choices[0]?.message?.content || '';
-    
+    const content = aiData.choices[0]?.message?.content || "";
+
     // Parse JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      throw new Error('Failed to parse AI response as JSON');
+      throw new Error("Failed to parse AI response as JSON");
     }
 
     const remediationData = JSON.parse(jsonMatch[0]);
-    console.log('Remediation generated successfully');
+    console.log("Remediation generated successfully");
 
-    return new Response(JSON.stringify({
-      success: true,
-      explanation: remediationData.explanation,
-      followUpQuestion: remediationData.followUpQuestion,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        explanation: remediationData.explanation,
+        followUpQuestion: remediationData.followUpQuestion,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error: unknown) {
-    console.error('Error in generate-remediation:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Error in generate-remediation:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

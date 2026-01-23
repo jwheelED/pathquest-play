@@ -1,8 +1,8 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 // Rate limiting: 20 submissions per IP per minute
@@ -13,25 +13,23 @@ const ipRequestCounts = new Map<string, { count: number; resetTime: number }>();
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const record = ipRequestCounts.get(ip);
-  
+
   if (!record || now > record.resetTime) {
     ipRequestCounts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
     return true;
   }
-  
+
   if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
     return false;
   }
-  
+
   record.count++;
   return true;
 }
 
 // Get client IP from request headers
 function getClientIP(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-         req.headers.get('x-real-ip') || 
-         'unknown';
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
 }
 
 // Validate UUID format
@@ -45,7 +43,7 @@ function calculatePoints(
   isCorrect: boolean,
   confidenceLevel: string | null,
   confidenceMultiplier: number,
-  baseReward: number
+  baseReward: number,
 ): number {
   if (!confidenceLevel) {
     // No confidence betting - just return base reward or 0
@@ -58,14 +56,14 @@ function calculatePoints(
   } else {
     // Wrong answer: penalty based on confidence level
     switch (confidenceLevel) {
-      case 'low':
+      case "low":
         // Small penalty for playing it safe
         return -Math.round(baseReward * 0.25);
-      case 'medium':
+      case "medium":
         // No penalty for medium confidence
         return 0;
-      case 'high':
-      case 'very_high':
+      case "high":
+      case "very_high":
         // Bigger penalty for high confidence wrong answers
         return -Math.round(baseReward * confidenceMultiplier * 0.5);
       default:
@@ -78,26 +76,26 @@ function calculatePoints(
 function calculateSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase().trim();
   const s2 = str2.toLowerCase().trim();
-  
+
   if (s1 === s2) return 1;
   if (s1.length === 0 || s2.length === 0) return 0;
-  
+
   // Word-level matching
-  const words1 = new Set(s1.split(/\s+/).filter(w => w.length > 2));
-  const words2 = new Set(s2.split(/\s+/).filter(w => w.length > 2));
-  
+  const words1 = new Set(s1.split(/\s+/).filter((w) => w.length > 2));
+  const words2 = new Set(s2.split(/\s+/).filter((w) => w.length > 2));
+
   if (words1.size === 0 || words2.size === 0) {
     // Character-level for short answers
     const longer = s1.length > s2.length ? s1 : s2;
     const shorter = s1.length > s2.length ? s2 : s1;
     return longer.includes(shorter) ? 0.8 : 0;
   }
-  
+
   let matches = 0;
   for (const word of words1) {
     if (words2.has(word)) matches++;
   }
-  
+
   return matches / Math.max(words1.size, words2.size);
 }
 
@@ -105,23 +103,23 @@ function calculateSimilarity(str1: string, str2: string): number {
 async function gradeShortAnswer(
   studentAnswer: string,
   expectedAnswer: string,
-  questionText: string
+  questionText: string,
 ): Promise<{ grade: number; feedback: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
+
   // If no expected answer, grade based on relevance and quality
   if (!expectedAnswer || expectedAnswer.trim() === "") {
     console.log("No expected answer provided, grading on relevance/quality");
     return gradeWithoutExpectedAnswer(studentAnswer, questionText);
   }
-  
+
   if (!LOVABLE_API_KEY) {
     console.warn("LOVABLE_API_KEY not set, using fallback grading");
     const similarity = calculateSimilarity(studentAnswer, expectedAnswer);
     const grade = Math.round(similarity * 100);
     return {
       grade,
-      feedback: grade >= 70 ? "Answer matches expected content." : "Answer differs from expected."
+      feedback: grade >= 70 ? "Answer matches expected content." : "Answer differs from expected.",
     };
   }
 
@@ -148,33 +146,35 @@ Student Answer: ${studentAnswer}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user", content: userPrompt },
         ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "grade_answer",
-            description: "Grade the student's short answer response",
-            parameters: {
-              type: "object",
-              properties: {
-                grade: {
-                  type: "number",
-                  description: "Grade from 0-100"
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "grade_answer",
+              description: "Grade the student's short answer response",
+              parameters: {
+                type: "object",
+                properties: {
+                  grade: {
+                    type: "number",
+                    description: "Grade from 0-100",
+                  },
+                  feedback: {
+                    type: "string",
+                    description: "Brief feedback (1-2 sentences)",
+                  },
                 },
-                feedback: {
-                  type: "string",
-                  description: "Brief feedback (1-2 sentences)"
-                }
+                required: ["grade", "feedback"],
+                additionalProperties: false,
               },
-              required: ["grade", "feedback"],
-              additionalProperties: false
-            }
-          }
-        }],
+            },
+          },
+        ],
         tool_choice: { type: "function", function: { name: "grade_answer" } },
         temperature: 0.3,
       }),
@@ -187,15 +187,15 @@ Student Answer: ${studentAnswer}`;
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (toolCall?.function?.arguments) {
       const result = JSON.parse(toolCall.function.arguments);
       return {
         grade: Math.min(100, Math.max(0, result.grade)),
-        feedback: result.feedback || ""
+        feedback: result.feedback || "",
       };
     }
-    
+
     throw new Error("Invalid AI response format");
   } catch (error) {
     console.error("AI grading failed, using fallback:", error);
@@ -203,7 +203,7 @@ Student Answer: ${studentAnswer}`;
     const grade = Math.round(similarity * 100);
     return {
       grade,
-      feedback: grade >= 70 ? "Answer matches expected content." : "Answer differs from expected."
+      feedback: grade >= 70 ? "Answer matches expected content." : "Answer differs from expected.",
     };
   }
 }
@@ -212,15 +212,15 @@ Student Answer: ${studentAnswer}`;
 // Focuses on relevance, coherence, and depth - generous grading
 async function gradeWithoutExpectedAnswer(
   studentAnswer: string,
-  questionText: string
+  questionText: string,
 ): Promise<{ grade: number; feedback: string }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
+
   if (!LOVABLE_API_KEY) {
     // No API key and no expected answer - give benefit of doubt
-    return { 
-      grade: 70, 
-      feedback: "Response recorded. Unable to verify automatically." 
+    return {
+      grade: 70,
+      feedback: "Response recorded. Unable to verify automatically.",
     };
   }
 
@@ -255,33 +255,35 @@ Grade this response based on relevance to the question, coherence, and depth of 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user", content: userPrompt },
         ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "grade_answer",
-            description: "Grade the student's short answer response on relevance and coherence",
-            parameters: {
-              type: "object",
-              properties: {
-                grade: {
-                  type: "number",
-                  description: "Grade from 0-100 (be generous for reasonable answers)"
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "grade_answer",
+              description: "Grade the student's short answer response on relevance and coherence",
+              parameters: {
+                type: "object",
+                properties: {
+                  grade: {
+                    type: "number",
+                    description: "Grade from 0-100 (be generous for reasonable answers)",
+                  },
+                  feedback: {
+                    type: "string",
+                    description: "Brief encouraging feedback (1-2 sentences)",
+                  },
                 },
-                feedback: {
-                  type: "string",
-                  description: "Brief encouraging feedback (1-2 sentences)"
-                }
+                required: ["grade", "feedback"],
+                additionalProperties: false,
               },
-              required: ["grade", "feedback"],
-              additionalProperties: false
-            }
-          }
-        }],
+            },
+          },
+        ],
         tool_choice: { type: "function", function: { name: "grade_answer" } },
         temperature: 0.3,
       }),
@@ -295,22 +297,22 @@ Grade this response based on relevance to the question, coherence, and depth of 
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (toolCall?.function?.arguments) {
       const result = JSON.parse(toolCall.function.arguments);
       return {
         grade: Math.min(100, Math.max(0, result.grade)),
-        feedback: result.feedback || "Response evaluated."
+        feedback: result.feedback || "Response evaluated.",
       };
     }
-    
+
     return { grade: 70, feedback: "Response recorded." };
   } catch (error) {
     console.error("AI grading without expected answer failed:", error);
     // On error, give benefit of doubt with passing grade
-    return { 
-      grade: 70, 
-      feedback: "Response recorded. Instructor may review." 
+    return {
+      grade: 70,
+      feedback: "Response recorded. Instructor may review.",
     };
   }
 }
@@ -321,21 +323,21 @@ async function gradeCodingQuestion(
   expectedSolution: string | null,
   problemStatement: string,
   language: string | null,
-  isSimpleCheckIn: boolean = false
+  isSimpleCheckIn: boolean = false,
 ): Promise<{ grade: number; feedback: string; understandsConcept: boolean }> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
+
   if (!LOVABLE_API_KEY) {
     console.warn("LOVABLE_API_KEY not set, using fallback grading");
     return {
       grade: 50,
       feedback: "Could not grade automatically. Your instructor will review your submission.",
-      understandsConcept: false
+      understandsConcept: false,
     };
   }
 
   // Different grading approach for simple check-ins vs full problems
-  const systemPrompt = isSimpleCheckIn 
+  const systemPrompt = isSimpleCheckIn
     ? `You are grading a SIMPLE coding check-in question. This is a quick conceptual check, NOT a full coding problem.
 
 GRADING RULE: This is essentially PASS/FAIL based on core understanding.
@@ -385,28 +387,33 @@ ${isSimpleCheckIn ? "Grade as PASS (100) or FAIL (0) based on whether they under
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user", content: userPrompt },
         ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "grade_code",
-            description: "Grade the student's code solution",
-            parameters: {
-              type: "object",
-              properties: {
-                grade: { type: "number", description: isSimpleCheckIn ? "Grade: 0 (fail) or 100 (pass)" : "Grade from 0-100" },
-                feedback: { type: "string", description: "Brief constructive feedback" },
-                understands_concept: { type: "boolean", description: "Does student understand the core concept?" }
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "grade_code",
+              description: "Grade the student's code solution",
+              parameters: {
+                type: "object",
+                properties: {
+                  grade: {
+                    type: "number",
+                    description: isSimpleCheckIn ? "Grade: 0 (fail) or 100 (pass)" : "Grade from 0-100",
+                  },
+                  feedback: { type: "string", description: "Brief constructive feedback" },
+                  understands_concept: { type: "boolean", description: "Does student understand the core concept?" },
+                },
+                required: ["grade", "feedback", "understands_concept"],
+                additionalProperties: false,
               },
-              required: ["grade", "feedback", "understands_concept"],
-              additionalProperties: false
-            }
-          }
-        }],
+            },
+          },
+        ],
         tool_choice: { type: "function", function: { name: "grade_code" } },
         temperature: 0.3,
       }),
@@ -418,10 +425,10 @@ ${isSimpleCheckIn ? "Grade as PASS (100) or FAIL (0) based on whether they under
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    
+
     if (toolCall?.function?.arguments) {
       const result = JSON.parse(toolCall.function.arguments);
-      
+
       let finalGrade: number;
       if (isSimpleCheckIn) {
         // Binary grading for simple check-ins: 100 if understands, 0 otherwise
@@ -433,27 +440,27 @@ ${isSimpleCheckIn ? "Grade as PASS (100) or FAIL (0) based on whether they under
           finalGrade = Math.max(finalGrade, 90);
         }
       }
-      
+
       return {
         grade: finalGrade,
         feedback: result.feedback || "",
-        understandsConcept: result.understands_concept
+        understandsConcept: result.understands_concept,
       };
     }
-    
+
     throw new Error("Invalid AI response format");
   } catch (error) {
     console.error("AI coding grading failed:", error);
     return {
       grade: 50,
       feedback: "Could not grade automatically. Your instructor will review your submission.",
-      understandsConcept: false
+      understandsConcept: false,
     };
   }
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -462,147 +469,135 @@ Deno.serve(async (req) => {
     const clientIP = getClientIP(req);
     if (!checkRateLimit(clientIP)) {
       console.warn(`Rate limit exceeded for IP: ${clientIP}`);
-      return new Response(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { 
-      questionId, 
-      participantId, 
-      answer, 
-      responseTimeMs,
-      confidenceLevel,
-      confidenceMultiplier,
-      baseReward 
-    } = await req.json();
+    const { questionId, participantId, answer, responseTimeMs, confidenceLevel, confidenceMultiplier, baseReward } =
+      await req.json();
 
     // Input validation
     if (!questionId || !participantId || !answer) {
-      return new Response(
-        JSON.stringify({ error: 'Question ID, participant ID, and answer are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Question ID, participant ID, and answer are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Validate UUID formats
     if (!isValidUUID(questionId)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid question ID format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid question ID format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!isValidUUID(participantId)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid participant ID format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid participant ID format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Validate answer length (max 5000 characters)
-    if (typeof answer !== 'string' || answer.length > 5000) {
-      return new Response(
-        JSON.stringify({ error: 'Answer must be a string of 5000 characters or less' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (typeof answer !== "string" || answer.length > 5000) {
+      return new Response(JSON.stringify({ error: "Answer must be a string of 5000 characters or less" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Validate confidence level if provided
-    const validConfidenceLevels = ['low', 'medium', 'high', 'very_high'];
+    const validConfidenceLevels = ["low", "medium", "high", "very_high"];
     if (confidenceLevel && !validConfidenceLevels.includes(confidenceLevel)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid confidence level' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid confidence level" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Validate confidence multiplier if provided
-    const safeMultiplier = typeof confidenceMultiplier === 'number' && 
-                          confidenceMultiplier >= 0.5 && 
-                          confidenceMultiplier <= 3 
-                          ? confidenceMultiplier : 1;
+    const safeMultiplier =
+      typeof confidenceMultiplier === "number" && confidenceMultiplier >= 0.5 && confidenceMultiplier <= 3
+        ? confidenceMultiplier
+        : 1;
 
     // Validate base reward if provided
-    const safeBaseReward = typeof baseReward === 'number' && 
-                          baseReward >= 0 && 
-                          baseReward <= 100 
-                          ? baseReward : 10;
+    const safeBaseReward = typeof baseReward === "number" && baseReward >= 0 && baseReward <= 100 ? baseReward : 10;
 
     // Validate response time if provided
-    const safeResponseTimeMs = typeof responseTimeMs === 'number' && 
-                               responseTimeMs >= 0 && 
-                               responseTimeMs <= 300000 
-                               ? responseTimeMs : null;
+    const safeResponseTimeMs =
+      typeof responseTimeMs === "number" && responseTimeMs >= 0 && responseTimeMs <= 300000 ? responseTimeMs : null;
 
     // Get question to check correct answer
     const { data: question, error: questionError } = await supabaseClient
-      .from('live_questions')
-      .select('question_content')
-      .eq('id', questionId)
+      .from("live_questions")
+      .select("question_content")
+      .eq("id", questionId)
       .single();
 
     if (questionError || !question) {
-      return new Response(
-        JSON.stringify({ error: 'Question not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Question not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify participant exists
     const { data: participant, error: participantError } = await supabaseClient
-      .from('live_participants')
-      .select('id, session_id')
-      .eq('id', participantId)
+      .from("live_participants")
+      .select("id, session_id")
+      .eq("id", participantId)
       .single();
 
     if (participantError || !participant) {
-      return new Response(
-        JSON.stringify({ error: 'Participant not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Participant not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Check if already answered
     const { data: existing } = await supabaseClient
-      .from('live_responses')
-      .select('id')
-      .eq('question_id', questionId)
-      .eq('participant_id', participantId)
+      .from("live_responses")
+      .select("id")
+      .eq("question_id", questionId)
+      .eq("participant_id", participantId)
       .single();
 
     if (existing) {
-      return new Response(
-        JSON.stringify({ error: 'Already answered this question' }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Already answered this question" }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const correctAnswer = question.question_content.correctAnswer || question.question_content.correct_answer;
     const questionType = question.question_content.type;
     const questionText = question.question_content.question || "";
     const gradingMode = question.question_content.gradingMode || "manual_grade"; // Check grading mode!
-    
+
     console.log(`📊 Question type: ${questionType}, Grading mode: ${gradingMode}`);
     console.log(`🔍 Full question_content:`, JSON.stringify(question.question_content, null, 2).substring(0, 500));
-    
+
     let isCorrect = false;
     let aiGrade: number | null = null;
     let aiFeedback: string | null = null;
     let studentAnswer = answer;
     let gradePending = false; // Flag for manual grading
-    
+
     // Only perform auto-grading if gradingMode is "auto_grade" or "ai_grade"
     const shouldAutoGrade = gradingMode === "auto_grade" || gradingMode === "ai_grade";
-    
+
     console.log(`🤖 Should auto-grade? ${shouldAutoGrade} (gradingMode: ${gradingMode})`);
-    
+
     if (!shouldAutoGrade) {
       // Manual grading mode - just store the answer
       console.log(`⏱️ Manual grading mode - answer stored, grade pending`);
@@ -633,39 +628,38 @@ Deno.serve(async (req) => {
       const problemStatement = questionText || "Solve the coding problem";
       const expectedSolution = correctAnswer; // May be null
       const language = question.question_content.language || null;
-      
-      console.log(`AI grading ${isSimpleCheckIn ? 'simple' : 'full'} coding submission for: "${problemStatement}"`);
+
+      console.log(`AI grading ${isSimpleCheckIn ? "simple" : "full"} coding submission for: "${problemStatement}"`);
       const gradeResult = await gradeCodingQuestion(
         answer,
         expectedSolution,
         problemStatement,
         language,
-        isSimpleCheckIn
+        isSimpleCheckIn,
       );
       aiGrade = gradeResult.grade;
       aiFeedback = gradeResult.feedback;
       isCorrect = isSimpleCheckIn ? aiGrade === 100 : aiGrade >= 70; // Simple: must be 100, Full: 70%+
-      console.log(`Coding grade: ${aiGrade}, understands concept: ${gradeResult.understandsConcept}, isSimple: ${isSimpleCheckIn}`);
+      console.log(
+        `Coding grade: ${aiGrade}, understands concept: ${gradeResult.understandsConcept}, isSimple: ${isSimpleCheckIn}`,
+      );
     } else {
       // Default fallback for truly unknown types
       isCorrect = studentAnswer === correctAnswer;
     }
-    
+
     // Calculate points earned based on confidence
-    const pointsEarned = calculatePoints(
-      isCorrect,
-      confidenceLevel || null,
-      safeMultiplier,
-      safeBaseReward
-    );
-    
+    const pointsEarned = calculatePoints(isCorrect, confidenceLevel || null, safeMultiplier, safeBaseReward);
+
     // Add logging for debugging
-    console.log(`Grading: student answered "${studentAnswer}", correct answer is "${correctAnswer}", result: ${isCorrect}`);
+    console.log(
+      `Grading: student answered "${studentAnswer}", correct answer is "${correctAnswer}", result: ${isCorrect}`,
+    );
     console.log(`Confidence: ${confidenceLevel}, multiplier: ${safeMultiplier}, points earned: ${pointsEarned}`);
 
     // Submit response with confidence data and AI grading info
     const { data: response, error: responseError } = await supabaseClient
-      .from('live_responses')
+      .from("live_responses")
       .insert({
         question_id: questionId,
         participant_id: participantId,
@@ -682,37 +676,40 @@ Deno.serve(async (req) => {
       .single();
 
     if (responseError) {
-      console.error('Error submitting response:', responseError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to submit response' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("Error submitting response:", responseError);
+      return new Response(JSON.stringify({ error: "Failed to submit response" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Build grade breakdown for frontend display
-    const gradeBreakdown = aiGrade !== null ? {
-      components: null, // Components are calculated in the grading functions but not stored
-      understandsConcept: null,
-    } : null;
+    const gradeBreakdown =
+      aiGrade !== null
+        ? {
+            components: null, // Components are calculated in the grading functions but not stored
+            understandsConcept: null,
+          }
+        : null;
 
     return new Response(
-      JSON.stringify({ 
-        response, 
-        isCorrect, 
+      JSON.stringify({
+        response,
+        isCorrect,
         pointsEarned,
         aiGrade,
         aiFeedback,
         gradeBreakdown,
         gradePending, // NEW: Tell frontend if grade is pending
-        gradingMode   // NEW: Tell frontend the grading mode
+        gradingMode, // NEW: Tell frontend the grading mode
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
-    console.error('Error in submit-live-response:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in submit-live-response:", error);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

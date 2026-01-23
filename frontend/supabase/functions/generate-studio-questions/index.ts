@@ -20,13 +20,14 @@ serve(async (req) => {
       });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -34,12 +35,12 @@ serve(async (req) => {
       });
     }
 
-    const { 
+    const {
       mode, // "transform" or "generate" (default)
-      prompt, 
-      parsedMaterials, 
-      instructorPreferences, 
-      regenerateQuestion, 
+      prompt,
+      parsedMaterials,
+      instructorPreferences,
+      regenerateQuestion,
       count,
       existingQuestions, // For transform mode
       lectureTranscript, // Full transcript for context
@@ -55,7 +56,7 @@ serve(async (req) => {
     const difficulty = instructorPreferences?.difficulty || "medium";
     const professorType = instructorPreferences?.professorType || "stem";
     const questionFormat = instructorPreferences?.questionFormat || "multiple_choice";
-    
+
     // Transform mode: modify existing questions while staying grounded in transcript
     if (mode === "transform" && existingQuestions && existingQuestions.length > 0) {
       const transformedQuestions = await transformQuestions({
@@ -66,7 +67,7 @@ serve(async (req) => {
         professorType,
         questionFormat,
       });
-      
+
       return new Response(JSON.stringify({ questions: transformedQuestions }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -93,27 +94,35 @@ ${difficulty === "easy" ? "Focus on recall and basic comprehension. Questions sh
 ${difficulty === "medium" ? "Balance recall with application. Include some questions that require applying concepts." : ""}
 ${difficulty === "hard" ? "Focus on application, analysis, and clinical reasoning. Questions should require integrating multiple concepts." : ""}
 
-${professorType === "medical" ? `
+${
+  professorType === "medical"
+    ? `
 MEDICAL QUESTION GUIDELINES:
 - Use clinical vignette format when appropriate
 - Include patient demographics, chief complaint, relevant history
 - Focus on diagnostic reasoning and clinical decision-making
 - Test understanding of pathophysiology and treatment mechanisms
-` : `
+`
+    : `
 STEM QUESTION GUIDELINES:
 - Focus on conceptual understanding over memorization
 - Include problems that require multi-step reasoning
 - Test ability to apply principles to new situations
-`}
+`
+}
 
 RESPONSE FORMAT:
 Return a JSON array of questions. Each question must have:
 {
   "question_text": "The complete question text",
   "question_type": "${questionFormat === "short_answer" ? "short_answer" : "multiple_choice"}",
-  ${questionFormat !== "short_answer" ? `"options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
-  "correct_answer": "A) First option",` : `"options": [],
-  "correct_answer": "Expected answer summary",`}
+  ${
+    questionFormat !== "short_answer"
+      ? `"options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
+  "correct_answer": "A) First option",`
+      : `"options": [],
+  "correct_answer": "Expected answer summary",`
+  }
   "explanation": "Brief explanation of why this is correct"
 }
 
@@ -129,10 +138,14 @@ ${prompt}
 
 ${materialContext ? `REFERENCE MATERIALS:\n${materialContext}` : "No reference materials provided - generate questions based on the instructor's topic description."}
 
-${regenerateQuestion ? `
+${
+  regenerateQuestion
+    ? `
 REGENERATE THIS QUESTION (create a new version with different phrasing):
 ${JSON.stringify(regenerateQuestion)}
-` : ""}
+`
+    : ""
+}
 
 Generate exactly ${questionCount} questions following the instructor's instructions. Return only the JSON array.`;
 
@@ -151,7 +164,7 @@ Generate exactly ${questionCount} questions following the instructor's instructi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -164,7 +177,7 @@ Generate exactly ${questionCount} questions following the instructor's instructi
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI API error:", response.status, errorText);
-      
+
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
           status: 429,
@@ -182,7 +195,7 @@ Generate exactly ${questionCount} questions following the instructor's instructi
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content || "";
-    
+
     console.log("AI response received, parsing...");
 
     // Parse the JSON response
@@ -200,24 +213,21 @@ Generate exactly ${questionCount} questions following the instructor's instructi
     }
 
     // Validate questions
-    questions = questions.filter((q: any) => 
-      q.question_text && 
-      q.question_type && 
-      q.correct_answer
-    ).map((q: any) => ({
-      question_text: q.question_text,
-      question_type: q.question_type || "multiple_choice",
-      options: Array.isArray(q.options) ? q.options : [],
-      correct_answer: q.correct_answer,
-      explanation: q.explanation || "",
-    }));
+    questions = questions
+      .filter((q: any) => q.question_text && q.question_type && q.correct_answer)
+      .map((q: any) => ({
+        question_text: q.question_text,
+        question_type: q.question_type || "multiple_choice",
+        options: Array.isArray(q.options) ? q.options : [],
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || "",
+      }));
 
     console.log(`Successfully generated ${questions.length} valid questions`);
 
     return new Response(JSON.stringify({ questions }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error) {
     console.error("Error in generate-studio-questions:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
@@ -275,27 +285,35 @@ ${difficulty === "easy" ? "Focus on recall and basic comprehension." : ""}
 ${difficulty === "medium" ? "Balance recall with application." : ""}
 ${difficulty === "hard" ? "Focus on application, analysis, and clinical reasoning." : ""}
 
-${professorType === "medical" ? `
+${
+  professorType === "medical"
+    ? `
 MEDICAL TRANSFORMATION GUIDELINES:
 - Transform into clinical vignette format when requested
 - Patient details (age, sex, symptoms) must be derived from transcript mentions
 - Clinical findings must reference actual lecture content
 - Treatment options must reflect what was discussed
-` : `
+`
+    : `
 STEM TRANSFORMATION GUIDELINES:
 - Focus on conceptual understanding from the lecture
 - Use examples and scenarios mentioned in the lecture
 - Reference specific terminology from the transcript
-`}
+`
+}
 
 RESPONSE FORMAT:
 Return a JSON array with EXACTLY ${existingQuestions.length} transformed questions in the same order. Each must have:
 {
   "question_text": "The transformed question text",
   "question_type": "${questionFormat === "short_answer" ? "short_answer" : "multiple_choice"}",
-  ${questionFormat !== "short_answer" ? `"options": ["A) ...", "B) ...", "C) ...", "D) ..."],
-  "correct_answer": "A) ...",` : `"options": [],
-  "correct_answer": "Expected answer",`}
+  ${
+    questionFormat !== "short_answer"
+      ? `"options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+  "correct_answer": "A) ...",`
+      : `"options": [],
+  "correct_answer": "Expected answer",`
+  }
   "explanation": "Brief explanation grounded in lecture content"
 }
 
@@ -308,7 +326,9 @@ FULL LECTURE TRANSCRIPT (for reference):
 ${lectureTranscript.slice(0, 15000)}
 
 QUESTIONS TO TRANSFORM:
-${questionsForTransform.map(q => `
+${questionsForTransform
+  .map(
+    (q) => `
 ---
 Question ${q.index} (at ${q.timestamp ? Math.floor(q.timestamp / 60) + ":" + String(Math.floor(q.timestamp % 60)).padStart(2, "0") : "unknown time"}):
 Original: "${q.original_question}"
@@ -317,7 +337,9 @@ Answer: "${q.original_answer}"
 
 TRANSCRIPT CONTEXT UP TO THIS POINT:
 ${q.transcript_context.slice(-3000) || "No transcript context available"}
----`).join("\n")}
+---`,
+  )
+  .join("\n")}
 
 Transform ALL ${existingQuestions.length} questions according to the instructor's style request. REMEMBER: Every detail must come from the transcript - do not add external knowledge.`;
 
@@ -330,7 +352,7 @@ Transform ALL ${existingQuestions.length} questions according to the instructor'
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -343,7 +365,7 @@ Transform ALL ${existingQuestions.length} questions according to the instructor'
   if (!response.ok) {
     const errorText = await response.text();
     console.error("Transform API error:", response.status, errorText);
-    
+
     if (response.status === 429) {
       throw new Error("Rate limit exceeded. Please try again later.");
     }
@@ -355,7 +377,7 @@ Transform ALL ${existingQuestions.length} questions according to the instructor'
 
   const aiResponse = await response.json();
   const content = aiResponse.choices?.[0]?.message?.content || "";
-  
+
   console.log("Transform response received, parsing...");
 
   // Parse the JSON response
@@ -373,16 +395,15 @@ Transform ALL ${existingQuestions.length} questions according to the instructor'
   }
 
   // Validate and clean questions
-  questions = questions.filter((q: any) => 
-    q.question_text && 
-    q.correct_answer
-  ).map((q: any) => ({
-    question_text: q.question_text,
-    question_type: q.question_type || "multiple_choice",
-    options: Array.isArray(q.options) ? q.options : [],
-    correct_answer: q.correct_answer,
-    explanation: q.explanation || "",
-  }));
+  questions = questions
+    .filter((q: any) => q.question_text && q.correct_answer)
+    .map((q: any) => ({
+      question_text: q.question_text,
+      question_type: q.question_type || "multiple_choice",
+      options: Array.isArray(q.options) ? q.options : [],
+      correct_answer: q.correct_answer,
+      explanation: q.explanation || "",
+    }));
 
   console.log(`Successfully transformed ${questions.length} questions`);
 

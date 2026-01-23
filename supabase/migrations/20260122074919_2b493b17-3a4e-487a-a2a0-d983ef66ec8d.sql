@@ -1,9 +1,9 @@
--- Update default model values from Gemini 2.5 to Gemini 3
+-- Update default model values from Gemini 2.5 to Gemini 2.5
 ALTER TABLE public.profiles
-ALTER COLUMN detection_model SET DEFAULT 'google/gemini-3-flash-preview',
-ALTER COLUMN transcription_model SET DEFAULT 'google/gemini-3-flash-preview',
-ALTER COLUMN generation_model SET DEFAULT 'google/gemini-3-flash-preview',
-ALTER COLUMN interval_question_model SET DEFAULT 'google/gemini-3-flash-preview';
+ALTER COLUMN detection_model SET DEFAULT 'google/gemini-2.5-flash',
+ALTER COLUMN transcription_model SET DEFAULT 'google/gemini-2.5-flash',
+ALTER COLUMN generation_model SET DEFAULT 'google/gemini-2.5-flash',
+ALTER COLUMN interval_question_model SET DEFAULT 'google/gemini-2.5-flash';
 
 -- Update existing records that still have old defaults
 UPDATE public.profiles
