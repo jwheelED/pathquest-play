@@ -68,7 +68,7 @@ The browser is blocking microphone access. This can happen for several reasons:
 - The browser WILL block microphone access
 - You MUST use HTTPS
 
-**Your current URL:** `https://edvana-remake.preview.emergentagent.com` ✅ (HTTPS - Good!)
+**Your current URL:** `https://student-hub-298.preview.emergentagent.com` ✅ (HTTPS - Good!)
 
 ---
 
