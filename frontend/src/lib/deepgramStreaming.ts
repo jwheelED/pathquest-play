@@ -349,8 +349,66 @@ export class DeepgramStreamingClient {
       return;
     }
 
-    // Extract speaker information from words
+    // LAYER 1: Stricter confidence threshold (75% for final, 60% for interim)
+    if (isFinal && confidence < 0.75) {
+      console.warn(`⚠️ Low confidence (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
+      return;
+    }
+
+    // LAYER 2: Word-level confidence filtering
     const words: DeepgramWord[] = alternative.words || [];
+    if (isFinal && words.length > 0) {
+      const confidentWords = words.filter(w => w.confidence >= 0.6);
+      const confidentRatio = confidentWords.length / words.length;
+      
+      if (confidentRatio < 0.5) {
+        console.warn(`⚠️ Too many low-confidence words (${(confidentRatio * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
+        return;
+      }
+    }
+
+    // LAYER 3: Repetition detection (stricter)
+    const textWords = transcript.toLowerCase().split(/\s+/).filter((w: string) => w.length > 0);
+    if (textWords.length >= 6) {
+      const uniqueWords = new Set(textWords);
+      const uniqueRatio = uniqueWords.size / textWords.length;
+      
+      // Reject if less than 40% unique words
+      if (uniqueRatio < 0.4) {
+        console.warn(`⚠️ Repetitive (${(uniqueRatio * 100).toFixed(0)}% unique): ${transcript.substring(0, 40)}`);
+        return;
+      }
+      
+      // Check for any word repeated 3+ times
+      const wordCounts = new Map<string, number>();
+      textWords.forEach((w: string) => wordCounts.set(w, (wordCounts.get(w) || 0) + 1));
+      for (const [word, count] of wordCounts) {
+        if (count >= 3 && word.length > 2) {
+          console.warn(`⚠️ Word "${word}" repeated ${count}x`);
+          return;
+        }
+      }
+    }
+
+    // LAYER 4: Known hallucination pattern detection
+    const trimmedLower = transcript.trim().toLowerCase();
+    const hallPatterns = [
+      /you'?re in the right place/i,
+      /thank you for watching/i,
+      /please subscribe/i,
+      /\bmuck\s+(of\s+the\s+muck)+/i,
+      /\bveve\s*,?\s*veve/i,
+      /\b(uh|um)\s+\1\s+\1/i,
+    ];
+    
+    for (const pattern of hallPatterns) {
+      if (pattern.test(trimmedLower)) {
+        console.warn(`⚠️ Hallucination pattern: ${transcript.substring(0, 40)}`);
+        return;
+      }
+    }
+
+    // Extract speaker information from words
     const speakerMap = new Map<number, { words: string[]; confidence: number[] }>();
 
     words.forEach((word) => {
@@ -382,7 +440,7 @@ export class DeepgramStreamingClient {
           ? ` [Speaker ${speakers[0].id}]`
           : "";
 
-    console.log(`${logPrefix}${speakerInfo}:`, transcript.substring(0, 100));
+    console.log(`${logPrefix}${speakerInfo} (${(confidence * 100).toFixed(0)}%):`, transcript.substring(0, 100));
 
     // Call the transcript handler
     this.config.onTranscript({

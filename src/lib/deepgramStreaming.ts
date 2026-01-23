@@ -349,24 +349,63 @@ export class DeepgramStreamingClient {
       return;
     }
 
-    // Filter out low-confidence transcripts (likely hallucinations)
-    // Only apply to final transcripts to allow interim results through
-    if (isFinal && confidence < 0.7) {
-      console.warn(`⚠️ Rejecting low-confidence transcript (${(confidence * 100).toFixed(1)}%):`, 
-        transcript.substring(0, 50));
+    // LAYER 1: Stricter confidence threshold (75% for final, 60% for interim)
+    if (isFinal && confidence < 0.75) {
+      console.warn(`⚠️ Low confidence (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
       return;
     }
 
-    // Detect and reject repetitive hallucination patterns
+    // LAYER 2: Word-level confidence filtering
     const words: DeepgramWord[] = alternative.words || [];
-    const textWords = transcript.toLowerCase().split(/\s+/);
-    const uniqueWords = new Set(textWords);
-    const repetitionRatio = uniqueWords.size / textWords.length;
+    if (isFinal && words.length > 0) {
+      const confidentWords = words.filter(w => w.confidence >= 0.6);
+      const confidentRatio = confidentWords.length / words.length;
+      
+      if (confidentRatio < 0.5) {
+        console.warn(`⚠️ Too many low-confidence words (${(confidentRatio * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
+        return;
+      }
+    }
+
+    // LAYER 3: Repetition detection (stricter)
+    const textWords = transcript.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    if (textWords.length >= 6) {
+      const uniqueWords = new Set(textWords);
+      const uniqueRatio = uniqueWords.size / textWords.length;
+      
+      // Reject if less than 40% unique words
+      if (uniqueRatio < 0.4) {
+        console.warn(`⚠️ Repetitive (${(uniqueRatio * 100).toFixed(0)}% unique): ${transcript.substring(0, 40)}`);
+        return;
+      }
+      
+      // Check for any word repeated 3+ times
+      const wordCounts = new Map<string, number>();
+      textWords.forEach(w => wordCounts.set(w, (wordCounts.get(w) || 0) + 1));
+      for (const [word, count] of wordCounts) {
+        if (count >= 3 && word.length > 2) {
+          console.warn(`⚠️ Word "${word}" repeated ${count}x`);
+          return;
+        }
+      }
+    }
+
+    // LAYER 4: Known hallucination pattern detection
+    const trimmedLower = transcript.trim().toLowerCase();
+    const hallPatterns = [
+      /you'?re in the right place/i,
+      /thank you for watching/i,
+      /please subscribe/i,
+      /\bmuck\s+(of\s+the\s+muck)+/i,
+      /\bveve\s*,?\s*veve/i,
+      /\b(uh|um)\s+\1\s+\1/i,
+    ];
     
-    if (textWords.length > 10 && repetitionRatio < 0.3) {
-      console.warn(`⚠️ Rejecting repetitive pattern (${(repetitionRatio * 100).toFixed(0)}% unique):`, 
-        transcript.substring(0, 50));
-      return;
+    for (const pattern of hallPatterns) {
+      if (pattern.test(trimmedLower)) {
+        console.warn(`⚠️ Hallucination pattern: ${transcript.substring(0, 40)}`);
+        return;
+      }
     }
 
     // Extract speaker information from words
