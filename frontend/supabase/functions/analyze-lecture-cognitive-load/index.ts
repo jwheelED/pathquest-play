@@ -3,11 +3,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 // ============================================
 // BLOOM'S TAXONOMY FRAMEWORK
@@ -15,186 +15,205 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const BLOOMS_TAXONOMY = {
   remember: {
     level: 1,
-    name: 'Remember',
-    description: 'Retrieve relevant knowledge from long-term memory',
-    verbs: ['define', 'list', 'recall', 'identify', 'name', 'recognize', 'state', 'match', 'label'],
+    name: "Remember",
+    description: "Retrieve relevant knowledge from long-term memory",
+    verbs: ["define", "list", "recall", "identify", "name", "recognize", "state", "match", "label"],
     questionStems: [
-      'What is the definition of...?',
-      'Which of the following correctly identifies...?',
-      'What are the key components of...?',
-      'List the main characteristics of...'
+      "What is the definition of...?",
+      "Which of the following correctly identifies...?",
+      "What are the key components of...?",
+      "List the main characteristics of...",
     ],
     antiPatterns: [
-      'Avoid questions that only require memorization of isolated facts',
-      'Maximum 15-20% of questions should be at this level'
+      "Avoid questions that only require memorization of isolated facts",
+      "Maximum 15-20% of questions should be at this level",
     ],
-    exampleGood: 'Which of the following is the correct definition of mitochondria?',
-    exampleBad: 'What is mitochondria?' // Too vague, encourages one-word answers
+    exampleGood: "Which of the following is the correct definition of mitochondria?",
+    exampleBad: "What is mitochondria?", // Too vague, encourages one-word answers
   },
   understand: {
     level: 2,
-    name: 'Understand',
-    description: 'Construct meaning from instructional messages, including oral, written, and graphic communication',
-    verbs: ['explain', 'describe', 'summarize', 'paraphrase', 'classify', 'interpret', 'compare', 'exemplify', 'infer'],
+    name: "Understand",
+    description: "Construct meaning from instructional messages, including oral, written, and graphic communication",
+    verbs: ["explain", "describe", "summarize", "paraphrase", "classify", "interpret", "compare", "exemplify", "infer"],
     questionStems: [
-      'Explain why...',
-      'What is the main idea of...?',
-      'How would you summarize...?',
-      'In your own words, describe...',
-      'What is the relationship between X and Y?'
+      "Explain why...",
+      "What is the main idea of...?",
+      "How would you summarize...?",
+      "In your own words, describe...",
+      "What is the relationship between X and Y?",
     ],
     antiPatterns: [
       'Dont accept simple definitions as "understanding"',
-      'Must require explanation or interpretation, not just recall'
+      "Must require explanation or interpretation, not just recall",
     ],
     exampleGood: 'Explain why the mitochondria is called the "powerhouse of the cell"',
-    exampleBad: 'What does powerhouse mean?' // Tests vocabulary, not understanding
+    exampleBad: "What does powerhouse mean?", // Tests vocabulary, not understanding
   },
   apply: {
     level: 3,
-    name: 'Apply',
-    description: 'Carry out or use a procedure in a given situation',
-    verbs: ['use', 'implement', 'solve', 'demonstrate', 'calculate', 'apply', 'execute', 'construct', 'show'],
+    name: "Apply",
+    description: "Carry out or use a procedure in a given situation",
+    verbs: ["use", "implement", "solve", "demonstrate", "calculate", "apply", "execute", "construct", "show"],
     questionStems: [
-      'How would you apply X to solve...?',
-      'Calculate the result when...',
-      'Use this concept to determine...',
-      'Given this scenario, what would happen if...?',
-      'Demonstrate how to...'
+      "How would you apply X to solve...?",
+      "Calculate the result when...",
+      "Use this concept to determine...",
+      "Given this scenario, what would happen if...?",
+      "Demonstrate how to...",
     ],
     antiPatterns: [
-      'Must involve a NOVEL situation, not just repetition of an example from the lecture',
-      'Should require transferring knowledge to a new context'
+      "Must involve a NOVEL situation, not just repetition of an example from the lecture",
+      "Should require transferring knowledge to a new context",
     ],
-    exampleGood: 'A patient presents with fatigue and muscle weakness. Given that the mitochondria are responsible for ATP production, what cellular process is likely impaired?',
-    exampleBad: 'What does the mitochondria produce?' // This is recall, not application
+    exampleGood:
+      "A patient presents with fatigue and muscle weakness. Given that the mitochondria are responsible for ATP production, what cellular process is likely impaired?",
+    exampleBad: "What does the mitochondria produce?", // This is recall, not application
   },
   analyze: {
     level: 4,
-    name: 'Analyze',
-    description: 'Break material into constituent parts, determine how parts relate to one another and to an overall structure or purpose',
-    verbs: ['compare', 'contrast', 'differentiate', 'examine', 'distinguish', 'categorize', 'organize', 'deconstruct', 'attribute'],
+    name: "Analyze",
+    description:
+      "Break material into constituent parts, determine how parts relate to one another and to an overall structure or purpose",
+    verbs: [
+      "compare",
+      "contrast",
+      "differentiate",
+      "examine",
+      "distinguish",
+      "categorize",
+      "organize",
+      "deconstruct",
+      "attribute",
+    ],
     questionStems: [
-      'How does X compare to Y?',
-      'What evidence supports...?',
-      'Distinguish between X and Y',
-      'What is the relationship between...?',
-      'Analyze why... leads to...',
-      'What factors contribute to...?'
+      "How does X compare to Y?",
+      "What evidence supports...?",
+      "Distinguish between X and Y",
+      "What is the relationship between...?",
+      "Analyze why... leads to...",
+      "What factors contribute to...?",
     ],
     antiPatterns: [
-      'Questions MUST require seeing relationships, patterns, or structures',
-      'Simple "what is the difference" questions without requiring reasoning are NOT analysis'
+      "Questions MUST require seeing relationships, patterns, or structures",
+      'Simple "what is the difference" questions without requiring reasoning are NOT analysis',
     ],
-    exampleGood: 'Compare the energy efficiency of aerobic respiration in mitochondria versus anaerobic glycolysis. What factors make one more advantageous in certain conditions?',
-    exampleBad: 'What is the difference between aerobic and anaerobic?' // Too simple, doesnt require deep analysis
+    exampleGood:
+      "Compare the energy efficiency of aerobic respiration in mitochondria versus anaerobic glycolysis. What factors make one more advantageous in certain conditions?",
+    exampleBad: "What is the difference between aerobic and anaerobic?", // Too simple, doesnt require deep analysis
   },
   evaluate: {
     level: 5,
-    name: 'Evaluate',
-    description: 'Make judgments based on criteria and standards',
-    verbs: ['judge', 'critique', 'justify', 'assess', 'argue', 'defend', 'prioritize', 'rank', 'recommend'],
+    name: "Evaluate",
+    description: "Make judgments based on criteria and standards",
+    verbs: ["judge", "critique", "justify", "assess", "argue", "defend", "prioritize", "rank", "recommend"],
     questionStems: [
-      'Which approach is better and why?',
-      'What are the strengths and weaknesses of...?',
-      'Evaluate the effectiveness of...',
-      'What criteria would you use to assess...?',
-      'Justify your reasoning for...',
-      'What is the most important factor in... and why?'
+      "Which approach is better and why?",
+      "What are the strengths and weaknesses of...?",
+      "Evaluate the effectiveness of...",
+      "What criteria would you use to assess...?",
+      "Justify your reasoning for...",
+      "What is the most important factor in... and why?",
     ],
     antiPatterns: [
-      'Must require VALUE JUDGMENT based on criteria, not just description',
-      'Should include justification component (and why?)'
+      "Must require VALUE JUDGMENT based on criteria, not just description",
+      "Should include justification component (and why?)",
     ],
-    exampleGood: 'A researcher proposes targeting mitochondria for cancer therapy. Evaluate this approach considering both its potential benefits and risks to healthy cells.',
-    exampleBad: 'Is mitochondrial therapy good?' // Too simple, no criteria for judgment
+    exampleGood:
+      "A researcher proposes targeting mitochondria for cancer therapy. Evaluate this approach considering both its potential benefits and risks to healthy cells.",
+    exampleBad: "Is mitochondrial therapy good?", // Too simple, no criteria for judgment
   },
   create: {
     level: 6,
-    name: 'Create',
-    description: 'Put elements together to form a coherent or functional whole; reorganize elements into a new pattern or structure',
-    verbs: ['design', 'construct', 'propose', 'formulate', 'hypothesize', 'invent', 'develop', 'compose', 'plan'],
+    name: "Create",
+    description:
+      "Put elements together to form a coherent or functional whole; reorganize elements into a new pattern or structure",
+    verbs: ["design", "construct", "propose", "formulate", "hypothesize", "invent", "develop", "compose", "plan"],
     questionStems: [
-      'Design a solution for...',
-      'What would happen if...? Propose a hypothesis.',
-      'How could you modify... to achieve...?',
-      'Develop a plan to...',
-      'What new approach could address...?'
+      "Design a solution for...",
+      "What would happen if...? Propose a hypothesis.",
+      "How could you modify... to achieve...?",
+      "Develop a plan to...",
+      "What new approach could address...?",
     ],
     antiPatterns: [
-      'Requires SYNTHESIS of multiple concepts into something new',
-      'Should not have a single correct answer - creativity should be valued'
+      "Requires SYNTHESIS of multiple concepts into something new",
+      "Should not have a single correct answer - creativity should be valued",
     ],
-    exampleGood: 'Propose a novel therapeutic approach that could enhance mitochondrial function in aging cells. What molecular targets would you focus on and why?',
-    exampleBad: 'Make a mitochondria diagram' // This is reproduction, not creation
-  }
+    exampleGood:
+      "Propose a novel therapeutic approach that could enhance mitochondrial function in aging cells. What molecular targets would you focus on and why?",
+    exampleBad: "Make a mitochondria diagram", // This is reproduction, not creation
+  },
 };
 
 // Map cognitive load score to appropriate Bloom's level
 function mapCognitiveLoadToBloomsLevel(cognitiveLoadScore: number, contentComplexity: string): string {
   // High cognitive load sections should get higher-order thinking questions
   if (cognitiveLoadScore >= 9) {
-    return Math.random() > 0.3 ? 'evaluate' : 'create';
+    return Math.random() > 0.3 ? "evaluate" : "create";
   }
   if (cognitiveLoadScore >= 7) {
-    return Math.random() > 0.4 ? 'analyze' : 'evaluate';
+    return Math.random() > 0.4 ? "analyze" : "evaluate";
   }
   if (cognitiveLoadScore >= 5) {
-    return Math.random() > 0.5 ? 'apply' : 'analyze';
+    return Math.random() > 0.5 ? "apply" : "analyze";
   }
   if (cognitiveLoadScore >= 3) {
-    return Math.random() > 0.6 ? 'understand' : 'apply';
+    return Math.random() > 0.6 ? "understand" : "apply";
   }
   // Low cognitive load - but still limit recall questions
-  return Math.random() > 0.7 ? 'understand' : 'remember';
+  return Math.random() > 0.7 ? "understand" : "remember";
 }
 
 // Validate that a question matches its claimed Bloom's level
-function validateBloomsLevel(questionText: string, claimedLevel: string): { valid: boolean; suggestedLevel: string; reason: string } {
+function validateBloomsLevel(
+  questionText: string,
+  claimedLevel: string,
+): { valid: boolean; suggestedLevel: string; reason: string } {
   const questionLower = questionText.toLowerCase();
   const taxonomy = BLOOMS_TAXONOMY[claimedLevel as keyof typeof BLOOMS_TAXONOMY];
-  
+
   if (!taxonomy) {
-    return { valid: false, suggestedLevel: 'understand', reason: 'Unknown level' };
+    return { valid: false, suggestedLevel: "understand", reason: "Unknown level" };
   }
-  
+
   // Check for verb usage
-  const hasLevelVerb = taxonomy.verbs.some(verb => questionLower.includes(verb));
-  
+  const hasLevelVerb = taxonomy.verbs.some((verb) => questionLower.includes(verb));
+
   // Red flags for misclassification
-  const recallIndicators = ['what is', 'define', 'list the', 'name the', 'which of the following is'];
-  const hasRecallIndicator = recallIndicators.some(indicator => questionLower.startsWith(indicator));
-  
+  const recallIndicators = ["what is", "define", "list the", "name the", "which of the following is"];
+  const hasRecallIndicator = recallIndicators.some((indicator) => questionLower.startsWith(indicator));
+
   // If claimed as higher-order but uses recall patterns
-  if (claimedLevel !== 'remember' && hasRecallIndicator && !hasLevelVerb) {
-    return { 
-      valid: false, 
-      suggestedLevel: 'remember', 
-      reason: 'Question uses recall-level patterns but claimed higher level'
+  if (claimedLevel !== "remember" && hasRecallIndicator && !hasLevelVerb) {
+    return {
+      valid: false,
+      suggestedLevel: "remember",
+      reason: "Question uses recall-level patterns but claimed higher level",
     };
   }
-  
+
   // Check for analysis/evaluation patterns in claimed higher-order questions
-  const analysisPatterns = ['compare', 'contrast', 'relationship', 'differ', 'similar', 'factor'];
-  const evaluationPatterns = ['better', 'best', 'most important', 'should', 'recommend', 'evaluate', 'justify'];
-  const applicationPatterns = ['given', 'scenario', 'would happen', 'calculate', 'determine', 'apply'];
-  
-  if (claimedLevel === 'analyze' && !analysisPatterns.some(p => questionLower.includes(p))) {
-    return { valid: false, suggestedLevel: 'understand', reason: 'Missing analysis patterns' };
+  const analysisPatterns = ["compare", "contrast", "relationship", "differ", "similar", "factor"];
+  const evaluationPatterns = ["better", "best", "most important", "should", "recommend", "evaluate", "justify"];
+  const applicationPatterns = ["given", "scenario", "would happen", "calculate", "determine", "apply"];
+
+  if (claimedLevel === "analyze" && !analysisPatterns.some((p) => questionLower.includes(p))) {
+    return { valid: false, suggestedLevel: "understand", reason: "Missing analysis patterns" };
   }
-  
-  if (claimedLevel === 'evaluate' && !evaluationPatterns.some(p => questionLower.includes(p))) {
-    return { valid: false, suggestedLevel: 'analyze', reason: 'Missing evaluation patterns' };
+
+  if (claimedLevel === "evaluate" && !evaluationPatterns.some((p) => questionLower.includes(p))) {
+    return { valid: false, suggestedLevel: "analyze", reason: "Missing evaluation patterns" };
   }
-  
-  if (claimedLevel === 'apply' && !applicationPatterns.some(p => questionLower.includes(p))) {
+
+  if (claimedLevel === "apply" && !applicationPatterns.some((p) => questionLower.includes(p))) {
     // Check if it's actually analysis
-    if (analysisPatterns.some(p => questionLower.includes(p))) {
-      return { valid: true, suggestedLevel: 'analyze', reason: 'Actually analysis level' };
+    if (analysisPatterns.some((p) => questionLower.includes(p))) {
+      return { valid: true, suggestedLevel: "analyze", reason: "Actually analysis level" };
     }
   }
-  
-  return { valid: true, suggestedLevel: claimedLevel, reason: 'Matches level' };
+
+  return { valid: true, suggestedLevel: claimedLevel, reason: "Matches level" };
 }
 
 // Generate distribution ensuring higher-order thinking
@@ -202,155 +221,160 @@ function generateBloomsDistribution(questionCount: number, instructorPreferences
   // Default distribution emphasizing higher-order thinking
   // Remember: 10%, Understand: 15%, Apply: 25%, Analyze: 25%, Evaluate: 20%, Create: 5%
   const defaultDist = {
-    remember: 0.10,
+    remember: 0.1,
     understand: 0.15,
     apply: 0.25,
     analyze: 0.25,
-    evaluate: 0.20,
-    create: 0.05
+    evaluate: 0.2,
+    create: 0.05,
   };
-  
+
   // Apply instructor preferences if provided (legacy format conversion)
   if (instructorPreferences?.difficulty_mix) {
     const { recall = 20, application = 40, reasoning = 40 } = instructorPreferences.difficulty_mix;
     // Map legacy format to Bloom's
     // recall -> remember + understand
-    // application -> apply + analyze  
+    // application -> apply + analyze
     // reasoning -> evaluate + create
     const rememberUnderstand = recall / 100;
     const applyAnalyze = application / 100;
     const evaluateCreate = reasoning / 100;
-    
+
     return {
       remember: Math.round(questionCount * (rememberUnderstand * 0.4)),
       understand: Math.round(questionCount * (rememberUnderstand * 0.6)),
       apply: Math.round(questionCount * (applyAnalyze * 0.5)),
       analyze: Math.round(questionCount * (applyAnalyze * 0.5)),
       evaluate: Math.round(questionCount * (evaluateCreate * 0.8)),
-      create: Math.max(0, questionCount - Math.round(questionCount * (1 - evaluateCreate * 0.2)))
+      create: Math.max(0, questionCount - Math.round(questionCount * (1 - evaluateCreate * 0.2))),
     };
   }
-  
+
   const distribution: Record<string, number> = {};
   let remaining = questionCount;
-  
+
   // Ensure at least 1 question at each major level (except create for small sets)
-  const levels = ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'];
-  
+  const levels = ["remember", "understand", "apply", "analyze", "evaluate", "create"];
+
   for (const level of levels) {
     const count = Math.round(questionCount * defaultDist[level as keyof typeof defaultDist]);
     distribution[level] = count;
     remaining -= count;
   }
-  
+
   // Distribute remaining to higher-order levels
   while (remaining > 0) {
-    distribution['analyze']++;
+    distribution["analyze"]++;
     remaining--;
     if (remaining > 0) {
-      distribution['apply']++;
+      distribution["apply"]++;
       remaining--;
     }
   }
   while (remaining < 0) {
-    if (distribution['remember'] > 0) {
-      distribution['remember']--;
+    if (distribution["remember"] > 0) {
+      distribution["remember"]--;
       remaining++;
-    } else if (distribution['understand'] > 0) {
-      distribution['understand']--;
+    } else if (distribution["understand"] > 0) {
+      distribution["understand"]--;
       remaining++;
     }
   }
-  
+
   return distribution;
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    
-    const authHeader = req.headers.get('Authorization');
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+      return new Response(JSON.stringify({ error: "No authorization header" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Verify instructor role
-    const { data: hasRole } = await supabase.rpc('has_role', { 
-      _user_id: user.id, 
-      _role: 'instructor' 
+    const { data: hasRole } = await supabase.rpc("has_role", {
+      _user_id: user.id,
+      _role: "instructor",
     });
-    
+
     if (!hasRole) {
-      return new Response(JSON.stringify({ error: 'Only instructors can analyze lectures' }), {
+      return new Response(JSON.stringify({ error: "Only instructors can analyze lectures" }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { 
-      lectureVideoId, 
-      transcript, 
-      questionCount: providedQuestionCount, 
+    const {
+      lectureVideoId,
+      transcript,
+      questionCount: providedQuestionCount,
       smartMode = false,
-      professorType = 'stem', 
-      examStyle = 'usmle_step1', 
-      medicalSpecialty = 'general' 
+      professorType = "stem",
+      examStyle = "usmle_step1",
+      medicalSpecialty = "general",
     } = await req.json();
-    
+
     // For smart mode, we'll determine questionCount from content analysis
     let questionCount = providedQuestionCount || 5;
 
     if (!lectureVideoId || !transcript || !Array.isArray(transcript)) {
-      return new Response(JSON.stringify({ error: 'Missing lectureVideoId or transcript array' }), {
+      return new Response(JSON.stringify({ error: "Missing lectureVideoId or transcript array" }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Fetch instructor's adaptive tutoring settings
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('difficulty_mix, style_mix, question_preset')
-      .eq('id', user.id)
+      .from("profiles")
+      .select("difficulty_mix, style_mix, question_preset")
+      .eq("id", user.id)
       .single();
 
     const styleMix = profile?.style_mix || { mcq: 70, short_answer: 30 };
-    
-    console.log(`Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, smartMode: ${smartMode}`);
+
+    console.log(
+      `Analyzing cognitive load for lecture ${lectureVideoId}, ${transcript.length} segments, smartMode: ${smartMode}`,
+    );
 
     // Build transcript text with timestamps for analysis
-    const transcriptText = transcript.map((seg: any) => 
-      `[${formatTime(seg.start)} - ${formatTime(seg.end)}] ${seg.text}`
-    ).join('\n');
-    
+    const transcriptText = transcript
+      .map((seg: any) => `[${formatTime(seg.start)} - ${formatTime(seg.end)}] ${seg.text}`)
+      .join("\n");
+
     // Calculate lecture duration from transcript
     const lastSegment = transcript[transcript.length - 1];
     const lectureDurationSeconds = lastSegment?.end || 600;
-    
+
     // SMART MODE: Analyze content to determine optimal question count
     if (smartMode) {
-      console.log('Smart Mode enabled - analyzing content for optimal question placement...');
-      
+      console.log("Smart Mode enabled - analyzing content for optimal question placement...");
+
       const smartAnalysisPrompt = `You are an expert educational psychologist. Analyze this lecture transcript and determine the OPTIMAL number of pause points for questions.
 
 Consider these factors:
@@ -382,17 +406,20 @@ Transcript:
 ${transcriptText}`;
 
       try {
-        const smartResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
+        const smartResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-3-flash-preview',
+            model: "google/gemini-2.5-pro",
             messages: [
-              { role: 'system', content: 'You are an expert at analyzing educational content. Return only valid JSON.' },
-              { role: 'user', content: smartAnalysisPrompt }
+              {
+                role: "system",
+                content: "You are an expert at analyzing educational content. Return only valid JSON.",
+              },
+              { role: "user", content: smartAnalysisPrompt },
             ],
             max_tokens: 2000,
             temperature: 0.3,
@@ -401,68 +428,70 @@ ${transcriptText}`;
 
         if (smartResponse.ok) {
           const smartResult = await smartResponse.json();
-          let smartContent = smartResult.choices?.[0]?.message?.content || '';
-          
+          let smartContent = smartResult.choices?.[0]?.message?.content || "";
+
           // Strip markdown code fences
-          smartContent = smartContent.replace(/```json\s*/gi, '');
-          smartContent = smartContent.replace(/```\s*/g, '');
+          smartContent = smartContent.replace(/```json\s*/gi, "");
+          smartContent = smartContent.replace(/```\s*/g, "");
           smartContent = smartContent.trim();
-          
+
           const smartMatch = smartContent.match(/\{[\s\S]*\}/);
-          
+
           if (smartMatch) {
             try {
               const smartAnalysis = JSON.parse(smartMatch[0]);
               questionCount = smartAnalysis.recommended_count || Math.max(3, Math.round(lectureDurationSeconds / 300));
               console.log(`Smart Mode determined optimal question count: ${questionCount}`);
               console.log(`Reasoning: ${smartAnalysis.reasoning}`);
-              
+
               // Update the lecture_videos table with the smart analysis
-              await supabase.from('lecture_videos').update({
-                question_count: questionCount,
-                cognitive_analysis: {
-                  smart_mode: true,
-                  recommended_count: questionCount,
-                  reasoning: smartAnalysis.reasoning,
-                  high_yield_moments: smartAnalysis.high_yield_moments || []
-                }
-              }).eq('id', lectureVideoId);
-              
+              await supabase
+                .from("lecture_videos")
+                .update({
+                  question_count: questionCount,
+                  cognitive_analysis: {
+                    smart_mode: true,
+                    recommended_count: questionCount,
+                    reasoning: smartAnalysis.reasoning,
+                    high_yield_moments: smartAnalysis.high_yield_moments || [],
+                  },
+                })
+                .eq("id", lectureVideoId);
             } catch (parseErr) {
-              console.error('Failed to parse smart analysis:', parseErr);
+              console.error("Failed to parse smart analysis:", parseErr);
               // Fallback: use duration-based calculation
               questionCount = Math.max(3, Math.round(lectureDurationSeconds / 300)); // 1 question per 5 minutes
             }
           }
         }
       } catch (e) {
-        console.error('Smart mode analysis failed:', e);
+        console.error("Smart mode analysis failed:", e);
         // Fallback calculation
         questionCount = Math.max(3, Math.round(lectureDurationSeconds / 300));
       }
     }
-    
+
     // Generate Bloom's distribution with the determined question count
     const bloomsDistribution = generateBloomsDistribution(questionCount, profile);
     console.log(`Final question count: ${questionCount}, Bloom's Distribution: ${JSON.stringify(bloomsDistribution)}`);
 
     // For medical lectures, first extract medical entities
     let medicalEntities: any[] = [];
-    if (professorType === 'medical') {
-      console.log('Medical lecture detected, extracting medical entities first...');
-      
+    if (professorType === "medical") {
+      console.log("Medical lecture detected, extracting medical entities first...");
+
       try {
-        const entityResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
+        const entityResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-3-pro-preview',
+            model: "google/gemini-2.5-pro",
             messages: [
-              { 
-                role: 'system', 
+              {
+                role: "system",
                 content: `You are an expert medical educator. Extract medical entities from this transcript for USMLE-style question generation.
                 
 Return JSON:
@@ -483,9 +512,9 @@ Return JSON:
     }
   ],
   "high_yield_topics": ["topic1", "topic2"]
-}` 
+}`,
               },
-              { role: 'user', content: `Extract medical entities from this lecture:\n\n${transcriptText}` }
+              { role: "user", content: `Extract medical entities from this lecture:\n\n${transcriptText}` },
             ],
             max_tokens: 4000,
             temperature: 0.3,
@@ -494,15 +523,15 @@ Return JSON:
 
         if (entityResponse.ok) {
           const entityResult = await entityResponse.json();
-          let entityContent = entityResult.choices?.[0]?.message?.content || '';
-          
+          let entityContent = entityResult.choices?.[0]?.message?.content || "";
+
           // Strip markdown code fences
-          entityContent = entityContent.replace(/```json\s*/gi, '');
-          entityContent = entityContent.replace(/```\s*/g, '');
+          entityContent = entityContent.replace(/```json\s*/gi, "");
+          entityContent = entityContent.replace(/```\s*/g, "");
           entityContent = entityContent.trim();
-          
+
           const entityMatch = entityContent.match(/\{[\s\S]*\}/);
-          
+
           if (entityMatch) {
             let highYieldTopics: any[] = [];
             try {
@@ -511,9 +540,9 @@ Return JSON:
               highYieldTopics = parsed.high_yield_topics || [];
               console.log(`Extracted ${medicalEntities.length} medical entities`);
             } catch (parseErr) {
-              console.error('Failed to parse medical entities:', parseErr);
+              console.error("Failed to parse medical entities:", parseErr);
             }
-            
+
             // Store entities in database
             if (medicalEntities.length > 0) {
               const entitiesToInsert = medicalEntities.map((e: any) => ({
@@ -524,21 +553,24 @@ Return JSON:
                 start_timestamp: e.start_timestamp,
                 end_timestamp: e.end_timestamp,
                 related_entities: e.related_entities || [],
-                clinical_context: e.clinical_context || {}
+                clinical_context: e.clinical_context || {},
               }));
 
-              await supabase.from('lecture_medical_entities').insert(entitiesToInsert);
+              await supabase.from("lecture_medical_entities").insert(entitiesToInsert);
             }
 
             // Update lecture video with entities
-            await supabase.from('lecture_videos').update({
-              domain_type: 'medical',
-              extracted_entities: { entities: medicalEntities, high_yield_topics: highYieldTopics }
-            }).eq('id', lectureVideoId);
+            await supabase
+              .from("lecture_videos")
+              .update({
+                domain_type: "medical",
+                extracted_entities: { entities: medicalEntities, high_yield_topics: highYieldTopics },
+              })
+              .eq("id", lectureVideoId);
           }
         }
       } catch (e) {
-        console.error('Failed to extract medical entities:', e);
+        console.error("Failed to extract medical entities:", e);
       }
     }
 
@@ -561,17 +593,21 @@ Return JSON array:
 Transcript:
 ${transcriptText}`;
 
-    const conceptMapResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const conceptMapResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: "google/gemini-2.5-flash",
         messages: [
-          { role: 'system', content: 'You are an expert curriculum designer. Extract concepts from lecture transcripts. Return only valid JSON.' },
-          { role: 'user', content: conceptMapPrompt }
+          {
+            role: "system",
+            content:
+              "You are an expert curriculum designer. Extract concepts from lecture transcripts. Return only valid JSON.",
+          },
+          { role: "user", content: conceptMapPrompt },
         ],
         max_tokens: 3000,
         temperature: 0.3,
@@ -580,20 +616,20 @@ ${transcriptText}`;
 
     if (conceptMapResponse.ok) {
       const conceptResult = await conceptMapResponse.json();
-      let conceptContent = conceptResult.choices?.[0]?.message?.content || '';
-      
+      let conceptContent = conceptResult.choices?.[0]?.message?.content || "";
+
       // Strip markdown code fences
-      conceptContent = conceptContent.replace(/```json\s*/gi, '');
-      conceptContent = conceptContent.replace(/```\s*/g, '');
+      conceptContent = conceptContent.replace(/```json\s*/gi, "");
+      conceptContent = conceptContent.replace(/```\s*/g, "");
       conceptContent = conceptContent.trim();
-      
+
       const conceptMatch = conceptContent.match(/\[[\s\S]*\]/);
-      
+
       if (conceptMatch) {
         try {
           const concepts = JSON.parse(conceptMatch[0]);
           console.log(`Generated ${concepts.length} concepts for concept map`);
-          
+
           // Insert concept map
           const conceptsToInsert = concepts.map((c: any) => ({
             lecture_video_id: lectureVideoId,
@@ -601,19 +637,17 @@ ${transcriptText}`;
             start_timestamp: c.start_timestamp,
             end_timestamp: c.end_timestamp,
             prerequisites: c.prerequisites || [],
-            difficulty_level: c.difficulty_level || 'intermediate',
-            description: c.description
+            difficulty_level: c.difficulty_level || "intermediate",
+            description: c.description,
           }));
 
-          const { error: conceptError } = await supabase
-            .from('lecture_concept_map')
-            .insert(conceptsToInsert);
+          const { error: conceptError } = await supabase.from("lecture_concept_map").insert(conceptsToInsert);
 
           if (conceptError) {
-            console.error('Failed to insert concept map:', conceptError);
+            console.error("Failed to insert concept map:", conceptError);
           }
         } catch (e) {
-          console.error('Failed to parse concept map:', e);
+          console.error("Failed to parse concept map:", e);
         }
       }
     }
@@ -626,15 +660,17 @@ You MUST generate questions at specific cognitive levels according to Bloom's Ta
 Each question must clearly match its assigned level through verb usage and question structure.
 
 REQUIRED DISTRIBUTION FOR THIS LECTURE (${questionCount} questions total):
-${Object.entries(bloomsDistribution).map(([level, count]) => {
-  const tax = BLOOMS_TAXONOMY[level as keyof typeof BLOOMS_TAXONOMY];
-  return `- ${tax.name.toUpperCase()} (Level ${tax.level}): ${count} questions
+${Object.entries(bloomsDistribution)
+  .map(([level, count]) => {
+    const tax = BLOOMS_TAXONOMY[level as keyof typeof BLOOMS_TAXONOMY];
+    return `- ${tax.name.toUpperCase()} (Level ${tax.level}): ${count} questions
   Description: ${tax.description}
-  USE THESE VERBS: ${tax.verbs.join(', ')}
-  EXAMPLE STEMS: ${tax.questionStems.slice(0, 2).join(' | ')}
+  USE THESE VERBS: ${tax.verbs.join(", ")}
+  EXAMPLE STEMS: ${tax.questionStems.slice(0, 2).join(" | ")}
   GOOD EXAMPLE: "${tax.exampleGood}"
   AVOID: ${tax.antiPatterns[0]}`;
-}).join('\n\n')}
+  })
+  .join("\n\n")}
 
 CRITICAL QUALITY RULES:
 1. Questions starting with "What is..." or "Define..." are ONLY acceptable for Remember level
@@ -656,11 +692,11 @@ VALIDATION CHECKLIST (apply to each question):
     const shortAnswerCount = questionCount - mcqCount;
 
     console.log(`Style distribution - MCQ: ${mcqCount}, Short Answer: ${shortAnswerCount}`);
-    
+
     // Build system prompt based on professor type with Bloom's Taxonomy
     let systemPrompt: string;
-    
-    if (professorType === 'medical') {
+
+    if (professorType === "medical") {
       systemPrompt = `You are an expert medical educator analyzing a lecture transcript for cognitive load and USMLE-style question placement.
 
 Your task is to identify ${questionCount} optimal pause points where students should be asked questions.
@@ -681,12 +717,16 @@ COGNITIVE LOAD INDICATORS FOR MEDICAL CONTENT (score 1-10):
 - Lab/imaging interpretation (6-8)
 - Epidemiology and risk factors (5-7)
 
-EXAM STYLE: ${examStyle === 'usmle_step1' ? 'USMLE Step 1 (focus on mechanisms, pathophysiology)' : 
-               examStyle === 'usmle_step2' ? 'USMLE Step 2 CK (focus on diagnosis, management)' :
-               'NBME Shelf (clinical reasoning)'}
+EXAM STYLE: ${
+        examStyle === "usmle_step1"
+          ? "USMLE Step 1 (focus on mechanisms, pathophysiology)"
+          : examStyle === "usmle_step2"
+            ? "USMLE Step 2 CK (focus on diagnosis, management)"
+            : "NBME Shelf (clinical reasoning)"
+      }
 
 MEDICAL ENTITIES IDENTIFIED IN LECTURE:
-${medicalEntities.map((e: any) => `- ${e.entity_name} (${e.entity_type}): ${e.description || ''}`).join('\n')}
+${medicalEntities.map((e: any) => `- ${e.entity_name} (${e.entity_type}): ${e.description || ""}`).join("\n")}
 
 RESPONSE FORMAT (JSON array):
 CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 600.0), NOT a time string like "6:04".
@@ -742,10 +782,12 @@ COGNITIVE LOAD INDICATORS (score 1-10):
 - Examples after complex explanations (4-6)
 - Review or summary sections (3-5)
 
-For ${professorType === 'stem' ? 'STEM/Technical' : 'Humanities/Liberal Arts'} content, focus on:
-${professorType === 'stem' 
-  ? '- Mathematical derivations and proofs\n- Algorithm explanations\n- Technical process steps\n- Formula introductions\n- Code explanations' 
-  : '- Key argument transitions\n- Introduction of new theories\n- Complex philosophical concepts\n- Historical cause-effect chains\n- Literary analysis points'}
+For ${professorType === "stem" ? "STEM/Technical" : "Humanities/Liberal Arts"} content, focus on:
+${
+  professorType === "stem"
+    ? "- Mathematical derivations and proofs\n- Algorithm explanations\n- Technical process steps\n- Formula introductions\n- Code explanations"
+    : "- Key argument transitions\n- Introduction of new theories\n- Complex philosophical concepts\n- Historical cause-effect chains\n- Literary analysis points"
+}
 
 RESPONSE FORMAT (JSON array):
 CRITICAL: The "timestamp" field MUST be a NUMBER in seconds (e.g., 125.5, 364, 600.0), NOT a time string like "6:04".
@@ -772,17 +814,20 @@ Rules:
 6. Include the specified distribution of blooms_level and question_style`;
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-pro-preview', // Use Pro for better question quality
+        model: "google/gemini-2.5-pro", // Use Pro for better question quality
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Analyze this lecture transcript and identify ${questionCount} optimal pause points with Bloom's Taxonomy levels:\n\n${transcriptText}` }
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Analyze this lecture transcript and identify ${questionCount} optimal pause points with Bloom's Taxonomy levels:\n\n${transcriptText}`,
+          },
         ],
         max_tokens: 8000,
         temperature: 0.4,
@@ -791,7 +836,7 @@ Rules:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI API error:', errorText);
+      console.error("AI API error:", errorText);
       throw new Error(`AI API error: ${response.status}`);
     }
 
@@ -799,7 +844,7 @@ Rules:
     const content = aiResult.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error('No content in AI response');
+      throw new Error("No content in AI response");
     }
 
     // Parse the JSON response with robust truncation recovery
@@ -807,19 +852,19 @@ Rules:
     try {
       // Strip markdown code fences if present
       let cleanContent = content;
-      cleanContent = cleanContent.replace(/```json\s*/gi, '');
-      cleanContent = cleanContent.replace(/```\s*/g, '');
+      cleanContent = cleanContent.replace(/```json\s*/gi, "");
+      cleanContent = cleanContent.replace(/```\s*/g, "");
       cleanContent = cleanContent.trim();
-      
+
       // Helper function to repair truncated JSON
       const repairTruncatedJson = (jsonStr: string): string => {
         let repaired = jsonStr;
-        
+
         // Count quotes to check if we're inside an unclosed string
         // Remove escaped quotes for counting
-        const unescapedContent = repaired.replace(/\\"/g, '');
+        const unescapedContent = repaired.replace(/\\"/g, "");
         const quoteCount = (unescapedContent.match(/"/g) || []).length;
-        
+
         // If odd number of quotes, we have an unclosed string
         if (quoteCount % 2 !== 0) {
           // Find the last quote and close the string there
@@ -827,50 +872,50 @@ Rules:
           // Close the string with a quote
           repaired = repaired.trimEnd();
           // Remove any partial escape sequences at the end
-          repaired = repaired.replace(/\\+$/, '');
+          repaired = repaired.replace(/\\+$/, "");
           // Remove any incomplete escape sequence
-          if (repaired.endsWith('\\')) {
+          if (repaired.endsWith("\\")) {
             repaired = repaired.slice(0, -1);
           }
           repaired += '"';
-          console.log('[JSON Recovery] Closed unclosed string');
+          console.log("[JSON Recovery] Closed unclosed string");
         }
-        
+
         // Now handle unclosed braces/brackets
         const openBraces = (repaired.match(/{/g) || []).length;
         const closeBraces = (repaired.match(/}/g) || []).length;
         const openBrackets = (repaired.match(/\[/g) || []).length;
         const closeBrackets = (repaired.match(/\]/g) || []).length;
-        
+
         // Remove trailing comma before we add closing brackets
-        repaired = repaired.replace(/,\s*$/, '');
-        
+        repaired = repaired.replace(/,\s*$/, "");
+
         // Close any unclosed structures
         for (let i = 0; i < openBraces - closeBraces; i++) {
-          repaired += '}';
+          repaired += "}";
         }
         for (let i = 0; i < openBrackets - closeBrackets; i++) {
-          repaired += ']';
+          repaired += "]";
         }
-        
+
         // Clean up any trailing comma before closing brackets
-        repaired = repaired.replace(/,\s*([}\]])/g, '$1');
-        
+        repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+
         return repaired;
       };
-      
+
       const jsonMatch = cleanContent.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         // Try to recover from truncated response by finding array start
-        const arrayStart = cleanContent.indexOf('[');
+        const arrayStart = cleanContent.indexOf("[");
         if (arrayStart !== -1) {
           let jsonStr = cleanContent.slice(arrayStart);
           jsonStr = repairTruncatedJson(jsonStr);
-          
-          console.log('[JSON Recovery] Attempting to parse repaired truncated JSON...');
+
+          console.log("[JSON Recovery] Attempting to parse repaired truncated JSON...");
           pausePoints = JSON.parse(jsonStr);
         } else {
-          throw new Error('No JSON array found in response');
+          throw new Error("No JSON array found in response");
         }
       } else {
         let jsonStr = jsonMatch[0];
@@ -879,22 +924,22 @@ Rules:
           const seconds = parseInt(min) * 60 + parseInt(sec);
           return `"timestamp": ${seconds}`;
         });
-        
+
         try {
           pausePoints = JSON.parse(jsonStr);
         } catch (innerParseError) {
           // If normal parse fails, try recovery
-          console.log('[JSON Recovery] Initial parse failed, attempting repair...');
+          console.log("[JSON Recovery] Initial parse failed, attempting repair...");
           jsonStr = repairTruncatedJson(jsonStr);
           pausePoints = JSON.parse(jsonStr);
         }
       }
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content.slice(0, 500));
-      console.error('Parse error:', parseError);
-      
+      console.error("Failed to parse AI response:", content.slice(0, 500));
+      console.error("Parse error:", parseError);
+
       // Last resort: return empty array and let the fallback generation create all questions
-      console.log('[JSON Recovery] All parsing failed, using fallback generation for all questions');
+      console.log("[JSON Recovery] All parsing failed, using fallback generation for all questions");
       pausePoints = [];
     }
 
@@ -903,17 +948,17 @@ Rules:
     // Calculate lecture duration from last transcript segment (use different var name to avoid redeclaration)
     const finalSegment = transcript[transcript.length - 1];
     const transcriptDuration = finalSegment?.end || 600;
-    
+
     const { data: lectureVideo } = await supabase
-      .from('lecture_videos')
-      .select('duration_seconds')
-      .eq('id', lectureVideoId)
+      .from("lecture_videos")
+      .select("duration_seconds")
+      .eq("id", lectureVideoId)
       .single();
-    
+
     const lectureDuration = lectureVideo?.duration_seconds || transcriptDuration;
     const minStartTime = Math.max(60, lectureDuration * 0.1);
     const maxTimestamp = Math.max(minStartTime + 60, lectureDuration - 30);
-    
+
     console.log(`[Duration Validation] Video: ${lectureDuration}s, valid range: ${minStartTime}s - ${maxTimestamp}s`);
 
     // Filter out any questions outside valid timestamp range
@@ -928,19 +973,19 @@ Rules:
     // Validate and fix pause point count
     if (pausePoints.length < questionCount) {
       console.log(`Generating ${questionCount - pausePoints.length} additional pause points to meet quota`);
-      
+
       const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp / 30)));
       const missingCount = questionCount - pausePoints.length;
       const availableRange = maxTimestamp - minStartTime;
       const interval = availableRange / (missingCount + 1);
-      
+
       // Determine which Bloom's levels are underrepresented
       const currentLevelCounts: Record<string, number> = {};
       for (const p of pausePoints) {
-        const level = p.blooms_level || 'apply';
+        const level = p.blooms_level || "apply";
         currentLevelCounts[level] = (currentLevelCounts[level] || 0) + 1;
       }
-      
+
       const neededLevels: string[] = [];
       for (const [level, needed] of Object.entries(bloomsDistribution)) {
         const current = currentLevelCounts[level] || 0;
@@ -948,11 +993,11 @@ Rules:
           neededLevels.push(level);
         }
       }
-      
+
       for (let i = 0; i < missingCount; i++) {
         let targetTime = Math.round(minStartTime + interval * (i + 1));
         targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
-        
+
         let bucket = Math.floor(targetTime / 30);
         let attempts = 0;
         while (usedTimestamps.has(bucket) && attempts < 20) {
@@ -960,7 +1005,7 @@ Rules:
           targetTime = bucket * 30;
           attempts++;
         }
-        
+
         if (targetTime > maxTimestamp) {
           bucket = Math.floor(maxTimestamp / 30);
           while (usedTimestamps.has(bucket) && bucket > Math.floor(minStartTime / 30)) {
@@ -968,21 +1013,24 @@ Rules:
           }
           targetTime = Math.max(minStartTime, bucket * 30);
         }
-        
+
         targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
         usedTimestamps.add(Math.floor(targetTime / 30));
-        
+
         // Use needed Bloom's level or default to higher-order
-        const bloomsLevel = neededLevels[i] || ['apply', 'analyze', 'evaluate'][i % 3];
+        const bloomsLevel = neededLevels[i] || ["apply", "analyze", "evaluate"][i % 3];
         const taxonomy = BLOOMS_TAXONOMY[bloomsLevel as keyof typeof BLOOMS_TAXONOMY];
-        const styleTypes = ['multiple_choice', 'short_answer'];
-        
-        const relevantSegments = transcript.filter((seg: any) => 
-          seg.start >= (targetTime - 60) && seg.end <= (targetTime + 60)
+        const styleTypes = ["multiple_choice", "short_answer"];
+
+        const relevantSegments = transcript.filter(
+          (seg: any) => seg.start >= targetTime - 60 && seg.end <= targetTime + 60,
         );
-        const contextText = relevantSegments.map((s: any) => s.text).join(' ').trim();
-        const truncatedContext = contextText.slice(0, 500) || 'Lecture content';
-        
+        const contextText = relevantSegments
+          .map((s: any) => s.text)
+          .join(" ")
+          .trim();
+        const truncatedContext = contextText.slice(0, 500) || "Lecture content";
+
         pausePoints.push({
           timestamp: Math.round(targetTime),
           cognitive_load_score: 7,
@@ -990,14 +1038,15 @@ Rules:
           question_style: styleTypes[i % 2],
           reason: `${taxonomy.name} level question for comprehensive coverage`,
           context_summary: truncatedContext,
-          question_suggestion: truncatedContext.length > 50 
-            ? `Focus on the concepts: "${truncatedContext.slice(0, 150)}"`
-            : `Key concepts discussed at ${formatTime(targetTime)}`,
+          question_suggestion:
+            truncatedContext.length > 50
+              ? `Focus on the concepts: "${truncatedContext.slice(0, 150)}"`
+              : `Key concepts discussed at ${formatTime(targetTime)}`,
           blooms_verb: taxonomy.verbs[0],
-          transcript_context: truncatedContext
+          transcript_context: truncatedContext,
         });
       }
-      
+
       pausePoints.sort((a: any, b: any) => a.timestamp - b.timestamp);
     } else if (pausePoints.length > questionCount) {
       console.log(`Trimming ${pausePoints.length - questionCount} excess pause points`);
@@ -1009,34 +1058,37 @@ Rules:
     // CRITICAL: Final validation
     if (pausePoints.length !== questionCount) {
       console.error(`MISMATCH: Have ${pausePoints.length} pause points but need ${questionCount}. Forcing correction.`);
-      
+
       while (pausePoints.length < questionCount) {
         const usedTimestamps = new Set(pausePoints.map((p: any) => Math.floor(p.timestamp / 30) * 30));
         const interval = (lectureDuration - minStartTime) / (questionCount + 1);
         let targetTime = minStartTime + interval * (pausePoints.length + 1);
-        
+
         let attempts = 0;
         while (usedTimestamps.has(Math.floor(targetTime / 30) * 30) && attempts < 20) {
           targetTime += 30;
           attempts++;
           if (targetTime > maxTimestamp) {
-            targetTime = minStartTime + (Math.random() * (maxTimestamp - minStartTime));
+            targetTime = minStartTime + Math.random() * (maxTimestamp - minStartTime);
           }
         }
-        
+
         targetTime = Math.max(minStartTime, Math.min(maxTimestamp, targetTime));
-        
-        const bloomsLevels = ['apply', 'analyze', 'evaluate', 'understand'];
+
+        const bloomsLevels = ["apply", "analyze", "evaluate", "understand"];
         const bloomsLevel = bloomsLevels[pausePoints.length % 4];
         const taxonomy = BLOOMS_TAXONOMY[bloomsLevel as keyof typeof BLOOMS_TAXONOMY];
-        const styleTypes = ['multiple_choice', 'short_answer'];
-        
-        const relevantSegs = transcript.filter((seg: any) => 
-          seg.start >= (targetTime - 60) && seg.end <= (targetTime + 60)
+        const styleTypes = ["multiple_choice", "short_answer"];
+
+        const relevantSegs = transcript.filter(
+          (seg: any) => seg.start >= targetTime - 60 && seg.end <= targetTime + 60,
         );
-        const ctxText = relevantSegs.map((s: any) => s.text).join(' ').trim();
-        const truncCtx = ctxText.slice(0, 500) || 'Lecture content';
-        
+        const ctxText = relevantSegs
+          .map((s: any) => s.text)
+          .join(" ")
+          .trim();
+        const truncCtx = ctxText.slice(0, 500) || "Lecture content";
+
         pausePoints.push({
           timestamp: Math.round(targetTime),
           cognitive_load_score: 6,
@@ -1044,19 +1096,20 @@ Rules:
           question_style: styleTypes[pausePoints.length % 2],
           reason: `${taxonomy.name} level comprehension checkpoint`,
           context_summary: truncCtx,
-          question_suggestion: truncCtx.length > 50 
-            ? `Focus on the concepts: "${truncCtx.slice(0, 150)}"`
-            : `Key concepts discussed at ${formatTime(targetTime)}`,
+          question_suggestion:
+            truncCtx.length > 50
+              ? `Focus on the concepts: "${truncCtx.slice(0, 150)}"`
+              : `Key concepts discussed at ${formatTime(targetTime)}`,
           blooms_verb: taxonomy.verbs[0],
-          transcript_context: truncCtx
+          transcript_context: truncCtx,
         });
       }
-      
+
       if (pausePoints.length > questionCount) {
         pausePoints.sort((a: any, b: any) => (b.cognitive_load_score || 0) - (a.cognitive_load_score || 0));
         pausePoints = pausePoints.slice(0, questionCount);
       }
-      
+
       pausePoints.sort((a: any, b: any) => a.timestamp - b.timestamp);
     }
 
@@ -1064,28 +1117,30 @@ Rules:
 
     // Generate questions with Bloom's Taxonomy enforcement
     const questionsPromises = pausePoints.map(async (point: any, index: number) => {
-      const questionStyle = point.question_style || 'multiple_choice';
-      const bloomsLevel = point.blooms_level || 'apply';
+      const questionStyle = point.question_style || "multiple_choice";
+      const bloomsLevel = point.blooms_level || "apply";
       const taxonomy = BLOOMS_TAXONOMY[bloomsLevel as keyof typeof BLOOMS_TAXONOMY];
-      
+
       // For USMLE vignettes, generate clinical scenarios
-      if (questionStyle === 'usmle_vignette' && professorType === 'medical') {
-        const relatedEntity = medicalEntities.find((e: any) => 
-          e.entity_name.toLowerCase().includes(point.related_entity?.toLowerCase() || '') ||
-          point.context_summary?.toLowerCase().includes(e.entity_name.toLowerCase())
-        ) || medicalEntities[index % medicalEntities.length];
+      if (questionStyle === "usmle_vignette" && professorType === "medical") {
+        const relatedEntity =
+          medicalEntities.find(
+            (e: any) =>
+              e.entity_name.toLowerCase().includes(point.related_entity?.toLowerCase() || "") ||
+              point.context_summary?.toLowerCase().includes(e.entity_name.toLowerCase()),
+          ) || medicalEntities[index % medicalEntities.length];
 
         const vignettePrompt = `Create a USMLE-style clinical vignette question at Bloom's Taxonomy ${taxonomy.name} level.
 
 BLOOM'S LEVEL REQUIREMENTS:
 - Level: ${taxonomy.name} (${taxonomy.level}/6)
 - Description: ${taxonomy.description}
-- REQUIRED VERBS: ${taxonomy.verbs.slice(0, 5).join(', ')}
+- REQUIRED VERBS: ${taxonomy.verbs.slice(0, 5).join(", ")}
 - EXAMPLE QUESTION STRUCTURE: "${taxonomy.exampleGood}"
 
 Medical concept: ${point.related_entity || point.context_summary}
-Question type: ${point.question_stem_type || 'diagnosis'}
-Clinical focus: ${point.clinical_focus || 'general understanding'}
+Question type: ${point.question_stem_type || "diagnosis"}
+Clinical focus: ${point.clinical_focus || "general understanding"}
 Entity context: ${JSON.stringify(relatedEntity?.clinical_context || {})}
 
 CRITICAL: The question MUST require ${taxonomy.description.toLowerCase()}. 
@@ -1098,9 +1153,9 @@ Return JSON:
   "correctAnswer": "A",
   "explanation": "Clinical reasoning explanation that demonstrates ${taxonomy.name} level analysis",
   "blooms_level": "${bloomsLevel}",
-  "blooms_verb_used": "the specific verb from ${taxonomy.verbs.join(', ')} that this question uses",
-  "vignette_type": "${point.question_stem_type || 'diagnosis'}",
-  "tested_concept": "${point.related_entity || ''}",
+  "blooms_verb_used": "the specific verb from ${taxonomy.verbs.join(", ")} that this question uses",
+  "vignette_type": "${point.question_stem_type || "diagnosis"}",
+  "tested_concept": "${point.related_entity || ""}",
   "why_not_other_choices": {
     "B": "Why option B is incorrect - explain the reasoning flaw",
     "C": "Why option C is incorrect",
@@ -1109,7 +1164,7 @@ Return JSON:
   },
   "follow_ups": {
     "correct_confident": {
-      "question": "A harder ${bloomsLevel === 'analyze' ? 'evaluate' : bloomsLevel === 'evaluate' ? 'create' : 'analyze'} level question",
+      "question": "A harder ${bloomsLevel === "analyze" ? "evaluate" : bloomsLevel === "evaluate" ? "create" : "analyze"} level question",
       "type": "multiple_choice",
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
       "correctAnswer": "A",
@@ -1126,16 +1181,18 @@ Return JSON:
 }`;
 
         try {
-          const qResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
+          const qResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
             },
             body: JSON.stringify({
-              model: 'google/gemini-3-pro-preview',
+              model: "google/gemini-2.5-pro",
               messages: [
-                { role: 'system', content: `You are an expert USMLE question writer who creates questions at specific Bloom's Taxonomy levels. 
+                {
+                  role: "system",
+                  content: `You are an expert USMLE question writer who creates questions at specific Bloom's Taxonomy levels. 
                 
 CRITICAL REQUIREMENTS:
 1. Questions at Apply level must present a NOVEL clinical scenario requiring knowledge transfer
@@ -1144,8 +1201,9 @@ CRITICAL REQUIREMENTS:
 4. NEVER create questions that can be answered through simple memorization unless explicitly at Remember level
 5. Include "why not other choices" explanations that address common misconceptions
 
-Return only valid JSON.` },
-                { role: 'user', content: vignettePrompt }
+Return only valid JSON.`,
+                },
+                { role: "user", content: vignettePrompt },
               ],
               max_tokens: 2500,
               temperature: 0.5,
@@ -1156,16 +1214,18 @@ Return only valid JSON.` },
             const qResult = await qResponse.json();
             const qContent = qResult.choices?.[0]?.message?.content;
             const jsonMatch = qContent?.match(/\{[\s\S]*\}/);
-            
+
             if (jsonMatch) {
               const parsedQuestion = JSON.parse(jsonMatch[0]);
-              
+
               // Validate Bloom's level
               const validation = validateBloomsLevel(parsedQuestion.question, bloomsLevel);
               if (!validation.valid) {
-                console.log(`[Bloom's Validation] Question ${index} claimed ${bloomsLevel} but appears to be ${validation.suggestedLevel}: ${validation.reason}`);
+                console.log(
+                  `[Bloom's Validation] Question ${index} claimed ${bloomsLevel} but appears to be ${validation.suggestedLevel}: ${validation.reason}`,
+                );
               }
-              
+
               return {
                 ...point,
                 order_index: index,
@@ -1178,12 +1238,12 @@ Return only valid JSON.` },
                   vignette_type: parsedQuestion.vignette_type,
                   tested_concept: parsedQuestion.tested_concept,
                   blooms_level: bloomsLevel,
-                  blooms_verb_used: parsedQuestion.blooms_verb_used
+                  blooms_verb_used: parsedQuestion.blooms_verb_used,
                 },
-                question_type: 'usmle_vignette',
+                question_type: "usmle_vignette",
                 difficulty_type: bloomsLevel, // Use Bloom's level as difficulty indicator
                 why_not_other_choices: parsedQuestion.why_not_other_choices || null,
-                follow_up_questions: parsedQuestion.follow_ups || null
+                follow_up_questions: parsedQuestion.follow_ups || null,
               };
             }
           }
@@ -1191,14 +1251,14 @@ Return only valid JSON.` },
           console.error(`Failed to generate USMLE vignette for point ${index}:`, e);
         }
       }
-      
+
       // Simplified question generation - focus on content, not taxonomy
-      const transcriptContext = point.transcript_context || point.context_summary || '';
-      
-      const questionPrompt = `Create a ${questionStyle === 'multiple_choice' ? 'multiple choice' : 'short answer'} quiz question based on this lecture content:
+      const transcriptContext = point.transcript_context || point.context_summary || "";
+
+      const questionPrompt = `Create a ${questionStyle === "multiple_choice" ? "multiple choice" : "short answer"} quiz question based on this lecture content:
 
 === LECTURE CONTENT ===
-${transcriptContext || 'Lecture content about the topic'}
+${transcriptContext || "Lecture content about the topic"}
 
 === REQUIREMENTS ===
 1. Ask about SPECIFIC facts, concepts, processes, or relationships from the content above
@@ -1211,31 +1271,39 @@ ${transcriptContext || 'Lecture content about the topic'}
 4. All answer options must be specific and realistic - NO generic placeholders
 5. The correct answer must be clearly supported by the lecture content
 
-${questionStyle === 'multiple_choice' ? `Return JSON:
+${
+  questionStyle === "multiple_choice"
+    ? `Return JSON:
 {
   "question": "A specific question about the lecture content",
   "options": ["A. Specific factual answer", "B. Another plausible answer", "C. Another plausible answer", "D. Another plausible answer"],
   "correctAnswer": "A",
   "explanation": "Brief explanation of why this is correct based on the lecture"
-}` : `Return JSON:
+}`
+    : `Return JSON:
 {
   "question": "A specific question requiring explanation",
   "expectedAnswer": "The expected answer based on lecture content",
   "explanation": "Brief explanation"
-}`}`;
+}`
+}`;
 
       try {
-        const qResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
+        const qResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'google/gemini-3-flash-preview',
+            model: "google/gemini-2.5-flash",
             messages: [
-              { role: 'system', content: 'You are a quiz question writer. Create specific, content-based questions about the lecture material. Never ask vague meta-questions. Return only valid JSON.' },
-              { role: 'user', content: questionPrompt }
+              {
+                role: "system",
+                content:
+                  "You are a quiz question writer. Create specific, content-based questions about the lecture material. Never ask vague meta-questions. Return only valid JSON.",
+              },
+              { role: "user", content: questionPrompt },
             ],
             max_tokens: 800,
             temperature: 0.3,
@@ -1243,16 +1311,16 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
         });
 
         if (!qResponse.ok) {
-          throw new Error('Question generation failed');
+          throw new Error("Question generation failed");
         }
 
         const qResult = await qResponse.json();
         const qContent = qResult.choices?.[0]?.message?.content;
         const jsonMatch = qContent?.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
           const parsedQuestion = JSON.parse(jsonMatch[0]);
-          
+
           return {
             ...point,
             order_index: index,
@@ -1264,9 +1332,9 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
               explanation: parsedQuestion.explanation,
             },
             question_type: questionStyle,
-            difficulty_type: 'standard',
+            difficulty_type: "standard",
             why_not_other_choices: null,
-            follow_up_questions: null
+            follow_up_questions: null,
           };
         }
       } catch (e) {
@@ -1274,42 +1342,103 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
       }
 
       // Fallback: Extract real content from transcript and create specific question
-      const contextText = transcriptContext || point.context_summary || '';
-      
+      const contextText = transcriptContext || point.context_summary || "";
+
       // Extract meaningful sentences from the transcript
-      const sentences = contextText.split(/[.!?]+/)
+      const sentences = contextText
+        .split(/[.!?]+/)
         .map((s: string) => s.trim())
         .filter((s: string) => s.length > 30 && s.length < 200);
-      
+
       // Find key concepts/terms (nouns, technical terms)
       const words = contextText.toLowerCase().split(/\s+/);
-      const stopWords = new Set(['the', 'and', 'is', 'are', 'was', 'were', 'that', 'this', 'with', 'for', 'from', 'have', 'has', 'been', 'being', 'will', 'would', 'could', 'should', 'about', 'which', 'their', 'there', 'they', 'what', 'when', 'where', 'how', 'why', 'also', 'more', 'some', 'into', 'over', 'such', 'than', 'then', 'these', 'those', 'very', 'just', 'only', 'other', 'like', 'said', 'know', 'going', 'okay', 'really', 'actually', 'basically', 'thing', 'things', 'lecture', 'lecturer', 'discussed', 'talked', 'mentioned', 'saying']);
-      
+      const stopWords = new Set([
+        "the",
+        "and",
+        "is",
+        "are",
+        "was",
+        "were",
+        "that",
+        "this",
+        "with",
+        "for",
+        "from",
+        "have",
+        "has",
+        "been",
+        "being",
+        "will",
+        "would",
+        "could",
+        "should",
+        "about",
+        "which",
+        "their",
+        "there",
+        "they",
+        "what",
+        "when",
+        "where",
+        "how",
+        "why",
+        "also",
+        "more",
+        "some",
+        "into",
+        "over",
+        "such",
+        "than",
+        "then",
+        "these",
+        "those",
+        "very",
+        "just",
+        "only",
+        "other",
+        "like",
+        "said",
+        "know",
+        "going",
+        "okay",
+        "really",
+        "actually",
+        "basically",
+        "thing",
+        "things",
+        "lecture",
+        "lecturer",
+        "discussed",
+        "talked",
+        "mentioned",
+        "saying",
+      ]);
+
       const significantWords = words
         .filter((w: string) => w.length > 4 && !stopWords.has(w))
         .reduce((acc: Record<string, number>, word: string) => {
           acc[word] = (acc[word] || 0) + 1;
           return acc;
         }, {});
-      
+
       // Get most frequent significant terms
       const topTerms = Object.entries(significantWords)
         .sort(([, a], [, b]) => (b as number) - (a as number))
         .slice(0, 3)
         .map(([word]) => word);
-      
-      const mainTerm = topTerms[0] || 'concept';
-      
+
+      const mainTerm = topTerms[0] || "concept";
+
       // Generate a real question based on the content
       let fallbackQuestion: string;
       let fallbackOptions: string[] | undefined;
       let fallbackAnswer: string;
       let fallbackExpectedAnswer: string | undefined;
-      
-      if (questionStyle === 'multiple_choice') {
+
+      if (questionStyle === "multiple_choice") {
         // Create a real question about the main term
         fallbackQuestion = `What is the primary function or characteristic of ${mainTerm} as described in the lecture?`;
-        
+
         // Try to create options from actual content phrases
         if (sentences.length >= 2) {
           const mainSentence = sentences.find((s: string) => s.toLowerCase().includes(mainTerm)) || sentences[0];
@@ -1317,39 +1446,39 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
             `A. ${mainSentence.slice(0, 100)}`,
             `B. It serves a different purpose than described`,
             `C. It is unrelated to the main topic`,
-            `D. The lecture did not specify its function`
+            `D. The lecture did not specify its function`,
           ];
         } else {
           fallbackOptions = [
             `A. It plays a key role in the process described in the lecture`,
             `B. It is a secondary component with minimal impact`,
             `C. It contradicts the main theory presented`,
-            `D. It was mentioned but not explained in detail`
+            `D. It was mentioned but not explained in detail`,
           ];
         }
-        fallbackAnswer = 'A';
+        fallbackAnswer = "A";
       } else {
         fallbackQuestion = `Explain the role of ${mainTerm} based on what was discussed in the lecture.`;
-        fallbackExpectedAnswer = `${mainTerm} is described in the lecture as ${sentences[0] || 'a key concept in the material covered'}.`;
-        fallbackAnswer = '';
+        fallbackExpectedAnswer = `${mainTerm} is described in the lecture as ${sentences[0] || "a key concept in the material covered"}.`;
+        fallbackAnswer = "";
       }
-      
+
       console.log(`[Fallback] Generated content-based fallback question for point ${index} about: ${mainTerm}`);
-      
+
       return {
         ...point,
         order_index: index,
         question_content: {
           question: fallbackQuestion,
           options: fallbackOptions,
-          correctAnswer: questionStyle === 'multiple_choice' ? fallbackAnswer : undefined,
+          correctAnswer: questionStyle === "multiple_choice" ? fallbackAnswer : undefined,
           expectedAnswer: fallbackExpectedAnswer,
           explanation: `This question focuses on ${mainTerm}, which was discussed in this section of the lecture.`,
         },
         question_type: questionStyle,
-        difficulty_type: 'standard',
+        difficulty_type: "standard",
         why_not_other_choices: null,
-        follow_up_questions: null
+        follow_up_questions: null,
       };
     });
 
@@ -1358,7 +1487,7 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
     // Log Bloom's distribution in generated questions
     const generatedDistribution: Record<string, number> = {};
     for (const q of questionsWithContent) {
-      const level = q.blooms_level || 'unknown';
+      const level = q.blooms_level || "unknown";
       generatedDistribution[level] = (generatedDistribution[level] || 0) + 1;
     }
     console.log(`Generated Bloom's distribution: ${JSON.stringify(generatedDistribution)}`);
@@ -1372,59 +1501,63 @@ ${questionStyle === 'multiple_choice' ? `Return JSON:
       question_content: point.question_content,
       question_type: point.question_type,
       order_index: point.order_index,
-      difficulty_type: point.blooms_level || point.difficulty_type || 'apply',
+      difficulty_type: point.blooms_level || point.difficulty_type || "apply",
       follow_up_questions: point.follow_up_questions,
       why_not_other_choices: point.why_not_other_choices,
-      is_active: true
+      is_active: true,
     }));
 
-    const { error: insertError } = await supabase
-      .from('lecture_pause_points')
-      .insert(pausePointsToInsert);
+    const { error: insertError } = await supabase.from("lecture_pause_points").insert(pausePointsToInsert);
 
     if (insertError) {
-      console.error('Failed to insert pause points:', insertError);
-      throw new Error('Failed to save pause points');
+      console.error("Failed to insert pause points:", insertError);
+      throw new Error("Failed to save pause points");
     }
 
     // Update lecture video status
     await supabase
-      .from('lecture_videos')
-      .update({ 
-        status: 'ready',
+      .from("lecture_videos")
+      .update({
+        status: "ready",
         cognitive_analysis: {
           analyzed_at: new Date().toISOString(),
           total_pause_points: pausePointsToInsert.length,
           blooms_distribution: generatedDistribution,
-          average_cognitive_load: pausePointsToInsert.reduce((acc: number, p: any) => 
-            acc + (p.cognitive_load_score || 0), 0) / pausePointsToInsert.length
+          average_cognitive_load:
+            pausePointsToInsert.reduce((acc: number, p: any) => acc + (p.cognitive_load_score || 0), 0) /
+            pausePointsToInsert.length,
         },
-        question_count: pausePointsToInsert.length
+        question_count: pausePointsToInsert.length,
       })
-      .eq('id', lectureVideoId);
+      .eq("id", lectureVideoId);
 
-    return new Response(JSON.stringify({
-      success: true,
-      pausePointCount: pausePointsToInsert.length,
-      bloomsDistribution: generatedDistribution,
-      requestedDistribution: bloomsDistribution
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        pausePointCount: pausePointsToInsert.length,
+        bloomsDistribution: generatedDistribution,
+        requestedDistribution: bloomsDistribution,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
-    console.error('Error in analyze-lecture-cognitive-load:', error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error in analyze-lecture-cognitive-load:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
