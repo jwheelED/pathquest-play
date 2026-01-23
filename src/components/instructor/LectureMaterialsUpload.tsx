@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getOrgId } from "@/hooks/useOrgId";
+import { useCourseContext } from "@/hooks/useCourseContext";
 import {
   Select,
   SelectContent,
@@ -55,6 +56,7 @@ export function LectureMaterialsUpload() {
   const [answerKeyType, setAnswerKeyType] = useState<"problem-solutions" | "mcqs">("problem-solutions");
   const [isParsing, setIsParsing] = useState(false);
   const queryClient = useQueryClient();
+  const { selectedCourseId } = useCourseContext();
 
   // Auto-detect if file might be an answer key based on title
   useEffect(() => {
@@ -69,20 +71,23 @@ export function LectureMaterialsUpload() {
   }, [title]);
 
   const { data: materials = [], isLoading } = useQuery({
-    queryKey: ["lecture-materials"],
+    queryKey: ["lecture-materials", selectedCourseId],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+      if (!selectedCourseId) return [];
 
       const { data, error } = await supabase
         .from("lecture_materials")
         .select("*")
         .eq("instructor_id", user.id)
+        .eq("course_id", selectedCourseId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data as LectureMaterial[];
     },
+    enabled: !!selectedCourseId,
   });
 
   const uploadMutation = useMutation({
@@ -93,6 +98,10 @@ export function LectureMaterialsUpload() {
 
       if (parseAsAnswerKey && !answerKeySubject) {
         throw new Error("Please select a subject for the answer key");
+      }
+      
+      if (!selectedCourseId) {
+        throw new Error("Please select a course first");
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -119,6 +128,7 @@ export function LectureMaterialsUpload() {
           .insert({
             instructor_id: user.id,
             org_id: orgId,
+            course_id: selectedCourseId,
             title: title.trim(),
             subject: answerKeySubject,
             course_context: description.trim() || null,
@@ -157,6 +167,7 @@ export function LectureMaterialsUpload() {
           .insert({
             instructor_id: user.id,
             org_id: orgId,
+            course_id: selectedCourseId,
             file_name: selectedFile.name,
             file_path: filePath,
             file_type: selectedFile.type,
@@ -173,6 +184,7 @@ export function LectureMaterialsUpload() {
           .insert({
             instructor_id: user.id,
             org_id: orgId,
+            course_id: selectedCourseId,
             file_name: selectedFile.name,
             file_path: filePath,
             file_type: selectedFile.type,

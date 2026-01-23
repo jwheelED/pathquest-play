@@ -413,7 +413,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null, expected_answer = "", options = null, correct_answer = null, explanation = null } = await req.json();
+    const { question_text, suggested_type, context, source = "manual_button", use_answer_key = false, course_context = null, expected_answer = "", options = null, correct_answer = null, explanation = null, course_id = null } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase

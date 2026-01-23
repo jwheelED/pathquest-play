@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface LiveSession {
   id: string;
@@ -26,6 +27,7 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
   const [participantCount, setParticipantCount] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
     loadActiveSession();
@@ -38,16 +40,17 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [activeSession]);
+  }, [activeSession, selectedCourseId]);
 
   const loadActiveSession = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user || !selectedCourseId) return;
 
     const { data } = await supabase
       .from("live_sessions")
       .select("*")
       .eq("instructor_id", user.id)
+      .eq("course_id", selectedCourseId)
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -57,6 +60,9 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
       setActiveSession(data);
       onSessionChange(data.id);
       updateParticipantCount();
+    } else {
+      setActiveSession(null);
+      onSessionChange(null);
     }
   };
 
@@ -76,12 +82,17 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
       toast.error("Please enter a session title");
       return;
     }
+    
+    if (!selectedCourseId) {
+      toast.error("Please select a course first");
+      return;
+    }
 
     setIsCreating(true);
 
     try {
       const { data, error } = await supabase.functions.invoke("create-live-session", {
-        body: { title: sessionTitle.trim() },
+        body: { title: sessionTitle.trim(), courseId: selectedCourseId },
       });
 
       if (error) throw error;

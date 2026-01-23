@@ -24,6 +24,7 @@ import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLec
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { cn } from "@/lib/utils";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface Student {
   id: string;
@@ -58,13 +59,22 @@ export default function InstructorDashboard() {
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const { selectedCourseId, selectedCourse } = useCourseContext();
   
   const professorType = instructorProfile?.professor_type;
 
   useEffect(() => {
     checkAuth();
-    fetchStudents();
-    
+  }, []);
+  
+  // Refetch students when course changes
+  useEffect(() => {
+    if (currentUser && selectedCourseId) {
+      fetchStudents();
+    }
+  }, [selectedCourseId, currentUser]);
+  
+  useEffect(() => {
     const lastReminderDate = localStorage.getItem('lastCourseMaterialsReminder');
     const today = new Date().toDateString();
     if (lastReminderDate !== today) {
@@ -199,14 +209,22 @@ export default function InstructorDashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
+      if (!selectedCourseId) {
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
 
       const { data: studentLinks } = await supabase
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", user.id)
+        .eq("course_id", selectedCourseId)
         .limit(100);
 
       if (!studentLinks || studentLinks.length === 0) {
+        setStudents([]);
         setLoading(false);
         return;
       }
@@ -223,6 +241,7 @@ export default function InstructorDashboard() {
           .select("student_id, grade")
           .eq("assignment_type", "lecture_checkin")
           .eq("instructor_id", user.id)
+          .eq("course_id", selectedCourseId)
           .in("student_id", studentIds),
       ]);
 

@@ -54,7 +54,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
-    const { questionType, extractedQuestion, slideNumber } = await req.json();
+    const { questionType, extractedQuestion, slideNumber, courseId } = await req.json();
 
     if (!extractedQuestion || !questionType) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -63,7 +63,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📋 Sending slide question (type: ${questionType}, slide: ${slideNumber})`);
+    console.log(`📋 Sending slide question (type: ${questionType}, slide: ${slideNumber}, course: ${courseId})`);
 
     // Get instructor's org_id
     const { data: instructorProfile } = await supabase
@@ -112,11 +112,17 @@ serve(async (req) => {
       questions: [formattedQuestion],
     };
 
-    // Get connected students
-    const { data: students, error: studentsError } = await supabase
+    // Get connected students - filtered by course if courseId provided
+    let studentsQuery = supabase
       .from("instructor_students")
       .select("student_id")
       .eq("instructor_id", user.id);
+    
+    if (courseId) {
+      studentsQuery = studentsQuery.eq("course_id", courseId);
+    }
+    
+    const { data: students, error: studentsError } = await studentsQuery;
 
     if (studentsError) {
       console.error("Error fetching students:", studentsError);
@@ -127,18 +133,23 @@ serve(async (req) => {
     }
 
     const studentIds = students?.map((s) => s.student_id) || [];
-    console.log(`👥 Found ${studentIds.length} connected students`);
+    console.log(`👥 Found ${studentIds.length} connected students for course ${courseId || 'all'}`);
 
-    // Check for active live session
-    const { data: activeSession } = await supabase
+    // Check for active live session - filtered by course if courseId provided
+    let sessionQuery = supabase
       .from("live_sessions")
       .select("id, session_code")
       .eq("instructor_id", user.id)
       .eq("is_active", true)
       .gt("ends_at", new Date().toISOString())
       .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
+    
+    if (courseId) {
+      sessionQuery = sessionQuery.eq("course_id", courseId);
+    }
+    
+    const { data: activeSession } = await sessionQuery.single();
 
     let liveQuestionId: string | null = null;
 
@@ -184,6 +195,7 @@ serve(async (req) => {
         content: questionContent,
         mode: questionType === "mcq" ? "auto_grade" as const : "manual_grade" as const,
         org_id: instructorOrgId,
+        course_id: courseId || null,
       }));
 
       const { data: insertedAssignments, error: insertError } = await supabase

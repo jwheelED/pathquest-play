@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, TrendingUp, CheckCircle2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface InstructorOverviewProps {
   instructorId: string;
@@ -23,22 +24,30 @@ export function InstructorOverview({ instructorId, className }: InstructorOvervi
     avgEngagement: 0,
   });
   const [loading, setLoading] = useState(true);
+  const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
     fetchMetrics();
-  }, [instructorId]);
+  }, [instructorId, selectedCourseId]);
 
   const fetchMetrics = async () => {
+    if (!selectedCourseId) {
+      setLoading(false);
+      return;
+    }
+    
     try {
       const [studentsData, assignmentsData] = await Promise.all([
         supabase
           .from("instructor_students")
           .select("student_id")
-          .eq("instructor_id", instructorId),
+          .eq("instructor_id", instructorId)
+          .eq("course_id", selectedCourseId),
         supabase
           .from("student_assignments")
           .select("student_id, grade")
-          .eq("instructor_id", instructorId),
+          .eq("instructor_id", instructorId)
+          .eq("course_id", selectedCourseId),
       ]);
 
       const totalStudents = studentsData.data?.length || 0;

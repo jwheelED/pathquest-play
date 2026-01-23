@@ -45,7 +45,7 @@ serve(async (req) => {
 
     console.log('create-live-session: Authenticated user:', user.id);
 
-    const { title } = await req.json();
+    const { title, courseId } = await req.json();
 
     if (!title) {
       return new Response(
@@ -61,13 +61,14 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    // Create new live session
+    // Create new live session with course_id
     const { data: session, error: sessionError } = await supabaseClient
       .from('live_sessions')
       .insert({
         instructor_id: user.id,
         title,
         org_id: profile?.org_id,
+        course_id: courseId || null,
       })
       .select()
       .single();

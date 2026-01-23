@@ -77,13 +77,20 @@ export const LectureCheckInResults = () => {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+    
+    const courseId = selectedCourse?.id;
+    if (!courseId) {
+      setGroupedResults([]);
+      setLoading(false);
+      return;
+    }
 
     // Optimized query: Fetch only recent check-ins (last 24 hours) to reduce load
     // For classroom of 40 students, this limits data transfer significantly
     const oneDayAgo = new Date();
     oneDayAgo.setHours(oneDayAgo.getHours() - 24);
 
-    // Fetch all lecture check-in assignments with optimized select
+    // Fetch all lecture check-in assignments with optimized select - filtered by course
     const { data: assignments, error } = await supabase
       .from("student_assignments")
       .select(
@@ -101,6 +108,7 @@ export const LectureCheckInResults = () => {
       `,
       )
       .eq("instructor_id", user.id)
+      .eq("course_id", courseId)
       .eq("assignment_type", "lecture_checkin")
       .gte("created_at", oneDayAgo.toISOString())
       .order("created_at", { ascending: false })
