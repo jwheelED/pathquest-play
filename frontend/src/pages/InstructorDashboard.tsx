@@ -18,7 +18,7 @@ import { LectureCheckInResults } from "@/components/instructor/LectureCheckInRes
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { AnswerKeyManager } from "@/components/instructor/answer-keys/AnswerKeyManager";
-import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
+// InstructorConnectionCard removed - organization connection not needed unless for institutional licensing
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
