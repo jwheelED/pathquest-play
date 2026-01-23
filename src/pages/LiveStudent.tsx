@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -286,13 +287,20 @@ const LiveStudent = () => {
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
   const [aiGradeComponents, setAiGradeComponents] = useState<any>(null);
   const [understandsConcept, setUnderstandsConcept] = useState<boolean | null>(null);
-  const [gradePending, setGradePending] = useState<boolean>(false); // NEW: Track if grade is pending
+  const [gradePending, setGradePending] = useState<boolean>(false);
+  const [isGrading, setIsGrading] = useState<boolean>(false); // Track grading in progress
 
   // For short answer questions (with AI grading)
   const handleSubmit = async () => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
 
     setIsSubmitting(true);
+    setIsGrading(true);
+    
+    // Show loading toast for auto-grading
+    const gradingToastId = toast.loading("Auto-grading in progress...", {
+      description: "AI is analyzing your answer",
+    });
     const responseTimeMs = Date.now() - questionStartTime;
 
     const responseData = {
@@ -322,18 +330,22 @@ const LiveStudent = () => {
 
       if (result.queued) {
         // Optimistic UI for offline submission
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         setHasAnswered(true);
         setShowAccountPrompt(true);
         toast.info("Answer saved! Will sync when back online.", {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
         setAiGrade(result.data.aiGrade || null);
         setAiFeedback(result.data.aiFeedback || null);
         setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setGradePending(result.data.gradePending || false); // NEW: Set pending state
+        setGradePending(result.data.gradePending || false);
         setShowAccountPrompt(true);
         
         // Show appropriate feedback based on grading mode
@@ -350,9 +362,13 @@ const LiveStudent = () => {
           }
         }
       } else if (result.error) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         throw result.error;
       }
     } catch (error: any) {
+      toast.dismiss(gradingToastId);
+      setIsGrading(false);
       console.error("Error submitting answer:", error);
       if (error.message?.includes("Already answered")) {
         toast.info("You already answered this question");
@@ -371,6 +387,13 @@ const LiveStudent = () => {
     if (!codeAnswer.trim() || !participantId || !currentQuestion) return;
 
     setIsSubmitting(true);
+    setIsGrading(true);
+    
+    // Show loading toast for auto-grading
+    const gradingToastId = toast.loading("Auto-grading in progress...", {
+      description: "AI is analyzing your code",
+    });
+    
     const responseTimeMs = Date.now() - questionStartTime;
 
     const responseData = {
@@ -404,12 +427,16 @@ const LiveStudent = () => {
 
       if (result.queued) {
         // Optimistic UI for offline submission
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         setHasAnswered(true);
         setShowAccountPrompt(true);
         toast.info("Code saved! Will sync when back online.", {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
         setAiGrade(result.data.aiGrade || null);
@@ -430,9 +457,13 @@ const LiveStudent = () => {
           }
         }
       } else if (result.error) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         throw result.error;
       }
     } catch (error: any) {
+      toast.dismiss(gradingToastId);
+      setIsGrading(false);
       console.error("Error submitting code:", error);
       if (error.message?.includes("Already answered")) {
         toast.info("You already submitted code for this question");
@@ -675,8 +706,30 @@ const LiveStudent = () => {
                 </>
               )}
 
+              {/* Grading in Progress Skeleton */}
+              {!isMCQ && isGrading && (
+                <div className="max-w-lg mx-auto animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                  <div className="p-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 space-y-4">
+                    <div className="flex items-center justify-center gap-3">
+                      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                      <span className="text-lg font-semibold text-blue-700 dark:text-blue-300">
+                        Auto-grading in progress...
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      <Skeleton className="h-4 w-full bg-blue-200/50 dark:bg-blue-800/50" />
+                      <Skeleton className="h-4 w-3/4 bg-blue-200/50 dark:bg-blue-800/50" />
+                      <Skeleton className="h-4 w-1/2 bg-blue-200/50 dark:bg-blue-800/50" />
+                    </div>
+                    <p className="text-sm text-blue-600 dark:text-blue-400 text-center">
+                      AI is analyzing your response...
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Short Answer and Coding Results with AI Grade */}
-              {!isMCQ && aiGrade !== null && aiFeedback && (
+              {!isMCQ && !isGrading && aiGrade !== null && aiFeedback && (
                 <div className="max-w-lg mx-auto animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
                   <AIGradeDisplay
                     grade={aiGrade}
@@ -698,7 +751,7 @@ const LiveStudent = () => {
               )}
 
               {/* Fallback for non-MCQ without AI grade - Show pending or submitted status */}
-              {!isMCQ && aiGrade === null && (
+              {!isMCQ && !isGrading && aiGrade === null && (
                 <>
                   {gradePending ? (
                     <>

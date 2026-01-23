@@ -17,8 +17,28 @@ import { ConfidenceSelector, ConfidenceLevel } from "./ConfidenceSelector";
 import ReactMarkdown from "react-markdown";
 import { LectureCountdownTimer } from "./LectureCountdownTimer";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
+
+// Loading skeleton for auto-grading in progress
+const GradingSkeletonCard = () => (
+  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 space-y-3">
+    <div className="flex items-center gap-2">
+      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+        Auto-grading in progress...
+      </span>
+    </div>
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-3/4 bg-blue-200/50 dark:bg-blue-800/50" />
+      <Skeleton className="h-4 w-1/2 bg-blue-200/50 dark:bg-blue-800/50" />
+    </div>
+    <p className="text-xs text-blue-600 dark:text-blue-400">
+      AI is analyzing your response...
+    </p>
+  </div>
+);
 
 interface Assignment {
   id: string;
@@ -72,6 +92,8 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
   const [confidenceData, setConfidenceData] = useState<Record<string, ConfidenceData>>({});
   const [showConfidenceSelector, setShowConfidenceSelector] = useState<Record<string, boolean>>({});
   const [pointsEarned, setPointsEarned] = useState<Record<string, number>>({});
+  // Track which assignments are being graded
+  const [gradingInProgress, setGradingInProgress] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   
   // Tab switching detection for the currently open assignment
@@ -712,8 +734,12 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       const needsGrading = result.has_short_answer || hasCodingQuestions;
       const isAutoGrade = result.assignment_mode === 'auto_grade';
       
-      if (needsGrading) {
-        // Don't show premature toast - wait for grading to complete before showing result
+      if (needsGrading && isAutoGrade) {
+        // Show loading toast and skeleton for auto-grading
+        setGradingInProgress(prev => ({ ...prev, [assignment.id]: true }));
+        const gradingToastId = sonnerToast.loading("Auto-grading in progress...", {
+          description: "AI is analyzing your response",
+        });
 
         let totalShortAnswerGrade = 0;
         let shortAnswerCount = 0;
@@ -851,8 +877,11 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
               : a
           ));
 
-          toast({ 
-            title: `✅ Graded: ${avgGrade}%`,
+          // Dismiss loading toast and show result
+          sonnerToast.dismiss(gradingToastId);
+          setGradingInProgress(prev => ({ ...prev, [assignment.id]: false }));
+          
+          sonnerToast.success(`Graded: ${avgGrade}%`, {
             description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
           });
         } else {
@@ -866,9 +895,12 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
             console.error('Failed to store recommendations:', updateError);
           }
           
+          // Dismiss loading toast
+          sonnerToast.dismiss(gradingToastId);
+          setGradingInProgress(prev => ({ ...prev, [assignment.id]: false }));
+          
           if (avgGrade !== null) {
-            toast({ 
-              title: `✅ Graded: ${avgGrade}%`,
+            sonnerToast.success(`Graded: ${avgGrade}%`, {
               description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
             });
           } else {
@@ -878,8 +910,14 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
             });
           }
         }
+      } else if (needsGrading && !isAutoGrade) {
+        // Manual grading mode - just submit without auto-grade
+        toast({ 
+          title: "✅ Quiz Submitted Successfully!",
+          description: "Your instructor will review and grade your answer."
+        });
       } else {
-        // Non-auto-grade submissions
+        // Non-graded submissions
         toast({ 
           title: "✅ Quiz Submitted Successfully!",
           description: "Your answers have been submitted for review."
@@ -1515,7 +1553,9 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                               </div>
                                {isSubmitted && (
                                 <div className="space-y-2">
-                                  {assignment.mode === 'manual_grade' && assignment.assignment_type !== 'lecture_checkin' ? (
+                                  {gradingInProgress[assignment.id] ? (
+                                    <GradingSkeletonCard />
+                                  ) : assignment.mode === 'manual_grade' && assignment.assignment_type !== 'lecture_checkin' ? (
                                     <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
                                       <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">⏳ Pending Instructor Review</p>
                                       <p className="text-xs text-yellow-800 dark:text-yellow-300">Your instructor will review and grade your code.</p>
@@ -1583,7 +1623,9 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                               />
                               {isSubmitted && (
                                 <div className="space-y-2">
-                                  {assignment.mode === 'manual_grade' && assignment.assignment_type !== 'lecture_checkin' ? (
+                                  {gradingInProgress[assignment.id] ? (
+                                    <GradingSkeletonCard />
+                                  ) : assignment.mode === 'manual_grade' && assignment.assignment_type !== 'lecture_checkin' ? (
                                     // Show pending review for manual grade mode (non lecture check-ins)
                                     <>
                                       {q.expectedAnswer && (
