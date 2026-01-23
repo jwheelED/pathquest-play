@@ -400,7 +400,7 @@ export default function InstructorDashboard() {
       case "overview":
         return (
           <div className="space-y-6">
-            <InstructorConnectionCard />
+            {/* Organization connection card removed - not needed unless for institutional licensing */}
             
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {instructorCode && (
