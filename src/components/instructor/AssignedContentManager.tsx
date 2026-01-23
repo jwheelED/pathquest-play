@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Trash2, FileText } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface Assignment {
   id: string;
@@ -22,26 +23,35 @@ interface Assignment {
 export function AssignedContentManager() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
     fetchAssignments();
-  }, []);
+  }, [selectedCourseId]);
 
   const fetchAssignments = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
+      if (!selectedCourseId) {
+        setAssignments([]);
+        setLoading(false);
+        return;
+      }
 
       const { data: assignmentData, error } = await supabase
         .from("student_assignments")
         .select("id, title, assignment_type, mode, completed, grade, created_at, student_id")
         .eq("instructor_id", user.id)
+        .eq("course_id", selectedCourseId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       if (!assignmentData || assignmentData.length === 0) {
         setAssignments([]);
+        setLoading(false);
         return;
       }
 
