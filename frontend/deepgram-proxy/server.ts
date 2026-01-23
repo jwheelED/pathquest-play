@@ -37,9 +37,9 @@ Deno.serve({ port: PORT }, (req) => {
     console.log("✅ Client connected to proxy");
 
     try {
-      // Build Deepgram WebSocket URL
+      // Build Deepgram WebSocket URL with Audio Intelligence features
       const url = new URL("wss://api.deepgram.com/v1/listen");
-      url.searchParams.set("model", "nova-2");
+      url.searchParams.set("model", "nova-2-general");  // More stable for diverse audio
       url.searchParams.set("language", "en");
       url.searchParams.set("smart_format", "true");
       url.searchParams.set("numerals", "true"); // Convert spoken numbers to digits
@@ -48,22 +48,29 @@ Deno.serve({ port: PORT }, (req) => {
       url.searchParams.set("diarize", "true");
       url.searchParams.set("encoding", "opus");
       url.searchParams.set("channels", "1");
-      url.searchParams.set("utterance_end_ms", "1000");
-      url.searchParams.set("vad_events", "true");
       
-      // Math/STEM keyword boosting to improve accuracy for technical terms
+      // Audio Intelligence features for hallucination prevention
+      url.searchParams.set("filler_words", "true");     // Detect um, uh, etc. separately
+      url.searchParams.set("utterances", "true");       // Natural speech segmentation
+      url.searchParams.set("endpointing", "300");       // Faster endpoint detection (ms)
+      url.searchParams.set("utterance_end_ms", "800");  // Shorter utterance boundary
+      url.searchParams.set("vad_events", "true");
+      url.searchParams.set("no_delay", "true");         // Reduce latency
+      
+      // Math/STEM keyword boosting with higher weights
       const mathKeywords = [
-        "derivative:2", "integral:2", "equation:2", "variable:2",
-        "coefficient:2", "exponent:2", "logarithm:2", "polynomial:2",
-        "quadratic:2", "calculus:2", "algebra:2", "trigonometry:2",
-        "sine:2", "cosine:2", "tangent:2", "function:2",
-        "limit:2", "infinity:2", "summation:2", "sigma:2",
-        "delta:2", "theta:2", "pi:2", "squared:2", "cubed:2",
-        "x:1", "y:1", "z:1", "f of x:2", "g of x:2",
-        "plus:1", "minus:1", "times:1", "divided by:1", "equals:1",
-        "greater than:1", "less than:1", "approximately:1",
-        "fraction:2", "numerator:2", "denominator:2",
-        "matrix:2", "vector:2", "scalar:2", "determinant:2"
+        "derivative:3", "integral:3", "equation:3", "variable:3",
+        "coefficient:3", "exponent:3", "logarithm:3", "polynomial:3",
+        "quadratic:3", "calculus:3", "algebra:3", "trigonometry:3",
+        "sine:3", "cosine:3", "tangent:3", "function:3",
+        "limit:3", "infinity:3", "summation:3", "sigma:3",
+        "delta:3", "theta:3", "pi:3", "squared:3", "cubed:3",
+        "x:2", "y:2", "z:2", "f of x:3", "g of x:3",
+        "plus:2", "minus:2", "times:2", "divided by:2", "equals:2",
+        "greater than:2", "less than:2", "approximately:2",
+        "fraction:3", "numerator:3", "denominator:3",
+        "matrix:3", "vector:3", "scalar:3", "determinant:3",
+        "hypothesis:3", "theorem:3", "proof:3", "lemma:3"
       ];
       url.searchParams.set("keywords", mathKeywords.join(","));
 
