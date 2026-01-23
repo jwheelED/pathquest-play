@@ -205,7 +205,9 @@ export const LectureCheckInResults = () => {
       } = await supabase.auth.getUser();
       if (!user || !selectedCourse?.id) return;
 
-      // Set up real-time subscription for assignment updates - filtered by instructor and course
+      // Set up real-time subscription for assignment updates
+      // Note: Supabase Realtime only supports single-column filters, so we filter by instructor_id
+      // and do client-side filtering for course_id and assignment_type
       channel = supabase
         .channel(`instructor-checkin-results-${selectedCourse.id}`)
         .on(
@@ -214,12 +216,15 @@ export const LectureCheckInResults = () => {
             event: "*",
             schema: "public",
             table: "student_assignments",
-            filter: `instructor_id=eq.${user.id},course_id=eq.${selectedCourse.id}`,
+            filter: `instructor_id=eq.${user.id}`,
           },
           (payload) => {
             // Handle INSERT (new questions) and UPDATE (student answers)
             const record = (payload.new || payload.old) as any;
-            if (!record || record.assignment_type !== 'lecture_checkin') return;
+            // Client-side filtering for course_id and assignment_type
+            if (!record || 
+                record.assignment_type !== 'lecture_checkin' ||
+                record.course_id !== selectedCourse.id) return;
             
             console.log("✅ Check-in result updated:", payload.eventType, record);
             toast.info("Student response received", { duration: 2000 });
