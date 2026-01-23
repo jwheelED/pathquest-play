@@ -25,6 +25,9 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
   const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
   const queryClient = useQueryClient();
 
+  const MAX_PPTX_SIZE = 10 * 1024 * 1024; // 10MB for Cloudinary free tier
+  const MAX_PDF_SIZE = 200 * 1024 * 1024; // 200MB for direct upload
+
   const allowedTypes = [
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
@@ -51,7 +54,13 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       return;
     }
 
-    if (file.size > 200 * 1024 * 1024) {
+    // Check file size based on type
+    if (isPptxFile(file)) {
+      if (file.size > MAX_PPTX_SIZE) {
+        toast.error('PowerPoint files must be under 10MB for conversion. Try reducing image sizes or upload as PDF instead.');
+        return;
+      }
+    } else if (file.size > MAX_PDF_SIZE) {
       toast.error('File size must be less than 200MB');
       return;
     }
@@ -192,7 +201,13 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
                       file?.name.toLowerCase().endsWith('.ppt');
     
     if (file && isAllowed) {
-      if (file.size > 200 * 1024 * 1024) {
+      // Check file size based on type
+      if (isPptxFile(file)) {
+        if (file.size > MAX_PPTX_SIZE) {
+          toast.error('PowerPoint files must be under 10MB for conversion. Try reducing image sizes or upload as PDF instead.');
+          return;
+        }
+      } else if (file.size > MAX_PDF_SIZE) {
         toast.error('File size must be less than 200MB');
         return;
       }
@@ -288,7 +303,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
               <Upload className="h-12 w-12 text-muted-foreground mx-auto" />
               <div>
                 <p className="font-medium">Drag and drop your PDF or PowerPoint here</p>
-                <p className="text-sm text-muted-foreground">Supports .pdf, .pptx, and .ppt files</p>
+                <p className="text-sm text-muted-foreground">PDF up to 200MB • PowerPoint up to 10MB</p>
               </div>
               <Input
                 type="file"
