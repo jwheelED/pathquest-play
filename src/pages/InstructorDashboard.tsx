@@ -18,7 +18,7 @@ import { LectureCheckInResults } from "@/components/instructor/LectureCheckInRes
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 import { AnswerKeyManager } from "@/components/instructor/answer-keys/AnswerKeyManager";
-import { InstructorConnectionCard } from "@/components/instructor/InstructorConnectionCard";
+// InstructorConnectionCard removed - organization connection not needed unless for institutional licensing
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
@@ -419,7 +419,7 @@ export default function InstructorDashboard() {
       case "overview":
         return (
           <div className="space-y-6">
-            <InstructorConnectionCard />
+            {/* Organization connection card removed - not needed unless for institutional licensing */}
             
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {instructorCode && (
