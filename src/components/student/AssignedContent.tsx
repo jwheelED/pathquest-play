@@ -1294,7 +1294,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="space-y-4 pt-2">
+                <div className="space-y-4 pt-2" onClick={(e) => e.stopPropagation()}>
                   {/* Live Check-in Notice */}
                   {assignment.assignment_type === 'lecture_checkin' && !assignment.completed && (
                     <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
