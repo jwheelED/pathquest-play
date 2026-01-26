@@ -263,7 +263,10 @@ export function LectureCheckInHistory({
             </button>
 
             {expandedId === response.id && (
-              <div className="px-4 pb-4 space-y-3 border-t pt-3">
+              <div 
+                className="px-4 pb-4 space-y-3 border-t pt-3"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-1">Your Answer</p>
                   <p className="text-sm bg-muted/50 p-2 rounded">
