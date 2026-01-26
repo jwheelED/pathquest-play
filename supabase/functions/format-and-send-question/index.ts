@@ -803,10 +803,18 @@ serve(async (req) => {
       console.log(`✅ Live question sent to ${participantCount || 0} anonymous participants`);
 
       // ALSO send to registered students via student_assignments
-      const { data: studentLinks } = await supabase
+      // Filter by course_id if provided to ensure course-scoped delivery
+      let studentQuery = supabase
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", user.id);
+      
+      if (course_id) {
+        studentQuery = studentQuery.eq("course_id", course_id);
+        console.log(`📚 Filtering students by course_id: ${course_id}`);
+      }
+      
+      const { data: studentLinks } = await studentQuery;
 
       let registeredStudentCount = 0;
       if (studentLinks && studentLinks.length > 0) {
@@ -876,11 +884,18 @@ serve(async (req) => {
     // No live session - use traditional student_assignments (authenticated users)
     console.log("📚 Standard mode - sending via student_assignments");
 
-    // Fetch students linked to this instructor
-    const { data: studentLinks, error: linkError } = await supabase
+    // Fetch students linked to this instructor, filtered by course if provided
+    let studentQuery = supabase
       .from("instructor_students")
       .select("student_id")
       .eq("instructor_id", user.id);
+    
+    if (course_id) {
+      studentQuery = studentQuery.eq("course_id", course_id);
+      console.log(`📚 Filtering students by course_id: ${course_id}`);
+    }
+    
+    const { data: studentLinks, error: linkError } = await studentQuery;
 
     if (linkError) {
       throw new Error(`Failed to fetch students: ${linkError.message}`);
