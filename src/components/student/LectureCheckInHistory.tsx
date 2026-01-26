@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   History, CheckCircle2, XCircle, Clock, ChevronRight, 
@@ -19,7 +18,6 @@ interface CheckInResponse {
   ai_grade: number | null;
   ai_feedback: string | null;
   submitted_at: string;
-  session_code: string;
   course_title: string | null;
 }
 
@@ -46,90 +44,69 @@ export function LectureCheckInHistory({
     try {
       setLoading(true);
       
-      // Get student's instructor connections
-      const { data: connections } = await supabase
-        .from("instructor_students")
-        .select("instructor_id")
-        .eq("student_id", userId);
-
-      if (!connections || connections.length === 0) {
-        setResponses([]);
-        return;
-      }
-
-      const instructorIds = connections.map(c => c.instructor_id);
-
-      // Get live sessions from connected instructors
-      const { data: sessions } = await supabase
-        .from("live_sessions")
-        .select("id, session_code, instructor_id")
-        .in("instructor_id", instructorIds);
-
-      if (!sessions || sessions.length === 0) {
-        setResponses([]);
-        return;
-      }
-
-      const sessionIds = sessions.map(s => s.id);
-
-      // Get check-ins from those sessions
-      const { data: checkIns } = await supabase
-        .from("live_session_check_ins")
-        .select("id, question_content, question_type, session_id")
-        .in("session_id", sessionIds);
-
-      if (!checkIns || checkIns.length === 0) {
-        setResponses([]);
-        return;
-      }
-
-      const checkInIds = checkIns.map(c => c.id);
-
-      // Get student's responses
-      let responsesQuery = supabase
-        .from("live_session_responses")
-        .select("id, check_in_id, answer, is_correct, ai_grade, ai_feedback, submitted_at")
+      // Get lecture check-in assignments for this student
+      let query = supabase
+        .from("student_assignments")
+        .select(`
+          id,
+          title,
+          content,
+          quiz_responses,
+          grade,
+          completed,
+          created_at,
+          instructor_id,
+          courses (title)
+        `)
         .eq("student_id", userId)
-        .in("check_in_id", checkInIds)
-        .order("submitted_at", { ascending: false })
+        .eq("assignment_type", "lecture_checkin")
+        .order("created_at", { ascending: false })
         .limit(limit);
 
       if (showOnlyWrong) {
-        responsesQuery = responsesQuery.or("is_correct.eq.false,ai_grade.lt.70");
+        query = query.eq("completed", true).lt("grade", 70);
       }
 
-      const { data: studentResponses } = await responsesQuery;
+      const { data: assignments, error } = await query;
 
-      if (!studentResponses) {
+      if (error) {
+        console.error("Error fetching check-in history:", error);
         setResponses([]);
         return;
       }
 
-      // Get instructor course titles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, course_title")
-        .in("id", instructorIds);
+      if (!assignments || assignments.length === 0) {
+        setResponses([]);
+        return;
+      }
 
-      const courseMap = new Map(profiles?.map(p => [p.id, p.course_title]) || []);
-      const sessionMap = new Map(sessions.map(s => [s.id, { code: s.session_code, instructorId: s.instructor_id }]));
-      const checkInMap = new Map(checkIns.map(c => [c.id, { content: c.question_content, type: c.question_type, sessionId: c.session_id }]));
+      // Transform assignments to check-in responses
+      const combinedResponses: CheckInResponse[] = assignments.map((assignment: any) => {
+        // Extract question from content
+        const questions = assignment.content?.questions || [];
+        const firstQuestion = questions[0] || {};
+        const questionText = firstQuestion.question || firstQuestion.question_text || assignment.title || "Question";
+        const questionType = firstQuestion.type || "unknown";
+        
+        // Get student's answer from quiz_responses
+        const studentAnswer = assignment.quiz_responses?.["0"] || "";
+        
+        // Determine correctness from grade
+        const isCorrect = assignment.grade !== null && assignment.grade >= 70;
+        
+        // Get course title from joined courses table
+        const courseTitle = (assignment.courses as any)?.title || null;
 
-      // Combine data
-      const combinedResponses: CheckInResponse[] = studentResponses.map(r => {
-        const checkIn = checkInMap.get(r.check_in_id);
-        const session = checkIn ? sessionMap.get(checkIn.sessionId) : null;
         return {
-          id: r.id,
-          question_content: checkIn?.content || "Question unavailable",
-          question_type: checkIn?.type || "unknown",
-          student_answer: r.answer || "",
-          is_correct: r.is_correct,
-          ai_grade: r.ai_grade,
-          ai_feedback: r.ai_feedback,
-          submitted_at: r.submitted_at,
-          session_code: session?.code || "N/A",
-          course_title: session ? courseMap.get(session.instructorId) || null : null,
+          id: assignment.id,
+          question_content: questionText,
+          question_type: questionType,
+          student_answer: studentAnswer,
+          is_correct: assignment.completed ? isCorrect : null,
+          ai_grade: assignment.grade,
+          ai_feedback: null, // AI feedback would need to be stored in a different field
+          submitted_at: assignment.created_at,
+          course_title: courseTitle,
         };
       });
 

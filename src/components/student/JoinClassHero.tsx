@@ -26,8 +26,7 @@ export function JoinClassHero({ userId, onClassJoined }: JoinClassHeroProps) {
         .from("profiles")
         .select("id, full_name, course_title")
         .eq("instructor_code", classCode.trim().toUpperCase())
-        .eq("role", "instructor")
-        .single();
+        .maybeSingle();
 
       if (findError || !instructor) {
         toast.error("Invalid class code. Please check and try again.");

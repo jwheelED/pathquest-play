@@ -434,6 +434,7 @@ serve(async (req) => {
       options = null,
       correct_answer = null,
       explanation = null,
+      course_id = null,
     } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
@@ -816,6 +817,7 @@ serve(async (req) => {
           instructor_id: user.id,
           student_id: link.student_id,
           org_id: instructorOrgId,
+          course_id: course_id,
           assignment_type: "lecture_checkin",
           mode: assignmentMode,
           title: "🎯 Live Lecture Question",
@@ -932,6 +934,7 @@ serve(async (req) => {
         instructor_id: user.id,
         student_id: studentId,
         org_id: instructorOrgId,
+        course_id: course_id,
         assignment_type: "lecture_checkin",
         mode: assignmentMode,
         title: "🎯 Live Lecture Question",
@@ -984,6 +987,8 @@ serve(async (req) => {
       const retryAssignments = failedStudents.map((studentId) => ({
         instructor_id: user.id,
         student_id: studentId,
+        org_id: instructorOrgId,
+        course_id: course_id,
         assignment_type: "lecture_checkin",
         mode: retryMode,
         title: "🎯 Live Lecture Question",

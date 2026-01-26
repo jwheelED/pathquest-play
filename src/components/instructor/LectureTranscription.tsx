@@ -33,6 +33,7 @@ import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboa
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { getOrgId } from "@/hooks/useOrgId";
+import { useCourseContext } from "@/hooks/useCourseContext";
 import { playNotificationSound } from "@/lib/audioNotification";
 import {
   AlertDialog,
@@ -96,6 +97,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Proactive token refresh
   useAuthRefresh(true);
+  
+  // Get selected course for proper assignment scoping
+  const { selectedCourseId } = useCourseContext();
+  
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
@@ -1161,6 +1166,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // Pass course_id for proper assignment scoping
+            course_id: selectedCourseId,
           },
         });
       });
