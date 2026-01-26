@@ -137,8 +137,11 @@ export default function ClassDashboard() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate("/dashboard")}
-                className="gap-2 rounded-full hover:bg-accent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate("/dashboard");
+                }}
+                className="gap-2 rounded-full hover:bg-accent pointer-events-auto relative z-10"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Dashboard
