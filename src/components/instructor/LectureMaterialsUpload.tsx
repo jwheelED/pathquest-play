@@ -1,24 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Upload, FileText, Trash2, Download, BookOpen, Loader2, ListChecks, Calculator } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getOrgId } from "@/hooks/useOrgId";
 import { useCourseContext } from "@/hooks/useCourseContext";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface LectureMaterial {
   id: string;
@@ -31,44 +22,13 @@ interface LectureMaterial {
   created_at: string;
 }
 
-const SUBJECTS = [
-  { value: "physics", label: "Physics" },
-  { value: "engineering", label: "Engineering" },
-  { value: "chemistry", label: "Chemistry" },
-  { value: "mathematics", label: "Mathematics" },
-  { value: "biology", label: "Biology" },
-  { value: "computer-science", label: "Computer Science" },
-  { value: "economics", label: "Economics" },
-  { value: "statistics", label: "Statistics" },
-  { value: "other", label: "Other" },
-];
-
-// Keywords that suggest the file is an answer key/quiz
-const ANSWER_KEY_KEYWORDS = ["quiz", "test", "exam", "answer", "key", "solution", "problem set", "homework", "assignment"];
-
 export function LectureMaterialsUpload() {
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [parseAsAnswerKey, setParseAsAnswerKey] = useState(false);
-  const [answerKeySubject, setAnswerKeySubject] = useState("");
-  const [answerKeyType, setAnswerKeyType] = useState<"problem-solutions" | "mcqs">("problem-solutions");
-  const [isParsing, setIsParsing] = useState(false);
   const queryClient = useQueryClient();
   const { selectedCourseId } = useCourseContext();
-
-  // Auto-detect if file might be an answer key based on title
-  useEffect(() => {
-    const lowerTitle = title.toLowerCase();
-    const mightBeAnswerKey = ANSWER_KEY_KEYWORDS.some(keyword => lowerTitle.includes(keyword));
-    if (mightBeAnswerKey && !parseAsAnswerKey) {
-      // Only auto-suggest, don't auto-enable
-      toast.info("This looks like a quiz/answer key. Enable 'Parse as Answer Key' to use it for live matching.", {
-        duration: 5000,
-      });
-    }
-  }, [title]);
 
   const { data: materials = [], isLoading } = useQuery({
     queryKey: ["lecture-materials", selectedCourseId],
@@ -95,10 +55,6 @@ export function LectureMaterialsUpload() {
       if (!selectedFile || !title.trim()) {
         throw new Error("Please provide a title and select a file");
       }
-
-      if (parseAsAnswerKey && !answerKeySubject) {
-        throw new Error("Please select a subject for the answer key");
-      }
       
       if (!selectedCourseId) {
         throw new Error("Please select a course first");
@@ -112,113 +68,36 @@ export function LectureMaterialsUpload() {
       const filePath = `${user.id}/${fileName}`;
       const orgId = await getOrgId(user.id);
 
-      // Upload to appropriate bucket based on whether it's an answer key
-      const bucketName = parseAsAnswerKey ? "answer-keys" : "lecture-materials";
-      
       const { error: uploadError } = await supabase.storage
-        .from(bucketName)
+        .from("lecture-materials")
         .upload(filePath, selectedFile);
 
       if (uploadError) throw uploadError;
 
-      if (parseAsAnswerKey) {
-        // Create answer key record and trigger parsing
-        const { data: answerKey, error: dbError } = await supabase
-          .from("instructor_answer_keys")
-          .insert({
-            instructor_id: user.id,
-            org_id: orgId,
-            course_id: selectedCourseId,
-            title: title.trim(),
-            subject: answerKeySubject,
-            course_context: description.trim() || null,
-            file_path: filePath,
-            file_name: selectedFile.name,
-            file_type: selectedFile.type,
-            status: "processing",
-            content_type: answerKeyType,
-          })
-          .select()
-          .single();
-
-        if (dbError) throw dbError;
-
-        // Trigger appropriate AI parsing based on content type
-        setIsParsing(true);
-        const functionName = answerKeyType === "mcqs" 
-          ? "extract-mcqs-from-file" 
-          : "parse-answer-key";
-        
-        const { error: parseError } = await supabase.functions.invoke(functionName, {
-          body: { answerKeyId: answerKey.id },
+      const { error: dbError } = await supabase
+        .from("lecture_materials")
+        .insert({
+          instructor_id: user.id,
+          org_id: orgId,
+          course_id: selectedCourseId,
+          file_name: selectedFile.name,
+          file_path: filePath,
+          file_type: selectedFile.type,
+          file_size: selectedFile.size,
+          title: title.trim(),
+          description: description.trim() || null,
         });
 
-        if (parseError) {
-          console.error("Parse error (non-blocking):", parseError);
-          const actionText = answerKeyType === "mcqs" 
-            ? "MCQs will appear in Answer Keys manager when ready."
-            : "Problems will appear in Answer Keys manager when ready.";
-          toast.info(`AI parsing started. ${actionText}`);
-        }
-
-        // Also add to lecture_materials for reference
-        await supabase
-          .from("lecture_materials")
-          .insert({
-            instructor_id: user.id,
-            org_id: orgId,
-            course_id: selectedCourseId,
-            file_name: selectedFile.name,
-            file_path: filePath,
-            file_type: selectedFile.type,
-            file_size: selectedFile.size,
-            title: title.trim(),
-            description: `[Answer Key] ${description.trim() || answerKeySubject}`,
-          });
-
-        return { isAnswerKey: true, answerKeyId: answerKey.id, contentType: answerKeyType };
-      } else {
-        // Regular material upload
-        const { error: dbError } = await supabase
-          .from("lecture_materials")
-          .insert({
-            instructor_id: user.id,
-            org_id: orgId,
-            course_id: selectedCourseId,
-            file_name: selectedFile.name,
-            file_path: filePath,
-            file_type: selectedFile.type,
-            file_size: selectedFile.size,
-            title: title.trim(),
-            description: description.trim() || null,
-          });
-
-        if (dbError) throw dbError;
-        return { isAnswerKey: false };
-      }
+      if (dbError) throw dbError;
     },
-    onSuccess: (result) => {
-      if (result?.isAnswerKey) {
-        const successText = result.contentType === "mcqs"
-          ? "Answer key uploaded! MCQs are being extracted for live matching."
-          : "Answer key uploaded! Problems are being parsed for live matching.";
-        toast.success(successText);
-      } else {
-        toast.success("Material uploaded successfully!");
-      }
+    onSuccess: () => {
+      toast.success("Material uploaded successfully!");
       setTitle("");
       setDescription("");
       setSelectedFile(null);
-      setParseAsAnswerKey(false);
-      setAnswerKeySubject("");
-      setAnswerKeyType("problem-solutions");
-      setIsParsing(false);
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
-      queryClient.invalidateQueries({ queryKey: ["answer-keys"] });
-      queryClient.invalidateQueries({ queryKey: ["verified-problems-count"] });
     },
     onError: (error: any) => {
-      setIsParsing(false);
       toast.error(error.message || "Failed to upload material");
     },
   });
@@ -369,89 +248,15 @@ export function LectureMaterialsUpload() {
             </p>
           </div>
 
-          {/* Parse as Answer Key option */}
-          <div className="p-3 border rounded-lg bg-muted/30 space-y-3">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="parse-answer-key"
-                checked={parseAsAnswerKey}
-                onCheckedChange={(checked) => setParseAsAnswerKey(checked === true)}
-              />
-              <Label htmlFor="parse-answer-key" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                <BookOpen className="h-4 w-4 text-primary" />
-                Parse as Answer Key
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground ml-6">
-              Enable this for quizzes, tests, or problem sets. The file will be processed for live lecture matching.
-            </p>
-
-            {parseAsAnswerKey && (
-              <div className="ml-6 space-y-4">
-                {/* Content Type Selection */}
-                <div>
-                  <Label className="text-xs font-medium mb-2 block">Content Type *</Label>
-                  <RadioGroup 
-                    value={answerKeyType} 
-                    onValueChange={(v) => setAnswerKeyType(v as "problem-solutions" | "mcqs")}
-                    className="grid grid-cols-1 gap-2"
-                  >
-                    <div className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
-                      <RadioGroupItem value="mcqs" id="mcqs" className="mt-1" />
-                      <Label htmlFor="mcqs" className="cursor-pointer flex-1">
-                        <div className="flex items-center gap-2">
-                          <ListChecks className="h-4 w-4 text-primary" />
-                          <span className="font-medium">Ready-Made Quiz Questions</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          File already contains MCQs with answer choices. They'll be extracted directly.
-                        </p>
-                      </Label>
-                    </div>
-                    <div className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
-                      <RadioGroupItem value="problem-solutions" id="problem-solutions" className="mt-1" />
-                      <Label htmlFor="problem-solutions" className="cursor-pointer flex-1">
-                        <div className="flex items-center gap-2">
-                          <Calculator className="h-4 w-4 text-primary" />
-                          <span className="font-medium">Problems with Solutions</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          File contains worked problems. They'll be parsed, then you can generate MCQs.
-                        </p>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {/* Subject Selection */}
-                <div>
-                  <Label htmlFor="answer-key-subject" className="text-xs">Subject *</Label>
-                  <Select value={answerKeySubject} onValueChange={setAnswerKeySubject}>
-                    <SelectTrigger className="mt-1 h-8 text-sm">
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SUBJECTS.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
-
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || !title.trim() || uploading || isParsing || isDeleting || (parseAsAnswerKey && !answerKeySubject)}
+            disabled={!selectedFile || !title.trim() || uploading || isDeleting}
             className="w-full"
           >
-            {uploading || isParsing ? (
+            {uploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {isParsing ? "Parsing..." : "Uploading..."}
+                Uploading...
               </>
             ) : isDeleting ? (
               <>
@@ -461,7 +266,7 @@ export function LectureMaterialsUpload() {
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                {parseAsAnswerKey ? "Upload & Parse Answer Key" : "Upload Material"}
+                Upload Material
               </>
             )}
           </Button>

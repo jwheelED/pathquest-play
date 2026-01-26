@@ -17,7 +17,6 @@ import { LectureTranscription } from "@/components/instructor/LectureTranscripti
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
-import { AnswerKeyManager } from "@/components/instructor/answer-keys/AnswerKeyManager";
 // InstructorConnectionCard removed - organization connection not needed unless for institutional licensing
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
@@ -547,9 +546,6 @@ export default function InstructorDashboard() {
               <LectureMaterialsUpload />
             </div>
             
-            <div className="min-w-0">
-              <AnswerKeyManager />
-            </div>
             
             {professorType === "research" && (
               <Card className="headspace-card h-fit">
