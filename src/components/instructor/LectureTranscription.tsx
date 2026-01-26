@@ -1403,6 +1403,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
       }
 
+      // Refresh auth token before edge function call to prevent 401 errors
+      console.log("🔑 Refreshing auth token before auto-question generation");
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error("❌ Auth refresh failed:", refreshError);
+        toast({
+          title: "⚠️ Session expired",
+          description: "Please refresh the page to continue",
+          variant: "destructive",
+        });
+        return false;
+      }
+
       // Fetch instructor's format preference before generating
       console.log("🔍 Fetching user authentication...");
       const {
@@ -2510,6 +2523,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setLectureSummaryData(null);
 
       try {
+        // Refresh auth token before lecture summary generation
+        console.log("🔑 Refreshing auth token before lecture summary generation");
+        const { error: summaryRefreshError } = await supabase.auth.refreshSession();
+        if (summaryRefreshError) {
+          console.warn("⚠️ Auth refresh before summary failed:", summaryRefreshError.message);
+          // Continue anyway - the edge function call might still work
+        }
+
         // Fetch today's check-in results for this instructor
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Not authenticated");
