@@ -489,9 +489,7 @@ export default function InstructorDashboard() {
               </Card>
             </div>
 
-            <div className="min-w-0">
-              <LectureTranscription onQuestionGenerated={() => {}} />
-            </div>
+            {/* LectureTranscription is now rendered outside tabs to persist recording */}
             
             <div className="min-w-0">
               <LectureCheckInResults />
@@ -619,6 +617,11 @@ export default function InstructorDashboard() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
+          {/* Always mount LectureTranscription to persist recording across tabs */}
+          <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
+            <LectureTranscription onQuestionGenerated={() => {}} />
+          </div>
+          
           {renderTabContent()}
         </main>
       </div>
