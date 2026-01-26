@@ -53,6 +53,56 @@ export interface UseLectureRecordingOptions {
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
 }
 
+// Direct voice command detection - checks raw text without relying on state
+const detectVoiceCommandDirect = (
+  text: string, 
+  lastDetectedRef: React.MutableRefObject<string>, 
+  lastTimeRef: React.MutableRefObject<number>, 
+  cooldownMs: number = 15000
+): 'send_question' | 'send_slide_question' | null => {
+  if (!text || text.length < 5) return null;
+  
+  const normalizedText = text.toLowerCase().trim();
+  const now = Date.now();
+  
+  // Cooldown check
+  if (now - lastTimeRef.current < cooldownMs) return null;
+  
+  // Skip if same command phrase detected recently
+  if (lastDetectedRef.current && normalizedText.includes(lastDetectedRef.current)) return null;
+  
+  // Check for slide commands FIRST (more specific)
+  const slidePatterns = [
+    /send\s+(this\s+)?slide(\s+question)?(\s+now)?/i,
+    /send\s+slide\s+question/i,
+    /slide\s+question(\s+now)?/i,
+  ];
+  
+  for (const pattern of slidePatterns) {
+    if (pattern.test(normalizedText)) {
+      lastTimeRef.current = now;
+      lastDetectedRef.current = normalizedText.substring(0, 30);
+      return 'send_slide_question';
+    }
+  }
+  
+  // Check for question commands
+  const questionPatterns = [
+    /send\s+(the\s+|a\s+|this\s+)?question(\s+now)?/i,
+    /question\s+now/i,
+  ];
+  
+  for (const pattern of questionPatterns) {
+    if (pattern.test(normalizedText)) {
+      lastTimeRef.current = now;
+      lastDetectedRef.current = normalizedText.substring(0, 30);
+      return 'send_question';
+    }
+  }
+  
+  return null;
+};
+
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted } = options;
   const { toast } = useToast();
@@ -133,6 +183,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   
   // Deepgram streaming refs for real-time transcription
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
+  
+  // Direct voice command detection refs (independent of state-based detection)
+  const directVoiceLastDetectedRef = useRef<string>('');
+  const directVoiceLastTimeRef = useRef<number>(0);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
 
   // Keep refs updated when state changes (avoids stale closures in timer callbacks)
@@ -646,6 +700,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       isGeneratingAutoQuestionRef.current = false;
       resetVoiceCommandCooldown();
       
+      // Reset direct voice command detection refs
+      directVoiceLastDetectedRef.current = '';
+      directVoiceLastTimeRef.current = 0;
+      
       // Stop and cleanup timer
       if (reliableTimerRef.current) {
         reliableTimerRef.current.stop();
@@ -822,6 +880,23 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           }
           
           console.log('📝 Deepgram final transcript:', cleanText);
+          
+          // DIRECT voice command detection - check immediately on each transcript
+          if (onVoiceCommand) {
+            const command = detectVoiceCommandDirect(
+              cleanText,
+              directVoiceLastDetectedRef,
+              directVoiceLastTimeRef,
+              15000 // 15s cooldown
+            );
+            
+            if (command) {
+              console.log(`🎤 Direct voice command detected: ${command}`);
+              setVoiceCommandDetected(true);
+              setTimeout(() => setVoiceCommandDetected(false), 2000);
+              onVoiceCommand(command);
+            }
+          }
           
           // Append to rolling buffers
           transcriptBufferRef.current += ' ' + cleanText;
