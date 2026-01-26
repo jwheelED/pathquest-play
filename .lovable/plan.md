@@ -1,166 +1,147 @@
 
-# Fix Voice Commands in Slide Presenter
+# Persist Recording Across Instructor Dashboard Tabs
 
-## Problem Summary
-Voice commands ("send question" and "send slide question") in the Slide Presenter are not working reliably because the voice command detection depends on `transcriptChunks` state, which is only updated every 5 transcript chunks and is replaced rather than appended to.
+## Problem
+When an instructor starts recording in the "Live Lecture" tab and navigates to another tab (Overview, Materials, etc.), the recording stops because the `LectureTranscription` component unmounts.
 
 ## Root Cause
+In `InstructorDashboard.tsx`, the tab content is rendered using a switch statement in `renderTabContent()`. When `activeTab !== "live"`, the `LectureTranscription` component is not rendered, causing it to unmount. React cleanup effects then stop all recording resources (MediaRecorder, Deepgram WebSocket, timers).
 
-In `useLectureRecording.ts` (lines 836-843), the Deepgram streaming callback:
+## Solution: Always Mount LectureTranscription
+
+The simplest and most reliable solution is to **always render** the `LectureTranscription` component, but only **show it** when on the Live Lecture tab. This keeps all recording state alive while the instructor navigates between tabs.
+
+### Implementation
+
+**File: `src/pages/InstructorDashboard.tsx`**
+
+#### Change 1: Extract LectureTranscription from tab switch (around line 461-499)
+
+Move `LectureTranscription` outside of `renderTabContent()` so it's always mounted:
+
 ```typescript
-if (transcriptChunkCountRef.current % 5 === 0) {
-  const recentText = intervalTranscriptRef.current.slice(-2000);
-  setTranscriptChunks([recentText]); // REPLACED, not appended
-}
+// Before the return statement, add a flag for visibility
+const isLiveTabActive = activeTab === "live";
 ```
 
-This causes two issues:
-1. Voice commands spoken between state updates are never detected
-2. The `useVoiceCommandDetection` hook's index tracking breaks when the array is replaced
+#### Change 2: Render LectureTranscription outside tabs with conditional visibility
 
-Meanwhile, `LectureTranscription.tsx` (used in regular Live Lecture Capture) appends each chunk immediately and has its own inline voice command detection that runs on every transcript.
-
-## Solution
-
-Add **direct streaming voice command detection** in `useLectureRecording.ts` that checks each incoming transcript immediately, bypassing the batched state updates.
-
-## Technical Implementation
-
-### File: `src/hooks/useLectureRecording.ts`
-
-**Change 1: Add direct voice command detection helper (new function around line 56)**
+In the main JSX, render `LectureTranscription` unconditionally but with visibility control:
 
 ```typescript
-// Direct voice command detection - checks raw text without relying on state
-const detectVoiceCommandDirect = (text: string, lastDetectedRef: React.MutableRefObject<string>, lastTimeRef: React.MutableRefObject<number>, cooldownMs: number = 15000): 'send_question' | 'send_slide_question' | null => {
-  if (!text || text.length < 5) return null;
-  
-  const normalizedText = text.toLowerCase().trim();
-  const now = Date.now();
-  
-  // Cooldown check
-  if (now - lastTimeRef.current < cooldownMs) return null;
-  
-  // Skip if same command phrase detected recently
-  if (lastDetectedRef.current && normalizedText.includes(lastDetectedRef.current)) return null;
-  
-  // Check for slide commands FIRST (more specific)
-  const slidePatterns = [
-    /send\s+(this\s+)?slide(\s+question)?(\s+now)?/i,
-    /send\s+slide\s+question/i,
-    /slide\s+question(\s+now)?/i,
-  ];
-  
-  for (const pattern of slidePatterns) {
-    if (pattern.test(normalizedText)) {
-      lastTimeRef.current = now;
-      lastDetectedRef.current = normalizedText.substring(0, 30);
-      return 'send_slide_question';
-    }
-  }
-  
-  // Check for question commands
-  const questionPatterns = [
-    /send\s+(the\s+|a\s+|this\s+)?question(\s+now)?/i,
-    /question\s+now/i,
-  ];
-  
-  for (const pattern of questionPatterns) {
-    if (pattern.test(normalizedText)) {
-      lastTimeRef.current = now;
-      lastDetectedRef.current = normalizedText.substring(0, 30);
-      return 'send_question';
-    }
-  }
-  
-  return null;
-};
+{/* Always mount LectureTranscription to persist recording across tabs */}
+<div className={cn("min-w-0", !isLiveTabActive && "hidden")}>
+  <LectureTranscription onQuestionGenerated={() => {}} />
+</div>
 ```
 
-**Change 2: Add refs for direct detection tracking (around line 130)**
+#### Change 3: Update renderTabContent for "live" tab
+
+Remove `LectureTranscription` from inside the `case "live":` block since it's now rendered separately:
 
 ```typescript
-// Direct voice command detection refs (independent of state-based detection)
-const directVoiceLastDetectedRef = useRef<string>('');
-const directVoiceLastTimeRef = useRef<number>(0);
-```
+case "live":
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {currentUser && (
+          <div className="min-w-0">
+            <LiveSessionControls onSessionChange={setLiveSessionId} />
+          </div>
+        )}
 
-**Change 3: Update onTranscript callback to detect commands directly (around line 815-845)**
+        <Card className="headspace-card border-primary/20 ...">
+          {/* Slide Presenter card - unchanged */}
+        </Card>
+      </div>
 
-In the `startDeepgramStreaming` callback, after sanitizing the transcript, add direct voice command detection:
-
-```typescript
-onTranscript: (data: DeepgramTranscript) => {
-  if (data.isFinal && data.text.trim()) {
-    const cleanText = sanitizeTranscript(data.text);
-    if (!cleanText) {
-      console.log('🚫 Skipping hallucinated transcript');
-      return;
-    }
-    
-    console.log('📝 Deepgram final transcript:', cleanText);
-    
-    // DIRECT voice command detection - check immediately on each transcript
-    if (onVoiceCommand) {
-      const command = detectVoiceCommandDirect(
-        cleanText,
-        directVoiceLastDetectedRef,
-        directVoiceLastTimeRef,
-        15000 // 15s cooldown
-      );
+      {/* LectureTranscription removed - now rendered outside tabs */}
       
-      if (command) {
-        console.log(`🎤 Direct voice command detected: ${command}`);
-        setVoiceCommandDetected(true);
-        setTimeout(() => setVoiceCommandDetected(false), 2000);
-        onVoiceCommand(command);
-      }
-    }
-    
-    // ... rest of existing code for buffer updates
-  }
-}
+      <div className="min-w-0">
+        <LectureCheckInResults />
+      </div>
+    </div>
+  );
 ```
 
-**Change 4: Reset direct detection refs when recording stops (around line 647)**
+### Visual Layout
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│  InstructorDashboard                                         │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  Tab Bar: [Overview] [Live Lecture] [Recorded] [...]   │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  LectureTranscription (always mounted)                 │  │
+│  │  - Visible when activeTab === "live"                   │  │
+│  │  - Hidden but RUNNING when on other tabs               │  │
+│  └────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  renderTabContent() - other tab content                │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### User Experience Improvements
+
+**Add Recording Indicator Badge**
+
+Show a visual indicator in the tab bar when recording is active but user is on a different tab:
 
 ```typescript
-// Reset state when recording stops
-useEffect(() => {
-  if (!isRecording) {
-    setNextAutoQuestionIn(0);
-    intervalTranscriptRef.current = '';
-    isGeneratingAutoQuestionRef.current = false;
-    resetVoiceCommandCooldown();
-    
-    // Reset direct voice command detection refs
-    directVoiceLastDetectedRef.current = '';
-    directVoiceLastTimeRef.current = 0;
-    
-    // Stop and cleanup timer
-    if (reliableTimerRef.current) {
-      reliableTimerRef.current.stop();
-    }
-  }
-}, [isRecording, resetVoiceCommandCooldown]);
+// In navItems rendering, add badge for live tab when recording
+{navItems.map(({ value, label, icon: Icon }) => (
+  <button
+    key={value}
+    onClick={() => setActiveTab(value)}
+    className={cn(...)}
+  >
+    <Icon className="w-4 h-4" />
+    {label}
+    {value === "live" && isRecordingActive && activeTab !== "live" && (
+      <Badge variant="destructive" className="ml-1 animate-pulse">
+        REC
+      </Badge>
+    )}
+  </button>
+))}
 ```
 
-## Summary of Changes
+This requires lifting `isRecording` state from `LectureTranscription` to the dashboard level, OR using a ref/callback to communicate recording status.
 
-| File | Changes |
-|------|---------|
-| `src/hooks/useLectureRecording.ts` | Add direct voice command detection in Deepgram streaming callback, bypassing batched state updates |
+## Technical Details
 
-## How It Works After Fix
+### Why CSS `hidden` Works
+- Using `hidden` (Tailwind's `display: none`) preserves the component in the React tree
+- All refs, state, and effects remain active
+- MediaRecorder continues capturing audio
+- Deepgram WebSocket stays connected
+- Timers (auto-question countdown) keep running
+- Student count updates continue via Realtime
 
-1. **Every Deepgram transcript** is checked immediately for voice commands
-2. **"send slide question"** or **"send slide"** triggers `handleSendSlideQuestionRef.current('mcq')` → Opens preview dialog for slide OCR question
-3. **"send question"** or **"send question now"** triggers `handleManualQuestionSendRef.current()` → Extracts question from transcript and opens preview dialog
-4. **15-second cooldown** prevents double-triggers from the same command phrase remaining in buffer
+### Alternative Considered: Lift State with useLectureRecording
+This would involve using the `useLectureRecording` hook directly in `InstructorDashboard` and passing all necessary props/callbacks to `LectureTranscription`. While more architecturally "clean," it requires:
+- Significant refactoring of `LectureTranscription` to accept recording state as props
+- Moving ~50 state variables and refs up to the dashboard
+- Breaking the current encapsulation of recording logic
+
+The "always mount with hidden" approach achieves the same result with minimal code changes.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/pages/InstructorDashboard.tsx` | Move `LectureTranscription` outside tab switch, control visibility with `hidden` class |
 
 ## Expected Behavior After Fix
 
-- Instructor says "send slide question" → Slide OCR extraction starts immediately
-- Instructor says "send question now" → Transcript-based question extraction starts immediately  
-- Both commands work identically to how they work in regular Live Lecture Capture
-- Visual feedback (emerald glow, mic icon) shows when command is detected
+1. Instructor goes to Live Lecture tab and starts recording
+2. Recording indicator shows, Deepgram streaming begins
+3. Instructor clicks "Overview" tab to check class code
+4. **Recording continues in background** (previously stopped)
+5. Tab bar shows "REC" badge on Live Lecture tab (optional enhancement)
+6. Instructor returns to Live Lecture tab - recording still active, transcript preserved
+7. Auto-question timers, voice commands, and student counts all continue working seamlessly
