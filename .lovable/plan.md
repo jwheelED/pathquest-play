@@ -1,147 +1,105 @@
 
-# Persist Recording Across Instructor Dashboard Tabs
+# Fix: Slide Presenter Edge Function 401 Authentication Errors
 
-## Problem
-When an instructor starts recording in the "Live Lecture" tab and navigates to another tab (Overview, Materials, etc.), the recording stops because the `LectureTranscription` component unmounts.
+## Problem Summary
+The Slide Presenter is failing to send both regular questions and slide OCR questions. All three critical edge functions are returning **401 Unauthorized** errors:
+- `extract-slide-question`
+- `send-slide-question` 
+- `format-and-send-question`
 
 ## Root Cause
-In `InstructorDashboard.tsx`, the tab content is rendered using a switch statement in `renderTabContent()`. When `activeTab !== "live"`, the `LectureTranscription` component is not rendered, causing it to unmount. React cleanup effects then stop all recording resources (MediaRecorder, Deepgram WebSocket, timers).
+The `SlidePresenter.tsx` component **does not refresh the Supabase authentication session** before invoking edge functions. When an instructor uses the Slide Presenter for an extended period, their JWT token expires, causing all subsequent edge function calls to fail with 401 errors.
 
-## Solution: Always Mount LectureTranscription
+In contrast, `LectureTranscription.tsx` and `useLectureRecording.ts` both call `supabase.auth.refreshSession()`:
+- Before sending questions
+- Proactively every 5 minutes during recording
 
-The simplest and most reliable solution is to **always render** the `LectureTranscription` component, but only **show it** when on the Live Lecture tab. This keeps all recording state alive while the instructor navigates between tabs.
+The Slide Presenter is missing these critical session refresh calls.
 
-### Implementation
+## Solution
+Add `supabase.auth.refreshSession()` calls before all edge function invocations in SlidePresenter.tsx.
 
-**File: `src/pages/InstructorDashboard.tsx`**
+## Technical Implementation
 
-#### Change 1: Extract LectureTranscription from tab switch (around line 461-499)
+### File: `src/pages/SlidePresenter.tsx`
 
-Move `LectureTranscription` outside of `renderTabContent()` so it's always mounted:
+**Change 1: Refresh session before extracting slide question (around line 171-175)**
 
-```typescript
-// Before the return statement, add a flag for visibility
-const isLiveTabActive = activeTab === "live";
-```
-
-#### Change 2: Render LectureTranscription outside tabs with conditional visibility
-
-In the main JSX, render `LectureTranscription` unconditionally but with visibility control:
+Add session refresh before calling `extract-slide-question`:
 
 ```typescript
-{/* Always mount LectureTranscription to persist recording across tabs */}
-<div className={cn("min-w-0", !isLiveTabActive && "hidden")}>
-  <LectureTranscription onQuestionGenerated={() => {}} />
-</div>
+try {
+  console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}${selection ? ' (region selected)' : ''}`);
+  
+  // Refresh auth token before edge function call
+  console.log('🔑 Refreshing auth token before slide extraction');
+  await supabase.auth.refreshSession();
+  
+  // Fetch instructor's difficulty preference
+  const { data: { user } } = await supabase.auth.getUser();
+  // ... rest of function
 ```
 
-#### Change 3: Update renderTabContent for "live" tab
+**Change 2: Refresh session before sending slide question (around line 259-264)**
 
-Remove `LectureTranscription` from inside the `case "live":` block since it's now rendered separately:
+Add session refresh before calling `send-slide-question`:
 
 ```typescript
-case "live":
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {currentUser && (
-          <div className="min-w-0">
-            <LiveSessionControls onSessionChange={setLiveSessionId} />
-          </div>
-        )}
-
-        <Card className="headspace-card border-primary/20 ...">
-          {/* Slide Presenter card - unchanged */}
-        </Card>
-      </div>
-
-      {/* LectureTranscription removed - now rendered outside tabs */}
-      
-      <div className="min-w-0">
-        <LectureCheckInResults />
-      </div>
-    </div>
-  );
+const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData) => {
+  setIsSendingFromPreview(true);
+  
+  try {
+    // Refresh auth token before sending question
+    console.log('🔑 Refreshing auth token before sending slide question');
+    await supabase.auth.refreshSession();
+    
+    // Send the edited question to students via dedicated edge function
+    const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
+      // ... rest of function
 ```
 
-### Visual Layout
+**Change 3: Add proactive token refresh during recording (add new useEffect)**
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│  InstructorDashboard                                         │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │  Tab Bar: [Overview] [Live Lecture] [Recorded] [...]   │  │
-│  └────────────────────────────────────────────────────────┘  │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │  LectureTranscription (always mounted)                 │  │
-│  │  - Visible when activeTab === "live"                   │  │
-│  │  - Hidden but RUNNING when on other tabs               │  │
-│  └────────────────────────────────────────────────────────┘  │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │  renderTabContent() - other tab content                │  │
-│  └────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### User Experience Improvements
-
-**Add Recording Indicator Badge**
-
-Show a visual indicator in the tab bar when recording is active but user is on a different tab:
+Add a periodic token refresh effect that runs while the instructor is recording:
 
 ```typescript
-// In navItems rendering, add badge for live tab when recording
-{navItems.map(({ value, label, icon: Icon }) => (
-  <button
-    key={value}
-    onClick={() => setActiveTab(value)}
-    className={cn(...)}
-  >
-    <Icon className="w-4 h-4" />
-    {label}
-    {value === "live" && isRecordingActive && activeTab !== "live" && (
-      <Badge variant="destructive" className="ml-1 animate-pulse">
-        REC
-      </Badge>
-    )}
-  </button>
-))}
+// Token refresh for extended slide presenter sessions
+useEffect(() => {
+  if (!isRecording) return;
+
+  // Refresh every 5 minutes during recording
+  const refreshTimer = setInterval(async () => {
+    console.log('🔑 Proactive auth token refresh (Slide Presenter)');
+    const { error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.warn('⚠️ Proactive auth refresh failed:', error.message);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+
+  return () => clearInterval(refreshTimer);
+}, [isRecording]);
 ```
 
-This requires lifting `isRecording` state from `LectureTranscription` to the dashboard level, OR using a ref/callback to communicate recording status.
+## Summary of Changes
 
-## Technical Details
+| Location | Change |
+|----------|--------|
+| `handleSendSlideQuestion` (~line 171) | Add `await supabase.auth.refreshSession()` before `extract-slide-question` call |
+| `handleConfirmSendQuestion` (~line 262) | Add `await supabase.auth.refreshSession()` before `send-slide-question` call |
+| New `useEffect` (~after line 320) | Add proactive 5-minute token refresh during recording |
 
-### Why CSS `hidden` Works
-- Using `hidden` (Tailwind's `display: none`) preserves the component in the React tree
-- All refs, state, and effects remain active
-- MediaRecorder continues capturing audio
-- Deepgram WebSocket stays connected
-- Timers (auto-question countdown) keep running
-- Student count updates continue via Realtime
+## Expected Behavior After Fix
 
-### Alternative Considered: Lift State with useLectureRecording
-This would involve using the `useLectureRecording` hook directly in `InstructorDashboard` and passing all necessary props/callbacks to `LectureTranscription`. While more architecturally "clean," it requires:
-- Significant refactoring of `LectureTranscription` to accept recording state as props
-- Moving ~50 state variables and refs up to the dashboard
-- Breaking the current encapsulation of recording logic
-
-The "always mount with hidden" approach achieves the same result with minimal code changes.
+1. Before every edge function call, the auth token is refreshed
+2. During extended recording sessions, tokens are refreshed proactively every 5 minutes
+3. Edge functions will receive valid authorization headers
+4. 401 errors will no longer occur
+5. Slide OCR question extraction will work
+6. Sending slide questions to students will work
+7. Voice command "send question" will continue working (already fixed via useLectureRecording hook)
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/InstructorDashboard.tsx` | Move `LectureTranscription` outside tab switch, control visibility with `hidden` class |
-
-## Expected Behavior After Fix
-
-1. Instructor goes to Live Lecture tab and starts recording
-2. Recording indicator shows, Deepgram streaming begins
-3. Instructor clicks "Overview" tab to check class code
-4. **Recording continues in background** (previously stopped)
-5. Tab bar shows "REC" badge on Live Lecture tab (optional enhancement)
-6. Instructor returns to Live Lecture tab - recording still active, transcript preserved
-7. Auto-question timers, voice commands, and student counts all continue working seamlessly
+| `src/pages/SlidePresenter.tsx` | Add session refresh calls before edge function invocations and add proactive refresh useEffect |
