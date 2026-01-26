@@ -171,6 +171,10 @@ export default function SlidePresenter() {
     try {
       console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}${selection ? ' (region selected)' : ''}`);
       
+      // Refresh auth token before edge function call
+      console.log('🔑 Refreshing auth token before slide extraction');
+      await supabase.auth.refreshSession();
+      
       // Fetch instructor's difficulty preference
       const { data: { user } } = await supabase.auth.getUser();
       let difficultyPref = 'easy';
@@ -260,6 +264,10 @@ export default function SlidePresenter() {
     setIsSendingFromPreview(true);
     
     try {
+      // Refresh auth token before sending question
+      console.log('🔑 Refreshing auth token before sending slide question');
+      await supabase.auth.refreshSession();
+      
       // Send the edited question to students via dedicated edge function
       const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
         body: {
@@ -317,6 +325,22 @@ export default function SlidePresenter() {
   useEffect(() => {
     handleSendSlideQuestionRef.current = handleSendSlideQuestion;
   }, [handleSendSlideQuestion]);
+
+  // Proactive token refresh for extended slide presenter sessions
+  useEffect(() => {
+    if (!isRecording) return;
+
+    // Refresh every 5 minutes during recording
+    const refreshTimer = setInterval(async () => {
+      console.log('🔑 Proactive auth token refresh (Slide Presenter)');
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.warn('⚠️ Proactive auth refresh failed:', error.message);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(refreshTimer);
+  }, [isRecording]);
 
   useEffect(() => {
     const checkAuth = async () => {
