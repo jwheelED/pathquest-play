@@ -145,9 +145,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
   const [quotaCircuitBreakerCountdown, setQuotaCircuitBreakerCountdown] = useState<number>(0);
 
-  // Answer Key MCQ integration
-  const [useAnswerKeyMcqs, setUseAnswerKeyMcqs] = useState(false);
-  const [verifiedProblemsCount, setVerifiedProblemsCount] = useState<number | null>(null);
   const [errorHistory, setErrorHistory] = useState<ErrorRecord[]>([]);
 
   // Extraction error dialog
@@ -377,25 +374,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setDailyQuestionCount(count);
         }
 
-        // Fetch verified answer key problems count (only verified ones)
-        const { data: answerKeys } = await supabase
-          .from("instructor_answer_keys")
-          .select("id")
-          .eq("instructor_id", user.id)
-          .eq("status", "parsed");
-
-        if (answerKeys && answerKeys.length > 0) {
-          const answerKeyIds = answerKeys.map(ak => ak.id);
-          const { count: problemsCount } = await supabase
-            .from("answer_key_problems")
-            .select("id", { count: "exact", head: true })
-            .in("answer_key_id", answerKeyIds)
-            .eq("verified_by_instructor", true);
-          
-          setVerifiedProblemsCount(problemsCount ?? 0);
-        } else {
-          setVerifiedProblemsCount(0);
-        }
       } catch (error) {
         console.error("Error fetching counts:", error);
       }
@@ -1161,7 +1139,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             confidence: detectionData.confidence,
             expected_answer: detectionData.expected_answer || "", // Pass expected answer for short answer grading
             source: detectionData.source || "manual_button",
-            use_answer_key: useAnswerKeyMcqs,
+            use_answer_key: false,
             // Pass pre-generated MCQ options if available (from preview dialog)
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
@@ -3364,47 +3342,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </div>
                   
-                  {/* Answer Key MCQ toggle */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
-                    <Checkbox
-                      id="answer-key-toggle"
-                      checked={useAnswerKeyMcqs}
-                      onCheckedChange={(checked) => {
-                        setUseAnswerKeyMcqs(checked === true);
-                        if (checked) {
-                          if (verifiedProblemsCount === 0) {
-                            sonnerToast.warning("No answer key problems found. Upload a quiz with 'Parse as Answer Key' enabled first.", {
-                              duration: 5000,
-                            });
-                          } else {
-                            sonnerToast.success(`Using ${verifiedProblemsCount} verified answer key problems for matching`);
-                          }
-                        }
-                      }}
-                    />
-                    <Label 
-                      htmlFor="answer-key-toggle" 
-                      className="text-xs font-medium cursor-pointer whitespace-nowrap flex items-center gap-1"
-                    >
-                      <BookOpen className="h-3 w-3" />
-                      Answer Keys
-                      {verifiedProblemsCount !== null && verifiedProblemsCount > 0 && (
-                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
-                          {verifiedProblemsCount}
-                        </span>
-                      )}
-                    </Label>
-                  </div>
-                  
-                  {/* Answer Keys warning when enabled but no problems */}
-                  {useAnswerKeyMcqs && verifiedProblemsCount === 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-md">
-                      <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                      <span className="text-xs text-amber-700 dark:text-amber-300">
-                        No problems found. Upload materials with "Parse as Answer Key" enabled.
-                      </span>
-                    </div>
-                  )}
                   
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">
