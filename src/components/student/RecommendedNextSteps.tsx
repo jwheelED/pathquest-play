@@ -58,7 +58,7 @@ export function RecommendedNextSteps({
           .from("live_sessions")
           .select("id, session_code")
           .in("instructor_id", instructorIds)
-          .eq("status", "active")
+          .eq("is_active", true)
           .limit(1);
 
         if (liveSessions && liveSessions.length > 0) {
@@ -148,10 +148,12 @@ export function RecommendedNextSteps({
     today.setHours(0, 0, 0, 0);
     
     const { count } = await supabase
-      .from("live_session_responses")
+      .from("student_assignments")
       .select("id", { count: "exact", head: true })
       .eq("student_id", userId)
-      .gte("submitted_at", today.toISOString());
+      .eq("assignment_type", "lecture_checkin")
+      .eq("completed", true)
+      .gte("created_at", today.toISOString());
 
     setCompletedToday(count || 0);
     setRecommendations(recs.sort((a, b) => {

@@ -60,7 +60,7 @@ export function SimpleClassList({ userId, onClassesLoaded }: SimpleClassListProp
         .from("live_sessions")
         .select("instructor_id")
         .in("instructor_id", instructorIds)
-        .eq("status", "active");
+        .eq("is_active", true);
 
       const liveInstructors = new Set(liveSessions?.map(s => s.instructor_id) || []);
 
