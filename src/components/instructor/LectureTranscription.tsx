@@ -703,6 +703,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("📝 Extracting question from transcript:", recentTranscript.length, "chars");
       console.log("🔍 Last 200 chars:", recentTranscript.slice(-200));
 
+      // Refresh auth session before edge function call to prevent 401 errors
+      console.log("🔑 Refreshing auth before voice command extraction...");
+      await supabase.auth.refreshSession();
+
       const { data, error } = await supabase.functions.invoke("extract-voice-command-question", {
         body: { recentTranscript },
       });
