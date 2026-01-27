@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.health-check]
 verify_jwt = false
+
+[functions.generate-mcq-options]
+verify_jwt = false
+
+[functions.generate-expected-answer]
+verify_jwt = false
