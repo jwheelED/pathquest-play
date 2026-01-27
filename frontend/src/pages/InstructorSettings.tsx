@@ -11,6 +11,7 @@ import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSe
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
+import { EdgeFunctionDiagnostic } from "@/components/instructor/EdgeFunctionDiagnostic";
 
 export default function InstructorSettings() {
   const navigate = useNavigate();
