@@ -1,135 +1,98 @@
 
-# Diagnosis: Laptop-Specific Edge Function Failures
+# Fix: Add Missing CORS Header to All Edge Functions
 
-## Root Cause Found: **Ad Blocker (uBlock Origin) Blocking Supabase Requests**
+## Root Cause Confirmed
 
-Based on your answers, the issue is clear:
-- **Different browser** on laptop (likely with extensions)
-- **Same network** as other devices
-- **Ad blocker installed** on the laptop browser
-
-### Why Ad Blockers Block Supabase
-
-Ad blockers like uBlock Origin maintain filter lists that can accidentally block:
-- Requests to `*.supabase.co` domains (seen as "tracking" or "analytics")
-- Third-party API requests from any domain
-- Requests containing certain patterns in URLs (like `/functions/v1/`)
-
-When blocked, the browser shows "Failed to fetch" with **no HTTP status code** - exactly what your logs show.
-
----
-
-## Evidence Summary
-
-| Factor | Your Situation | Conclusion |
-|--------|----------------|------------|
-| Edge functions tested via server | ✅ All return 200 OK | Server is healthy |
-| Same network, different devices | ✅ Phone/PC work | Not a network/firewall issue |
-| Different browser on laptop | ✅ Confirmed | Browser-specific issue |
-| Ad blocker on laptop | ✅ Confirmed | **Most likely cause** |
-| Request shows "Failed to fetch" | ✅ No status code | Request blocked before sending |
-
----
-
-## Fix Options
-
-### Option 1: Whitelist Supabase in Your Ad Blocker (Recommended)
-
-**For uBlock Origin:**
-1. Click the uBlock icon in the toolbar
-2. Click the power button to disable it for this site, OR
-3. Open settings → My Filters → Add these rules:
-   ```
-   @@||supabase.co^$domain=lovableproject.com
-   @@||supabase.co^$domain=edvana.dev
-   @@||supabase.co^$domain=lovable.app
-   ```
-
-**For AdBlock/AdBlock Plus:**
-1. Click the extension icon
-2. Select "Don't run on pages on this site"
-3. Or add `supabase.co` to your allowlist
-
-### Option 2: Use a Different Browser Profile
-
-Create a new browser profile without extensions for development/testing.
-
-### Option 3: Disable Ad Blocker Temporarily
-
-Turn off the ad blocker while using Edvana, then re-enable when done.
-
----
-
-## Secondary Issue: Missing `auto-release-answers` Edge Function
-
-The network logs show repeated calls to an edge function that doesn't exist:
+Your DevTools screenshot shows the **exact problem**:
 
 ```
-POST https://otsmjgrhyteyvpufkwdh.supabase.co/functions/v1/auto-release-answers
-Error: Failed to fetch
+Disallowed Request Header: x-supabase-client-platform
 ```
 
-This is called in `AnswerReleaseCard.tsx` lines 100 and 429 but the function was never created. While this doesn't cause your main issue (the ad blocker does), it should be fixed to prevent unnecessary errors.
+The Supabase JavaScript client automatically sends a header called `x-supabase-client-platform` with every request. However, all 10 edge functions have CORS headers that do NOT allow this header, causing the browser to block the preflight request.
 
-### Proposed Code Fix
+This is why:
+- It works on iOS (different browser/Supabase client behavior)
+- It works on PC (possibly different browser version)
+- It fails on laptop (stricter browser CORS enforcement)
 
-Remove the edge function health check and replace with database-based status check.
+---
 
-**File: `src/components/instructor/AnswerReleaseCard.tsx`**
+## The Fix
 
-Change the `checkCronHealth` function to not call the non-existent function:
+Update the `corsHeaders` in ALL edge functions to include `x-supabase-client-platform`:
 
+**Current (broken):**
 ```typescript
-// REMOVE these lines (98-105):
-const checkCronHealth = async () => {
-  try {
-    const { data, error } = await supabase.functions.invoke('auto-release-answers');
-    setCronHealthy(!error && data?.success === true);
-  } catch {
-    setCronHealthy(false);
-  }
-};
-
-// REPLACE with:
-const checkCronHealth = async () => {
-  // Auto-release is handled by database RPC, not edge function
-  // Check if RPC exists by calling it with empty array
-  try {
-    const { error } = await supabase.rpc('auto_release_expired_answers');
-    setCronHealthy(!error);
-  } catch {
-    setCronHealthy(false);
-  }
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 ```
 
-Also update line 429 to remove the edge function call.
+**Fixed:**
+```typescript
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+};
+```
 
 ---
 
-## Not the Cause (Ruled Out)
+## Files to Update
 
-| Suspected Cause | Why It's Not the Issue |
-|-----------------|------------------------|
-| CloudConvert pricing | Only used for PPTX→PDF, not general edge functions |
-| GitHub branches | You're testing the same deployed version on all devices |
-| Supabase maintenance | Server tests return 200 OK |
-| Expired tokens | Auth logs show successful requests |
-| Service Worker cache | Would affect all browsers on same device |
-| PWA offline mode | Network requests are reaching the browser |
-
----
-
-## Action Items
-
-1. **Immediate**: Whitelist `*.supabase.co` in your laptop's ad blocker
-2. **Code Fix**: Remove/replace the `auto-release-answers` edge function calls in `AnswerReleaseCard.tsx`
-3. **Verification**: After whitelisting, hard refresh (Ctrl+Shift+R) and test again
+| # | File | Line to Change |
+|---|------|----------------|
+| 1 | `supabase/functions/extract-voice-command-question/index.ts` | Line 6 |
+| 2 | `supabase/functions/format-and-send-question/index.ts` | Line 7 |
+| 3 | `supabase/functions/extract-slide-question/index.ts` | Line 7 |
+| 4 | `supabase/functions/send-slide-question/index.ts` | Line 6 |
+| 5 | `supabase/functions/health-check/index.ts` | Line 5 |
+| 6 | `supabase/functions/generate-interval-question/index.ts` | Line 5 |
+| 7 | `supabase/functions/auto-grade-coding/index.ts` | Line 7 |
+| 8 | `supabase/functions/auto-grade-short-answer/index.ts` | Line 7 |
+| 9 | `supabase/functions/convert-pptx-to-pdf/index.ts` | Line 6 |
+| 10 | `supabase/functions/generate-live-lecture-summary/index.ts` | Line 5 |
 
 ---
 
-## Files to Modify
+## Technical Explanation
 
-| File | Change |
-|------|--------|
-| `src/components/instructor/AnswerReleaseCard.tsx` | Replace edge function calls with RPC call to fix the secondary missing function error |
+### Why This Happens
+
+1. The Supabase JS client (v2.58.0) automatically adds `x-supabase-client-platform` to identify the client platform
+2. When a browser sees a custom header, it sends a CORS preflight (OPTIONS request)
+3. The server must respond with `Access-Control-Allow-Headers` listing ALL headers the client will send
+4. If ANY header is missing from the allowed list, the browser blocks the actual request
+5. Different browsers enforce this differently (Chrome laptop may be stricter than Safari iOS)
+
+### Why It Worked Before
+
+- The Supabase client may have been updated to add this header recently
+- Different browsers have different CORS enforcement levels
+- iOS Safari and some Chrome versions may be more lenient
+
+---
+
+## Changes Summary
+
+All 10 edge functions will have their `corsHeaders` updated from:
+```typescript
+"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+```
+
+To:
+```typescript
+"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform"
+```
+
+This is a one-line change in each file that adds the missing header to the allowed list.
+
+---
+
+## After Implementation
+
+1. All edge functions will be automatically redeployed
+2. Hard refresh your laptop browser (Ctrl+Shift+R)
+3. The CORS error will be resolved and requests will succeed
