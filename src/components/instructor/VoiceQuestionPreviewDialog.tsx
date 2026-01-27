@@ -373,9 +373,6 @@ export function VoiceQuestionPreviewDialog({
                 </div>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              💡 Tip: Use $...$ for inline math (e.g., $x^2$) and $$...$$ for display equations
-            </p>
           </div>
 
           {/* Expected Answer (only shown for short answer) */}
