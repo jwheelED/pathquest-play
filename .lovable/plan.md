@@ -1,98 +1,143 @@
 
-# Fix: Add Missing CORS Header to All Edge Functions
+# Fix Lecture Summary Generation
 
-## Root Cause Confirmed
+## Problem Analysis
 
-Your DevTools screenshot shows the **exact problem**:
+The lecture summary feature has two main issues:
 
+### Issue 1: Data Structure Mismatch
+
+The Edge Function returns:
+```text
+{
+  overallScore: 20,           // 0-100 scale
+  topicsIdentified: [...],
+  keyConceptsCovered: [...],
+  engagementAnalysis: "...",
+  teachingSuggestions: [...],
+  conceptsToReview: [...],
+  lectureHighlights: [...]
+}
 ```
-Disallowed Request Header: x-supabase-client-platform
+
+But `LectureSummarySheet.tsx` expects:
+```text
+{
+  overallScore: number,
+  summary: string,
+  transcriptInsights: {
+    avgPaceWPM: number,
+    topicsCovered: string[],
+    ...
+  },
+  studentInsights: {
+    overallAccuracy: number,
+    strugglingQuestions: [...],
+    commonMisconceptions: [...],
+    ...
+  },
+  recommendations: [...],
+  reteachingSuggestions: [...]
+}
 ```
 
-The Supabase JavaScript client automatically sends a header called `x-supabase-client-platform` with every request. However, all 10 edge functions have CORS headers that do NOT allow this header, causing the browser to block the preflight request.
+When the component tries to access `summaryData.transcriptInsights.avgPaceWPM`, it crashes because `transcriptInsights` is undefined.
 
-This is why:
-- It works on iOS (different browser/Supabase client behavior)
-- It works on PC (possibly different browser version)
-- It fails on laptop (stricter browser CORS enforcement)
+### Issue 2: User Wants Rating Removed
+
+The "Overall Performance" card with the score display (e.g., "7/10 - Great") should be removed entirely.
 
 ---
 
-## The Fix
+## Solution
 
-Update the `corsHeaders` in ALL edge functions to include `x-supabase-client-platform`:
+### Part 1: Update `LectureSummaryData` Interface
 
-**Current (broken):**
+Align the TypeScript interface with what the Edge Function actually returns.
+
+**File: `src/components/instructor/LectureSummarySheet.tsx`**
+
+Replace the current interface (lines 32-50) with:
+
 ```typescript
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+export interface LectureSummaryData {
+  topicsIdentified: string[];
+  keyConceptsCovered: string[];
+  engagementAnalysis: string;
+  teachingSuggestions: string[];
+  conceptsToReview: string[];
+  lectureHighlights: string[];
+  durationMinutes?: number;
+  questionsAsked?: number;
+  checkInResults?: {
+    total: number;
+    correct: number;
+    accuracy: number;
+  };
+}
 ```
 
-**Fixed:**
-```typescript
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
-};
-```
+Note: `overallScore` and `summary` are intentionally removed.
+
+### Part 2: Update Component UI
+
+Remove the "Overall Performance" card and update other cards to use the correct data properties.
+
+**Changes to make:**
+
+| Section | Current Code | New Code |
+|---------|--------------|----------|
+| Overall Score Card | Lines 147-171 | **Remove entirely** |
+| Topics Covered | `summaryData.transcriptInsights.topicsCovered` | `summaryData.topicsIdentified` |
+| Speaking Pace Card | `summaryData.transcriptInsights.avgPaceWPM` | **Remove** (not returned by API) |
+| Student Performance | `summaryData.studentInsights.overallAccuracy` | `summaryData.checkInResults?.accuracy` |
+| Struggling Questions | `summaryData.studentInsights.strugglingQuestions` | **Remove** (not returned by API) |
+| Common Misconceptions | `summaryData.studentInsights.commonMisconceptions` | **Remove** (not returned by API) |
+| Recommendations | `summaryData.recommendations` | `summaryData.teachingSuggestions` |
+| Re-teaching Suggestions | `summaryData.reteachingSuggestions` | `summaryData.conceptsToReview` (as simple strings) |
+
+### Part 3: Simplified Component Structure
+
+The new UI will display:
+
+1. **Header Stats** - Duration, Questions Asked, Students (unchanged)
+2. **Student Check-In Performance** - Shows accuracy from `checkInResults`
+3. **Topics Covered** - From `topicsIdentified`
+4. **Key Concepts** - From `keyConceptsCovered`
+5. **Lecture Highlights** - From `lectureHighlights`
+6. **Engagement Analysis** - From `engagementAnalysis`
+7. **Teaching Suggestions** - From `teachingSuggestions`
+8. **Concepts to Review** - From `conceptsToReview`
+
+### Part 4: Remove Unused Helper Functions
+
+Delete these functions that are no longer needed:
+- `getScoreColor()` (lines 63-67)
+- `getScoreLabel()` (lines 69-76)
+- `getPaceStatus()` (lines 78-83)
 
 ---
 
-## Files to Update
+## Files to Modify
 
-| # | File | Line to Change |
-|---|------|----------------|
-| 1 | `supabase/functions/extract-voice-command-question/index.ts` | Line 6 |
-| 2 | `supabase/functions/format-and-send-question/index.ts` | Line 7 |
-| 3 | `supabase/functions/extract-slide-question/index.ts` | Line 7 |
-| 4 | `supabase/functions/send-slide-question/index.ts` | Line 6 |
-| 5 | `supabase/functions/health-check/index.ts` | Line 5 |
-| 6 | `supabase/functions/generate-interval-question/index.ts` | Line 5 |
-| 7 | `supabase/functions/auto-grade-coding/index.ts` | Line 7 |
-| 8 | `supabase/functions/auto-grade-short-answer/index.ts` | Line 7 |
-| 9 | `supabase/functions/convert-pptx-to-pdf/index.ts` | Line 6 |
-| 10 | `supabase/functions/generate-live-lecture-summary/index.ts` | Line 5 |
+| File | Changes |
+|------|---------|
+| `src/components/instructor/LectureSummarySheet.tsx` | Update interface, remove rating card, fix data property access |
 
 ---
 
-## Technical Explanation
+## Technical Notes
 
-### Why This Happens
-
-1. The Supabase JS client (v2.58.0) automatically adds `x-supabase-client-platform` to identify the client platform
-2. When a browser sees a custom header, it sends a CORS preflight (OPTIONS request)
-3. The server must respond with `Access-Control-Allow-Headers` listing ALL headers the client will send
-4. If ANY header is missing from the allowed list, the browser blocks the actual request
-5. Different browsers enforce this differently (Chrome laptop may be stricter than Safari iOS)
-
-### Why It Worked Before
-
-- The Supabase client may have been updated to add this header recently
-- Different browsers have different CORS enforcement levels
-- iOS Safari and some Chrome versions may be more lenient
-
----
-
-## Changes Summary
-
-All 10 edge functions will have their `corsHeaders` updated from:
-```typescript
-"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
-```
-
-To:
-```typescript
-"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform"
-```
-
-This is a one-line change in each file that adds the missing header to the allowed list.
+- The Edge Function itself is working correctly (tested, returns 200 OK)
+- No changes needed to the Edge Function
+- No changes needed to `LectureTranscription.tsx` (already correctly passes the data)
+- CORS headers were already fixed in the previous update
 
 ---
 
 ## After Implementation
 
-1. All edge functions will be automatically redeployed
-2. Hard refresh your laptop browser (Ctrl+Shift+R)
-3. The CORS error will be resolved and requests will succeed
+The lecture summary sheet will:
+1. Display correctly without crashing
+2. Show all available insights from the AI analysis
+3. Not show any "rating" or "score" for the lecture
