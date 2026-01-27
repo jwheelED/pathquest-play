@@ -260,7 +260,7 @@ export default function SlidePresenter() {
   }, [currentSlideNumber]);
 
   // Handle confirming and sending the question from preview dialog
-  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData) => {
+  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData, isPollMode: boolean) => {
     setIsSendingFromPreview(true);
     
     try {
@@ -274,6 +274,7 @@ export default function SlidePresenter() {
           questionType: previewQuestionType,
           extractedQuestion: editedData,
           slideNumber: currentSlideNumber,
+          isPollMode,
         },
       });
 
@@ -288,7 +289,8 @@ export default function SlidePresenter() {
         return;
       }
 
-      toast.success(`${previewQuestionType.toUpperCase()} question sent to students!`);
+      const modeLabel = isPollMode ? 'Poll' : previewQuestionType.toUpperCase();
+      toast.success(`${modeLabel} sent to students!`);
       setIsPreviewOpen(false);
       setPreviewExtractedData(null);
       
