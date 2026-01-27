@@ -1,449 +1,236 @@
 
+# Poll Mode & Live MCQ Bar Chart for Slide Presenter
 
-# Fix: Create Missing `generate-interval-question` Edge Function
+## Overview
 
-## Problem Summary
-Auto-questions are being skipped with "failed to send a request to edge function" errors because the **`generate-interval-question` edge function does not exist**. The frontend code (`LectureTranscription.tsx` and `useLectureRecording.ts`) calls this function at lines 1494 and 456 respectively, but there is no corresponding function in `supabase/functions/`.
+This plan adds two new features to the Slide Presenter:
 
-Additionally, `generate-live-lecture-summary` is also missing, causing lecture summaries to fail.
+1. **Poll Mode**: Send questions without grading - just collect student responses like a poll
+2. **Live MCQ Bar Chart**: Display a real-time bar chart showing answer distribution as students respond
 
-## Root Cause
-The `supabase/functions/` directory contains these functions:
-- `auto-grade-coding/`
-- `auto-grade-short-answer/`
-- `convert-pptx-to-pdf/`
-- `extract-slide-question/`
-- `extract-voice-command-question/`
-- `format-and-send-question/`
-- `send-slide-question/`
+---
 
-**Missing functions:**
-1. **`generate-interval-question/`** - Called by auto-question timer to generate questions from transcript
-2. **`generate-live-lecture-summary/`** - Called after long recordings to generate teaching summaries
+## Feature 1: Poll Mode
 
-The `supabase/config.toml` also doesn't include these functions, confirming they were never created.
+### Concept
+When sending a question, the instructor can toggle "Poll Mode" which:
+- Removes grading (no correct answer needed)
+- Collects all responses without marking them right/wrong
+- Shows only response distribution, not correctness metrics
 
-## Solution
+### Changes Required
 
-Create both missing edge functions following the existing patterns in the codebase:
+#### 1.1 Update `SlideQuestionPreviewDialog.tsx`
+Add a "Poll Mode" toggle switch to the preview dialog:
+- When enabled, hide the "correct answer" selection for MCQs
+- Hide "expected answer" for short answers
+- Add visual indicator that this is a poll (no grades)
 
-### 1. Create `generate-interval-question` Edge Function
+#### 1.2 Update `SlidePresenter.tsx`
+Pass `isPollMode` flag to the send-slide-question edge function
 
-This function will:
-- Accept transcript content and interval settings
-- Use AI to generate an appropriate question based on the lecture content
-- Support format preferences (MCQ, short answer, coding)
-- Handle fallback questions when AI fails
-- Return structured question data for delivery
+#### 1.3 Update `send-slide-question` Edge Function
+- Accept new `isPollMode` boolean parameter
+- When true, set `mode: 'poll'` on the assignment instead of `auto_grade` or `manual_grade`
+- Store questions without `correctAnswer` field (or mark them as polls)
 
-### 2. Create `generate-live-lecture-summary` Edge Function
+#### 1.4 Update `useLecturePresenterData.ts`
+- Detect poll-type questions and skip correctness calculations
+- Return poll-specific stats (just response counts, no correct/incorrect)
 
-This function will:
-- Accept transcript chunks and check-in results
-- Generate a teaching summary with engagement metrics
-- Return structured summary data
+---
 
-## Technical Implementation
+## Feature 2: Live MCQ Bar Chart in Overlay
 
-### File 1: `supabase/functions/generate-interval-question/index.ts`
+### Concept
+Replace the current stats display with a live-updating horizontal bar chart showing:
+- Option A: ████████ 12 (40%)
+- Option B: ██████████████ 15 (50%) 
+- Option C: ██ 2 (7%)
+- Option D: █ 1 (3%)
+
+Updates in real-time as each student submits their answer.
+
+### Changes Required
+
+#### 2.1 Update `useLecturePresenterData.ts`
+Add a new function to calculate MCQ option distribution:
 
 ```typescript
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-// Fallback questions for when AI fails
-const FALLBACK_QUESTIONS = [
-  { question_text: "What was the main concept just discussed?", suggested_type: "short_answer" },
-  { question_text: "Can you summarize the key point from the last few minutes?", suggested_type: "short_answer" },
-  { question_text: "What is the most important takeaway from what was just covered?", suggested_type: "short_answer" },
-];
-
-const LONG_INTERVAL_FALLBACK_QUESTIONS = [
-  { question_text: "What was the most important concept covered in the last section of the lecture?", suggested_type: "short_answer" },
-  { question_text: "Summarize the main learning objective from the past segment.", suggested_type: "short_answer" },
-];
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const {
-      interval_transcript,
-      interval_minutes,
-      format_preference = "multiple_choice",
-      coding_question_style = "simple",
-      force_send = false,
-      strict_mode = false,
-      materialContext = [],
-      slide_context = null,
-      course_context = null,
-    } = await req.json();
-
-    console.log("📝 Generating interval question");
-    console.log("  Transcript length:", interval_transcript?.length || 0);
-    console.log("  Interval minutes:", interval_minutes);
-    console.log("  Format preference:", format_preference);
-
-    // Validate transcript
-    if (!interval_transcript || interval_transcript.length < 50) {
-      if (!force_send) {
-        return new Response(JSON.stringify({
-          success: false,
-          error: "Not enough content to generate a question",
-          error_type: "insufficient_content",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Trim transcript for AI processing (max 8000 chars)
-    const trimmedTranscript = interval_transcript.slice(-8000);
-
-    // Build context for AI
-    let additionalContext = "";
-    if (materialContext && materialContext.length > 0) {
-      additionalContext += "\n\nCourse Materials Context:\n";
-      for (const material of materialContext.slice(0, 2)) {
-        additionalContext += `- ${material.title}: ${material.content?.slice(0, 500) || ""}\n`;
-      }
-    }
-    if (slide_context) {
-      additionalContext += `\n\nCurrent Slide: ${slide_context}\n`;
-    }
-
-    // Long interval guidance
-    const longIntervalGuidance = interval_minutes >= 20
-      ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
-      : "";
-
-    // Build prompt based on format preference
-    let formatInstructions = "";
-    if (format_preference === "coding") {
-      formatInstructions = coding_question_style === "simple"
-        ? `Generate a simple coding fill-in-the-blank question with ONE missing line.`
-        : `Generate a complete coding problem with starter code and test cases.`;
-    } else if (format_preference === "short_answer") {
-      formatInstructions = `Generate an open-ended short answer question that tests understanding.`;
-    } else {
-      formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
-    }
-
-    const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from lecture transcripts.
-${longIntervalGuidance}
-
-${formatInstructions}
-
-Return JSON in this exact format:
-{
-  "question_text": "the question (use LaTeX $...$ for math)",
-  "suggested_type": "${format_preference}",
-  "confidence": 0.0-1.0,
-  "reasoning": "why this question tests the key concept"
+interface MCQDistribution {
+  option: string;
+  count: number;
+  percentage: number;
+  isCorrect?: boolean; // undefined for polls
 }
 
-For multiple_choice, also include:
-- "options": ["A. ...", "B. ...", "C. ...", "D. ..."]
-- "correct_answer": "A" | "B" | "C" | "D"
-- "explanation": "why the correct answer is right"
-
-For coding questions:
-- "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }`;
-
-    const userPrompt = `Generate a question from this lecture content:
-
-"""
-${trimmedTranscript}
-"""
-${additionalContext}
-
-Generate ONE focused question that tests understanding of the most important concept just taught.`;
-
-    // Call AI
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        console.error("AI API error:", response.status);
-        // Use fallback
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-        
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: 0.5,
-          is_fallback: true,
-          reasoning: "AI service unavailable, using fallback question",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const aiResponse = await response.json();
-      let content = aiResponse.choices[0].message.content;
-
-      // Parse JSON response
-      content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-      const parsed = JSON.parse(content);
-
-      console.log("✅ Question generated:", parsed.question_text?.substring?.(0, 100) || parsed.question_text?.title);
-
-      return new Response(JSON.stringify({
-        success: true,
-        question_text: parsed.question_text,
-        suggested_type: parsed.suggested_type || format_preference,
-        confidence: parsed.confidence || 0.8,
-        options: parsed.options,
-        correct_answer: parsed.correct_answer,
-        explanation: parsed.explanation,
-        reasoning: parsed.reasoning,
-        is_fallback: false,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-
-    } catch (aiError: any) {
-      clearTimeout(timeoutId);
-      console.error("AI error:", aiError);
-
-      // Use fallback on any AI error
-      const fallback = interval_minutes >= 20
-        ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-        : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-      return new Response(JSON.stringify({
-        success: true,
-        ...fallback,
-        confidence: 0.5,
-        is_fallback: true,
-        reasoning: `AI error: ${aiError.message}, using fallback`,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-  } catch (error: any) {
-    console.error("Edge function error:", error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || "Unknown error",
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-});
+const calculateMCQDistribution = (
+  assignments: Assignment[], 
+  question: any,
+  questionIndex: number
+): MCQDistribution[] => {
+  // Count how many students chose each option (A, B, C, D)
+  const distribution = ['A', 'B', 'C', 'D'].map(letter => {
+    const count = assignments.filter(a => 
+      a.completed && 
+      a.quiz_responses?.[questionIndex.toString()] === letter
+    ).length;
+    
+    const total = assignments.filter(a => a.completed).length;
+    
+    return {
+      option: letter,
+      count,
+      percentage: total > 0 ? (count / total) * 100 : 0,
+      isCorrect: question.isPoll ? undefined : letter === question.correctAnswer
+    };
+  });
+  
+  return distribution;
+};
 ```
 
-### File 2: `supabase/functions/generate-live-lecture-summary/index.ts`
+#### 2.2 Create New `MCQDistributionChart.tsx` Component
+A compact, real-time updating bar chart designed for the overlay:
 
 ```typescript
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+interface MCQDistributionChartProps {
+  distribution: MCQDistribution[];
+  isPoll: boolean;
+  totalResponses: number;
+}
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const {
-      transcript_chunks,
-      recording_duration_seconds,
-      check_in_results = [],
-      questions_asked = 0,
-      course_type = "general",
-    } = await req.json();
-
-    const durationMinutes = Math.round(recording_duration_seconds / 60);
-    const fullTranscript = transcript_chunks.join(" ").slice(-15000);
-    
-    // Calculate engagement metrics
-    const totalCheckIns = check_in_results.length;
-    const correctAnswers = check_in_results.filter((c: any) => c.is_correct).length;
-    const engagementRate = totalCheckIns > 0 ? (correctAnswers / totalCheckIns * 100).toFixed(0) : 0;
-
-    const prompt = `Analyze this ${durationMinutes}-minute lecture and generate a teaching summary.
-
-Transcript (last portion):
-"""
-${fullTranscript}
-"""
-
-Check-in Results: ${totalCheckIns} responses, ${correctAnswers} correct (${engagementRate}% accuracy)
-Questions Asked: ${questions_asked}
-
-Generate a JSON summary with:
-{
-  "overallScore": 0-100,
-  "topicsIdentified": ["topic1", "topic2", ...],
-  "keyConceptsCovered": ["concept1", "concept2", ...],
-  "engagementAnalysis": "brief analysis of student engagement",
-  "teachingSuggestions": ["suggestion1", "suggestion2"],
-  "conceptsToReview": ["concept that may need more explanation"],
-  "lectureHighlights": ["key moment 1", "key moment 2"]
-}`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are an expert educational analyst. Return only valid JSON." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.5,
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const aiResponse = await response.json();
-    let content = aiResponse.choices[0].message.content;
-    content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    const summary = JSON.parse(content);
-
-    return new Response(JSON.stringify({
-      success: true,
-      summary: {
-        ...summary,
-        durationMinutes,
-        questionsAsked: questions_asked,
-        checkInResults: {
-          total: totalCheckIns,
-          correct: correctAnswers,
-          accuracy: engagementRate,
-        },
-      },
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-
-  } catch (error: any) {
-    console.error("Summary generation error:", error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-});
+// Horizontal bar chart with:
+// - Option labels (A, B, C, D)
+// - Animated bars that grow as responses come in
+// - Count and percentage labels
+// - Green highlight for correct answer (if not poll mode)
 ```
 
-### File 3: Update `supabase/config.toml`
+#### 2.3 Update `SlidePresenterOverlay.tsx`
+Replace the current stats grid with the MCQ bar chart when:
+- There's an active MCQ question
+- The question is a poll OR a graded MCQ
 
-Add the new functions to the config:
-
-```toml
-project_id = "otsmjgrhyteyvpufkwdh"
-
-[functions.auto-grade-coding]
-verify_jwt = false
-
-[functions.auto-grade-short-answer]
-verify_jwt = false
-
-[functions.extract-voice-command-question]
-verify_jwt = false
-
-[functions.format-and-send-question]
-verify_jwt = false
-
-[functions.extract-slide-question]
-verify_jwt = false
-
-[functions.send-slide-question]
-verify_jwt = false
-
-[functions.convert-pptx-to-pdf]
-verify_jwt = false
-
-[functions.generate-interval-question]
-verify_jwt = false
-
-[functions.generate-live-lecture-summary]
-verify_jwt = false
+```typescript
+// New section after "Response Stats"
+{currentQuestion && isMCQ && (
+  <div className="bg-slate-800/50 rounded-lg p-3">
+    <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-2">
+      {isPoll ? '📊 Poll Results' : 'Answer Distribution'}
+    </div>
+    <MCQDistributionChart 
+      distribution={mcqDistribution}
+      isPoll={currentQuestion.isPoll}
+      totalResponses={currentStats.responseCount}
+    />
+  </div>
+)}
 ```
 
-## Summary of Changes
+---
 
-| File | Action |
-|------|--------|
-| `supabase/functions/generate-interval-question/index.ts` | CREATE - New edge function for auto-question generation |
-| `supabase/functions/generate-live-lecture-summary/index.ts` | CREATE - New edge function for lecture summaries |
-| `supabase/config.toml` | UPDATE - Add both new functions with `verify_jwt = false` |
+## Technical Implementation Details
 
-## Expected Behavior After Fix
+### New Files to Create
+| File | Purpose |
+|------|---------|
+| `src/components/instructor/slides/MCQDistributionChart.tsx` | Compact bar chart for overlay |
 
-1. Auto-questions will generate reliably at each interval (1, 2, 3, 5, 10, 15, 20, 30 minutes)
-2. AI will analyze the transcript and generate relevant questions
-3. If AI fails, fallback questions will be used (no more skipped questions)
-4. Lecture summaries will generate after 10+ minute recordings
-5. The "failed to send a request to edge function" error will be eliminated
+### Files to Modify
 
-## Key Reliability Features
+| File | Changes |
+|------|---------|
+| `src/components/instructor/slides/SlideQuestionPreviewDialog.tsx` | Add Poll Mode toggle |
+| `src/components/instructor/slides/SlideRecordingControls.tsx` | Add "Send as Poll" quick option |
+| `src/components/instructor/slides/SlidePresenterOverlay.tsx` | Add MCQ bar chart display |
+| `src/pages/SlidePresenter.tsx` | Pass poll mode flag to edge function |
+| `src/hooks/useLecturePresenterData.ts` | Add MCQ distribution calculation |
+| `supabase/functions/send-slide-question/index.ts` | Handle poll mode assignments |
 
-1. **Fallback Questions**: If AI fails for any reason, pre-defined questions are used
-2. **Timeout Handling**: 30-second timeout with graceful fallback
-3. **Long Interval Support**: Special handling for 20+ minute intervals
-4. **Format Flexibility**: Supports MCQ, short answer, and coding questions
-5. **Math Support**: LaTeX rendering for STEM content
+---
 
+## Database Considerations
+
+### Assignment Mode
+Currently uses enum: `auto_grade | manual_grade`
+
+**Option A (Recommended)**: Reuse `manual_grade` for polls since they aren't graded
+- No database migration needed
+- Add `isPoll: true` flag in the question content JSON
+
+**Option B**: Add new `poll` mode to the enum
+- Requires database migration
+- More explicit but adds complexity
+
+**Recommendation**: Use Option A - store `isPoll: true` in the question content and use `manual_grade` mode
+
+---
+
+## UI/UX Design
+
+### Poll Mode Toggle in Preview Dialog
+```
+┌──────────────────────────────────────────┐
+│  Preview & Edit Question     [MCQ ▼]     │
+├──────────────────────────────────────────┤
+│                                          │
+│  [Toggle] Send as Poll                   │
+│  ℹ️ Collect responses without grading    │
+│                                          │
+│  Question:                               │
+│  [What is the capital of France?      ]  │
+│                                          │
+│  Answer Options:                         │
+│  ○ A: [Paris         ] ← Correct (hidden │
+│  ○ B: [London        ]     if poll mode) │
+│  ○ C: [Berlin        ]                   │
+│  ○ D: [Madrid        ]                   │
+│                                          │
+├──────────────────────────────────────────┤
+│         [Cancel]  [Send to Students]     │
+└──────────────────────────────────────────┘
+```
+
+### MCQ Bar Chart in Overlay
+```
+┌─────────────────────────────┐
+│ 🔴 LIVE          👥 25      │
+├─────────────────────────────┤
+│ 📊 Answer Distribution      │
+│                             │
+│ A ████████████░░░  12 (48%) │
+│ B ████████░░░░░░░   8 (32%) │
+│ C ████░░░░░░░░░░░   4 (16%) │
+│ D █░░░░░░░░░░░░░░   1 (4%)  │
+│                             │
+│ Total: 25/30 responded      │
+└─────────────────────────────┘
+```
+
+The bars animate smoothly as responses come in, creating an engaging live visualization.
+
+---
+
+## Real-Time Updates
+
+The MCQ distribution chart will update in real-time via:
+1. **Supabase Realtime subscription** (already in `useLecturePresenterData.ts`)
+2. **3-second polling fallback** (already implemented)
+
+When a student submits an answer:
+1. `student_assignments.quiz_responses` is updated
+2. Realtime triggers `fetchData()` in the hook
+3. New distribution is calculated
+4. Chart animates to new values
+
+---
+
+## Summary
+
+| Feature | Description |
+|---------|-------------|
+| **Poll Mode** | Toggle to send questions without grading |
+| **MCQ Bar Chart** | Live-updating visualization of student answers |
+| **Real-time Updates** | Leverages existing Realtime subscription |
+| **No Database Migration** | Uses existing schema with content flags |
