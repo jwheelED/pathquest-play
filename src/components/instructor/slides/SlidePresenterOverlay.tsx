@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { usePresenterReceiver } from '@/hooks/useLecturePresenterChannel';
 import { useLecturePresenterData } from '@/hooks/useLecturePresenterData';
-import { Clock, Users, Send, CheckCircle, Timer } from 'lucide-react';
+import { MCQDistributionChart } from './MCQDistributionChart';
+import { Clock, Users, Send, CheckCircle, Timer, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DirectState {
@@ -27,11 +28,21 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(directState?.autoQuestionEnabled || false);
 
   // Fetch real-time question stats
-  const { currentQuestion, studentCount: fetchedStudentCount, calculateQuestionStats } = useLecturePresenterData();
+  const { currentQuestion, studentCount: fetchedStudentCount, calculateQuestionStats, calculateMCQDistribution } = useLecturePresenterData();
   
   // Calculate stats for the first question in current group
   const currentStats = currentQuestion && currentQuestion.questions.length > 0
     ? calculateQuestionStats(currentQuestion.assignments, 0, currentQuestion.questions[0])
+    : null;
+
+  // Check if current question is MCQ for bar chart display
+  const currentQuestionData = currentQuestion?.questions?.[0];
+  const isMCQ = currentQuestionData?.type === 'multiple_choice';
+  const isPoll = currentQuestionData?.isPoll === true;
+  
+  // Calculate MCQ distribution for bar chart
+  const mcqDistribution = isMCQ && currentQuestion 
+    ? calculateMCQDistribution(currentQuestion.assignments, 0, currentQuestionData)
     : null;
 
   // Update from direct props when they change
@@ -211,8 +222,26 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
           </div>
         )}
 
-        {/* Response Stats */}
-        {currentStats && currentStats.responseCount > 0 && (
+        {/* MCQ Live Distribution Chart */}
+        {isMCQ && mcqDistribution && currentStats && currentStats.responseCount > 0 && (
+          <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-[10px] text-slate-400 uppercase tracking-wide">
+                {isPoll ? 'Poll Results' : 'Answer Distribution'}
+              </span>
+            </div>
+            <MCQDistributionChart
+              distribution={mcqDistribution}
+              isPoll={isPoll}
+              totalResponses={currentStats.responseCount}
+              totalStudents={studentCount}
+            />
+          </div>
+        )}
+
+        {/* Response Stats - show for non-MCQ or when no responses yet */}
+        {currentStats && currentStats.responseCount > 0 && !isMCQ && (
           <div className="bg-slate-800/50 rounded-lg p-3">
             <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-2">Last Question Stats</div>
             <div className="grid grid-cols-3 gap-2">
