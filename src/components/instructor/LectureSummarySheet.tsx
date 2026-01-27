@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -6,7 +5,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +12,6 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Award,
-  TrendingUp,
-  TrendingDown,
   Clock,
   Users,
   MessageSquare,
@@ -24,29 +20,25 @@ import {
   BookOpen,
   Lightbulb,
   RefreshCw,
-  Download,
-  X,
   Loader2,
+  Sparkles,
+  Star,
 } from "lucide-react";
 
 export interface LectureSummaryData {
-  overallScore: number;
-  summary: string;
-  transcriptInsights: {
-    avgPaceWPM: number;
-    topicsCovered: string[];
-    complexSections: Array<{ timestamp: string; topic: string }>;
-    coverageGaps?: string[];
+  topicsIdentified: string[];
+  keyConceptsCovered: string[];
+  engagementAnalysis: string;
+  teachingSuggestions: string[];
+  conceptsToReview: string[];
+  lectureHighlights: string[];
+  durationMinutes?: number;
+  questionsAsked?: number;
+  checkInResults?: {
+    total: number;
+    correct: number;
+    accuracy: number;
   };
-  studentInsights: {
-    overallAccuracy: number;
-    totalResponses: number;
-    strugglingQuestions: Array<{ question: string; accuracy: number }>;
-    commonMisconceptions: string[];
-    sentiment?: string;
-  };
-  recommendations: string[];
-  reteachingSuggestions: Array<{ topic: string; reason: string }>;
 }
 
 interface LectureSummarySheetProps {
@@ -59,28 +51,6 @@ interface LectureSummarySheetProps {
   studentCount: number;
   onExport?: () => void;
 }
-
-const getScoreColor = (score: number) => {
-  if (score >= 8) return "text-green-600";
-  if (score >= 6) return "text-yellow-600";
-  return "text-red-600";
-};
-
-const getScoreLabel = (score: number) => {
-  if (score >= 9) return "Excellent";
-  if (score >= 8) return "Great";
-  if (score >= 7) return "Good";
-  if (score >= 6) return "Fair";
-  if (score >= 5) return "Needs Work";
-  return "Challenging";
-};
-
-const getPaceStatus = (wpm: number) => {
-  if (wpm >= 120 && wpm <= 150) return { label: "Ideal", color: "text-green-600" };
-  if (wpm < 100) return { label: "Slow", color: "text-yellow-600" };
-  if (wpm > 170) return { label: "Fast", color: "text-red-600" };
-  return { label: "Acceptable", color: "text-muted-foreground" };
-};
 
 const formatDuration = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -97,8 +67,6 @@ export const LectureSummarySheet = ({
   questionsAsked,
   studentCount,
 }: LectureSummarySheetProps) => {
-  const paceStatus = summaryData ? getPaceStatus(summaryData.transcriptInsights.avgPaceWPM) : null;
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-hidden">
@@ -144,103 +112,38 @@ export const LectureSummarySheet = ({
                 </Card>
               </div>
 
-              {/* Overall Score */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Award className="h-4 w-4" />
-                    Overall Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <div className={`text-4xl font-bold ${getScoreColor(summaryData.overallScore)}`}>
-                      {summaryData.overallScore}/10
+              {/* Student Check-In Performance */}
+              {summaryData.checkInResults && summaryData.checkInResults.total > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Student Check-In Performance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Overall Accuracy</span>
+                      <span className={`font-bold ${
+                        Number(summaryData.checkInResults.accuracy) >= 70 
+                          ? "text-green-600" 
+                          : Number(summaryData.checkInResults.accuracy) >= 50 
+                            ? "text-yellow-600" 
+                            : "text-red-600"
+                      }`}>
+                        {summaryData.checkInResults.accuracy}%
+                      </span>
                     </div>
-                    <div className="flex-1">
-                      <Badge variant="secondary" className="mb-2">
-                        {getScoreLabel(summaryData.overallScore)}
-                      </Badge>
-                      <Progress value={summaryData.overallScore * 10} className="h-2" />
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {summaryData.summary}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Student Performance */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Student Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Overall Accuracy</span>
-                    <span className={`font-bold ${
-                      summaryData.studentInsights.overallAccuracy >= 70 
-                        ? "text-green-600" 
-                        : summaryData.studentInsights.overallAccuracy >= 50 
-                          ? "text-yellow-600" 
-                          : "text-red-600"
-                    }`}>
-                      {summaryData.studentInsights.overallAccuracy}%
-                    </span>
-                  </div>
-                  <Progress value={summaryData.studentInsights.overallAccuracy} className="h-2" />
-                  
-                  {summaryData.studentInsights.strugglingQuestions.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium flex items-center gap-1 mb-2">
-                        <AlertTriangle className="h-3 w-3 text-yellow-600" />
-                        Areas Students Struggled
-                      </p>
-                      <div className="space-y-2">
-                        {summaryData.studentInsights.strugglingQuestions.map((q, i) => (
-                          <div key={i} className="flex items-center justify-between text-sm bg-muted/50 p-2 rounded">
-                            <span className="truncate flex-1">{q.question}...</span>
-                            <Badge variant="outline" className="ml-2 shrink-0">
-                              {q.accuracy}%
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Speaking Pace */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Speaking Pace
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold">
-                      {summaryData.transcriptInsights.avgPaceWPM} WPM
-                    </span>
-                    {paceStatus && (
-                      <Badge variant="secondary" className={paceStatus.color}>
-                        {paceStatus.label}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Ideal range: 120-150 words per minute
-                  </p>
-                </CardContent>
-              </Card>
+                    <Progress value={Number(summaryData.checkInResults.accuracy)} className="h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      {summaryData.checkInResults.correct} of {summaryData.checkInResults.total} responses correct
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Topics Covered */}
-              {summaryData.transcriptInsights.topicsCovered.length > 0 && (
+              {summaryData.topicsIdentified && summaryData.topicsIdentified.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
@@ -250,7 +153,7 @@ export const LectureSummarySheet = ({
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
-                      {summaryData.transcriptInsights.topicsCovered.map((topic, i) => (
+                      {summaryData.topicsIdentified.map((topic, i) => (
                         <Badge key={i} variant="secondary">
                           {topic}
                         </Badge>
@@ -260,21 +163,21 @@ export const LectureSummarySheet = ({
                 </Card>
               )}
 
-              {/* Common Misconceptions */}
-              {summaryData.studentInsights.commonMisconceptions.length > 0 && (
+              {/* Key Concepts */}
+              {summaryData.keyConceptsCovered && summaryData.keyConceptsCovered.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                      Potential Misconceptions
+                      <Sparkles className="h-4 w-4" />
+                      Key Concepts Covered
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {summaryData.studentInsights.commonMisconceptions.map((item, i) => (
+                      {summaryData.keyConceptsCovered.map((concept, i) => (
                         <li key={i} className="text-sm flex items-start gap-2">
-                          <span className="text-yellow-600 mt-0.5">•</span>
-                          {item}
+                          <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                          {concept}
                         </li>
                       ))}
                     </ul>
@@ -282,21 +185,60 @@ export const LectureSummarySheet = ({
                 </Card>
               )}
 
-              {/* Recommendations */}
-              {summaryData.recommendations.length > 0 && (
+              {/* Lecture Highlights */}
+              {summaryData.lectureHighlights && summaryData.lectureHighlights.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Star className="h-4 w-4 text-yellow-500" />
+                      Lecture Highlights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      {summaryData.lectureHighlights.map((highlight, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2">
+                          <span className="text-yellow-500 mt-0.5">•</span>
+                          {highlight}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Engagement Analysis */}
+              {summaryData.engagementAnalysis && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Engagement Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {summaryData.engagementAnalysis}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Teaching Suggestions */}
+              {summaryData.teachingSuggestions && summaryData.teachingSuggestions.length > 0 && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Lightbulb className="h-4 w-4 text-primary" />
-                      Recommendations
+                      Teaching Suggestions
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {summaryData.recommendations.map((rec, i) => (
+                      {summaryData.teachingSuggestions.map((suggestion, i) => (
                         <li key={i} className="text-sm flex items-start gap-2">
                           <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                          {rec}
+                          {suggestion}
                         </li>
                       ))}
                     </ul>
@@ -304,24 +246,24 @@ export const LectureSummarySheet = ({
                 </Card>
               )}
 
-              {/* Re-teaching Suggestions */}
-              {summaryData.reteachingSuggestions.length > 0 && (
+              {/* Concepts to Review */}
+              {summaryData.conceptsToReview && summaryData.conceptsToReview.length > 0 && (
                 <Card className="border-dashed border-primary/50">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <RefreshCw className="h-4 w-4 text-primary" />
-                      Consider Re-teaching
+                      Consider Reviewing
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {summaryData.reteachingSuggestions.map((item, i) => (
-                        <div key={i} className="bg-primary/5 p-3 rounded-lg">
-                          <p className="font-medium text-sm">{item.topic}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{item.reason}</p>
-                        </div>
+                    <ul className="space-y-2">
+                      {summaryData.conceptsToReview.map((concept, i) => (
+                        <li key={i} className="text-sm flex items-start gap-2 bg-primary/5 p-2 rounded-lg">
+                          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+                          {concept}
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </CardContent>
                 </Card>
               )}
