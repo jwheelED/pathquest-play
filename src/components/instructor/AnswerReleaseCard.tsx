@@ -96,9 +96,11 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
 
     // Check cron health on mount and every 5 minutes
     const checkCronHealth = async () => {
+      // Auto-release is handled by database RPC, not edge function
+      // Check if RPC exists by calling it (it returns count of released items)
       try {
-        const { data, error } = await supabase.functions.invoke('auto-release-answers');
-        setCronHealthy(!error && data?.success === true);
+        const { error } = await supabase.rpc('auto_release_expired_answers');
+        setCronHealthy(!error);
       } catch {
         setCronHealthy(false);
       }
@@ -426,8 +428,8 @@ export const AnswerReleaseCard = ({ instructorId }: { instructorId: string }) =>
                             variant="outline"
                             onClick={async () => {
                               toast.info('Triggering auto-release check...');
-                              await supabase.functions.invoke('auto-release-answers');
-                              setTimeout(fetchAssignments, 2000);
+                              await supabase.rpc('auto_release_expired_answers');
+                              setTimeout(fetchAssignments, 1000);
                             }}
                           >
                             Check Now
