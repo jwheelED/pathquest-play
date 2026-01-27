@@ -1,236 +1,122 @@
 
-# Poll Mode & Live MCQ Bar Chart for Slide Presenter
+# Make Poll Mode the Default (No Toggle)
 
 ## Overview
 
-This plan adds two new features to the Slide Presenter:
-
-1. **Poll Mode**: Send questions without grading - just collect student responses like a poll
-2. **Live MCQ Bar Chart**: Display a real-time bar chart showing answer distribution as students respond
+This change removes the Poll Mode toggle and makes poll mode the **default and only behavior** for the Slide Presenter. Instructors will no longer have the option to send graded questions - all questions from Slide Presenter will be polls.
 
 ---
 
-## Feature 1: Poll Mode
+## Changes Required
 
-### Concept
-When sending a question, the instructor can toggle "Poll Mode" which:
-- Removes grading (no correct answer needed)
-- Collects all responses without marking them right/wrong
-- Shows only response distribution, not correctness metrics
+### File 1: `src/components/instructor/slides/SlideQuestionPreviewDialog.tsx`
 
-### Changes Required
+**Changes:**
+1. Remove the `isPollMode` state variable and always treat it as `true`
+2. Remove the Poll Mode toggle UI section entirely
+3. Simplify the MCQ editor to never show the "correct answer" radio buttons
+4. Simplify the Short Answer editor to never show "expected answer" fields
+5. Always pass `isPollMode: true` in `handleConfirm`
 
-#### 1.1 Update `SlideQuestionPreviewDialog.tsx`
-Add a "Poll Mode" toggle switch to the preview dialog:
-- When enabled, hide the "correct answer" selection for MCQs
-- Hide "expected answer" for short answers
-- Add visual indicator that this is a poll (no grades)
-
-#### 1.2 Update `SlidePresenter.tsx`
-Pass `isPollMode` flag to the send-slide-question edge function
-
-#### 1.3 Update `send-slide-question` Edge Function
-- Accept new `isPollMode` boolean parameter
-- When true, set `mode: 'poll'` on the assignment instead of `auto_grade` or `manual_grade`
-- Store questions without `correctAnswer` field (or mark them as polls)
-
-#### 1.4 Update `useLecturePresenterData.ts`
-- Detect poll-type questions and skip correctness calculations
-- Return poll-specific stats (just response counts, no correct/incorrect)
-
----
-
-## Feature 2: Live MCQ Bar Chart in Overlay
-
-### Concept
-Replace the current stats display with a live-updating horizontal bar chart showing:
-- Option A: ████████ 12 (40%)
-- Option B: ██████████████ 15 (50%) 
-- Option C: ██ 2 (7%)
-- Option D: █ 1 (3%)
-
-Updates in real-time as each student submits their answer.
-
-### Changes Required
-
-#### 2.1 Update `useLecturePresenterData.ts`
-Add a new function to calculate MCQ option distribution:
-
+**Before (lines 69-70):**
 ```typescript
-interface MCQDistribution {
-  option: string;
-  count: number;
-  percentage: number;
-  isCorrect?: boolean; // undefined for polls
-}
-
-const calculateMCQDistribution = (
-  assignments: Assignment[], 
-  question: any,
-  questionIndex: number
-): MCQDistribution[] => {
-  // Count how many students chose each option (A, B, C, D)
-  const distribution = ['A', 'B', 'C', 'D'].map(letter => {
-    const count = assignments.filter(a => 
-      a.completed && 
-      a.quiz_responses?.[questionIndex.toString()] === letter
-    ).length;
-    
-    const total = assignments.filter(a => a.completed).length;
-    
-    return {
-      option: letter,
-      count,
-      percentage: total > 0 ? (count / total) * 100 : 0,
-      isCorrect: question.isPoll ? undefined : letter === question.correctAnswer
-    };
-  });
-  
-  return distribution;
-};
+// Poll mode state
+const [isPollMode, setIsPollMode] = useState(false);
 ```
 
-#### 2.2 Create New `MCQDistributionChart.tsx` Component
-A compact, real-time updating bar chart designed for the overlay:
-
+**After:**
 ```typescript
-interface MCQDistributionChartProps {
-  distribution: MCQDistribution[];
-  isPoll: boolean;
-  totalResponses: number;
-}
-
-// Horizontal bar chart with:
-// - Option labels (A, B, C, D)
-// - Animated bars that grow as responses come in
-// - Count and percentage labels
-// - Green highlight for correct answer (if not poll mode)
+// Poll mode is always enabled - no grading for slide presenter
+const isPollMode = true;
 ```
 
-#### 2.3 Update `SlidePresenterOverlay.tsx`
-Replace the current stats grid with the MCQ bar chart when:
-- There's an active MCQ question
-- The question is a poll OR a graded MCQ
+**Remove entire section (lines 194-214):**
+The Poll Mode toggle UI block will be removed completely.
 
-```typescript
-// New section after "Response Stats"
-{currentQuestion && isMCQ && (
-  <div className="bg-slate-800/50 rounded-lg p-3">
-    <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-2">
-      {isPoll ? '📊 Poll Results' : 'Answer Distribution'}
-    </div>
-    <MCQDistributionChart 
-      distribution={mcqDistribution}
-      isPoll={currentQuestion.isPoll}
-      totalResponses={currentStats.responseCount}
-    />
-  </div>
-)}
-```
+**MCQ Editor simplification (lines 232-275):**
+- Remove the conditional `{isPollMode ? (...) : (...)}` 
+- Keep only the poll mode UI (simple inputs without RadioGroup for correct answer)
+
+**Short Answer simplification (lines 312-344):**
+- Remove the conditional `{!isPollMode && (...)}` blocks
+- Always show the poll mode info banner
+
+**handleConfirm simplification (lines 124-156):**
+- Always set `correct_answer: ''` for MCQ
+- Always set `expected_answer: ''` for Short Answer  
+- Always set `isPoll: true` on the data
 
 ---
 
-## Technical Implementation Details
+## Summary of Removals
 
-### New Files to Create
-| File | Purpose |
-|------|---------|
-| `src/components/instructor/slides/MCQDistributionChart.tsx` | Compact bar chart for overlay |
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/instructor/slides/SlideQuestionPreviewDialog.tsx` | Add Poll Mode toggle |
-| `src/components/instructor/slides/SlideRecordingControls.tsx` | Add "Send as Poll" quick option |
-| `src/components/instructor/slides/SlidePresenterOverlay.tsx` | Add MCQ bar chart display |
-| `src/pages/SlidePresenter.tsx` | Pass poll mode flag to edge function |
-| `src/hooks/useLecturePresenterData.ts` | Add MCQ distribution calculation |
-| `supabase/functions/send-slide-question/index.ts` | Handle poll mode assignments |
+| Item | Action |
+|------|--------|
+| `isPollMode` state | Replace with constant `true` |
+| Poll Mode toggle switch | Remove entirely |
+| Correct answer RadioGroup (MCQ) | Remove, keep simple inputs |
+| Expected answer fields (Short Answer) | Remove |
+| Explanation fields | Remove (only used for grading) |
+| "Select the radio button..." helper text | Remove |
 
 ---
 
-## Database Considerations
+## Simplified UI After Changes
 
-### Assignment Mode
-Currently uses enum: `auto_grade | manual_grade`
-
-**Option A (Recommended)**: Reuse `manual_grade` for polls since they aren't graded
-- No database migration needed
-- Add `isPoll: true` flag in the question content JSON
-
-**Option B**: Add new `poll` mode to the enum
-- Requires database migration
-- More explicit but adds complexity
-
-**Recommendation**: Use Option A - store `isPoll: true` in the question content and use `manual_grade` mode
-
----
-
-## UI/UX Design
-
-### Poll Mode Toggle in Preview Dialog
+### MCQ Preview Dialog:
 ```
 ┌──────────────────────────────────────────┐
-│  Preview & Edit Question     [MCQ ▼]     │
+│  Preview & Edit Question     [MCQ]       │
 ├──────────────────────────────────────────┤
 │                                          │
-│  [Toggle] Send as Poll                   │
-│  ℹ️ Collect responses without grading    │
+│  📊 Responses will be collected as poll  │
 │                                          │
 │  Question:                               │
 │  [What is the capital of France?      ]  │
 │                                          │
 │  Answer Options:                         │
-│  ○ A: [Paris         ] ← Correct (hidden │
-│  ○ B: [London        ]     if poll mode) │
-│  ○ C: [Berlin        ]                   │
-│  ○ D: [Madrid        ]                   │
+│  A: [Paris              ]                │
+│  B: [London             ]                │
+│  C: [Berlin             ]                │
+│  D: [Madrid             ]                │
 │                                          │
 ├──────────────────────────────────────────┤
 │         [Cancel]  [Send to Students]     │
 └──────────────────────────────────────────┘
 ```
 
-### MCQ Bar Chart in Overlay
+### Short Answer Preview Dialog:
 ```
-┌─────────────────────────────┐
-│ 🔴 LIVE          👥 25      │
-├─────────────────────────────┤
-│ 📊 Answer Distribution      │
-│                             │
-│ A ████████████░░░  12 (48%) │
-│ B ████████░░░░░░░   8 (32%) │
-│ C ████░░░░░░░░░░░   4 (16%) │
-│ D █░░░░░░░░░░░░░░   1 (4%)  │
-│                             │
-│ Total: 25/30 responded      │
-└─────────────────────────────┘
+┌──────────────────────────────────────────┐
+│  Preview & Edit Question  [Short Answer] │
+├──────────────────────────────────────────┤
+│                                          │
+│  📊 Poll mode: Student responses will    │
+│     be collected without grading.        │
+│                                          │
+│  Question:                               │
+│  [Explain the concept of...           ]  │
+│                                          │
+├──────────────────────────────────────────┤
+│         [Cancel]  [Send to Students]     │
+└──────────────────────────────────────────┘
 ```
-
-The bars animate smoothly as responses come in, creating an engaging live visualization.
 
 ---
 
-## Real-Time Updates
+## Impact
 
-The MCQ distribution chart will update in real-time via:
-1. **Supabase Realtime subscription** (already in `useLecturePresenterData.ts`)
-2. **3-second polling fallback** (already implemented)
-
-When a student submits an answer:
-1. `student_assignments.quiz_responses` is updated
-2. Realtime triggers `fetchData()` in the hook
-3. New distribution is calculated
-4. Chart animates to new values
+- **No database changes needed** - already uses `isPoll: true` flag
+- **Live MCQ Bar Chart continues to work** - unaffected by this change
+- **Edge function unchanged** - still receives `isPollMode: true`
+- **Cleaner UI** - fewer options for instructors to consider
 
 ---
 
-## Summary
+## Files to Modify
 
-| Feature | Description |
-|---------|-------------|
-| **Poll Mode** | Toggle to send questions without grading |
-| **MCQ Bar Chart** | Live-updating visualization of student answers |
-| **Real-time Updates** | Leverages existing Realtime subscription |
-| **No Database Migration** | Uses existing schema with content flags |
+| File | Changes |
+|------|--------|
+| `src/components/instructor/slides/SlideQuestionPreviewDialog.tsx` | Remove toggle, hardcode poll mode |
+
+The `SlidePresenter.tsx` file requires no changes since it already passes `isPollMode` to the edge function from the dialog's callback.
