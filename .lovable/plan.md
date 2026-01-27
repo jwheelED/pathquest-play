@@ -1,132 +1,149 @@
 
 
-# Fix: Compress Slide Images to Prevent "Failed to Fetch" Errors
+# Fix Edge Function Connection Issues
 
-## Problem Identified
+## Root Cause Analysis
 
-The "failed to send a request to the Edge Function" error is **NOT caused by Supabase maintenance**. The root cause is:
+After extensive investigation, I've identified **three separate issues** causing the "failed to send a request to edge function" errors:
 
-1. **Slide images are too large** - The `SlideViewer` component exports full-resolution PNG images using `canvas.toDataURL('image/png')` with no compression
-2. **Base64 encoding inflates size further** - A 2MB image becomes ~2.67MB as base64
-3. **Request body exceeds limits** - Supabase Edge Functions have HTTP body limits, and browsers will fail to send oversized requests
-4. **Network error occurs** - The browser shows "Failed to fetch" before the request even reaches the edge function
+### Issue 1: Missing `health-check` Edge Function
+The `EdgeFunctionHealthCheck.tsx` component calls `supabase.functions.invoke('health-check')`, but **no `health-check` folder exists** in `supabase/functions/`. This will always fail.
 
-Evidence from the logs:
-- The edge function logs show "booted" and "shutdown" but **never show any request processing** - meaning the request never arrived
-- The network request shows `Error: Failed to fetch` status
-- The request body contained an extremely large base64 string (truncated in logs)
+### Issue 2: Edge Functions Are Actually Working
+My direct tests to the edge functions returned successful responses:
+- `extract-voice-command-question` returned status **200** with valid question extraction
+- `extract-slide-question` returned status **401** (expected - requires auth)
 
-## Solution
+This proves the edge functions ARE deployed and reachable.
 
-Modify the `getSlideImage()` function in `SlideViewer.tsx` to:
-1. **Use JPEG format** instead of PNG (typically 5-10x smaller for slides)
-2. **Apply compression** with quality setting (0.7-0.8 provides good balance)
-3. **Resize if necessary** to cap maximum dimensions at 1920px
-
----
-
-## Implementation Details
-
-### File: `src/components/instructor/slides/SlideViewer.tsx`
-
-#### Change 1: Update `getSlideImage()` method (lines 64-86)
-
-**Current code:**
-```typescript
-getSlideImage: (selection?: SelectionRect) => {
-  const canvas = canvasRef.current;
-  if (!canvas) return null;
-  
-  const sel = selection || activeSelection;
-  if (sel && sel.width > 10 && sel.height > 10) {
-    // Create a temp canvas with just the selected region
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = sel.width;
-    tempCanvas.height = sel.height;
-    const ctx = tempCanvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(
-      canvas,
-      sel.x, sel.y, sel.width, sel.height,
-      0, 0, sel.width, sel.height
-    );
-    return tempCanvas.toDataURL('image/png');  // ❌ Large PNG
-  }
-  
-  return canvas.toDataURL('image/png');  // ❌ Large PNG
-},
-```
-
-**Fixed code:**
-```typescript
-getSlideImage: (selection?: SelectionRect) => {
-  const canvas = canvasRef.current;
-  if (!canvas) return null;
-  
-  const sel = selection || activeSelection;
-  let sourceCanvas = canvas;
-  
-  // If there's a selection, crop to that region first
-  if (sel && sel.width > 10 && sel.height > 10) {
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = sel.width;
-    tempCanvas.height = sel.height;
-    const ctx = tempCanvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(
-      canvas,
-      sel.x, sel.y, sel.width, sel.height,
-      0, 0, sel.width, sel.height
-    );
-    sourceCanvas = tempCanvas;
-  }
-  
-  // Resize if too large (max 1920px on longest side)
-  const MAX_DIMENSION = 1920;
-  let finalCanvas = sourceCanvas;
-  
-  if (sourceCanvas.width > MAX_DIMENSION || sourceCanvas.height > MAX_DIMENSION) {
-    const scale = Math.min(
-      MAX_DIMENSION / sourceCanvas.width,
-      MAX_DIMENSION / sourceCanvas.height
-    );
-    const resizedCanvas = document.createElement('canvas');
-    resizedCanvas.width = Math.round(sourceCanvas.width * scale);
-    resizedCanvas.height = Math.round(sourceCanvas.height * scale);
-    const ctx = resizedCanvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(sourceCanvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
-      finalCanvas = resizedCanvas;
-    }
-  }
-  
-  // Export as compressed JPEG (0.75 quality = good balance of size/quality)
-  // This typically reduces file size by 80-90% compared to PNG
-  return finalCanvas.toDataURL('image/jpeg', 0.75);
-},
-```
+### Issue 3: Browser Network Issue (Not Server Issue)
+The network request log shows `Error: Failed to fetch` with no HTTP status code. This means:
+- The request never reached the server
+- Could be a browser cache issue, service worker interference, or stale connection
+- The preview may need to be refreshed after the recent deployments
 
 ---
 
-## Expected Results
+## Proposed Fixes
 
-| Metric | Before (PNG) | After (JPEG 0.75) |
-|--------|-------------|-------------------|
-| Typical slide image size | 5-15 MB | 200-500 KB |
-| Base64 string length | 7-20 million chars | 300-700K chars |
-| Request success rate | Fails for most slides | Works reliably |
-| Image quality | Lossless | Excellent (barely noticeable) |
+### Fix 1: Create Missing `health-check` Edge Function
 
-## Why This Fix Works
+Create a new edge function that verifies all system components are working:
 
-1. **JPEG is much smaller than PNG** for photographic/complex content like slides with gradients, images, and text
-2. **0.75 quality is sufficient** for OCR - the AI can still read text and analyze charts perfectly
-3. **Resizing to 1920px max** ensures even 4K displays don't produce oversized images
-4. **No edge function changes needed** - the function already accepts any image format (it just looks at the data URL prefix)
+**File: `supabase/functions/health-check/index.ts`**
+```typescript
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-## Files to Modify
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-| File | Change |
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const checks = [];
+  
+  // Check 1: LOVABLE_API_KEY configured
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  checks.push({
+    id: "lovable_api",
+    name: "AI API Key",
+    status: lovableKey ? "pass" : "fail",
+    message: lovableKey ? "LOVABLE_API_KEY is configured" : "LOVABLE_API_KEY is missing"
+  });
+
+  // Check 2: Supabase connection
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
+  checks.push({
+    id: "database",
+    name: "Database Connection",
+    status: supabaseUrl && supabaseKey ? "pass" : "fail", 
+    message: supabaseUrl && supabaseKey ? "Supabase configured" : "Supabase credentials missing"
+  });
+
+  // Overall status
+  const failedChecks = checks.filter(c => c.status === "fail");
+  const overall = failedChecks.length === 0 ? "healthy" : 
+                  failedChecks.length < checks.length ? "degraded" : "unhealthy";
+
+  return new Response(
+    JSON.stringify({ overall, checks }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+});
+```
+
+**Update: `supabase/config.toml`** - Add health-check function config:
+```toml
+[functions.health-check]
+verify_jwt = false
+```
+
+### Fix 2: Add Retry Logic with Session Refresh
+
+The `LectureTranscription.tsx` and `useLectureRecording.ts` files should refresh the auth session before calling edge functions (similar to what SlidePresenter already does):
+
+**In `LectureTranscription.tsx` (around line 706)**:
+```typescript
+// Refresh auth session before edge function call
+await supabase.auth.refreshSession();
+
+const { data, error } = await supabase.functions.invoke("extract-voice-command-question", {
+  body: { recentTranscript },
+});
+```
+
+### Fix 3: Add Automatic Retry with Backoff
+
+Wrap edge function calls with retry logic to handle transient network issues:
+
+**Use existing `retryWithBackoff` utility** from `src/lib/retryWithBackoff.ts`:
+```typescript
+import { retryWithBackoff, isTransientError } from "@/lib/retryWithBackoff";
+
+// Wrap edge function call with retry
+const { data, error } = await retryWithBackoff(
+  () => supabase.functions.invoke("extract-voice-command-question", {
+    body: { recentTranscript },
+  }),
+  {
+    maxAttempts: 3,
+    baseDelayMs: 1000,
+    isRetryable: (err) => isTransientError(err),
+    onRetry: (attempt, err) => console.log(`🔄 Retry ${attempt}: ${err.message}`)
+  }
+);
+```
+
+---
+
+## Files to Modify/Create
+
+| File | Action |
 |------|--------|
-| `src/components/instructor/slides/SlideViewer.tsx` | Update `getSlideImage()` to use JPEG compression and optional resizing |
+| `supabase/functions/health-check/index.ts` | **CREATE** - New health check edge function |
+| `supabase/config.toml` | **EDIT** - Add `[functions.health-check]` config |
+| `src/components/instructor/LectureTranscription.tsx` | **EDIT** - Add session refresh before edge function calls |
+| `src/hooks/useLectureRecording.ts` | **EDIT** - Add session refresh and retry logic |
+
+---
+
+## Why This Will Work
+
+1. **Health check endpoint** - Gives a proper diagnostic tool that actually exists
+2. **Session refresh** - Prevents 401 errors from expired tokens during long sessions
+3. **Retry logic** - Handles transient network glitches automatically
+4. **Edge functions confirmed working** - Direct curl tests prove the server-side is fine
+
+---
+
+## Immediate Action: Clear Service Worker Cache
+
+The PWA service worker may be caching failed requests. After implementing these fixes, users should:
+1. Hard refresh the page (Ctrl+Shift+R or Cmd+Shift+R)
+2. Or open browser DevTools > Application > Service Workers > "Unregister"
 
