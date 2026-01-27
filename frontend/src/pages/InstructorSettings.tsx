@@ -86,6 +86,9 @@ export default function InstructorSettings() {
         <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl mx-auto">
           {currentUser && (
             <>
+              <div className="md:col-span-2">
+                <EdgeFunctionDiagnostic />
+              </div>
               <BillingSettings />
               <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
               <QuestionPreviewSettings />
