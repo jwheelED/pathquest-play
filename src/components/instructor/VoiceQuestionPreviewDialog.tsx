@@ -85,8 +85,10 @@ export function VoiceQuestionPreviewDialog({
 
   const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
 
-  // Auto-generate options when switching to MCQ with empty options
+  // Auto-generate options when dialog opens with MCQ type and empty options
   useEffect(() => {
+    if (!open) return; // Only trigger when dialog is open
+    
     const optionsEmpty = !mcqOptions.some(opt => opt.trim() !== '');
     const shouldAutoGenerate = 
       questionType === 'multiple_choice' && 
@@ -95,13 +97,14 @@ export function VoiceQuestionPreviewDialog({
       !isGeneratingOptions;
       
     if (shouldAutoGenerate) {
-      // Trigger the generation
       handleGenerateOptionsAuto();
     }
-  }, [questionType]);
+  }, [questionType, open, questionText]);
 
-  // Auto-generate expected answer when switching to Short Answer with empty expected answer
+  // Auto-generate expected answer when dialog opens with Short Answer type and empty expected answer
   useEffect(() => {
+    if (!open) return; // Only trigger when dialog is open
+    
     const shouldAutoGenerate = 
       questionType === 'short_answer' && 
       expectedAnswer.trim() === '' && 
@@ -111,7 +114,7 @@ export function VoiceQuestionPreviewDialog({
     if (shouldAutoGenerate) {
       handleGenerateExpectedAnswerAuto();
     }
-  }, [questionType]);
+  }, [questionType, open, questionText]);
 
   const handleGenerateExpectedAnswerAuto = async () => {
     if (!questionText.trim() || isGeneratingExpectedAnswer) return;
