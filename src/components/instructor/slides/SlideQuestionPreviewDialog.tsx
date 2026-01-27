@@ -10,9 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Send, X, Code, FileText, ListChecks, BarChart3 } from 'lucide-react';
 
 export type QuestionType = 'mcq' | 'short_answer' | 'coding';
@@ -66,8 +64,8 @@ export function SlideQuestionPreviewDialog({
   onConfirmSend,
   isSending = false,
 }: SlideQuestionPreviewDialogProps) {
-  // Poll mode state
-  const [isPollMode, setIsPollMode] = useState(false);
+  // Poll mode is always enabled - no grading for slide presenter
+  const isPollMode = true;
   // Editable state for MCQ
   const [mcqQuestion, setMcqQuestion] = useState('');
   const [mcqOptions, setMcqOptions] = useState<string[]>(['', '', '', '']);
@@ -191,25 +189,13 @@ export function SlideQuestionPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Poll Mode Toggle - only for MCQ and Short Answer */}
+          {/* Poll Mode Info - for MCQ and Short Answer */}
           {(questionType === 'mcq' || questionType === 'short_answer') && (
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
-              <div className="flex items-center gap-3">
-                <BarChart3 className="h-5 w-5 text-blue-500" />
-                <div>
-                  <Label htmlFor="poll-mode" className="text-sm font-medium cursor-pointer">
-                    Send as Poll
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Collect responses without grading
-                  </p>
-                </div>
-              </div>
-              <Switch
-                id="poll-mode"
-                checked={isPollMode}
-                onCheckedChange={setIsPollMode}
-              />
+            <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+              <p className="text-sm text-blue-400">
+                📊 Responses will be collected as a poll (no grading)
+              </p>
             </div>
           )}
 
@@ -229,120 +215,37 @@ export function SlideQuestionPreviewDialog({
 
               <div className="space-y-3">
                 <Label>Answer Options</Label>
-                {isPollMode ? (
-                  // Poll mode - no correct answer selection
-                  <div className="space-y-2">
-                    {['A', 'B', 'C', 'D'].map((letter, index) => (
-                      <div key={letter} className="flex items-center gap-3">
-                        <span className="text-sm font-medium w-6 text-muted-foreground">
-                          {letter}:
-                        </span>
-                        <Input
-                          value={mcqOptions[index]}
-                          onChange={(e) => handleOptionChange(index, e.target.value)}
-                          placeholder={`Option ${letter}`}
-                          className="flex-1"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  // Graded mode - select correct answer
-                  <RadioGroup value={mcqCorrectAnswer} onValueChange={setMcqCorrectAnswer}>
-                    {['A', 'B', 'C', 'D'].map((letter, index) => (
-                      <div key={letter} className="flex items-center gap-3">
-                        <RadioGroupItem value={letter} id={`option-${letter}`} />
-                        <Label
-                          htmlFor={`option-${letter}`}
-                          className="text-sm font-medium w-6"
-                        >
-                          {letter}:
-                        </Label>
-                        <Input
-                          value={mcqOptions[index]}
-                          onChange={(e) => handleOptionChange(index, e.target.value)}
-                          placeholder={`Option ${letter}`}
-                          className="flex-1"
-                        />
-                        {mcqCorrectAnswer === letter && (
-                          <Badge variant="default" className="bg-green-600">
-                            Correct
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </RadioGroup>
-                )}
-                {!isPollMode && (
-                  <p className="text-xs text-muted-foreground">
-                    Select the radio button next to the correct answer
-                  </p>
-                )}
-              </div>
-
-              {!isPollMode && (
                 <div className="space-y-2">
-                  <Label htmlFor="mcq-explanation">Explanation (optional)</Label>
-                  <Textarea
-                    id="mcq-explanation"
-                    value={mcqExplanation}
-                    onChange={(e) => setMcqExplanation(e.target.value)}
-                    placeholder="Explain why this is the correct answer..."
-                    className="min-h-[60px]"
-                  />
+                  {['A', 'B', 'C', 'D'].map((letter, index) => (
+                    <div key={letter} className="flex items-center gap-3">
+                      <span className="text-sm font-medium w-6 text-muted-foreground">
+                        {letter}:
+                      </span>
+                      <Input
+                        value={mcqOptions[index]}
+                        onChange={(e) => handleOptionChange(index, e.target.value)}
+                        placeholder={`Option ${letter}`}
+                        className="flex-1"
+                      />
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
             </>
           )}
 
           {/* Short Answer Editor */}
           {questionType === 'short_answer' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="sa-question">Question</Label>
-                <Textarea
-                  id="sa-question"
-                  value={saQuestion}
-                  onChange={(e) => setSaQuestion(e.target.value)}
-                  placeholder="Enter the question..."
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              {!isPollMode && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="sa-expected">Expected Answer</Label>
-                    <Textarea
-                      id="sa-expected"
-                      value={saExpectedAnswer}
-                      onChange={(e) => setSaExpectedAnswer(e.target.value)}
-                      placeholder="Enter the expected answer for grading..."
-                      className="min-h-[80px]"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="sa-explanation">Explanation (optional)</Label>
-                    <Textarea
-                      id="sa-explanation"
-                      value={saExplanation}
-                      onChange={(e) => setSaExplanation(e.target.value)}
-                      placeholder="Additional context for grading..."
-                      className="min-h-[60px]"
-                    />
-                  </div>
-                </>
-              )}
-
-              {isPollMode && (
-                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <p className="text-sm text-blue-400">
-                    📊 Poll mode: Student responses will be collected without grading.
-                  </p>
-                </div>
-              )}
-            </>
+            <div className="space-y-2">
+              <Label htmlFor="sa-question">Question</Label>
+              <Textarea
+                id="sa-question"
+                value={saQuestion}
+                onChange={(e) => setSaQuestion(e.target.value)}
+                placeholder="Enter the question..."
+                className="min-h-[80px]"
+              />
+            </div>
           )}
 
           {/* Coding Editor */}
