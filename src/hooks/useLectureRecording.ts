@@ -51,6 +51,8 @@ export interface UseLectureRecordingOptions {
   onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
   /** Callback when a voice command extracts a question - allows preview before sending */
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
+  /** When true, bypasses the question preview setting and sends questions immediately */
+  bypassPreviewSetting?: boolean;
 }
 
 // Direct voice command detection - checks raw text without relying on state
@@ -104,7 +106,7 @@ const detectVoiceCommandDirect = (
 };
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
@@ -1066,8 +1068,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return;
       }
 
-      // If preview is enabled AND callback is provided, show preview dialog
-      if (questionPreviewEnabledRef.current && onQuestionExtracted) {
+      // If preview is enabled AND callback is provided AND not bypassed, show preview dialog
+      if (questionPreviewEnabledRef.current && onQuestionExtracted && !bypassPreviewSetting) {
         console.log('📋 Question extracted, opening preview dialog (preview enabled)');
         onQuestionExtracted({
           question_text: data.question_text,
