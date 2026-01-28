@@ -72,7 +72,10 @@ export default function SlidePresenter() {
     } else if (type === 'send_question') {
       // Voice command to send regular question from transcript
       toast.success('Voice command: Send Question');
-      handleManualQuestionSendRef.current?.();
+      // 500ms delay to ensure transcript buffer is fully populated with the spoken question
+      setTimeout(() => {
+        handleManualQuestionSendRef.current?.();
+      }, 500);
     }
   }, []);
 
