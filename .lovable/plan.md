@@ -1,147 +1,109 @@
 
+# Fix Voice Command Question Extraction Timing Bug
 
-# Fix Slide Presenter Issues: Preview Bypass and Poll Mode Grading
+## Problem Identified
 
-## Issues Identified
+When a user says an impromptu question followed by "send question now" in the Slide Presenter, the spoken question is NOT included in the transcript buffer when the extraction happens.
 
-### Issue 1: Slide Presenter Still Shows Preview for Voice Commands
+### Root Cause
 
-**Root Cause:** There are two separate flows for questions in Slide Presenter:
-
-1. **Voice command "send question"** → Calls `handleManualQuestionSend` → Goes through `useLectureRecording` → Uses `bypassPreviewSetting` ✓
-2. **Voice command "send slide question"** → Calls `handleSendSlideQuestion` → Extracts via OCR → **Opens `SlideQuestionPreviewDialog`** ✗
-
-The `handleSendSlideQuestion` function (lines 150-261) always opens the preview dialog at line 253:
-```typescript
-setIsPreviewOpen(true);
-```
-
-This is a **separate flow** from the `useLectureRecording` hook bypass. The OCR-based slide question extraction was intentionally designed to show a preview for editing before sending.
-
-**Solution:** Add an option to skip the preview and send immediately when triggered by voice command. For voice-triggered slide questions, bypass the preview dialog and call `handleConfirmSendQuestion` directly.
-
----
-
-### Issue 2: Poll Mode Shows "Incorrect Answer" After Submission
-
-**Root Cause:** The `send-slide-question` edge function correctly sets:
-- `correctAnswer: isPollMode ? '' : ...` (empty string for polls)
-- `isPoll: isPollMode`
-
-But the student UI in `AssignedContent.tsx` (lines 1732-1788) always compares answers against `q.correctAnswer` without checking if it's a poll:
+In `useLectureRecording.ts`, the Deepgram transcript handler processes voice commands in the wrong order:
 
 ```typescript
-const correctAnswer = q.correctAnswer;  // Could be empty string for polls
-const isCorrect = studentAnswer === correctAnswer;  // Always false for polls!
-```
-
-When `correctAnswer` is an empty string (`''`), no student answer will ever match it, so every answer shows as "incorrect".
-
-**Solution:** The UI must check for poll mode (`q.isPoll` or empty `correctAnswer`) and skip the correct/incorrect feedback entirely for polls.
-
----
-
-## Implementation Plan
-
-### Part 1: Fix Voice Command Bypass for Slide Questions
-
-**File: `src/pages/SlidePresenter.tsx`**
-
-Modify `handleSendSlideQuestion` to accept an optional `skipPreview` parameter:
-
-```typescript
-const handleSendSlideQuestion = useCallback(async (
-  questionType: SlideQuestionType,
-  skipPreview: boolean = false  // NEW parameter
-) => {
-  // ... existing extraction logic ...
-  
-  if (skipPreview) {
-    // Voice command triggered - send immediately
-    await handleConfirmSendQuestion(transformedData, true); // isPollMode = true
-    setExtractionStage('idle');
-    return;
+// Lines 886-905 - CURRENT ORDER (BUGGY)
+if (onVoiceCommand) {
+  const command = detectVoiceCommandDirect(cleanText, ...);
+  if (command) {
+    onVoiceCommand(command);  // ← Fires immediately!
   }
-  
-  // Manual trigger - show preview dialog
-  setPreviewQuestionType(questionType as QuestionType);
-  setPreviewExtractedData(transformedData);
-  setIsPreviewOpen(true);
-  setExtractionStage('idle');
-}, [currentSlideNumber, handleConfirmSendQuestion]);
-```
-
-Update the ref type and voice command handler:
-
-```typescript
-const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType, skipPreview?: boolean) => Promise<void>) | null>(null);
-
-// In handleVoiceCommand:
-if (type === 'send_slide_question') {
-  toast.success('Voice command: Send Slide Question');
-  handleSendSlideQuestionRef.current?.('mcq', true);  // Skip preview for voice commands
 }
+
+// Append to buffers AFTER voice command fires
+transcriptBufferRef.current += ' ' + cleanText;  // ← Too late!
 ```
+
+When the voice command handler calls `handleManualQuestionSend`, it reads from `transcriptBufferRef.current.slice(-1500)`, but the **current transcript chunk** (containing the question) hasn't been appended yet!
+
+### Timeline of Bug:
+1. User says: "How many bones in the human body? Send question now"
+2. Deepgram transcript arrives: `"How many bones in the human body? Send question now"`
+3. Voice command "send question now" detected → `onVoiceCommand()` fires
+4. `handleManualQuestionSend()` reads buffer → **buffer doesn't have the question yet!**
+5. Edge function gets old/insufficient content → generates fallback
+6. Buffer finally gets appended → too late
 
 ---
 
-### Part 2: Fix Poll Mode UI Feedback
+## Solution
 
-**File: `src/components/student/AssignedContent.tsx`**
+Reorder the transcript handler to append to buffers FIRST, then detect voice commands:
 
-Update the MCQ feedback logic to check for poll mode:
+### Change in `src/hooks/useLectureRecording.ts`
 
-**Around line 1734-1738:**
+**Current order (lines 886-905):**
 ```typescript
-const correctAnswer = q.correctAnswer;
-const isPollQuestion = q.isPoll || !correctAnswer || correctAnswer === '';
-const isCorrect = isPollQuestion ? null : studentAnswer === correctAnswer;
-const showFeedback = isSubmitted && !isPollQuestion; // Don't show correct/incorrect for polls
+// 1. Detect voice command FIRST (bug)
+if (onVoiceCommand) { ... onVoiceCommand(command); }
+
+// 2. Append to buffers SECOND (too late)
+transcriptBufferRef.current += ' ' + cleanText;
 ```
 
-**Around line 1749-1755 (option styling):**
+**Fixed order:**
 ```typescript
-className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-  showFeedback && isThisOptionCorrect
-    ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
-    : showFeedback && isStudentChoice && !isCorrect
-    ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
-    : isPollQuestion && isStudentChoice && isSubmitted
-    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'  // Poll - just highlight selection
-    : isSelected && !isSubmitted 
-    ? 'border-primary bg-primary/5' 
-    : 'border-border hover:border-primary/50'
-} ${isSubmitted ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+// 1. Append to buffers FIRST
+transcriptBufferRef.current += ' ' + cleanText;
+intervalTranscriptRef.current += ' ' + cleanText;
+
+// Trim if needed
+if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
+  intervalTranscriptRef.current = intervalTranscriptRef.current.slice(-TRANSCRIPT_MAX_LENGTH);
+}
+
+// 2. THEN detect voice command (buffer now has the question!)
+if (onVoiceCommand) {
+  const command = detectVoiceCommandDirect(cleanText, ...);
+  if (command) {
+    onVoiceCommand(command);
+  }
+}
+
+// 3. Update React state last
+transcriptChunkCountRef.current++;
+setLastTranscript(cleanText);
 ```
 
-**Around line 1773-1788 (result text):**
+### Optional: Add Small Delay for Buffer Propagation
+
+As additional protection, add a 500ms delay after detecting the voice command before calling the extraction function. This ensures the buffer is fully populated.
+
+In `src/pages/SlidePresenter.tsx`, update `handleVoiceCommand`:
+
 ```typescript
-{isSubmitted && (
-  <div className="space-y-3">
-    {isPollQuestion ? (
-      <div className="p-3 rounded border-2 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-        <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-          ✓ Response Recorded
-        </p>
-        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-          This was a poll - no correct/incorrect answers
-        </p>
-      </div>
-    ) : (
-      // Existing correct/incorrect feedback
-    )}
-  </div>
-)}
+const handleVoiceCommand = useCallback((type: 'send_question' | 'send_slide_question') => {
+  playNotificationSound().catch(() => {});
+  
+  if (type === 'send_slide_question') {
+    toast.success('Voice command: Send Slide Question');
+    handleSendSlideQuestionRef.current?.('mcq', true);
+  } else if (type === 'send_question') {
+    toast.success('Voice command: Send Question');
+    // Small delay to ensure transcript buffer is fully populated
+    setTimeout(() => {
+      handleManualQuestionSendRef.current?.();
+    }, 500);
+  }
+}, []);
 ```
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/pages/SlidePresenter.tsx` | Add `skipPreview` parameter to `handleSendSlideQuestion`, update ref type and voice command handler |
-| `src/components/student/AssignedContent.tsx` | Add poll mode detection and show neutral feedback instead of incorrect |
+| File | Change |
+|------|--------|
+| `src/hooks/useLectureRecording.ts` | Reorder: append to buffers BEFORE voice command detection |
+| `src/pages/SlidePresenter.tsx` | Add 500ms delay for `send_question` voice command |
 
 ---
 
@@ -149,8 +111,12 @@ className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
 
 | Scenario | Before | After |
 |----------|--------|-------|
-| Voice command "send slide question" | Opens preview dialog | Sends immediately as poll |
-| Manual button in Slide Presenter | Opens preview dialog | Opens preview dialog (unchanged) |
-| Student submits poll answer | Shows "✗ Incorrect" | Shows "✓ Response Recorded" |
-| Student submits graded MCQ | Shows correct/incorrect | Shows correct/incorrect (unchanged) |
+| "How many bones? Send question now" | Buffer empty → fallback question | Buffer has question → correct extraction |
+| Voice command fires | Before buffer append | After buffer append |
+| Delay before extraction | None | 500ms safety margin |
 
+---
+
+## Technical Summary
+
+The fix ensures the transcript containing the spoken question is in the buffer before the voice command triggers extraction. The 500ms delay provides additional safety for async buffer propagation.
