@@ -79,10 +79,30 @@ export default function ClassConnectionCard() {
         return;
       }
 
-      const { data: newInstructorId, error: validateError } = await supabase
-        .rpc("validate_instructor_code", { code: newClassCode.trim() });
+      // Try new course code validation first
+      const { data: courseData } = await supabase
+        .rpc("validate_course_code", { code: newClassCode.trim() });
 
-      if (validateError || !newInstructorId) {
+      let newInstructorId: string | null = null;
+      let courseId: string | null = null;
+
+      if (courseData && courseData.length > 0) {
+        // Found course with new system
+        newInstructorId = courseData[0].instructor_id;
+        courseId = courseData[0].course_id;
+      } else {
+        // Fallback to legacy instructor code validation
+        const { data: legacyInstructorId, error: validateError } = await supabase
+          .rpc("validate_instructor_code", { code: newClassCode.trim() });
+
+        if (validateError || !legacyInstructorId) {
+          toast.error("Invalid class code. Please check with your instructor.");
+          return;
+        }
+        newInstructorId = legacyInstructorId;
+      }
+
+      if (!newInstructorId) {
         toast.error("Invalid class code. Please check with your instructor.");
         return;
       }
@@ -99,12 +119,19 @@ export default function ClassConnectionCard() {
         .delete()
         .eq("student_id", user.id);
 
+      // Insert with course_id if available
+      const insertData: { instructor_id: string; student_id: string; course_id?: string } = {
+        instructor_id: newInstructorId,
+        student_id: user.id
+      };
+      
+      if (courseId) {
+        insertData.course_id = courseId;
+      }
+
       const { error: insertError } = await supabase
         .from("instructor_students")
-        .insert({
-          instructor_id: newInstructorId,
-          student_id: user.id
-        });
+        .insert(insertData);
 
       if (insertError) {
         toast.error("Failed to join new class");
