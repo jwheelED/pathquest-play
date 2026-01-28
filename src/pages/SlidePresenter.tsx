@@ -56,7 +56,7 @@ export default function SlidePresenter() {
 
   // Refs to hold callbacks to avoid circular dependency with useLectureRecording
   const handleManualQuestionSendRef = useRef<(() => Promise<void>) | null>(null);
-  const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType) => Promise<void>) | null>(null);
+  const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType, skipPreview?: boolean) => Promise<void>) | null>(null);
 
   // Handle voice commands from lecture recording
   const handleVoiceCommand = useCallback((type: 'send_question' | 'send_slide_question') => {
@@ -66,9 +66,9 @@ export default function SlidePresenter() {
     playNotificationSound().catch(() => {});
     
     if (type === 'send_slide_question') {
-      // Voice command to send slide question - default to MCQ
+      // Voice command to send slide question - default to MCQ, skip preview
       toast.success('Voice command: Send Slide Question');
-      handleSendSlideQuestionRef.current?.('mcq');
+      handleSendSlideQuestionRef.current?.('mcq', true); // Skip preview for voice commands
     } else if (type === 'send_question') {
       // Voice command to send regular question from transcript
       toast.success('Voice command: Send Question');
@@ -146,8 +146,52 @@ export default function SlidePresenter() {
     }
   }, []);
 
+  // Handle confirming and sending the question from preview dialog
+  // (Moved above handleSendSlideQuestion so it can be referenced by it)
+  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData, isPollMode: boolean) => {
+    setIsSendingFromPreview(true);
+    
+    try {
+      // Refresh auth token before sending question
+      console.log('🔑 Refreshing auth token before sending slide question');
+      await supabase.auth.refreshSession();
+      
+      // Send the edited question to students via dedicated edge function
+      const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
+        body: {
+          questionType: previewQuestionType,
+          extractedQuestion: editedData,
+          slideNumber: currentSlideNumber,
+          isPollMode,
+        },
+      });
+
+      if (sendError) {
+        console.error('Error sending slide question:', sendError);
+        toast.error(sendError.message || 'Failed to send question to students');
+        return;
+      }
+
+      if (!sendData?.success) {
+        toast.error(sendData?.error || 'Failed to send question');
+        return;
+      }
+
+      const modeLabel = isPollMode ? 'Poll' : previewQuestionType.toUpperCase();
+      toast.success(`${modeLabel} sent to students!`);
+      setIsPreviewOpen(false);
+      setPreviewExtractedData(null);
+      
+    } catch (err) {
+      console.error('Error in handleConfirmSendQuestion:', err);
+      toast.error('An error occurred while sending the question');
+    } finally {
+      setIsSendingFromPreview(false);
+    }
+  }, [previewQuestionType, currentSlideNumber]);
+
   // Handle sending a question from the current slide via OCR
-  const handleSendSlideQuestion = useCallback(async (questionType: SlideQuestionType) => {
+  const handleSendSlideQuestion = useCallback(async (questionType: SlideQuestionType, skipPreview: boolean = false) => {
     if (!slideViewerRef.current) {
       toast.error('Slide viewer not ready');
       return;
@@ -247,6 +291,13 @@ export default function SlidePresenter() {
         };
       }
 
+      // If skipPreview (voice command), send immediately without dialog
+      if (skipPreview) {
+        await handleConfirmSendQuestion(transformedData, true); // isPollMode = true for voice commands
+        setExtractionStage('idle');
+        return;
+      }
+
       // Open preview dialog with transformed data
       setPreviewQuestionType(questionType as QuestionType);
       setPreviewExtractedData(transformedData);
@@ -258,50 +309,7 @@ export default function SlidePresenter() {
       toast.error('An error occurred while processing the slide');
       setExtractionStage('idle');
     }
-  }, [currentSlideNumber]);
-
-  // Handle confirming and sending the question from preview dialog
-  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData, isPollMode: boolean) => {
-    setIsSendingFromPreview(true);
-    
-    try {
-      // Refresh auth token before sending question
-      console.log('🔑 Refreshing auth token before sending slide question');
-      await supabase.auth.refreshSession();
-      
-      // Send the edited question to students via dedicated edge function
-      const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
-        body: {
-          questionType: previewQuestionType,
-          extractedQuestion: editedData,
-          slideNumber: currentSlideNumber,
-          isPollMode,
-        },
-      });
-
-      if (sendError) {
-        console.error('Error sending slide question:', sendError);
-        toast.error(sendError.message || 'Failed to send question to students');
-        return;
-      }
-
-      if (!sendData?.success) {
-        toast.error(sendData?.error || 'Failed to send question');
-        return;
-      }
-
-      const modeLabel = isPollMode ? 'Poll' : previewQuestionType.toUpperCase();
-      toast.success(`${modeLabel} sent to students!`);
-      setIsPreviewOpen(false);
-      setPreviewExtractedData(null);
-      
-    } catch (err) {
-      console.error('Error in handleConfirmSendQuestion:', err);
-      toast.error('An error occurred while sending the question');
-    } finally {
-      setIsSendingFromPreview(false);
-    }
-  }, [previewQuestionType, currentSlideNumber]);
+  }, [currentSlideNumber, handleConfirmSendQuestion]);
 
   // Handle confirming and sending voice question from preview dialog
   const handleConfirmVoiceQuestion = useCallback(async (editedQuestion: ExtractedVoiceQuestion) => {
