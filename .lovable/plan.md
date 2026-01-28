@@ -1,127 +1,111 @@
 
+# Exempt Slide Presenter from Question Preview
 
-# Auto-Generate Questions in Preview Dialog
+## Overview
 
-## Current Problem
+Make the Slide Presenter bypass the question preview setting so that questions are sent immediately, regardless of whether the instructor has question preview enabled globally.
 
-The question preview dialog currently has auto-generation code that **doesn't work** due to two issues:
+## Current Behavior
 
-1. **Missing Edge Functions**: The component calls two Edge Functions that don't exist:
-   - `generate-mcq-options`
-   - `generate-expected-answer`
+When an instructor has **Question Preview enabled** in their settings:
+- Voice commands in Slide Presenter → Opens preview dialog
+- Manual "Send Question" button → Opens preview dialog
 
-2. **Trigger Timing**: The auto-generation only triggers when the question **type changes**, not when the dialog first opens
-
----
+The preview check happens in `useLectureRecording.ts` at lines 1069-1077:
+```typescript
+if (questionPreviewEnabledRef.current && onQuestionExtracted) {
+  // Opens preview dialog
+  onQuestionExtracted({ ... });
+  return;
+}
+// Otherwise sends immediately
+```
 
 ## Solution
 
-### Part 1: Create Missing Edge Functions
-
-#### File: `supabase/functions/generate-mcq-options/index.ts`
-
-This function takes a question text and generates 4 MCQ options with a correct answer.
-
-```typescript
-// Uses Gemini 2.5 Flash to generate:
-// - 4 answer options (A, B, C, D)
-// - The correct answer letter
-// - An explanation (optional)
-```
-
-#### File: `supabase/functions/generate-expected-answer/index.ts`
-
-This function takes a short answer question and generates an expected/ideal answer for grading reference.
-
-```typescript
-// Uses Gemini 2.5 Flash to generate:
-// - A concise expected answer
-// - Used as grading reference for auto-grading
-```
+Add a `bypassPreviewSetting` option to the `useLectureRecording` hook that, when `true`, forces questions to send immediately without showing the preview dialog.
 
 ---
 
-### Part 2: Fix Auto-Generation Triggers
+## Changes
 
-**File: `src/components/instructor/VoiceQuestionPreviewDialog.tsx`**
+### File 1: `src/hooks/useLectureRecording.ts`
 
-Update the `useEffect` hooks to trigger on dialog open, not just on type change:
+**Add new option to interface:**
 
-**Current (lines 89-101):**
 ```typescript
-useEffect(() => {
-  // ... auto-generate MCQ options
-}, [questionType]);  // Only triggers on type change
-```
-
-**Updated:**
-```typescript
-useEffect(() => {
-  // ... auto-generate MCQ options
-}, [questionType, open, questionText]);  // Also triggers on dialog open
-```
-
-Same change for the expected answer generation (lines 104-114).
-
----
-
-## Technical Details
-
-### Edge Function: `generate-mcq-options`
-
-```text
-Input: { question_text: "What is 2 + 2?" }
-
-Output: {
-  options: ["3", "4", "5", "6"],
-  correct_answer: "B",
-  explanation: "2 + 2 equals 4"
+export interface UseLectureRecordingOptions {
+  onQuestionGenerated?: () => void;
+  slideContext?: string;
+  onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
+  onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
+  bypassPreviewSetting?: boolean;  // NEW: Skip preview dialog
 }
 ```
 
-Uses tool calling to ensure structured JSON output.
+**Update the destructure:**
 
-### Edge Function: `generate-expected-answer`
+```typescript
+const { 
+  onQuestionGenerated, 
+  slideContext, 
+  onVoiceCommand, 
+  onQuestionExtracted,
+  bypassPreviewSetting = false  // NEW
+} = options;
+```
 
-```text
-Input: { question_text: "Explain photosynthesis" }
+**Update the preview check logic:**
 
-Output: {
-  expected_answer: "Photosynthesis is the process by which plants convert sunlight, carbon dioxide, and water into glucose and oxygen."
-}
+```typescript
+// Old (line 1070):
+if (questionPreviewEnabledRef.current && onQuestionExtracted) {
+
+// New:
+if (questionPreviewEnabledRef.current && onQuestionExtracted && !bypassPreviewSetting) {
 ```
 
 ---
 
-## Files to Create
+### File 2: `src/pages/SlidePresenter.tsx`
 
-| File | Purpose |
-|------|---------|
-| `supabase/functions/generate-mcq-options/index.ts` | Generate 4 MCQ options + correct answer |
-| `supabase/functions/generate-expected-answer/index.ts` | Generate expected answer for short answer questions |
+**Update the hook call to bypass preview:**
+
+```typescript
+} = useLectureRecording({
+  onQuestionGenerated: () => {
+    console.log('Question generated from slide presenter');
+  },
+  slideContext: currentSlideText,
+  onVoiceCommand: handleVoiceCommand,
+  onQuestionExtracted: handleQuestionExtracted,
+  bypassPreviewSetting: true,  // NEW: Always send immediately in Slide Presenter
+});
+```
+
+---
+
+## Technical Summary
+
+| Context | Preview Setting ON | Preview Setting OFF |
+|---------|-------------------|---------------------|
+| **Standard Lecture Transcription** | Shows preview dialog | Sends immediately |
+| **Slide Presenter** | **Sends immediately** (bypassed) | Sends immediately |
+
+---
+
+## Result
+
+After this change:
+- Voice commands like "send question" in Slide Presenter will immediately extract and send the question to students
+- The instructor's global "Question Preview" setting will only apply to the standard Lecture Transcription mode
+- Slide Presenter is optimized for fast, presentation-focused workflows where preview would interrupt the flow
+
+---
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/instructor/VoiceQuestionPreviewDialog.tsx` | Update useEffect dependencies to trigger on dialog open |
-| `supabase/config.toml` | Add new functions with `verify_jwt = false` |
-
----
-
-## User Experience After Fix
-
-1. Instructor triggers voice question or clicks "Send Question"
-2. Preview dialog opens with extracted question
-3. **Automatically** generates:
-   - MCQ options (if type is multiple choice)
-   - Expected answer (if type is short answer)
-4. Instructor can edit or regenerate before sending
-5. No manual "Generate" button click required
-
----
-
-## CORS Headers
-
-Both new Edge Functions will include the updated CORS headers with `x-supabase-client-platform` to prevent the connectivity issues you experienced.
-
+| `src/hooks/useLectureRecording.ts` | Add `bypassPreviewSetting` option and check |
+| `src/pages/SlidePresenter.tsx` | Set `bypassPreviewSetting: true` |
