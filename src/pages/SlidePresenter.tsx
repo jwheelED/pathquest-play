@@ -106,6 +106,7 @@ export default function SlidePresenter() {
     slideContext: currentSlideText,
     onVoiceCommand: handleVoiceCommand,
     onQuestionExtracted: handleQuestionExtracted,
+    bypassPreviewSetting: true, // Slide Presenter always sends immediately
   });
 
   // Update ref when handleManualQuestionSend is available
