@@ -57,18 +57,28 @@ export default function SlidePresenter() {
   // Refs to hold callbacks to avoid circular dependency with useLectureRecording
   const handleManualQuestionSendRef = useRef<(() => Promise<void>) | null>(null);
   const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType, skipPreview?: boolean) => Promise<void>) | null>(null);
+  
+  // Guard ref to prevent duplicate voice command triggers
+  const isProcessingSlideQuestionRef = useRef(false);
 
   // Handle voice commands from lecture recording
   const handleVoiceCommand = useCallback((type: 'send_question' | 'send_slide_question') => {
     console.log(`🎤 Slide Presenter received voice command: ${type}`);
     
+    // Prevent duplicate slide question triggers
+    if (type === 'send_slide_question' && isProcessingSlideQuestionRef.current) {
+      console.log('⚠️ Skipping duplicate slide question trigger - already processing');
+      return;
+    }
+    
     // Play notification sound for voice command detection
     playNotificationSound().catch(() => {});
     
     if (type === 'send_slide_question') {
-      // Voice command to send slide question - default to MCQ, skip preview
+      // Voice command to send slide question - default to MCQ, show preview
+      isProcessingSlideQuestionRef.current = true;
       toast.success('Voice command: Send Slide Question');
-      handleSendSlideQuestionRef.current?.('mcq', true); // Skip preview for voice commands
+      handleSendSlideQuestionRef.current?.('mcq', false); // Show preview for review
     } else if (type === 'send_question') {
       // Voice command to send regular question from transcript
       toast.success('Voice command: Send Question');
@@ -190,6 +200,7 @@ export default function SlidePresenter() {
       toast.error('An error occurred while sending the question');
     } finally {
       setIsSendingFromPreview(false);
+      isProcessingSlideQuestionRef.current = false; // Reset guard
     }
   }, [previewQuestionType, currentSlideNumber]);
 
@@ -311,6 +322,7 @@ export default function SlidePresenter() {
       console.error('Error in handleSendSlideQuestion:', err);
       toast.error('An error occurred while processing the slide');
       setExtractionStage('idle');
+      isProcessingSlideQuestionRef.current = false; // Reset guard on error
     }
   }, [currentSlideNumber, handleConfirmSendQuestion]);
 
