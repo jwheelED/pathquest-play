@@ -352,6 +352,13 @@ export default function SlidePresenter() {
     handleSendSlideQuestionRef.current = handleSendSlideQuestion;
   }, [handleSendSlideQuestion]);
 
+  // Reset processing guard when preview dialog closes for ANY reason (cancel, click outside, etc.)
+  useEffect(() => {
+    if (!isPreviewOpen) {
+      isProcessingSlideQuestionRef.current = false;
+    }
+  }, [isPreviewOpen]);
+
   // Proactive token refresh for extended slide presenter sessions
   useEffect(() => {
     if (!isRecording) return;

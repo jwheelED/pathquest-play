@@ -86,14 +86,27 @@ export function SlideQuestionPreviewDialog({
   const [codingConstraints, setCodingConstraints] = useState('');
   const [codingStarterCode, setCodingStarterCode] = useState('');
 
-  // Initialize state when extractedData changes
+  // Reset all form state when dialog opens - ensures fresh state on each open
+  // Uses `open` as trigger to force re-initialization even if extractedData reference is same
   useEffect(() => {
-    if (!extractedData) return;
+    if (!open || !extractedData) return;
+
+    console.log('📋 SlideQuestionPreviewDialog opened, initializing state from extractedData');
 
     if (questionType === 'mcq' && extractedData.mcq) {
       const mcq = extractedData.mcq;
       setMcqQuestion(mcq.question || '');
-      setMcqOptions(mcq.options?.length === 4 ? mcq.options : ['', '', '', '']);
+      
+      // Validate and pad options - filter out empty strings, then pad to 4
+      const validOptions = mcq.options?.filter(opt => opt && opt.trim() !== '') || [];
+      if (validOptions.length >= 4) {
+        setMcqOptions(mcq.options!.slice(0, 4));
+      } else {
+        // Pad with empty strings to always have 4 slots
+        const paddedOptions = [...validOptions, '', '', '', ''].slice(0, 4);
+        setMcqOptions(paddedOptions);
+      }
+      
       setMcqCorrectAnswer(mcq.correct_answer || 'A');
       setMcqExplanation(mcq.explanation || '');
     } else if (questionType === 'short_answer' && extractedData.short_answer) {
@@ -111,7 +124,7 @@ export function SlideQuestionPreviewDialog({
       setCodingConstraints(coding.constraints?.join('\n') || '');
       setCodingStarterCode(coding.starter_code || '');
     }
-  }, [extractedData, questionType]);
+  }, [open, extractedData, questionType]);
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...mcqOptions];
