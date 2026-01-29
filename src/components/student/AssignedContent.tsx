@@ -1804,50 +1804,52 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                                   </div>
                                 )}
                                 
-                                {/* AI Explanation for both correct and incorrect answers */}
-                                <div className="space-y-3 mt-3">
-                                  {!aiExplanations[assignment.id]?.[idx] ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleGetAiExplanation(assignment, q, idx);
-                                      }}
-                                      disabled={loadingExplanations[assignment.id]?.[idx]}
-                                      className="w-full"
-                                    >
-                                      {loadingExplanations[assignment.id]?.[idx] ? (
-                                        <>
-                                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                          Generating explanation...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Sparkles className="w-4 h-4 mr-2" />
-                                          Why? Get AI Explanation
-                                        </>
-                                      )}
-                                    </Button>
-                                  ) : (
-                                    <div className="bg-primary/5 p-4 rounded-lg border-2 border-primary/20">
-                                      <div className="flex items-start gap-2 mb-2">
-                                        <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                                        <p className="font-semibold text-primary text-sm">
-                                          🎓 AI Explanation
-                                        </p>
+                                {/* AI Explanation - only show for graded questions (not polls) */}
+                                {!(q.isPoll || !q.correctAnswer || q.correctAnswer === '') && (
+                                  <div className="space-y-3 mt-3">
+                                    {!aiExplanations[assignment.id]?.[idx] ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleGetAiExplanation(assignment, q, idx);
+                                        }}
+                                        disabled={loadingExplanations[assignment.id]?.[idx]}
+                                        className="w-full"
+                                      >
+                                        {loadingExplanations[assignment.id]?.[idx] ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Generating explanation...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Sparkles className="w-4 h-4 mr-2" />
+                                            Why? Get AI Explanation
+                                          </>
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <div className="bg-primary/5 p-4 rounded-lg border-2 border-primary/20">
+                                        <div className="flex items-start gap-2 mb-2">
+                                          <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                                          <p className="font-semibold text-primary text-sm">
+                                            🎓 AI Explanation
+                                          </p>
+                                        </div>
+                                        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
+                                          <ReactMarkdown>{aiExplanations[assignment.id][idx].explanation}</ReactMarkdown>
+                                        </div>
+                                        {aiExplanations[assignment.id][idx].cached && (
+                                          <p className="text-xs text-primary/70 mt-2">
+                                            ⚡ Instant response from cache
+                                          </p>
+                                        )}
                                       </div>
-                                      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
-                                        <ReactMarkdown>{aiExplanations[assignment.id][idx].explanation}</ReactMarkdown>
-                                      </div>
-                                      {aiExplanations[assignment.id][idx].cached && (
-                                        <p className="text-xs text-primary/70 mt-2">
-                                          ⚡ Instant response from cache
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                             
