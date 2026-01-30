@@ -180,7 +180,11 @@ export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProp
     toast.success("Presenter view opened!");
   };
 
-  const joinUrl = `${window.location.origin}/join`;
+  // Use production domain for QR codes to avoid preview URL issues
+  const origin = window.location.hostname === "localhost" 
+    ? "http://localhost:8080" 
+    : "https://edvana.dev";
+  const joinUrl = `${origin}/join`;
 
   if (activeSession) {
     return (
