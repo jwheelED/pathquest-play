@@ -1,156 +1,144 @@
 
-# Fix Live Session UI and Grading Issues
+# Fix Live Session Grading and Add Join Button to Landing Page
 
-## Bug Analysis
+## Problem 1: Correct Answers Marked as Incorrect
 
-### Bug 1: Live Session Screen Disappears After Starting
-**Root Cause:** Race condition in `LiveSessionControls.tsx`
+### Root Cause Analysis
 
-The `useEffect` on line 32-43 has `activeSession` as a dependency:
-```typescript
-useEffect(() => {
-  loadActiveSession();
-  // ...
-}, [activeSession, selectedCourseId]);
-```
+The `submit-live-response` edge function expects the correct answer at `question_content.correctAnswer`, but the data is actually stored in a nested structure:
 
-When the session is created:
-1. `handleStartSession()` calls `setActiveSession(data.session)` (line 100)
-2. This triggers the useEffect because `activeSession` changed
-3. `loadActiveSession()` runs and queries the database
-4. Due to eventual consistency or timing, the query might not find the session yet
-5. Line 64 calls `setActiveSession(null)`, clearing the session card!
-
-**Solution:** 
-- Remove `activeSession` from the useEffect dependencies
-- Only reload on `selectedCourseId` change or initial mount
-- Add a flag to skip reloading when we just created a session
-
----
-
-### Bug 2: Correct Answers Marked Wrong in Live Session
-**Root Cause:** Answer format mismatch in submit-live-response edge function
-
-From the logs:
-```
-Grading: student answered "B) 206 bones", correct answer is "B", result: false
-```
-
-The question stores:
-- `correctAnswer: "B"` (just the letter)
-- `options: ["A) 100 bones", "B) 206 bones", ...]` (full text)
-
-The student submits the **full option text** `"B) 206 bones"` (from RadioGroup value), but the comparison checks against just `"B"`.
-
-**Solution:** 
-Before comparing, extract the letter prefix from the student's answer:
-```typescript
-// Extract letter from answer like "B) 206 bones" -> "B"
-const normalizedAnswer = answer.trim().charAt(0).toUpperCase();
-const isCorrect = normalizedAnswer === correctAnswer;
-```
-
-This needs to be fixed in the `submit-live-response` edge function. Since this function isn't in the repository, it will need to be created/updated.
-
----
-
-## Implementation Plan
-
-### Part 1: Fix Live Session Card Disappearing
-
-**File: `src/components/instructor/LiveSessionControls.tsx`**
-
-1. Add a ref to track if we just created a session:
-```typescript
-const justCreatedSessionRef = useRef(false);
-```
-
-2. Modify the useEffect to skip loading when we just created:
-```typescript
-useEffect(() => {
-  // Skip if we just created a session - don't re-query
-  if (justCreatedSessionRef.current) {
-    justCreatedSessionRef.current = false;
-    return;
-  }
-  loadActiveSession();
-  
-  const interval = setInterval(() => {
-    if (activeSession) {
-      updateParticipantCount();
+**What's stored in `live_questions.question_content`:**
+```json
+{
+  "type": "quiz",
+  "questions": [
+    {
+      "question": "What is 2+2?",
+      "type": "multiple_choice", 
+      "options": ["A. 3", "B. 4", "C. 5", "D. 6"],
+      "correctAnswer": "B"   // ← Answer is HERE
     }
-  }, 5000);
-
-  return () => clearInterval(interval);
-}, [selectedCourseId]); // Remove activeSession from dependencies
+  ]
+}
 ```
 
-3. Set the flag in `handleStartSession`:
+**What the grading code looks for:**
 ```typescript
-// Before setting state
-justCreatedSessionRef.current = true;
-setActiveSession(data.session);
+const correctAnswer = questionContent.correctAnswer || '';  // ← Looks at TOP level (empty!)
 ```
 
-This prevents the immediate re-query that clears the session.
+Since `correctAnswer` is empty, ALL answers are marked wrong.
 
----
+### Solution
 
-### Part 2: Fix Answer Grading Comparison
-
-**New File: `supabase/functions/submit-live-response/index.ts`**
-
-Create the edge function with proper answer normalization:
+Update `submit-live-response` to correctly extract the answer from the nested structure:
 
 ```typescript
-// When comparing MCQ answers, normalize to just the letter
-const normalizeAnswer = (answer: string, type: string): string => {
-  if (type !== 'multiple_choice') return answer;
-  
-  // Handle formats like "B) 206 bones" or "B. Answer" or just "B"
-  const trimmed = answer.trim();
-  
-  // If it's already just a letter (A-D), return as-is
-  if (/^[A-Da-d]$/.test(trimmed)) {
-    return trimmed.toUpperCase();
-  }
-  
-  // Extract letter from start: "B) text" or "B. text" or "B - text"
-  const match = trimmed.match(/^([A-Da-d])[).\-\s]/);
-  if (match) {
-    return match[1].toUpperCase();
-  }
-  
-  // Fallback: return first character if it's a letter
-  if (/^[A-Da-d]/i.test(trimmed)) {
-    return trimmed.charAt(0).toUpperCase();
-  }
-  
-  // Return original if no pattern matches
-  return trimmed;
-};
+// Handle both formats:
+// 1. Nested: { questions: [{ correctAnswer: "B" }] }  (from send-slide-question)
+// 2. Direct: { correctAnswer: "B" }  (legacy format)
 
-// In the grading logic:
-const studentAnswerNormalized = normalizeAnswer(answer, questionType);
-const correctAnswerNormalized = normalizeAnswer(correctAnswer, questionType);
-const isCorrect = studentAnswerNormalized === correctAnswerNormalized;
+let correctAnswer = '';
+let questionType = 'multiple_choice';
+
+if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions[0]) {
+  const firstQuestion = questionContent.questions[0];
+  correctAnswer = firstQuestion.correctAnswer || '';
+  questionType = firstQuestion.type || 'multiple_choice';
+} else {
+  correctAnswer = questionContent.correctAnswer || '';
+  questionType = questionContent.type || 'multiple_choice';
+}
 ```
 
 ---
 
-## Files to Modify/Create
+## Problem 2: No "Join Live Session" on Mobile Landing Page
+
+### Root Cause
+
+In `Index.tsx` line 119-126, the "Join Session" button has the class `hidden sm:block`, making it invisible on mobile devices:
+
+```tsx
+<Button 
+  variant="ghost" 
+  size="sm" 
+  onClick={() => navigate("/join")} 
+  className="text-muted-foreground hover:text-foreground hidden sm:block"  // ← Hidden on mobile!
+>
+  Join Session
+</Button>
+```
+
+### Solution
+
+Make the button visible on all screen sizes and add a prominent mobile-friendly option in the hero section:
+
+1. **Header button**: Change `hidden sm:block` to `block` so it's always visible
+2. **Hero section**: Add a third CTA button "Join Live Session" for students without accounts
+
+---
+
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/instructor/LiveSessionControls.tsx` | Add ref to skip re-query after session creation, remove `activeSession` from useEffect deps |
-| `supabase/functions/submit-live-response/index.ts` | Create/update with normalized answer comparison for MCQ |
+| `supabase/functions/submit-live-response/index.ts` | Fix nested `correctAnswer` extraction from `questions[0]` |
+| `src/pages/Index.tsx` | Make "Join Session" visible on all devices |
 
 ---
 
-## Result After Fix
+## Technical Details
+
+### submit-live-response/index.ts Changes
+
+**Lines 101-109 - Update question content parsing:**
+
+```typescript
+// Parse question content - handle both nested and direct formats
+let correctAnswer = '';
+let questionType = 'multiple_choice';
+
+// Handle nested format: { questions: [{ correctAnswer, type }] }
+if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions.length > 0) {
+  const firstQuestion = questionContent.questions[0] as {
+    question?: string;
+    type?: string;
+    correctAnswer?: string;
+  };
+  correctAnswer = firstQuestion.correctAnswer || '';
+  questionType = firstQuestion.type || 'multiple_choice';
+  console.log('📋 Using nested question format:', { correctAnswer, questionType });
+} else {
+  // Handle direct format: { correctAnswer, type }
+  correctAnswer = (questionContent as any).correctAnswer || '';
+  questionType = (questionContent as any).type || 'multiple_choice';
+  console.log('📋 Using direct question format:', { correctAnswer, questionType });
+}
+```
+
+### Index.tsx Changes
+
+**Line 119-126 - Make Join Session visible on mobile:**
+
+```tsx
+<Button 
+  variant="ghost" 
+  size="sm" 
+  onClick={() => navigate("/join")} 
+  className="text-muted-foreground hover:text-foreground"  // Removed hidden sm:block
+>
+  Join Session
+</Button>
+```
+
+---
+
+## Expected Results After Fix
 
 | Scenario | Before | After |
 |----------|--------|-------|
-| Start live session | Card disappears, only toast shows | Card stays visible with QR dialog |
-| Student selects "B) 206 bones" | Marked incorrect (comparing to "B") | Marked correct (extracts "B" from answer) |
-| Confidence betting with correct answer | -15 XP penalty (wrong grading) | +30 XP reward (3x multiplier) |
+| Student selects correct MCQ answer | Marked incorrect (correctAnswer is empty) | Marked correct |
+| Confidence betting rewards | Always 0 or negative XP | +10 to +30 XP for correct answers |
+| Mobile user visits landing page | No way to join live session | "Join Session" button visible in header |
+| Anonymous student joins via /join | Works but grading broken | Full functionality with correct grading |
