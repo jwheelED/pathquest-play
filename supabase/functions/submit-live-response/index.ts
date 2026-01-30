@@ -99,14 +99,34 @@ Deno.serve(async (req) => {
     }
 
     const questionContent = question.question_content as {
-      question: string;
-      type: string;
+      question?: string;
+      type?: string;
       options?: string[];
       correctAnswer?: string;
+      questions?: Array<{
+        question?: string;
+        type?: string;
+        options?: string[];
+        correctAnswer?: string;
+      }>;
     };
 
-    const questionType = questionContent.type || 'multiple_choice';
-    const correctAnswer = questionContent.correctAnswer || '';
+    // Handle both nested and direct formats for question content
+    let correctAnswer = '';
+    let questionType = 'multiple_choice';
+
+    // Check for nested format: { questions: [{ correctAnswer, type }] }
+    if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions.length > 0) {
+      const firstQuestion = questionContent.questions[0];
+      correctAnswer = firstQuestion.correctAnswer || '';
+      questionType = firstQuestion.type || 'multiple_choice';
+      console.log('📋 Using nested question format:', { correctAnswer, questionType });
+    } else {
+      // Handle direct format: { correctAnswer, type }
+      correctAnswer = questionContent.correctAnswer || '';
+      questionType = questionContent.type || 'multiple_choice';
+      console.log('📋 Using direct question format:', { correctAnswer, questionType });
+    }
 
     // Normalize both answers for comparison
     const normalizedStudentAnswer = normalizeAnswer(answer, questionType);
