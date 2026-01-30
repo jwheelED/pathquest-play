@@ -1,116 +1,149 @@
 
-# Fix Slide Presenter Voice Command and Preview Bugs
+# Fix Live Session UI and Grading Issues
 
-## Bug 1: Voice Command Stops Working After First Use
+## Bug Analysis
 
-### Root Cause
+### Bug 1: Live Session Screen Disappears After Starting
+**Root Cause:** Race condition in `LiveSessionControls.tsx`
 
-In `SlidePresenter.tsx`, the guard ref `isProcessingSlideQuestionRef` is set to `true` when the voice command fires (line 79), but it's only reset in TWO places:
-1. `handleConfirmSendQuestion` finally block (line 203) - when user clicks "Send"
-2. `handleSendSlideQuestion` catch block (line 325) - when extraction error occurs
-
-**Missing reset scenarios:**
-- User cancels/closes the preview dialog → guard stays `true` forever
-- User closes dialog by clicking outside → guard stays `true`
-- Dialog closes programmatically → guard stays `true`
-
-All subsequent voice commands are blocked because line 69 returns early:
+The `useEffect` on line 32-43 has `activeSession` as a dependency:
 ```typescript
-if (type === 'send_slide_question' && isProcessingSlideQuestionRef.current) {
-  console.log('⚠️ Skipping duplicate slide question trigger - already processing');
-  return; // Forever blocked!
-}
-```
-
-### Solution
-
-Reset the guard when the preview dialog closes for ANY reason:
-
-**File: `src/pages/SlidePresenter.tsx`**
-
-Add a useEffect to reset the guard when preview dialog closes:
-
-```typescript
-// Reset processing guard when preview dialog closes for any reason
 useEffect(() => {
-  if (!isPreviewOpen) {
-    isProcessingSlideQuestionRef.current = false;
-  }
-}, [isPreviewOpen]);
+  loadActiveSession();
+  // ...
+}, [activeSession, selectedCourseId]);
 ```
+
+When the session is created:
+1. `handleStartSession()` calls `setActiveSession(data.session)` (line 100)
+2. This triggers the useEffect because `activeSession` changed
+3. `loadActiveSession()` runs and queries the database
+4. Due to eventual consistency or timing, the query might not find the session yet
+5. Line 64 calls `setActiveSession(null)`, clearing the session card!
+
+**Solution:** 
+- Remove `activeSession` from the useEffect dependencies
+- Only reload on `selectedCourseId` change or initial mount
+- Add a flag to skip reloading when we just created a session
 
 ---
 
-## Bug 2: Question Preview Loads with Blank Options
+### Bug 2: Correct Answers Marked Wrong in Live Session
+**Root Cause:** Answer format mismatch in submit-live-response edge function
 
-### Root Cause
-
-Two issues in `SlideQuestionPreviewDialog.tsx`:
-
-1. **State not reset when dialog opens:** The useEffect only updates state when `extractedData` changes, but if the previous data was blank and new data also has the same structure, React may not detect a meaningful change.
-
-2. **Insufficient option validation:** Line 96 only checks if exactly 4 options exist:
-```typescript
-setMcqOptions(mcq.options?.length === 4 ? mcq.options : ['', '', '', '']);
+From the logs:
 ```
-If the AI returns 4 empty strings `['', '', '', '']` or the options are malformed, they display as blank.
+Grading: student answered "B) 206 bones", correct answer is "B", result: false
+```
 
-3. **No re-initialization on dialog open:** State persists between opens, so stale blank data from a previous failed extraction may show.
+The question stores:
+- `correctAnswer: "B"` (just the letter)
+- `options: ["A) 100 bones", "B) 206 bones", ...]` (full text)
 
-### Solution
+The student submits the **full option text** `"B) 206 bones"` (from RadioGroup value), but the comparison checks against just `"B"`.
 
-Reset ALL form state when the dialog opens (not just when extractedData changes):
-
-**File: `src/components/instructor/slides/SlideQuestionPreviewDialog.tsx`**
-
-Add an effect that resets state when `open` changes to `true`:
-
+**Solution:** 
+Before comparing, extract the letter prefix from the student's answer:
 ```typescript
-// Reset all state when dialog opens
+// Extract letter from answer like "B) 206 bones" -> "B"
+const normalizedAnswer = answer.trim().charAt(0).toUpperCase();
+const isCorrect = normalizedAnswer === correctAnswer;
+```
+
+This needs to be fixed in the `submit-live-response` edge function. Since this function isn't in the repository, it will need to be created/updated.
+
+---
+
+## Implementation Plan
+
+### Part 1: Fix Live Session Card Disappearing
+
+**File: `src/components/instructor/LiveSessionControls.tsx`**
+
+1. Add a ref to track if we just created a session:
+```typescript
+const justCreatedSessionRef = useRef(false);
+```
+
+2. Modify the useEffect to skip loading when we just created:
+```typescript
 useEffect(() => {
-  if (open && extractedData) {
-    // Force re-initialize based on current extractedData
-    if (questionType === 'mcq' && extractedData.mcq) {
-      const mcq = extractedData.mcq;
-      setMcqQuestion(mcq.question || '');
-      // Ensure we have valid non-empty options, or default to placeholders
-      const validOptions = mcq.options?.filter(opt => opt && opt.trim() !== '') || [];
-      if (validOptions.length >= 4) {
-        setMcqOptions(mcq.options!);
-      } else {
-        // Pad with empty strings if we have some options
-        const paddedOptions = [...validOptions, '', '', '', ''].slice(0, 4);
-        setMcqOptions(paddedOptions);
-      }
-      setMcqCorrectAnswer(mcq.correct_answer || 'A');
-      setMcqExplanation(mcq.explanation || '');
-    } else if (questionType === 'short_answer' && extractedData.short_answer) {
-      const sa = extractedData.short_answer;
-      setSaQuestion(sa.question || '');
-      setSaExpectedAnswer(sa.expected_answer || '');
-      setSaExplanation(sa.explanation || '');
-    } else if (questionType === 'coding' && extractedData.coding) {
-      // ... coding state initialization
+  // Skip if we just created a session - don't re-query
+  if (justCreatedSessionRef.current) {
+    justCreatedSessionRef.current = false;
+    return;
+  }
+  loadActiveSession();
+  
+  const interval = setInterval(() => {
+    if (activeSession) {
+      updateParticipantCount();
     }
-  }
-}, [open, extractedData, questionType]);
+  }, 5000);
+
+  return () => clearInterval(interval);
+}, [selectedCourseId]); // Remove activeSession from dependencies
 ```
 
-Also add better logging in `SlidePresenter.tsx` to track what data is being passed:
+3. Set the flag in `handleStartSession`:
+```typescript
+// Before setting state
+justCreatedSessionRef.current = true;
+setActiveSession(data.session);
+```
+
+This prevents the immediate re-query that clears the session.
+
+---
+
+### Part 2: Fix Answer Grading Comparison
+
+**New File: `supabase/functions/submit-live-response/index.ts`**
+
+Create the edge function with proper answer normalization:
 
 ```typescript
-// In handleSendSlideQuestion, after transforming data:
-console.log('📋 Transformed question data for preview:', JSON.stringify(transformedData, null, 2));
+// When comparing MCQ answers, normalize to just the letter
+const normalizeAnswer = (answer: string, type: string): string => {
+  if (type !== 'multiple_choice') return answer;
+  
+  // Handle formats like "B) 206 bones" or "B. Answer" or just "B"
+  const trimmed = answer.trim();
+  
+  // If it's already just a letter (A-D), return as-is
+  if (/^[A-Da-d]$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  
+  // Extract letter from start: "B) text" or "B. text" or "B - text"
+  const match = trimmed.match(/^([A-Da-d])[).\-\s]/);
+  if (match) {
+    return match[1].toUpperCase();
+  }
+  
+  // Fallback: return first character if it's a letter
+  if (/^[A-Da-d]/i.test(trimmed)) {
+    return trimmed.charAt(0).toUpperCase();
+  }
+  
+  // Return original if no pattern matches
+  return trimmed;
+};
+
+// In the grading logic:
+const studentAnswerNormalized = normalizeAnswer(answer, questionType);
+const correctAnswerNormalized = normalizeAnswer(correctAnswer, questionType);
+const isCorrect = studentAnswerNormalized === correctAnswerNormalized;
 ```
 
 ---
 
-## Files to Modify
+## Files to Modify/Create
 
 | File | Changes |
 |------|---------|
-| `src/pages/SlidePresenter.tsx` | Add useEffect to reset `isProcessingSlideQuestionRef` when preview dialog closes |
-| `src/components/instructor/slides/SlideQuestionPreviewDialog.tsx` | Reset form state on dialog open with better option validation |
+| `src/components/instructor/LiveSessionControls.tsx` | Add ref to skip re-query after session creation, remove `activeSession` from useEffect deps |
+| `supabase/functions/submit-live-response/index.ts` | Create/update with normalized answer comparison for MCQ |
 
 ---
 
@@ -118,8 +151,6 @@ console.log('📋 Transformed question data for preview:', JSON.stringify(transf
 
 | Scenario | Before | After |
 |----------|--------|-------|
-| Say "send slide question" twice | 2nd command ignored forever | 2nd command works after dialog closes |
-| Close dialog with Cancel | Guard stays true | Guard resets to false |
-| Click outside dialog | Guard stays true | Guard resets to false |
-| Options extracted as empty | Shows 4 blank inputs | Shows padded options with extracted data |
-| Dialog opens with stale state | May show previous blank data | Fresh state on each open |
+| Start live session | Card disappears, only toast shows | Card stays visible with QR dialog |
+| Student selects "B) 206 bones" | Marked incorrect (comparing to "B") | Marked correct (extracts "B" from answer) |
+| Confidence betting with correct answer | -15 XP penalty (wrong grading) | +30 XP reward (3x multiplier) |
