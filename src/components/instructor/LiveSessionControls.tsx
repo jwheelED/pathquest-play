@@ -19,10 +19,15 @@ interface LiveSession {
 
 interface LiveSessionControlsProps {
   onSessionChange: (sessionId: string | null) => void;
+  activeSession: LiveSession | null;
+  setActiveSession: (session: LiveSession | null) => void;
 }
 
-export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProps) => {
-  const [activeSession, setActiveSession] = useState<LiveSession | null>(null);
+export const LiveSessionControls = ({ 
+  onSessionChange, 
+  activeSession, 
+  setActiveSession 
+}: LiveSessionControlsProps) => {
   const [sessionTitle, setSessionTitle] = useState("");
   const [participantCount, setParticipantCount] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
