@@ -6,7 +6,8 @@ const corsHeaders = {
 };
 
 // Normalize MCQ answer to just the letter (A, B, C, D)
-const normalizeAnswer = (answer: string, questionType: string): string => {
+// Also handles matching full option text against the options array
+const normalizeAnswer = (answer: string, questionType: string, options?: string[]): string => {
   // Only normalize multiple choice answers
   if (questionType !== 'multiple_choice') {
     return answer.trim();
@@ -23,6 +24,24 @@ const normalizeAnswer = (answer: string, questionType: string): string => {
   const match = trimmed.match(/^([A-Da-d])[).\-\s]/);
   if (match) {
     return match[1].toUpperCase();
+  }
+  
+  // Check if answer matches the text part of an option (without prefix)
+  // e.g., "Dennis Lehane" should match option "B. Dennis Lehane" → returns "B"
+  if (options && options.length > 0) {
+    const letters = ['A', 'B', 'C', 'D'];
+    for (let i = 0; i < options.length && i < 4; i++) {
+      const option = options[i];
+      // Remove prefix like "A. ", "A) ", "A - " from option
+      const optionText = option.replace(/^[A-Da-d][).\-\s]+\s*/, '').trim();
+      if (optionText.toLowerCase() === trimmed.toLowerCase()) {
+        return letters[i];
+      }
+      // Also check if full option matches
+      if (option.toLowerCase() === trimmed.toLowerCase()) {
+        return letters[i];
+      }
+    }
   }
   
   // Fallback: return first character if it's a letter A-D
@@ -114,23 +133,26 @@ Deno.serve(async (req) => {
     // Handle both nested and direct formats for question content
     let correctAnswer = '';
     let questionType = 'multiple_choice';
+    let options: string[] = [];
 
     // Check for nested format: { questions: [{ correctAnswer, type }] }
     if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions.length > 0) {
       const firstQuestion = questionContent.questions[0];
       correctAnswer = firstQuestion.correctAnswer || '';
       questionType = firstQuestion.type || 'multiple_choice';
+      options = firstQuestion.options || [];
       console.log('📋 Using nested question format:', { correctAnswer, questionType });
     } else {
       // Handle direct format: { correctAnswer, type }
       correctAnswer = questionContent.correctAnswer || '';
       questionType = questionContent.type || 'multiple_choice';
+      options = questionContent.options || [];
       console.log('📋 Using direct question format:', { correctAnswer, questionType });
     }
 
-    // Normalize both answers for comparison
-    const normalizedStudentAnswer = normalizeAnswer(answer, questionType);
-    const normalizedCorrectAnswer = normalizeAnswer(correctAnswer, questionType);
+    // Normalize both answers for comparison (pass options for text matching)
+    const normalizedStudentAnswer = normalizeAnswer(answer, questionType, options);
+    const normalizedCorrectAnswer = normalizeAnswer(correctAnswer, questionType, options);
 
     const isCorrect = normalizedStudentAnswer === normalizedCorrectAnswer;
 
