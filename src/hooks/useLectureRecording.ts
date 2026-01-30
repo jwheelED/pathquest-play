@@ -51,6 +51,8 @@ export interface UseLectureRecordingOptions {
   onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
   /** Callback when a voice command extracts a question - allows preview before sending */
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
+  /** When true, bypasses the question preview setting and sends questions immediately */
+  bypassPreviewSetting?: boolean;
 }
 
 // Direct voice command detection - checks raw text without relying on state
@@ -104,7 +106,7 @@ const detectVoiceCommandDirect = (
 };
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
@@ -881,7 +883,19 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           
           console.log('📝 Deepgram final transcript:', cleanText);
           
-          // DIRECT voice command detection - check immediately on each transcript
+          // CRITICAL: Append to rolling buffers FIRST before voice command detection
+          // This ensures the current transcript chunk is available when extraction happens
+          transcriptBufferRef.current += ' ' + cleanText;
+          intervalTranscriptRef.current += ' ' + cleanText;
+          
+          // Trim interval transcript if exceeding max length (keep most recent content)
+          if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
+            intervalTranscriptRef.current = intervalTranscriptRef.current.slice(-TRANSCRIPT_MAX_LENGTH);
+            console.log('✂️ Trimmed interval transcript to max length');
+          }
+          
+          // DIRECT voice command detection - check AFTER buffer append
+          // so the spoken question is included when extraction happens
           if (onVoiceCommand) {
             const command = detectVoiceCommandDirect(
               cleanText,
@@ -896,16 +910,6 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
               setTimeout(() => setVoiceCommandDetected(false), 2000);
               onVoiceCommand(command);
             }
-          }
-          
-          // Append to rolling buffers
-          transcriptBufferRef.current += ' ' + cleanText;
-          intervalTranscriptRef.current += ' ' + cleanText;
-          
-          // Trim interval transcript if exceeding max length (keep most recent content)
-          if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
-            intervalTranscriptRef.current = intervalTranscriptRef.current.slice(-TRANSCRIPT_MAX_LENGTH);
-            console.log('✂️ Trimmed interval transcript to max length');
           }
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
@@ -1066,8 +1070,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return;
       }
 
-      // If preview is enabled AND callback is provided, show preview dialog
-      if (questionPreviewEnabledRef.current && onQuestionExtracted) {
+      // If preview is enabled AND callback is provided AND not bypassed, show preview dialog
+      if (questionPreviewEnabledRef.current && onQuestionExtracted && !bypassPreviewSetting) {
         console.log('📋 Question extracted, opening preview dialog (preview enabled)');
         onQuestionExtracted({
           question_text: data.question_text,

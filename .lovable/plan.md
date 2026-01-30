@@ -1,127 +1,144 @@
 
+# Fix Live Session Grading and Add Join Button to Landing Page
 
-# Auto-Generate Questions in Preview Dialog
+## Problem 1: Correct Answers Marked as Incorrect
 
-## Current Problem
+### Root Cause Analysis
 
-The question preview dialog currently has auto-generation code that **doesn't work** due to two issues:
+The `submit-live-response` edge function expects the correct answer at `question_content.correctAnswer`, but the data is actually stored in a nested structure:
 
-1. **Missing Edge Functions**: The component calls two Edge Functions that don't exist:
-   - `generate-mcq-options`
-   - `generate-expected-answer`
+**What's stored in `live_questions.question_content`:**
+```json
+{
+  "type": "quiz",
+  "questions": [
+    {
+      "question": "What is 2+2?",
+      "type": "multiple_choice", 
+      "options": ["A. 3", "B. 4", "C. 5", "D. 6"],
+      "correctAnswer": "B"   // ← Answer is HERE
+    }
+  ]
+}
+```
 
-2. **Trigger Timing**: The auto-generation only triggers when the question **type changes**, not when the dialog first opens
+**What the grading code looks for:**
+```typescript
+const correctAnswer = questionContent.correctAnswer || '';  // ← Looks at TOP level (empty!)
+```
+
+Since `correctAnswer` is empty, ALL answers are marked wrong.
+
+### Solution
+
+Update `submit-live-response` to correctly extract the answer from the nested structure:
+
+```typescript
+// Handle both formats:
+// 1. Nested: { questions: [{ correctAnswer: "B" }] }  (from send-slide-question)
+// 2. Direct: { correctAnswer: "B" }  (legacy format)
+
+let correctAnswer = '';
+let questionType = 'multiple_choice';
+
+if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions[0]) {
+  const firstQuestion = questionContent.questions[0];
+  correctAnswer = firstQuestion.correctAnswer || '';
+  questionType = firstQuestion.type || 'multiple_choice';
+} else {
+  correctAnswer = questionContent.correctAnswer || '';
+  questionType = questionContent.type || 'multiple_choice';
+}
+```
 
 ---
 
-## Solution
+## Problem 2: No "Join Live Session" on Mobile Landing Page
 
-### Part 1: Create Missing Edge Functions
+### Root Cause
 
-#### File: `supabase/functions/generate-mcq-options/index.ts`
+In `Index.tsx` line 119-126, the "Join Session" button has the class `hidden sm:block`, making it invisible on mobile devices:
 
-This function takes a question text and generates 4 MCQ options with a correct answer.
-
-```typescript
-// Uses Gemini 2.5 Flash to generate:
-// - 4 answer options (A, B, C, D)
-// - The correct answer letter
-// - An explanation (optional)
+```tsx
+<Button 
+  variant="ghost" 
+  size="sm" 
+  onClick={() => navigate("/join")} 
+  className="text-muted-foreground hover:text-foreground hidden sm:block"  // ← Hidden on mobile!
+>
+  Join Session
+</Button>
 ```
 
-#### File: `supabase/functions/generate-expected-answer/index.ts`
+### Solution
 
-This function takes a short answer question and generates an expected/ideal answer for grading reference.
+Make the button visible on all screen sizes and add a prominent mobile-friendly option in the hero section:
 
-```typescript
-// Uses Gemini 2.5 Flash to generate:
-// - A concise expected answer
-// - Used as grading reference for auto-grading
-```
+1. **Header button**: Change `hidden sm:block` to `block` so it's always visible
+2. **Hero section**: Add a third CTA button "Join Live Session" for students without accounts
 
 ---
 
-### Part 2: Fix Auto-Generation Triggers
+## Files to Modify
 
-**File: `src/components/instructor/VoiceQuestionPreviewDialog.tsx`**
-
-Update the `useEffect` hooks to trigger on dialog open, not just on type change:
-
-**Current (lines 89-101):**
-```typescript
-useEffect(() => {
-  // ... auto-generate MCQ options
-}, [questionType]);  // Only triggers on type change
-```
-
-**Updated:**
-```typescript
-useEffect(() => {
-  // ... auto-generate MCQ options
-}, [questionType, open, questionText]);  // Also triggers on dialog open
-```
-
-Same change for the expected answer generation (lines 104-114).
+| File | Changes |
+|------|---------|
+| `supabase/functions/submit-live-response/index.ts` | Fix nested `correctAnswer` extraction from `questions[0]` |
+| `src/pages/Index.tsx` | Make "Join Session" visible on all devices |
 
 ---
 
 ## Technical Details
 
-### Edge Function: `generate-mcq-options`
+### submit-live-response/index.ts Changes
 
-```text
-Input: { question_text: "What is 2 + 2?" }
+**Lines 101-109 - Update question content parsing:**
 
-Output: {
-  options: ["3", "4", "5", "6"],
-  correct_answer: "B",
-  explanation: "2 + 2 equals 4"
+```typescript
+// Parse question content - handle both nested and direct formats
+let correctAnswer = '';
+let questionType = 'multiple_choice';
+
+// Handle nested format: { questions: [{ correctAnswer, type }] }
+if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions.length > 0) {
+  const firstQuestion = questionContent.questions[0] as {
+    question?: string;
+    type?: string;
+    correctAnswer?: string;
+  };
+  correctAnswer = firstQuestion.correctAnswer || '';
+  questionType = firstQuestion.type || 'multiple_choice';
+  console.log('📋 Using nested question format:', { correctAnswer, questionType });
+} else {
+  // Handle direct format: { correctAnswer, type }
+  correctAnswer = (questionContent as any).correctAnswer || '';
+  questionType = (questionContent as any).type || 'multiple_choice';
+  console.log('📋 Using direct question format:', { correctAnswer, questionType });
 }
 ```
 
-Uses tool calling to ensure structured JSON output.
+### Index.tsx Changes
 
-### Edge Function: `generate-expected-answer`
+**Line 119-126 - Make Join Session visible on mobile:**
 
-```text
-Input: { question_text: "Explain photosynthesis" }
-
-Output: {
-  expected_answer: "Photosynthesis is the process by which plants convert sunlight, carbon dioxide, and water into glucose and oxygen."
-}
+```tsx
+<Button 
+  variant="ghost" 
+  size="sm" 
+  onClick={() => navigate("/join")} 
+  className="text-muted-foreground hover:text-foreground"  // Removed hidden sm:block
+>
+  Join Session
+</Button>
 ```
 
 ---
 
-## Files to Create
+## Expected Results After Fix
 
-| File | Purpose |
-|------|---------|
-| `supabase/functions/generate-mcq-options/index.ts` | Generate 4 MCQ options + correct answer |
-| `supabase/functions/generate-expected-answer/index.ts` | Generate expected answer for short answer questions |
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/instructor/VoiceQuestionPreviewDialog.tsx` | Update useEffect dependencies to trigger on dialog open |
-| `supabase/config.toml` | Add new functions with `verify_jwt = false` |
-
----
-
-## User Experience After Fix
-
-1. Instructor triggers voice question or clicks "Send Question"
-2. Preview dialog opens with extracted question
-3. **Automatically** generates:
-   - MCQ options (if type is multiple choice)
-   - Expected answer (if type is short answer)
-4. Instructor can edit or regenerate before sending
-5. No manual "Generate" button click required
-
----
-
-## CORS Headers
-
-Both new Edge Functions will include the updated CORS headers with `x-supabase-client-platform` to prevent the connectivity issues you experienced.
-
+| Scenario | Before | After |
+|----------|--------|-------|
+| Student selects correct MCQ answer | Marked incorrect (correctAnswer is empty) | Marked correct |
+| Confidence betting rewards | Always 0 or negative XP | +10 to +30 XP for correct answers |
+| Mobile user visits landing page | No way to join live session | "Join Session" button visible in header |
+| Anonymous student joins via /join | Works but grading broken | Full functionality with correct grading |

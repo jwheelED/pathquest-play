@@ -65,13 +65,32 @@ export default function OnboardingPage() {
         return
       }
 
-      // Validate instructor code
-      const { data: instructorId, error: instructorError } = await supabase
-        .rpc("validate_instructor_code", { code: classCode.trim() })
+      // Try new course code validation first
+      const { data: courseData, error: courseError } = await supabase
+        .rpc("validate_course_code", { code: classCode.trim() });
 
-      if (instructorError || !instructorId) {
-        toast.error("Invalid class code. Please check with your instructor.")
-        return
+      let instructorId: string | null = null;
+      let courseId: string | null = null;
+
+      if (courseData && courseData.length > 0) {
+        // Found course with new system
+        instructorId = courseData[0].instructor_id;
+        courseId = courseData[0].course_id;
+      } else {
+        // Fallback to legacy instructor code validation
+        const { data: legacyInstructorId, error: validateError } = await supabase
+          .rpc("validate_instructor_code", { code: classCode.trim() });
+
+        if (validateError || !legacyInstructorId) {
+          toast.error("Invalid class code. Please check with your instructor.");
+          return;
+        }
+        instructorId = legacyInstructorId;
+      }
+
+      if (!instructorId) {
+        toast.error("Invalid class code. Please check with your instructor.");
+        return;
       }
 
       // Check if already connected to this instructor
@@ -120,13 +139,19 @@ export default function OnboardingPage() {
 
       const instructorOrgId = instructorProfile?.org_id
 
-      // Connect to new instructor (trigger will automatically sync org_id to student's profile)
+      // Connect to new instructor with course_id if available
+      const insertData: { instructor_id: string; student_id: string; course_id?: string } = {
+        instructor_id: instructorId,
+        student_id: user.id
+      };
+      
+      if (courseId) {
+        insertData.course_id = courseId;
+      }
+
       const { error: connectionError } = await supabase
         .from("instructor_students")
-        .insert({
-          instructor_id: instructorId,
-          student_id: user.id
-        })
+        .insert(insertData)
 
       if (connectionError) {
         toast.error("Failed to join class. Please try again.")

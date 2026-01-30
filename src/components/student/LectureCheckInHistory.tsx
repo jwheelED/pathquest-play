@@ -19,6 +19,7 @@ interface CheckInResponse {
   ai_feedback: string | null;
   submitted_at: string;
   course_title: string | null;
+  isPoll?: boolean;
 }
 
 interface LectureCheckInHistoryProps {
@@ -80,35 +81,50 @@ export function LectureCheckInHistory({
         return;
       }
 
-      // Transform assignments to check-in responses
-      const combinedResponses: CheckInResponse[] = assignments.map((assignment: any) => {
-        // Extract question from content
-        const questions = assignment.content?.questions || [];
-        const firstQuestion = questions[0] || {};
-        const questionText = firstQuestion.question || firstQuestion.question_text || assignment.title || "Question";
-        const questionType = firstQuestion.type || "unknown";
-        
-        // Get student's answer from quiz_responses
-        const studentAnswer = assignment.quiz_responses?.["0"] || "";
-        
-        // Determine correctness from grade
-        const isCorrect = assignment.grade !== null && assignment.grade >= 70;
-        
-        // Get course title from joined courses table
-        const courseTitle = (assignment.courses as any)?.title || null;
+      // Transform assignments to check-in responses, filtering out polls when showing wrong answers
+      const combinedResponses: CheckInResponse[] = assignments
+        .map((assignment: any) => {
+          // Extract question from content
+          const questions = assignment.content?.questions || [];
+          const firstQuestion = questions[0] || {};
+          
+          // Check if this is a poll question (ungraded)
+          const isPoll = firstQuestion.isPoll === true || 
+                         firstQuestion.correctAnswer === '' || 
+                         firstQuestion.correctAnswer === null;
+          
+          const questionText = firstQuestion.question || firstQuestion.question_text || assignment.title || "Question";
+          const questionType = firstQuestion.type || "unknown";
+          
+          // Get student's answer from quiz_responses
+          const studentAnswer = assignment.quiz_responses?.["0"] || "";
+          
+          // Determine correctness from grade
+          const isCorrect = assignment.grade !== null && assignment.grade >= 70;
+          
+          // Get course title from joined courses table
+          const courseTitle = (assignment.courses as any)?.title || null;
 
-        return {
-          id: assignment.id,
-          question_content: questionText,
-          question_type: questionType,
-          student_answer: studentAnswer,
-          is_correct: assignment.completed ? isCorrect : null,
-          ai_grade: assignment.grade,
-          ai_feedback: null, // AI feedback would need to be stored in a different field
-          submitted_at: assignment.created_at,
-          course_title: courseTitle,
-        };
-      });
+          return {
+            id: assignment.id,
+            question_content: questionText,
+            question_type: questionType,
+            student_answer: studentAnswer,
+            is_correct: assignment.completed ? isCorrect : null,
+            ai_grade: assignment.grade,
+            ai_feedback: null,
+            submitted_at: assignment.created_at,
+            course_title: courseTitle,
+            isPoll, // Track if it's a poll
+          };
+        })
+        .filter((response: any) => {
+          // When showing only wrong answers, exclude poll questions entirely
+          if (showOnlyWrong && response.isPoll) {
+            return false;
+          }
+          return true;
+        });
 
       setResponses(combinedResponses);
     } catch (error) {
@@ -119,6 +135,15 @@ export function LectureCheckInHistory({
   };
 
   const getStatusBadge = (response: CheckInResponse) => {
+    // Poll questions show "Recorded" instead of correct/incorrect
+    if (response.isPoll) {
+      return (
+        <Badge className="bg-primary/10 text-primary border-primary/20">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          Recorded
+        </Badge>
+      );
+    }
     if (response.is_correct === true || (response.ai_grade !== null && response.ai_grade >= 70)) {
       return (
         <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">

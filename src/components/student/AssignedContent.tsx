@@ -1732,10 +1732,13 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                                 // After submission and answer release, show correct/incorrect indicators
                                 const studentAnswer = assignment.quiz_responses?.[idx];
                                 const correctAnswer = q.correctAnswer;
-                                const isCorrect = studentAnswer === correctAnswer;
-                                const isThisOptionCorrect = optionLetter === correctAnswer;
+                                // Detect poll mode - polls have no correct answer
+                                const isPollQuestion = q.isPoll || !correctAnswer || correctAnswer === '';
+                                const isCorrect = isPollQuestion ? null : studentAnswer === correctAnswer;
+                                const isThisOptionCorrect = isPollQuestion ? false : optionLetter === correctAnswer;
                                 const isStudentChoice = optionLetter === studentAnswer;
-                                const showFeedback = isSubmitted; // Always show feedback immediately after submission
+                                // Only show correct/incorrect feedback for graded questions, not polls
+                                const showFeedback = isSubmitted && !isPollQuestion;
                                 
                                 return (
                                   <button
@@ -1750,6 +1753,8 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                                         ? 'border-green-500 bg-green-50 dark:bg-green-950/20'
                                         : showFeedback && isStudentChoice && !isCorrect
                                         ? 'border-red-500 bg-red-50 dark:bg-red-950/20'
+                                        : isPollQuestion && isStudentChoice && isSubmitted
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
                                         : isSelected && !isSubmitted 
                                         ? 'border-primary bg-primary/5' 
                                         : 'border-border hover:border-primary/50'
@@ -1772,66 +1777,79 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                             
                             {isSubmitted && (
                               <div className="space-y-3">
-                                <div className={`p-3 rounded border-2 ${
-                                  (assignment.quiz_responses?.[idx] === q.correctAnswer)
-                                    ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
-                                    : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
-                                }`}>
-                                  <p className={`text-sm font-medium ${
+                                {(q.isPoll || !q.correctAnswer || q.correctAnswer === '') ? (
+                                  <div className="p-3 rounded border-2 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                                    <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                                      ✓ Response Recorded
+                                    </p>
+                                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                      This was a poll - no correct/incorrect answers
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className={`p-3 rounded border-2 ${
                                     (assignment.quiz_responses?.[idx] === q.correctAnswer)
-                                      ? 'text-green-900 dark:text-green-200'
-                                      : 'text-red-900 dark:text-red-200'
+                                      ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                      : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
                                   }`}>
-                                    {(assignment.quiz_responses?.[idx] === q.correctAnswer) 
-                                      ? '✓ Correct Answer' 
-                                      : '✗ Incorrect Answer'}
-                                  </p>
-                                </div>
+                                    <p className={`text-sm font-medium ${
+                                      (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                        ? 'text-green-900 dark:text-green-200'
+                                        : 'text-red-900 dark:text-red-200'
+                                    }`}>
+                                      {(assignment.quiz_responses?.[idx] === q.correctAnswer) 
+                                        ? '✓ Correct Answer' 
+                                        : '✗ Incorrect Answer'}
+                                    </p>
+                                  </div>
+                                )}
                                 
-                                {/* AI Explanation for both correct and incorrect answers */}
-                                <div className="space-y-3 mt-3">
-                                  {!aiExplanations[assignment.id]?.[idx] ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleGetAiExplanation(assignment, q, idx);
-                                      }}
-                                      disabled={loadingExplanations[assignment.id]?.[idx]}
-                                      className="w-full"
-                                    >
-                                      {loadingExplanations[assignment.id]?.[idx] ? (
-                                        <>
-                                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                          Generating explanation...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Sparkles className="w-4 h-4 mr-2" />
-                                          Why? Get AI Explanation
-                                        </>
-                                      )}
-                                    </Button>
-                                  ) : (
-                                    <div className="bg-primary/5 p-4 rounded-lg border-2 border-primary/20">
-                                      <div className="flex items-start gap-2 mb-2">
-                                        <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                                        <p className="font-semibold text-primary text-sm">
-                                          🎓 AI Explanation
-                                        </p>
+                                {/* AI Explanation - only show for graded questions (not polls) */}
+                                {!(q.isPoll || !q.correctAnswer || q.correctAnswer === '') && (
+                                  <div className="space-y-3 mt-3">
+                                    {!aiExplanations[assignment.id]?.[idx] ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleGetAiExplanation(assignment, q, idx);
+                                        }}
+                                        disabled={loadingExplanations[assignment.id]?.[idx]}
+                                        className="w-full"
+                                      >
+                                        {loadingExplanations[assignment.id]?.[idx] ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Generating explanation...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Sparkles className="w-4 h-4 mr-2" />
+                                            Why? Get AI Explanation
+                                          </>
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <div className="bg-primary/5 p-4 rounded-lg border-2 border-primary/20">
+                                        <div className="flex items-start gap-2 mb-2">
+                                          <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                                          <p className="font-semibold text-primary text-sm">
+                                            🎓 AI Explanation
+                                          </p>
+                                        </div>
+                                        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
+                                          <ReactMarkdown>{aiExplanations[assignment.id][idx].explanation}</ReactMarkdown>
+                                        </div>
+                                        {aiExplanations[assignment.id][idx].cached && (
+                                          <p className="text-xs text-primary/70 mt-2">
+                                            ⚡ Instant response from cache
+                                          </p>
+                                        )}
                                       </div>
-                                      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground">
-                                        <ReactMarkdown>{aiExplanations[assignment.id][idx].explanation}</ReactMarkdown>
-                                      </div>
-                                      {aiExplanations[assignment.id][idx].cached && (
-                                        <p className="text-xs text-primary/70 mt-2">
-                                          ⚡ Instant response from cache
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                             
