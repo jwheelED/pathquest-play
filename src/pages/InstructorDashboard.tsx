@@ -56,6 +56,7 @@ export default function InstructorDashboard() {
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [instructorProfile, setInstructorProfile] = useState<any>(null);
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
@@ -462,12 +463,7 @@ export default function InstructorDashboard() {
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {currentUser && (
-                <div className="min-w-0">
-                  <LiveSessionControls onSessionChange={setLiveSessionId} />
-                </div>
-              )}
-
+              {/* LiveSessionControls is rendered outside switch to persist - shown here */}
               <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent h-fit">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -617,6 +613,19 @@ export default function InstructorDashboard() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
+          {/* Always mount LiveSessionControls to persist session state across tabs */}
+          {currentUser && (
+            <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <LiveSessionControls 
+                  onSessionChange={setLiveSessionId} 
+                  activeSession={activeSession}
+                  setActiveSession={setActiveSession}
+                />
+              </div>
+            </div>
+          )}
+          
           {/* Always mount LectureTranscription to persist recording across tabs */}
           <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
             <LectureTranscription onQuestionGenerated={() => {}} />
