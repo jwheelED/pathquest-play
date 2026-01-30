@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.generate-expected-answer]
 verify_jwt = false
+
+[functions.submit-live-response]
+verify_jwt = false
