@@ -177,16 +177,38 @@ const LiveStudent = () => {
     handleSubmitWithConfidence(level, multiplier);
   };
 
+  // Extract just the letter from MCQ answer for reliable server-side comparison
+  const extractMCQLetter = (answer: string): string => {
+    // If already just a letter, return it
+    if (/^[A-Da-d]$/.test(answer.trim())) {
+      return answer.trim().toUpperCase();
+    }
+    // Extract letter from "B) 206 bones", "B. Answer", etc.
+    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
+    if (letterMatch) {
+      return letterMatch[1].toUpperCase();
+    }
+    // Fallback: return first character if A-D
+    if (/^[A-Da-d]/i.test(answer.trim())) {
+      return answer.trim().charAt(0).toUpperCase();
+    }
+    return answer; // Return original if no pattern matches
+  };
+
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
 
     setIsSubmitting(true);
     const responseTimeMs = Date.now() - questionStartTime;
 
+    // For MCQ, extract just the letter for reliable grading
+    const isMCQ = currentQuestion.question_content.type === 'multiple_choice';
+    const normalizedAnswer = isMCQ ? extractMCQLetter(selectedAnswer) : selectedAnswer;
+
     const responseData = {
       questionId: currentQuestion.id,
       participantId,
-      answer: selectedAnswer,
+      answer: normalizedAnswer,
       responseTimeMs,
       confidenceLevel: level,
       confidenceMultiplier: multiplier,
