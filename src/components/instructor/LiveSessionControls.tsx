@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
 
 interface LiveSession {
   id: string;
@@ -123,6 +124,9 @@ export const LiveSessionControls = ({
       onSessionChange(data.session.id);
       setSessionTitle("");
       
+      // Track session start in PostHog
+      trackSessionStarted(data.session.session_code, selectedCourseId);
+      
       // Play audio notification for session start
       try {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -162,6 +166,9 @@ export const LiveSessionControls = ({
       toast.error("Failed to end session");
       return;
     }
+
+    // Track session end in PostHog
+    trackSessionEnded(activeSession.session_code, participantCount);
 
     setActiveSession(null);
     onSessionChange(null);

@@ -16,6 +16,7 @@ import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { trackQuestionAnswered } from "@/lib/posthogTracking";
 
 interface Question {
   id: string;
@@ -223,6 +224,12 @@ const LiveStudent = () => {
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
         
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'multiple_choice',
+          responseTimeMs
+        );
+        
         if (result.data.isCorrect) {
           toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
         } else {
@@ -348,6 +355,12 @@ const LiveStudent = () => {
         setGradePending(result.data.gradePending || false);
         setShowAccountPrompt(true);
         
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'short_answer',
+          responseTimeMs
+        );
+        
         // Show appropriate feedback based on grading mode
         if (result.data.gradePending) {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
@@ -445,6 +458,12 @@ const LiveStudent = () => {
         setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
+        
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'coding',
+          responseTimeMs
+        );
         
         if (result.data.aiGrade !== null) {
           const gradeText = `${result.data.aiGrade}%`;

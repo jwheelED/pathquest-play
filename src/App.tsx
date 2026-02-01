@@ -1,8 +1,12 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import posthog from "posthog-js";
+import { supabase } from "@/integrations/supabase/client";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import Index from "./pages/Index";
 import MarketingLanding from "./pages/MarketingLanding";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -36,14 +40,36 @@ import { CourseProvider } from "./hooks/useCourseContext";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <ScreenReaderAnnouncer>
-        <SkipLink />
-        <Toaster />
-        <Sonner />
-        <OfflineIndicator />
+function App() {
+  // PostHog user identification
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user) {
+          // Identify user in PostHog
+          posthog.identify(session.user.id, {
+            email: session.user.email,
+            role: session.user.user_metadata?.role,
+          });
+        } else if (event === 'SIGNED_OUT') {
+          // Clear PostHog data on logout
+          posthog.reset();
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <ErrorBoundary>
+          <ScreenReaderAnnouncer>
+            <SkipLink />
+            <Toaster />
+            <Sonner />
+            <OfflineIndicator />
         <InstallPrompt />
         <BrowserRouter>
           <main id="main-content">
@@ -136,11 +162,13 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </main>
-      </BrowserRouter>
-    </ScreenReaderAnnouncer>
-  </TooltipProvider>
-</QueryClientProvider>
-);
+          </main>
+        </BrowserRouter>
+      </ScreenReaderAnnouncer>
+    </ErrorBoundary>
+    </TooltipProvider>
+  </QueryClientProvider>
+  );
+}
 
 export default App;
