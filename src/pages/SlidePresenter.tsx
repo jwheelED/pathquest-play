@@ -13,6 +13,7 @@ import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
+import { trackQuestionSent, trackSlidePresenterStarted } from '@/lib/posthogTracking';
 
 export interface SlideData {
   id: string;
@@ -189,6 +190,9 @@ export default function SlidePresenter() {
         toast.error(sendData?.error || 'Failed to send question');
         return;
       }
+
+      // Track question sent in PostHog
+      trackQuestionSent(previewQuestionType, 'slide');
 
       const modeLabel = isPollMode ? 'Poll' : previewQuestionType.toUpperCase();
       toast.success(`${modeLabel} sent to students!`);
@@ -423,6 +427,9 @@ export default function SlidePresenter() {
     setIsFullscreen(true);
     setCurrentSlideText('');
     setCurrentSlideNumber(1);
+    
+    // Track slide presentation start in PostHog
+    trackSlidePresenterStarted(presentation.id);
     
     // Enter browser fullscreen
     try {

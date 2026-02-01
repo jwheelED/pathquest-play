@@ -10,6 +10,7 @@ import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
 import { sanitizeTranscript } from '@/lib/transcriptSanitizer';
+import { trackRecordingStarted, trackRecordingEnded, trackAutoQuestionTriggered, trackQuestionSent } from '@/lib/posthogTracking';
 
 // Constants
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -477,6 +478,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return false;
       }
 
+      // Track auto-question triggered in PostHog
+      trackAutoQuestionTriggered(autoQuestionInterval);
+      
       // Auto-generated questions always send directly - no preview
       await handleQuestionSend({
         question_text: data.question_text,
@@ -486,6 +490,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         extraction_method: 'auto_interval',
         source: 'auto_interval',
       });
+      
+      // Track question sent in PostHog
+      trackQuestionSent(data.suggested_type || 'unknown', 'auto');
 
       return true;
     } catch (error) {
@@ -977,6 +984,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       await startDeepgramStreaming();
 
       broadcast('recording_status', { isRecording: true });
+      
+      // Track recording start in PostHog
+      trackRecordingStarted();
 
       toast({
         title: '🎙️ Recording started',
@@ -1029,8 +1039,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
 
     broadcast('recording_status', { isRecording: false });
+    
+    // Track recording end in PostHog (using current recordingDuration)
+    trackRecordingEnded(recordingDuration);
+    
     toast({ title: 'Recording stopped' });
-  }, [broadcast, toast, stopDeepgramStreaming]);
+  }, [broadcast, toast, stopDeepgramStreaming, recordingDuration]);
 
   // Manual question send
   const handleManualQuestionSend = useCallback(async () => {
