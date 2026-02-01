@@ -97,6 +97,16 @@ export default function SlidePresenter() {
     setIsVoicePreviewOpen(true);
   }, []);
 
+  // Handle extracted auto-interval question - reuse voice preview dialog
+  const handleAutoQuestionExtracted = useCallback((data: ExtractedVoiceQuestion) => {
+    console.log('⏰ Auto-interval question extracted, opening preview:', data);
+    // Play notification to alert instructor
+    playNotificationSound().catch(() => {});
+    toast.info('Auto-question ready for review!');
+    setVoicePreviewData(data);
+    setIsVoicePreviewOpen(true);
+  }, []);
+
   // Integrate lecture recording hook with slide context
   const {
     isRecording,
@@ -120,7 +130,8 @@ export default function SlidePresenter() {
     slideContext: currentSlideText,
     onVoiceCommand: handleVoiceCommand,
     onQuestionExtracted: handleQuestionExtracted,
-    bypassPreviewSetting: true, // Slide Presenter always sends immediately
+    onAutoQuestionExtracted: handleAutoQuestionExtracted,
+    bypassPreviewSetting: false, // Allow preview for auto-questions when enabled
   });
 
   // Update ref when handleManualQuestionSend is available
