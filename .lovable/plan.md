@@ -1,5 +1,21 @@
 
-# Question Studio Enhancement for STEM/Coding Classes
+# Project Implementation Status
+
+## Recently Completed: High-Concurrency Student Submission Fix
+
+**Problem:** Students in classrooms with 20+ students were getting errors when submitting answers simultaneously.
+
+**Root Cause:** Race condition in the check-then-insert pattern without database-level uniqueness constraint.
+
+**Solution Implemented:**
+1. Added unique constraint `(question_id, participant_id)` to `live_responses` table
+2. Updated `submit-live-response` edge function to use `upsert` with `ON CONFLICT` for atomic, race-safe submissions
+3. Created `submitWithRetry` utility with exponential backoff for transient network failures
+4. Updated `LiveStudent.tsx` to use the new retry-based submission
+5. Graceful handling of duplicate submissions (returns success instead of error)
+
+---
+
 
 ## ✅ COMPLETED
 
