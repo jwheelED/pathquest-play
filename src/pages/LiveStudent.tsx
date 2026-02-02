@@ -14,9 +14,8 @@ import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
 import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
-import { submitLiveResponseWithRetry } from "@/lib/submitWithRetry";
+import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
-import { trackQuestionAnswered } from "@/lib/posthogTracking";
 
 interface Question {
   id: string;
@@ -177,42 +176,33 @@ const LiveStudent = () => {
     handleSubmitWithConfidence(level, multiplier);
   };
 
-  // Extract just the letter from MCQ answer for reliable server-side comparison
-  const extractMCQLetter = (answer: string): string => {
-    // If already just a letter, return it
-    if (/^[A-Da-d]$/.test(answer.trim())) {
-      return answer.trim().toUpperCase();
-    }
-    // Extract letter from "B) 206 bones", "B. Answer", etc.
-    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
-    if (letterMatch) {
-      return letterMatch[1].toUpperCase();
-    }
-    // Fallback: return first character if A-D
-    if (/^[A-Da-d]/i.test(answer.trim())) {
-      return answer.trim().charAt(0).toUpperCase();
-    }
-    return answer; // Return original if no pattern matches
-  };
-
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
 
     setIsSubmitting(true);
     const responseTimeMs = Date.now() - questionStartTime;
 
-    // For MCQ, extract just the letter for reliable grading
-    const isMCQ = currentQuestion.question_content.type === 'multiple_choice';
-    const normalizedAnswer = isMCQ ? extractMCQLetter(selectedAnswer) : selectedAnswer;
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: selectedAnswer,
+      responseTimeMs,
+      confidenceLevel: level,
+      confidenceMultiplier: multiplier,
+      baseReward: BASE_REWARD,
+    };
 
     try {
-      const result = await submitLiveResponseWithRetry(
-        currentQuestion.id,
-        participantId,
-        normalizedAnswer,
-        responseTimeMs,
-        level,
-        multiplier
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
       );
 
       // Mark this question as answered to prevent re-prompting
@@ -220,40 +210,36 @@ const LiveStudent = () => {
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
       
-      if (result.success && result.data) {
+      if (result.queued) {
+        // Optimistic UI for offline submission
+        setHasAnswered(true);
+        setShowAccountPrompt(true);
+        toast.info("Answer saved! Will sync when back online.", {
+          icon: "📡",
+        });
+      } else if (result.success && result.data) {
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
         
-        // Track question answered in PostHog
-        trackQuestionAnswered(
-          currentQuestion.question_content.type || 'multiple_choice',
-          responseTimeMs
-        );
-        
-        if (result.alreadySubmitted) {
-          toast.info("You already answered this question");
-        } else if (result.data.isCorrect) {
+        if (result.data.isCorrect) {
           toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
         } else {
           const penalty = result.data.pointsEarned < 0 ? ` ${result.data.pointsEarned} XP` : '';
           toast.error(`Incorrect${penalty}`);
         }
-      } else if (result.alreadySubmitted) {
-        toast.info("You already answered this question");
-        setHasAnswered(true);
       } else if (result.error) {
         throw result.error;
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
-      if (error.message?.includes("already") || error.message?.includes("duplicate")) {
+      if (error.message?.includes("Already answered")) {
         toast.info("You already answered this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
-        toast.error("Failed to submit answer. Please try again.");
+        toast.error("Failed to submit answer");
       }
     } finally {
       setIsSubmitting(false);
@@ -317,12 +303,24 @@ const LiveStudent = () => {
     });
     const responseTimeMs = Date.now() - questionStartTime;
 
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: selectedAnswer,
+      responseTimeMs,
+    };
+
     try {
-      const result = await submitLiveResponseWithRetry(
-        currentQuestion.id,
-        participantId,
-        selectedAnswer,
-        responseTimeMs
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
       );
 
       // Mark this question as answered to prevent re-prompting
@@ -330,41 +328,54 @@ const LiveStudent = () => {
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
 
-      toast.dismiss(gradingToastId);
-      setIsGrading(false);
-
-      if (result.success && result.data) {
+      if (result.queued) {
+        // Optimistic UI for offline submission
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
+        setHasAnswered(true);
+        setShowAccountPrompt(true);
+        toast.info("Answer saved! Will sync when back online.", {
+          icon: "📡",
+        });
+      } else if (result.success && result.data) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
+        setAiGrade(result.data.aiGrade || null);
+        setAiFeedback(result.data.aiFeedback || null);
+        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
+        setGradePending(result.data.gradePending || false);
         setShowAccountPrompt(true);
         
-        // Track question answered in PostHog
-        trackQuestionAnswered(
-          currentQuestion.question_content.type || 'short_answer',
-          responseTimeMs
-        );
-        
-        if (result.alreadySubmitted) {
-          toast.info("You already answered this question");
-        } else {
-          toast.success("Answer submitted! ✓");
+        // Show appropriate feedback based on grading mode
+        if (result.data.gradePending) {
+          toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
+        } else if (result.data.aiGrade !== null) {
+          const gradeText = `${result.data.aiGrade}%`;
+          if (result.data.aiGrade >= 70) {
+            toast.success(`Great work! Score: ${gradeText} 🎉`);
+          } else if (result.data.aiGrade >= 50) {
+            toast.info(`Score: ${gradeText} - Good effort!`);
+          } else {
+            toast.error(`Score: ${gradeText} - Keep practicing!`);
+          }
         }
-      } else if (result.alreadySubmitted) {
-        toast.info("You already answered this question");
-        setHasAnswered(true);
       } else if (result.error) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         throw result.error;
       }
     } catch (error: any) {
       toast.dismiss(gradingToastId);
       setIsGrading(false);
       console.error("Error submitting answer:", error);
-      if (error.message?.includes("already") || error.message?.includes("duplicate")) {
+      if (error.message?.includes("Already answered")) {
         toast.info("You already answered this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
-        toast.error("Failed to submit answer. Please try again.");
+        toast.error("Failed to submit answer");
       }
     } finally {
       setIsSubmitting(false);
@@ -385,12 +396,28 @@ const LiveStudent = () => {
     
     const responseTimeMs = Date.now() - questionStartTime;
 
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: codeAnswer,
+      responseTimeMs,
+      // Coding questions don't use confidence betting (too complex)
+      confidenceLevel: null,
+      confidenceMultiplier: 1,
+      baseReward: BASE_REWARD,
+    };
+
     try {
-      const result = await submitLiveResponseWithRetry(
-        currentQuestion.id,
-        participantId,
-        codeAnswer,
-        responseTimeMs
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
       );
 
       // Mark this question as answered to prevent re-prompting
@@ -398,37 +425,47 @@ const LiveStudent = () => {
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
 
-      toast.dismiss(gradingToastId);
-      setIsGrading(false);
-
-      if (result.success && result.data) {
+      if (result.queued) {
+        // Optimistic UI for offline submission
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
+        setHasAnswered(true);
+        setShowAccountPrompt(true);
+        toast.info("Code saved! Will sync when back online.", {
+          icon: "📡",
+        });
+      } else if (result.success && result.data) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
+        setAiGrade(result.data.aiGrade || null);
+        setAiFeedback(result.data.aiFeedback || null);
+        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
+        setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
         
-        // Track question answered in PostHog
-        trackQuestionAnswered(
-          currentQuestion.question_content.type || 'coding',
-          responseTimeMs
-        );
-        
-        if (result.alreadySubmitted) {
-          toast.info("You already submitted code for this question");
-        } else {
-          toast.success("Code submitted! ✓");
+        if (result.data.aiGrade !== null) {
+          const gradeText = `${result.data.aiGrade}%`;
+          if (result.data.aiGrade >= 70) {
+            toast.success(`Great work! Score: ${gradeText} 🎉`);
+          } else if (result.data.aiGrade >= 50) {
+            toast.info(`Score: ${gradeText} - Good effort!`);
+          } else {
+            toast.error(`Score: ${gradeText} - Keep practicing!`);
+          }
         }
-      } else if (result.alreadySubmitted) {
-        toast.info("You already submitted code for this question");
-        setHasAnswered(true);
       } else if (result.error) {
+        toast.dismiss(gradingToastId);
+        setIsGrading(false);
         throw result.error;
       }
     } catch (error: any) {
       toast.dismiss(gradingToastId);
       setIsGrading(false);
       console.error("Error submitting code:", error);
-      if (error.message?.includes("already") || error.message?.includes("duplicate")) {
+      if (error.message?.includes("Already answered")) {
         toast.info("You already submitted code for this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
@@ -640,18 +677,25 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
-              {/* MCQ Results - Poll-style neutral feedback */}
+              {/* MCQ Results */}
               {isMCQ && (
                 <>
-                  <div className="relative">
-                    <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-                    Response Recorded ✓
-                  </p>
-                  <p className="text-muted-foreground">
-                    Your answer: <span className="font-semibold">{selectedAnswer}</span>
-                  </p>
+                  {isCorrect ? (
+                    <>
+                      <div className="relative">
+                        <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
+                      <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
+                      <p className="text-muted-foreground">
+                        Correct answer: <MathRenderer content={currentQuestion.question_content.correctAnswer} />
+                      </p>
+                    </>
+                  )}
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}

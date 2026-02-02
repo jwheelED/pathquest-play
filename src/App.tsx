@@ -1,12 +1,8 @@
-import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import posthog from "posthog-js";
-import { supabase } from "@/integrations/supabase/client";
-import { ErrorBoundary } from "./components/ErrorBoundary";
 import Index from "./pages/Index";
 import MarketingLanding from "./pages/MarketingLanding";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -37,54 +33,21 @@ import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { SkipLink, ScreenReaderAnnouncer } from "./components/accessibility";
 import { CourseProvider } from "./hooks/useCourseContext";
-import { RecordingProvider } from "./contexts/RecordingContext";
-import { InstructorLayoutRoute } from "./components/instructor/InstructorLayout";
 
 const queryClient = new QueryClient();
 
-function App() {
-  // PostHog user identification
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          // Fetch user's profile to get their full name for PostHog display
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          
-          // Identify user in PostHog with name for better display
-          posthog.identify(session.user.id, {
-            email: session.user.email,
-            name: profile?.full_name || session.user.email,
-            role: session.user.user_metadata?.role,
-          });
-        } else if (event === 'SIGNED_OUT') {
-          // Clear PostHog data on logout
-          posthog.reset();
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ErrorBoundary>
-          <ScreenReaderAnnouncer>
-            <SkipLink />
-            <Toaster />
-            <Sonner />
-            <OfflineIndicator />
-            <InstallPrompt />
-            <RecordingProvider>
-              <BrowserRouter>
-                <main id="main-content">
-                  <Routes>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <ScreenReaderAnnouncer>
+        <SkipLink />
+        <Toaster />
+        <Sonner />
+        <OfflineIndicator />
+        <InstallPrompt />
+        <BrowserRouter>
+          <main id="main-content">
+            <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/learn-more" element={<MarketingLanding />} />
           <Route path="/auth" element={<Auth />} />
@@ -110,15 +73,20 @@ function App() {
               <InstructorOnboarding />
             </ProtectedRoute>
           } />
-          {/* Nested routes for instructor pages that share recording state */}
-          <Route element={
+          <Route path="/instructor/dashboard" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <InstructorLayoutRoute />
+              <CourseProvider>
+                <InstructorDashboard />
+              </CourseProvider>
             </ProtectedRoute>
-          }>
-            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
-            <Route path="/instructor/settings" element={<InstructorSettings />} />
-          </Route>
+          } />
+          <Route path="/instructor/settings" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <CourseProvider>
+                <InstructorSettings />
+              </CourseProvider>
+            </ProtectedRoute>
+          } />
           <Route path="/instructor/lecture-presenter" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <LecturePresenterView />
@@ -167,15 +135,12 @@ function App() {
           <Route path="/terms" element={<TermsOfService />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </main>
-              </BrowserRouter>
-            </RecordingProvider>
-          </ScreenReaderAnnouncer>
-    </ErrorBoundary>
-    </TooltipProvider>
-  </QueryClientProvider>
-  );
-}
+          </Routes>
+        </main>
+      </BrowserRouter>
+    </ScreenReaderAnnouncer>
+  </TooltipProvider>
+</QueryClientProvider>
+);
 
 export default App;

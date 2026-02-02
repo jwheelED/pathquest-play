@@ -120,7 +120,7 @@ const Index = () => {
               variant="ghost" 
               size="sm" 
               onClick={() => navigate("/join")} 
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground hidden sm:block"
             >
               Join Session
             </Button>

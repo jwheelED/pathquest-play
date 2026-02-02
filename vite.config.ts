@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
-import { sentryVitePlugin } from "@sentry/vite-plugin"; // <--- 1. Added Import
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -78,16 +77,9 @@ export default defineConfig(({ mode }) => ({
           }
         ]
       }
-    }),
-    // 2. Added Sentry Plugin (Must be last)
-    sentryVitePlugin({
-      authToken: process.env.SENTRY_AUTH_TOKEN,
-      org: "edvana",
-      project: "sentry-edvana",
-    }),
+    })
   ].filter(Boolean),
   build: {
-    sourcemap: true, // <--- 3. Enabled Source Maps (Critical for Sentry)
     outDir: 'build',
     rollupOptions: {
       output: {

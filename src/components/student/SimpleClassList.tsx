@@ -55,14 +55,12 @@ export function SimpleClassList({ userId, onClassesLoaded }: SimpleClassListProp
         .select("id, full_name, course_title")
         .in("id", instructorIds);
 
-      // Check for active live sessions - must be active AND within valid time window
-      const now = new Date().toISOString();
+      // Check for active live sessions
       const { data: liveSessions } = await supabase
         .from("live_sessions")
-        .select("instructor_id, course_id")
+        .select("instructor_id")
         .in("instructor_id", instructorIds)
-        .eq("is_active", true)
-        .gt("ends_at", now); // Only count sessions that haven't expired
+        .eq("is_active", true);
 
       const liveInstructors = new Set(liveSessions?.map(s => s.instructor_id) || []);
 

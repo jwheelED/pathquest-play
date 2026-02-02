@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
-import type { Session } from "@supabase/supabase-js";
 
 export default function InstructorAuth() {
   const [email, setEmail] = useState("");
@@ -16,9 +15,7 @@ export default function InstructorAuth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
   const navigate = useNavigate();
-  const hasCheckedSessionRef = useRef(false);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -27,13 +24,9 @@ export default function InstructorAuth() {
   };
 
   useEffect(() => {
-    let isMounted = true;
-
-    // Handle authenticated user - check role and redirect appropriately
-    const handleAuthenticatedUser = async (session: Session) => {
-      if (!isMounted) return;
-      
-      try {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         // Check if user has instructor role
         const { data: roleData } = await supabase
           .from("user_roles")
@@ -42,8 +35,6 @@ export default function InstructorAuth() {
           .eq("role", "instructor")
           .maybeSingle();
         
-        if (!isMounted) return;
-
         if (roleData) {
           // Check if user has completed org onboarding and regular onboarding
           const { data: profile } = await supabase
@@ -52,8 +43,6 @@ export default function InstructorAuth() {
             .eq('id', session.user.id)
             .single();
           
-          if (!isMounted) return;
-
           // First check if they have an organization
           if (!profile?.org_id) {
             navigate("/instructor/org-onboarding");
@@ -80,8 +69,6 @@ export default function InstructorAuth() {
                 p_role: 'instructor' 
               });
             
-            if (!isMounted) return;
-
             if (success) {
               toast.success("Instructor account created!");
               navigate("/instructor/org-onboarding");
@@ -92,67 +79,9 @@ export default function InstructorAuth() {
             await supabase.auth.signOut();
           }
         }
-      } catch (error) {
-        console.error('Error handling authenticated user:', error);
-      }
-      // Note: Loading state is managed by checkSession's finally block
-    };
-
-    // Set up auth state listener for OAuth callbacks
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-        
-        // Handle OAuth redirect (SIGNED_IN from OAuth)
-        if (event === 'SIGNED_IN' && session) {
-          // Use setTimeout to prevent Supabase auth deadlock
-          setTimeout(() => {
-            handleAuthenticatedUser(session).finally(() => {
-              if (isMounted) setIsInitializing(false);
-            });
-          }, 0);
-        }
-      }
-    );
-
-    const checkSession = async () => {
-      // Prevent double-checking in StrictMode
-      if (hasCheckedSessionRef.current) {
-        setIsInitializing(false);
-        return;
-      }
-      hasCheckedSessionRef.current = true;
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!isMounted) {
-          setIsInitializing(false);
-          return;
-        }
-
-        if (session) {
-          await handleAuthenticatedUser(session);
-        }
-      } catch (error) {
-        // Silently handle abort errors - they're expected in StrictMode
-        if (!(error instanceof Error && error.message.includes('abort'))) {
-          console.error('Session check error:', error);
-        }
-      } finally {
-        // ALWAYS stop loading after checkSession completes
-        if (isMounted) {
-          setIsInitializing(false);
-        }
       }
     };
-
     checkSession();
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
   }, [navigate]);
 
   const handlePasswordReset = async () => {
@@ -286,15 +215,6 @@ export default function InstructorAuth() {
       setLoading(false);
     }
   };
-
-  // Show loading during initial session check
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/5 to-secondary/10 p-4">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/5 to-secondary/10 p-4">

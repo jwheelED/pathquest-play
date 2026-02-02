@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft } from "lucide-react";
-import { trackSessionJoined } from "@/lib/posthogTracking";
 
 const JoinLive = () => {
   const [sessionCode, setSessionCode] = useState("");
@@ -60,9 +59,6 @@ const JoinLive = () => {
       // Store participant ID in localStorage
       localStorage.setItem("participantId", data.participant.id);
       localStorage.setItem("participantNickname", nickname.trim());
-      
-      // Track session join in PostHog
-      trackSessionJoined(sessionCode.toUpperCase(), nickname.trim());
 
       toast.success("Joined successfully!");
       navigate(`/live/${sessionCode.toUpperCase()}`);

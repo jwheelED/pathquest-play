@@ -1,15 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, Play, Square, Copy, QrCode, Monitor, Library } from "lucide-react";
+import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCourseContext } from "@/hooks/useCourseContext";
-import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
-import { QuickSendPanel } from "./QuickSendPanel";
 
 interface LiveSession {
   id: string;
@@ -21,48 +19,28 @@ interface LiveSession {
 
 interface LiveSessionControlsProps {
   onSessionChange: (sessionId: string | null) => void;
-  activeSession: LiveSession | null;
-  setActiveSession: (session: LiveSession | null) => void;
 }
 
-export const LiveSessionControls = ({ 
-  onSessionChange, 
-  activeSession, 
-  setActiveSession 
-}: LiveSessionControlsProps) => {
+export const LiveSessionControls = ({ onSessionChange }: LiveSessionControlsProps) => {
+  const [activeSession, setActiveSession] = useState<LiveSession | null>(null);
   const [sessionTitle, setSessionTitle] = useState("");
   const [participantCount, setParticipantCount] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const { selectedCourseId } = useCourseContext();
-  
-  // Ref to prevent re-querying immediately after session creation
-  const justCreatedSessionRef = useRef(false);
 
   useEffect(() => {
-    // Skip if we just created a session - don't re-query which could clear state
-    if (justCreatedSessionRef.current) {
-      justCreatedSessionRef.current = false;
-      return;
-    }
-    
     loadActiveSession();
-  }, [selectedCourseId]);
-
-  // Separate effect for polling participant count
-  useEffect(() => {
-    if (!activeSession) return;
-    
-    // Initial count update
-    updateParticipantCount();
     
     // Poll participant count every 5 seconds when session is active
     const interval = setInterval(() => {
-      updateParticipantCount();
+      if (activeSession) {
+        updateParticipantCount();
+      }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [activeSession?.id]);
+  }, [activeSession, selectedCourseId]);
 
   const loadActiveSession = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -119,14 +97,9 @@ export const LiveSessionControls = ({
 
       if (error) throw error;
 
-      // Set flag to prevent useEffect from re-querying and clearing state
-      justCreatedSessionRef.current = true;
       setActiveSession(data.session);
       onSessionChange(data.session.id);
       setSessionTitle("");
-      
-      // Track session start in PostHog
-      trackSessionStarted(data.session.session_code, selectedCourseId);
       
       // Play audio notification for session start
       try {
@@ -168,9 +141,6 @@ export const LiveSessionControls = ({
       return;
     }
 
-    // Track session end in PostHog
-    trackSessionEnded(activeSession.session_code, participantCount);
-
     setActiveSession(null);
     onSessionChange(null);
     toast.success("Session ended");
@@ -193,11 +163,7 @@ export const LiveSessionControls = ({
     toast.success("Presenter view opened!");
   };
 
-  // Use production domain for QR codes to avoid preview URL issues
-  const origin = window.location.hostname === "localhost" 
-    ? "http://localhost:8080" 
-    : "https://edvana.dev";
-  const joinUrl = `${origin}/join`;
+  const joinUrl = `${window.location.origin}/join`;
 
   if (activeSession) {
     return (
@@ -246,12 +212,6 @@ export const LiveSessionControls = ({
             <p className="text-sm text-muted-foreground break-all">
               Students can join at: <span className="font-mono">{joinUrl}</span>
             </p>
-
-            {/* Quick Send Panel */}
-            <QuickSendPanel 
-              sessionId={activeSession.id} 
-              onQuestionSent={() => updateParticipantCount()}
-            />
           </CardContent>
         </Card>
 
