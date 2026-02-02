@@ -1,107 +1,127 @@
 
-# Project Implementation Status
+# Fix: Instructor Auth Infinite Loading
 
-## Recently Completed: High-Concurrency Student Submission Fix
+## Problem Diagnosed
 
-**Problem:** Students in classrooms with 20+ students were getting errors when submitting answers simultaneously.
+The "signal is aborted without reason" and infinite loading issue in `InstructorAuth.tsx` is caused by a race condition in React StrictMode:
 
-**Root Cause:** Race condition in the check-then-insert pattern without database-level uniqueness constraint.
+1. StrictMode mounts the component twice (mount → unmount → mount)
+2. On first mount, `checkSession()` starts an async `getSession()` call
+3. StrictMode immediately unmounts → sets `isMounted = false`
+4. Second mount begins, `hasCheckedSessionRef.current` is still `false`
+5. The first async call completes, checks `if (!isMounted) return;` → returns early
+6. **Critical bug**: The early return happens BEFORE reaching the `finally` block that sets `setIsInitializing(false)`
+7. The spinner keeps spinning forever
 
-**Solution Implemented:**
-1. Added unique constraint `(question_id, participant_id)` to `live_responses` table
-2. Updated `submit-live-response` edge function to use `upsert` with `ON CONFLICT` for atomic, race-safe submissions
-3. Created `submitWithRetry` utility with exponential backoff for transient network failures
-4. Updated `LiveStudent.tsx` to use the new retry-based submission
-5. Graceful handling of duplicate submissions (returns success instead of error)
+## Root Cause
 
----
+The current code has two problems:
 
+```typescript
+// Problem 1: Early returns skip the finally block
+if (!isMounted) return; // Returns BEFORE finally runs
 
-## ✅ COMPLETED
+// Problem 2: The finally block only runs if isMounted
+finally {
+  if (isMounted) {
+    setIsInitializing(false); // Never reached if unmounted
+  }
+}
+```
 
-All phases have been implemented successfully.
+## Solution
 
----
+Apply the same pattern used successfully in `Auth.tsx`:
 
-## Overview
+1. **Always set loading to false in finally** - Remove the `isMounted` check from finally block, but guard state updates with isMounted inside try
+2. **Add auth state listener** - Use `onAuthStateChange` to properly handle auth events
+3. **Separate initial load from ongoing changes** - Like Auth.tsx does
 
-This enhancement enables STEM instructors to create programming problems (including OOP exercises like Library/Book composition) before class and send them to students during live lectures.
+## Technical Changes
 
-## What This Enables
+### File: `src/pages/InstructorAuth.tsx`
 
-Your professor can now:
-1. ✅ **Create coding problems before class** - Including multi-class OOP exercises (e.g., Library has-a Book)
-2. ✅ **Save questions to a library** - Organized by course with tags
-3. ✅ **Send saved questions during live lecture** - One-click deployment via QuickSendPanel
-4. ✅ **AI auto-grading** - Students get immediate feedback on their code submissions
+```typescript
+useEffect(() => {
+  let isMounted = true;
+  
+  // Add auth state listener for OAuth callbacks
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      if (!isMounted) return;
+      
+      // Handle OAuth redirect (SIGNED_IN from OAuth)
+      if (event === 'SIGNED_IN' && session) {
+        setTimeout(() => {
+          handleAuthenticatedUser(session);
+        }, 0);
+      }
+    }
+  );
 
----
+  const handleAuthenticatedUser = async (session: Session) => {
+    // ... existing role check logic
+  };
 
-## Implementation Summary
+  const checkSession = async () => {
+    if (hasCheckedSessionRef.current) {
+      setIsInitializing(false);
+      return;
+    }
+    hasCheckedSessionRef.current = true;
 
-### Phase 1: Database Schema ✅
-- Created `instructor_question_bank` table with RLS policies
-- Supports MCQ, short answer, coding, and coding_simple question types
-- Includes tags, difficulty, usage tracking
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!isMounted) {
+        // Ensure we still turn off loading even if unmounted
+        return;
+      }
+      
+      if (session) {
+        await handleAuthenticatedUser(session);
+      }
+    } catch (error) {
+      // Log non-abort errors
+      if (!(error instanceof Error && error.message.includes('abort'))) {
+        console.error('Session check error:', error);
+      }
+    } finally {
+      // ALWAYS turn off loading - this is the key fix
+      setIsInitializing(false);
+    }
+  };
 
-### Phase 2: Question Studio UI ✅
-- Added **CodingQuestionCreator** component with:
-  - Language selection (Java, Python, JavaScript, C++)
-  - Starter code templates
-  - Expected behavior description
-  - Concepts tested and tags
-- Added **QuestionBankPanel** component with:
-  - Search and filter by type/difficulty
-  - Expand/collapse question details
-  - Edit, duplicate, delete actions
-- Updated **QuestionStudio** with 3 tabs:
-  - Generate (AI-powered question generation)
-  - Coding (manual coding problem creation)
-  - Question Bank (saved question library)
+  checkSession();
 
-### Phase 3: Quick-Send Panel ✅
-- Created **QuickSendPanel** component
-- Integrated into **LiveSessionControls** during active sessions
-- Shows recently used questions first
-- One-click send to all connected students
-- Tracks usage statistics
+  return () => {
+    isMounted = false;
+    subscription.unsubscribe();
+  };
+}, [navigate]);
+```
 
-### Phase 4: StudioQuestionCard Enhancement ✅
-- Updated card to support `coding` and `coding_simple` types
-- Shows starter code with syntax highlighting
-- Displays expected behavior
-- Language badge for coding questions
-- Editable fields for starter code and expected behavior
+## Key Fixes
 
----
+| Issue | Current Code | Fixed Code |
+|-------|--------------|------------|
+| Finally block guarded | `if (isMounted) setIsInitializing(false)` | `setIsInitializing(false)` unconditionally |
+| No auth listener | Missing `onAuthStateChange` | Added listener for OAuth callbacks |
+| Early return leaves spinner | Multiple `if (!isMounted) return` before finally | Move isMounted check, always reach finally |
+| hasCheckedSessionRef timing | Set after async calls | Set immediately in checkSession |
 
-## Files Created/Modified
+## Why This Works
 
-### New Files
-- `src/components/instructor/CodingQuestionCreator.tsx`
-- `src/components/instructor/QuestionBankPanel.tsx`
-- `src/components/instructor/QuickSendPanel.tsx`
+1. **Finally always runs** - Even if errors occur or component unmounts, the loading state gets cleared
+2. **Setting state on unmounted component** - React 18+ handles this gracefully (just logs a warning in dev)
+3. **Auth listener handles OAuth** - Properly catches the SIGNED_IN event from Google redirect
+4. **setTimeout(0) pattern** - Prevents Supabase auth deadlock as documented in our memory
 
-### Modified Files
-- `src/components/instructor/QuestionStudio.tsx` - Added tabs for coding and bank
-- `src/components/instructor/StudioQuestionCard.tsx` - Added coding question support
-- `src/components/instructor/LiveSessionControls.tsx` - Added QuickSendPanel
+## Testing Checklist
 
----
-
-## User Experience Flow
-
-### Before Class (Prep Time)
-1. Instructor opens Question Studio → "Coding" tab
-2. Enters problem details (title, language, starter code, expected behavior)
-3. Adds tags like "OOP", "composition"
-4. Clicks "Save to Question Bank"
-5. Question appears in "Question Bank" tab
-
-### During Class (Live)
-1. Instructor starts live lecture session
-2. QuickSendPanel appears in session controls
-3. Search or find "Library-Book Composition" question
-4. Click "Send" button
-5. All connected students receive the coding problem
-6. AI grades submissions in real-time
+After implementing:
+- [ ] Email/password sign in works
+- [ ] Google OAuth sign in works  
+- [ ] Page doesn't get stuck on "Loading..."
+- [ ] Existing instructors redirect to dashboard
+- [ ] New instructors redirect to org onboarding
