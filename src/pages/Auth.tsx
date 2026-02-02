@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -17,8 +17,6 @@ export default function AuthPage() {
   const [success, setSuccess] = useState("");
   const [session, setSession] = useState(null);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const isInitializedRef = useRef(false);
 
   const navigate = useNavigate();
 
@@ -39,41 +37,6 @@ export default function AuthPage() {
 
     // Default to student dashboard
     navigate("/dashboard");
-  };
-
-  const initializeUser = async (session: any) => {
-    if (!session?.user) return;
-
-    // Ensure profile exists with onboarded true
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, onboarded")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (!profile) {
-      // Create profile for OAuth users
-      await supabase.from("profiles").upsert({
-        id: session.user.id,
-        full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-        onboarded: true,
-      });
-
-      // Create user stats
-      try {
-        await supabase.from("user_stats").insert({
-          user_id: session.user.id,
-          org_id: null,
-        });
-      } catch {
-        // Errors are OK - record might already exist
-      }
-    } else if (!profile.onboarded) {
-      await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
-    }
-
-    // Navigate based on user role
-    await navigateByRole(session.user.id);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -223,62 +186,58 @@ export default function AuthPage() {
     setSession(null);
   };
 
+  const fetchSession = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (!error) {
+      setSession(data.session);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
+    fetchSession();
 
-    // Listener for ONGOING auth changes (does NOT control isLoading)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-        
-        // Only synchronous state updates here
-        setSession(session);
+    const {data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
 
-        // Defer Supabase calls with setTimeout - fire and forget
-        if (session && event !== 'INITIAL_SESSION') {
-          setTimeout(() => {
-            initializeUser(session);
-          }, 0);
-        }
+      if (session) {
+        const initializeUser = async () => {
+          // Ensure profile exists with onboarded true
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("id, onboarded")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+          if (!profile) {
+            // Create profile for OAuth users
+            await supabase.from("profiles").upsert({
+              id: session.user.id,
+              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
+              onboarded: true, // All students are onboarded immediately
+            });
+
+            // Create user stats
+            await supabase.from("user_stats").insert({
+              user_id: session.user.id,
+              org_id: null,
+            }).then(() => {
+              // Errors are OK here - record might already exist
+            });
+          } else if (!profile.onboarded) {
+            // Mark existing users as onboarded
+            await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+          }
+
+          // Navigate based on user role
+          await navigateByRole(session.user.id);
+        };
+
+        initializeUser();
       }
-    );
+    });
 
-    // INITIAL load (controls isLoading)
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
-
-        setSession(session);
-
-        // If there's an existing session, initialize the user
-        if (session) {
-          await initializeUser(session);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          isInitializedRef.current = true;
-        }
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [navigate]);
-
-  // Show loading state during initial auth check
-  if (isLoading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">

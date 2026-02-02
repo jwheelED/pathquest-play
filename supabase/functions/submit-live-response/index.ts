@@ -191,91 +191,43 @@ Deno.serve(async (req) => {
     // Calculate points based on correctness and confidence
     const { points, multiplier } = calculatePoints(isCorrect, confidenceLevel);
 
-    // Use upsert with ON CONFLICT for atomic, race-condition-safe submission
-    // This handles 20+ concurrent students without race conditions
+    // Check if response already exists
+    const { data: existingResponse } = await supabase
+      .from('live_responses')
+      .select('id')
+      .eq('question_id', questionId)
+      .eq('participant_id', participantId)
+      .single();
+
+    if (existingResponse) {
+      return new Response(
+        JSON.stringify({ error: 'Response already submitted', existingId: existingResponse.id }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Insert the response
     const { data: response, error: insertError } = await supabase
       .from('live_responses')
-      .upsert(
-        {
-          question_id: questionId,
-          participant_id: participantId,
-          answer: answer,
-          is_correct: isCorrect,
-          confidence_level: confidenceLevel,
-          confidence_multiplier: multiplier,
-          points_earned: points,
-          response_time_ms: responseTimeMs,
-        },
-        {
-          onConflict: 'question_id,participant_id',
-          ignoreDuplicates: true, // Don't overwrite existing answers
-        }
-      )
+      .insert({
+        question_id: questionId,
+        participant_id: participantId,
+        answer: answer,
+        is_correct: isCorrect,
+        confidence_level: confidenceLevel,
+        confidence_multiplier: multiplier,
+        points_earned: points,
+        response_time_ms: responseTimeMs,
+      })
       .select()
       .single();
 
-    // Check if this was a duplicate submission (upsert returned existing row or no row)
     if (insertError) {
-      // If it's a duplicate key error, fetch the existing response
-      if (insertError.code === '23505' || insertError.message?.includes('duplicate')) {
-        console.log('Duplicate submission detected, fetching existing response');
-        const { data: existingResponse } = await supabase
-          .from('live_responses')
-          .select('id, is_correct, points_earned, confidence_multiplier')
-          .eq('question_id', questionId)
-          .eq('participant_id', participantId)
-          .single();
-        
-        if (existingResponse) {
-          return new Response(
-            JSON.stringify({ 
-              success: true,
-              alreadySubmitted: true,
-              response: {
-                id: existingResponse.id,
-                isCorrect: existingResponse.is_correct,
-                pointsEarned: existingResponse.points_earned,
-                confidenceMultiplier: existingResponse.confidence_multiplier,
-                correctAnswer: correctAnswer,
-              },
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      
       console.error('Error inserting response:', insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to save response', details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-    
-    // Handle case where ignoreDuplicates returns null (existing row wasn't returned)
-    if (!response) {
-      const { data: existingResponse } = await supabase
-        .from('live_responses')
-        .select('id, is_correct, points_earned, confidence_multiplier')
-        .eq('question_id', questionId)
-        .eq('participant_id', participantId)
-        .single();
-      
-      if (existingResponse) {
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            alreadySubmitted: true,
-            response: {
-              id: existingResponse.id,
-              isCorrect: existingResponse.is_correct,
-              pointsEarned: existingResponse.points_earned,
-              confidenceMultiplier: existingResponse.confidence_multiplier,
-              correctAnswer: correctAnswer,
-            },
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
     }
 
     console.log('Response saved:', { responseId: response.id, isCorrect, points });
