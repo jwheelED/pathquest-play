@@ -128,23 +128,20 @@ export default function InstructorAuth() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (!isMounted) {
-          setIsInitializing(false);
-          return;
-        }
+        if (!isMounted) return;
 
         if (session) {
           await handleAuthenticatedUser(session);
-        } else {
-          // No session - stop loading immediately
-          setIsInitializing(false);
         }
+        // Note: handleAuthenticatedUser sets isInitializing to false in its finally block
+        // If no session, we fall through to the finally block below
       } catch (error) {
         // Silently handle abort errors - they're expected in StrictMode
         if (!(error instanceof Error && error.message.includes('abort'))) {
           console.error('Session check error:', error);
         }
-        // Always stop loading on error
+      } finally {
+        // ALWAYS stop loading - single source of truth
         setIsInitializing(false);
       }
     };
