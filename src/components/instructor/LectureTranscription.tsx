@@ -60,6 +60,7 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
+import { useOptionalRecordingContext } from "@/contexts/RecordingContext";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -100,6 +101,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   
   // Get selected course for proper assignment scoping
   const { selectedCourseId } = useCourseContext();
+  
+  // Global recording context for cross-route state persistence
+  const recordingContext = useOptionalRecordingContext();
   
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -2128,17 +2132,36 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     }
   }, [isRecording]);
 
-  // Recording duration timer + broadcast
+  // Recording duration timer + broadcast + context sync
   useEffect(() => {
     if (!isRecording) {
       setRecordingDuration(0);
+      // Sync to context when recording stops
+      if (recordingContext) {
+        recordingContext.setIsRecording(false);
+        recordingContext.setRecordingDuration(0);
+      }
       return;
+    }
+
+    // Sync to context when recording starts
+    if (recordingContext) {
+      recordingContext.setIsRecording(true);
     }
 
     const startTime = Date.now();
     durationTimerRef.current = setInterval(() => {
       const newDuration = Math.floor((Date.now() - startTime) / 1000);
       setRecordingDuration(newDuration);
+      
+      // Sync recording state to global context for cross-route persistence
+      if (recordingContext) {
+        recordingContext.setRecordingDuration(newDuration);
+        recordingContext.setAutoQuestionEnabled(autoQuestionEnabled);
+        recordingContext.setAutoQuestionInterval(autoQuestionInterval);
+        recordingContext.setNextAutoQuestionIn(nextAutoQuestionIn);
+        recordingContext.setStudentCount(studentCount);
+      }
       
       // Broadcast state update every second
       broadcast('state_update', {
@@ -2165,7 +2188,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         clearInterval(durationTimerRef.current);
       }
     };
-  }, [isRecording, nextQuestionAllowedAt, autoQuestionEnabled, autoQuestionInterval, studentCount, contentQualityScore, broadcast]);
+  }, [isRecording, nextQuestionAllowedAt, autoQuestionEnabled, autoQuestionInterval, studentCount, contentQualityScore, broadcast, nextAutoQuestionIn, recordingContext]);
 
   // Cleanup on unmount
   useEffect(() => {
