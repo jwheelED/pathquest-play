@@ -2,18 +2,34 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Code, FileText } from "lucide-react";
+import { Settings, Code, FileText, Terminal } from "lucide-react";
 
 interface QuestionFormatSettingsProps {
   instructorId: string;
   professorType?: 'stem' | 'humanities' | 'medical' | null;
 }
 
+const PROGRAMMING_LANGUAGES = [
+  { value: 'python', label: 'Python', icon: '🐍' },
+  { value: 'java', label: 'Java', icon: '☕' },
+  { value: 'javascript', label: 'JavaScript', icon: '🟨' },
+  { value: 'typescript', label: 'TypeScript', icon: '🔷' },
+  { value: 'cpp', label: 'C++', icon: '⚡' },
+  { value: 'c', label: 'C', icon: '🔧' },
+  { value: 'csharp', label: 'C#', icon: '🎯' },
+  { value: 'go', label: 'Go', icon: '🐹' },
+  { value: 'rust', label: 'Rust', icon: '🦀' },
+] as const;
+
+type ProgrammingLanguage = typeof PROGRAMMING_LANGUAGES[number]['value'];
+
 export const QuestionFormatSettings = ({ instructorId, professorType }: QuestionFormatSettingsProps) => {
   const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding'>('multiple_choice');
   const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
+  const [preferredLanguage, setPreferredLanguage] = useState<ProgrammingLanguage>('python');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -25,7 +41,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('question_format_preference, coding_question_style')
+        .select('question_format_preference, coding_question_style, preferred_coding_language')
         .eq('id', instructorId)
         .single();
 
@@ -36,6 +52,9 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
       }
       if (data?.coding_question_style) {
         setCodingStyle(data.coding_question_style as 'simple' | 'full');
+      }
+      if (data?.preferred_coding_language) {
+        setPreferredLanguage(data.preferred_coding_language as ProgrammingLanguage);
       }
     } catch (error) {
       console.error('Error fetching preference:', error);
@@ -106,9 +125,38 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
     }
   };
 
+  const handleLanguageChange = async (value: string) => {
+    const newLanguage = value as ProgrammingLanguage;
+    setPreferredLanguage(newLanguage);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ preferred_coding_language: newLanguage })
+        .eq('id', instructorId);
+
+      if (error) throw error;
+
+      const langLabel = PROGRAMMING_LANGUAGES.find(l => l.value === newLanguage)?.label || newLanguage;
+      toast({
+        title: "✅ Language preference saved",
+        description: `Coding questions will use ${langLabel}`,
+      });
+    } catch (error: any) {
+      console.error('Error updating language preference:', error);
+      toast({
+        title: "Failed to save language preference",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return null;
   }
+
+  const showCodingOptions = professorType !== 'humanities';
 
   return (
     <Card>
@@ -147,7 +195,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
             </div>
           </div>
 
-          {professorType !== 'humanities' && (
+          {showCodingOptions && (
             <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
               <RadioGroupItem value="coding" id="coding" />
               <div className="space-y-1 leading-none flex-1">
@@ -162,38 +210,67 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
           )}
         </RadioGroup>
 
-        {/* Coding style sub-options - only show when coding is selected */}
-        {format === 'coding' && professorType !== 'humanities' && (
-          <div className="mt-4 ml-6 p-4 border-l-2 border-primary/20 space-y-3">
-            <Label className="text-sm font-medium flex items-center gap-2">
-              <Code className="h-4 w-4" />
-              Coding Question Style
-            </Label>
-            <RadioGroup value={codingStyle} onValueChange={handleCodingStyleChange} className="space-y-3">
-              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors bg-primary/5">
-                <RadioGroupItem value="simple" id="coding_simple" />
-                <div className="space-y-1 leading-none flex-1">
-                  <Label htmlFor="coding_simple" className="font-medium cursor-pointer text-sm">
-                    Simple Check-Ins (Recommended)
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Quick conceptual prompts (e.g., "Write a for loop that..."). <strong>100% if student shows core understanding.</strong>
-                  </p>
-                </div>
-              </div>
+        {/* Coding options - only show when coding is selected for STEM */}
+        {format === 'coding' && showCodingOptions && (
+          <div className="mt-4 ml-6 p-4 border-l-2 border-primary/20 space-y-4">
+            {/* Programming Language Selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Terminal className="h-4 w-4" />
+                Programming Language
+              </Label>
+              <Select value={preferredLanguage} onValueChange={handleLanguageChange}>
+                <SelectTrigger className="w-full max-w-xs">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROGRAMMING_LANGUAGES.map((lang) => (
+                    <SelectItem key={lang.value} value={lang.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{lang.icon}</span>
+                        <span>{lang.label}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Questions will be generated in this language and students will answer in it
+              </p>
+            </div>
 
-              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors">
-                <RadioGroupItem value="full" id="coding_full" />
-                <div className="space-y-1 leading-none flex-1">
-                  <Label htmlFor="coding_full" className="font-medium cursor-pointer text-sm">
-                    Full Coding Problems
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    LeetCode-style with constraints and test cases. Component-based grading (0-100).
-                  </p>
+            {/* Coding Style Selector */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Code className="h-4 w-4" />
+                Coding Question Style
+              </Label>
+              <RadioGroup value={codingStyle} onValueChange={handleCodingStyleChange} className="space-y-3">
+                <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors bg-primary/5">
+                  <RadioGroupItem value="simple" id="coding_simple" />
+                  <div className="space-y-1 leading-none flex-1">
+                    <Label htmlFor="coding_simple" className="font-medium cursor-pointer text-sm">
+                      Simple Check-Ins (Recommended)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Quick conceptual prompts (e.g., "Write a for loop that..."). <strong>100% if student shows core understanding.</strong>
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </RadioGroup>
+
+                <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent/50 transition-colors">
+                  <RadioGroupItem value="full" id="coding_full" />
+                  <div className="space-y-1 leading-none flex-1">
+                    <Label htmlFor="coding_full" className="font-medium cursor-pointer text-sm">
+                      Full Coding Problems
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      LeetCode-style with constraints and test cases. Component-based grading (0-100).
+                    </p>
+                  </div>
+                </div>
+              </RadioGroup>
+            </div>
           </div>
         )}
       </CardContent>
