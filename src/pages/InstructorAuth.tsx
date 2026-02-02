@@ -94,12 +94,8 @@ export default function InstructorAuth() {
         }
       } catch (error) {
         console.error('Error handling authenticated user:', error);
-      } finally {
-        // Always stop loading after handling authenticated user
-        if (isMounted) {
-          setIsInitializing(false);
-        }
       }
+      // Note: Loading state is managed by checkSession's finally block
     };
 
     // Set up auth state listener for OAuth callbacks
@@ -111,7 +107,9 @@ export default function InstructorAuth() {
         if (event === 'SIGNED_IN' && session) {
           // Use setTimeout to prevent Supabase auth deadlock
           setTimeout(() => {
-            handleAuthenticatedUser(session);
+            handleAuthenticatedUser(session).finally(() => {
+              if (isMounted) setIsInitializing(false);
+            });
           }, 0);
         }
       }
@@ -128,21 +126,24 @@ export default function InstructorAuth() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (!isMounted) return;
+        if (!isMounted) {
+          setIsInitializing(false);
+          return;
+        }
 
         if (session) {
           await handleAuthenticatedUser(session);
         }
-        // Note: handleAuthenticatedUser sets isInitializing to false in its finally block
-        // If no session, we fall through to the finally block below
       } catch (error) {
         // Silently handle abort errors - they're expected in StrictMode
         if (!(error instanceof Error && error.message.includes('abort'))) {
           console.error('Session check error:', error);
         }
       } finally {
-        // ALWAYS stop loading - single source of truth
-        setIsInitializing(false);
+        // ALWAYS stop loading after checkSession completes
+        if (isMounted) {
+          setIsInitializing(false);
+        }
       }
     };
 
