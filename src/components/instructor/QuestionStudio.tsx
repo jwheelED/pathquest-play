@@ -5,10 +5,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, FileText, X, Sparkles, Loader2, Send, Plus, Wand2, Video } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, FileText, X, Sparkles, Loader2, Send, Plus, Wand2, Video, Code, Library } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { StudioQuestionCard, StudioQuestion } from "./StudioQuestionCard";
+import { CodingQuestionCreator } from "./CodingQuestionCreator";
+import { QuestionBankPanel } from "./QuestionBankPanel";
 
 interface UploadedFile {
   id: string;
@@ -616,188 +619,225 @@ export function QuestionStudio({ lectureId }: QuestionStudioProps) {
     );
   }
 
-  // Standalone mode UI (original behavior)
+  // Standalone mode UI with tabs (original + coding + bank)
   return (
-    <Card className="border-primary/20">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          Question Studio
-        </CardTitle>
-        <CardDescription>
-          Upload materials and use natural language to generate custom questions for your lectures
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Section 1: Context Materials Upload */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            Context Materials
-          </label>
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`
-              border-2 border-dashed rounded-lg p-6 text-center transition-colors
-              ${isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}
-            `}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.txt,.docx"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground mb-2">
-              Drag & drop PDFs, DOCX, or TXT files here
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Browse Files
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <Tabs defaultValue="generate" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="generate" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Generate
+          </TabsTrigger>
+          <TabsTrigger value="coding" className="flex items-center gap-2">
+            <Code className="h-4 w-4" />
+            Coding
+          </TabsTrigger>
+          <TabsTrigger value="bank" className="flex items-center gap-2">
+            <Library className="h-4 w-4" />
+            Question Bank
+          </TabsTrigger>
+        </TabsList>
 
-          {uploadedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {uploadedFiles.map(file => (
-                <Badge
-                  key={file.id}
-                  variant="secondary"
-                  className="flex items-center gap-2 py-1.5 px-3"
-                >
-                  <FileText className="h-3 w-3" />
-                  <span className="max-w-[150px] truncate">{file.name}</span>
-                  {file.parsing ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <button
-                      onClick={() => removeFile(file.id)}
-                      className="hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Section 2: Natural Language Prompt */}
-        <div className="space-y-3">
-          <label className="text-sm font-medium flex items-center gap-2">
-            <Send className="h-4 w-4" />
-            Instructions
-          </label>
-          <div className="flex gap-2">
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Create 5 USMLE-style clinical vignettes about diabetes management based on the uploaded PDF..."
-              className="min-h-[80px] flex-1"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span>Examples:</span>
-            <button
-              className="hover:text-primary underline"
-              onClick={() => setPrompt("Create 5 complex MCQs focusing on clinical diagnosis")}
-            >
-              Clinical MCQs
-            </button>
-            <span>•</span>
-            <button
-              className="hover:text-primary underline"
-              onClick={() => setPrompt("Generate 3 short answer questions about key concepts")}
-            >
-              Short answer
-            </button>
-            <span>•</span>
-            <button
-              className="hover:text-primary underline"
-              onClick={() => setPrompt("Create 5 recall-level questions for exam prep")}
-            >
-              Exam prep
-            </button>
-          </div>
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim()}
-            className="w-full"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Questions
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Section 3: Generated Questions Queue */}
-        {questions.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">
-                Generated Questions ({questions.length})
-              </label>
-              <Badge variant="outline">
-                {approvedQuestions.length} approved
-              </Badge>
-            </div>
-            <ScrollArea className="h-[400px] pr-4">
+        {/* Generate Tab - Original functionality */}
+        <TabsContent value="generate">
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Question Studio
+              </CardTitle>
+              <CardDescription>
+                Upload materials and use natural language to generate custom questions for your lectures
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Section 1: Context Materials Upload */}
               <div className="space-y-3">
-                {questions.map((question, idx) => (
-                  <StudioQuestionCard
-                    key={question.id}
-                    question={question}
-                    index={idx + 1}
-                    onApprove={() => handleApprove(question.id)}
-                    onEdit={(updates) => handleEdit(question.id, updates)}
-                    onRegenerate={() => handleRegenerate(question.id)}
-                    onDelete={() => handleDelete(question.id)}
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Context Materials
+                </label>
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`
+                    border-2 border-dashed rounded-lg p-6 text-center transition-colors
+                    ${isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"}
+                  `}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.txt,.docx"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
                   />
-                ))}
-              </div>
-            </ScrollArea>
+                  <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Drag & drop PDFs, DOCX, or TXT files here
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Browse Files
+                  </Button>
+                </div>
 
-            {/* Assign to Lecture */}
-            {approvedQuestions.length > 0 && (
-              <div className="flex gap-2 pt-4 border-t">
-                <Select value={selectedLectureId} onValueChange={setSelectedLectureId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a lecture to assign questions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {lectures.map(lecture => (
-                      <SelectItem key={lecture.id} value={lecture.id}>
-                        {lecture.title}
-                      </SelectItem>
+                {uploadedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedFiles.map(file => (
+                      <Badge
+                        key={file.id}
+                        variant="secondary"
+                        className="flex items-center gap-2 py-1.5 px-3"
+                      >
+                        <FileText className="h-3 w-3" />
+                        <span className="max-w-[150px] truncate">{file.name}</span>
+                        {file.parsing ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <button
+                            onClick={() => removeFile(file.id)}
+                            className="hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </Badge>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAssignToLecture} disabled={!selectedLectureId}>
-                  Assign {approvedQuestions.length} Questions
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Natural Language Prompt */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Send className="h-4 w-4" />
+                  Instructions
+                </label>
+                <div className="flex gap-2">
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Create 5 USMLE-style clinical vignettes about diabetes management based on the uploaded PDF..."
+                    className="min-h-[80px] flex-1"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span>Examples:</span>
+                  <button
+                    className="hover:text-primary underline"
+                    onClick={() => setPrompt("Create 5 complex MCQs focusing on clinical diagnosis")}
+                  >
+                    Clinical MCQs
+                  </button>
+                  <span>•</span>
+                  <button
+                    className="hover:text-primary underline"
+                    onClick={() => setPrompt("Generate 3 short answer questions about key concepts")}
+                  >
+                    Short answer
+                  </button>
+                  <span>•</span>
+                  <button
+                    className="hover:text-primary underline"
+                    onClick={() => setPrompt("Create 5 recall-level questions for exam prep")}
+                  >
+                    Exam prep
+                  </button>
+                </div>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !prompt.trim()}
+                  className="w-full"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate Questions
+                    </>
+                  )}
                 </Button>
               </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+              {/* Section 3: Generated Questions Queue */}
+              {questions.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">
+                      Generated Questions ({questions.length})
+                    </label>
+                    <Badge variant="outline">
+                      {approvedQuestions.length} approved
+                    </Badge>
+                  </div>
+                  <ScrollArea className="h-[400px] pr-4">
+                    <div className="space-y-3">
+                      {questions.map((question, idx) => (
+                        <StudioQuestionCard
+                          key={question.id}
+                          question={question}
+                          index={idx + 1}
+                          onApprove={() => handleApprove(question.id)}
+                          onEdit={(updates) => handleEdit(question.id, updates)}
+                          onRegenerate={() => handleRegenerate(question.id)}
+                          onDelete={() => handleDelete(question.id)}
+                        />
+                      ))}
+                    </div>
+                  </ScrollArea>
+
+                  {/* Assign to Lecture */}
+                  {approvedQuestions.length > 0 && (
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Select value={selectedLectureId} onValueChange={setSelectedLectureId}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select a lecture to assign questions" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lectures.map(lecture => (
+                            <SelectItem key={lecture.id} value={lecture.id}>
+                              {lecture.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button onClick={handleAssignToLecture} disabled={!selectedLectureId}>
+                        Assign {approvedQuestions.length} Questions
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Coding Tab - New coding question creator */}
+        <TabsContent value="coding">
+          <CodingQuestionCreator 
+            onSave={() => {
+              // Refresh will happen in bank tab
+              toast.success("Navigate to Question Bank to see your saved questions");
+            }}
+          />
+        </TabsContent>
+
+        {/* Question Bank Tab */}
+        <TabsContent value="bank">
+          <QuestionBankPanel />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
