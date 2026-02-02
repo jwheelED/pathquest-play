@@ -46,11 +46,19 @@ function App() {
   // PostHog user identification
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (session?.user) {
-          // Identify user in PostHog
+          // Fetch user's profile to get their full name for PostHog display
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          
+          // Identify user in PostHog with name for better display
           posthog.identify(session.user.id, {
             email: session.user.email,
+            name: profile?.full_name || session.user.email,
             role: session.user.user_metadata?.role,
           });
         } else if (event === 'SIGNED_OUT') {
