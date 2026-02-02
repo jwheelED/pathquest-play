@@ -13,7 +13,6 @@ import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
-import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
@@ -24,6 +23,7 @@ import { LectureVideoManager } from "@/components/instructor/LectureVideoManager
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { useInstructorLayout } from "@/components/instructor/InstructorLayout";
 
 interface Student {
   id: string;
@@ -60,8 +60,14 @@ export default function InstructorDashboard() {
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
+  const { setShowTranscription } = useInstructorLayout();
   
   const professorType = instructorProfile?.professor_type;
+
+  // Sync activeTab with InstructorLayout to control LectureTranscription visibility
+  useEffect(() => {
+    setShowTranscription(activeTab === "live");
+  }, [activeTab, setShowTranscription]);
 
   useEffect(() => {
     checkAuth();
@@ -626,10 +632,7 @@ export default function InstructorDashboard() {
             </div>
           )}
           
-          {/* Always mount LectureTranscription to persist recording across tabs */}
-          <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
-            <LectureTranscription onQuestionGenerated={() => {}} />
-          </div>
+          {/* LectureTranscription is now rendered in InstructorLayout to persist across route navigation */}
           
           {renderTabContent()}
         </main>
