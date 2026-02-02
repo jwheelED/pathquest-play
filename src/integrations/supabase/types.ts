@@ -2405,6 +2405,7 @@ export type Database = {
           medical_specialty: string | null
           onboarded: boolean | null
           org_id: string | null
+          preferred_coding_language: string | null
           professor_type: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference: string | null
           question_format_preference: string | null
@@ -2445,6 +2446,7 @@ export type Database = {
           medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
+          preferred_coding_language?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
@@ -2485,6 +2487,7 @@ export type Database = {
           medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
+          preferred_coding_language?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
