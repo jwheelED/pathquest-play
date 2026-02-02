@@ -44,11 +44,6 @@ export interface LectureRecordingActions {
 export interface ExtractedVoiceQuestion {
   question_text: string;
   suggested_type: 'short_answer' | 'multiple_choice';
-  // MCQ fields (pre-generated for editing)
-  options?: string[];
-  correct_answer?: 'A' | 'B' | 'C' | 'D';
-  // Short answer expected answer (for grading reference)
-  expected_answer?: string;
 }
 
 export interface UseLectureRecordingOptions {
@@ -57,8 +52,6 @@ export interface UseLectureRecordingOptions {
   onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
   /** Callback when a voice command extracts a question - allows preview before sending */
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
-  /** Callback when an auto-interval question is extracted - allows preview before sending */
-  onAutoQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
   /** When true, bypasses the question preview setting and sends questions immediately */
   bypassPreviewSetting?: boolean;
 }
@@ -114,7 +107,7 @@ const detectVoiceCommandDirect = (
 };
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, onAutoQuestionExtracted, bypassPreviewSetting = false } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
@@ -488,27 +481,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       // Track auto-question triggered in PostHog
       trackAutoQuestionTriggered(autoQuestionInterval);
       
-      // Check if preview is enabled and callback is available
-      const shouldPreview = questionPreviewEnabledRef.current && !bypassPreviewSetting && onAutoQuestionExtracted;
-      
-      if (shouldPreview) {
-        // Show preview dialog instead of sending directly
-        console.log('👁️ Auto-question preview enabled - opening preview dialog');
-        playNotificationSound().catch(() => {});
-        
-        onAutoQuestionExtracted({
-          question_text: data.question_text,
-          suggested_type: data.suggested_type,
-          expected_answer: data.expected_answer || "",
-          options: data.options,
-          correct_answer: data.correct_answer,
-        });
-        
-        // Return true to indicate we handled it (user will confirm via dialog)
-        return true;
-      }
-      
-      // Send directly without preview
+      // Auto-generated questions always send directly - no preview
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
