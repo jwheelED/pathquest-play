@@ -94,6 +94,11 @@ export default function InstructorAuth() {
         }
       } catch (error) {
         console.error('Error handling authenticated user:', error);
+      } finally {
+        // Always stop loading after handling authenticated user
+        if (isMounted) {
+          setIsInitializing(false);
+        }
       }
     };
 
@@ -124,19 +129,22 @@ export default function InstructorAuth() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!isMounted) {
+          setIsInitializing(false);
           return;
         }
 
         if (session) {
           await handleAuthenticatedUser(session);
+        } else {
+          // No session - stop loading immediately
+          setIsInitializing(false);
         }
       } catch (error) {
         // Silently handle abort errors - they're expected in StrictMode
         if (!(error instanceof Error && error.message.includes('abort'))) {
           console.error('Session check error:', error);
         }
-      } finally {
-        // ALWAYS turn off loading - this is the key fix
+        // Always stop loading on error
         setIsInitializing(false);
       }
     };
