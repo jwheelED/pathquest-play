@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,9 @@ export default function InstructorAuth() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const navigate = useNavigate();
+  const hasCheckedSessionRef = useRef(false);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -24,64 +26,100 @@ export default function InstructorAuth() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Check if user has instructor role
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", session.user.id)
-          .eq("role", "instructor")
-          .maybeSingle();
-        
-        if (roleData) {
-          // Check if user has completed org onboarding and regular onboarding
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('org_id, onboarded, course_title, course_schedule, course_topics')
-            .eq('id', session.user.id)
-            .single();
+      // Prevent double-checking in StrictMode
+      if (hasCheckedSessionRef.current) {
+        setIsInitializing(false);
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
+        if (session) {
+          hasCheckedSessionRef.current = true;
           
-          // First check if they have an organization
-          if (!profile?.org_id) {
-            navigate("/instructor/org-onboarding");
-          } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
-            navigate("/instructor/onboarding");
-          } else {
-            navigate("/instructor/dashboard");
-          }
-        } else {
-          // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
-          const sessionCreatedAt = new Date(session.user.created_at).getTime();
-          const now = Date.now();
-          const isRecentSignup = (now - sessionCreatedAt) < 30000; // 30 seconds
+          // Check if user has instructor role
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .eq("role", "instructor")
+            .maybeSingle();
           
-          // Also check URL for OAuth callback indicators
-          const urlParams = new URLSearchParams(window.location.search);
-          const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
-          
-          if (isRecentSignup && hasOAuthCallback) {
-            // This is a new OAuth signup - assign instructor role
-            const { data: success } = await supabase
-              .rpc('assign_oauth_role', { 
-                p_user_id: session.user.id, 
-                p_role: 'instructor' 
-              });
+          if (!isMounted) return;
+
+          if (roleData) {
+            // Check if user has completed org onboarding and regular onboarding
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('org_id, onboarded, course_title, course_schedule, course_topics')
+              .eq('id', session.user.id)
+              .single();
             
-            if (success) {
-              toast.success("Instructor account created!");
+            if (!isMounted) return;
+
+            // First check if they have an organization
+            if (!profile?.org_id) {
               navigate("/instructor/org-onboarding");
+            } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+              navigate("/instructor/onboarding");
+            } else {
+              navigate("/instructor/dashboard");
             }
           } else {
-            // Existing user who is not an instructor - redirect them appropriately
-            toast.error("This account is not registered as an instructor. Please use the student login.");
-            await supabase.auth.signOut();
+            // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
+            const sessionCreatedAt = new Date(session.user.created_at).getTime();
+            const now = Date.now();
+            const isRecentSignup = (now - sessionCreatedAt) < 30000; // 30 seconds
+            
+            // Also check URL for OAuth callback indicators
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
+            
+            if (isRecentSignup && hasOAuthCallback) {
+              // This is a new OAuth signup - assign instructor role
+              const { data: success } = await supabase
+                .rpc('assign_oauth_role', { 
+                  p_user_id: session.user.id, 
+                  p_role: 'instructor' 
+                });
+              
+              if (!isMounted) return;
+
+              if (success) {
+                toast.success("Instructor account created!");
+                navigate("/instructor/org-onboarding");
+              }
+            } else {
+              // Existing user who is not an instructor - redirect them appropriately
+              toast.error("This account is not registered as an instructor. Please use the student login.");
+              await supabase.auth.signOut();
+            }
           }
+        }
+      } catch (error) {
+        // Silently handle abort errors - they're expected in StrictMode
+        if (error instanceof Error && error.message.includes('abort')) {
+          console.log('Session check aborted (expected in StrictMode)');
+        } else {
+          console.error('Session check error:', error);
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
         }
       }
     };
+
     checkSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const handlePasswordReset = async () => {
@@ -215,6 +253,15 @@ export default function InstructorAuth() {
       setLoading(false);
     }
   };
+
+  // Show loading during initial session check
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/5 to-secondary/10 p-4">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/5 to-secondary/10 p-4">
