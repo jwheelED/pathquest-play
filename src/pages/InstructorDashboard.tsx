@@ -13,7 +13,6 @@ import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
-import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
@@ -24,6 +23,7 @@ import { LectureVideoManager } from "@/components/instructor/LectureVideoManager
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { useInstructorLayout } from "@/components/instructor/InstructorLayout";
 
 interface Student {
   id: string;
@@ -56,11 +56,18 @@ export default function InstructorDashboard() {
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [instructorProfile, setInstructorProfile] = useState<any>(null);
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
+  const { setShowTranscription } = useInstructorLayout();
   
   const professorType = instructorProfile?.professor_type;
+
+  // Sync activeTab with InstructorLayout to control LectureTranscription visibility
+  useEffect(() => {
+    setShowTranscription(activeTab === "live");
+  }, [activeTab, setShowTranscription]);
 
   useEffect(() => {
     checkAuth();
@@ -462,12 +469,7 @@ export default function InstructorDashboard() {
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {currentUser && (
-                <div className="min-w-0">
-                  <LiveSessionControls onSessionChange={setLiveSessionId} />
-                </div>
-              )}
-
+              {/* LiveSessionControls is rendered outside switch to persist - shown here */}
               <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent h-fit">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -617,10 +619,20 @@ export default function InstructorDashboard() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-          {/* Always mount LectureTranscription to persist recording across tabs */}
-          <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
-            <LectureTranscription onQuestionGenerated={() => {}} />
-          </div>
+          {/* Always mount LiveSessionControls to persist session state across tabs */}
+          {currentUser && (
+            <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <LiveSessionControls 
+                  onSessionChange={setLiveSessionId} 
+                  activeSession={activeSession}
+                  setActiveSession={setActiveSession}
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* LectureTranscription is now rendered in InstructorLayout to persist across route navigation */}
           
           {renderTabContent()}
         </main>

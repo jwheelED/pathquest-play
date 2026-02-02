@@ -16,6 +16,7 @@ import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { trackQuestionAnswered } from "@/lib/posthogTracking";
 
 interface Question {
   id: string;
@@ -176,16 +177,38 @@ const LiveStudent = () => {
     handleSubmitWithConfidence(level, multiplier);
   };
 
+  // Extract just the letter from MCQ answer for reliable server-side comparison
+  const extractMCQLetter = (answer: string): string => {
+    // If already just a letter, return it
+    if (/^[A-Da-d]$/.test(answer.trim())) {
+      return answer.trim().toUpperCase();
+    }
+    // Extract letter from "B) 206 bones", "B. Answer", etc.
+    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
+    if (letterMatch) {
+      return letterMatch[1].toUpperCase();
+    }
+    // Fallback: return first character if A-D
+    if (/^[A-Da-d]/i.test(answer.trim())) {
+      return answer.trim().charAt(0).toUpperCase();
+    }
+    return answer; // Return original if no pattern matches
+  };
+
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
 
     setIsSubmitting(true);
     const responseTimeMs = Date.now() - questionStartTime;
 
+    // For MCQ, extract just the letter for reliable grading
+    const isMCQ = currentQuestion.question_content.type === 'multiple_choice';
+    const normalizedAnswer = isMCQ ? extractMCQLetter(selectedAnswer) : selectedAnswer;
+
     const responseData = {
       questionId: currentQuestion.id,
       participantId,
-      answer: selectedAnswer,
+      answer: normalizedAnswer,
       responseTimeMs,
       confidenceLevel: level,
       confidenceMultiplier: multiplier,
@@ -222,6 +245,12 @@ const LiveStudent = () => {
         setIsCorrect(result.data.isCorrect);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
+        
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'multiple_choice',
+          responseTimeMs
+        );
         
         if (result.data.isCorrect) {
           toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
@@ -348,6 +377,12 @@ const LiveStudent = () => {
         setGradePending(result.data.gradePending || false);
         setShowAccountPrompt(true);
         
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'short_answer',
+          responseTimeMs
+        );
+        
         // Show appropriate feedback based on grading mode
         if (result.data.gradePending) {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
@@ -445,6 +480,12 @@ const LiveStudent = () => {
         setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
+        
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'coding',
+          responseTimeMs
+        );
         
         if (result.data.aiGrade !== null) {
           const gradeText = `${result.data.aiGrade}%`;
@@ -677,25 +718,18 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
-              {/* MCQ Results */}
+              {/* MCQ Results - Poll-style neutral feedback */}
               {isMCQ && (
                 <>
-                  {isCorrect ? (
-                    <>
-                      <div className="relative">
-                        <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
-                      </div>
-                      <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
-                      <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
-                      <p className="text-muted-foreground">
-                        Correct answer: <MathRenderer content={currentQuestion.question_content.correctAnswer} />
-                      </p>
-                    </>
-                  )}
+                  <div className="relative">
+                    <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                    Response Recorded ✓
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your answer: <span className="font-semibold">{selectedAnswer}</span>
+                  </p>
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}

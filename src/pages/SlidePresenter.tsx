@@ -13,6 +13,7 @@ import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
+import { trackQuestionSent, trackSlidePresenterStarted } from '@/lib/posthogTracking';
 
 export interface SlideData {
   id: string;
@@ -96,6 +97,16 @@ export default function SlidePresenter() {
     setIsVoicePreviewOpen(true);
   }, []);
 
+  // Handle extracted auto-interval question - reuse voice preview dialog
+  const handleAutoQuestionExtracted = useCallback((data: ExtractedVoiceQuestion) => {
+    console.log('⏰ Auto-interval question extracted, opening preview:', data);
+    // Play notification to alert instructor
+    playNotificationSound().catch(() => {});
+    toast.info('Auto-question ready for review!');
+    setVoicePreviewData(data);
+    setIsVoicePreviewOpen(true);
+  }, []);
+
   // Integrate lecture recording hook with slide context
   const {
     isRecording,
@@ -119,7 +130,8 @@ export default function SlidePresenter() {
     slideContext: currentSlideText,
     onVoiceCommand: handleVoiceCommand,
     onQuestionExtracted: handleQuestionExtracted,
-    bypassPreviewSetting: true, // Slide Presenter always sends immediately
+    onAutoQuestionExtracted: handleAutoQuestionExtracted,
+    bypassPreviewSetting: false, // Allow preview for auto-questions when enabled
   });
 
   // Update ref when handleManualQuestionSend is available
@@ -189,6 +201,9 @@ export default function SlidePresenter() {
         toast.error(sendData?.error || 'Failed to send question');
         return;
       }
+
+      // Track question sent in PostHog
+      trackQuestionSent(previewQuestionType, 'slide');
 
       const modeLabel = isPollMode ? 'Poll' : previewQuestionType.toUpperCase();
       toast.success(`${modeLabel} sent to students!`);
@@ -423,6 +438,9 @@ export default function SlidePresenter() {
     setIsFullscreen(true);
     setCurrentSlideText('');
     setCurrentSlideNumber(1);
+    
+    // Track slide presentation start in PostHog
+    trackSlidePresenterStarted(presentation.id);
     
     // Enter browser fullscreen
     try {
