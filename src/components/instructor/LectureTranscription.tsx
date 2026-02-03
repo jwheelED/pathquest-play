@@ -60,6 +60,7 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
+import { useRecordingContextSafe } from "@/contexts/RecordingContext";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -196,6 +197,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
+  
+  // Sync recording state to context for persistent recording across route changes
+  const recordingContext = useRecordingContextSafe();
+  
+  useEffect(() => {
+    if (recordingContext) {
+      recordingContext.updateRecordingState({
+        isRecording,
+        recordingDuration,
+        autoQuestionEnabled,
+        autoQuestionInterval,
+        nextAutoQuestionIn,
+        studentCount,
+      });
+    }
+  }, [isRecording, recordingDuration, autoQuestionEnabled, autoQuestionInterval, nextAutoQuestionIn, studentCount, recordingContext]);
 
   // Document Picture-in-Picture for floating presenter widget
   const { isSupported: isPiPSupported, openPiP } = useDocumentPiP({
