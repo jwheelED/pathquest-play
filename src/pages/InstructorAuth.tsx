@@ -11,11 +11,49 @@ import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
 export default function InstructorAuth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const navigate = useNavigate();
+
+  // Handle password recovery flow when user clicks link from email
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handlePasswordUpdate = async () => {
+    setLoading(true);
+    try {
+      if (!newPassword || newPassword.length < 8) {
+        toast.error("Password must be at least 8 characters");
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) throw error;
+
+      toast.success("Password updated successfully! Please sign in.");
+      setIsRecoveryMode(false);
+      setNewPassword("");
+      await supabase.auth.signOut();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -224,10 +262,34 @@ export default function InstructorAuth() {
             Instructor Portal
           </CardTitle>
           <CardDescription>
-            {isResetMode ? "Reset your password" : isSignUp ? "Create your instructor account" : "Sign in to manage your students"}
+            {isRecoveryMode ? "Enter your new password" : isResetMode ? "Reset your password" : isSignUp ? "Create your instructor account" : "Sign in to manage your students"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isRecoveryMode ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Enter your new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
+                  className="retro-input"
+                />
+              </div>
+              <Button
+                onClick={handlePasswordUpdate}
+                disabled={loading}
+                className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold shadow-glow"
+              >
+                {loading ? "Updating..." : "Update Password"}
+              </Button>
+            </>
+          ) : (
+            <>
           {!isResetMode && isSignUp && (
             <div className="space-y-2">
               <Label htmlFor="instructor-name">Full Name</Label>
@@ -343,11 +405,15 @@ export default function InstructorAuth() {
               ← Back to Sign In
             </Button>
           )}
-          <p className="text-sm text-center text-muted-foreground">
-            <Link to="/" className="text-secondary hover:underline">
-              ← Back to Home
-            </Link>
-          </p>
+          {!isRecoveryMode && (
+            <p className="text-sm text-center text-muted-foreground">
+              <Link to="/" className="text-secondary hover:underline">
+                ← Back to Home
+              </Link>
+            </p>
+          )}
+          </>
+          )}
         </CardContent>
       </Card>
     </div>
