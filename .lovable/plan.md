@@ -1,181 +1,187 @@
 
-# Expandable Student Response Viewer for Check-In Results
+# Bug Fix Plan: Visual Analytics Count & MCQ Grading Issues
 
-## Overview
-Add collapsible/expandable sections in both **Question Bank Results** and **Live Lecture Check-In Results** so professors can view the full text of student short answer and coding submissions.
+## Bug 1: Visual Analytics Showing Wrong Student Count
 
-## Current State
-
-### LectureCheckInResults.tsx
-- **Coding questions**: Already has a basic `<details>` element for viewing code (lines 1387-1400), but it's minimal
-- **Short answer questions**: Has a dedicated review section (lines 1503-1619) that shows the full text but not in an expandable format
-
-### QuestionBankResults.tsx
-- **Coding questions**: Shows truncated code preview (first 200 chars) in a small `<pre>` block
-- **Short answer questions**: Shows truncated text in a `line-clamp-2` paragraph
-- Neither type has expandable functionality
-
-## Implementation Plan
-
-### Phase 1: Create Reusable Expandable Response Component
-
-Create a new component that handles the expandable view for both short answer and coding responses:
-
-**New File**: `src/components/instructor/ExpandableStudentResponse.tsx`
-
-Features:
-- Collapsible container with smooth animation using Radix Collapsible
-- Different styling for code (syntax-highlighted dark theme) vs text (light background)
-- Shows student name, grade badge, and AI feedback when available
-- ChevronDown icon that rotates when expanded
-- Truncated preview when collapsed
-
-```
-+----------------------------------------+
-| 👤 John Smith          [85%] [▼ View]  |
-+----------------------------------------+
-| (collapsed: "Osmosis is the moveme..." |
-+----------------------------------------+
-
-When expanded:
-+----------------------------------------+
-| 👤 John Smith          [85%] [▲ Hide]  |
-+----------------------------------------+
-| Osmosis is the movement of water       |
-| molecules through a semipermeable      |
-| membrane from an area of low solute    |
-| concentration to high concentration... |
-|                                        |
-| 💬 AI Feedback: Good explanation of... |
-+----------------------------------------+
-```
-
-### Phase 2: Update QuestionBankResults.tsx
-
-Replace the current `renderAnswer` function with the new expandable component:
-
-**Changes to `renderAnswer` function (lines 238-298)**:
-1. For `short_answer`: Use Collapsible to show full text on expand
-2. For `coding`/`coding_simple`: Use Collapsible with code block styling
-3. Add expand/collapse button with visual indicator
-4. Show AI feedback in expanded view
-
-### Phase 3: Update LectureCheckInResults.tsx
-
-Enhance both the student responses section and the short answer review section:
-
-**Changes to student response rendering (around lines 1370-1400)**:
-1. Replace `<details>` with styled Collapsible for coding
-2. Add same expandable treatment for short answer responses in the main list
-
-**Changes to short answer review section (lines 1503-1619)**:
-1. Make the student answer text collapsible for long responses
-2. Add visual indicator for expand/collapse
-3. Keep the grading controls visible outside the collapsible area
-
-### Phase 4: Add Coding Review Section to LectureCheckInResults
-
-Add a dedicated "Student Code Submissions" section similar to the short answer review section (lines 1503-1619):
-
-**New section for coding questions** (after line 1619):
-- Similar structure to short answer review
-- Syntax-highlighted code display
-- AI grade and feedback display
-- Manual grade override option
-
-## Technical Details
-
-### Collapsible Component Usage
+### Root Cause
+The `QuestionAnalyticsChart.tsx` component uses a fixed `questionIndex` (the index within the group's merged questions array) to look up student responses:
 
 ```typescript
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-
-<Collapsible>
-  <div className="flex items-center justify-between">
-    <span>{studentName}</span>
-    <CollapsibleTrigger asChild>
-      <Button variant="ghost" size="sm">
-        <ChevronsUpDown className="h-4 w-4" />
-        View Response
-      </Button>
-    </CollapsibleTrigger>
-  </div>
-  <CollapsibleContent>
-    <div className="p-3 mt-2 rounded bg-muted">
-      {/* Full response content */}
-    </div>
-  </CollapsibleContent>
-</Collapsible>
+// Line 43-45 in QuestionAnalyticsChart.tsx
+const count = assignments.filter(
+  (a) => a.completed && a.quiz_responses?.[questionIndex.toString()] === letter
+).length;
 ```
 
-### Code Display Styling
+**Problem**: Each student's assignment may have the question at a DIFFERENT index. When questions are grouped together from multiple assignment batches, the group's `questionIndex` doesn't match the actual position in each student's individual assignment.
 
-For coding responses, use consistent styling:
+For example:
+- Group shows Question A at index 0
+- Student 1's assignment has Question A at index 0 ✓
+- Student 2's assignment has Question A at index 1 (they received a different question first) ✗
+
+This causes the chart to miss students who answered at different indices, or count wrong answers.
+
+### The Fix Already Exists
+The same bug was already fixed in `LectureCheckInResults.tsx` (line 422-428) for the main stats calculation. The fix is to find the question index within EACH student's assignment by matching the question text:
+
 ```typescript
-<pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap">
-  {studentCode}
-</pre>
+const studentQuestionIdx = assignmentQuestions.findIndex(
+  (q: any) => q.question === question.question
+);
 ```
 
-### Short Answer Display Styling
+### Files to Modify
+- `src/components/instructor/QuestionAnalyticsChart.tsx`
 
-For text responses:
+### Changes
+
+1. **Pass the question object to the chart** (if not already available)
+2. **Update answer distribution calculation** to find the correct question index per student:
+
 ```typescript
-<p className="text-sm text-muted-foreground whitespace-pre-wrap p-3 bg-muted/50 rounded">
-  {studentAnswer}
-</p>
+const answerDistribution = isMultipleChoice
+  ? question.options?.map((opt: string, idx: number) => {
+      const letter = String.fromCharCode(65 + idx);
+      
+      // FIX: Find question index within EACH student's assignment
+      const count = assignments.filter((a) => {
+        if (!a.completed) return false;
+        const content = a.content as any;
+        const assignmentQuestions = content?.questions || [];
+        const studentQuestionIdx = assignmentQuestions.findIndex(
+          (q: any) => q.question === question.question
+        );
+        const studentAnswer = studentQuestionIdx >= 0 
+          ? a.quiz_responses?.[studentQuestionIdx.toString()]
+          : null;
+        return studentAnswer === letter;
+      }).length;
+      
+      return { option: letter, count, label: opt, isCorrect: letter === correctAnswer };
+    })
+  : [];
 ```
 
-## Files to Modify
+3. **Add deduplication** to prevent counting duplicate submissions from the same student
 
-| File | Changes |
-|------|---------|
-| `src/components/instructor/QuestionBankResults.tsx` | Update `renderAnswer` function to use Collapsible for full text/code viewing |
-| `src/components/instructor/LectureCheckInResults.tsx` | Add Collapsible to student responses, add dedicated coding review section |
+---
 
-## Visual Design
+## Bug 2: MCQ Sometimes Marked Incorrect
 
-### QuestionBankResults - Expanded Response
-```
-+------------------------------------------+
-| 👤 Alice Brown                    [85%]  |
-| ┌──────────────────────────────────────┐ |
-| │ ▼ View Full Response                 │ |
-| ├──────────────────────────────────────┤ |
-| │ Osmosis is the movement of water     │ |
-| │ molecules through a semipermeable    │ |
-| │ membrane from an area of lower       │ |
-| │ solute concentration to higher...    │ |
-| │                                      │ |
-| │ 💬 AI: Great explanation, captured   │ |
-| │    the key concept of passive...     │ |
-| └──────────────────────────────────────┘ |
-+------------------------------------------+
+### Root Cause
+There are two potential issues in the grading flow:
+
+**Issue A: Nested vs Direct Format Mismatch**
+The `submit-live-response` edge function handles two question content formats:
+1. Nested: `{ questions: [{ correctAnswer, options, type }] }`
+2. Direct: `{ correctAnswer, options, type }`
+
+When questions are sent via `format-and-send-question`, they're stored in the `live_questions` table with the `formattedQuestion` object directly (line 788):
+```typescript
+question_content: formattedQuestion,  // Direct format: { question, type, options, correctAnswer }
 ```
 
-### LectureCheckInResults - Coding Submission
-```
-+------------------------------------------+
-| Student Code Submissions & Grades        |
-+------------------------------------------+
-| 👤 John Smith                    [92%]   |
-| ┌──────────────────────────────────────┐ |
-| │ ▼ View Code                          │ |
-| ├──────────────────────────────────────┤ |
-| │ def fibonacci(n):                    │ |
-| │     if n <= 1:                       │ |
-| │         return n                     │ |
-| │     return fibonacci(n-1) + ...      │ |
-| │                                      │ |
-| │ 💬 AI: Correct recursive solution,   │ |
-| │    good base case handling.          │ |
-| └──────────────────────────────────────┘ |
-+------------------------------------------+
+However, when sent to `student_assignments`, they're wrapped in a `questions` array (line 833):
+```typescript
+content: {
+  questions: [formattedQuestion],  // Nested format
+  isLive: true,
+  ...
+}
 ```
 
-## Implementation Order
+The edge function correctly handles both, BUT there's still a potential issue:
 
-1. Update `QuestionBankResults.tsx` - Add Collapsible imports and update `renderAnswer`
-2. Update `LectureCheckInResults.tsx` - Replace `<details>` with Collapsible for coding responses
-3. Add coding review section to `LectureCheckInResults.tsx` (similar to short answer section)
-4. Test expand/collapse functionality across question types
+**Issue B: Empty Options Array**
+When the `options` array is empty or undefined in the stored question, the text-matching fallback in `normalizeAnswer()` won't work. The function relies on `options` to match text answers like "206 bones" to their corresponding letter "B".
+
+If the question is stored without options (or options get lost), the normalization can fail.
+
+### Verification
+Looking at line 166 in `submit-live-response`:
+```typescript
+options = firstQuestion.options || [];
+```
+
+If `firstQuestion.options` is undefined/null, options becomes an empty array, and the text matching loop (lines 33-66) won't find any matches.
+
+### The Fix
+1. **Add logging** to trace when options are empty to identify the data source issue
+2. **Ensure robust letter extraction** even without options by improving the fallback logic
+3. **Add case normalization** to the comparison to catch edge cases
+
+### Files to Modify
+- `supabase/functions/submit-live-response/index.ts`
+
+### Changes
+
+1. **Add diagnostic logging** when options are missing:
+```typescript
+if (!options || options.length === 0) {
+  console.warn(`⚠️ No options array found for MCQ grading. Question ID: ${questionId}`);
+}
+```
+
+2. **Improve the normalization to handle edge cases**:
+   - Trim whitespace from both student answer and correct answer before comparison
+   - Handle case where correctAnswer might contain extra formatting
+   - Add direct string comparison fallback AFTER normalization
+
+3. **Add final comparison logging** to debug mismatches:
+```typescript
+console.log('Final comparison:', {
+  studentAnswer: normalizedStudentAnswer,
+  correctAnswer: normalizedCorrectAnswer,
+  match: normalizedStudentAnswer === normalizedCorrectAnswer,
+  rawStudent: answer,
+  rawCorrect: correctAnswer
+});
+```
+
+---
+
+## Implementation Details
+
+### QuestionAnalyticsChart.tsx Changes
+
+The component needs access to the question object (specifically `question.question` text) to find the correct index per student. Currently it receives:
+- `question` - the question object (already has this)
+- `assignments` - the list of assignments
+- `questionIndex` - the group's question index (not reliable)
+
+The fix updates:
+1. `answerDistribution` calculation (lines 40-55)
+2. Any other place using `questionIndex` to access `quiz_responses`
+
+### submit-live-response Changes
+
+Add robustness to the normalization:
+
+```typescript
+// Before final comparison, ensure both are normalized
+const normalizedStudentAnswer = normalizeAnswer(answer.toString().trim(), questionType, options);
+const normalizedCorrectAnswer = normalizeAnswer(correctAnswer.toString().trim(), questionType, options);
+
+// Direct comparison after normalization
+const isCorrect = normalizedStudentAnswer.toUpperCase() === normalizedCorrectAnswer.toUpperCase();
+```
+
+---
+
+## Summary of Changes
+
+| File | Issue | Change |
+|------|-------|--------|
+| `src/components/instructor/QuestionAnalyticsChart.tsx` | Bug 1: Wrong count | Find question index per-student instead of using fixed group index |
+| `supabase/functions/submit-live-response/index.ts` | Bug 2: Wrong grading | Add diagnostic logging and improve normalization robustness |
+
+## Testing Recommendations
+
+After implementation:
+1. Create a live session with 2+ students
+2. Send an MCQ question
+3. Have students answer with different options
+4. Verify the visual analytics chart shows correct counts
+5. Verify answers are graded correctly (check edge function logs)
+6. Test with answers in different formats: "A", "A.", "A) text", "just the text"
