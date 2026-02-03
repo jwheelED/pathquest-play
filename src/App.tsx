@@ -100,6 +100,14 @@ function App() {
               <InstructorOnboarding />
             </ProtectedRoute>
           } />
+          {/* Standalone settings route - outside InstructorLayout to avoid persistent mounting conflicts */}
+          <Route path="/instructor/settings" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <CourseProvider>
+                <InstructorSettings />
+              </CourseProvider>
+            </ProtectedRoute>
+          } />
           {/* Instructor routes wrapped in InstructorLayout for persistent recording */}
           <Route element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
@@ -110,7 +118,6 @@ function App() {
           }>
             {/* Dashboard is rendered by InstructorLayout, but we need a route for it */}
             <Route path="/instructor/dashboard" element={null} />
-            <Route path="/instructor/settings" element={<InstructorSettings />} />
             <Route path="/instructor/lecture-presenter" element={<LecturePresenterView />} />
             <Route path="/instructor/presenter" element={<PresenterView />} />
             <Route path="/instructor/slides" element={<SlidePresenter />} />

@@ -438,7 +438,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
     
     // For lecture check-ins with MCQ, show confidence selector after selecting answer
     if (assignment.assignment_type === 'lecture_checkin') {
-      const questions = assignment.content.questions || [];
+      const questions = assignment.content?.questions || [];
       const hasMCQ = questions.some((q: any) => q.type !== 'short_answer' && q.type !== 'coding');
       if (hasMCQ) {
         setShowConfidenceSelector(prev => ({
@@ -574,7 +574,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
   const handleSubmitQuiz = async (assignment: Assignment) => {
     const mcAnswers = selectedAnswers[assignment.id] || {};
     const textAns = textAnswers[assignment.id] || {};
-    const questions = assignment.content.questions || [];
+    const questions = assignment.content?.questions || [];
     
     // Combine both answer types
     const allAnswers: Record<number, string> = {};
@@ -1309,7 +1309,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                   )}
 
                   {/* Quiz/Lecture Check-in Display */}
-                  {(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && assignment.content.questions && (
+                  {(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && assignment.content?.questions && (
                     <div className="space-y-4">
                       {assignment.content.questions.map((q: any, idx: number) => {
                         const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
