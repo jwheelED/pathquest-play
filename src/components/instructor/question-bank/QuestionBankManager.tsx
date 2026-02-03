@@ -7,12 +7,14 @@ import { QuestionBankItem, QuestionFormData } from "./types";
 
 interface QuestionBankManagerProps {
   courseId?: string;
+  professorType?: 'stem' | 'humanities' | 'medical' | null;
   onSendQuestion?: (question: QuestionBankItem) => void;
   isLiveSession?: boolean;
 }
 
 export function QuestionBankManager({ 
   courseId, 
+  professorType,
   onSendQuestion,
   isLiveSession = false 
 }: QuestionBankManagerProps) {
@@ -59,6 +61,7 @@ export function QuestionBankManager({
           <QuestionBankLibrary 
             key={refreshKey}
             courseId={courseId}
+            professorType={professorType}
             onEdit={handleEdit}
             onCreateNew={handleCreateNew}
             onSend={onSendQuestion}
@@ -69,6 +72,7 @@ export function QuestionBankManager({
         <TabsContent value="create" className="mt-6">
           <QuestionBankEditor 
             courseId={courseId}
+            professorType={professorType}
             editingQuestion={editingQuestion}
             onSave={handleSaveComplete}
             onCancel={handleCancel}

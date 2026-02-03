@@ -33,6 +33,7 @@ import { Json } from "@/integrations/supabase/types";
 
 interface QuestionBankLibraryProps {
   courseId?: string;
+  professorType?: 'stem' | 'humanities' | 'medical' | null;
   onEdit: (question: QuestionBankItem) => void;
   onCreateNew: () => void;
   onSend?: (question: QuestionBankItem) => void;
@@ -61,6 +62,7 @@ const difficultyColors: Record<Difficulty, string> = {
 
 export function QuestionBankLibrary({ 
   courseId, 
+  professorType,
   onEdit, 
   onCreateNew, 
   onSend,
@@ -219,7 +221,9 @@ export function QuestionBankLibrary({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="coding">Coding</SelectItem>
+              {professorType !== 'humanities' && (
+                <SelectItem value="coding">Coding</SelectItem>
+              )}
               <SelectItem value="multiple_choice">MCQ</SelectItem>
               <SelectItem value="short_answer">Short Answer</SelectItem>
             </SelectContent>

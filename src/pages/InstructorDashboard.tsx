@@ -38,10 +38,10 @@ interface Student {
 
 type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank";
 
-const baseNavItems: { value: TabValue; label: string; icon: React.ElementType; stemOnly?: boolean }[] = [
+const baseNavItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "live", label: "Live Lecture", icon: Radio },
-  { value: "question-bank", label: "Question Bank", icon: Library, stemOnly: true },
+  { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
@@ -65,11 +65,8 @@ export default function InstructorDashboard() {
   
   const professorType = instructorProfile?.professor_type;
   
-  // Filter nav items based on professor type - STEM instructors get Question Bank
-  const navItems = useMemo(() => 
-    baseNavItems.filter(item => !item.stemOnly || professorType === "stem"),
-    [professorType]
-  );
+  // All instructors get access to all nav items
+  const navItems = baseNavItems;
 
   useEffect(() => {
     checkAuth();
@@ -586,6 +583,7 @@ export default function InstructorDashboard() {
               <CardContent>
                 <QuestionBankManager 
                   courseId={selectedCourseId || undefined}
+                  professorType={professorType}
                   isLiveSession={!!activeSession}
                 />
               </CardContent>
