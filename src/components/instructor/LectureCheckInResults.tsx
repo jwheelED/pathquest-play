@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
@@ -460,6 +461,149 @@ export const LectureCheckInResults = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  // Expandable code response component for coding questions
+  const ExpandableCodeResponse = ({ 
+    studentAnswer, 
+    studentAIFeedback 
+  }: { 
+    studentAnswer: string; 
+    studentAIFeedback: string | null;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full max-w-md">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-6 px-2 gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Code className="h-3 w-3" />
+            <span>{isOpen ? "Hide Code" : "View Code"}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap text-left max-h-60">
+            {studentAnswer}
+          </pre>
+          {studentAIFeedback && (
+            <p className="mt-1 text-xs text-muted-foreground italic text-left p-2 bg-muted/50 rounded">
+              💬 {studentAIFeedback}
+            </p>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
+  // Coding submission card component with expandable code view
+  const CodingSubmissionCard = ({ 
+    assignment, 
+    studentAnswer, 
+    isCompleted, 
+    currentGrade,
+    questionAIRec,
+    qIdx,
+    fetchResults: fetchResultsFn
+  }: { 
+    assignment: Assignment;
+    studentAnswer: string | null;
+    isCompleted: boolean;
+    currentGrade: number | null;
+    questionAIRec: any;
+    qIdx: number;
+    fetchResults: () => void;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <div className="bg-white dark:bg-gray-900 p-3 rounded border">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <span className="font-medium text-sm">{assignment.student_name}</span>
+          <div className="flex items-center gap-2">
+            {!isCompleted && (
+              <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                <Clock className="h-3 w-3" />
+                Not Answered
+              </Badge>
+            )}
+            {isCompleted && currentGrade !== null && (
+              <Badge variant="default" className="bg-green-600">
+                Grade: {currentGrade}/100
+              </Badge>
+            )}
+          </div>
+        </div>
+        {isCompleted && studentAnswer && (
+          <>
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs mb-2 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                  <Code className="h-3 w-3" />
+                  <span>{isOpen ? "Hide Code" : "View Code"}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap mb-3 max-h-80">
+                  {studentAnswer}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
+            
+            {questionAIRec && (
+              <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded">
+                <p className="text-xs font-semibold text-purple-900 dark:text-purple-200 mb-1">
+                  🤖 AI Recommended Grade: {questionAIRec.grade}/100
+                </p>
+                <p className="text-xs text-purple-800 dark:text-purple-300">
+                  {questionAIRec.feedback}
+                </p>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                placeholder="Grade (0-100)"
+                defaultValue={currentGrade ?? questionAIRec?.grade ?? ''}
+                className="w-24 px-2 py-1 text-sm border rounded"
+                id={`coding-grade-${assignment.id}`}
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  const input = document.getElementById(`coding-grade-${assignment.id}`) as HTMLInputElement;
+                  const grade = parseInt(input.value);
+                  
+                  if (isNaN(grade) || grade < 0 || grade > 100) {
+                    toast.error("Please enter a valid grade (0-100)");
+                    return;
+                  }
+
+                  const { error } = await supabase
+                    .from('student_assignments')
+                    .update({ grade })
+                    .eq('id', assignment.id);
+
+                  if (error) {
+                    toast.error("Failed to save grade");
+                    return;
+                  }
+
+                  toast.success(`Grade saved: ${grade}/100`);
+                  fetchResultsFn();
+                }}
+              >
+                Save Grade
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   const generateSummary = async (
@@ -1385,19 +1529,10 @@ export const LectureCheckInResults = () => {
                                       </div>
                                       {/* Code viewer for coding questions */}
                                       {isCodingSimple && studentAnswer && (
-                                        <details className="text-xs w-full max-w-md">
-                                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground text-right">
-                                            View Code
-                                          </summary>
-                                          <pre className="mt-2 p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap text-left">
-                                            {studentAnswer}
-                                          </pre>
-                                          {studentAIFeedback && (
-                                            <p className="mt-1 text-xs text-muted-foreground italic text-left">
-                                              {studentAIFeedback}
-                                            </p>
-                                          )}
-                                        </details>
+                                        <ExpandableCodeResponse
+                                          studentAnswer={studentAnswer}
+                                          studentAIFeedback={studentAIFeedback}
+                                        />
                                       )}
                                     </div>
                                    ) : isManualGradeShortAnswer || (isCodingSimple && !hasAIGrade) ? (
@@ -1613,6 +1748,67 @@ export const LectureCheckInResults = () => {
                                   </div>
                                 );
                               });
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Coding review section */}
+                        {(question.type === "coding" || question.type === "coding_simple") && (
+                          <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                            <p className="text-xs font-medium mb-2 text-purple-900 dark:text-purple-200 flex items-center gap-2">
+                              <Code className="h-4 w-4" />
+                              Student Code Submissions & Grades:
+                            </p>
+                            <div className="space-y-2">
+                              {(() => {
+                                // Filter assignments to only those containing this specific question
+                                const questionAssignments = group.assignments.filter((a) => {
+                                  const content = a.content as any;
+                                  const assignmentQuestions = content?.questions || [];
+                                  return assignmentQuestions.some((q: any) => q.question === question.question);
+                                });
+
+                                // Deduplicate students - keep only the latest submission per student
+                                const uniqueStudents = new Map<string, Assignment>();
+                                questionAssignments.forEach((assignment) => {
+                                  const existing = uniqueStudents.get(assignment.student_id);
+                                  if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+                                    uniqueStudents.set(assignment.student_id, assignment);
+                                  }
+                                });
+                                
+                                return Array.from(uniqueStudents.values()).map((assignment) => {
+                                  // Find the question index within THIS student's assignment
+                                  const assignmentContent = assignment.content as any;
+                                  const assignmentQuestions = assignmentContent?.questions || [];
+                                  const studentQuestionIdx = assignmentQuestions.findIndex(
+                                    (q: any) => q.question === question.question
+                                  );
+                                  
+                                  const studentAnswer = studentQuestionIdx >= 0 
+                                    ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
+                                    : null;
+                                  const isCompleted = assignment.completed;
+                                  const currentGrade = assignment.grade;
+                                  
+                                  // Get AI recommendations for this question
+                                  const aiRec = assignment.quiz_responses?._ai_recommendations;
+                                  const questionAIRec = Array.isArray(aiRec) ? aiRec[studentQuestionIdx] : aiRec?.[studentQuestionIdx];
+
+                                  return (
+                                    <CodingSubmissionCard
+                                      key={assignment.id}
+                                      assignment={assignment}
+                                      studentAnswer={studentAnswer}
+                                      isCompleted={isCompleted}
+                                      currentGrade={currentGrade}
+                                      questionAIRec={questionAIRec}
+                                      qIdx={qIdx}
+                                      fetchResults={fetchResults}
+                                    />
+                                  );
+                                });
                               })()}
                             </div>
                           </div>

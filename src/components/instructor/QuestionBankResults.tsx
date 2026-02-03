@@ -8,6 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   BarChart3, 
@@ -19,7 +20,8 @@ import {
   Loader2,
   MessageSquare,
   Code,
-  FileText
+  FileText,
+  ChevronDown
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -235,6 +237,92 @@ export function QuestionBankResults() {
     return { completed, total, avgGrade };
   };
 
+  const ExpandableResponse = ({ 
+    answer, 
+    grade, 
+    feedback, 
+    questionType 
+  }: { 
+    answer: string | null | undefined; 
+    grade: number | undefined; 
+    feedback: string | null | undefined;
+    questionType: string;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const isCoding = questionType === "coding" || questionType === "coding_simple";
+    const isShortAnswer = questionType === "short_answer";
+    const needsExpansion = isCoding || isShortAnswer;
+    const previewLength = isCoding ? 80 : 60;
+
+    if (!needsExpansion) {
+      // MCQ - just show the answer
+      return (
+        <div className="flex items-center gap-2">
+          <Badge variant={grade === 100 ? "default" : "destructive"}>
+            {answer}
+          </Badge>
+          {grade === 100 ? (
+            <CheckCircle className="w-4 h-4 text-primary" />
+          ) : (
+            <XCircle className="w-4 h-4 text-destructive" />
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {isCoding ? (
+              <Code className="w-4 h-4 text-primary flex-shrink-0" />
+            ) : (
+              <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+            )}
+            <Badge 
+              variant={grade !== undefined && grade >= 70 ? "default" : grade !== undefined ? "destructive" : "outline"}
+              className={grade !== undefined && grade >= 70 ? "bg-green-600" : ""}
+            >
+              {grade !== undefined ? `${grade}%` : "Pending"}
+            </Badge>
+          </div>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs">
+              <span>{isOpen ? "Hide" : "View"}</span>
+              <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+
+        {/* Preview when collapsed */}
+        {!isOpen && answer && (
+          <p className="text-xs text-muted-foreground truncate mt-1">
+            {answer.slice(0, previewLength)}{answer.length > previewLength ? "..." : ""}
+          </p>
+        )}
+
+        <CollapsibleContent className="mt-2">
+          {isCoding ? (
+            <pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap max-h-60">
+              {answer || "(empty)"}
+            </pre>
+          ) : (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap p-3 bg-muted/50 rounded">
+              {answer || "(empty)"}
+            </p>
+          )}
+
+          {feedback && (
+            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/30 p-2 rounded mt-2 border border-blue-200 dark:border-blue-800">
+              <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0 text-blue-600" />
+              <span>{feedback}</span>
+            </div>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
   const renderAnswer = (assignment: Assignment, group: QuestionGroup) => {
     const answer = assignment.answers?.["0"] || assignment.answers?.q0;
     const grade = assignment.grades?.["0"] ?? assignment.grades?.q0;
@@ -250,51 +338,12 @@ export function QuestionBankResults() {
     }
 
     return (
-      <div className="space-y-2">
-        {group.questionType === "multiple_choice" ? (
-          <div className="flex items-center gap-2">
-            <Badge variant={grade === 100 ? "default" : "destructive"}>
-              {answer}
-            </Badge>
-            {grade === 100 ? (
-              <CheckCircle className="w-4 h-4 text-primary" />
-            ) : (
-              <XCircle className="w-4 h-4 text-destructive" />
-            )}
-          </div>
-        ) : group.questionType === "coding" || group.questionType === "coding_simple" ? (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">
-                {grade !== undefined ? `${grade}%` : "Pending"}
-              </span>
-            </div>
-            <pre className="text-xs bg-muted p-2 rounded overflow-x-auto max-h-20">
-              {answer?.slice(0, 200)}{answer?.length > 200 ? "..." : ""}
-            </pre>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">
-                {grade !== undefined ? `${grade}%` : "Pending"}
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              "{answer}"
-            </p>
-          </div>
-        )}
-
-        {feedback && (
-          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-            <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
-            <span className="line-clamp-2">{feedback}</span>
-          </div>
-        )}
-      </div>
+      <ExpandableResponse
+        answer={answer}
+        grade={grade}
+        feedback={feedback}
+        questionType={group.questionType}
+      />
     );
   };
 
