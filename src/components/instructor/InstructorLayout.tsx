@@ -99,7 +99,7 @@ function InstructorLayoutInner() {
         This preserves the LectureTranscription component and its recording state.
       */}
       {shouldKeepDashboardMounted && (
-        <div className={cn(isOnDashboard ? "" : "hidden")}>
+        <div className={cn(isOnDashboard ? "" : "hidden")} aria-hidden={!isOnDashboard}>
           <Suspense fallback={
             <div className="min-h-screen flex items-center justify-center bg-background">
               <p className="text-muted-foreground">Loading...</p>
