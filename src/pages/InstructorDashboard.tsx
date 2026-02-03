@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -22,6 +22,7 @@ import { LiveSessionControls } from "@/components/instructor/LiveSessionControls
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
+import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 
@@ -35,12 +36,13 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "live", label: "Live Lecture", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
+  { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
 ];
@@ -532,6 +534,9 @@ export default function InstructorDashboard() {
             )}
           </div>
         );
+
+      case "question-bank":
+        return <QuestionBankTab professorType={professorType} />;
 
       case "materials":
         return (
