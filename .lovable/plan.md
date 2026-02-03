@@ -1,238 +1,181 @@
 
-# Question Bank Results & Auto-Grading Plan
+# Expandable Student Response Viewer for Check-In Results
 
 ## Overview
-This plan adds two key features for Question Bank questions:
-1. **Dedicated Results Card**: A new component to view student responses for Question Bank-pushed questions (similar to `LectureCheckInResults` for live capture)
-2. **Auto-Grading Integration**: Ensure short answer and coding questions from the Question Bank are auto-graded when students submit
+Add collapsible/expandable sections in both **Question Bank Results** and **Live Lecture Check-In Results** so professors can view the full text of student short answer and coding submissions.
 
-## Current State Analysis
+## Current State
 
-### Question Bank Push Flow
-When questions are pushed via `push-bank-question`:
-- Assignments are created with `assignment_type: "lecture_checkin"`
-- Content includes `source: "question_bank"` to identify the origin
-- Mode is set to `auto_grade` for MCQ and coding, `manual_grade` for short answer
+### LectureCheckInResults.tsx
+- **Coding questions**: Already has a basic `<details>` element for viewing code (lines 1387-1400), but it's minimal
+- **Short answer questions**: Has a dedicated review section (lines 1503-1619) that shows the full text but not in an expandable format
 
-### Auto-Grading Gap
-Looking at `push-bank-question`, the mode for short answers is currently hardcoded to `manual_grade`:
-```typescript
-const getAssignmentMode = (questionType: string): string => {
-  if (questionType === "multiple_choice") return "auto_grade";
-  if (questionType === "coding_simple" || questionType === "coding") return "auto_grade";
-  return "manual_grade"; // short_answer <-- This prevents auto-grading!
-};
-```
-
-However, the student-side `AssignedContent.tsx` already handles auto-grading for short answers when `assignment_mode === 'auto_grade'`. The issue is that Question Bank short answers are not being sent as auto-grade.
-
-### Results Visibility
-Currently, `LectureCheckInResults.tsx` shows ALL `lecture_checkin` assignments without differentiating by source. Question Bank questions are mixed in with live capture questions.
-
----
+### QuestionBankResults.tsx
+- **Coding questions**: Shows truncated code preview (first 200 chars) in a small `<pre>` block
+- **Short answer questions**: Shows truncated text in a `line-clamp-2` paragraph
+- Neither type has expandable functionality
 
 ## Implementation Plan
 
-### Phase 1: Fix Auto-Grading for Question Bank Short Answers
+### Phase 1: Create Reusable Expandable Response Component
 
-**File**: `supabase/functions/push-bank-question/index.ts`
+Create a new component that handles the expandable view for both short answer and coding responses:
 
-Change the mode logic to enable auto-grading for short answers:
-
-```typescript
-const getAssignmentMode = (questionType: string): string => {
-  // All question types from Question Bank should be auto-graded
-  // Instructors explicitly chose to push these, so auto-grading is expected
-  if (questionType === "multiple_choice") return "auto_grade";
-  if (questionType === "coding_simple" || questionType === "coding") return "auto_grade";
-  if (questionType === "short_answer") return "auto_grade"; // NEW: Enable auto-grading
-  return "manual_grade";
-};
-```
-
-This single change enables auto-grading because the student-side already:
-1. Calls `auto-grade-short-answer` edge function for short answers when mode is `auto_grade`
-2. Calls `auto-grade-coding` for coding questions
-3. Saves grades directly to `student_assignments`
-
-### Phase 2: Create Question Bank Results Component
-
-Create a new component that shows results specifically for Question Bank pushed questions.
-
-**New File**: `src/components/instructor/QuestionBankResults.tsx`
+**New File**: `src/components/instructor/ExpandableStudentResponse.tsx`
 
 Features:
-- Filter assignments where `content.source === "question_bank"`
-- Group by `content.questionBankId` (the original question ID) + timestamp
-- Show question title prominently (from the bank question's title)
-- Display student responses with grades
-- Real-time updates via Supabase subscription
-- AI summary generation (reuse existing pattern)
-- Export to PDF/CSV
+- Collapsible container with smooth animation using Radix Collapsible
+- Different styling for code (syntax-highlighted dark theme) vs text (light background)
+- Shows student name, grade badge, and AI feedback when available
+- ChevronDown icon that rotates when expanded
+- Truncated preview when collapsed
 
-Component structure:
-```text
-QuestionBankResults
-├── Header with title + refresh/export buttons
-├── Accordion for each pushed question batch
-│   ├── Question title + push timestamp
-│   ├── Response stats (completed/total, avg grade)
-│   ├── Student responses list
-│   │   ├── Student name
-│   │   ├── Answer (MCQ letter / short text / code block)
-│   │   ├── Grade badge
-│   │   └── AI feedback (if available)
-│   └── AI Summary section
-└── Empty state when no results
+```
++----------------------------------------+
+| 👤 John Smith          [85%] [▼ View]  |
++----------------------------------------+
+| (collapsed: "Osmosis is the moveme..." |
++----------------------------------------+
+
+When expanded:
++----------------------------------------+
+| 👤 John Smith          [85%] [▲ Hide]  |
++----------------------------------------+
+| Osmosis is the movement of water       |
+| molecules through a semipermeable      |
+| membrane from an area of low solute    |
+| concentration to high concentration... |
+|                                        |
+| 💬 AI Feedback: Good explanation of... |
++----------------------------------------+
 ```
 
-### Phase 3: Integrate into Question Bank Tab
+### Phase 2: Update QuestionBankResults.tsx
 
-**File**: `src/components/instructor/QuestionBankTab.tsx`
+Replace the current `renderAnswer` function with the new expandable component:
 
-Add the results component below the question list:
+**Changes to `renderAnswer` function (lines 238-298)**:
+1. For `short_answer`: Use Collapsible to show full text on expand
+2. For `coding`/`coding_simple`: Use Collapsible with code block styling
+3. Add expand/collapse button with visual indicator
+4. Show AI feedback in expanded view
 
-```typescript
-import { QuestionBankResults } from "./QuestionBankResults";
+### Phase 3: Update LectureCheckInResults.tsx
 
-// In the return JSX, after the questions Card:
-<QuestionBankResults />
-```
+Enhance both the student responses section and the short answer review section:
 
----
+**Changes to student response rendering (around lines 1370-1400)**:
+1. Replace `<details>` with styled Collapsible for coding
+2. Add same expandable treatment for short answer responses in the main list
+
+**Changes to short answer review section (lines 1503-1619)**:
+1. Make the student answer text collapsible for long responses
+2. Add visual indicator for expand/collapse
+3. Keep the grading controls visible outside the collapsible area
+
+### Phase 4: Add Coding Review Section to LectureCheckInResults
+
+Add a dedicated "Student Code Submissions" section similar to the short answer review section (lines 1503-1619):
+
+**New section for coding questions** (after line 1619):
+- Similar structure to short answer review
+- Syntax-highlighted code display
+- AI grade and feedback display
+- Manual grade override option
 
 ## Technical Details
 
-### QuestionBankResults Component
+### Collapsible Component Usage
 
-Key differences from LectureCheckInResults:
-1. Filter by `content.source === 'question_bank'` (client-side since Realtime doesn't support JSONB filters)
-2. Group by `questionBankId` instead of timestamp alone
-3. Show the question title from the bank prominently
-4. Include reference to original bank question for context
-
-**Data Fetching Logic**:
 ```typescript
-// Filter assignments with question_bank source
-const { data: assignments } = await supabase
-  .from("student_assignments")
-  .select("*")
-  .eq("instructor_id", user.id)
-  .eq("course_id", selectedCourseId)
-  .eq("assignment_type", "lecture_checkin")
-  .order("created_at", { ascending: false })
-  .limit(200);
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-// Client-side filter for question_bank source
-const bankAssignments = assignments?.filter(
-  (a) => a.content?.source === "question_bank"
-) || [];
+<Collapsible>
+  <div className="flex items-center justify-between">
+    <span>{studentName}</span>
+    <CollapsibleTrigger asChild>
+      <Button variant="ghost" size="sm">
+        <ChevronsUpDown className="h-4 w-4" />
+        View Response
+      </Button>
+    </CollapsibleTrigger>
+  </div>
+  <CollapsibleContent>
+    <div className="p-3 mt-2 rounded bg-muted">
+      {/* Full response content */}
+    </div>
+  </CollapsibleContent>
+</Collapsible>
 ```
 
-**Grouping Logic**:
-```typescript
-// Group by questionBankId + timestamp (5 min window)
-const groups = groupByBankQuestion(bankAssignments);
+### Code Display Styling
 
-interface BankQuestionGroup {
-  questionBankId: string;
-  title: string;
-  timestamp: string;
-  assignments: Assignment[];
-  questionContent: any;
-}
+For coding responses, use consistent styling:
+```typescript
+<pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap">
+  {studentCode}
+</pre>
 ```
 
-### Auto-Grading Flow (Already Works)
+### Short Answer Display Styling
 
-When a student submits a Question Bank question:
-
-1. `AssignedContent.tsx` calls `submit_quiz` RPC
-2. RPC returns `has_short_answer: true` and `assignment_mode: 'auto_grade'`
-3. Frontend loops through short answer questions calling `auto-grade-short-answer`
-4. Frontend loops through coding questions calling `auto-grade-coding`
-5. Frontend saves grades directly to `student_assignments`
-6. Realtime subscription updates instructor's results view
-
-The only fix needed is in `push-bank-question` to set the correct mode.
-
----
-
-## Files to Create
-
-| File | Description |
-|------|-------------|
-| `src/components/instructor/QuestionBankResults.tsx` | New results component for Question Bank questions |
+For text responses:
+```typescript
+<p className="text-sm text-muted-foreground whitespace-pre-wrap p-3 bg-muted/50 rounded">
+  {studentAnswer}
+</p>
+```
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/push-bank-question/index.ts` | Change short_answer mode to `auto_grade` |
-| `src/components/instructor/QuestionBankTab.tsx` | Import and render QuestionBankResults |
+| `src/components/instructor/QuestionBankResults.tsx` | Update `renderAnswer` function to use Collapsible for full text/code viewing |
+| `src/components/instructor/LectureCheckInResults.tsx` | Add Collapsible to student responses, add dedicated coding review section |
 
----
+## Visual Design
 
-## Component Design: QuestionBankResults.tsx
-
-```text
+### QuestionBankResults - Expanded Response
+```
 +------------------------------------------+
-| 📊 Question Bank Results         [🔄][📥] |
-+------------------------------------------+
-|                                          |
-| ▼ "Derivative of x²" (MCQ)               |
-|   Pushed: Feb 3, 2:15 PM • 25 students   |
-|   ┌────────────────────────────────────┐ |
-|   │ 92% correct • Avg: 12s response    │ |
-|   └────────────────────────────────────┘ |
-|   ┌────────────────────────────────────┐ |
-|   │ 👤 John Smith      [A] ✓   100%    │ |
-|   │ 👤 Jane Doe        [B] ✗    0%     │ |
-|   │ ...                                │ |
-|   └────────────────────────────────────┘ |
-|                                          |
-| ▼ "Explain osmosis" (Short Answer)       |
-|   Pushed: Feb 3, 1:00 PM • 25 students   |
-|   ┌────────────────────────────────────┐ |
-|   │ Avg Grade: 78% (AI graded)         │ |
-|   └────────────────────────────────────┘ |
-|   ┌────────────────────────────────────┐ |
-|   │ 👤 Alice Brown     85%             │ |
-|   │   "Osmosis is the movement of..."  │ |
-|   │   💬 AI: Good explanation of...    │ |
-|   └────────────────────────────────────┘ |
-|                                          |
+| 👤 Alice Brown                    [85%]  |
+| ┌──────────────────────────────────────┐ |
+| │ ▼ View Full Response                 │ |
+| ├──────────────────────────────────────┤ |
+| │ Osmosis is the movement of water     │ |
+| │ molecules through a semipermeable    │ |
+| │ membrane from an area of lower       │ |
+| │ solute concentration to higher...    │ |
+| │                                      │ |
+| │ 💬 AI: Great explanation, captured   │ |
+| │    the key concept of passive...     │ |
+| └──────────────────────────────────────┘ |
 +------------------------------------------+
 ```
 
----
-
-## Reliability Considerations
-
-### Realtime Updates
-- Subscribe to `student_assignments` changes filtered by instructor_id
-- Client-side filter for `question_bank` source
-- Debounce rapid updates (300ms) for large classes
-- Polling fallback (5s) for reliability
-
-### Auto-Grading Reliability
-- Already implemented in AssignedContent.tsx with:
-  - Loading toast during grading
-  - Error handling per question
-  - Direct save to database
-  - Retry logic for failed grades
-
----
+### LectureCheckInResults - Coding Submission
+```
++------------------------------------------+
+| Student Code Submissions & Grades        |
++------------------------------------------+
+| 👤 John Smith                    [92%]   |
+| ┌──────────────────────────────────────┐ |
+| │ ▼ View Code                          │ |
+| ├──────────────────────────────────────┤ |
+| │ def fibonacci(n):                    │ |
+| │     if n <= 1:                       │ |
+| │         return n                     │ |
+| │     return fibonacci(n-1) + ...      │ |
+| │                                      │ |
+| │ 💬 AI: Correct recursive solution,   │ |
+| │    good base case handling.          │ |
+| └──────────────────────────────────────┘ |
++------------------------------------------+
+```
 
 ## Implementation Order
 
-1. **Fix auto-grading mode** in `push-bank-question` edge function
-2. **Create QuestionBankResults component** with:
-   - Data fetching + filtering
-   - Grouping logic
-   - Basic results display
-3. **Add realtime subscription** for live updates
-4. **Add AI summary** using existing pattern
-5. **Add export functionality** (PDF/CSV)
-6. **Integrate into QuestionBankTab**
-7. **Deploy edge function** and test end-to-end
+1. Update `QuestionBankResults.tsx` - Add Collapsible imports and update `renderAnswer`
+2. Update `LectureCheckInResults.tsx` - Replace `<details>` with Collapsible for coding responses
+3. Add coding review section to `LectureCheckInResults.tsx` (similar to short answer section)
+4. Test expand/collapse functionality across question types
