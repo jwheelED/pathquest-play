@@ -161,23 +161,41 @@ Deno.serve(async (req) => {
     // Check for nested format: { questions: [{ correctAnswer, type }] }
     if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions.length > 0) {
       const firstQuestion = questionContent.questions[0];
-      correctAnswer = firstQuestion.correctAnswer || '';
+      correctAnswer = (firstQuestion.correctAnswer || '').toString().trim();
       questionType = firstQuestion.type || 'multiple_choice';
       options = firstQuestion.options || [];
-      console.log('📋 Using nested question format:', { correctAnswer, questionType });
+      console.log('📋 Using nested question format:', { correctAnswer, questionType, optionsCount: options.length });
     } else {
       // Handle direct format: { correctAnswer, type }
-      correctAnswer = questionContent.correctAnswer || '';
+      correctAnswer = (questionContent.correctAnswer || '').toString().trim();
       questionType = questionContent.type || 'multiple_choice';
       options = questionContent.options || [];
-      console.log('📋 Using direct question format:', { correctAnswer, questionType });
+      console.log('📋 Using direct question format:', { correctAnswer, questionType, optionsCount: options.length });
+    }
+
+    // Diagnostic: warn if options are missing for MCQ
+    if (questionType === 'multiple_choice' && (!options || options.length === 0)) {
+      console.warn(`⚠️ No options array found for MCQ grading. Question ID: ${questionId}. This may cause grading issues.`);
     }
 
     // Normalize both answers for comparison (pass options for text matching)
-    const normalizedStudentAnswer = normalizeAnswer(answer, questionType, options);
+    const studentAnswerTrimmed = answer.toString().trim();
+    const normalizedStudentAnswer = normalizeAnswer(studentAnswerTrimmed, questionType, options);
     const normalizedCorrectAnswer = normalizeAnswer(correctAnswer, questionType, options);
 
-    const isCorrect = normalizedStudentAnswer === normalizedCorrectAnswer;
+    // Case-insensitive comparison for robustness
+    const isCorrect = normalizedStudentAnswer.toUpperCase() === normalizedCorrectAnswer.toUpperCase();
+
+    // Enhanced logging for debugging grading issues
+    console.log('🎯 Final grading comparison:', {
+      rawStudentAnswer: answer,
+      rawCorrectAnswer: correctAnswer,
+      normalizedStudent: normalizedStudentAnswer,
+      normalizedCorrect: normalizedCorrectAnswer,
+      isCorrect,
+      questionType,
+      hasOptions: options.length > 0
+    });
 
     console.log('Grading:', {
       studentAnswer: answer,
