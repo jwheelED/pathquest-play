@@ -5,18 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Check, Pencil, RefreshCw, Trash2, ChevronDown, Loader2, X, Save } from "lucide-react";
+import { Check, Pencil, RefreshCw, Trash2, ChevronDown, Loader2, X, Save, Code, MessageSquare, FileText } from "lucide-react";
 import { MathRenderer } from "@/components/ui/math-renderer";
 
 export interface StudioQuestion {
   id: string;
   question_text: string;
-  question_type: "multiple_choice" | "short_answer";
+  question_type: "multiple_choice" | "short_answer" | "coding" | "coding_simple";
   options: string[];
   correct_answer: string;
   explanation: string;
   status: "pending" | "approved" | "edited" | "regenerating";
   timestamp?: number; // Video timestamp in seconds for calibration mode
+  // Coding question fields
+  language?: string;
+  starterCode?: string;
+  expectedBehavior?: string;
 }
 
 interface StudioQuestionCardProps {
@@ -43,6 +47,8 @@ export function StudioQuestionCard({
     options: [...question.options],
     correct_answer: question.correct_answer,
     explanation: question.explanation,
+    starterCode: question.starterCode || "",
+    expectedBehavior: question.expectedBehavior || "",
   });
 
   const handleSaveEdit = () => {
@@ -56,6 +62,8 @@ export function StudioQuestionCard({
       options: [...question.options],
       correct_answer: question.correct_answer,
       explanation: question.explanation,
+      starterCode: question.starterCode || "",
+      expectedBehavior: question.expectedBehavior || "",
     });
     setIsEditing(false);
   };
@@ -64,6 +72,33 @@ export function StudioQuestionCard({
     const newOptions = [...editData.options];
     newOptions[idx] = value;
     setEditData({ ...editData, options: newOptions });
+  };
+
+  const isCodingQuestion = question.question_type === "coding" || question.question_type === "coding_simple";
+
+  const getTypeIcon = () => {
+    switch (question.question_type) {
+      case "coding":
+      case "coding_simple":
+        return <Code className="h-3 w-3" />;
+      case "short_answer":
+        return <MessageSquare className="h-3 w-3" />;
+      default:
+        return <FileText className="h-3 w-3" />;
+    }
+  };
+
+  const getTypeLabel = () => {
+    switch (question.question_type) {
+      case "coding":
+        return "Coding";
+      case "coding_simple":
+        return "Quick Code";
+      case "short_answer":
+        return "Short Answer";
+      default:
+        return "MCQ";
+    }
   };
 
   const statusBadge = {
@@ -118,9 +153,15 @@ export function StudioQuestionCard({
               
               <div className="flex items-center gap-2 mt-2">
                 {statusBadge[question.status]}
-                <Badge variant="outline" className="text-xs">
-                  {question.question_type === "multiple_choice" ? "MCQ" : "Short Answer"}
+                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                  {getTypeIcon()}
+                  {getTypeLabel()}
                 </Badge>
+                {question.language && (
+                  <Badge variant="secondary" className="text-xs">
+                    {question.language}
+                  </Badge>
+                )}
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
                     <ChevronDown className={`h-3 w-3 mr-1 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
@@ -132,7 +173,7 @@ export function StudioQuestionCard({
           </div>
 
           <CollapsibleContent className="mt-4 space-y-3">
-            {/* Options */}
+            {/* MCQ Options */}
             {question.question_type === "multiple_choice" && (
               <div className="space-y-2 pl-11">
                 <label className="text-xs font-medium text-muted-foreground">Options</label>
@@ -186,6 +227,42 @@ export function StudioQuestionCard({
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Coding Question: Starter Code */}
+            {isCodingQuestion && (
+              <div className="space-y-3 pl-11">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Starter Code</label>
+                  {isEditing ? (
+                    <Textarea
+                      value={editData.starterCode}
+                      onChange={(e) => setEditData({ ...editData, starterCode: e.target.value })}
+                      className="text-sm font-mono mt-1 min-h-[100px]"
+                    />
+                  ) : (
+                    <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto font-mono mt-1">
+                      {question.starterCode || "// No starter code provided"}
+                    </pre>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Expected Behavior</label>
+                  {isEditing ? (
+                    <Textarea
+                      value={editData.expectedBehavior}
+                      onChange={(e) => setEditData({ ...editData, expectedBehavior: e.target.value })}
+                      className="text-sm mt-1"
+                      rows={2}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {question.expectedBehavior || "No expected behavior specified"}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 

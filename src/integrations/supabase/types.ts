@@ -903,6 +903,76 @@ export type Database = {
           },
         ]
       }
+      instructor_question_bank: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          difficulty: string | null
+          id: string
+          instructor_id: string
+          last_used_at: string | null
+          org_id: string | null
+          question_content: Json
+          question_type: string
+          tags: string[] | null
+          times_used: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          difficulty?: string | null
+          id?: string
+          instructor_id: string
+          last_used_at?: string | null
+          org_id?: string | null
+          question_content?: Json
+          question_type: string
+          tags?: string[] | null
+          times_used?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          difficulty?: string | null
+          id?: string
+          instructor_id?: string
+          last_used_at?: string | null
+          org_id?: string | null
+          question_content?: Json
+          question_type?: string
+          tags?: string[] | null
+          times_used?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instructor_question_bank_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_question_bank_instructor_id_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_question_bank_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instructor_students: {
         Row: {
           course_id: string | null
@@ -2335,6 +2405,7 @@ export type Database = {
           medical_specialty: string | null
           onboarded: boolean | null
           org_id: string | null
+          preferred_coding_language: string | null
           professor_type: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference: string | null
           question_format_preference: string | null
@@ -2375,6 +2446,7 @@ export type Database = {
           medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
+          preferred_coding_language?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference?: string | null
           question_format_preference?: string | null
@@ -2415,6 +2487,7 @@ export type Database = {
           medical_specialty?: string | null
           onboarded?: boolean | null
           org_id?: string | null
+          preferred_coding_language?: string | null
           professor_type?: Database["public"]["Enums"]["professor_type"] | null
           question_difficulty_preference?: string | null
           question_format_preference?: string | null

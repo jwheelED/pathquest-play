@@ -1,161 +1,107 @@
 
+# Project Implementation Status
 
-# MCQ Grading Reliability Fix Plan
+## Recently Completed: High-Concurrency Student Submission Fix
 
-## Problem Summary
+**Problem:** Students in classrooms with 20+ students were getting errors when submitting answers simultaneously.
 
-Students are experiencing incorrect grading where their correct MCQ answers are marked as wrong. For example, a student who answered "B) 206 bones" for a question where the correct answer is "B" was marked incorrect.
+**Root Cause:** Race condition in the check-then-insert pattern without database-level uniqueness constraint.
 
-## Root Cause Analysis
+**Solution Implemented:**
+1. Added unique constraint `(question_id, participant_id)` to `live_responses` table
+2. Updated `submit-live-response` edge function to use `upsert` with `ON CONFLICT` for atomic, race-safe submissions
+3. Created `submitWithRetry` utility with exponential backoff for transient network failures
+4. Updated `LiveStudent.tsx` to use the new retry-based submission
+5. Graceful handling of duplicate submissions (returns success instead of error)
 
-After investigation, I identified **two root causes**:
+---
 
-### 1. Outdated Edge Function Deployment
-The `submit-live-response` edge function deployed in production was outdated and didn't include the latest answer normalization logic. After redeploying the function, the same test case `"B) 206 bones"` now correctly returns `isCorrect: true`.
 
-**Evidence**: 
-- Historical responses with `answer: "C. C++ provides..."` and `correctAnswer: "C"` have mixed `is_correct` values (both true and false for identical inputs)
-- Testing the redeployed function shows correct behavior
+## ✅ COMPLETED
 
-### 2. Edge Cases in Answer Normalization (Potential Future Issues)
-The current `normalizeAnswer` function handles most cases but has potential gaps:
+All phases have been implemented successfully.
 
-| Scenario | Example Answer | Options | Current Behavior | Risk |
-|----------|----------------|---------|------------------|------|
-| Letter prefix with `)` | `"B) 206 bones"` | `["A) ...", "B) ..."]` | ✅ Extracts "B" | Fixed |
-| Letter prefix with `.` | `"B. Answer"` | `["A. ...", "B. ..."]` | ✅ Extracts "B" | Fixed |
-| No letter prefix in options | `"Dennis Lehane"` | `["Stephen King", "Dennis Lehane", ...]` | ✅ Matches by index | Works |
-| Student types raw text | `"206"` | `["A. 100", "B. 206", ...]` | ⚠️ May not match | Potential issue |
+---
 
-## Proposed Solution
+## Overview
 
-### Phase 1: Immediate Deployment Verification ✅
-The edge function has been redeployed. Future deployments should be automatic.
+This enhancement enables STEM instructors to create programming problems (including OOP exercises like Library/Book composition) before class and send them to students during live lectures.
 
-### Phase 2: Enhanced Normalization Logic
-Add additional fallback matching to handle edge cases:
+## What This Enables
 
-```text
-File: supabase/functions/submit-live-response/index.ts
+Your professor can now:
+1. ✅ **Create coding problems before class** - Including multi-class OOP exercises (e.g., Library has-a Book)
+2. ✅ **Save questions to a library** - Organized by course with tags
+3. ✅ **Send saved questions during live lecture** - One-click deployment via QuickSendPanel
+4. ✅ **AI auto-grading** - Students get immediate feedback on their code submissions
 
-Changes to normalizeAnswer function:
-1. Keep existing letter extraction logic (works for most cases)
-2. Add partial text matching as fallback (extract key numbers/words)
-3. Add logging for debugging failed matches
-```
+---
 
-**Specific improvements:**
+## Implementation Summary
 
-1. **Numeric answer matching**: If student types just "206" and options contain "B. 206", extract the number and match
-2. **Case-insensitive full text match**: Already exists but can be strengthened
-3. **Enhanced logging**: Log all normalization steps for easier debugging
+### Phase 1: Database Schema ✅
+- Created `instructor_question_bank` table with RLS policies
+- Supports MCQ, short answer, coding, and coding_simple question types
+- Includes tags, difficulty, usage tracking
 
-### Phase 3: Defensive UI Changes
-Ensure the answer sent from the client is always in a predictable format:
+### Phase 2: Question Studio UI ✅
+- Added **CodingQuestionCreator** component with:
+  - Language selection (Java, Python, JavaScript, C++)
+  - Starter code templates
+  - Expected behavior description
+  - Concepts tested and tags
+- Added **QuestionBankPanel** component with:
+  - Search and filter by type/difficulty
+  - Expand/collapse question details
+  - Edit, duplicate, delete actions
+- Updated **QuestionStudio** with 3 tabs:
+  - Generate (AI-powered question generation)
+  - Coding (manual coding problem creation)
+  - Question Bank (saved question library)
 
-```text
-File: src/pages/LiveStudent.tsx
+### Phase 3: Quick-Send Panel ✅
+- Created **QuickSendPanel** component
+- Integrated into **LiveSessionControls** during active sessions
+- Shows recently used questions first
+- One-click send to all connected students
+- Tracks usage statistics
 
-Instead of sending the full option text, extract and send just the letter prefix:
-- Current: value={option} → sends "B) 206 bones"  
-- Better: Extract letter, send structured { letter: "B", fullText: "B) 206 bones" }
+### Phase 4: StudioQuestionCard Enhancement ✅
+- Updated card to support `coding` and `coding_simple` types
+- Shows starter code with syntax highlighting
+- Displays expected behavior
+- Language badge for coding questions
+- Editable fields for starter code and expected behavior
 
-This makes server-side comparison trivial and eliminates normalization edge cases.
-```
+---
 
-## Implementation Details
+## Files Created/Modified
 
-### Enhanced normalizeAnswer Function
+### New Files
+- `src/components/instructor/CodingQuestionCreator.tsx`
+- `src/components/instructor/QuestionBankPanel.tsx`
+- `src/components/instructor/QuickSendPanel.tsx`
 
-```typescript
-const normalizeAnswer = (answer: string, questionType: string, options?: string[]): string => {
-  if (questionType !== 'multiple_choice') {
-    return answer.trim();
-  }
-  
-  const trimmed = answer.trim();
-  
-  // 1. Already just a letter (A-D)
-  if (/^[A-Da-d]$/.test(trimmed)) {
-    return trimmed.toUpperCase();
-  }
-  
-  // 2. Extract letter from prefixed formats: "B) text", "B. text", "B - text", "B text"
-  const letterMatch = trimmed.match(/^([A-Da-d])[\).\-\s]/);
-  if (letterMatch) {
-    return letterMatch[1].toUpperCase();
-  }
-  
-  // 3. Match full option text (with or without prefix) 
-  if (options && options.length > 0) {
-    const letters = ['A', 'B', 'C', 'D'];
-    for (let i = 0; i < options.length && i < 4; i++) {
-      const option = options[i];
-      
-      // Strip any prefix from option for comparison
-      const optionText = option.replace(/^[A-Da-d][\).\-\s]+\s*/, '').trim();
-      
-      // Full match (case insensitive)
-      if (trimmed.toLowerCase() === option.toLowerCase() || 
-          trimmed.toLowerCase() === optionText.toLowerCase()) {
-        console.log(`📍 Matched "${trimmed}" to option ${letters[i]} via text match`);
-        return letters[i];
-      }
-    }
-  }
-  
-  // 4. Fallback: first character if A-D
-  if (/^[A-Da-d]/i.test(trimmed)) {
-    console.log(`📍 Using first char fallback for "${trimmed}"`);
-    return trimmed.charAt(0).toUpperCase();
-  }
-  
-  console.warn(`⚠️ Could not normalize answer: "${trimmed}"`);
-  return trimmed;
-};
-```
+### Modified Files
+- `src/components/instructor/QuestionStudio.tsx` - Added tabs for coding and bank
+- `src/components/instructor/StudioQuestionCard.tsx` - Added coding question support
+- `src/components/instructor/LiveSessionControls.tsx` - Added QuickSendPanel
 
-### Client-Side Improvement (Optional but Recommended)
+---
 
-```typescript
-// In LiveStudent.tsx, when submitting MCQ
-const handleConfidenceSelect = (level, multiplier) => {
-  // Extract just the letter from the selected option
-  const letterMatch = selectedAnswer.match(/^([A-Da-d])/);
-  const answerLetter = letterMatch ? letterMatch[1].toUpperCase() : selectedAnswer;
-  
-  const responseData = {
-    questionId: currentQuestion.id,
-    participantId,
-    answer: answerLetter, // Send just "B" instead of "B) 206 bones"
-    // ... rest of data
-  };
-};
-```
+## User Experience Flow
 
-## Files to Modify
+### Before Class (Prep Time)
+1. Instructor opens Question Studio → "Coding" tab
+2. Enters problem details (title, language, starter code, expected behavior)
+3. Adds tags like "OOP", "composition"
+4. Clicks "Save to Question Bank"
+5. Question appears in "Question Bank" tab
 
-1. **`supabase/functions/submit-live-response/index.ts`**
-   - Enhance `normalizeAnswer` with better logging
-   - Add fallback matching patterns
-   
-2. **`src/pages/LiveStudent.tsx`** (Optional)
-   - Extract letter prefix before sending
-   - Add defensive validation
-
-## Testing Plan
-
-After implementation:
-1. Test with `"B) 206 bones"` format → should return correct
-2. Test with `"B. Answer text"` format → should return correct  
-3. Test with `"B"` (just letter) → should return correct
-4. Test with raw text `"206"` → should match to correct option
-5. Test with no-prefix options like `"Dennis Lehane"` → should match by index
-
-## Success Criteria
-
-- All MCQ answers with correct letter prefix are marked as correct 100% of the time
-- Grading is consistent regardless of option format (`.`, `)`, space, etc.)
-- Clear logging exists to debug any future grading issues
-- No false negatives (correct answers marked wrong)
-
+### During Class (Live)
+1. Instructor starts live lecture session
+2. QuickSendPanel appears in session controls
+3. Search or find "Library-Book Composition" question
+4. Click "Send" button
+5. All connected students receive the coding problem
+6. AI grades submissions in real-time

@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
+import { Users, Play, Square, Copy, QrCode, Monitor, Library } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
+import { QuickSendPanel } from "./QuickSendPanel";
 
 interface LiveSession {
   id: string;
@@ -245,6 +246,12 @@ export const LiveSessionControls = ({
             <p className="text-sm text-muted-foreground break-all">
               Students can join at: <span className="font-mono">{joinUrl}</span>
             </p>
+
+            {/* Quick Send Panel */}
+            <QuickSendPanel 
+              sessionId={activeSession.id} 
+              onQuestionSent={() => updateParticipantCount()}
+            />
           </CardContent>
         </Card>
 

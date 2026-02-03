@@ -14,7 +14,7 @@ import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
 import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
-import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
+import { submitLiveResponseWithRetry } from "@/lib/submitWithRetry";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { trackQuestionAnswered } from "@/lib/posthogTracking";
 
@@ -205,27 +205,14 @@ const LiveStudent = () => {
     const isMCQ = currentQuestion.question_content.type === 'multiple_choice';
     const normalizedAnswer = isMCQ ? extractMCQLetter(selectedAnswer) : selectedAnswer;
 
-    const responseData = {
-      questionId: currentQuestion.id,
-      participantId,
-      answer: normalizedAnswer,
-      responseTimeMs,
-      confidenceLevel: level,
-      confidenceMultiplier: multiplier,
-      baseReward: BASE_REWARD,
-    };
-
     try {
-      const result = await submitWithOfflineSupport(
-        'submit-live-response',
-        async () => {
-          const { data, error } = await supabase.functions.invoke("submit-live-response", {
-            body: responseData,
-          });
-          if (error) throw error;
-          return data;
-        },
-        responseData
+      const result = await submitLiveResponseWithRetry(
+        currentQuestion.id,
+        participantId,
+        normalizedAnswer,
+        responseTimeMs,
+        level,
+        multiplier
       );
 
       // Mark this question as answered to prevent re-prompting
@@ -233,14 +220,7 @@ const LiveStudent = () => {
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
       
-      if (result.queued) {
-        // Optimistic UI for offline submission
-        setHasAnswered(true);
-        setShowAccountPrompt(true);
-        toast.info("Answer saved! Will sync when back online.", {
-          icon: "📡",
-        });
-      } else if (result.success && result.data) {
+      if (result.success && result.data) {
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
         setPointsEarned(result.data.pointsEarned || 0);
@@ -252,23 +232,28 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        if (result.data.isCorrect) {
+        if (result.alreadySubmitted) {
+          toast.info("You already answered this question");
+        } else if (result.data.isCorrect) {
           toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
         } else {
           const penalty = result.data.pointsEarned < 0 ? ` ${result.data.pointsEarned} XP` : '';
           toast.error(`Incorrect${penalty}`);
         }
+      } else if (result.alreadySubmitted) {
+        toast.info("You already answered this question");
+        setHasAnswered(true);
       } else if (result.error) {
         throw result.error;
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
-      if (error.message?.includes("Already answered")) {
+      if (error.message?.includes("already") || error.message?.includes("duplicate")) {
         toast.info("You already answered this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
-        toast.error("Failed to submit answer");
+        toast.error("Failed to submit answer. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -332,24 +317,12 @@ const LiveStudent = () => {
     });
     const responseTimeMs = Date.now() - questionStartTime;
 
-    const responseData = {
-      questionId: currentQuestion.id,
-      participantId,
-      answer: selectedAnswer,
-      responseTimeMs,
-    };
-
     try {
-      const result = await submitWithOfflineSupport(
-        'submit-live-response',
-        async () => {
-          const { data, error } = await supabase.functions.invoke("submit-live-response", {
-            body: responseData,
-          });
-          if (error) throw error;
-          return data;
-        },
-        responseData
+      const result = await submitLiveResponseWithRetry(
+        currentQuestion.id,
+        participantId,
+        selectedAnswer,
+        responseTimeMs
       );
 
       // Mark this question as answered to prevent re-prompting
@@ -357,24 +330,12 @@ const LiveStudent = () => {
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
 
-      if (result.queued) {
-        // Optimistic UI for offline submission
-        toast.dismiss(gradingToastId);
-        setIsGrading(false);
-        setHasAnswered(true);
-        setShowAccountPrompt(true);
-        toast.info("Answer saved! Will sync when back online.", {
-          icon: "📡",
-        });
-      } else if (result.success && result.data) {
-        toast.dismiss(gradingToastId);
-        setIsGrading(false);
+      toast.dismiss(gradingToastId);
+      setIsGrading(false);
+
+      if (result.success && result.data) {
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
-        setAiGrade(result.data.aiGrade || null);
-        setAiFeedback(result.data.aiFeedback || null);
-        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setGradePending(result.data.gradePending || false);
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -383,34 +344,27 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        // Show appropriate feedback based on grading mode
-        if (result.data.gradePending) {
-          toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
-        } else if (result.data.aiGrade !== null) {
-          const gradeText = `${result.data.aiGrade}%`;
-          if (result.data.aiGrade >= 70) {
-            toast.success(`Great work! Score: ${gradeText} 🎉`);
-          } else if (result.data.aiGrade >= 50) {
-            toast.info(`Score: ${gradeText} - Good effort!`);
-          } else {
-            toast.error(`Score: ${gradeText} - Keep practicing!`);
-          }
+        if (result.alreadySubmitted) {
+          toast.info("You already answered this question");
+        } else {
+          toast.success("Answer submitted! ✓");
         }
+      } else if (result.alreadySubmitted) {
+        toast.info("You already answered this question");
+        setHasAnswered(true);
       } else if (result.error) {
-        toast.dismiss(gradingToastId);
-        setIsGrading(false);
         throw result.error;
       }
     } catch (error: any) {
       toast.dismiss(gradingToastId);
       setIsGrading(false);
       console.error("Error submitting answer:", error);
-      if (error.message?.includes("Already answered")) {
+      if (error.message?.includes("already") || error.message?.includes("duplicate")) {
         toast.info("You already answered this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
-        toast.error("Failed to submit answer");
+        toast.error("Failed to submit answer. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -431,28 +385,12 @@ const LiveStudent = () => {
     
     const responseTimeMs = Date.now() - questionStartTime;
 
-    const responseData = {
-      questionId: currentQuestion.id,
-      participantId,
-      answer: codeAnswer,
-      responseTimeMs,
-      // Coding questions don't use confidence betting (too complex)
-      confidenceLevel: null,
-      confidenceMultiplier: 1,
-      baseReward: BASE_REWARD,
-    };
-
     try {
-      const result = await submitWithOfflineSupport(
-        'submit-live-response',
-        async () => {
-          const { data, error } = await supabase.functions.invoke("submit-live-response", {
-            body: responseData,
-          });
-          if (error) throw error;
-          return data;
-        },
-        responseData
+      const result = await submitLiveResponseWithRetry(
+        currentQuestion.id,
+        participantId,
+        codeAnswer,
+        responseTimeMs
       );
 
       // Mark this question as answered to prevent re-prompting
@@ -460,24 +398,12 @@ const LiveStudent = () => {
       // Reset interaction flag to allow new questions to load
       hasStartedAnsweringRef.current = false;
 
-      if (result.queued) {
-        // Optimistic UI for offline submission
-        toast.dismiss(gradingToastId);
-        setIsGrading(false);
-        setHasAnswered(true);
-        setShowAccountPrompt(true);
-        toast.info("Code saved! Will sync when back online.", {
-          icon: "📡",
-        });
-      } else if (result.success && result.data) {
-        toast.dismiss(gradingToastId);
-        setIsGrading(false);
+      toast.dismiss(gradingToastId);
+      setIsGrading(false);
+
+      if (result.success && result.data) {
         setHasAnswered(true);
         setIsCorrect(result.data.isCorrect);
-        setAiGrade(result.data.aiGrade || null);
-        setAiFeedback(result.data.aiFeedback || null);
-        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
         
@@ -487,26 +413,22 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        if (result.data.aiGrade !== null) {
-          const gradeText = `${result.data.aiGrade}%`;
-          if (result.data.aiGrade >= 70) {
-            toast.success(`Great work! Score: ${gradeText} 🎉`);
-          } else if (result.data.aiGrade >= 50) {
-            toast.info(`Score: ${gradeText} - Good effort!`);
-          } else {
-            toast.error(`Score: ${gradeText} - Keep practicing!`);
-          }
+        if (result.alreadySubmitted) {
+          toast.info("You already submitted code for this question");
+        } else {
+          toast.success("Code submitted! ✓");
         }
+      } else if (result.alreadySubmitted) {
+        toast.info("You already submitted code for this question");
+        setHasAnswered(true);
       } else if (result.error) {
-        toast.dismiss(gradingToastId);
-        setIsGrading(false);
         throw result.error;
       }
     } catch (error: any) {
       toast.dismiss(gradingToastId);
       setIsGrading(false);
       console.error("Error submitting code:", error);
-      if (error.message?.includes("Already answered")) {
+      if (error.message?.includes("already") || error.message?.includes("duplicate")) {
         toast.info("You already submitted code for this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
