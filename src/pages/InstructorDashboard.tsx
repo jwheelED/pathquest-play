@@ -1,9 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -22,6 +22,7 @@ import { LiveSessionControls } from "@/components/instructor/LiveSessionControls
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
+import { QuestionBankManager } from "@/components/instructor/question-bank";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 
@@ -35,11 +36,12 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank";
 
-const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
+const baseNavItems: { value: TabValue; label: string; icon: React.ElementType; stemOnly?: boolean }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "live", label: "Live Lecture", icon: Radio },
+  { value: "question-bank", label: "Question Bank", icon: Library, stemOnly: true },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
@@ -62,6 +64,12 @@ export default function InstructorDashboard() {
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
   const professorType = instructorProfile?.professor_type;
+  
+  // Filter nav items based on professor type - STEM instructors get Question Bank
+  const navItems = useMemo(() => 
+    baseNavItems.filter(item => !item.stemOnly || professorType === "stem"),
+    [professorType]
+  );
 
   useEffect(() => {
     checkAuth();
@@ -559,6 +567,29 @@ export default function InstructorDashboard() {
                 </CardContent>
               </Card>
             )}
+          </div>
+        );
+
+      case "question-bank":
+        return (
+          <div className="space-y-6">
+            <Card className="headspace-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Library className="h-5 w-5 text-primary" />
+                  STEM Question Bank
+                </CardTitle>
+                <CardDescription>
+                  Create and manage coding problems, MCQs, and short-answer questions for your classes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QuestionBankManager 
+                  courseId={selectedCourseId || undefined}
+                  isLiveSession={!!activeSession}
+                />
+              </CardContent>
+            </Card>
           </div>
         );
 
