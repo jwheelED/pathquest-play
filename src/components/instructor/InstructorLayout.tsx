@@ -110,10 +110,14 @@ function InstructorLayoutInner() {
         </div>
       )}
       
-      {/* Render other routes via Outlet when not on dashboard */}
-      {!isOnDashboard && (
+      {/* 
+        CRITICAL FIX: Always render Outlet when not on dashboard.
+        The Outlet needs to be rendered for child routes like /instructor/settings to work.
+        Previously this was conditional which caused the settings page not to render.
+      */}
+      <div className={cn(isOnDashboard ? "hidden" : "")}>
         <Outlet context={{ recordingContext: context }} />
-      )}
+      </div>
     </>
   );
 }
