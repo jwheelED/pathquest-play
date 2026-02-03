@@ -112,10 +112,12 @@ Deno.serve(async (req) => {
     console.log(`👥 Found ${studentIds.length} students to send to`);
 
     // 4. Determine assignment mode based on question type
+    // All question types from Question Bank should be auto-graded
     const getAssignmentMode = (questionType: string): string => {
       if (questionType === "multiple_choice") return "auto_grade";
       if (questionType === "coding_simple" || questionType === "coding") return "auto_grade";
-      return "manual_grade"; // short_answer
+      if (questionType === "short_answer") return "auto_grade";
+      return "manual_grade";
     };
 
     // 5. Format the question content for student_assignments

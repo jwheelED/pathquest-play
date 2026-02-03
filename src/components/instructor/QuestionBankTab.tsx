@@ -29,6 +29,7 @@ import {
   PushQuestionDialog,
   type BankQuestion 
 } from "./question-bank";
+import { QuestionBankResults } from "./QuestionBankResults";
 
 interface QuestionBankTabProps {
   professorType: string | null;
@@ -270,6 +271,9 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Results Section */}
+      <QuestionBankResults />
     </div>
   );
 }
