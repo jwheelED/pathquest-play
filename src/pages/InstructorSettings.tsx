@@ -19,29 +19,41 @@ export default function InstructorSettings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Auth is already handled by ProtectedRoute - just fetch user data
-    const fetchUserData = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("professor_type")
-            .eq("id", session.user.id)
-            .single();
-          
-          setCurrentUser(session.user);
-          setProfessorType(profile?.professor_type || null);
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchUserData();
+    checkAuth();
   }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/instructor/auth");
+      return;
+    }
+
+    // Verify instructor role
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", session.user.id)
+      .eq("role", "instructor")
+      .maybeSingle();
+    
+    if (!roleData) {
+      toast.error("Access denied. Instructor privileges required.");
+      navigate("/instructor/auth");
+      return;
+    }
+    
+    // Fetch profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("professor_type")
+      .eq("id", session.user.id)
+      .single();
+    
+    setCurrentUser(session.user);
+    setProfessorType(profile?.professor_type || null);
+    setLoading(false);
+  };
 
   if (loading) {
     return (

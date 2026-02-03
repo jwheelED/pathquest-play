@@ -1,13 +1,12 @@
-import { Menu, LogOut, Bell, Flame, Trophy, Home, Settings } from "lucide-react";
+import { Menu, LogOut, Bell, Flame, Trophy, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  SheetClose,
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,8 +32,6 @@ export function MobileHeader({
   userId,
   stats,
 }: MobileHeaderProps) {
-  const navigate = useNavigate();
-  
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -124,44 +121,26 @@ export function MobileHeader({
                   </div>
                 )}
 
-                {/* Settings Link for Instructors */}
-                {role === "instructor" && (
-                  <SheetClose asChild>
-                    <Button
-                      variant="ghost"
-                      className="w-full rounded-xl h-12 justify-start"
-                      onClick={() => navigate("/instructor/settings")}
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
-                    </Button>
-                  </SheetClose>
-                )}
-
                 {/* Home Link */}
-                <SheetClose asChild>
-                  <Link to="/">
-                    <Button
-                      variant="ghost"
-                      className="w-full rounded-xl h-12 justify-start"
-                    >
-                      <Home className="mr-2 h-4 w-4" />
-                      Back to Home
-                    </Button>
-                  </Link>
-                </SheetClose>
+                <Link to="/">
+                  <Button
+                    variant="ghost"
+                    className="w-full rounded-xl h-12 justify-start"
+                  >
+                    <Home className="mr-2 h-4 w-4" />
+                    Back to Home
+                  </Button>
+                </Link>
 
                 {/* Logout Button */}
-                <SheetClose asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-xl h-12"
-                    onClick={onLogout}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
-                  </Button>
-                </SheetClose>
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl h-12"
+                  onClick={onLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
               </div>
             </SheetContent>
           </Sheet>

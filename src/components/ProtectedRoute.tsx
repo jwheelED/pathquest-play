@@ -24,26 +24,13 @@ export function ProtectedRoute({
   useEffect(() => {
     // Set up auth state listener FIRST to catch session restoration
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (event === 'INITIAL_SESSION') {
           // Auth is now initialized - check authorization
-          // Use setTimeout to avoid blocking the auth callback
-          setTimeout(async () => {
-            try {
-              await checkAuthorization(session);
-            } catch (error) {
-              console.error('Authorization check failed:', error);
-              setAuthorized(false);
-            } finally {
-              setIsLoading(false);
-            }
-          }, 0);
+          checkAuthorization(session);
+          setIsLoading(false);
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          try {
-            await checkAuthorization(session);
-          } catch (error) {
-            console.error('Authorization check failed:', error);
-          }
+          checkAuthorization(session);
         } else if (event === 'SIGNED_OUT') {
           setAuthorized(false);
           navigate(redirectTo);
@@ -69,37 +56,22 @@ export function ProtectedRoute({
       return;
     }
 
-    try {
-      // Use server-side RPC function to check role
-      const { data: hasRole, error } = await supabase
-        .rpc('has_role', { 
-          _user_id: session.user.id, 
-          _role: requiredRole 
-        });
+    // Use server-side RPC function to check role
+    const { data: hasRole, error } = await supabase
+      .rpc('has_role', { 
+        _user_id: session.user.id, 
+        _role: requiredRole 
+      });
 
-      if (error) {
-        console.error('Role check error:', error);
-        toast.error(`Access denied. ${requiredRole.charAt(0).toUpperCase() + requiredRole.slice(1)} privileges required.`);
-        setAuthorized(false);
-        navigate(redirectTo);
-        return;
-      }
-
-      if (!hasRole) {
-        toast.error(`Access denied. ${requiredRole.charAt(0).toUpperCase() + requiredRole.slice(1)} privileges required.`);
-        setAuthorized(false);
-        navigate(redirectTo);
-        return;
-      }
-
-      hasCheckedRef.current = cacheKey;
-      setAuthorized(true);
-    } catch (error) {
-      console.error('Unexpected error during authorization:', error);
-      toast.error('An error occurred while verifying access');
+    if (error || !hasRole) {
+      toast.error(`Access denied. ${requiredRole.charAt(0).toUpperCase() + requiredRole.slice(1)} privileges required.`);
       setAuthorized(false);
       navigate(redirectTo);
+      return;
     }
+
+    hasCheckedRef.current = cacheKey;
+    setAuthorized(true);
   };
 
   if (isLoading || authorized === null) {

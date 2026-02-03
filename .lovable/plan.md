@@ -1,133 +1,161 @@
 
-# Fix Plan: Student Dashboard Crash & Instructor Settings Navigation
+
+# MCQ Grading Reliability Fix Plan
 
 ## Problem Summary
 
-### Issue 1: "Something Went Wrong" on Student Class Dashboard
-When a question bank question is sent to a class, students see a "Something went wrong" error when trying to open the class dashboard. The issue is in `AssignedContent.tsx` - the code assumes `assignment.content.questions` always exists (line 1312-1314), but the data structure may be malformed or missing when certain question bank questions are sent.
+Students are experiencing incorrect grading where their correct MCQ answers are marked as wrong. For example, a student who answered "B) 206 bones" for a question where the correct answer is "B" was marked incorrect.
 
-**Root Cause**: The code at line 1312 accesses `assignment.content.questions` without null-safe guards:
-```typescript
-{(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && assignment.content.questions && (
+## Root Cause Analysis
+
+After investigation, I identified **two root causes**:
+
+### 1. Outdated Edge Function Deployment
+The `submit-live-response` edge function deployed in production was outdated and didn't include the latest answer normalization logic. After redeploying the function, the same test case `"B) 206 bones"` now correctly returns `isCorrect: true`.
+
+**Evidence**: 
+- Historical responses with `answer: "C. C++ provides..."` and `correctAnswer: "C"` have mixed `is_correct` values (both true and false for identical inputs)
+- Testing the redeployed function shows correct behavior
+
+### 2. Edge Cases in Answer Normalization (Potential Future Issues)
+The current `normalizeAnswer` function handles most cases but has potential gaps:
+
+| Scenario | Example Answer | Options | Current Behavior | Risk |
+|----------|----------------|---------|------------------|------|
+| Letter prefix with `)` | `"B) 206 bones"` | `["A) ...", "B) ..."]` | ✅ Extracts "B" | Fixed |
+| Letter prefix with `.` | `"B. Answer"` | `["A. ...", "B. ..."]` | ✅ Extracts "B" | Fixed |
+| No letter prefix in options | `"Dennis Lehane"` | `["Stephen King", "Dennis Lehane", ...]` | ✅ Matches by index | Works |
+| Student types raw text | `"206"` | `["A. 100", "B. 206", ...]` | ⚠️ May not match | Potential issue |
+
+## Proposed Solution
+
+### Phase 1: Immediate Deployment Verification ✅
+The edge function has been redeployed. Future deployments should be automatic.
+
+### Phase 2: Enhanced Normalization Logic
+Add additional fallback matching to handle edge cases:
+
+```text
+File: supabase/functions/submit-live-response/index.ts
+
+Changes to normalizeAnswer function:
+1. Keep existing letter extraction logic (works for most cases)
+2. Add partial text matching as fallback (extract key numbers/words)
+3. Add logging for debugging failed matches
 ```
 
-If `assignment.content` is undefined or doesn't have a `questions` property (due to edge function data issues or question bank format differences), this causes a runtime error that crashes the component.
+**Specific improvements:**
 
-### Issue 2: Settings Page Not Rendering
-Despite the URL changing to `/instructor/settings`, the page doesn't render. The `InstructorLayout.tsx` architecture keeps the dashboard mounted but hidden, and renders child routes via `<Outlet />`. The current implementation should work, but there may be a conflict with how the Outlet is being rendered alongside the hidden dashboard.
+1. **Numeric answer matching**: If student types just "206" and options contain "B. 206", extract the number and match
+2. **Case-insensitive full text match**: Already exists but can be strengthened
+3. **Enhanced logging**: Log all normalization steps for easier debugging
 
-**Root Cause**: The current implementation has the Outlet wrapped in a div with conditional `hidden` class, but the component tree structure may cause React's rendering to not properly switch between the hidden dashboard and the visible Outlet content.
+### Phase 3: Defensive UI Changes
+Ensure the answer sent from the client is always in a predictable format:
 
----
+```text
+File: src/pages/LiveStudent.tsx
 
-## Solution
+Instead of sending the full option text, extract and send just the letter prefix:
+- Current: value={option} → sends "B) 206 bones"  
+- Better: Extract letter, send structured { letter: "B", fullText: "B) 206 bones" }
 
-### Fix 1: Add Defensive Null Checks to AssignedContent
-
-Add optional chaining (`?.`) to all `assignment.content` and `assignment.content.questions` accesses to prevent crashes:
-
-**File: `src/components/student/AssignedContent.tsx`**
-
-Changes needed at these locations:
-- Line 441: `const questions = assignment.content?.questions || [];`
-- Line 577: `const questions = assignment.content?.questions || [];`
-- Line 1312: `{... && assignment.content?.questions && (`
-- Line 1314: `{assignment.content?.questions?.map(...`
-
-This ensures that if the content or questions property is missing, the code gracefully handles it instead of crashing.
-
-### Fix 2: Create Standalone Settings Route (Simpler Architecture)
-
-Instead of fighting with the complex InstructorLayout nested routing, move the Settings route outside of the layout and make it a standalone protected route. This provides a clean separation and avoids the persistent mounting complexity.
-
-**File: `src/App.tsx`**
-
-Move `/instructor/settings` outside of the InstructorLayout wrapper:
-
-```typescript
-// BEFORE (inside InstructorLayout):
-<Route element={<InstructorLayout />}>
-  <Route path="/instructor/settings" element={<InstructorSettings />} />
-</Route>
-
-// AFTER (standalone route):
-<Route path="/instructor/settings" element={
-  <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-    <InstructorSettings />
-  </ProtectedRoute>
-} />
+This makes server-side comparison trivial and eliminates normalization edge cases.
 ```
 
-This ensures the Settings page renders independently without conflicts from the persistent dashboard mounting logic.
+## Implementation Details
 
----
+### Enhanced normalizeAnswer Function
+
+```typescript
+const normalizeAnswer = (answer: string, questionType: string, options?: string[]): string => {
+  if (questionType !== 'multiple_choice') {
+    return answer.trim();
+  }
+  
+  const trimmed = answer.trim();
+  
+  // 1. Already just a letter (A-D)
+  if (/^[A-Da-d]$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  
+  // 2. Extract letter from prefixed formats: "B) text", "B. text", "B - text", "B text"
+  const letterMatch = trimmed.match(/^([A-Da-d])[\).\-\s]/);
+  if (letterMatch) {
+    return letterMatch[1].toUpperCase();
+  }
+  
+  // 3. Match full option text (with or without prefix) 
+  if (options && options.length > 0) {
+    const letters = ['A', 'B', 'C', 'D'];
+    for (let i = 0; i < options.length && i < 4; i++) {
+      const option = options[i];
+      
+      // Strip any prefix from option for comparison
+      const optionText = option.replace(/^[A-Da-d][\).\-\s]+\s*/, '').trim();
+      
+      // Full match (case insensitive)
+      if (trimmed.toLowerCase() === option.toLowerCase() || 
+          trimmed.toLowerCase() === optionText.toLowerCase()) {
+        console.log(`📍 Matched "${trimmed}" to option ${letters[i]} via text match`);
+        return letters[i];
+      }
+    }
+  }
+  
+  // 4. Fallback: first character if A-D
+  if (/^[A-Da-d]/i.test(trimmed)) {
+    console.log(`📍 Using first char fallback for "${trimmed}"`);
+    return trimmed.charAt(0).toUpperCase();
+  }
+  
+  console.warn(`⚠️ Could not normalize answer: "${trimmed}"`);
+  return trimmed;
+};
+```
+
+### Client-Side Improvement (Optional but Recommended)
+
+```typescript
+// In LiveStudent.tsx, when submitting MCQ
+const handleConfidenceSelect = (level, multiplier) => {
+  // Extract just the letter from the selected option
+  const letterMatch = selectedAnswer.match(/^([A-Da-d])/);
+  const answerLetter = letterMatch ? letterMatch[1].toUpperCase() : selectedAnswer;
+  
+  const responseData = {
+    questionId: currentQuestion.id,
+    participantId,
+    answer: answerLetter, // Send just "B" instead of "B) 206 bones"
+    // ... rest of data
+  };
+};
+```
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/student/AssignedContent.tsx` | Add optional chaining to `assignment.content?.questions` at lines 441, 577, 1312, 1314 |
-| `src/App.tsx` | Move `/instructor/settings` route outside of InstructorLayout to be a standalone protected route |
+1. **`supabase/functions/submit-live-response/index.ts`**
+   - Enhance `normalizeAnswer` with better logging
+   - Add fallback matching patterns
+   
+2. **`src/pages/LiveStudent.tsx`** (Optional)
+   - Extract letter prefix before sending
+   - Add defensive validation
 
----
+## Testing Plan
 
-## Technical Details
+After implementation:
+1. Test with `"B) 206 bones"` format → should return correct
+2. Test with `"B. Answer text"` format → should return correct  
+3. Test with `"B"` (just letter) → should return correct
+4. Test with raw text `"206"` → should match to correct option
+5. Test with no-prefix options like `"Dennis Lehane"` → should match by index
 
-### AssignedContent.tsx Changes
+## Success Criteria
 
-The key defensive patterns:
+- All MCQ answers with correct letter prefix are marked as correct 100% of the time
+- Grading is consistent regardless of option format (`.`, `)`, space, etc.)
+- Clear logging exists to debug any future grading issues
+- No false negatives (correct answers marked wrong)
 
-```typescript
-// Line 441 - in handleAnswerSelect
-const questions = assignment.content?.questions || [];
-
-// Line 577 - in handleSubmitQuiz  
-const questions = assignment.content?.questions || [];
-
-// Line 1312-1314 - in render
-{(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && 
-  assignment.content?.questions && (
-    <div className="space-y-4">
-      {assignment.content.questions.map((q: any, idx: number) => {
-```
-
-### App.tsx Changes
-
-The Settings route becomes a peer of the InstructorLayout routes rather than a child:
-
-```typescript
-// Standalone settings route (before the InstructorLayout routes)
-<Route path="/instructor/settings" element={
-  <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-    <CourseProvider>
-      <InstructorSettings />
-    </CourseProvider>
-  </ProtectedRoute>
-} />
-
-// InstructorLayout routes (dashboard and other pages that need persistent recording)
-<Route element={
-  <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-    <CourseProvider>
-      <InstructorLayout />
-    </CourseProvider>
-  </ProtectedRoute>
-}>
-  <Route path="/instructor/dashboard" element={null} />
-  {/* Other routes that need persistent recording... */}
-</Route>
-```
-
-This approach:
-- Eliminates the routing conflict entirely
-- Settings page renders independently with its own full-page UI
-- No need to modify InstructorLayout's complex mounting logic
-- Recording state is preserved on dashboard (users must go back to dashboard if recording)
-
----
-
-## Expected Result
-
-- **Students**: Can open class dashboards without "Something went wrong" errors, even if a question bank question has malformed content
-- **Instructors**: Clicking Settings button navigates to and renders the Settings page correctly
-- **Recording**: Instructors are warned via the existing "Return to Lecture" banner if they navigate to settings while recording

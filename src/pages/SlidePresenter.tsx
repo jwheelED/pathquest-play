@@ -7,10 +7,9 @@ import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePrese
 import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
 import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from '@/components/instructor/slides/SlideQuestionPreviewDialog';
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components/instructor/VoiceQuestionPreviewDialog';
-import { SlidePresenterQuickSend } from '@/components/instructor/question-bank/SlidePresenterQuickSend';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Presentation, Upload, Mic, Library } from 'lucide-react';
+import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
@@ -48,9 +47,6 @@ export default function SlidePresenter() {
   // Selection mode state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
-  
-  // Question Bank panel state
-  const [showQuestionBank, setShowQuestionBank] = useState(false);
   
   // Ref to SlideViewer for capturing slide image
   const slideViewerRef = useRef<SlideViewerRef>(null);
@@ -559,27 +555,7 @@ export default function SlidePresenter() {
           onSendSlideQuestion={handleSendSlideQuestion}
         />
         
-        {/* Question Bank Toggle Button - bottom right */}
-        {isRecording && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowQuestionBank(!showQuestionBank)}
-            className="absolute bottom-4 right-4 z-50 bg-slate-900/90 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
-          >
-            <Library className="h-4 w-4 mr-2" />
-            Question Bank
-          </Button>
-        )}
-        
-        {/* Question Bank Quick Send Panel */}
-        <SlidePresenterQuickSend
-          isVisible={isRecording && showQuestionBank}
-          onClose={() => setShowQuestionBank(false)}
-          onQuestionSent={() => {}}
-        />
-        
-        {/* Stats Overlay - top left when bank is open */}
+        {/* Stats Overlay - top right (receives state via BroadcastChannel) */}
         <SlidePresenterOverlay
           directState={{
             isRecording,

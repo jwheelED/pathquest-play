@@ -18,7 +18,7 @@ import Onboarding from "./pages/Onboarding";
 import InstructorAuth from "./pages/InstructorAuth";
 import InstructorOnboarding from "./pages/InstructorOnboarding";
 import InstructorOrgOnboarding from "./pages/InstructorOrgOnboarding";
-// InstructorDashboard is lazy-loaded in InstructorLayout for persistent mounting
+import InstructorDashboard from "./pages/InstructorDashboard";
 import InstructorSettings from "./pages/InstructorSettings";
 import AdminAuth from "./pages/AdminAuth";
 import AdminOnboarding from "./pages/AdminOnboarding";
@@ -37,7 +37,6 @@ import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { SkipLink, ScreenReaderAnnouncer } from "./components/accessibility";
 import { CourseProvider } from "./hooks/useCourseContext";
-import { InstructorLayout } from "./components/instructor/InstructorLayout";
 
 const queryClient = new QueryClient();
 
@@ -100,7 +99,13 @@ function App() {
               <InstructorOnboarding />
             </ProtectedRoute>
           } />
-          {/* Standalone settings route - outside InstructorLayout to avoid persistent mounting conflicts */}
+          <Route path="/instructor/dashboard" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <CourseProvider>
+                <InstructorDashboard />
+              </CourseProvider>
+            </ProtectedRoute>
+          } />
           <Route path="/instructor/settings" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <CourseProvider>
@@ -108,21 +113,26 @@ function App() {
               </CourseProvider>
             </ProtectedRoute>
           } />
-          {/* Instructor routes wrapped in InstructorLayout for persistent recording */}
-          <Route element={
+          <Route path="/instructor/lecture-presenter" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <CourseProvider>
-                <InstructorLayout />
-              </CourseProvider>
+              <LecturePresenterView />
             </ProtectedRoute>
-          }>
-            {/* Dashboard is rendered by InstructorLayout, but we need a route for it */}
-            <Route path="/instructor/dashboard" element={null} />
-            <Route path="/instructor/lecture-presenter" element={<LecturePresenterView />} />
-            <Route path="/instructor/presenter" element={<PresenterView />} />
-            <Route path="/instructor/slides" element={<SlidePresenter />} />
-            <Route path="/instructor/preview/:lectureId" element={<InstructorLecturePreview />} />
-          </Route>
+          } />
+          <Route path="/instructor/presenter" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <PresenterView />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/slides" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <SlidePresenter />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/preview/:lectureId" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <InstructorLecturePreview />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/auth" element={<AdminAuth />} />
           <Route path="/admin/onboarding" element={
             <ProtectedRoute requiredRole="admin" redirectTo="/admin/auth">

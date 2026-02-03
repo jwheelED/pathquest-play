@@ -21,7 +21,6 @@ import {
   PictureInPicture2,
   BookOpen,
   Award,
-  Library,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -61,8 +60,6 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
-import { useRecordingContextSafe } from "@/contexts/RecordingContext";
-import { QuestionBankQuickSend } from "./question-bank";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -199,22 +196,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
-  
-  // Sync recording state to context for persistent recording across route changes
-  const recordingContext = useRecordingContextSafe();
-  
-  useEffect(() => {
-    if (recordingContext) {
-      recordingContext.updateRecordingState({
-        isRecording,
-        recordingDuration,
-        autoQuestionEnabled,
-        autoQuestionInterval,
-        nextAutoQuestionIn,
-        studentCount,
-      });
-    }
-  }, [isRecording, recordingDuration, autoQuestionEnabled, autoQuestionInterval, nextAutoQuestionIn, studentCount, recordingContext]);
 
   // Document Picture-in-Picture for floating presenter widget
   const { isSupported: isPiPSupported, openPiP } = useDocumentPiP({
@@ -3259,30 +3240,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 )}
               </CardContent>
             </Card>
-          )}
-
-          {/* Quick Send from Question Bank - shown when recording is active */}
-          {isRecording && (
-            <QuestionBankQuickSend 
-              onQuestionSent={() => {
-                // Refresh daily count after sending
-                const fetchDailyCount = async () => {
-                  const { data: { user } } = await supabase.auth.getUser();
-                  if (!user) return;
-                  const today = new Date().toISOString().split("T")[0];
-                  const { count } = await supabase
-                    .from("student_assignments")
-                    .select("id", { count: "exact", head: true })
-                    .eq("instructor_id", user.id)
-                    .eq("assignment_type", "lecture_checkin")
-                    .gte("created_at", today);
-                  if (count !== null) {
-                    setDailyQuestionCount(count);
-                  }
-                };
-                fetchDailyCount();
-              }}
-            />
           )}
 
           <Card className="relative overflow-hidden">
