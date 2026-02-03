@@ -134,7 +134,6 @@ Deno.serve(async (req) => {
 
     // 6. Create student_assignments in batches
     const BATCH_SIZE = 25;
-    const idempotencyKey = `bank_${questionId}_${Date.now()}`;
     let successCount = 0;
     let failedCount = 0;
 
@@ -149,7 +148,6 @@ Deno.serve(async (req) => {
         title: question.title,
         content: assignmentContent,
         mode: getAssignmentMode(question.question_type),
-        idempotency_key: `${idempotencyKey}_${studentId}`,
       }));
 
       const { error: insertError } = await supabase
