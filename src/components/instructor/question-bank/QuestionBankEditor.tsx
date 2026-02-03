@@ -19,6 +19,7 @@ import { Json } from "@/integrations/supabase/types";
 
 interface QuestionBankEditorProps {
   courseId?: string;
+  professorType?: 'stem' | 'humanities' | 'medical' | null;
   editingQuestion: QuestionBankItem | null;
   onSave: () => void;
   onCancel: () => void;
@@ -52,6 +53,7 @@ const defaultShortAnswerContent: ShortAnswerQuestionContent = {
 
 export function QuestionBankEditor({ 
   courseId, 
+  professorType,
   editingQuestion, 
   onSave, 
   onCancel 
@@ -86,14 +88,15 @@ export function QuestionBankEditor({
     } else {
       // Reset form for new question
       setTitle("");
-      setQuestionType("coding");
+      // Default to multiple_choice for humanities, coding for others
+      setQuestionType(professorType === 'humanities' ? 'multiple_choice' : 'coding');
       setDifficulty("medium");
       setTags([]);
       setCodingContent(defaultCodingContent);
       setMCQContent(defaultMCQContent);
       setShortAnswerContent(defaultShortAnswerContent);
     }
-  }, [editingQuestion]);
+  }, [editingQuestion, professorType]);
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim().toLowerCase();
@@ -327,12 +330,14 @@ export function QuestionBankEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="coding">
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4" />
-                    Coding Problem
-                  </div>
-                </SelectItem>
+                {professorType !== 'humanities' && (
+                  <SelectItem value="coding">
+                    <div className="flex items-center gap-2">
+                      <Code className="h-4 w-4" />
+                      Coding Problem
+                    </div>
+                  </SelectItem>
+                )}
                 <SelectItem value="multiple_choice">
                   <div className="flex items-center gap-2">
                     <ListChecks className="h-4 w-4" />
