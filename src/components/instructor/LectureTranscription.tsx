@@ -21,6 +21,7 @@ import {
   PictureInPicture2,
   BookOpen,
   Award,
+  Library,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -61,6 +62,7 @@ import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySh
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { useRecordingContextSafe } from "@/contexts/RecordingContext";
+import { QuestionBankQuickSend } from "./question-bank";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -3257,6 +3259,30 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Quick Send from Question Bank - shown when recording is active */}
+          {isRecording && (
+            <QuestionBankQuickSend 
+              onQuestionSent={() => {
+                // Refresh daily count after sending
+                const fetchDailyCount = async () => {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (!user) return;
+                  const today = new Date().toISOString().split("T")[0];
+                  const { count } = await supabase
+                    .from("student_assignments")
+                    .select("id", { count: "exact", head: true })
+                    .eq("instructor_id", user.id)
+                    .eq("assignment_type", "lecture_checkin")
+                    .gte("created_at", today);
+                  if (count !== null) {
+                    setDailyQuestionCount(count);
+                  }
+                };
+                fetchDailyCount();
+              }}
+            />
           )}
 
           <Card className="relative overflow-hidden">
