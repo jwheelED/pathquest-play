@@ -61,58 +61,87 @@ export default function AdminAuth() {
     }
   };
 
+  // Check for recovery token in URL on mount
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Check if user has admin role
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", session.user.id)
-          .eq("role", "admin")
-          .maybeSingle();
-        
-        if (roleData) {
-          // Check if admin has org_id set
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("org_id, onboarded")
-            .eq("id", session.user.id)
-            .single();
-          
-          if (profileData?.org_id && profileData?.onboarded) {
-            navigate("/admin/dashboard");
-          } else {
-            navigate("/admin/onboarding");
-          }
-        } else {
-          // Check if this is a new OAuth signup (only has student role)
-          const { data: studentRole } = await supabase
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
+    }
+  }, []);
+
+  // Combined auth state change handler
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Handle password recovery event
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+        return;
+      }
+
+      // Skip session checks if we're in recovery mode
+      if (isRecoveryMode) {
+        return;
+      }
+    });
+
+    // Check for existing session on mount (but not during recovery)
+    if (!isRecoveryMode) {
+      const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // Check if user has admin role
+          const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", session.user.id)
-            .eq("role", "student")
+            .eq("role", "admin")
             .maybeSingle();
           
-          if (studentRole) {
-            // New OAuth signup - assign admin role
-            const { data: success } = await supabase
-              .rpc('assign_oauth_role', { 
-                p_user_id: session.user.id, 
-                p_role: 'admin' 
-              });
+          if (roleData) {
+            // Check if admin has org_id set
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("org_id, onboarded")
+              .eq("id", session.user.id)
+              .single();
             
-            if (success) {
-              toast.success("Admin account created!");
+            if (profileData?.org_id && profileData?.onboarded) {
+              navigate("/admin/dashboard");
+            } else {
               navigate("/admin/onboarding");
+            }
+          } else {
+            // Check if this is a new OAuth signup (only has student role)
+            const { data: studentRole } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", session.user.id)
+              .eq("role", "student")
+              .maybeSingle();
+            
+            if (studentRole) {
+              // New OAuth signup - assign admin role
+              const { data: success } = await supabase
+                .rpc('assign_oauth_role', { 
+                  p_user_id: session.user.id, 
+                  p_role: 'admin' 
+                });
+              
+              if (success) {
+                toast.success("Admin account created!");
+                navigate("/admin/onboarding");
+              }
             }
           }
         }
-      }
-    };
-    checkSession();
-  }, [navigate]);
+      };
+      checkSession();
+    }
+
+    return () => subscription.unsubscribe();
+  }, [navigate, isRecoveryMode]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
