@@ -19,17 +19,11 @@ export default function InstructorAuth() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const navigate = useNavigate();
 
-  // Handle password recovery flow when user clicks link from email
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveryMode(true);
-        toast.info("Please enter your new password");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleAuth();
+    }
+  };
 
   const handlePasswordUpdate = async () => {
     setLoading(true);
@@ -55,72 +49,128 @@ export default function InstructorAuth() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleAuth();
-    }
-  };
-
+  // Check for recovery token in URL on mount
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Check if user has instructor role
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", session.user.id)
-          .eq("role", "instructor")
-          .maybeSingle();
-        
-        if (roleData) {
-          // Check if user has completed org onboarding and regular onboarding
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('org_id, onboarded, course_title, course_schedule, course_topics')
-            .eq('id', session.user.id)
-            .single();
+    // Check if this is a password recovery redirect (has type=recovery in hash)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
+    }
+  }, []);
+
+  // Combined auth state change handler
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event);
+      
+      // Handle password recovery event
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+        return; // Don't proceed with session checks
+      }
+
+      // Skip session checks if we're in recovery mode
+      if (isRecoveryMode) {
+        return;
+      }
+
+      // Handle signed in event - check role and redirect
+      if (event === 'SIGNED_IN' && session) {
+        // Use setTimeout to avoid Supabase auth deadlock
+        setTimeout(async () => {
+          // Check if user has instructor role
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .eq("role", "instructor")
+            .maybeSingle();
           
-          // First check if they have an organization
-          if (!profile?.org_id) {
-            navigate("/instructor/org-onboarding");
-          } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
-            navigate("/instructor/onboarding");
-          } else {
-            navigate("/instructor/dashboard");
-          }
-        } else {
-          // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
-          const sessionCreatedAt = new Date(session.user.created_at).getTime();
-          const now = Date.now();
-          const isRecentSignup = (now - sessionCreatedAt) < 30000; // 30 seconds
-          
-          // Also check URL for OAuth callback indicators
-          const urlParams = new URLSearchParams(window.location.search);
-          const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
-          
-          if (isRecentSignup && hasOAuthCallback) {
-            // This is a new OAuth signup - assign instructor role
-            const { data: success } = await supabase
-              .rpc('assign_oauth_role', { 
-                p_user_id: session.user.id, 
-                p_role: 'instructor' 
-              });
+          if (roleData) {
+            // Check if user has completed org onboarding and regular onboarding
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('org_id, onboarded, course_title, course_schedule, course_topics')
+              .eq('id', session.user.id)
+              .single();
             
-            if (success) {
-              toast.success("Instructor account created!");
+            // First check if they have an organization
+            if (!profile?.org_id) {
               navigate("/instructor/org-onboarding");
+            } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+              navigate("/instructor/onboarding");
+            } else {
+              navigate("/instructor/dashboard");
             }
           } else {
-            // Existing user who is not an instructor - redirect them appropriately
-            toast.error("This account is not registered as an instructor. Please use the student login.");
-            await supabase.auth.signOut();
+            // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
+            const sessionCreatedAt = new Date(session.user.created_at).getTime();
+            const now = Date.now();
+            const isRecentSignup = (now - sessionCreatedAt) < 30000; // 30 seconds
+            
+            // Also check URL for OAuth callback indicators
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
+            
+            if (isRecentSignup && hasOAuthCallback) {
+              // This is a new OAuth signup - assign instructor role
+              const { data: success } = await supabase
+                .rpc('assign_oauth_role', { 
+                  p_user_id: session.user.id, 
+                  p_role: 'instructor' 
+                });
+              
+              if (success) {
+                toast.success("Instructor account created!");
+                navigate("/instructor/org-onboarding");
+              }
+            } else {
+              // Existing user who is not an instructor - redirect them appropriately
+              toast.error("This account is not registered as an instructor. Please use the student login.");
+              await supabase.auth.signOut();
+            }
           }
-        }
+        }, 0);
       }
-    };
-    checkSession();
-  }, [navigate]);
+    });
+
+    // Check for existing session on mount (but not during recovery)
+    if (!isRecoveryMode) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          // Trigger the same logic as SIGNED_IN
+          setTimeout(async () => {
+            const { data: roleData } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", session.user.id)
+              .eq("role", "instructor")
+              .maybeSingle();
+            
+            if (roleData) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('org_id, onboarded, course_title, course_schedule, course_topics')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (!profile?.org_id) {
+                navigate("/instructor/org-onboarding");
+              } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+                navigate("/instructor/onboarding");
+              } else {
+                navigate("/instructor/dashboard");
+              }
+            }
+          }, 0);
+        }
+      });
+    }
+
+    return () => subscription.unsubscribe();
+  }, [navigate, isRecoveryMode]);
 
   const handlePasswordReset = async () => {
     setLoading(true);

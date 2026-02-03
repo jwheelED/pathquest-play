@@ -22,7 +22,16 @@ export default function AuthPage() {
 
   const navigate = useNavigate();
 
-  // Handle password recovery flow when user clicks link from email
+  // Check for recovery token in URL on mount
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
+    }
+  }, []);
+
+  // Handle password recovery event from auth state change
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -232,9 +241,19 @@ export default function AuthPage() {
   };
 
   useEffect(() => {
+    // Skip session handling if in recovery mode
+    if (isRecoveryMode) {
+      return;
+    }
+
     fetchSession();
 
-    const {data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Skip if in recovery mode or if this is a password recovery event
+      if (isRecoveryMode || event === 'PASSWORD_RECOVERY') {
+        return;
+      }
+
       setSession(session);
 
       if (session) {
@@ -270,12 +289,13 @@ export default function AuthPage() {
           await navigateByRole(session.user.id);
         };
 
-        initializeUser();
+        // Use setTimeout to avoid Supabase auth deadlock
+        setTimeout(initializeUser, 0);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, isRecoveryMode]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
