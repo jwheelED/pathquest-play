@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Search, Plus, Code, ListChecks, MessageSquare, Trash2, Edit2, 
-  Copy, Zap, Clock, MoreVertical, Filter
+  Copy, Zap, Clock, MoreVertical, Filter, Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { QuestionBankItem, QuestionType, Difficulty, isCodingContent, isMCQContent } from "./types";
+import { QuestionPreviewDialog } from "./QuestionPreviewDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +73,7 @@ export function QuestionBankLibrary({
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | "all">("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<QuestionBankItem | null>(null);
+  const [previewQuestion, setPreviewQuestion] = useState<QuestionBankItem | null>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -347,6 +349,10 @@ export function QuestionBankLibrary({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setPreviewQuestion(question)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Preview
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDuplicate(question)}>
                           <Copy className="h-4 w-4 mr-2" />
                           Duplicate
@@ -388,6 +394,13 @@ export function QuestionBankLibrary({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Question Preview Dialog */}
+      <QuestionPreviewDialog
+        open={previewQuestion !== null}
+        onOpenChange={(open) => !open && setPreviewQuestion(null)}
+        question={previewQuestion}
+      />
     </div>
   );
 }
