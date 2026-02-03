@@ -36,28 +36,37 @@ export default function ClassDashboard() {
   }, [instructorId]);
 
   const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/");
-    } else {
-      setUser(session.user);
-      fetchUserProfile(session.user.id);
-      if (instructorId) {
-        fetchCourseInfo(session.user.id, instructorId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/");
+      } else {
+        setUser(session.user);
+        await fetchUserProfile(session.user.id);
+        if (instructorId) {
+          await fetchCourseInfo(session.user.id, instructorId);
+        }
       }
+    } catch (error) {
+      console.error("Error checking session:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchUserProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", userId)
-      .single();
-    
-    if (data?.full_name) {
-      setUserName(data.full_name);
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .single();
+      
+      if (data?.full_name) {
+        setUserName(data.full_name);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
     }
   };
 
