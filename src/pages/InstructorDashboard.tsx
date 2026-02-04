@@ -425,33 +425,7 @@ export default function InstructorDashboard() {
             {/* Organization connection card removed - not needed unless for institutional licensing */}
             
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {instructorCode && (
-                <Card className="headspace-card h-fit">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Your Class Code</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block break-all">
-                      {instructorCode}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full rounded-xl"
-                      onClick={() => {
-                        navigator.clipboard.writeText(instructorCode);
-                        toast.success("Code copied to clipboard!");
-                      }}
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Code
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Share this code with your students
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              <CourseCodeCard />
 
               {currentUser && (
                 <div className="xl:col-span-2">
