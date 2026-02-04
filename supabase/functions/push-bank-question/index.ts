@@ -85,22 +85,36 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Question verified: "${question.title}" (${question.question_type})`);
 
-    // 3. Get all students in the course
-    const { data: studentLinks, error: studentsError } = await supabase
+    // 3. Get all students in the course (including legacy students with null course_id for backward compatibility)
+    // Query 1: Students explicitly enrolled in this course
+    const { data: courseStudents, error: courseStudentsError } = await supabase
       .from("instructor_students")
       .select("student_id")
       .eq("instructor_id", user.id)
       .eq("course_id", courseId);
 
-    if (studentsError) {
-      console.error("❌ Error fetching students:", studentsError);
+    // Query 2: Legacy students with no course_id (joined via instructor code)
+    const { data: legacyStudents, error: legacyStudentsError } = await supabase
+      .from("instructor_students")
+      .select("student_id")
+      .eq("instructor_id", user.id)
+      .is("course_id", null);
+
+    if (courseStudentsError || legacyStudentsError) {
+      console.error("❌ Error fetching students:", courseStudentsError || legacyStudentsError);
       return new Response(
         JSON.stringify({ error: "Failed to fetch students" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!studentLinks || studentLinks.length === 0) {
+    // Combine and deduplicate student IDs
+    const allStudentLinks = [...(courseStudents || []), ...(legacyStudents || [])];
+    const uniqueStudentIds = [...new Set(allStudentLinks.map((link) => link.student_id))];
+    
+    console.log(`👥 Found ${uniqueStudentIds.length} students (${courseStudents?.length || 0} course-enrolled, ${legacyStudents?.length || 0} legacy)`);
+
+    if (uniqueStudentIds.length === 0) {
       console.log("⚠️ No students enrolled in this course");
       return new Response(
         JSON.stringify({ success: true, studentCount: 0, message: "No students enrolled" }),
@@ -108,8 +122,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const studentIds = studentLinks.map((link) => link.student_id);
-    console.log(`👥 Found ${studentIds.length} students to send to`);
+    const studentIds = uniqueStudentIds;
 
     // 4. Determine assignment mode based on question type
     // All question types from Question Bank should be auto-graded
