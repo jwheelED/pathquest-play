@@ -139,7 +139,7 @@ export default function InstructorAuth() {
     if (!isRecoveryMode) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          // Trigger the same logic as SIGNED_IN
+          // Trigger the same logic as SIGNED_IN - existing session goes to dashboard
           setTimeout(async () => {
             const { data: roleData } = await supabase
               .from("user_roles")
@@ -151,24 +151,13 @@ export default function InstructorAuth() {
             if (roleData) {
               const { data: profile } = await supabase
                 .from('profiles')
-                .select('org_id, onboarded')
+                .select('org_id')
                 .eq('id', session.user.id)
                 .single();
               
-              // Check if instructor has any courses (new multi-course system)
-              const { data: courses } = await supabase
-                .from('courses')
-                .select('id')
-                .eq('instructor_id', session.user.id)
-                .limit(1);
-              
-              const hasCourses = courses && courses.length > 0;
-              
+              // Only check org - existing instructors go straight to dashboard
               if (!profile?.org_id) {
                 navigate("/instructor/org-onboarding");
-              } else if (!hasCourses) {
-                // Only redirect to onboarding if they have no courses
-                navigate("/instructor/onboarding");
               } else {
                 navigate("/instructor/dashboard");
               }
