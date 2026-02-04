@@ -945,11 +945,8 @@ serve(async (req) => {
       }
       studentLinks = allStudents || [];
       console.log(`📚 No course filter - sending to all ${studentLinks.length} students`);
-    }
 
-    if (linkError) {
-      throw new Error(`Failed to fetch students: ${linkError.message}`);
-    }
+    // Error handling is now done within the conditionals above
 
     if (!studentLinks || studentLinks.length === 0) {
       return new Response(
