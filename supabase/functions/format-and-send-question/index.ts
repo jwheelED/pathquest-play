@@ -945,7 +945,8 @@ serve(async (req) => {
       }
       studentLinks = allStudents || [];
       console.log(`📚 No course filter - sending to all ${studentLinks.length} students`);
-
+    }
+    
     // Error handling is now done within the conditionals above
 
     if (!studentLinks || studentLinks.length === 0) {
