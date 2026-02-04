@@ -93,16 +93,25 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Check if already connected to this instructor
-      const { data: existing } = await supabase
+      // Check if already enrolled in this specific course (or instructor for legacy codes)
+      let existingQuery = supabase
         .from("instructor_students")
-        .select("id")
+        .select("id, course_id")
         .eq("instructor_id", instructorId)
-        .eq("student_id", user.id)
-        .maybeSingle()
+        .eq("student_id", user.id);
+      
+      // For course-specific codes, check the exact course
+      // For legacy codes (courseId is null), check for null course_id enrollment
+      if (courseId) {
+        existingQuery = existingQuery.eq("course_id", courseId);
+      } else {
+        existingQuery = existingQuery.is("course_id", null);
+      }
+
+      const { data: existing } = await existingQuery.maybeSingle();
 
       if (existing) {
-        toast.info("You're already enrolled in this class.")
+        toast.info("You're already enrolled in this course.")
         // Still mark as onboarded
         await supabase
           .from("profiles")
@@ -113,21 +122,6 @@ export default function OnboardingPage() {
         localStorage.setItem("edvana_onboarded", "true")
         navigate("/dashboard")
         return
-      }
-
-      // If student has existing connection to different instructor, remove it first
-      const { data: oldConnection } = await supabase
-        .from("instructor_students")
-        .select("id, instructor_id")
-        .eq("student_id", user.id)
-        .maybeSingle()
-
-      if (oldConnection && oldConnection.instructor_id !== instructorId) {
-        toast.info("Switching to new class...")
-        await supabase
-          .from("instructor_students")
-          .delete()
-          .eq("id", oldConnection.id)
       }
 
       // Get instructor's org_id for the connection (trigger will sync to student profile)
