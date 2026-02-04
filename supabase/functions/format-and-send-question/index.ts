@@ -803,18 +803,39 @@ serve(async (req) => {
       console.log(`✅ Live question sent to ${participantCount || 0} anonymous participants`);
 
       // ALSO send to registered students via student_assignments
-      // Filter by course_id if provided to ensure course-scoped delivery
-      let studentQuery = supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id);
+      // Include both course-enrolled students AND legacy students (null course_id) for backward compatibility
+      let studentLinks: { student_id: string }[] = [];
       
       if (course_id) {
-        studentQuery = studentQuery.eq("course_id", course_id);
-        console.log(`📚 Filtering students by course_id: ${course_id}`);
+        // Query 1: Students explicitly enrolled in this course
+        const { data: courseStudents } = await supabase
+          .from("instructor_students")
+          .select("student_id")
+          .eq("instructor_id", user.id)
+          .eq("course_id", course_id);
+        
+        // Query 2: Legacy students with no course_id (joined via instructor code)
+        const { data: legacyStudents } = await supabase
+          .from("instructor_students")
+          .select("student_id")
+          .eq("instructor_id", user.id)
+          .is("course_id", null);
+        
+        // Combine and deduplicate
+        const allStudents = [...(courseStudents || []), ...(legacyStudents || [])];
+        const uniqueIds = [...new Set(allStudents.map(s => s.student_id))];
+        studentLinks = uniqueIds.map(id => ({ student_id: id }));
+        
+        console.log(`📚 Found ${studentLinks.length} students (${courseStudents?.length || 0} course-enrolled, ${legacyStudents?.length || 0} legacy)`);
+      } else {
+        // No course_id - get all instructor's students
+        const { data: allStudents } = await supabase
+          .from("instructor_students")
+          .select("student_id")
+          .eq("instructor_id", user.id);
+        studentLinks = allStudents || [];
+        console.log(`📚 No course filter - sending to all ${studentLinks.length} students`);
       }
-      
-      const { data: studentLinks } = await studentQuery;
 
       let registeredStudentCount = 0;
       if (studentLinks && studentLinks.length > 0) {
