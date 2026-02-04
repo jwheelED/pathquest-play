@@ -94,9 +94,8 @@ export function QuestionBankResults() {
           student_id: a.student_id,
           title: a.title,
           content: a.content as Assignment["content"],
-          answers: a.answers as Record<string, string> | null,
-          grades: a.grades as Record<string, number> | null,
-          ai_feedback: a.ai_feedback as Record<string, string> | null,
+          quiz_responses: a.quiz_responses as Record<string, any> | null,
+          grade: a.grade as number | null,
           completed: a.completed,
           created_at: a.created_at,
         })) as Assignment[];
