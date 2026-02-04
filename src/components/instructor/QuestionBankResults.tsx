@@ -43,9 +43,8 @@ interface Assignment {
       problemText?: string;
     }>;
   } | null;
-  answers: Record<string, string> | null;
-  grades: Record<string, number> | null;
-  ai_feedback: Record<string, string> | null;
+  quiz_responses: Record<string, any> | null; // Contains answers + embedded _ai_recommendations
+  grade: number | null; // Top-level grade
   completed: boolean;
   created_at: string;
 }
@@ -95,9 +94,8 @@ export function QuestionBankResults() {
           student_id: a.student_id,
           title: a.title,
           content: a.content as Assignment["content"],
-          answers: a.answers as Record<string, string> | null,
-          grades: a.grades as Record<string, number> | null,
-          ai_feedback: a.ai_feedback as Record<string, string> | null,
+          quiz_responses: a.quiz_responses as Record<string, any> | null,
+          grade: a.grade as number | null,
           completed: a.completed,
           created_at: a.created_at,
         })) as Assignment[];
@@ -223,12 +221,17 @@ export function QuestionBankResults() {
     const completed = assignments.filter(a => a.completed).length;
     const total = assignments.length;
     
+    // Extract grades from top-level grade or embedded _ai_recommendations
     const grades = assignments
-      .filter(a => a.grades && Object.keys(a.grades).length > 0)
       .map(a => {
-        const gradeValues = Object.values(a.grades!);
-        return gradeValues.reduce((sum, g) => sum + g, 0) / gradeValues.length;
-      });
+        // First check top-level grade
+        if (a.grade !== null && a.grade !== undefined) return a.grade;
+        // Fallback to embedded AI recommendations
+        const aiRec = a.quiz_responses?._ai_recommendations?.["0"];
+        if (aiRec?.grade !== undefined) return aiRec.grade;
+        return null;
+      })
+      .filter((g): g is number => g !== null);
     
     const avgGrade = grades.length > 0 
       ? Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length)
@@ -324,11 +327,27 @@ export function QuestionBankResults() {
   };
 
   const renderAnswer = (assignment: Assignment, group: QuestionGroup) => {
-    const answer = assignment.answers?.["0"] || assignment.answers?.q0;
-    const grade = assignment.grades?.["0"] ?? assignment.grades?.q0;
-    const feedback = assignment.ai_feedback?.["0"] || assignment.ai_feedback?.q0;
+    // Get answer from quiz_responses (exclude _ai_recommendations key)
+    const responses = assignment.quiz_responses || {};
+    const answer = responses["0"] || responses.q0;
+    
+    // Get grade from top-level or embedded AI recommendations
+    let grade: number | undefined;
+    if (assignment.grade !== null && assignment.grade !== undefined) {
+      grade = assignment.grade;
+    } else {
+      const aiRec = responses._ai_recommendations?.["0"];
+      if (aiRec?.grade !== undefined) grade = aiRec.grade;
+    }
+    
+    // Get feedback from embedded AI recommendations
+    const aiRec = responses._ai_recommendations?.["0"];
+    const feedback = aiRec?.feedback;
 
-    if (!answer && !assignment.completed) {
+    // Filter out _ai_recommendations from being treated as an answer
+    const actualAnswer = typeof answer === 'string' ? answer : undefined;
+
+    if (!actualAnswer && !assignment.completed) {
       return (
         <span className="text-muted-foreground italic flex items-center gap-1">
           <Clock className="w-3 h-3" />
@@ -339,7 +358,7 @@ export function QuestionBankResults() {
 
     return (
       <ExpandableResponse
-        answer={answer}
+        answer={actualAnswer}
         grade={grade}
         feedback={feedback}
         questionType={group.questionType}
