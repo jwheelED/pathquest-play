@@ -177,7 +177,8 @@ export default function InstructorAuth() {
               
               if (!profile?.org_id) {
                 navigate("/instructor/org-onboarding");
-              } else if (!profile?.onboarded || !hasCourses) {
+              } else if (!hasCourses) {
+                // Only redirect to onboarding if they have no courses
                 navigate("/instructor/onboarding");
               } else {
                 navigate("/instructor/dashboard");
