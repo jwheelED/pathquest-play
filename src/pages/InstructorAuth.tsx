@@ -89,18 +89,19 @@ export default function InstructorAuth() {
             .maybeSingle();
           
           if (roleData) {
-            // Existing instructor - check org only, skip onboarding check for sign-in
+            // Check if user has completed org onboarding and regular onboarding
             const { data: profile } = await supabase
               .from('profiles')
-              .select('org_id')
+              .select('org_id, onboarded, course_title, course_schedule, course_topics')
               .eq('id', session.user.id)
               .single();
             
-            // Only check org - existing instructors go straight to dashboard
+            // First check if they have an organization
             if (!profile?.org_id) {
               navigate("/instructor/org-onboarding");
+            } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+              navigate("/instructor/onboarding");
             } else {
-              // Existing instructor with org goes to dashboard
               navigate("/instructor/dashboard");
             }
           } else {
@@ -139,7 +140,7 @@ export default function InstructorAuth() {
     if (!isRecoveryMode) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          // Trigger the same logic as SIGNED_IN - existing session goes to dashboard
+          // Trigger the same logic as SIGNED_IN
           setTimeout(async () => {
             const { data: roleData } = await supabase
               .from("user_roles")
@@ -151,13 +152,14 @@ export default function InstructorAuth() {
             if (roleData) {
               const { data: profile } = await supabase
                 .from('profiles')
-                .select('org_id')
+                .select('org_id, onboarded, course_title, course_schedule, course_topics')
                 .eq('id', session.user.id)
                 .single();
               
-              // Only check org - existing instructors go straight to dashboard
               if (!profile?.org_id) {
                 navigate("/instructor/org-onboarding");
+              } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+                navigate("/instructor/onboarding");
               } else {
                 navigate("/instructor/dashboard");
               }
@@ -277,16 +279,15 @@ export default function InstructorAuth() {
           }
 
           if (roleData) {
-            // Existing instructor signing in - only check org, go straight to dashboard
+            // Check if user has completed onboarding
             const { data: profile } = await supabase
               .from('profiles')
-              .select('org_id')
+              .select('onboarded, course_title, course_schedule, course_topics')
               .eq('id', user.id)
               .single();
             
-            // Only check org - existing instructors go straight to dashboard
-            if (!profile?.org_id) {
-              navigate("/instructor/org-onboarding");
+            if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+              navigate("/instructor/onboarding");
             } else {
               navigate("/instructor/dashboard");
             }
