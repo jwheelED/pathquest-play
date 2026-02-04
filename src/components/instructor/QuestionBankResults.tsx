@@ -221,12 +221,17 @@ export function QuestionBankResults() {
     const completed = assignments.filter(a => a.completed).length;
     const total = assignments.length;
     
+    // Extract grades from top-level grade or embedded _ai_recommendations
     const grades = assignments
-      .filter(a => a.grades && Object.keys(a.grades).length > 0)
       .map(a => {
-        const gradeValues = Object.values(a.grades!);
-        return gradeValues.reduce((sum, g) => sum + g, 0) / gradeValues.length;
-      });
+        // First check top-level grade
+        if (a.grade !== null && a.grade !== undefined) return a.grade;
+        // Fallback to embedded AI recommendations
+        const aiRec = a.quiz_responses?._ai_recommendations?.["0"];
+        if (aiRec?.grade !== undefined) return aiRec.grade;
+        return null;
+      })
+      .filter((g): g is number => g !== null);
     
     const avgGrade = grades.length > 0 
       ? Math.round(grades.reduce((sum, g) => sum + g, 0) / grades.length)
