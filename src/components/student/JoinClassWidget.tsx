@@ -54,15 +54,18 @@ export function JoinClassWidget({ userId, onClassJoined, onCancel }: JoinClassWi
         return;
       }
 
-      // Check if already connected to this course/instructor
+      // Check if already enrolled in THIS specific course (or legacy null course)
       let existingQuery = supabase
         .from("instructor_students")
-        .select("id")
+        .select("id, course_id")
         .eq("instructor_id", instructorId)
         .eq("student_id", userId);
-
+      
+      // Handle course_id properly - use .is() for null, .eq() for actual values
       if (courseId) {
         existingQuery = existingQuery.eq("course_id", courseId);
+      } else {
+        existingQuery = existingQuery.is("course_id", null);
       }
 
       const { data: existing } = await existingQuery.maybeSingle();
