@@ -905,18 +905,47 @@ serve(async (req) => {
     // No live session - use traditional student_assignments (authenticated users)
     console.log("📚 Standard mode - sending via student_assignments");
 
-    // Fetch students linked to this instructor, filtered by course if provided
-    let studentQuery = supabase
-      .from("instructor_students")
-      .select("student_id")
-      .eq("instructor_id", user.id);
+    // Fetch students linked to this instructor, including legacy students for backward compatibility
+    let studentLinks: { student_id: string }[] = [];
     
     if (course_id) {
-      studentQuery = studentQuery.eq("course_id", course_id);
-      console.log(`📚 Filtering students by course_id: ${course_id}`);
+      // Query 1: Students explicitly enrolled in this course
+      const { data: courseStudents, error: courseError } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id)
+        .eq("course_id", course_id);
+      
+      // Query 2: Legacy students with no course_id (joined via instructor code)
+      const { data: legacyStudents, error: legacyError } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id)
+        .is("course_id", null);
+      
+      if (courseError || legacyError) {
+        throw new Error(`Failed to fetch students: ${(courseError || legacyError)?.message}`);
+      }
+      
+      // Combine and deduplicate
+      const allStudents = [...(courseStudents || []), ...(legacyStudents || [])];
+      const uniqueIds = [...new Set(allStudents.map(s => s.student_id))];
+      studentLinks = uniqueIds.map(id => ({ student_id: id }));
+      
+      console.log(`📚 Found ${studentLinks.length} students (${courseStudents?.length || 0} course-enrolled, ${legacyStudents?.length || 0} legacy)`);
+    } else {
+      // No course_id - get all instructor's students
+      const { data: allStudents, error: linkError } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id);
+      
+      if (linkError) {
+        throw new Error(`Failed to fetch students: ${linkError.message}`);
+      }
+      studentLinks = allStudents || [];
+      console.log(`📚 No course filter - sending to all ${studentLinks.length} students`);
     }
-    
-    const { data: studentLinks, error: linkError } = await studentQuery;
 
     if (linkError) {
       throw new Error(`Failed to fetch students: ${linkError.message}`);
