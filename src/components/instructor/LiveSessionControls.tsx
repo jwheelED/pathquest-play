@@ -125,16 +125,7 @@ export const LiveSessionControls = ({
     }
   };
 
-  const updateParticipantCount = async () => {
-    if (!activeSession) return;
-
-    const { count } = await supabase
-      .from("live_participants")
-      .select("*", { count: "exact", head: true })
-      .eq("session_id", activeSession.id);
-
-    setParticipantCount(count || 0);
-  };
+  // updateParticipantCount is now inline in the effect above to avoid stale closures
 
   const handleStartSession = async () => {
     if (!sessionTitle.trim()) {
