@@ -43,9 +43,8 @@ interface Assignment {
       problemText?: string;
     }>;
   } | null;
-  answers: Record<string, string> | null;
-  grades: Record<string, number> | null;
-  ai_feedback: Record<string, string> | null;
+  quiz_responses: Record<string, any> | null; // Contains answers + embedded _ai_recommendations
+  grade: number | null; // Top-level grade
   completed: boolean;
   created_at: string;
 }
