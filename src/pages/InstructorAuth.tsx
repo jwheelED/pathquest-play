@@ -279,14 +279,25 @@ export default function InstructorAuth() {
           }
 
           if (roleData) {
-            // Check if user has completed onboarding
+            // Check if user has completed onboarding - check for courses in new multi-course system
             const { data: profile } = await supabase
               .from('profiles')
-              .select('onboarded, course_title, course_schedule, course_topics')
+              .select('onboarded, org_id')
               .eq('id', user.id)
               .single();
             
-            if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+            // Check if instructor has any courses (new multi-course system)
+            const { data: courses } = await supabase
+              .from('courses')
+              .select('id')
+              .eq('instructor_id', user.id)
+              .limit(1);
+            
+            const hasCourses = courses && courses.length > 0;
+            
+            if (!profile?.org_id) {
+              navigate("/instructor/org-onboarding");
+            } else if (!profile?.onboarded || !hasCourses) {
               navigate("/instructor/onboarding");
             } else {
               navigate("/instructor/dashboard");
