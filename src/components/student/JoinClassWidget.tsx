@@ -54,18 +54,15 @@ export function JoinClassWidget({ userId, onClassJoined, onCancel }: JoinClassWi
         return;
       }
 
-      // Check if already connected to this course/instructor
-      let existingQuery = supabase
+      // Check if already enrolled in THIS specific course (or legacy null course)
+      // We need to check for exact match: same instructor + same student + same course_id
+      const { data: existing } = await supabase
         .from("instructor_students")
-        .select("id")
+        .select("id, course_id")
         .eq("instructor_id", instructorId)
-        .eq("student_id", userId);
-
-      if (courseId) {
-        existingQuery = existingQuery.eq("course_id", courseId);
-      }
-
-      const { data: existing } = await existingQuery.maybeSingle();
+        .eq("student_id", userId)
+        .eq("course_id", courseId ?? null)
+        .maybeSingle();
 
       if (existing) {
         toast.info("You're already enrolled in this class.");
