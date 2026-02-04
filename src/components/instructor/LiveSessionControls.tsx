@@ -118,7 +118,7 @@ export const LiveSessionControls = ({
     if (data) {
       setActiveSession(data);
       onSessionChange(data.id);
-      updateParticipantCount();
+      // Participant count will be fetched by the useEffect when activeSession changes
     } else {
       setActiveSession(null);
       onSessionChange(null);
