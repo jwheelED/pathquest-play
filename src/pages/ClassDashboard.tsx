@@ -198,7 +198,7 @@ export default function ClassDashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
           {/* Course Information - Headspace Style */}
           {courseInfo && (
