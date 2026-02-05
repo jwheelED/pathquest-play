@@ -263,18 +263,21 @@ export default function InstructorAuth() {
             return;
           }
 
-          if (roleData) {
-            // Check if user has completed onboarding
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('onboarded, course_title, course_schedule, course_topics')
-              .eq('id', user.id)
-              .single();
-            
-            if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
-              navigate("/instructor/onboarding");
-            } else {
-              navigate("/instructor/dashboard");
+          if (roleData) {  
+            // Check if user has completed org onboarding and regular onboarding  
+            const { data: profile } = await supabase  
+              .from('profiles')  
+              .select('org_id, onboarded, course_title, course_schedule, course_topics')  
+              .eq('id', user.id)  
+              .single();  
+              
+            // First check if they have an organization  
+            if (!profile?.org_id) {  
+              navigate("/instructor/org-onboarding");  
+            } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {  
+              navigate("/instructor/onboarding");  
+            } else {  
+              navigate("/instructor/dashboard");  
             }
           } else {
             toast.error("This account is not registered as an instructor");
