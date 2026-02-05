@@ -89,17 +89,27 @@ export default function InstructorAuth() {
             .maybeSingle();
           
           if (roleData) {
-            // Check if user has completed org onboarding and regular onboarding
+            // Check if user has completed onboarding - org_id is optional for existing instructors
             const { data: profile } = await supabase
               .from('profiles')
               .select('org_id, onboarded, course_title, course_schedule, course_topics')
               .eq('id', session.user.id)
               .single();
             
-            // First check if they have an organization
-            if (!profile?.org_id) {
-              navigate("/instructor/org-onboarding");
+            // Check if instructor has completed onboarding (has courses set up)
+            const { data: courses } = await supabase
+              .from('courses')
+              .select('id')
+              .eq('instructor_id', session.user.id)
+              .limit(1);
+            
+            const hasCompletedOnboarding = profile?.onboarded && courses && courses.length > 0;
+            
+            if (hasCompletedOnboarding) {
+              // Existing instructor with courses - go directly to dashboard
+              navigate("/instructor/dashboard");
             } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
+              // Needs to complete course setup
               navigate("/instructor/onboarding");
             } else {
               navigate("/instructor/dashboard");
