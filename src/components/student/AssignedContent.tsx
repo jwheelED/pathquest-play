@@ -802,14 +802,28 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
               }
             } else if (q.type === 'coding_simple') {
               // For simple coding check-ins, use lenient AI grading (concept-focused)
+              // Handle both 'question' (live capture) and 'problemText' (question bank) formats
               const studentAnswer = allAnswers[idx];
+              const problemStatement = q.question || q.problemText || q.title || '';
+              
+              if (!studentAnswer || !problemStatement) {
+                console.warn('Missing student answer or problem statement for coding_simple', idx);
+                continue;
+              }
+              
               try {
+                console.log('📝 Auto-grading coding_simple:', { 
+                  idx, 
+                  problemStatement: problemStatement.substring(0, 50),
+                  language: q.language || 'python'
+                });
+                
                 const { data: gradeData, error: gradeError } = await supabase.functions.invoke(
                   'auto-grade-coding',
                   {
                     body: {
                       studentCode: studentAnswer,
-                      problemStatement: q.question,
+                      problemStatement: problemStatement,
                       expectedSolution: q.expectedAnswer || q.correct_answer || '',
                       language: q.language || 'python',
                       functionSignature: q.functionSignature || ''
@@ -817,7 +831,10 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                   }
                 );
 
-                if (!gradeError && gradeData) {
+                if (gradeError) {
+                  console.error('Auto-grade-coding error:', gradeError);
+                } else if (gradeData) {
+                  console.log('✅ Coding grade received:', gradeData.grade);
                   recommendedGrades[idx] = {
                     grade: gradeData.grade,
                     feedback: gradeData.feedback

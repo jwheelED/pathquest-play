@@ -11,11 +11,49 @@ import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
 export default function AdminAuth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const navigate = useNavigate();
+
+  // Handle password recovery flow when user clicks link from email
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handlePasswordUpdate = async () => {
+    setLoading(true);
+    try {
+      if (!newPassword || newPassword.length < 8) {
+        toast.error("Password must be at least 8 characters");
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      
+      if (error) throw error;
+
+      toast.success("Password updated successfully! Please sign in.");
+      setIsRecoveryMode(false);
+      setNewPassword("");
+      await supabase.auth.signOut();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -23,58 +61,87 @@ export default function AdminAuth() {
     }
   };
 
+  // Check for recovery token in URL on mount
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Check if user has admin role
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", session.user.id)
-          .eq("role", "admin")
-          .maybeSingle();
-        
-        if (roleData) {
-          // Check if admin has org_id set
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("org_id, onboarded")
-            .eq("id", session.user.id)
-            .single();
-          
-          if (profileData?.org_id && profileData?.onboarded) {
-            navigate("/admin/dashboard");
-          } else {
-            navigate("/admin/onboarding");
-          }
-        } else {
-          // Check if this is a new OAuth signup (only has student role)
-          const { data: studentRole } = await supabase
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
+    }
+  }, []);
+
+  // Combined auth state change handler
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Handle password recovery event
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+        return;
+      }
+
+      // Skip session checks if we're in recovery mode
+      if (isRecoveryMode) {
+        return;
+      }
+    });
+
+    // Check for existing session on mount (but not during recovery)
+    if (!isRecoveryMode) {
+      const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // Check if user has admin role
+          const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", session.user.id)
-            .eq("role", "student")
+            .eq("role", "admin")
             .maybeSingle();
           
-          if (studentRole) {
-            // New OAuth signup - assign admin role
-            const { data: success } = await supabase
-              .rpc('assign_oauth_role', { 
-                p_user_id: session.user.id, 
-                p_role: 'admin' 
-              });
+          if (roleData) {
+            // Check if admin has org_id set
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("org_id, onboarded")
+              .eq("id", session.user.id)
+              .single();
             
-            if (success) {
-              toast.success("Admin account created!");
+            if (profileData?.org_id && profileData?.onboarded) {
+              navigate("/admin/dashboard");
+            } else {
               navigate("/admin/onboarding");
+            }
+          } else {
+            // Check if this is a new OAuth signup (only has student role)
+            const { data: studentRole } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", session.user.id)
+              .eq("role", "student")
+              .maybeSingle();
+            
+            if (studentRole) {
+              // New OAuth signup - assign admin role
+              const { data: success } = await supabase
+                .rpc('assign_oauth_role', { 
+                  p_user_id: session.user.id, 
+                  p_role: 'admin' 
+                });
+              
+              if (success) {
+                toast.success("Admin account created!");
+                navigate("/admin/onboarding");
+              }
             }
           }
         }
-      }
-    };
-    checkSession();
-  }, [navigate]);
+      };
+      checkSession();
+    }
+
+    return () => subscription.unsubscribe();
+  }, [navigate, isRecoveryMode]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
@@ -202,10 +269,34 @@ export default function AdminAuth() {
             Administrator Portal
           </CardTitle>
           <CardDescription>
-            {isResetMode ? "Reset your password" : isSignUp ? "Create your administrator account" : "Sign in to access analytics and reports"}
+            {isRecoveryMode ? "Enter your new password" : isResetMode ? "Reset your password" : isSignUp ? "Create your administrator account" : "Sign in to access analytics and reports"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {isRecoveryMode ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Enter your new password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
+                  className="retro-input"
+                />
+              </div>
+              <Button
+                onClick={handlePasswordUpdate}
+                disabled={loading}
+                className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold shadow-glow"
+              >
+                {loading ? "Updating..." : "Update Password"}
+              </Button>
+            </>
+          ) : (
+            <>
           {!isResetMode && isSignUp && (
             <div className="space-y-2">
               <Label htmlFor="admin-name">Full Name</Label>
@@ -312,7 +403,7 @@ export default function AdminAuth() {
             </>
           )}
 
-          {isResetMode && (
+          {isResetMode && !isRecoveryMode && (
             <Button
               variant="ghost"
               onClick={() => setIsResetMode(false)}
@@ -321,11 +412,15 @@ export default function AdminAuth() {
               ← Back to Sign In
             </Button>
           )}
-          <p className="text-sm text-center text-muted-foreground">
-            <Link to="/" className="text-foreground hover:underline">
-              ← Back to Home
-            </Link>
-          </p>
+          {!isRecoveryMode && (
+            <p className="text-sm text-center text-muted-foreground">
+              <Link to="/" className="text-foreground hover:underline">
+                ← Back to Home
+              </Link>
+            </p>
+          )}
+          </>
+          )}
         </CardContent>
       </Card>
     </div>

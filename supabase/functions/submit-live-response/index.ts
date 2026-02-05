@@ -161,23 +161,41 @@ Deno.serve(async (req) => {
     // Check for nested format: { questions: [{ correctAnswer, type }] }
     if (questionContent.questions && Array.isArray(questionContent.questions) && questionContent.questions.length > 0) {
       const firstQuestion = questionContent.questions[0];
-      correctAnswer = firstQuestion.correctAnswer || '';
+      correctAnswer = (firstQuestion.correctAnswer || '').toString().trim();
       questionType = firstQuestion.type || 'multiple_choice';
       options = firstQuestion.options || [];
-      console.log('📋 Using nested question format:', { correctAnswer, questionType });
+      console.log('📋 Using nested question format:', { correctAnswer, questionType, optionsCount: options.length });
     } else {
       // Handle direct format: { correctAnswer, type }
-      correctAnswer = questionContent.correctAnswer || '';
+      correctAnswer = (questionContent.correctAnswer || '').toString().trim();
       questionType = questionContent.type || 'multiple_choice';
       options = questionContent.options || [];
-      console.log('📋 Using direct question format:', { correctAnswer, questionType });
+      console.log('📋 Using direct question format:', { correctAnswer, questionType, optionsCount: options.length });
+    }
+
+    // Diagnostic: warn if options are missing for MCQ
+    if (questionType === 'multiple_choice' && (!options || options.length === 0)) {
+      console.warn(`⚠️ No options array found for MCQ grading. Question ID: ${questionId}. This may cause grading issues.`);
     }
 
     // Normalize both answers for comparison (pass options for text matching)
-    const normalizedStudentAnswer = normalizeAnswer(answer, questionType, options);
+    const studentAnswerTrimmed = answer.toString().trim();
+    const normalizedStudentAnswer = normalizeAnswer(studentAnswerTrimmed, questionType, options);
     const normalizedCorrectAnswer = normalizeAnswer(correctAnswer, questionType, options);
 
-    const isCorrect = normalizedStudentAnswer === normalizedCorrectAnswer;
+    // Case-insensitive comparison for robustness
+    const isCorrect = normalizedStudentAnswer.toUpperCase() === normalizedCorrectAnswer.toUpperCase();
+
+    // Enhanced logging for debugging grading issues
+    console.log('🎯 Final grading comparison:', {
+      rawStudentAnswer: answer,
+      rawCorrectAnswer: correctAnswer,
+      normalizedStudent: normalizedStudentAnswer,
+      normalizedCorrect: normalizedCorrectAnswer,
+      isCorrect,
+      questionType,
+      hasOptions: options.length > 0
+    });
 
     console.log('Grading:', {
       studentAnswer: answer,
@@ -191,91 +209,43 @@ Deno.serve(async (req) => {
     // Calculate points based on correctness and confidence
     const { points, multiplier } = calculatePoints(isCorrect, confidenceLevel);
 
-    // Use upsert with ON CONFLICT for atomic, race-condition-safe submission
-    // This handles 20+ concurrent students without race conditions
+    // Check if response already exists
+    const { data: existingResponse } = await supabase
+      .from('live_responses')
+      .select('id')
+      .eq('question_id', questionId)
+      .eq('participant_id', participantId)
+      .single();
+
+    if (existingResponse) {
+      return new Response(
+        JSON.stringify({ error: 'Response already submitted', existingId: existingResponse.id }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Insert the response
     const { data: response, error: insertError } = await supabase
       .from('live_responses')
-      .upsert(
-        {
-          question_id: questionId,
-          participant_id: participantId,
-          answer: answer,
-          is_correct: isCorrect,
-          confidence_level: confidenceLevel,
-          confidence_multiplier: multiplier,
-          points_earned: points,
-          response_time_ms: responseTimeMs,
-        },
-        {
-          onConflict: 'question_id,participant_id',
-          ignoreDuplicates: true, // Don't overwrite existing answers
-        }
-      )
+      .insert({
+        question_id: questionId,
+        participant_id: participantId,
+        answer: answer,
+        is_correct: isCorrect,
+        confidence_level: confidenceLevel,
+        confidence_multiplier: multiplier,
+        points_earned: points,
+        response_time_ms: responseTimeMs,
+      })
       .select()
       .single();
 
-    // Check if this was a duplicate submission (upsert returned existing row or no row)
     if (insertError) {
-      // If it's a duplicate key error, fetch the existing response
-      if (insertError.code === '23505' || insertError.message?.includes('duplicate')) {
-        console.log('Duplicate submission detected, fetching existing response');
-        const { data: existingResponse } = await supabase
-          .from('live_responses')
-          .select('id, is_correct, points_earned, confidence_multiplier')
-          .eq('question_id', questionId)
-          .eq('participant_id', participantId)
-          .single();
-        
-        if (existingResponse) {
-          return new Response(
-            JSON.stringify({ 
-              success: true,
-              alreadySubmitted: true,
-              response: {
-                id: existingResponse.id,
-                isCorrect: existingResponse.is_correct,
-                pointsEarned: existingResponse.points_earned,
-                confidenceMultiplier: existingResponse.confidence_multiplier,
-                correctAnswer: correctAnswer,
-              },
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      
       console.error('Error inserting response:', insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to save response', details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-    
-    // Handle case where ignoreDuplicates returns null (existing row wasn't returned)
-    if (!response) {
-      const { data: existingResponse } = await supabase
-        .from('live_responses')
-        .select('id, is_correct, points_earned, confidence_multiplier')
-        .eq('question_id', questionId)
-        .eq('participant_id', participantId)
-        .single();
-      
-      if (existingResponse) {
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            alreadySubmitted: true,
-            response: {
-              id: existingResponse.id,
-              isCorrect: existingResponse.is_correct,
-              pointsEarned: existingResponse.points_earned,
-              confidenceMultiplier: existingResponse.confidence_multiplier,
-              correctAnswer: correctAnswer,
-            },
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
     }
 
     console.log('Response saved:', { responseId: response.id, isCorrect, points });

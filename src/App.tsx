@@ -37,8 +37,6 @@ import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import { SkipLink, ScreenReaderAnnouncer } from "./components/accessibility";
 import { CourseProvider } from "./hooks/useCourseContext";
-import { RecordingProvider } from "./contexts/RecordingContext";
-import { InstructorLayoutRoute } from "./components/instructor/InstructorLayout";
 
 const queryClient = new QueryClient();
 
@@ -46,19 +44,11 @@ function App() {
   // PostHog user identification
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (session?.user) {
-          // Fetch user's profile to get their full name for PostHog display
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          
-          // Identify user in PostHog with name for better display
+          // Identify user in PostHog
           posthog.identify(session.user.id, {
             email: session.user.email,
-            name: profile?.full_name || session.user.email,
             role: session.user.user_metadata?.role,
           });
         } else if (event === 'SIGNED_OUT') {
@@ -80,11 +70,10 @@ function App() {
             <Toaster />
             <Sonner />
             <OfflineIndicator />
-            <InstallPrompt />
-            <RecordingProvider>
-              <BrowserRouter>
-                <main id="main-content">
-                  <Routes>
+        <InstallPrompt />
+        <BrowserRouter>
+          <main id="main-content">
+            <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/learn-more" element={<MarketingLanding />} />
           <Route path="/auth" element={<Auth />} />
@@ -110,15 +99,20 @@ function App() {
               <InstructorOnboarding />
             </ProtectedRoute>
           } />
-          {/* Nested routes for instructor pages that share recording state */}
-          <Route element={
+          <Route path="/instructor/dashboard" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <InstructorLayoutRoute />
+              <CourseProvider>
+                <InstructorDashboard />
+              </CourseProvider>
             </ProtectedRoute>
-          }>
-            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
-            <Route path="/instructor/settings" element={<InstructorSettings />} />
-          </Route>
+          } />
+          <Route path="/instructor/settings" element={
+            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
+              <CourseProvider>
+                <InstructorSettings />
+              </CourseProvider>
+            </ProtectedRoute>
+          } />
           <Route path="/instructor/lecture-presenter" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <LecturePresenterView />
@@ -167,11 +161,10 @@ function App() {
           <Route path="/terms" element={<TermsOfService />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </main>
-              </BrowserRouter>
-            </RecordingProvider>
-          </ScreenReaderAnnouncer>
+          </Routes>
+          </main>
+        </BrowserRouter>
+      </ScreenReaderAnnouncer>
     </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
