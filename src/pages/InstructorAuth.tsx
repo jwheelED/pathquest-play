@@ -166,8 +166,17 @@ export default function InstructorAuth() {
                 .eq('id', session.user.id)
                 .single();
               
-              if (!profile?.org_id) {
-                navigate("/instructor/org-onboarding");
+              // Check if instructor has courses
+              const { data: courses } = await supabase
+                .from('courses')
+                .select('id')
+                .eq('instructor_id', session.user.id)
+                .limit(1);
+              
+              const hasCompletedOnboarding = profile?.onboarded && courses && courses.length > 0;
+              
+              if (hasCompletedOnboarding) {
+                navigate("/instructor/dashboard");
               } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {
                 navigate("/instructor/onboarding");
               } else {
