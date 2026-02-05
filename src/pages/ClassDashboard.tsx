@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BookOpen, Calendar, Sparkles } from "lucide-react";
@@ -25,6 +25,9 @@ interface CourseInfo {
 
 export default function ClassDashboard() {
   const { instructorId } = useParams<{ instructorId: string }>();
+  const [searchParams] = useSearchParams();
+  const courseId = searchParams.get("course");
+  
   const [user, setUser] = useState<User | null>(null);
   const [userName, setUserName] = useState("");
   const [courseInfo, setCourseInfo] = useState<CourseInfo | null>(null);
@@ -33,7 +36,7 @@ export default function ClassDashboard() {
 
   useEffect(() => {
     checkSession();
-  }, [instructorId]);
+  }, [instructorId, courseId]);
 
   const checkSession = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -43,7 +46,7 @@ export default function ClassDashboard() {
       setUser(session.user);
       fetchUserProfile(session.user.id);
       if (instructorId) {
-        fetchCourseInfo(session.user.id, instructorId);
+        fetchCourseInfo(session.user.id, instructorId, courseId);
       }
     }
     setLoading(false);
@@ -61,22 +64,55 @@ export default function ClassDashboard() {
     }
   };
 
-  const fetchCourseInfo = async (userId: string, instructorId: string) => {
+  const fetchCourseInfo = async (userId: string, instructorId: string, courseId: string | null) => {
     try {
-      // Verify student is connected to this instructor
-      const { data: connection } = await supabase
+      // Build enrollment check query
+      let enrollmentQuery = supabase
         .from("instructor_students")
-        .select("id")
+        .select("id, course_id")
         .eq("student_id", userId)
-        .eq("instructor_id", instructorId)
-        .maybeSingle();
+        .eq("instructor_id", instructorId);
+
+      if (courseId) {
+        enrollmentQuery = enrollmentQuery.eq("course_id", courseId);
+      } else {
+        enrollmentQuery = enrollmentQuery.is("course_id", null);
+      }
+
+      const { data: connection } = await enrollmentQuery.maybeSingle();
 
       if (!connection) {
         navigate("/dashboard");
         return;
       }
 
-      // Fetch instructor details
+      // If we have a course_id, fetch from courses table
+      if (courseId) {
+        const { data: course } = await supabase
+          .from("courses")
+          .select("title, description, topics, schedule, instructor_id")
+          .eq("id", courseId)
+          .single();
+
+        if (course) {
+          // Get instructor name
+          const { data: instructor } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", course.instructor_id)
+            .single();
+
+          setCourseInfo({
+            instructorName: instructor?.full_name || "Unknown Instructor",
+            courseTitle: course.title || "No Course Title",
+            courseTopics: course.topics || undefined,
+            courseSchedule: course.schedule || undefined,
+          });
+          return;
+        }
+      }
+
+      // Fallback to legacy instructor profile
       const { data: instructor } = await supabase
         .from("profiles")
         .select("full_name, course_title, course_topics, course_schedule")

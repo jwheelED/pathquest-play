@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,16 +11,61 @@ import { Label } from "@/components/ui/label";
 export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [session, setSession] = useState(null);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const isInitializedRef = useRef(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   const navigate = useNavigate();
+
+  // Check for recovery token in URL on mount
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
+    }
+  }, []);
+
+  // Handle password recovery event from auth state change
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handlePasswordUpdate = async () => {
+    setError("");
+    setSuccess("");
+
+    if (!newPassword || newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
+    if (error) {
+      setError(error.message);
+      toast.error(error.message);
+    } else {
+      setSuccess("Password updated successfully!");
+      toast.success("Password updated successfully! Please sign in.");
+      setIsRecoveryMode(false);
+      setNewPassword("");
+      await supabase.auth.signOut();
+    }
+  };
 
   // Helper to navigate user to the correct dashboard based on their role
   const navigateByRole = async (userId: string) => {
@@ -39,41 +84,6 @@ export default function AuthPage() {
 
     // Default to student dashboard
     navigate("/dashboard");
-  };
-
-  const initializeUser = async (session: any) => {
-    if (!session?.user) return;
-
-    // Ensure profile exists with onboarded true
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, onboarded")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    if (!profile) {
-      // Create profile for OAuth users
-      await supabase.from("profiles").upsert({
-        id: session.user.id,
-        full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-        onboarded: true,
-      });
-
-      // Create user stats
-      try {
-        await supabase.from("user_stats").insert({
-          user_id: session.user.id,
-          org_id: null,
-        });
-      } catch {
-        // Errors are OK - record might already exist
-      }
-    } else if (!profile.onboarded) {
-      await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
-    }
-
-    // Navigate based on user role
-    await navigateByRole(session.user.id);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -223,62 +233,69 @@ export default function AuthPage() {
     setSession(null);
   };
 
+  const fetchSession = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (!error) {
+      setSession(data.session);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
+    // Skip session handling if in recovery mode
+    if (isRecoveryMode) {
+      return;
+    }
 
-    // Listener for ONGOING auth changes (does NOT control isLoading)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!isMounted) return;
-        
-        // Only synchronous state updates here
-        setSession(session);
+    fetchSession();
 
-        // Defer Supabase calls with setTimeout - fire and forget
-        if (session && event !== 'INITIAL_SESSION') {
-          setTimeout(() => {
-            initializeUser(session);
-          }, 0);
-        }
+    const {data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Skip if in recovery mode or if this is a password recovery event
+      if (isRecoveryMode || event === 'PASSWORD_RECOVERY') {
+        return;
       }
-    );
 
-    // INITIAL load (controls isLoading)
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
+      setSession(session);
 
-        setSession(session);
+      if (session) {
+        const initializeUser = async () => {
+          // Ensure profile exists with onboarded true
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("id, onboarded")
+            .eq("id", session.user.id)
+            .maybeSingle();
 
-        // If there's an existing session, initialize the user
-        if (session) {
-          await initializeUser(session);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          isInitializedRef.current = true;
-        }
+          if (!profile) {
+            // Create profile for OAuth users
+            await supabase.from("profiles").upsert({
+              id: session.user.id,
+              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
+              onboarded: true, // All students are onboarded immediately
+            });
+
+            // Create user stats
+            await supabase.from("user_stats").insert({
+              user_id: session.user.id,
+              org_id: null,
+            }).then(() => {
+              // Errors are OK here - record might already exist
+            });
+          } else if (!profile.onboarded) {
+            // Mark existing users as onboarded
+            await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+          }
+
+          // Navigate based on user role
+          await navigateByRole(session.user.id);
+        };
+
+        // Use setTimeout to avoid Supabase auth deadlock
+        setTimeout(initializeUser, 0);
       }
-    };
+    });
 
-    initializeAuth();
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
-
-  // Show loading state during initial auth check
-  if (isLoading) {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </main>
-    );
-  }
+    return () => subscription.unsubscribe();
+  }, [navigate, isRecoveryMode]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
@@ -294,6 +311,43 @@ export default function AuthPage() {
               Logout
             </button>
           </div>
+        ) : isRecoveryMode ? (
+          <>
+            <h2 className="text-2xl font-bold mb-6 text-center text-primary">
+              Set your new password
+            </h2>
+
+            {error && (
+              <div role="alert" className="text-destructive mb-4 text-sm">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div role="status" className="text-primary mb-4 text-sm">
+                {success}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <input
+                id="new-password"
+                type="password"
+                placeholder="Enter your new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
+                className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <button
+              onClick={handlePasswordUpdate}
+              className="w-full mt-4 bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow"
+            >
+              Update Password
+            </button>
+          </>
         ) : (
           <>
             <h2 className="text-2xl font-bold mb-6 text-center text-primary">

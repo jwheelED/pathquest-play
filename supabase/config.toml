@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.submit-live-response]
 verify_jwt = false
+
+[functions.push-bank-question]
+verify_jwt = false

@@ -37,13 +37,40 @@ export const QuestionAnalyticsChart = ({
   const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
   // Calculate answer distribution for multiple choice
+  // FIX: Find question index within EACH student's assignment by matching question text
+  const correctAnswerLetter = question.overriddenAnswer || question.correctAnswer;
+  
   const answerDistribution = isMultipleChoice
     ? question.options?.map((opt: string, idx: number) => {
         const letter = String.fromCharCode(65 + idx);
-        const count = assignments.filter(
-          (a) => a.completed && a.quiz_responses?.[questionIndex.toString()] === letter
-        ).length;
-        const isCorrect = letter === (question.overriddenAnswer || question.correctAnswer);
+        
+        // Track unique students to prevent duplicate counting
+        const countedStudents = new Set<string>();
+        
+        const count = assignments.filter((a) => {
+          if (!a.completed) return false;
+          
+          // Prevent counting same student twice
+          if (countedStudents.has(a.student_id)) return false;
+          
+          // Find the question index within THIS student's assignment
+          const content = (a as any).content;
+          const assignmentQuestions = content?.questions || [];
+          const studentQuestionIdx = assignmentQuestions.findIndex(
+            (q: any) => q.question === question.question
+          );
+          
+          if (studentQuestionIdx < 0) return false;
+          
+          const studentAnswer = a.quiz_responses?.[studentQuestionIdx.toString()];
+          if (studentAnswer === letter) {
+            countedStudents.add(a.student_id);
+            return true;
+          }
+          return false;
+        }).length;
+        
+        const isCorrect = letter === correctAnswerLetter;
 
         return {
           option: letter,

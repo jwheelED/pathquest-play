@@ -5,11 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, Play, Square, Copy, QrCode, Monitor, Library } from "lucide-react";
+import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
-import { QuickSendPanel } from "./QuickSendPanel";
 
 interface LiveSession {
   id: string;
@@ -49,19 +48,57 @@ export const LiveSessionControls = ({
     loadActiveSession();
   }, [selectedCourseId]);
 
-  // Separate effect for polling participant count
+  // Separate effect for polling participant count - use session ID directly to avoid stale closure
   useEffect(() => {
-    if (!activeSession) return;
+    if (!activeSession?.id) return;
+    
+    const sessionId = activeSession.id;
+    
+    // Fetch participant count using session ID directly (avoids stale closure)
+    const fetchParticipantCount = async () => {
+      const { count, error } = await supabase
+        .from("live_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", sessionId);
+
+      if (error) {
+        console.error("Error fetching participant count:", error);
+        return;
+      }
+      
+      setParticipantCount(count || 0);
+    };
     
     // Initial count update
-    updateParticipantCount();
+    fetchParticipantCount();
     
-    // Poll participant count every 5 seconds when session is active
-    const interval = setInterval(() => {
-      updateParticipantCount();
-    }, 5000);
+    // Poll participant count every 3 seconds when session is active (reduced from 5s for faster updates)
+    const interval = setInterval(fetchParticipantCount, 3000);
+    
+    // Also subscribe to realtime for instant updates
+    const channel = supabase
+      .channel(`live-participants-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'live_participants',
+          filter: `session_id=eq.${sessionId}`
+        },
+        () => {
+          // Refetch count on any participant change
+          fetchParticipantCount();
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Participant realtime subscription: ${status}`);
+      });
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [activeSession?.id]);
 
   const loadActiveSession = async () => {
@@ -81,23 +118,14 @@ export const LiveSessionControls = ({
     if (data) {
       setActiveSession(data);
       onSessionChange(data.id);
-      updateParticipantCount();
+      // Participant count will be fetched by the useEffect when activeSession changes
     } else {
       setActiveSession(null);
       onSessionChange(null);
     }
   };
 
-  const updateParticipantCount = async () => {
-    if (!activeSession) return;
-
-    const { count } = await supabase
-      .from("live_participants")
-      .select("*", { count: "exact", head: true })
-      .eq("session_id", activeSession.id);
-
-    setParticipantCount(count || 0);
-  };
+  // updateParticipantCount is now inline in the effect above to avoid stale closures
 
   const handleStartSession = async () => {
     if (!sessionTitle.trim()) {
@@ -246,12 +274,6 @@ export const LiveSessionControls = ({
             <p className="text-sm text-muted-foreground break-all">
               Students can join at: <span className="font-mono">{joinUrl}</span>
             </p>
-
-            {/* Quick Send Panel */}
-            <QuickSendPanel 
-              sessionId={activeSession.id} 
-              onQuestionSent={() => updateParticipantCount()}
-            />
           </CardContent>
         </Card>
 
