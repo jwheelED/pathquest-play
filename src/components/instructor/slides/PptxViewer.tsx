@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ImageIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PptxViewerProps {
