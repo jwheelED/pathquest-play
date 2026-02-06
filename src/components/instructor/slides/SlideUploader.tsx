@@ -200,7 +200,10 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       if (dbError) throw dbError;
 
       setUploadProgress(100);
-      toast.success(isPptxFile(selectedFile) ? 'PowerPoint converted and uploaded!' : 'Slides uploaded successfully!');
+      const successMessage = isPptxFile(selectedFile) 
+        ? (skipConversion ? 'PowerPoint uploaded with animations!' : 'PowerPoint converted and uploaded!') 
+        : 'Slides uploaded successfully!';
+      toast.success(successMessage);
       
       // Invalidate queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
