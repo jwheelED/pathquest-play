@@ -106,6 +106,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       // Check if this is a PPTX file
       if (isPptxFile(selectedFile)) {
         // If skipConversion is true, upload PPTX directly (preserves animations via Office Online)
+        // AND trigger background PDF conversion for slide extraction
         if (skipConversion) {
           setUploadProgress(30);
           
@@ -124,7 +125,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           finalFileName = selectedFile.name;
           
           setUploadProgress(70);
-          toast.info('PowerPoint uploaded with animations preserved!');
+          toast.info('PowerPoint uploaded! Background PDF conversion starting...');
         } else {
           // Convert PPTX to PDF (default behavior)
           setUploadStage('converting');
