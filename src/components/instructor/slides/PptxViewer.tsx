@@ -433,6 +433,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           ) : embedUrl ? (
             <div className="w-full h-full flex items-center justify-center">
               <iframe
+                ref={iframeRef}
                 src={embedUrl}
                 className="rounded-lg"
                 style={{
