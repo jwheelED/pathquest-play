@@ -299,7 +299,8 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     // Open in new tab for full Office Online experience
     const handleOpenInNewTab = () => {
       if (embedUrl) {
-        window.open(embedUrl.replace('/embed.aspx', '/view.aspx'), '_blank');
+        // Already using view.aspx, just open the same URL
+        window.open(embedUrl, '_blank');
       }
     };
 
