@@ -39,6 +39,9 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
            file.name.toLowerCase().endsWith('.pptx') || file.name.toLowerCase().endsWith('.ppt');
   };
 
+  // State to track whether user wants to skip conversion (preserve animations)
+  const [skipConversion, setSkipConversion] = useState(false);
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
