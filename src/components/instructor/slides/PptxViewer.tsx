@@ -238,7 +238,11 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     // Poll for PDF conversion status if pending/processing
     useEffect(() => {
       if (conversionStatus === 'pending' || conversionStatus?.startsWith('processing')) {
+        let pollCount = 0;
+        const maxPolls = 60; // ~3 min at 3s intervals — after this, mark as stale
+        
         const pollInterval = setInterval(async () => {
+          pollCount++;
           const { data } = await supabase
             .from('lecture_materials')
             .select('pdf_fallback_path, pdf_conversion_status')
@@ -257,7 +261,15 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               clearInterval(pollInterval);
             }
           }
-        }, 3000); // Poll every 3 seconds for responsive progress
+          
+          // If polling too long with no progress, the conversion is likely stuck
+          if (pollCount >= maxPolls) {
+            console.warn('⚠️ Conversion appears stuck, stopping polling');
+            setConversionStatus('failed');
+            toast.error('PDF conversion timed out. Try re-uploading the file.');
+            clearInterval(pollInterval);
+          }
+        }, 3000);
 
         return () => clearInterval(pollInterval);
       }
