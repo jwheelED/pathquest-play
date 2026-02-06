@@ -284,36 +284,70 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
       generateEmbedUrl();
     }, [generateEmbedUrl]);
 
-    // Handle keyboard navigation (ESC to exit, arrow keys to track slide changes)
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          onExit();
-          return;
-        }
+    // Keep refs in sync with state
+    useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+    useEffect(() => { totalPagesRef.current = totalPages; }, [totalPages]);
 
-        // Track common PowerPoint navigation keys to auto-sync slide number
+    // Track slide navigation via keyboard AND iframe blur/focus pattern
+    useEffect(() => {
+      const advance = (delta: number) => {
+        const cur = currentPageRef.current;
+        const max = totalPagesRef.current || Infinity;
+        const next = Math.max(1, Math.min(cur + delta, max));
+        if (next !== cur) setCurrentPage(next);
+      };
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') { onExit(); return; }
+
+        const activeEl = document.activeElement;
+        if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA') return;
+
         const nextKeys = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'];
         const prevKeys = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
 
-        // Only track if focus is NOT on an input element (avoid interfering with the slide # input)
-        const activeEl = document.activeElement;
-        const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA';
-        if (isInput) return;
+        if (nextKeys.includes(e.key)) advance(1);
+        else if (prevKeys.includes(e.key)) advance(-1);
+      };
 
-        if (nextKeys.includes(e.key)) {
-          setCurrentPage(prev => {
-            const max = totalPages || Infinity;
-            return Math.min(prev + 1, max);
-          });
-        } else if (prevKeys.includes(e.key)) {
-          setCurrentPage(prev => Math.max(prev - 1, 1));
+      // When the iframe has focus, keyboard events don't reach us.
+      // Use postMessage listener — Office Online posts messages on slide change.
+      // Also use a blur-based heuristic: when window blurs (iframe got focus) and
+      // then regains focus, we can't know direction, but we can listen for
+      // Office Online's postMessage which includes slide info.
+      const handleMessage = (e: MessageEvent) => {
+        try {
+          // Office Online sends various postMessage events
+          // Try to extract slide number from known message formats
+          if (typeof e.data === 'string') {
+            const match = e.data.match(/slide[:\s]*(\d+)/i);
+            if (match) {
+              const slideNum = parseInt(match[1]);
+              const max = totalPagesRef.current || Infinity;
+              if (slideNum >= 1 && slideNum <= max) {
+                setCurrentPage(slideNum);
+              }
+            }
+          } else if (e.data && typeof e.data === 'object') {
+            // Some Office messages use object format
+            const slideNum = e.data.slideNumber || e.data.slideIndex;
+            if (typeof slideNum === 'number' && slideNum >= 1) {
+              const max = totalPagesRef.current || Infinity;
+              setCurrentPage(Math.min(slideNum, max));
+            }
+          }
+        } catch {
+          // Ignore parsing errors from unrelated messages
         }
       };
 
       window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onExit, totalPages]);
+      window.addEventListener('message', handleMessage);
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('message', handleMessage);
+      };
+    }, [onExit]);
 
     // Refresh the embed URL (regenerate signed URL)
     const handleRefresh = () => {
