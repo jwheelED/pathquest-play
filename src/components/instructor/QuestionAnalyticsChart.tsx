@@ -7,6 +7,7 @@ interface Assignment {
   completed: boolean;
   quiz_responses: any;
   grade: number | null;
+  created_at: string;
 }
 
 interface QuestionStats {
