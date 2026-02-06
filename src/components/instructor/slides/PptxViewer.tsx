@@ -120,10 +120,19 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
       }
     }, [pdfFallbackPath, currentPage]);
 
-    // Clear cached image when page changes
+    // Clear cached image when page changes, then pre-load the new page
     useEffect(() => {
       setCachedSlideImage(null);
+      pdfDocRef.current = null; // Clear cached PDF when page changes
     }, [currentPage]);
+
+    // Pre-load slide image when PDF fallback is available
+    useEffect(() => {
+      if (pdfFallbackPath && conversionStatus === 'completed' && !cachedSlideImage && !loadingSlideImage) {
+        console.log('🔄 Pre-loading slide image from PDF fallback for extraction...');
+        loadSlideImageFromPdf();
+      }
+    }, [pdfFallbackPath, conversionStatus, cachedSlideImage, loadingSlideImage, loadSlideImageFromPdf]);
 
     // Expose ref methods
     useImperativeHandle(ref, () => ({
@@ -136,10 +145,14 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
           return null;
         }
-        // Trigger async load and return null for now
-        // The caller should handle the async case
+        if (loadingSlideImage) {
+          toast.info('Loading slide for extraction... Please try again in a moment.');
+          return null;
+        }
+        // Trigger async load - user may need to retry
         loadSlideImageFromPdf();
-        return cachedSlideImage; // Will be null initially
+        toast.info('Loading slide for extraction... Please try again.');
+        return null;
       },
       getCurrentSlideNumber: () => currentPage,
       getActiveSelection: () => null,
