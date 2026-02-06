@@ -103,41 +103,64 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       let finalFileType = selectedFile.type;
       let finalFileName = selectedFile.name;
 
-      // Check if this is a PPTX file that needs conversion
+      // Check if this is a PPTX file
       if (isPptxFile(selectedFile)) {
-        setUploadStage('converting');
-        setUploadProgress(30);
-        
-        toast.info('Converting PowerPoint to PDF...', { duration: 5000 });
-        
-        // Convert file to base64
-        const fileBase64 = await fileToBase64(selectedFile);
-        
-        setUploadProgress(50);
-        
-        // Call edge function to convert PPTX to PDF
-        const { data, error } = await supabase.functions.invoke('convert-pptx-to-pdf', {
-          body: {
-            fileBase64,
-            fileName: selectedFile.name,
-            instructorId: user.id,
-          },
-        });
+        // If skipConversion is true, upload PPTX directly (preserves animations via Office Online)
+        if (skipConversion) {
+          setUploadProgress(30);
+          
+          const fileExt = selectedFile.name.split('.').pop();
+          const fileName = `${Date.now()}.${fileExt}`;
+          filePath = `${user.id}/slides/${fileName}`;
 
-        if (error) {
-          console.error('Conversion error:', error);
-          throw new Error(error.message || 'Failed to convert PowerPoint file');
+          const { error: uploadError } = await supabase.storage
+            .from('lecture-materials')
+            .upload(filePath, selectedFile, { upsert: true });
+
+          if (uploadError) throw uploadError;
+
+          // Keep original PPTX file type
+          finalFileType = selectedFile.type || 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          finalFileName = selectedFile.name;
+          
+          setUploadProgress(70);
+          toast.info('PowerPoint uploaded with animations preserved!');
+        } else {
+          // Convert PPTX to PDF (default behavior)
+          setUploadStage('converting');
+          setUploadProgress(30);
+          
+          toast.info('Converting PowerPoint to PDF...', { duration: 5000 });
+          
+          // Convert file to base64
+          const fileBase64 = await fileToBase64(selectedFile);
+          
+          setUploadProgress(50);
+          
+          // Call edge function to convert PPTX to PDF
+          const { data, error } = await supabase.functions.invoke('convert-pptx-to-pdf', {
+            body: {
+              fileBase64,
+              fileName: selectedFile.name,
+              instructorId: user.id,
+            },
+          });
+
+          if (error) {
+            console.error('Conversion error:', error);
+            throw new Error(error.message || 'Failed to convert PowerPoint file');
+          }
+
+          if (!data?.success) {
+            throw new Error(data?.error || 'Conversion failed');
+          }
+
+          filePath = data.filePath;
+          finalFileType = 'application/pdf';
+          finalFileName = data.convertedName;
+          
+          setUploadProgress(80);
         }
-
-        if (!data?.success) {
-          throw new Error(data?.error || 'Conversion failed');
-        }
-
-        filePath = data.filePath;
-        finalFileType = 'application/pdf';
-        finalFileName = data.convertedName;
-        
-        setUploadProgress(80);
       } else {
         // Direct PDF upload
         setUploadProgress(30);
