@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { X, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PptxViewerProps {
@@ -21,6 +21,7 @@ export interface PptxViewerRef {
 /**
  * PPTX Viewer using Microsoft Office Online embed
  * Preserves animations and formatting from the original PowerPoint file
+ * Supports slide extraction via PDF fallback (converted in background)
  */
 export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
   ({ presentationId, title, onExit, onSlideChange }, ref) => {
@@ -28,12 +29,24 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    
+    // PDF fallback state for slide extraction
+    const [pdfFallbackPath, setPdfFallbackPath] = useState<string | null>(null);
+    const [conversionStatus, setConversionStatus] = useState<string | null>(null);
+    const [cachedSlideImage, setCachedSlideImage] = useState<string | null>(null);
+    const [loadingSlideImage, setLoadingSlideImage] = useState(false);
 
-    // Expose ref methods (limited functionality for Office embed)
+    // Expose ref methods
     useImperativeHandle(ref, () => ({
       getSlideImage: () => {
-        // Cannot capture slide image from Office embed iframe (cross-origin restriction)
-        toast.warning('Slide image capture not available for PowerPoint presentations');
+        // Return cached slide image from PDF fallback if available
+        if (cachedSlideImage) {
+          return cachedSlideImage;
+        }
+        if (!pdfFallbackPath) {
+          toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
+          return null;
+        }
         return null;
       },
       getCurrentSlideNumber: () => currentPage,
@@ -41,22 +54,26 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
       clearSelection: () => {},
     }));
 
-    // Generate Office Online embed URL
+    // Generate Office Online embed URL and check for PDF fallback
     const generateEmbedUrl = useCallback(async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Get the lecture material file path
+        // Get the lecture material file path and PDF fallback info
         const { data: material, error: materialError } = await supabase
           .from('lecture_materials')
-          .select('file_path, file_type')
+          .select('file_path, file_type, pdf_fallback_path, pdf_conversion_status')
           .eq('id', presentationId)
           .single();
 
         if (materialError || !material) {
           throw new Error('Presentation not found');
         }
+
+        // Store PDF fallback info
+        setPdfFallbackPath(material.pdf_fallback_path);
+        setConversionStatus(material.pdf_conversion_status);
 
         // Verify it's a PPTX file
         const isPptx = material.file_type?.includes('presentation') || 
@@ -96,6 +113,34 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         setLoading(false);
       }
     }, [presentationId, onSlideChange]);
+
+    // Poll for PDF conversion status if pending/processing
+    useEffect(() => {
+      if (conversionStatus === 'pending' || conversionStatus === 'processing') {
+        const pollInterval = setInterval(async () => {
+          const { data } = await supabase
+            .from('lecture_materials')
+            .select('pdf_fallback_path, pdf_conversion_status')
+            .eq('id', presentationId)
+            .single();
+          
+          if (data) {
+            setPdfFallbackPath(data.pdf_fallback_path);
+            setConversionStatus(data.pdf_conversion_status);
+            
+            if (data.pdf_conversion_status === 'completed') {
+              toast.success('PDF conversion complete! Slide extraction is now available.');
+              clearInterval(pollInterval);
+            } else if (data.pdf_conversion_status === 'failed') {
+              toast.error('PDF conversion failed. Slide extraction unavailable.');
+              clearInterval(pollInterval);
+            }
+          }
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(pollInterval);
+      }
+    }, [conversionStatus, presentationId]);
 
     useEffect(() => {
       generateEmbedUrl();
@@ -205,12 +250,29 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           ) : null}
         </div>
 
-        {/* Bottom info bar */}
+        {/* Bottom info bar with extraction status */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-center">
-          <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg">
-            <span>💡 Use PowerPoint's built-in controls to navigate slides with animations</span>
-            <span className="mx-2">•</span>
-            <span>Note: Slide question extraction not available for embedded PowerPoint</span>
+          <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg flex items-center gap-3">
+            <span>💡 Use PowerPoint's built-in controls to navigate slides</span>
+            <span className="text-white/30">•</span>
+            {conversionStatus === 'completed' && pdfFallbackPath ? (
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Slide extraction ready
+              </span>
+            ) : conversionStatus === 'pending' || conversionStatus === 'processing' ? (
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Converting for extraction...
+              </span>
+            ) : conversionStatus === 'failed' ? (
+              <span className="flex items-center gap-1.5 text-red-400">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Extraction unavailable
+              </span>
+            ) : (
+              <span className="text-white/50">Slide extraction not configured</span>
+            )}
           </div>
         </div>
       </div>

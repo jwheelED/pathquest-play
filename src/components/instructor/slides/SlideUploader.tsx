@@ -106,6 +106,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       // Check if this is a PPTX file
       if (isPptxFile(selectedFile)) {
         // If skipConversion is true, upload PPTX directly (preserves animations via Office Online)
+        // AND trigger background PDF conversion for slide extraction
         if (skipConversion) {
           setUploadProgress(30);
           
@@ -124,7 +125,7 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           finalFileName = selectedFile.name;
           
           setUploadProgress(70);
-          toast.info('PowerPoint uploaded with animations preserved!');
+          toast.info('PowerPoint uploaded! Background PDF conversion starting...');
         } else {
           // Convert PPTX to PDF (default behavior)
           setUploadStage('converting');
@@ -184,7 +185,11 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       setUploadProgress(90);
       
       const orgId = await getOrgId(user.id);
-      const { error: dbError } = await supabase
+      
+      // Set conversion status for PPTX with preserved animations
+      const needsBackgroundConversion = isPptxFile(selectedFile) && skipConversion;
+      
+      const { data: insertedMaterial, error: dbError } = await supabase
         .from('lecture_materials')
         .insert({
           instructor_id: user.id,
@@ -195,9 +200,32 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           file_size: selectedFile.size,
           title: title.trim(),
           description: 'Presentation slides',
-        });
+          pdf_conversion_status: needsBackgroundConversion ? 'pending' : null,
+        })
+        .select('id')
+        .single();
 
       if (dbError) throw dbError;
+      
+      // Trigger background PDF conversion for PPTX with preserved animations
+      if (needsBackgroundConversion && insertedMaterial?.id) {
+        console.log('🔄 Triggering background PDF conversion for:', insertedMaterial.id);
+        
+        // Fire and forget - don't await, let it run in background
+        supabase.functions.invoke('convert-pptx-background', {
+          body: {
+            materialId: insertedMaterial.id,
+            filePath: filePath,
+            instructorId: user.id,
+          },
+        }).then(({ error }) => {
+          if (error) {
+            console.error('Background conversion trigger failed:', error);
+          } else {
+            console.log('✅ Background conversion started');
+          }
+        });
+      }
 
       setUploadProgress(100);
       const successMessage = isPptxFile(selectedFile) 
@@ -339,8 +367,8 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
                     </p>
                   )}
                   {skipConversion && (
-                    <p className="text-xs text-muted-foreground pl-6">
-                      ⚠️ Note: Slide question extraction is not available with Office Online viewer
+                    <p className="text-xs text-emerald-600 pl-6">
+                      ✓ Slide extraction will be enabled via background PDF conversion
                     </p>
                   )}
                 </div>
