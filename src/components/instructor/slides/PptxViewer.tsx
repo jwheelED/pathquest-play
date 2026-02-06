@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ImageIcon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PptxViewerProps {
@@ -35,6 +36,103 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [conversionStatus, setConversionStatus] = useState<string | null>(null);
     const [cachedSlideImage, setCachedSlideImage] = useState<string | null>(null);
     const [loadingSlideImage, setLoadingSlideImage] = useState(false);
+    const pdfDocRef = useRef<any>(null);
+
+    // Load slide image from PDF fallback on-demand
+    const loadSlideImageFromPdf = useCallback(async (): Promise<string | null> => {
+      if (!pdfFallbackPath) {
+        toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
+        return null;
+      }
+
+      setLoadingSlideImage(true);
+
+      try {
+        // Get signed URL for PDF fallback
+        const { data: signedData, error: signError } = await supabase.storage
+          .from('lecture-materials')
+          .createSignedUrl(pdfFallbackPath, 60 * 5); // 5 min expiry
+
+        if (signError || !signedData) {
+          console.error('Failed to get PDF fallback URL:', signError);
+          toast.error('Failed to access slide for extraction');
+          return null;
+        }
+
+        // Use global PDF.js (same as SlideViewer pattern)
+        // @ts-ignore
+        let pdfjsLib = window.pdfjsLib;
+        
+        // Load PDF.js if not already loaded
+        if (!pdfjsLib) {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.async = true;
+          document.body.appendChild(script);
+          
+          await new Promise((resolve) => {
+            script.onload = resolve;
+          });
+          
+          // @ts-ignore
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          
+          // @ts-ignore
+          pdfjsLib = window.pdfjsLib;
+        }
+
+        // Load PDF document if not cached
+        if (!pdfDocRef.current) {
+          const loadingTask = pdfjsLib.getDocument(signedData.signedUrl);
+          pdfDocRef.current = await loadingTask.promise;
+        }
+
+        const pdfDoc = pdfDocRef.current;
+        const pageNum = Math.min(currentPage, pdfDoc.numPages);
+        const page = await pdfDoc.getPage(pageNum);
+
+        // Render to canvas at high resolution
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          throw new Error('Failed to get canvas context');
+        }
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Convert to JPEG with compression
+        const imageData = canvas.toDataURL('image/jpeg', 0.75);
+        setCachedSlideImage(imageData);
+        return imageData;
+
+      } catch (err) {
+        console.error('Error loading slide from PDF fallback:', err);
+        toast.error('Failed to extract slide image');
+        return null;
+      } finally {
+        setLoadingSlideImage(false);
+      }
+    }, [pdfFallbackPath, currentPage]);
+
+    // Clear cached slide image when page changes (but keep PDF document cached)
+    useEffect(() => {
+      setCachedSlideImage(null);
+    }, [currentPage]);
+
+    // Pre-load slide image when PDF fallback is available
+    useEffect(() => {
+      if (pdfFallbackPath && conversionStatus === 'completed' && !cachedSlideImage && !loadingSlideImage) {
+        console.log('🔄 Pre-loading slide image from PDF fallback for extraction...');
+        loadSlideImageFromPdf();
+      }
+    }, [pdfFallbackPath, conversionStatus, cachedSlideImage, loadingSlideImage, loadSlideImageFromPdf]);
 
     // Expose ref methods
     useImperativeHandle(ref, () => ({
@@ -47,6 +145,13 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
           return null;
         }
+        if (loadingSlideImage) {
+          toast.info('Loading slide for extraction... Please try again in a moment.');
+          return null;
+        }
+        // Trigger async load - user may need to retry
+        loadSlideImageFromPdf();
+        toast.info('Loading slide for extraction... Please try again.');
         return null;
       },
       getCurrentSlideNumber: () => currentPage,
@@ -250,27 +355,69 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           ) : null}
         </div>
 
-        {/* Bottom info bar with extraction status */}
+        {/* Bottom info bar with extraction status and slide selector */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-center">
           <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg flex items-center gap-3">
-            <span>💡 Use PowerPoint's built-in controls to navigate slides</span>
+            <span>💡 Use PowerPoint's controls to navigate</span>
             <span className="text-white/30">•</span>
-            {conversionStatus === 'completed' && pdfFallbackPath ? (
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Slide extraction ready
-              </span>
-            ) : conversionStatus === 'pending' || conversionStatus === 'processing' ? (
+            
+            {/* Slide number selector for extraction */}
+            {conversionStatus === 'completed' && pdfFallbackPath && (
+              <>
+                <div className="flex items-center gap-1">
+                  <span className="text-white/60">Extract slide:</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <Input
+                    type="number"
+                    value={currentPage}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1) {
+                        setCurrentPage(val);
+                      }
+                    }}
+                    className="w-12 h-6 text-center text-xs bg-white/10 border-white/20 text-white px-1"
+                    min={1}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <span className="text-white/30">•</span>
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  {loadingSlideImage ? 'Loading...' : cachedSlideImage ? 'Ready' : 'Extraction ready'}
+                </span>
+              </>
+            )}
+            
+            {(conversionStatus === 'pending' || conversionStatus === 'processing') && (
               <span className="flex items-center gap-1.5 text-amber-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Converting for extraction...
               </span>
-            ) : conversionStatus === 'failed' ? (
+            )}
+            
+            {conversionStatus === 'failed' && (
               <span className="flex items-center gap-1.5 text-red-400">
                 <AlertCircle className="h-3.5 w-3.5" />
                 Extraction unavailable
               </span>
-            ) : (
+            )}
+            
+            {!conversionStatus && (
               <span className="text-white/50">Slide extraction not configured</span>
             )}
           </div>
