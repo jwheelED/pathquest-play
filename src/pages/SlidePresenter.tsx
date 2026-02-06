@@ -399,12 +399,12 @@ export default function SlidePresenter() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Fetch PDF materials that can be presented
+    // Fetch both PDF and PPTX materials that can be presented
     const { data, error } = await supabase
       .from('lecture_materials')
       .select('*')
       .eq('instructor_id', user.id)
-      .eq('file_type', 'application/pdf')
+      .or('file_type.eq.application/pdf,file_type.ilike.%presentation%,file_type.ilike.%powerpoint%')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -419,6 +419,7 @@ export default function SlidePresenter() {
       slides: [], // Will be populated when presenting
       totalSlides: 0,
       createdAt: m.created_at,
+      fileType: m.file_type || 'application/pdf',
     }));
 
     setPresentations(slides);
