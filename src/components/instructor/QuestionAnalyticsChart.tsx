@@ -118,29 +118,29 @@ export const QuestionAnalyticsChart = ({
         },
       ].filter((d) => d.value > 0);
 
-  // Calculate grade distribution for auto-graded short answers
+  // Calculate grade distribution for auto-graded short answers (using deduplicated data)
   const gradeDistribution = isAutoGradedShortAnswer
     ? [
         {
           range: "90-100 (Excellent)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade >= 90).length,
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 90).length,
           fill: "hsl(var(--success))",
         },
         {
           range: "70-89 (Good)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade >= 70 && a.grade < 90)
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 70 && a.grade < 90)
             .length,
           fill: "hsl(var(--primary))",
         },
         {
           range: "50-69 (Pass)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade >= 50 && a.grade < 70)
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 50 && a.grade < 70)
             .length,
           fill: "hsl(var(--warning))",
         },
         {
           range: "0-49 (Needs Work)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade < 50).length,
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade < 50).length,
           fill: "hsl(var(--destructive))",
         },
       ].filter((d) => d.count > 0)
