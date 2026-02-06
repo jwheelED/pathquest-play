@@ -336,7 +336,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               setCurrentPage(Math.min(slideNum, max));
             }
           }
-        } catch {
+        } catch (_) {
           // Ignore parsing errors from unrelated messages
         }
       };
@@ -382,27 +382,6 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
             <span className="text-amber-400/90 text-xs bg-black/50 px-2 py-1 rounded">
               PowerPoint (animations enabled)
             </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRefresh}
-              className="bg-black/50 hover:bg-black/70 text-white border-0"
-              title="Refresh presentation"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleOpenInNewTab}
-              className="bg-black/50 hover:bg-black/70 text-white border-0"
-              title="Open in new tab"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -455,7 +434,26 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         {/* Bottom info bar with extraction status and slide selector */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-center">
           <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg flex items-center gap-3">
-            <span>💡 Use PowerPoint's controls to navigate</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              className="h-6 px-2 text-white hover:bg-white/20"
+              title="Refresh presentation"
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+              Refresh
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenInNewTab}
+              className="h-6 px-2 text-white hover:bg-white/20"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1" />
+              New tab
+            </Button>
             <span className="text-white/30">•</span>
             
             {/* Slide number selector for extraction */}
