@@ -238,7 +238,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
 
     // Poll for PDF conversion status if pending/processing
     useEffect(() => {
-      if (conversionStatus === 'pending' || conversionStatus === 'processing') {
+      if (conversionStatus === 'pending' || conversionStatus?.startsWith('processing')) {
         const pollInterval = setInterval(async () => {
           const { data } = await supabase
             .from('lecture_materials')
@@ -258,7 +258,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               clearInterval(pollInterval);
             }
           }
-        }, 5000); // Poll every 5 seconds
+        }, 3000); // Poll every 3 seconds for responsive progress
 
         return () => clearInterval(pollInterval);
       }
