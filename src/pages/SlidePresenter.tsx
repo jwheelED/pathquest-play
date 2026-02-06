@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
 import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/SlideViewer';
+import { PptxViewer, PptxViewerRef } from '@/components/instructor/slides/PptxViewer';
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
 import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
 import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from '@/components/instructor/slides/SlideQuestionPreviewDialog';
