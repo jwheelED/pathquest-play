@@ -434,7 +434,26 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         {/* Bottom info bar with extraction status and slide selector */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-center">
           <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg flex items-center gap-3">
-            <span>💡 Use PowerPoint's controls to navigate</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              className="h-6 px-2 text-white hover:bg-white/20"
+              title="Refresh presentation"
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+              Refresh
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenInNewTab}
+              className="h-6 px-2 text-white hover:bg-white/20"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1" />
+              New tab
+            </Button>
             <span className="text-white/30">•</span>
             
             {/* Slide number selector for extraction */}
