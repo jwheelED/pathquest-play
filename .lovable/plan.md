@@ -1,172 +1,113 @@
 
-# Plan: Fix Check-In Results & Visual Analytics Accuracy
 
-## Problem Summary
-The instructor's check-in results card and visual analytics charts are showing inaccurate data:
-1. Students appear as "didn't answer" when they actually did
-2. Multiple students shown when only one answered
-3. Charts display incorrect counts
+# Plan: PPTX Conversion Progress & Gating
 
-## Root Cause Analysis
+## Problem
+When a PPTX file is uploaded with "Preserve animations" enabled, the bottom bar in the Slide Presenter just shows a spinning "Converting for extraction..." with no indication of how long it will take or how far along it is.
 
-After exploring the codebase, I identified **three distinct bugs**:
+## Solution: Stage-Based Progress Bar + Optional Gating
 
-### Bug 1: `QuestionAnalyticsChart` Deduplication Flaw
-**Location**: `src/components/instructor/QuestionAnalyticsChart.tsx` (lines 43-71)
+### Approach
+Since CloudConvert doesn't provide granular percentage progress, we'll implement **stage-based progress tracking**. The edge function will update a `pdf_conversion_progress` field in the database as it moves through each stage, and the PptxViewer will poll and display this as an estimated progress bar.
 
-The chart component receives `group.assignments` directly (line 1389-1394 in `LectureCheckInResults.tsx`), but its deduplication logic has a critical flaw:
+### Conversion Stages & Estimated Progress
 
-```typescript
-const count = assignments.filter((a) => {
-  if (!a.completed) return false;
-  if (countedStudents.has(a.student_id)) return false;
-  // ... check answer ...
-  if (studentAnswer === letter) {
-    countedStudents.add(a.student_id);
-    return true;
-  }
-  return false;
-}).length;
+| Stage | Progress | Description |
+|-------|----------|-------------|
+| pending | 0% | Queued for conversion |
+| downloading | 10% | Downloading PPTX from storage |
+| uploading_to_converter | 30% | Uploading to CloudConvert |
+| converting | 50% | CloudConvert processing (longest step) |
+| downloading_pdf | 75% | Downloading converted PDF |
+| uploading_pdf | 90% | Uploading PDF to Supabase storage |
+| completed | 100% | Done |
+| failed | -- | Error state |
+
+### Files to Modify
+
+**1. Edge Function: `supabase/functions/convert-pptx-background/index.ts`**
+- Add database updates at each stage to set both `pdf_conversion_status` (existing field) and a descriptive status message
+- Use the existing `pdf_conversion_status` field with more granular values (e.g., `processing:downloading`, `processing:converting`, `processing:uploading_pdf`)
+- This avoids needing a schema migration for a new column
+
+**2. PptxViewer: `src/components/instructor/slides/PptxViewer.tsx`**
+- Replace the static "Converting for extraction..." text with a progress bar and stage label
+- The existing 5-second polling already fetches `pdf_conversion_status` -- parse the sub-stage from it
+- Map each sub-stage to a percentage and display using the existing `Progress` UI component
+- Show estimated time remaining based on typical conversion durations
+
+### Visual Design (Bottom Bar)
+
+Before (current):
+```
+[spinner] Converting for extraction...
 ```
 
-**The problem**: If a student's answer doesn't match the current option being counted, they're NOT added to `countedStudents`, so their OTHER assignments can still be counted for different options. This means:
-- A single student with multiple assignment records could be counted multiple times across different options
-- A student could appear as "not answered" if their first assignment record was incomplete, even if a later one was complete
-
-### Bug 2: Answer Distribution Bar Lacks Deduplication
-**Location**: `src/components/instructor/LectureCheckInResults.tsx` (lines 1591-1609)
-
-The inline "Answer Distribution" bar chart counts responses without student deduplication:
-
-```typescript
-const count = questionAssignments.filter((a) => {
-  if (!a.completed) return false;
-  // ... finds student's answer ...
-  return studentAnswer === optionLetter;
-}).length;
+After:
+```
+[progress bar 50%] Converting... (uploading to converter)
 ```
 
-If a student has multiple assignment records, they're counted multiple times.
-
-### Bug 3: Stale React State on Real-time Updates
-The component uses debounced fetching (300ms) and polling (5s) for real-time updates, but there's a subtle timing issue:
-- When realtime triggers `fetchResults()`, the UI re-renders with old grouped data while waiting for the new fetch
-- The `groupedResults` state can become stale if rapid updates occur
-
-## Solution
-
-### Part 1: Fix `QuestionAnalyticsChart` Deduplication
-
-Deduplicate assignments **before** calculating answer distribution:
-
-```typescript
-// Deduplicate assignments - keep only latest per student
-const uniqueStudents = new Map<string, Assignment>();
-assignments.forEach((a) => {
-  const existing = uniqueStudents.get(a.student_id);
-  if (!existing || new Date((a as any).created_at) > new Date((existing as any).created_at)) {
-    uniqueStudents.set(a.student_id, a);
-  }
-});
-const deduplicatedAssignments = Array.from(uniqueStudents.values());
-
-const answerDistribution = isMultipleChoice
-  ? question.options?.map((opt: string, idx: number) => {
-      const letter = String.fromCharCode(65 + idx);
-      const count = deduplicatedAssignments.filter((a) => {
-        if (!a.completed) return false;
-        // ... rest of logic ...
-      }).length;
+When complete:
+```
+[checkmark] Extraction ready | [slide selector controls]
 ```
 
-### Part 2: Fix Answer Distribution Bar Deduplication
-
-Add the same deduplication pattern to the inline answer distribution (lines 1591-1609):
-
-```typescript
-// Deduplicate by student_id
-const uniqueStudents = new Map<string, Assignment>();
-questionAssignments.forEach((a) => {
-  const existing = uniqueStudents.get(a.student_id);
-  if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
-    uniqueStudents.set(a.student_id, a);
-  }
-});
-const deduplicatedAssignments = Array.from(uniqueStudents.values());
-const count = deduplicatedAssignments.filter((a) => { ... }).length;
-```
-
-### Part 3: Add `created_at` to Chart Assignment Interface
-
-The `QuestionAnalyticsChart` component's `Assignment` interface doesn't include `created_at`:
-
-```typescript
-interface Assignment {
-  id: string;
-  student_id: string;
-  completed: boolean;
-  quiz_responses: any;
-  grade: number | null;
-  // Missing: created_at for deduplication
-}
-```
-
-**Fix**: Add `created_at: string` to the interface.
-
-### Part 4: Pass Deduplicated Data to Chart (Cleaner Alternative)
-
-Instead of duplicating deduplication logic, we can pass already-deduplicated assignments to `QuestionAnalyticsChart`:
-
-In `LectureCheckInResults.tsx`, before rendering the chart (around line 1389):
-```typescript
-// Pre-deduplicate for chart
-const chartAssignments = (() => {
-  const uniqueStudents = new Map<string, Assignment>();
-  group.assignments.forEach((a) => {
-    const existing = uniqueStudents.get(a.student_id);
-    if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
-      uniqueStudents.set(a.student_id, a);
-    }
-  });
-  return Array.from(uniqueStudents.values());
-})();
-
-<QuestionAnalyticsChart
-  question={question}
-  assignments={chartAssignments}  // Pass deduplicated
-  questionIndex={qIdx}
-  stats={stats}
-/>
-```
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/instructor/QuestionAnalyticsChart.tsx` | Add `created_at` to interface, implement proper deduplication before counting |
-| `src/components/instructor/LectureCheckInResults.tsx` | Fix inline answer distribution to deduplicate, pass pre-deduplicated data to chart |
+### Gating Option
+The plan does NOT block the instructor from opening the PPTX while converting, since the PowerPoint itself loads fine via Office Online -- only the slide extraction feature depends on the PDF. Blocking would unnecessarily delay the instructor from starting their lecture. Instead, the progress bar provides clear feedback about when extraction will be available.
 
 ## Technical Details
 
-### Deduplication Strategy
-The consistent pattern across all locations:
-1. Build a `Map<student_id, Assignment>`
-2. For each assignment, keep only if it's newer than existing (by `created_at`)
-3. Convert map values to array for processing
+### Edge Function Changes
+Update `pdf_conversion_status` at each stage using sub-status format:
 
-### Matching Logic
-Use question text matching (not array index) to handle cases where students receive questions in different orders:
 ```typescript
-const studentQuestionIdx = assignmentQuestions.findIndex(
-  (q: any) => q.question === question.question
-);
+// Stage: downloading PPTX
+await supabase.from('lecture_materials')
+  .update({ pdf_conversion_status: 'processing:downloading' })
+  .eq('id', materialId);
+
+// Stage: uploading to CloudConvert  
+await supabase.from('lecture_materials')
+  .update({ pdf_conversion_status: 'processing:uploading_to_converter' })
+  .eq('id', materialId);
+
+// Stage: converting
+await supabase.from('lecture_materials')
+  .update({ pdf_conversion_status: 'processing:converting' })
+  .eq('id', materialId);
+
+// Stage: downloading PDF
+await supabase.from('lecture_materials')
+  .update({ pdf_conversion_status: 'processing:downloading_pdf' })
+  .eq('id', materialId);
+
+// Stage: uploading PDF to storage
+await supabase.from('lecture_materials')
+  .update({ pdf_conversion_status: 'processing:uploading_pdf' })
+  .eq('id', materialId);
 ```
 
-This is already implemented correctly in most places but needs to be consistent in the chart component.
+### PptxViewer Progress Mapping
 
-## Testing Approach
-After implementation:
-1. Send a question to multiple students
-2. Have one student answer, verify count shows 1
-3. Have the same student's assignment record duplicated (edge case), verify still shows 1
-4. Check that "Not Answered" count excludes students who answered
+```typescript
+const getConversionProgress = (status: string | null): { percent: number; label: string } => {
+  if (!status) return { percent: 0, label: '' };
+  if (status === 'pending') return { percent: 5, label: 'Queued...' };
+  if (status === 'processing') return { percent: 15, label: 'Starting...' };
+  if (status === 'processing:downloading') return { percent: 15, label: 'Downloading file...' };
+  if (status === 'processing:uploading_to_converter') return { percent: 30, label: 'Preparing conversion...' };
+  if (status === 'processing:converting') return { percent: 50, label: 'Converting slides...' };
+  if (status === 'processing:downloading_pdf') return { percent: 75, label: 'Finalizing...' };
+  if (status === 'processing:uploading_pdf') return { percent: 90, label: 'Almost done...' };
+  if (status === 'completed') return { percent: 100, label: 'Ready' };
+  return { percent: 0, label: 'Error' };
+};
+```
+
+### No Schema Migration Needed
+The existing `pdf_conversion_status` text column already supports arbitrary string values. The sub-stage format (`processing:stage_name`) is backward-compatible -- the PptxViewer's existing check `status === 'pending' || status === 'processing'` will still match via `status?.startsWith('processing')`.
+
+### Polling Adjustment
+Reduce polling interval from 5 seconds to 3 seconds during active conversion for more responsive progress updates.
+
