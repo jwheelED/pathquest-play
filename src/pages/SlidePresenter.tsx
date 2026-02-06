@@ -492,48 +492,65 @@ export default function SlidePresenter() {
 
   // Fullscreen presentation mode with integrated recording
   if (isFullscreen && activePresentation) {
+    // Check if this is a PPTX file (uses Office Online embed)
+    const isPptxPresentation = activePresentation.fileType?.includes('presentation') || 
+                               activePresentation.fileType?.includes('powerpoint');
+
     return (
       <div className="fixed inset-0 bg-black z-50">
-        {/* Voice Command Screen Flash Overlay */}
-        <div 
-          className={cn(
-            "absolute inset-0 pointer-events-none z-[60] transition-opacity duration-300",
-            voiceCommandDetected 
-              ? "opacity-100" 
-              : "opacity-0"
-          )}
-        >
-          {/* Border glow effect */}
-          <div className={cn(
-            "absolute inset-0 border-8 border-emerald-400 rounded-lg",
-            voiceCommandDetected && "animate-[border-flash_0.5s_ease-out]"
-          )} 
-          style={{
-            boxShadow: voiceCommandDetected 
-              ? 'inset 0 0 60px rgba(52, 211, 153, 0.3), 0 0 60px rgba(52, 211, 153, 0.5)' 
-              : 'none'
-          }}
-          />
-          
-          {/* Center mic icon indicator */}
-          {voiceCommandDetected && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[voice-icon-appear_0.3s_ease-out]">
-              <div className="bg-emerald-500/90 rounded-full p-6 shadow-[0_0_60px_rgba(52,211,153,0.8)]">
-                <Mic className="w-12 h-12 text-white animate-pulse" />
+        {/* Voice Command Screen Flash Overlay - only show for PDF (slide extraction works) */}
+        {!isPptxPresentation && (
+          <div 
+            className={cn(
+              "absolute inset-0 pointer-events-none z-[60] transition-opacity duration-300",
+              voiceCommandDetected 
+                ? "opacity-100" 
+                : "opacity-0"
+            )}
+          >
+            {/* Border glow effect */}
+            <div className={cn(
+              "absolute inset-0 border-8 border-emerald-400 rounded-lg",
+              voiceCommandDetected && "animate-[border-flash_0.5s_ease-out]"
+            )} 
+            style={{
+              boxShadow: voiceCommandDetected 
+                ? 'inset 0 0 60px rgba(52, 211, 153, 0.3), 0 0 60px rgba(52, 211, 153, 0.5)' 
+                : 'none'
+            }}
+            />
+            
+            {/* Center mic icon indicator */}
+            {voiceCommandDetected && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[voice-icon-appear_0.3s_ease-out]">
+                <div className="bg-emerald-500/90 rounded-full p-6 shadow-[0_0_60px_rgba(52,211,153,0.8)]">
+                  <Mic className="w-12 h-12 text-white animate-pulse" />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        <SlideViewer
-          ref={slideViewerRef}
-          presentationId={activePresentation.id}
-          title={activePresentation.title}
-          onExit={handleExitPresentation}
-          onSlideChange={handleSlideChange}
-          isSelectionMode={isSelectionMode}
-          onSelectionChange={handleSelectionChange}
-        />
+        {/* Render appropriate viewer based on file type */}
+        {isPptxPresentation ? (
+          <PptxViewer
+            ref={slideViewerRef as React.RefObject<PptxViewerRef>}
+            presentationId={activePresentation.id}
+            title={activePresentation.title}
+            onExit={handleExitPresentation}
+            onSlideChange={handleSlideChange}
+          />
+        ) : (
+          <SlideViewer
+            ref={slideViewerRef}
+            presentationId={activePresentation.id}
+            title={activePresentation.title}
+            onExit={handleExitPresentation}
+            onSlideChange={handleSlideChange}
+            isSelectionMode={isSelectionMode}
+            onSelectionChange={handleSelectionChange}
+          />
+        )}
         
         {/* Recording Controls - bottom left */}
         <SlideRecordingControls
