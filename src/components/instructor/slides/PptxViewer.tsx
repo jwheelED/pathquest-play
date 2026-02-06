@@ -383,27 +383,6 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               PowerPoint (animations enabled)
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleRefresh}
-              className="bg-black/50 hover:bg-black/70 text-white border-0"
-              title="Refresh presentation"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleOpenInNewTab}
-              className="bg-black/50 hover:bg-black/70 text-white border-0"
-              title="Open in new tab"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
 
         {/* Main content area */}
