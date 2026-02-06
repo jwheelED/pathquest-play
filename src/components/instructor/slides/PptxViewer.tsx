@@ -55,6 +55,9 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [loadingSlideImage, setLoadingSlideImage] = useState(false);
     const [totalPages, setTotalPages] = useState<number | null>(null);
     const pdfDocRef = useRef<any>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const currentPageRef = useRef(currentPage);
+    const totalPagesRef = useRef(totalPages);
 
     // Load slide image from PDF fallback on-demand
     const loadSlideImageFromPdf = useCallback(async (): Promise<string | null> => {
