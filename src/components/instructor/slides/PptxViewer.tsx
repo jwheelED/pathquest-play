@@ -53,6 +53,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [conversionStatus, setConversionStatus] = useState<string | null>(null);
     const [cachedSlideImage, setCachedSlideImage] = useState<string | null>(null);
     const [loadingSlideImage, setLoadingSlideImage] = useState(false);
+    const [totalPages, setTotalPages] = useState<number | null>(null);
     const pdfDocRef = useRef<any>(null);
 
     // Load slide image from PDF fallback on-demand
@@ -103,6 +104,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         if (!pdfDocRef.current) {
           const loadingTask = pdfjsLib.getDocument(signedData.signedUrl);
           pdfDocRef.current = await loadingTask.promise;
+          setTotalPages(pdfDocRef.current.numPages);
         }
 
         const pdfDoc = pdfDocRef.current;
@@ -409,6 +411,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
                     size="sm"
                     className="h-6 w-6 p-0 text-white hover:bg-white/20"
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
                   </Button>
@@ -418,20 +421,23 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
                     onChange={(e) => {
                       const val = parseInt(e.target.value);
                       if (!isNaN(val) && val >= 1) {
-                        setCurrentPage(val);
+                        setCurrentPage(totalPages ? Math.min(val, totalPages) : val);
                       }
                     }}
                     className="w-12 h-6 text-center text-xs bg-white/10 border-white/20 text-white px-1"
                     min={1}
+                    max={totalPages || undefined}
                   />
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 text-white hover:bg-white/20"
-                    onClick={() => setCurrentPage(currentPage + 1)}
+                    onClick={() => setCurrentPage(totalPages ? Math.min(currentPage + 1, totalPages) : currentPage + 1)}
+                    disabled={totalPages !== null && currentPage >= totalPages}
                   >
                     <ChevronRight className="h-3.5 w-3.5" />
                   </Button>
+                  {totalPages && <span className="text-white/50">/ {totalPages}</span>}
                 </div>
                 <span className="text-white/30">•</span>
                 <span className="flex items-center gap-1.5 text-emerald-400">
