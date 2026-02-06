@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.convert-pptx-to-pdf]
 verify_jwt = false
 
+[functions.convert-pptx-background]
+verify_jwt = false
+
 [functions.generate-interval-question]
 verify_jwt = false
 
