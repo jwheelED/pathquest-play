@@ -54,22 +54,26 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
       clearSelection: () => {},
     }));
 
-    // Generate Office Online embed URL
+    // Generate Office Online embed URL and check for PDF fallback
     const generateEmbedUrl = useCallback(async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Get the lecture material file path
+        // Get the lecture material file path and PDF fallback info
         const { data: material, error: materialError } = await supabase
           .from('lecture_materials')
-          .select('file_path, file_type')
+          .select('file_path, file_type, pdf_fallback_path, pdf_conversion_status')
           .eq('id', presentationId)
           .single();
 
         if (materialError || !material) {
           throw new Error('Presentation not found');
         }
+
+        // Store PDF fallback info
+        setPdfFallbackPath(material.pdf_fallback_path);
+        setConversionStatus(material.pdf_conversion_status);
 
         // Verify it's a PPTX file
         const isPptx = material.file_type?.includes('presentation') || 
@@ -109,6 +113,34 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         setLoading(false);
       }
     }, [presentationId, onSlideChange]);
+
+    // Poll for PDF conversion status if pending/processing
+    useEffect(() => {
+      if (conversionStatus === 'pending' || conversionStatus === 'processing') {
+        const pollInterval = setInterval(async () => {
+          const { data } = await supabase
+            .from('lecture_materials')
+            .select('pdf_fallback_path, pdf_conversion_status')
+            .eq('id', presentationId)
+            .single();
+          
+          if (data) {
+            setPdfFallbackPath(data.pdf_fallback_path);
+            setConversionStatus(data.pdf_conversion_status);
+            
+            if (data.pdf_conversion_status === 'completed') {
+              toast.success('PDF conversion complete! Slide extraction is now available.');
+              clearInterval(pollInterval);
+            } else if (data.pdf_conversion_status === 'failed') {
+              toast.error('PDF conversion failed. Slide extraction unavailable.');
+              clearInterval(pollInterval);
+            }
+          }
+        }, 5000); // Poll every 5 seconds
+
+        return () => clearInterval(pollInterval);
+      }
+    }, [conversionStatus, presentationId]);
 
     useEffect(() => {
       generateEmbedUrl();
