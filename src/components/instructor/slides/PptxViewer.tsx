@@ -337,7 +337,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         </div>
 
         {/* Main content area */}
-        <div className="flex-1 flex items-center justify-center pt-16 pb-4 px-4">
+        <div className="flex-1 flex items-center justify-center pt-16 pb-14 px-4">
           {loading ? (
             <div className="text-white text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4" />
@@ -361,14 +361,23 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               </div>
             </div>
           ) : embedUrl ? (
-            <iframe
-              src={embedUrl}
-              className="w-full h-full rounded-lg"
-              style={{ maxWidth: '100%', maxHeight: '100%' }}
-              frameBorder="0"
-              allowFullScreen
-              title={`PowerPoint: ${title}`}
-            />
+            <div className="w-full h-full flex items-center justify-center">
+              <iframe
+                src={embedUrl}
+                className="rounded-lg"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  aspectRatio: '16 / 9',
+                  objectFit: 'contain',
+                }}
+                frameBorder="0"
+                allowFullScreen
+                title={`PowerPoint: ${title}`}
+              />
+            </div>
           ) : null}
         </div>
 
