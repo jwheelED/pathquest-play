@@ -1110,6 +1110,8 @@ export type Database = {
           id: string
           instructor_id: string
           org_id: string | null
+          pdf_conversion_status: string | null
+          pdf_fallback_path: string | null
           title: string
           updated_at: string
         }
@@ -1124,6 +1126,8 @@ export type Database = {
           id?: string
           instructor_id: string
           org_id?: string | null
+          pdf_conversion_status?: string | null
+          pdf_fallback_path?: string | null
           title: string
           updated_at?: string
         }
@@ -1138,6 +1142,8 @@ export type Database = {
           id?: string
           instructor_id?: string
           org_id?: string | null
+          pdf_conversion_status?: string | null
+          pdf_fallback_path?: string | null
           title?: string
           updated_at?: string
         }
