@@ -250,12 +250,29 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           ) : null}
         </div>
 
-        {/* Bottom info bar */}
+        {/* Bottom info bar with extraction status */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-center">
-          <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg">
-            <span>💡 Use PowerPoint's built-in controls to navigate slides with animations</span>
-            <span className="mx-2">•</span>
-            <span>Note: Slide question extraction not available for embedded PowerPoint</span>
+          <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg flex items-center gap-3">
+            <span>💡 Use PowerPoint's built-in controls to navigate slides</span>
+            <span className="text-white/30">•</span>
+            {conversionStatus === 'completed' && pdfFallbackPath ? (
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Slide extraction ready
+              </span>
+            ) : conversionStatus === 'pending' || conversionStatus === 'processing' ? (
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Converting for extraction...
+              </span>
+            ) : conversionStatus === 'failed' ? (
+              <span className="flex items-center gap-1.5 text-red-400">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Extraction unavailable
+              </span>
+            ) : (
+              <span className="text-white/50">Slide extraction not configured</span>
+            )}
           </div>
         </div>
       </div>

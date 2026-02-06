@@ -367,8 +367,8 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
                     </p>
                   )}
                   {skipConversion && (
-                    <p className="text-xs text-muted-foreground pl-6">
-                      ⚠️ Note: Slide question extraction is not available with Office Online viewer
+                    <p className="text-xs text-emerald-600 pl-6">
+                      ✓ Slide extraction will be enabled via background PDF conversion
                     </p>
                   )}
                 </div>
