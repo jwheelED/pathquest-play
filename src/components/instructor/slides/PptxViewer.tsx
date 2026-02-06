@@ -104,6 +104,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
         if (!pdfDocRef.current) {
           const loadingTask = pdfjsLib.getDocument(signedData.signedUrl);
           pdfDocRef.current = await loadingTask.promise;
+          setTotalPages(pdfDocRef.current.numPages);
         }
 
         const pdfDoc = pdfDocRef.current;
