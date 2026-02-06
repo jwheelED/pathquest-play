@@ -217,12 +217,11 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           throw new Error('Failed to generate file access URL');
         }
 
-        // Build the Office Online embed URL
-        // The src parameter must be URL-encoded
+        // Build the Office Online view URL (view.aspx enables animations, embed.aspx does not)
         const encodedUrl = encodeURIComponent(signedData.signedUrl);
-        const officeEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+        const officeEmbedUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`;
 
-        console.log('📊 Office Online embed URL generated for PPTX');
+        console.log('📊 Office Online view URL generated for PPTX (animations enabled)');
         setEmbedUrl(officeEmbedUrl);
         setLoading(false);
 
@@ -239,7 +238,11 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     // Poll for PDF conversion status if pending/processing
     useEffect(() => {
       if (conversionStatus === 'pending' || conversionStatus?.startsWith('processing')) {
+        let pollCount = 0;
+        const maxPolls = 60; // ~3 min at 3s intervals — after this, mark as stale
+        
         const pollInterval = setInterval(async () => {
+          pollCount++;
           const { data } = await supabase
             .from('lecture_materials')
             .select('pdf_fallback_path, pdf_conversion_status')
@@ -258,7 +261,15 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               clearInterval(pollInterval);
             }
           }
-        }, 3000); // Poll every 3 seconds for responsive progress
+          
+          // If polling too long with no progress, the conversion is likely stuck
+          if (pollCount >= maxPolls) {
+            console.warn('⚠️ Conversion appears stuck, stopping polling');
+            setConversionStatus('failed');
+            toast.error('PDF conversion timed out. Try re-uploading the file.');
+            clearInterval(pollInterval);
+          }
+        }, 3000);
 
         return () => clearInterval(pollInterval);
       }
@@ -288,7 +299,8 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     // Open in new tab for full Office Online experience
     const handleOpenInNewTab = () => {
       if (embedUrl) {
-        window.open(embedUrl.replace('/embed.aspx', '/view.aspx'), '_blank');
+        // Already using view.aspx, just open the same URL
+        window.open(embedUrl, '_blank');
       }
     };
 
