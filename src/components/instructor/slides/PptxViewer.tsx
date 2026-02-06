@@ -35,6 +35,76 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [conversionStatus, setConversionStatus] = useState<string | null>(null);
     const [cachedSlideImage, setCachedSlideImage] = useState<string | null>(null);
     const [loadingSlideImage, setLoadingSlideImage] = useState(false);
+    const pdfDocRef = useRef<any>(null);
+
+    // Load slide image from PDF fallback on-demand
+    const loadSlideImageFromPdf = useCallback(async (): Promise<string | null> => {
+      if (!pdfFallbackPath) {
+        toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
+        return null;
+      }
+
+      setLoadingSlideImage(true);
+
+      try {
+        // Get signed URL for PDF fallback
+        const { data: signedData, error: signError } = await supabase.storage
+          .from('lecture-materials')
+          .createSignedUrl(pdfFallbackPath, 60 * 5); // 5 min expiry
+
+        if (signError || !signedData) {
+          console.error('Failed to get PDF fallback URL:', signError);
+          toast.error('Failed to access slide for extraction');
+          return null;
+        }
+
+        // Load PDF.js dynamically
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+        // Load PDF document if not cached
+        if (!pdfDocRef.current) {
+          const loadingTask = pdfjsLib.getDocument(signedData.signedUrl);
+          pdfDocRef.current = await loadingTask.promise;
+        }
+
+        const pdfDoc = pdfDocRef.current;
+        const pageNum = Math.min(currentPage, pdfDoc.numPages);
+        const page = await pdfDoc.getPage(pageNum);
+
+        // Render to canvas at high resolution
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          throw new Error('Failed to get canvas context');
+        }
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Convert to JPEG with compression
+        const imageData = canvas.toDataURL('image/jpeg', 0.75);
+        setCachedSlideImage(imageData);
+        return imageData;
+
+      } catch (err) {
+        console.error('Error loading slide from PDF fallback:', err);
+        toast.error('Failed to extract slide image');
+        return null;
+      } finally {
+        setLoadingSlideImage(false);
+      }
+    }, [pdfFallbackPath, currentPage]);
+
+    // Clear cached image when page changes
+    useEffect(() => {
+      setCachedSlideImage(null);
+    }, [currentPage]);
 
     // Expose ref methods
     useImperativeHandle(ref, () => ({
@@ -47,7 +117,10 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
           return null;
         }
-        return null;
+        // Trigger async load and return null for now
+        // The caller should handle the async case
+        loadSlideImageFromPdf();
+        return cachedSlideImage; // Will be null initially
       },
       getCurrentSlideNumber: () => currentPage,
       getActiveSelection: () => null,
