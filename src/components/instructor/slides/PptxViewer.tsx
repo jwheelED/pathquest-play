@@ -121,10 +121,9 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
       }
     }, [pdfFallbackPath, currentPage]);
 
-    // Clear cached image when page changes, then pre-load the new page
+    // Clear cached slide image when page changes (but keep PDF document cached)
     useEffect(() => {
       setCachedSlideImage(null);
-      pdfDocRef.current = null; // Clear cached PDF when page changes
     }, [currentPage]);
 
     // Pre-load slide image when PDF fallback is available
