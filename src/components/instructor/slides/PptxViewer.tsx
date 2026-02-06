@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { X, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
+import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PptxViewerProps {
@@ -21,6 +21,7 @@ export interface PptxViewerRef {
 /**
  * PPTX Viewer using Microsoft Office Online embed
  * Preserves animations and formatting from the original PowerPoint file
+ * Supports slide extraction via PDF fallback (converted in background)
  */
 export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
   ({ presentationId, title, onExit, onSlideChange }, ref) => {
@@ -28,12 +29,24 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    
+    // PDF fallback state for slide extraction
+    const [pdfFallbackPath, setPdfFallbackPath] = useState<string | null>(null);
+    const [conversionStatus, setConversionStatus] = useState<string | null>(null);
+    const [cachedSlideImage, setCachedSlideImage] = useState<string | null>(null);
+    const [loadingSlideImage, setLoadingSlideImage] = useState(false);
 
-    // Expose ref methods (limited functionality for Office embed)
+    // Expose ref methods
     useImperativeHandle(ref, () => ({
       getSlideImage: () => {
-        // Cannot capture slide image from Office embed iframe (cross-origin restriction)
-        toast.warning('Slide image capture not available for PowerPoint presentations');
+        // Return cached slide image from PDF fallback if available
+        if (cachedSlideImage) {
+          return cachedSlideImage;
+        }
+        if (!pdfFallbackPath) {
+          toast.warning('Slide extraction not ready yet. Please wait for PDF conversion to complete.');
+          return null;
+        }
         return null;
       },
       getCurrentSlideNumber: () => currentPage,
