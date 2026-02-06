@@ -356,27 +356,69 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           ) : null}
         </div>
 
-        {/* Bottom info bar with extraction status */}
+        {/* Bottom info bar with extraction status and slide selector */}
         <div className="absolute bottom-4 left-4 right-4 flex justify-center">
           <div className="bg-black/60 text-white/70 text-xs px-4 py-2 rounded-lg flex items-center gap-3">
-            <span>💡 Use PowerPoint's built-in controls to navigate slides</span>
+            <span>💡 Use PowerPoint's controls to navigate</span>
             <span className="text-white/30">•</span>
-            {conversionStatus === 'completed' && pdfFallbackPath ? (
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Slide extraction ready
-              </span>
-            ) : conversionStatus === 'pending' || conversionStatus === 'processing' ? (
+            
+            {/* Slide number selector for extraction */}
+            {conversionStatus === 'completed' && pdfFallbackPath && (
+              <>
+                <div className="flex items-center gap-1">
+                  <span className="text-white/60">Extract slide:</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <Input
+                    type="number"
+                    value={currentPage}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1) {
+                        setCurrentPage(val);
+                      }
+                    }}
+                    className="w-12 h-6 text-center text-xs bg-white/10 border-white/20 text-white px-1"
+                    min={1}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <span className="text-white/30">•</span>
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  {loadingSlideImage ? 'Loading...' : cachedSlideImage ? 'Ready' : 'Extraction ready'}
+                </span>
+              </>
+            )}
+            
+            {(conversionStatus === 'pending' || conversionStatus === 'processing') && (
               <span className="flex items-center gap-1.5 text-amber-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Converting for extraction...
               </span>
-            ) : conversionStatus === 'failed' ? (
+            )}
+            
+            {conversionStatus === 'failed' && (
               <span className="flex items-center gap-1.5 text-red-400">
                 <AlertCircle className="h-3.5 w-3.5" />
                 Extraction unavailable
               </span>
-            ) : (
+            )}
+            
+            {!conversionStatus && (
               <span className="text-white/50">Slide extraction not configured</span>
             )}
           </div>
