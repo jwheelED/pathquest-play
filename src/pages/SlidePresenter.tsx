@@ -22,6 +22,7 @@ export interface SlideData {
   slides: string[]; // Array of image URLs
   totalSlides: number;
   createdAt: string;
+  fileType: string; // 'application/pdf' or PPTX types
 }
 
 export default function SlidePresenter() {
