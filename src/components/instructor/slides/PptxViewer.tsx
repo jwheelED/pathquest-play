@@ -420,12 +420,17 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               </>
             )}
             
-            {(conversionStatus === 'pending' || conversionStatus === 'processing') && (
-              <span className="flex items-center gap-1.5 text-amber-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Converting for extraction...
-              </span>
-            )}
+            {(conversionStatus === 'pending' || conversionStatus?.startsWith('processing')) && (() => {
+              const progress = getConversionProgress(conversionStatus);
+              return (
+                <div className="flex items-center gap-2 min-w-[200px]">
+                  <Progress value={progress.percent} className="h-2 w-24 bg-white/20" />
+                  <span className="text-amber-400 text-xs whitespace-nowrap">
+                    {progress.percent}% — {progress.label}
+                  </span>
+                </div>
+              );
+            })()}
             
             {conversionStatus === 'failed' && (
               <span className="flex items-center gap-1.5 text-red-400">
@@ -437,11 +442,5 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
             {!conversionStatus && (
               <span className="text-white/50">Slide extraction not configured</span>
             )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-);
 
 PptxViewer.displayName = 'PptxViewer';
