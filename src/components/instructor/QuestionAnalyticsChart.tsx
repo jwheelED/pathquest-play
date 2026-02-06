@@ -37,22 +37,25 @@ export const QuestionAnalyticsChart = ({
   const isMultipleChoice = question.type === "multiple_choice" && question.options;
   const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
-  // Calculate answer distribution for multiple choice
-  // FIX: Find question index within EACH student's assignment by matching question text
+  // DEDUPLICATION: Keep only the latest submission per student
+  const uniqueStudents = new Map<string, Assignment>();
+  assignments.forEach((a) => {
+    const existing = uniqueStudents.get(a.student_id);
+    if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+      uniqueStudents.set(a.student_id, a);
+    }
+  });
+  const deduplicatedAssignments = Array.from(uniqueStudents.values());
+
+  // Calculate answer distribution for multiple choice using deduplicated data
   const correctAnswerLetter = question.overriddenAnswer || question.correctAnswer;
   
   const answerDistribution = isMultipleChoice
     ? question.options?.map((opt: string, idx: number) => {
         const letter = String.fromCharCode(65 + idx);
         
-        // Track unique students to prevent duplicate counting
-        const countedStudents = new Set<string>();
-        
-        const count = assignments.filter((a) => {
+        const count = deduplicatedAssignments.filter((a) => {
           if (!a.completed) return false;
-          
-          // Prevent counting same student twice
-          if (countedStudents.has(a.student_id)) return false;
           
           // Find the question index within THIS student's assignment
           const content = (a as any).content;
@@ -64,11 +67,7 @@ export const QuestionAnalyticsChart = ({
           if (studentQuestionIdx < 0) return false;
           
           const studentAnswer = a.quiz_responses?.[studentQuestionIdx.toString()];
-          if (studentAnswer === letter) {
-            countedStudents.add(a.student_id);
-            return true;
-          }
-          return false;
+          return studentAnswer === letter;
         }).length;
         
         const isCorrect = letter === correctAnswerLetter;
