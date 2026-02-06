@@ -10,6 +10,10 @@ const corsHeaders = {
  * Background PPTX to PDF conversion for hybrid mode
  * Converts PPTX files that were uploaded with "preserve animations" 
  * to enable slide question extraction while keeping the original PPTX for presentation
+ * 
+ * Writes granular sub-stages to pdf_conversion_status for progress tracking:
+ * processing:downloading → processing:uploading_to_converter → processing:converting →
+ * processing:downloading_pdf → processing:uploading_pdf → completed
  */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -19,6 +23,15 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Helper to update conversion stage
+  const setStage = async (materialId: string, stage: string) => {
+    console.log(`📍 Stage: ${stage}`);
+    await supabase
+      .from('lecture_materials')
+      .update({ pdf_conversion_status: stage })
+      .eq('id', materialId);
+  };
 
   try {
     const { materialId, filePath, instructorId } = await req.json();
@@ -32,20 +45,14 @@ serve(async (req) => {
 
     console.log(`🔄 Starting background PPTX conversion for material: ${materialId}`);
 
-    // Update status to processing
-    await supabase
-      .from('lecture_materials')
-      .update({ pdf_conversion_status: 'processing' })
-      .eq('id', materialId);
+    // Stage: downloading PPTX from storage
+    await setStage(materialId, 'processing:downloading');
 
     // Get CloudConvert API key
     const apiKey = Deno.env.get('CLOUDCONVERT_API_KEY');
     if (!apiKey) {
       console.error('Missing CloudConvert API key');
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Server configuration error' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -60,21 +67,16 @@ serve(async (req) => {
 
     if (downloadError || !fileData) {
       console.error('Failed to download PPTX:', downloadError);
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to download file' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Convert blob to array buffer for base64 encoding
+    // Convert blob to base64
     const arrayBuffer = await fileData.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
-    
-    // Convert to base64
     let binary = '';
     const chunkSize = 8192;
     for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -83,6 +85,8 @@ serve(async (req) => {
     }
     const fileBase64 = btoa(binary);
 
+    // Stage: uploading to CloudConvert
+    await setStage(materialId, 'processing:uploading_to_converter');
     console.log('📤 Creating CloudConvert job...');
 
     // Create CloudConvert job
@@ -112,10 +116,7 @@ serve(async (req) => {
     if (!jobResponse.ok) {
       const errorText = await jobResponse.text();
       console.error('CloudConvert job creation failed:', errorText);
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to create conversion job' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -130,10 +131,7 @@ serve(async (req) => {
     const importTask = jobData.data.tasks.find((t: any) => t.name === 'import-file');
     if (!importTask?.result?.form?.url) {
       console.error('Import task missing upload URL');
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to get upload URL' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -163,21 +161,20 @@ serve(async (req) => {
 
     if (!uploadResponse.ok) {
       console.error('CloudConvert upload failed');
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to upload file' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Stage: converting
+    await setStage(materialId, 'processing:converting');
     console.log('⏳ Waiting for conversion...');
 
     // Poll for completion
     let attempts = 0;
-    const maxAttempts = 90; // 90 seconds timeout
+    const maxAttempts = 90;
     let completedJob = null;
 
     while (attempts < maxAttempts) {
@@ -196,10 +193,7 @@ serve(async (req) => {
           break;
         } else if (status === 'error') {
           console.error('CloudConvert job failed');
-          await supabase
-            .from('lecture_materials')
-            .update({ pdf_conversion_status: 'failed' })
-            .eq('id', materialId);
+          await setStage(materialId, 'failed');
           return new Response(
             JSON.stringify({ error: 'Conversion failed' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -211,40 +205,32 @@ serve(async (req) => {
 
     if (!completedJob) {
       console.error('Conversion timed out');
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Conversion timed out' }),
         { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get PDF download URL
+    // Stage: downloading PDF
+    await setStage(materialId, 'processing:downloading_pdf');
+
     const exportTask = completedJob.tasks.find((t: any) => t.name === 'export-file');
     const pdfUrl = exportTask?.result?.files?.[0]?.url;
     
     if (!pdfUrl) {
       console.error('No PDF URL in export task');
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to get PDF URL' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Download the PDF
     console.log('📥 Downloading converted PDF...');
     const pdfResponse = await fetch(pdfUrl);
     if (!pdfResponse.ok) {
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to download PDF' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -254,7 +240,9 @@ serve(async (req) => {
     const pdfBuffer = await pdfResponse.arrayBuffer();
     console.log(`✅ PDF downloaded: ${pdfBuffer.byteLength} bytes`);
 
-    // Upload PDF to Supabase Storage (alongside the original PPTX)
+    // Stage: uploading PDF to storage
+    await setStage(materialId, 'processing:uploading_pdf');
+
     const pdfFileName = fileName.replace(/\.(pptx|ppt)$/i, '_fallback.pdf');
     const pdfPath = `${instructorId}/slides/${Date.now()}_${pdfFileName}`;
 
@@ -269,17 +257,14 @@ serve(async (req) => {
 
     if (storageError) {
       console.error('Failed to upload PDF:', storageError);
-      await supabase
-        .from('lecture_materials')
-        .update({ pdf_conversion_status: 'failed' })
-        .eq('id', materialId);
+      await setStage(materialId, 'failed');
       return new Response(
         JSON.stringify({ error: 'Failed to save PDF' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Update the material record with the PDF fallback path
+    // Stage: completed
     const { error: updateError } = await supabase
       .from('lecture_materials')
       .update({ 

@@ -2,8 +2,25 @@ import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useR
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+
+const getConversionProgress = (status: string | null): { percent: number; label: string } => {
+  if (!status) return { percent: 0, label: '' };
+  if (status === 'pending') return { percent: 5, label: 'Queued...' };
+  if (status === 'processing') return { percent: 15, label: 'Starting...' };
+  if (status === 'processing:downloading') return { percent: 15, label: 'Downloading file...' };
+  if (status === 'processing:uploading_to_converter') return { percent: 30, label: 'Preparing conversion...' };
+  if (status === 'processing:converting') return { percent: 50, label: 'Converting slides...' };
+  if (status === 'processing:downloading_pdf') return { percent: 75, label: 'Finalizing...' };
+  if (status === 'processing:uploading_pdf') return { percent: 90, label: 'Almost done...' };
+  if (status === 'completed') return { percent: 100, label: 'Ready' };
+  if (status === 'failed') return { percent: 0, label: 'Failed' };
+  // Fallback for any processing: prefix we don't know
+  if (status.startsWith('processing')) return { percent: 20, label: 'Processing...' };
+  return { percent: 0, label: '' };
+};
 
 interface PptxViewerProps {
   presentationId: string;
@@ -221,7 +238,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
 
     // Poll for PDF conversion status if pending/processing
     useEffect(() => {
-      if (conversionStatus === 'pending' || conversionStatus === 'processing') {
+      if (conversionStatus === 'pending' || conversionStatus?.startsWith('processing')) {
         const pollInterval = setInterval(async () => {
           const { data } = await supabase
             .from('lecture_materials')
@@ -241,7 +258,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               clearInterval(pollInterval);
             }
           }
-        }, 5000); // Poll every 5 seconds
+        }, 3000); // Poll every 3 seconds for responsive progress
 
         return () => clearInterval(pollInterval);
       }
@@ -403,12 +420,17 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               </>
             )}
             
-            {(conversionStatus === 'pending' || conversionStatus === 'processing') && (
-              <span className="flex items-center gap-1.5 text-amber-400">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Converting for extraction...
-              </span>
-            )}
+            {(conversionStatus === 'pending' || conversionStatus?.startsWith('processing')) && (() => {
+              const progress = getConversionProgress(conversionStatus);
+              return (
+                <div className="flex items-center gap-2 min-w-[200px]">
+                  <Progress value={progress.percent} className="h-2 w-24 bg-white/20" />
+                  <span className="text-amber-400 text-xs whitespace-nowrap">
+                    {progress.percent}% — {progress.label}
+                  </span>
+                </div>
+              );
+            })()}
             
             {conversionStatus === 'failed' && (
               <span className="flex items-center gap-1.5 text-red-400">
