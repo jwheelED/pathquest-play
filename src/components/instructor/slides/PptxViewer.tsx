@@ -53,6 +53,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
     const [conversionStatus, setConversionStatus] = useState<string | null>(null);
     const [cachedSlideImage, setCachedSlideImage] = useState<string | null>(null);
     const [loadingSlideImage, setLoadingSlideImage] = useState(false);
+    const [totalPages, setTotalPages] = useState<number | null>(null);
     const pdfDocRef = useRef<any>(null);
 
     // Load slide image from PDF fallback on-demand
