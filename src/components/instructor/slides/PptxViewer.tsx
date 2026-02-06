@@ -403,7 +403,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
             {conversionStatus === 'completed' && pdfFallbackPath && (
               <>
                 <div className="flex items-center gap-1">
-                  <span className="text-white/60">Extract slide:</span>
+                  <span className="text-white/60">Slide # for extraction:</span>
                   <Button
                     variant="ghost"
                     size="sm"
