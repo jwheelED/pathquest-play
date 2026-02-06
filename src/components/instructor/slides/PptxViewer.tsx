@@ -58,9 +58,28 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           return null;
         }
 
-        // Load PDF.js dynamically
-        const pdfjsLib = await import('pdfjs-dist');
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        // Use global PDF.js (same as SlideViewer pattern)
+        // @ts-ignore
+        let pdfjsLib = window.pdfjsLib;
+        
+        // Load PDF.js if not already loaded
+        if (!pdfjsLib) {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.async = true;
+          document.body.appendChild(script);
+          
+          await new Promise((resolve) => {
+            script.onload = resolve;
+          });
+          
+          // @ts-ignore
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          
+          // @ts-ignore
+          pdfjsLib = window.pdfjsLib;
+        }
 
         // Load PDF document if not cached
         if (!pdfDocRef.current) {
