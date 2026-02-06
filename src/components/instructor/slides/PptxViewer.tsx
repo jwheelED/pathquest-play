@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { X, AlertCircle, ExternalLink, RefreshCw, Loader2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, AlertCircle, ExternalLink, RefreshCw, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const getConversionProgress = (status: string | null): { percent: number; label: string } => {
@@ -281,17 +281,36 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
       generateEmbedUrl();
     }, [generateEmbedUrl]);
 
-    // Handle keyboard navigation (ESC to exit)
+    // Handle keyboard navigation (ESC to exit, arrow keys to track slide changes)
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           onExit();
+          return;
+        }
+
+        // Track common PowerPoint navigation keys to auto-sync slide number
+        const nextKeys = ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'];
+        const prevKeys = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
+
+        // Only track if focus is NOT on an input element (avoid interfering with the slide # input)
+        const activeEl = document.activeElement;
+        const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA';
+        if (isInput) return;
+
+        if (nextKeys.includes(e.key)) {
+          setCurrentPage(prev => {
+            const max = totalPages || Infinity;
+            return Math.min(prev + 1, max);
+          });
+        } else if (prevKeys.includes(e.key)) {
+          setCurrentPage(prev => Math.max(prev - 1, 1));
         }
       };
 
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onExit]);
+    }, [onExit, totalPages]);
 
     // Refresh the embed URL (regenerate signed URL)
     const handleRefresh = () => {
