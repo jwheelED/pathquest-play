@@ -655,28 +655,37 @@ export default function SlidePresenter() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {presentations.map((presentation) => (
-              <div
-                key={presentation.id}
-                className="border rounded-lg overflow-hidden bg-card hover:border-primary/50 transition-colors cursor-pointer group"
-                onClick={() => handleStartPresentation(presentation)}
-              >
-                <div className="aspect-video bg-muted flex items-center justify-center relative">
-                  <Presentation className="h-12 w-12 text-muted-foreground" />
-                  <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button variant="secondary">
-                      Start Presenting
-                    </Button>
+            {presentations.map((presentation) => {
+              const isPptx = presentation.fileType?.includes('presentation') || 
+                             presentation.fileType?.includes('powerpoint');
+              return (
+                <div
+                  key={presentation.id}
+                  className="border rounded-lg overflow-hidden bg-card hover:border-primary/50 transition-colors cursor-pointer group"
+                  onClick={() => handleStartPresentation(presentation)}
+                >
+                  <div className="aspect-video bg-muted flex items-center justify-center relative">
+                    <Presentation className="h-12 w-12 text-muted-foreground" />
+                    {isPptx && (
+                      <div className="absolute top-2 right-2 bg-amber-500/90 text-white text-xs px-2 py-1 rounded">
+                        Animations
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button variant="secondary">
+                        Start Presenting
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold truncate">{presentation.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {isPptx ? 'PowerPoint' : 'PDF'} • {new Date(presentation.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold truncate">{presentation.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(presentation.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
