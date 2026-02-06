@@ -442,5 +442,11 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
             {!conversionStatus && (
               <span className="text-white/50">Slide extraction not configured</span>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
 
 PptxViewer.displayName = 'PptxViewer';
