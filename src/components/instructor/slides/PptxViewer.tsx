@@ -217,12 +217,11 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
           throw new Error('Failed to generate file access URL');
         }
 
-        // Build the Office Online embed URL
-        // The src parameter must be URL-encoded
+        // Build the Office Online view URL (view.aspx enables animations, embed.aspx does not)
         const encodedUrl = encodeURIComponent(signedData.signedUrl);
-        const officeEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+        const officeEmbedUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodedUrl}`;
 
-        console.log('📊 Office Online embed URL generated for PPTX');
+        console.log('📊 Office Online view URL generated for PPTX (animations enabled)');
         setEmbedUrl(officeEmbedUrl);
         setLoading(false);
 
