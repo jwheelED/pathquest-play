@@ -336,7 +336,7 @@ export const PptxViewer = forwardRef<PptxViewerRef, PptxViewerProps>(
               setCurrentPage(Math.min(slideNum, max));
             }
           }
-        } catch {
+        } catch (_) {
           // Ignore parsing errors from unrelated messages
         }
       };
