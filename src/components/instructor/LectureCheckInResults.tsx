@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,8 @@ import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { Progress } from "@/components/ui/progress";
 
 interface Assignment {
   id: string;
@@ -1059,14 +1061,83 @@ export const LectureCheckInResults = () => {
     }
   };
 
+  // Compute summary metrics across all groups
+  const summaryMetrics = (() => {
+    let totalQuestions = 0;
+    let totalCompleted = 0;
+    let totalExpected = 0;
+    const allPercentages: number[] = [];
+    const allResponseTimes: number[] = [];
+
+    groupedResults.forEach((group) => {
+      totalQuestions += group.questions.length;
+      group.questions.forEach((question, qIdx) => {
+        const stats = calculateQuestionStats(group.assignments, qIdx, question);
+        totalCompleted += stats.completed;
+        totalExpected += stats.total;
+        if (stats.percentage !== null) {
+          allPercentages.push(stats.percentage);
+        }
+        if (stats.avgResponseTime !== null) {
+          allResponseTimes.push(stats.avgResponseTime);
+        }
+      });
+    });
+
+    const avgAccuracy = allPercentages.length > 0
+      ? Math.round(allPercentages.reduce((s, v) => s + v, 0) / allPercentages.length)
+      : null;
+    const responseRate = totalExpected > 0
+      ? Math.round((totalCompleted / totalExpected) * 100)
+      : 0;
+    const avgTime = allResponseTimes.length > 0
+      ? Math.round(allResponseTimes.reduce((s, v) => s + v, 0) / allResponseTimes.length)
+      : null;
+
+    return { totalQuestions, avgAccuracy, responseRate, totalCompleted, totalExpected, avgTime };
+  })();
+
+  // Helper: relative time formatting for group headers
+  const formatRelativeTime = (timestamp: string): string => {
+    const diff = Date.now() - new Date(timestamp).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(timestamp).toLocaleString();
+  };
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Live Lecture Check-In Results</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            Check-In Results
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Loading results...</p>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="border rounded-2xl p-3 space-y-3">
+                <Skeleton className="h-8 w-8 rounded-xl" />
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            ))}
+          </div>
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="border rounded-lg p-5 space-y-3">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-2 w-full rounded-full" />
+              <div className="space-y-2 pt-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
     );
@@ -1076,9 +1147,22 @@ export const LectureCheckInResults = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Live Lecture Check-In Results</CardTitle>
-          <CardDescription>No lecture check-ins sent yet</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            Check-In Results
+          </CardTitle>
         </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="rounded-full bg-muted p-4 mb-4">
+              <ClipboardList className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-medium text-muted-foreground mb-1">No check-ins yet</p>
+            <p className="text-sm text-muted-foreground/70 max-w-sm">
+              Send a lecture check-in question to your students during a live session to see results here.
+            </p>
+          </div>
+        </CardContent>
       </Card>
     );
   }
@@ -1158,14 +1242,61 @@ export const LectureCheckInResults = () => {
         </div>
       </CardHeader>
       <CardContent className="pt-6">
+        {/* Summary Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <MetricCard
+            icon={<FileText className="h-4 w-4" />}
+            label="Total Questions"
+            value={summaryMetrics.totalQuestions}
+            size="sm"
+            variant="primary"
+          />
+          <MetricCard
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Avg Accuracy"
+            value={summaryMetrics.avgAccuracy !== null ? `${summaryMetrics.avgAccuracy}%` : 'N/A'}
+            size="sm"
+            variant={summaryMetrics.avgAccuracy !== null && summaryMetrics.avgAccuracy >= 70 ? 'success' : 'warning'}
+          />
+          <MetricCard
+            icon={<Users className="h-4 w-4" />}
+            label="Response Rate"
+            value={`${summaryMetrics.responseRate}%`}
+            size="sm"
+            variant="default"
+          />
+          <MetricCard
+            icon={<Clock className="h-4 w-4" />}
+            label="Avg Response Time"
+            value={summaryMetrics.avgTime !== null ? formatTime(summaryMetrics.avgTime) : 'N/A'}
+            size="sm"
+            variant="default"
+          />
+        </div>
+
         <Accordion type="single" collapsible className="space-y-4" defaultValue="group-0">
           {groupedResults.map((group, groupIdx) => (
             <AccordionItem key={groupIdx} value={`group-${groupIdx}`} className="border-2 rounded-lg px-4 shadow-sm bg-card">
               <AccordionTrigger className="hover:no-underline py-4">
                 <div className="flex items-center justify-between w-full pr-4">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">{new Date(group.timestamp).toLocaleString()}</Badge>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge variant="outline">{formatRelativeTime(group.timestamp)}</Badge>
+                    <Badge variant="secondary" className="text-xs">{group.questions.length} question{group.questions.length !== 1 ? 's' : ''}</Badge>
                     <span className="text-sm text-muted-foreground">{group.assignments.length} student(s)</span>
+                    {(() => {
+                      const groupPercentages: number[] = [];
+                      group.questions.forEach((q, qi) => {
+                        const s = calculateQuestionStats(group.assignments, qi, q);
+                        if (s.percentage !== null) groupPercentages.push(s.percentage);
+                      });
+                      if (groupPercentages.length === 0) return null;
+                      const avg = Math.round(groupPercentages.reduce((a, b) => a + b, 0) / groupPercentages.length);
+                      return (
+                        <Badge variant="outline" className={`text-xs ${avg >= 70 ? 'border-green-500 text-green-600' : avg >= 50 ? 'border-amber-500 text-amber-600' : 'border-red-500 text-red-600'}`}>
+                          {avg}% avg
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-3">
                     {group.assignments.filter((a) => a.completed).length === group.assignments.length ? (
@@ -1216,7 +1347,13 @@ export const LectureCheckInResults = () => {
                   const isOverridden = !!question.overriddenAnswer;
 
                   return (
-                    <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card ${isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
+                    <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card border-l-4 ${
+                      isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' :
+                      stats.percentage === null ? 'border-l-blue-500' :
+                      stats.percentage >= 80 ? 'border-l-green-500' :
+                      stats.percentage >= 50 ? 'border-l-amber-500' :
+                      'border-l-red-500'
+                    }`}>
                       {isOverridden && (
                         <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-400 text-sm">
                           <AlertTriangle className="h-4 w-4" />
@@ -1247,6 +1384,16 @@ export const LectureCheckInResults = () => {
                                 );
                               })}
                             </ul>
+                          )}
+                          {/* Completion Progress Bar */}
+                          {stats.total > 0 && (
+                            <div className="mt-3">
+                              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                <span>{stats.completed}/{stats.total} responded</span>
+                                <span>{Math.round((stats.completed / stats.total) * 100)}%</span>
+                              </div>
+                              <Progress value={(stats.completed / stats.total) * 100} className="h-2" />
+                            </div>
                           )}
                         </div>
                         <div className="text-right space-y-2">
@@ -1502,9 +1649,18 @@ export const LectureCheckInResults = () => {
                             return (
                               <div
                                 key={assignment.id}
-                                className="flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50"
+                                className={`flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50 ${
+                                  !isCompleted ? '' :
+                                  isCorrect === true ? 'bg-green-50/50 dark:bg-green-950/20' :
+                                  isCorrect === false ? 'bg-red-50/50 dark:bg-red-950/20' : ''
+                                }`}
                               >
-                                <span className="font-medium">{assignment.student_name}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                    {(assignment.student_name || '?').charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="font-medium">{assignment.student_name}</span>
+                                </div>
                                 <div className="flex items-center gap-2">
                                   {!isCompleted ? (
                                     <Badge variant="outline" className="gap-1">
