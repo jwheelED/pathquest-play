@@ -41,6 +41,30 @@ interface LiveSessionResultsProps {
   sessionId: string;
 }
 
+// Resolve a short answer like "A" or "B" to the full option text
+const resolveAnswerToFullText = (answer: string, questionContent: any): string => {
+  const options: string[] = questionContent?.options || [];
+  if (!options.length) return answer;
+
+  const trimmed = answer.trim();
+  // Check if answer is just a letter (A, B, C, D)
+  const letterMatch = trimmed.match(/^([A-Da-d])\.?\s*$/);
+  if (letterMatch) {
+    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1...
+    if (idx >= 0 && idx < options.length) {
+      return options[idx];
+    }
+  }
+
+  // Check if answer starts with a letter prefix but is already full text
+  const prefixMatch = trimmed.match(/^([A-Da-d])[\.\)]\s+(.+)/);
+  if (prefixMatch) {
+    return trimmed; // Already detailed
+  }
+
+  return answer;
+};
+
 export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
   const [questionGroups, setQuestionGroups] = useState<QuestionGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -274,7 +298,9 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                             <span className="font-medium text-xs text-muted-foreground w-20 truncate shrink-0">
                               {r.nickname}
                             </span>
-                            <span className="flex-1 truncate">{r.answer}</span>
+                            <span className="flex-1 truncate">
+                              {resolveAnswerToFullText(r.answer, group.question.question_content)}
+                            </span>
                             {r.confidence_level && (
                               <Badge variant="outline" className="text-[10px] shrink-0">
                                 {r.confidence_level}
