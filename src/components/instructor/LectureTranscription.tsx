@@ -1966,10 +1966,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
-    if (isSendingQuestion) {
-      console.log("⏸️ Timer paused: already sending a question");
-      return;
-    }
+    // NOTE: isSendingQuestion check moved inside the interval callback via ref
+    // to avoid tearing down and recreating the timer interval
 
     const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
 
