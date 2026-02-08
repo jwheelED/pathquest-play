@@ -112,6 +112,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const [lastTranscript, setLastTranscript] = useState<string>("");
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
+  const isSendingQuestionRef = useRef(false);
   const [nextQuestionAllowedAt, setNextQuestionAllowedAt] = useState<number>(0);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number>(0);
   const [studentCount, setStudentCount] = useState<number>(0);
@@ -193,6 +194,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isDeepgramConnected, setIsDeepgramConnected] = useState(false);
   
   const { toast } = useToast();
+
+  // Keep isSendingQuestion ref in sync with state
+  useEffect(() => {
+    isSendingQuestionRef.current = isSendingQuestion;
+  }, [isSendingQuestion]);
 
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
@@ -1960,10 +1966,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
-    if (isSendingQuestion) {
-      console.log("⏸️ Timer paused: already sending a question");
-      return;
-    }
+    // NOTE: isSendingQuestion check moved inside the interval callback via ref
+    // to avoid tearing down and recreating the timer interval
 
     const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
 
@@ -1979,7 +1983,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
-      if (isSendingQuestion) {
+      if (isSendingQuestionRef.current) {
         console.log("⏸️ Skipping check: already sending a question");
         return;
       }
@@ -2102,7 +2106,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🧹 Cleaning up auto-question timer");
       clearInterval(checkInterval);
     };
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, retryAttempts]);
+  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, retryAttempts]);
 
   // Initialize timer when auto-questions are toggled on during recording
   useEffect(() => {
