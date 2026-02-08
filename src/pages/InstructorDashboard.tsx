@@ -20,6 +20,7 @@ import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 // InstructorConnectionCard removed - organization connection not needed unless for institutional licensing
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
+import { LiveSessionResults } from "@/components/instructor/LiveSessionResults";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
