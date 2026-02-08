@@ -298,7 +298,9 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                             <span className="font-medium text-xs text-muted-foreground w-20 truncate shrink-0">
                               {r.nickname}
                             </span>
-                            <span className="flex-1 truncate">{r.answer}</span>
+                            <span className="flex-1 truncate">
+                              {resolveAnswerToFullText(r.answer, group.question.question_content)}
+                            </span>
                             {r.confidence_level && (
                               <Badge variant="outline" className="text-[10px] shrink-0">
                                 {r.confidence_level}
