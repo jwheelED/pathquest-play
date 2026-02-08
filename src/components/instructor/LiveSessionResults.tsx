@@ -66,6 +66,57 @@ const resolveAnswerToFullText = (answer: string, questionContent: any): string =
   return answer;
 };
 
+const ExpandableResponseRow = ({
+  response,
+  fullAnswer,
+  isLong,
+}: {
+  response: LiveResponse & { nickname?: string };
+  fullAnswer: string;
+  isLong: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      className={cn(
+        "text-sm rounded-lg bg-background border transition-all",
+        isLong ? "cursor-pointer" : ""
+      )}
+      onClick={() => isLong && setExpanded(!expanded)}
+    >
+      <div className="flex items-center gap-2 py-1.5 px-3">
+        {response.is_correct ? (
+          <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+        )}
+        <span className="font-medium text-xs text-muted-foreground w-20 truncate shrink-0">
+          {response.nickname}
+        </span>
+        <span className={cn("flex-1 min-w-0", !expanded && "truncate")}>
+          {fullAnswer}
+        </span>
+        {isLong && (
+          expanded
+            ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        )}
+        {response.confidence_level && (
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            {response.confidence_level}
+          </Badge>
+        )}
+        {response.response_time_ms && (
+          <span className="text-xs text-muted-foreground shrink-0">
+            {(response.response_time_ms / 1000).toFixed(1)}s
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
   const [questionGroups, setQuestionGroups] = useState<QuestionGroup[]>([]);
   const [loading, setLoading] = useState(true);
