@@ -19,25 +19,11 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY not configured");
     }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Use service role for cache operations since live session participants may be anonymous
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      // For live sessions, participants may not be authenticated — allow anonymous access
-      console.log("No authenticated user, proceeding as anonymous participant");
-    }
 
     const { problemText, correctAnswer, userAnswer, wasCorrect, courseContext } = await req.json();
 
