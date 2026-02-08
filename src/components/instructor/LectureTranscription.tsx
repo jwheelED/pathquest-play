@@ -112,6 +112,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const [lastTranscript, setLastTranscript] = useState<string>("");
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
+  const isSendingQuestionRef = useRef(false);
   const [nextQuestionAllowedAt, setNextQuestionAllowedAt] = useState<number>(0);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number>(0);
   const [studentCount, setStudentCount] = useState<number>(0);
