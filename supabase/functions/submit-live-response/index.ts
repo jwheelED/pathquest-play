@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
     // Get the question to check the correct answer
     const { data: question, error: questionError } = await supabase
       .from('live_questions')
-      .select('question_content, question_number')
+      .select('question_content, question_number, instructor_id, session_id')
       .eq('id', questionId)
       .single();
 
@@ -249,6 +249,115 @@ Deno.serve(async (req) => {
     }
 
     console.log('Response saved:', { responseId: response.id, isCorrect, points });
+
+    // Best-effort sync: update corresponding student_assignments record
+    // so LectureCheckInResults card reflects live session answers
+    try {
+      if (question.session_id && question.instructor_id) {
+        // 1. Get course_id from live_sessions
+        const { data: session } = await supabase
+          .from('live_sessions')
+          .select('course_id')
+          .eq('id', question.session_id)
+          .single();
+
+        if (session?.course_id) {
+          // 2. Get participant nickname
+          const { data: participant } = await supabase
+            .from('live_participants')
+            .select('nickname')
+            .eq('id', participantId)
+            .single();
+
+          if (participant?.nickname) {
+            const nickname = participant.nickname.trim().toLowerCase();
+
+            // 3. Get student IDs for this instructor + course
+            const { data: instructorStudents } = await supabase
+              .from('instructor_students')
+              .select('student_id')
+              .eq('instructor_id', question.instructor_id)
+              .eq('course_id', session.course_id);
+
+            if (instructorStudents && instructorStudents.length > 0) {
+              const studentIds = instructorStudents.map((s: { student_id: string }) => s.student_id);
+
+              // 4. Find matching profile by nickname
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', studentIds);
+
+              const matchedProfile = profiles?.find((p: { id: string; full_name: string | null }) =>
+                p.full_name && p.full_name.trim().toLowerCase() === nickname
+              );
+
+              if (matchedProfile) {
+                console.log(`🔗 Matched participant "${participant.nickname}" to profile ${matchedProfile.id}`);
+
+                // 5. Find recent uncompleted lecture_checkin assignments
+                const { data: assignments } = await supabase
+                  .from('student_assignments')
+                  .select('id, content, quiz_responses')
+                  .eq('student_id', matchedProfile.id)
+                  .eq('instructor_id', question.instructor_id)
+                  .eq('assignment_type', 'lecture_checkin')
+                  .eq('completed', false)
+                  .order('created_at', { ascending: false })
+                  .limit(5);
+
+                if (assignments && assignments.length > 0) {
+                  // 6. Find the assignment whose content.questions contains this question
+                  const questionText = questionContent.questions?.[0]?.question || questionContent.question || '';
+
+                  for (const assignment of assignments) {
+                    const content = assignment.content as { questions?: Array<{ question?: string }> };
+                    const questions = content?.questions || [];
+                    const matchIdx = questions.findIndex(
+                      (q: { question?: string }) => q.question === questionText
+                    );
+
+                    if (matchIdx >= 0) {
+                      // 7. Build quiz_responses and update
+                      const existingResponses = assignment.quiz_responses || {};
+                      const updatedResponses = {
+                        ...existingResponses,
+                        [matchIdx.toString()]: normalizedStudentAnswer,
+                      };
+
+                      const grade = isCorrect ? 100 : 0;
+                      const responseTimeSec = responseTimeMs ? Math.round(responseTimeMs / 1000) : null;
+
+                      const { error: updateError } = await supabase
+                        .from('student_assignments')
+                        .update({
+                          completed: true,
+                          quiz_responses: updatedResponses,
+                          grade,
+                          response_time_seconds: responseTimeSec,
+                        })
+                        .eq('id', assignment.id);
+
+                      if (updateError) {
+                        console.error('⚠️ Sync: failed to update student_assignment:', updateError);
+                      } else {
+                        console.log(`✅ Sync: updated student_assignment ${assignment.id} for student ${matchedProfile.id}`);
+                      }
+                      break; // Only update the first matching assignment
+                    }
+                  }
+                }
+              } else {
+                console.log(`ℹ️ Sync: no profile match for nickname "${participant.nickname}" — skipping`);
+              }
+            }
+          }
+        }
+      }
+    } catch (syncError) {
+      // Non-blocking: sync failure should never affect the primary live response flow
+      console.error('⚠️ Sync to student_assignments failed (non-blocking):', syncError);
+    }
 
     return new Response(
       JSON.stringify({
