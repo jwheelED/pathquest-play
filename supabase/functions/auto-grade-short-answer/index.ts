@@ -66,7 +66,7 @@ serve(async (req) => {
       });
     }
 
-    if (expectedAnswer.length > 5000) {
+    if (expectedAnswer && expectedAnswer.length > 5000) {
       return new Response(JSON.stringify({ error: "expectedAnswer exceeds maximum length of 5,000 characters" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
