@@ -465,6 +465,13 @@ export default function InstructorDashboard() {
 
             {/* LectureTranscription is now rendered outside tabs to persist recording */}
             
+            {/* Live session responses - only shown when a live session is active */}
+            {activeSession?.id && (
+              <div className="min-w-0">
+                <LiveSessionResults sessionId={activeSession.id} />
+              </div>
+            )}
+
             <div className="min-w-0">
               <LectureCheckInResults />
             </div>
