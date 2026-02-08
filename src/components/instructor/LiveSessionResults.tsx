@@ -285,35 +285,19 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
 
                     {/* Individual responses */}
                     {group.responses.length > 0 ? (
-                      <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                        {group.responses.map((r) => (
-                          <div
-                            key={r.id}
-                            className="flex items-center gap-2 text-sm py-1.5 px-3 rounded-lg bg-background border"
-                          >
-                            {r.is_correct ? (
-                              <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                            ) : (
-                              <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                            )}
-                            <span className="font-medium text-xs text-muted-foreground w-20 truncate shrink-0">
-                              {r.nickname}
-                            </span>
-                            <span className="flex-1 truncate">
-                              {resolveAnswerToFullText(r.answer, group.question.question_content)}
-                            </span>
-                            {r.confidence_level && (
-                              <Badge variant="outline" className="text-[10px] shrink-0">
-                                {r.confidence_level}
-                              </Badge>
-                            )}
-                            {r.response_time_ms && (
-                              <span className="text-xs text-muted-foreground shrink-0">
-                                {(r.response_time_ms / 1000).toFixed(1)}s
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                      <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                        {group.responses.map((r) => {
+                          const fullAnswer = resolveAnswerToFullText(r.answer, group.question.question_content);
+                          const isLong = fullAnswer.length > 60;
+                          return (
+                            <ExpandableResponseRow
+                              key={r.id}
+                              response={r}
+                              fullAnswer={fullAnswer}
+                              isLong={isLong}
+                            />
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground text-center py-2">
