@@ -1750,8 +1750,18 @@ export const LectureCheckInResults = () => {
                                   return assignmentQuestions.some((q: any) => q.question === question.question);
                                 });
 
-                                // FIX: Count using correct question index for each student's assignment
-                                const count = questionAssignments.filter((a) => {
+                                // DEDUPLICATION: Keep only the latest submission per student
+                                const uniqueStudents = new Map<string, Assignment>();
+                                questionAssignments.forEach((a) => {
+                                  const existing = uniqueStudents.get(a.student_id);
+                                  if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+                                    uniqueStudents.set(a.student_id, a);
+                                  }
+                                });
+                                const deduplicatedAssignments = Array.from(uniqueStudents.values());
+
+                                // Count using correct question index for each student's deduplicated assignment
+                                const count = deduplicatedAssignments.filter((a) => {
                                   if (!a.completed) return false;
                                   const assignmentContent = a.content as any;
                                   const assignmentQuestions = assignmentContent?.questions || [];
@@ -1763,7 +1773,7 @@ export const LectureCheckInResults = () => {
                                     : null;
                                   return studentAnswer === optionLetter;
                                 }).length;
-                                const total = questionAssignments.filter((a) => a.completed).length;
+                                const total = deduplicatedAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                                 const isCorrect = optionLetter === correctAnswerToUse;

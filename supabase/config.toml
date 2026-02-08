@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.convert-pptx-to-pdf]
 verify_jwt = false
 
+[functions.convert-pptx-background]
+verify_jwt = false
+
 [functions.generate-interval-question]
 verify_jwt = false
 
@@ -40,4 +43,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.push-bank-question]
+verify_jwt = false
+
+[functions.generate-detailed-explanation]
 verify_jwt = false

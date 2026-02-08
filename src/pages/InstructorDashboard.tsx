@@ -20,6 +20,8 @@ import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
 // InstructorConnectionCard removed - organization connection not needed unless for institutional licensing
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
+import { LiveSessionResults } from "@/components/instructor/LiveSessionResults";
+import { PastLiveSessions } from "@/components/instructor/PastLiveSessions";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
@@ -464,8 +466,19 @@ export default function InstructorDashboard() {
 
             {/* LectureTranscription is now rendered outside tabs to persist recording */}
             
+            {/* Live session responses - only shown when a live session is active */}
+            {activeSession?.id && (
+              <div className="min-w-0">
+                <LiveSessionResults sessionId={activeSession.id} />
+              </div>
+            )}
+
             <div className="min-w-0">
               <LectureCheckInResults />
+            </div>
+
+            <div className="min-w-0">
+              <PastLiveSessions />
             </div>
           </div>
         );
