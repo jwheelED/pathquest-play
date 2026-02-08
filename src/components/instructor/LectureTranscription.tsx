@@ -195,6 +195,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   
   const { toast } = useToast();
 
+  // Keep isSendingQuestion ref in sync with state
+  useEffect(() => {
+    isSendingQuestionRef.current = isSendingQuestion;
+  }, [isSendingQuestion]);
+
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
 
