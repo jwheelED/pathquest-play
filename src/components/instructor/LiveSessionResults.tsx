@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle, XCircle, Users, BarChart3, RefreshCw, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Users, BarChart3, RefreshCw, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
 
 interface LiveResponse {
   id: string;
