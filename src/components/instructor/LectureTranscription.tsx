@@ -2106,7 +2106,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🧹 Cleaning up auto-question timer");
       clearInterval(checkInterval);
     };
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, retryAttempts]);
+  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, retryAttempts]);
 
   // Initialize timer when auto-questions are toggled on during recording
   useEffect(() => {
