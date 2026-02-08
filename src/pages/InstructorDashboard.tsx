@@ -476,6 +476,10 @@ export default function InstructorDashboard() {
             <div className="min-w-0">
               <LectureCheckInResults />
             </div>
+
+            <div className="min-w-0">
+              <PastLiveSessions />
+            </div>
           </div>
         );
 
