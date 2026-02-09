@@ -120,7 +120,7 @@ export default function AuthPage() {
         email: validData.email,
         password: validData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
           data: {
             full_name: validData.name
           }
