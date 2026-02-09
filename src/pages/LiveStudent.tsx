@@ -201,18 +201,21 @@ const LiveStudent = () => {
 
   // Fallback polling at reduced frequency (10s) in case realtime drops
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !sessionCode) return;
 
     const pollInterval = setInterval(async () => {
-      const { data: questions } = await supabase
-        .from("live_questions")
-        .select("id, question_content, sent_at")
-        .eq("session_id", sessionId)
-        .order("sent_at", { ascending: false })
-        .limit(1);
+      try {
+        const { data, error } = await supabase.functions.invoke("resolve-live-session", {
+          body: { sessionCode },
+        });
 
-      if (questions && questions.length > 0) {
-        processIncomingQuestion(questions[0] as unknown as Question);
+        if (!error && data?.questions?.length > 0) {
+          processIncomingQuestion(data.questions[0] as unknown as Question);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000);
       }
     }, 10000);
 
