@@ -21,6 +21,8 @@ export default function AuthPage() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const redirectTo = searchParams.get("redirect");
 
   // Check for recovery token in URL on mount
   useEffect(() => {
@@ -118,7 +120,7 @@ export default function AuthPage() {
         email: validData.email,
         password: validData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
           data: {
             full_name: validData.name
           }
@@ -198,8 +200,13 @@ export default function AuthPage() {
         }
       } else {
         setSuccess("Signed in successfully!");
-        // Navigate based on user role
-        await navigateByRole(data.user.id);
+        // If there's a redirect (e.g. from live session), go there
+        if (redirectTo) {
+          navigate(redirectTo);
+        } else {
+          // Navigate based on user role
+          await navigateByRole(data.user.id);
+        }
       }
     }
   };

@@ -644,7 +644,7 @@ const LiveStudent = () => {
                 <p className="text-sm text-muted-foreground">Create an account to save your stats and compete on leaderboards</p>
               </div>
               <Button 
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate(`/auth?redirect=/live/${sessionCode}`)}
                 className="shrink-0"
               >
                 Create Account
