@@ -1062,18 +1062,28 @@ serve(async (req) => {
     });
     await supabase.removeChannel(broadcastChannel);
 
+    const responsePayload: Record<string, any> = {
+      success: true,
+      sent_to: successCount,
+      total_students: studentIds.length,
+      failed_count: failedStudents.length,
+      question_type: finalType,
+      question: formattedQuestion,
+      batches_processed: batches.length,
+      processing_time_ms: processingTime,
+      parallel_batches: true,
+    };
+
+    // Include live session info if dual delivery was used
+    if (liveSession) {
+      responsePayload.liveMode = true;
+      responsePayload.sessionCode = liveSession.session_code;
+      responsePayload.liveParticipantCount = liveParticipantCount;
+      responsePayload.liveQuestionNumber = liveQuestionNumber;
+    }
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        sent_to: successCount,
-        total_students: studentIds.length,
-        failed_count: failedStudents.length,
-        question_type: finalType,
-        question: formattedQuestion,
-        batches_processed: batches.length,
-        processing_time_ms: processingTime,
-        parallel_batches: true,
-      }),
+      JSON.stringify(responsePayload),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
