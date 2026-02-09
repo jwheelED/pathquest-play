@@ -24,17 +24,15 @@ export default function AuthPage() {
   const searchParams = new URLSearchParams(window.location.search);
   const redirectTo = searchParams.get("redirect");
 
-  // Check for recovery token in URL on mount
+  // Single consolidated auth state listener for recovery detection
   useEffect(() => {
+    // Check URL hash on mount for recovery token
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
-  }, []);
 
-  // Handle password recovery event from auth state change
-  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveryMode(true);
@@ -55,11 +53,30 @@ export default function AuthPage() {
       return;
     }
 
+    // Ensure we have a valid session before updating password
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (!currentSession) {
+      // Try refreshing the session first
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        setError("Your reset link has expired. Please request a new password reset.");
+        toast.error("Your reset link has expired. Please request a new password reset.");
+        setIsRecoveryMode(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     
     if (error) {
-      setError(error.message);
-      toast.error(error.message);
+      if (error.message.toLowerCase().includes('session') || error.message.toLowerCase().includes('token')) {
+        setError("Your reset link has expired. Please request a new password reset.");
+        toast.error("Your reset link has expired. Please request a new password reset.");
+        setIsRecoveryMode(false);
+      } else {
+        setError(error.message);
+        toast.error(error.message);
+      }
     } else {
       setSuccess("Password updated successfully!");
       toast.success("Password updated successfully! Please sign in.");
