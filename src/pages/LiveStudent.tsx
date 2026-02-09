@@ -216,11 +216,9 @@ const LiveStudent = () => {
         console.error("Polling error:", err);
       }
     }, 10000);
-      }
-    }, 10000);
 
     return () => clearInterval(pollInterval);
-  }, [sessionId, processIncomingQuestion]);
+  }, [sessionId, sessionCode, processIncomingQuestion]);
 
   // Handle MCQ answer selection - show confidence selector
   const handleAnswerSelect = (answer: string) => {
