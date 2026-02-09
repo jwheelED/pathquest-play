@@ -93,7 +93,7 @@ serve(async (req) => {
       formattedQuestion = {
         question: questionData.question || '',
         type: "short_answer",
-        expectedAnswer: isPollMode ? '' : (questionData.expected_answer || questionData.expectedAnswer || ""),
+        expectedAnswer: questionData.expected_answer || questionData.expectedAnswer || "",
         gradingMode: isPollMode ? "poll" : "manual_grade",
         isPoll: isPollMode,
       };

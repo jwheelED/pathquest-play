@@ -146,7 +146,7 @@ export function SlideQuestionPreviewDialog({
     } else if (questionType === 'short_answer') {
       editedData.short_answer = {
         question: saQuestion,
-        expected_answer: isPollMode ? '' : saExpectedAnswer,
+        expected_answer: saExpectedAnswer,
         explanation: saExplanation,
         isPoll: isPollMode,
       };
