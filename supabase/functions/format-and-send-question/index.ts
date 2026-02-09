@@ -802,82 +802,14 @@ serve(async (req) => {
 
       console.log(`✅ Live question sent to ${participantCount || 0} anonymous participants`);
 
-      // ALSO send to registered students via student_assignments
-      // Include both course-enrolled students AND legacy students (null course_id) for backward compatibility
-      let studentLinks: { student_id: string }[] = [];
-      
-      if (course_id) {
-        // Query 1: Students explicitly enrolled in this course
-        const { data: courseStudents } = await supabase
-          .from("instructor_students")
-          .select("student_id")
-          .eq("instructor_id", user.id)
-          .eq("course_id", course_id);
-        
-        // Query 2: Legacy students with no course_id (joined via instructor code)
-        const { data: legacyStudents } = await supabase
-          .from("instructor_students")
-          .select("student_id")
-          .eq("instructor_id", user.id)
-          .is("course_id", null);
-        
-        // Combine and deduplicate
-        const allStudents = [...(courseStudents || []), ...(legacyStudents || [])];
-        const uniqueIds = [...new Set(allStudents.map(s => s.student_id))];
-        studentLinks = uniqueIds.map(id => ({ student_id: id }));
-        
-        console.log(`📚 Found ${studentLinks.length} students (${courseStudents?.length || 0} course-enrolled, ${legacyStudents?.length || 0} legacy)`);
-      } else {
-        // No course_id - get all instructor's students
-        const { data: allStudents } = await supabase
-          .from("instructor_students")
-          .select("student_id")
-          .eq("instructor_id", user.id);
-        studentLinks = allStudents || [];
-        console.log(`📚 No course filter - sending to all ${studentLinks.length} students`);
-      }
-
-      let registeredStudentCount = 0;
-      if (studentLinks && studentLinks.length > 0) {
-        console.log(`📚 Also sending to ${studentLinks.length} registered students`);
-
-        const assignmentMode = getAssignmentMode(finalType);
-        const assignments = studentLinks.map((link) => ({
-          instructor_id: user.id,
-          student_id: link.student_id,
-          org_id: instructorOrgId,
-          course_id: course_id,
-          assignment_type: "lecture_checkin",
-          mode: assignmentMode,
-          title: "🎯 Live Lecture Question",
-          content: {
-            questions: [formattedQuestion],
-            isLive: true,
-            detectedAutomatically: true,
-            source: source,
-          },
-          completed: false,
-          auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        }));
-
-        const { error: assignmentError } = await supabase.from("student_assignments").insert(assignments);
-
-        if (assignmentError) {
-          console.error("❌ Failed to send to registered students:", assignmentError.message);
-        } else {
-          registeredStudentCount = studentLinks.length;
-          console.log(`✅ Sent to ${registeredStudentCount} registered students`);
-        }
-      }
-
       const processingTime = Date.now() - startTime;
 
       // Log success
       await supabase.from("question_send_logs").insert({
         instructor_id: user.id,
         success: true,
-        student_count: (participantCount || 0) + registeredStudentCount,
-        successful_sends: (participantCount || 0) + registeredStudentCount,
+        student_count: participantCount || 0,
+        successful_sends: participantCount || 0,
         failed_sends: 0,
         batch_count: 1,
         processing_time_ms: processingTime,
@@ -892,7 +824,6 @@ serve(async (req) => {
           liveMode: true,
           sessionCode: liveSession.session_code,
           participantCount: participantCount || 0,
-          registeredStudentCount,
           questionNumber,
           processingTime,
         }),
