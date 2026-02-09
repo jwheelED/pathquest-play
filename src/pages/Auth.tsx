@@ -24,17 +24,15 @@ export default function AuthPage() {
   const searchParams = new URLSearchParams(window.location.search);
   const redirectTo = searchParams.get("redirect");
 
-  // Check for recovery token in URL on mount
+  // Single consolidated auth state listener for recovery detection
   useEffect(() => {
+    // Check URL hash on mount for recovery token
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
-  }, []);
 
-  // Handle password recovery event from auth state change
-  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveryMode(true);
