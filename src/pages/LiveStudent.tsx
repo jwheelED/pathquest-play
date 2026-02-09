@@ -95,6 +95,24 @@ const LiveStudent = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
 
+  // Normalize question_content: slide questions nest data inside questions[0]
+  const normalizeQuestionContent = (qc: any): Question["question_content"] => {
+    // If question_content has a nested questions array (slide/format-and-send format),
+    // unwrap the first question and merge its fields to the top level
+    if (qc?.questions && Array.isArray(qc.questions) && qc.questions.length > 0) {
+      const inner = qc.questions[0];
+      return {
+        question: inner.question || inner.title || "",
+        options: inner.options || [],
+        correctAnswer: inner.correctAnswer || "",
+        type: inner.type || "short_answer",
+        language: inner.language,
+      };
+    }
+    // Already flat format
+    return qc;
+  };
+
   // Shared logic for processing an incoming question (used by both realtime and polling)
   const processIncomingQuestion = useCallback((question: Question) => {
     const isNewQuestion = currentQuestionIdRef.current !== question.id;
@@ -102,7 +120,12 @@ const LiveStudent = () => {
     const userIsInteracting = hasStartedAnsweringRef.current || isTypingRef.current;
 
     if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
-      setCurrentQuestion(question);
+      // Normalize nested question_content (from slide presenter / format-and-send)
+      const normalized: Question = {
+        ...question,
+        question_content: normalizeQuestionContent(question.question_content),
+      };
+      setCurrentQuestion(normalized);
       setSelectedAnswer("");
       setCodeAnswer("");
       setHasAnswered(false);
