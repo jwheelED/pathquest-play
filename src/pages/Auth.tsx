@@ -200,8 +200,13 @@ export default function AuthPage() {
         }
       } else {
         setSuccess("Signed in successfully!");
-        // Navigate based on user role
-        await navigateByRole(data.user.id);
+        // If there's a redirect (e.g. from live session), go there
+        if (redirectTo) {
+          navigate(redirectTo);
+        } else {
+          // Navigate based on user role
+          await navigateByRole(data.user.id);
+        }
       }
     }
   };
