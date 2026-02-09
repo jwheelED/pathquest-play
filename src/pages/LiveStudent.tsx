@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { trackQuestionAnswered } from "@/lib/posthogTracking";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Question {
   id: string;
@@ -90,10 +91,31 @@ const LiveStudent = () => {
     setExplanation("");
   }, [currentQuestion?.id]);
 
+  // Session ID resolved from session_code for realtime subscription
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+
+  // Shared logic for processing an incoming question (used by both realtime and polling)
+  const processIncomingQuestion = useCallback((question: Question) => {
+    const isNewQuestion = currentQuestionIdRef.current !== question.id;
+    const hasBeenAnswered = answeredQuestionsRef.current.has(question.id);
+    const userIsInteracting = hasStartedAnsweringRef.current || isTypingRef.current;
+
+    if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
+      setCurrentQuestion(question);
+      setSelectedAnswer("");
+      setCodeAnswer("");
+      setHasAnswered(false);
+      setIsCorrect(null);
+      setQuestionStartTime(Date.now());
+    }
+  }, []);
+
+  // On mount: validate participant, resolve session_id, fetch initial questions
   useEffect(() => {
     const storedParticipantId = localStorage.getItem("participantId");
     const storedNickname = localStorage.getItem("participantNickname");
-    
+
     if (!storedParticipantId) {
       toast.error("Please join the session first");
       navigate("/join");
@@ -103,62 +125,101 @@ const LiveStudent = () => {
     setParticipantId(storedParticipantId);
     setNickname(storedNickname || "");
 
-    // Start polling for questions
-    const pollInterval = setInterval(() => {
-      pollForQuestions();
-    }, 3000);
-
-    // Initial poll
-    pollForQuestions();
-
-    return () => clearInterval(pollInterval);
-  }, [sessionCode, navigate]);
-
-  const pollForQuestions = async () => {
     if (!sessionCode) return;
 
-    try {
-      const url = `https://otsmjgrhyteyvpufkwdh.supabase.co/functions/v1/get-live-question?sessionCode=${sessionCode}`;
-      const response = await fetch(url, {
-        headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90c21qZ3JoeXRleXZwdWZrd2RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3MTAwMjksImV4cCI6MjA2NTI4NjAyOX0.lECUFBdhoe2gxBJSvHSMlq1BGearE97kSOL-Pz8FZbw',
-        },
-      });
+    // Resolve session_code to session_id
+    const initSession = async () => {
+      const { data: session, error } = await supabase
+        .from("live_sessions")
+        .select("id, is_active")
+        .eq("session_code", sessionCode)
+        .maybeSingle();
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast.error("Session ended", {
-            description: "The live session has ended or is no longer active.",
-          });
-          setTimeout(() => navigate("/join"), 2000);
-        }
+      if (error || !session) {
+        toast.error("Session not found", {
+          description: "Check the code and try again.",
+        });
+        navigate("/join");
         return;
       }
 
-      const result = await response.json();
-      
-      if (result.questions && result.questions.length > 0) {
-        const latestQuestion = result.questions[0];
-        
-        // Use REFS instead of state (always current, no stale closure)
-        const isNewQuestion = currentQuestionIdRef.current !== latestQuestion.id;
-        const hasBeenAnswered = answeredQuestionsRef.current.has(latestQuestion.id);
-        const userIsInteracting = hasStartedAnsweringRef.current || isTypingRef.current;
-        
-        // Only update if: 1) NEW question 2) Not answered 3) User not interacting
-        if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
-          setCurrentQuestion(latestQuestion);
-          setSelectedAnswer("");
-          setCodeAnswer("");
-          setHasAnswered(false);
-          setIsCorrect(null);
-          setQuestionStartTime(Date.now());
-        }
+      if (!session.is_active) {
+        toast.error("Session ended", {
+          description: "The live session has ended or is no longer active.",
+        });
+        navigate("/join");
+        return;
       }
-    } catch (error) {
-      console.error("Error polling for questions:", error);
-    }
-  };
+
+      setSessionId(session.id);
+
+      // Fetch latest questions on initial load
+      const { data: questions } = await supabase
+        .from("live_questions")
+        .select("id, question_content, sent_at")
+        .eq("session_id", session.id)
+        .order("sent_at", { ascending: false })
+        .limit(5);
+
+      if (questions && questions.length > 0) {
+        const latestQuestion = questions[0] as unknown as Question;
+        processIncomingQuestion(latestQuestion);
+      }
+    };
+
+    initSession();
+  }, [sessionCode, navigate, processIncomingQuestion]);
+
+  // Subscribe to realtime INSERT events on live_questions for this session
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const channel = supabase
+      .channel(`live-questions-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_questions',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const newQuestion = payload.new as unknown as Question;
+          processIncomingQuestion(newQuestion);
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Live questions realtime subscription: ${status}`);
+      });
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      realtimeChannelRef.current = null;
+    };
+  }, [sessionId, processIncomingQuestion]);
+
+  // Fallback polling at reduced frequency (10s) in case realtime drops
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const pollInterval = setInterval(async () => {
+      const { data: questions } = await supabase
+        .from("live_questions")
+        .select("id, question_content, sent_at")
+        .eq("session_id", sessionId)
+        .order("sent_at", { ascending: false })
+        .limit(1);
+
+      if (questions && questions.length > 0) {
+        processIncomingQuestion(questions[0] as unknown as Question);
+      }
+    }, 10000);
+
+    return () => clearInterval(pollInterval);
+  }, [sessionId, processIncomingQuestion]);
 
   // Handle MCQ answer selection - show confidence selector
   const handleAnswerSelect = (answer: string) => {
