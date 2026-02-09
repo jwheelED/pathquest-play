@@ -768,10 +768,12 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    // If live session active, send to BOTH live_questions AND student_assignments
-    // This ensures anonymous participants AND registered students both receive questions
+    // If live session active, send to live_questions for anonymous participants
+    // Then ALSO fall through to send to student_assignments for registered students (dual delivery)
+    let liveQuestionNumber: number | null = null;
+    let liveParticipantCount = 0;
     if (liveSession) {
-      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using hybrid mode`);
+      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using dual delivery mode`);
 
       // Get question number for this session
       const { count: questionCount } = await supabase
@@ -779,19 +781,18 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("session_id", liveSession.id);
 
-      const questionNumber = (questionCount || 0) + 1;
+      liveQuestionNumber = (questionCount || 0) + 1;
 
       // Insert into live_questions for anonymous participants
       const { error: liveInsertError } = await supabase.from("live_questions").insert({
         session_id: liveSession.id,
         instructor_id: user.id,
         question_content: formattedQuestion,
-        question_number: questionNumber,
+        question_number: liveQuestionNumber,
       });
 
       if (liveInsertError) {
         console.error("❌ Failed to insert live question:", liveInsertError);
-        // Continue anyway - try to send to registered students
       }
 
       // Get participant count for logging
@@ -800,37 +801,9 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("session_id", liveSession.id);
 
-      console.log(`✅ Live question sent to ${participantCount || 0} anonymous participants`);
-
-      const processingTime = Date.now() - startTime;
-
-      // Log success
-      await supabase.from("question_send_logs").insert({
-        instructor_id: user.id,
-        success: true,
-        student_count: participantCount || 0,
-        successful_sends: participantCount || 0,
-        failed_sends: 0,
-        batch_count: 1,
-        processing_time_ms: processingTime,
-        question_text: questionPreview,
-        question_type: finalType,
-        source: source,
-      });
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          liveMode: true,
-          sessionCode: liveSession.session_code,
-          participantCount: participantCount || 0,
-          questionNumber,
-          processingTime,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      liveParticipantCount = participantCount || 0;
+      console.log(`✅ Live question sent to ${liveParticipantCount} anonymous participants`);
+      // Fall through to also send to student_assignments below
     }
 
     // No live session - use traditional student_assignments (authenticated users)
