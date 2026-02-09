@@ -21,6 +21,8 @@ export default function AuthPage() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const redirectTo = searchParams.get("redirect");
 
   // Check for recovery token in URL on mount
   useEffect(() => {
