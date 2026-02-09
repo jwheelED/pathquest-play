@@ -55,11 +55,30 @@ export default function AuthPage() {
       return;
     }
 
+    // Ensure we have a valid session before updating password
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (!currentSession) {
+      // Try refreshing the session first
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        setError("Your reset link has expired. Please request a new password reset.");
+        toast.error("Your reset link has expired. Please request a new password reset.");
+        setIsRecoveryMode(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     
     if (error) {
-      setError(error.message);
-      toast.error(error.message);
+      if (error.message.toLowerCase().includes('session') || error.message.toLowerCase().includes('token')) {
+        setError("Your reset link has expired. Please request a new password reset.");
+        toast.error("Your reset link has expired. Please request a new password reset.");
+        setIsRecoveryMode(false);
+      } else {
+        setError(error.message);
+        toast.error(error.message);
+      }
     } else {
       setSuccess("Password updated successfully!");
       toast.success("Password updated successfully! Please sign in.");
