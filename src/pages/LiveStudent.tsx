@@ -127,43 +127,41 @@ const LiveStudent = () => {
 
     if (!sessionCode) return;
 
-    // Resolve session_code to session_id
+    // Resolve session_code to session_id via edge function (bypasses RLS for anonymous users)
     const initSession = async () => {
-      const { data: session, error } = await supabase
-        .from("live_sessions")
-        .select("id, is_active")
-        .eq("session_code", sessionCode)
-        .maybeSingle();
-
-      if (error || !session) {
-        toast.error("Session not found", {
-          description: "Check the code and try again.",
+      try {
+        const { data, error } = await supabase.functions.invoke("resolve-live-session", {
+          body: { sessionCode },
         });
+
+        if (error || !data?.session) {
+          const errMsg = data?.error || "Session not found";
+          toast.error(errMsg, {
+            description: "Check the code and try again.",
+          });
+          navigate("/join");
+          return;
+        }
+
+        if (!data.session.is_active) {
+          toast.error("Session ended", {
+            description: "The live session has ended or is no longer active.",
+          });
+          navigate("/join");
+          return;
+        }
+
+        setSessionId(data.session.id);
+
+        // Process any existing questions
+        if (data.questions && data.questions.length > 0) {
+          const latestQuestion = data.questions[0] as unknown as Question;
+          processIncomingQuestion(latestQuestion);
+        }
+      } catch (err) {
+        console.error("Error initializing session:", err);
+        toast.error("Failed to connect to session");
         navigate("/join");
-        return;
-      }
-
-      if (!session.is_active) {
-        toast.error("Session ended", {
-          description: "The live session has ended or is no longer active.",
-        });
-        navigate("/join");
-        return;
-      }
-
-      setSessionId(session.id);
-
-      // Fetch latest questions on initial load
-      const { data: questions } = await supabase
-        .from("live_questions")
-        .select("id, question_content, sent_at")
-        .eq("session_id", session.id)
-        .order("sent_at", { ascending: false })
-        .limit(5);
-
-      if (questions && questions.length > 0) {
-        const latestQuestion = questions[0] as unknown as Question;
-        processIncomingQuestion(latestQuestion);
       }
     };
 
@@ -203,23 +201,24 @@ const LiveStudent = () => {
 
   // Fallback polling at reduced frequency (10s) in case realtime drops
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !sessionCode) return;
 
     const pollInterval = setInterval(async () => {
-      const { data: questions } = await supabase
-        .from("live_questions")
-        .select("id, question_content, sent_at")
-        .eq("session_id", sessionId)
-        .order("sent_at", { ascending: false })
-        .limit(1);
+      try {
+        const { data, error } = await supabase.functions.invoke("resolve-live-session", {
+          body: { sessionCode },
+        });
 
-      if (questions && questions.length > 0) {
-        processIncomingQuestion(questions[0] as unknown as Question);
+        if (!error && data?.questions?.length > 0) {
+          processIncomingQuestion(data.questions[0] as unknown as Question);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
       }
     }, 10000);
 
     return () => clearInterval(pollInterval);
-  }, [sessionId, processIncomingQuestion]);
+  }, [sessionId, sessionCode, processIncomingQuestion]);
 
   // Handle MCQ answer selection - show confidence selector
   const handleAnswerSelect = (answer: string) => {
