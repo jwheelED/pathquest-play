@@ -139,14 +139,14 @@ export function SlideQuestionPreviewDialog({
       editedData.mcq = {
         question: mcqQuestion,
         options: mcqOptions,
-        correct_answer: isPollMode ? '' : mcqCorrectAnswer,
+        correct_answer: mcqCorrectAnswer,
         explanation: mcqExplanation,
         isPoll: isPollMode,
       };
     } else if (questionType === 'short_answer') {
       editedData.short_answer = {
         question: saQuestion,
-        expected_answer: isPollMode ? '' : saExpectedAnswer,
+        expected_answer: saExpectedAnswer,
         explanation: saExplanation,
         isPoll: isPollMode,
       };

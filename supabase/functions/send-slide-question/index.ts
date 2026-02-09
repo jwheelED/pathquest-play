@@ -85,7 +85,7 @@ serve(async (req) => {
         question: questionData.question || '',
         type: "multiple_choice",
         options: questionData.options || [],
-        correctAnswer: isPollMode ? '' : (questionData.correct_answer || questionData.correctAnswer || 'A'),
+        correctAnswer: questionData.correct_answer || questionData.correctAnswer || 'A',
         explanation: questionData.explanation || "",
         isPoll: isPollMode,
       };
@@ -93,7 +93,7 @@ serve(async (req) => {
       formattedQuestion = {
         question: questionData.question || '',
         type: "short_answer",
-        expectedAnswer: isPollMode ? '' : (questionData.expected_answer || questionData.expectedAnswer || ""),
+        expectedAnswer: questionData.expected_answer || questionData.expectedAnswer || "",
         gradingMode: isPollMode ? "poll" : "manual_grade",
         isPoll: isPollMode,
       };
