@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,29 +19,11 @@ export default function AuthPage() {
   const [session, setSession] = useState(null);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const isRecoveryModeRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
   const redirectTo = searchParams.get("redirect");
-
-  // Single consolidated auth state listener for recovery detection
-  useEffect(() => {
-    // Check URL hash on mount for recovery token
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    if (hashParams.get('type') === 'recovery') {
-      setIsRecoveryMode(true);
-      toast.info("Please enter your new password");
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveryMode(true);
-        toast.info("Please enter your new password");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const handlePasswordUpdate = async () => {
     setError("");
