@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,29 +19,11 @@ export default function AuthPage() {
   const [session, setSession] = useState(null);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const isRecoveryModeRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
   const redirectTo = searchParams.get("redirect");
-
-  // Single consolidated auth state listener for recovery detection
-  useEffect(() => {
-    // Check URL hash on mount for recovery token
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    if (hashParams.get('type') === 'recovery') {
-      setIsRecoveryMode(true);
-      toast.info("Please enter your new password");
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveryMode(true);
-        toast.info("Please enter your new password");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const handlePasswordUpdate = async () => {
     setError("");
@@ -238,24 +220,27 @@ export default function AuthPage() {
     setSession(null);
   };
 
-  const fetchSession = async () => {
-    const { data, error } = await supabase.auth.getSession();
-    if (!error) {
-      setSession(data.session);
-    }
-  };
-
+  // Single consolidated auth lifecycle effect
   useEffect(() => {
-    // Skip session handling if in recovery mode
-    if (isRecoveryMode) {
-      return;
+    // Check URL hash on mount for recovery token (synchronous)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
     }
 
-    fetchSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle recovery FIRST, before any navigation logic
+      if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+        return;
+      }
 
-    const {data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Skip if in recovery mode or if this is a password recovery event
-      if (isRecoveryMode || event === 'PASSWORD_RECOVERY') {
+      // If in recovery mode, suppress all navigation/session logic
+      if (isRecoveryModeRef.current) {
         return;
       }
 
@@ -275,7 +260,7 @@ export default function AuthPage() {
             await supabase.from("profiles").upsert({
               id: session.user.id,
               full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-              onboarded: true, // All students are onboarded immediately
+              onboarded: true,
             });
 
             // Create user stats
@@ -286,7 +271,6 @@ export default function AuthPage() {
               // Errors are OK here - record might already exist
             });
           } else if (!profile.onboarded) {
-            // Mark existing users as onboarded
             await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
           }
 
@@ -300,7 +284,7 @@ export default function AuthPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode]);
+  }, [navigate]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
