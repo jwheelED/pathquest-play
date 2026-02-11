@@ -219,7 +219,8 @@ CRITICAL REQUIREMENTS:
 4. Provide at least 2 examples with clear explanations
 5. Include 2-3 hints that reference lecture concepts
 6. Starter code should match the detected language syntax
-7. Problem should be solvable based on lecture content`;
+7. Problem should be solvable based on lecture content
+8. GROUNDING: The problem MUST be based on concepts from the lecture context above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
 
   // Add timeout handling (30 seconds)
   const controller = new AbortController();
