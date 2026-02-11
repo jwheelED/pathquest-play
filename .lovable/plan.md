@@ -1,57 +1,88 @@
 
 
-## Fix: Password Reset "Auth Session Missing" Error
+## Plan: Add Relevance Guardrails to Auto-Generated Questions
 
-### Diagnosis
+### Problem
 
-The auth logs reveal the exact sequence of events:
+During a pilot lecture, questions 4, 5, and 6 were completely unrelated to the lecture material (e.g., "Which of the following is not a valid JSON data type?" during a non-JSON lecture). The AI is generating generic CS trivia instead of questions grounded in the actual transcript content.
 
-1. Recovery email is sent successfully (status 200 on `/recover`)
-2. User clicks the link, Supabase verifies the token and exchanges it for a session (status 303 on `/verify`, login event fires)
-3. **Problem**: The second `useEffect` (line 248) has its own `onAuthStateChange` listener that races against the first one. When the recovery token exchange creates a session, this second listener fires with a `SIGNED_IN` event, sees a valid session, and immediately calls `navigateByRole()` -- redirecting the user away from the password reset form before they can use it. This also causes `fetchSession()` to set `session` state, which renders the "You are signed in" view instead of the recovery form.
+### Root Cause
 
-The `isRecoveryMode` guard on line 250 doesn't help because React state updates are asynchronous -- by the time the first `useEffect` sets `isRecoveryMode = true`, the second `useEffect` has already captured the stale `false` value in its closure and proceeds with navigation.
+The `generate-interval-question` edge function has no relevance enforcement:
 
-Additionally, the logs show repeated "One-time token not found" errors, indicating the token is consumed on the first request but subsequent requests (from email client link previews or re-renders) fail.
-
-### Root Cause Summary
-
-Two competing `onAuthStateChange` subscriptions create a race condition where the navigation listener wins before the recovery listener can suppress it.
+1. **Weak prompt grounding** -- The AI is told to "generate a question from this lecture content" but is never told it MUST NOT use outside knowledge or fabricate topics not mentioned in the transcript.
+2. **No confidence threshold** -- The AI returns a `confidence` score (0-1), but it is passed through without any validation. Even a 0.1 confidence question gets sent to students.
+3. **No relevance validation** -- There is no second check to verify the generated question actually relates to transcript keywords or the course context.
+4. **Course context underutilized** -- The `course_context` (course title, topics) is included as a footnote but not used as a constraint to reject off-topic output.
 
 ### Solution
 
-Merge both `useEffect` hooks into a single consolidated auth state handler that:
-1. Detects `PASSWORD_RECOVERY` event FIRST and sets recovery mode
-2. Only runs session/navigation logic when NOT in recovery mode
-3. Uses a mutable ref (not state) for the recovery flag so the check is instant, not subject to React's async state batching
+Add a multi-layer relevance enforcement system:
+
+#### Layer 1: Stronger Prompt Grounding (Primary Fix)
+In `generate-interval-question/index.ts`, add explicit anti-hallucination instructions to the system prompt:
+
+- "You MUST ONLY generate questions about topics explicitly mentioned in the transcript"
+- "NEVER use your general knowledge to create questions about topics not discussed"
+- "If the transcript doesn't contain enough substantive content, return a confidence of 0.0"
+- Include the course title/topics as a constraint: "This is a [Course Title] class -- only generate questions relevant to this subject"
+
+#### Layer 2: Confidence-Based Rejection
+After the AI responds, check the `confidence` field. If confidence is below 0.6, reject the question and use a generic fallback instead of sending an irrelevant question. This catches cases where the AI itself signals low confidence.
+
+#### Layer 3: Keyword Overlap Validation
+Add a lightweight relevance check that compares significant words from the generated question against the transcript. If the question introduces multiple concepts that don't appear anywhere in the transcript (e.g., "JSON" when the transcript never mentions JSON), reject it.
+
+- Extract non-stopword nouns/terms from the question
+- Check how many appear in the transcript
+- If fewer than 30% of the question's key terms appear in the transcript, flag as irrelevant and use fallback
+
+#### Layer 4: Apply Same Fix to Voice Command Questions
+The `extract-voice-command-question` function doesn't have this problem (it extracts directly from speech), but the `format-and-send-question` function's MCQ/coding generators should also get the anti-hallucination prompt additions since they take the extracted question and may embellish it.
 
 ### Changes
 
-**`src/pages/Auth.tsx`** -- Rewrite auth lifecycle:
+#### File 1: `supabase/functions/generate-interval-question/index.ts`
+- Enhance system prompt with strict grounding rules and anti-hallucination instructions
+- Add course context as a constraint (not just a hint)
+- Add confidence threshold check (reject < 0.6)
+- Add keyword overlap validation function
+- Return `relevance_rejected: true` when a question fails validation so the client knows what happened
 
-- Add a `useRef(false)` for `isRecoveryModeRef` alongside the existing state, so the flag can be checked synchronously inside the listener callback
-- Merge the two `useEffect` hooks into one that:
-  - Checks URL hash for `type=recovery` on mount, sets both ref and state
-  - Sets up a single `onAuthStateChange` that handles `PASSWORD_RECOVERY` by setting the ref+state and returning early
-  - For all other events, checks the ref (not state) before proceeding with session/navigation logic
-- Remove the separate `fetchSession()` call -- instead handle initial session inside the same listener using Supabase's `INITIAL_SESSION` event
-- In the render, use `isRecoveryMode` state (not ref) for UI display since React needs state for re-renders
+#### File 2: `supabase/functions/format-and-send-question/index.ts`
+- Add grounding instructions to `generateMCQ()` and `generateCodingQuestion()` prompts: "Options and distractors MUST relate to the lecture content provided, not general knowledge"
+- Pass course context more prominently in the prompt
 
-### Technical Detail
+### Technical Details
 
+**Keyword overlap validation (pseudocode):**
 ```text
-Before (two competing effects):
-
-  useEffect #1 (line 28):  detects recovery --> sets state (async)
-  useEffect #2 (line 248): checks state (stale!) --> navigates away
-
-After (single effect with ref):
-
-  useEffect (merged):
-    1. Check hash for recovery --> set ref immediately
-    2. onAuthStateChange:
-       - PASSWORD_RECOVERY? --> set ref, set state, return
-       - ref is true? --> skip navigation
-       - otherwise --> normal session/navigation logic
+function checkRelevance(questionText, transcript):
+    stopwords = {the, a, an, is, are, of, in, to, for, ...}
+    questionTerms = unique words from questionText, length > 3, not in stopwords
+    transcriptLower = transcript.toLowerCase()
+    
+    matches = count of questionTerms found in transcriptLower
+    ratio = matches / questionTerms.length
+    
+    if ratio < 0.3 and questionTerms.length >= 3:
+        return { relevant: false, reason: "Question introduces terms not in transcript" }
+    return { relevant: true }
 ```
+
+**Enhanced system prompt addition:**
+```text
+CRITICAL GROUNDING RULES:
+- You MUST ONLY ask about concepts, terms, and ideas that appear in the transcript
+- NEVER generate questions about topics not explicitly discussed (e.g., don't ask about JSON if JSON was never mentioned)
+- If the transcript is unclear or lacks substantive content, set confidence to 0.0
+- Every key term in your question MUST trace back to something said in the lecture
+```
+
+### What This Prevents
+
+- Questions about JSON in a non-JSON lecture
+- Questions about "long-interval check-in instructions" (the AI was reading its own system prompt context as lecture content)
+- Generic CS trivia questions when transcript quality is low
+- Any question where the AI uses general knowledge instead of transcript content
 
