@@ -62,6 +62,11 @@ FORMATTING RULES:
 
 Context from lecture: "${context}"${courseInfo}${mathGuidance}
 
+GROUNDING RULES:
+- All options and distractors MUST relate to the lecture content provided above, NOT general knowledge.
+- Do NOT introduce concepts, terms, or topics that were not mentioned in the lecture context.
+- Every option should be plausible based on what was actually taught.
+
 Generate a multiple choice question with 4 options:
 - One correct answer
 - Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""}${isMathQuestion ? " and typical calculation errors" : ""}
@@ -97,7 +102,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
           {
             role: "system",
             content:
-              "You are an educational AI that creates high-quality multiple choice questions. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates high-quality multiple choice questions grounded strictly in the provided lecture content. You MUST NOT use general knowledge or introduce topics not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
@@ -214,7 +219,8 @@ CRITICAL REQUIREMENTS:
 4. Provide at least 2 examples with clear explanations
 5. Include 2-3 hints that reference lecture concepts
 6. Starter code should match the detected language syntax
-7. Problem should be solvable based on lecture content`;
+7. Problem should be solvable based on lecture content
+8. GROUNDING: The problem MUST be based on concepts from the lecture context above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
 
   // Add timeout handling (30 seconds)
   const controller = new AbortController();
@@ -233,7 +239,7 @@ CRITICAL REQUIREMENTS:
           {
             role: "system",
             content:
-              "You are an educational AI that creates coding challenges for students. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
