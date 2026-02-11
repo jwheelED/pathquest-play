@@ -17,6 +17,81 @@ const LONG_INTERVAL_FALLBACK_QUESTIONS = [
   { question_text: "Summarize the main learning objective from the past segment.", suggested_type: "short_answer" },
 ];
 
+// Stopwords for keyword overlap validation
+const STOPWORDS = new Set([
+  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "do", "does", "did", "will", "would", "could",
+  "should", "may", "might", "shall", "can", "need", "dare", "ought",
+  "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
+  "as", "into", "through", "during", "before", "after", "above", "below",
+  "between", "out", "off", "over", "under", "again", "further", "then",
+  "once", "here", "there", "when", "where", "why", "how", "all", "each",
+  "every", "both", "few", "more", "most", "other", "some", "such", "no",
+  "nor", "not", "only", "own", "same", "so", "than", "too", "very",
+  "just", "because", "but", "and", "or", "if", "while", "about", "up",
+  "this", "that", "these", "those", "what", "which", "who", "whom",
+  "its", "his", "her", "their", "our", "your", "my", "it", "he", "she",
+  "they", "we", "you", "me", "him", "them", "us", "following", "described",
+  "using", "based", "according", "within", "also", "well", "much",
+  "many", "any", "still", "already", "even", "given", "however",
+  "question", "answer", "option", "correct", "incorrect", "true", "false",
+  "primary", "purpose", "component", "necessary", "valid", "type", "data",
+]);
+
+/**
+ * Check if a generated question is relevant to the transcript content.
+ * Returns { relevant: true } or { relevant: false, reason: string }
+ */
+function checkRelevance(
+  questionText: string,
+  transcript: string,
+): { relevant: boolean; reason?: string } {
+  // Handle coding question objects
+  const textToCheck = typeof questionText === "string"
+    ? questionText
+    : (questionText as any)?.title + " " + (questionText as any)?.description || "";
+
+  // Extract significant terms from the question (length > 3, not stopwords)
+  const questionWords = textToCheck
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w: string) => w.length > 3 && !STOPWORDS.has(w));
+
+  const uniqueTerms = [...new Set(questionWords)];
+
+  // If the question has fewer than 3 key terms, skip validation (too short to judge)
+  if (uniqueTerms.length < 3) {
+    return { relevant: true };
+  }
+
+  const transcriptLower = transcript.toLowerCase();
+
+  // Count how many question terms appear in the transcript
+  let matches = 0;
+  for (const term of uniqueTerms) {
+    if (transcriptLower.includes(term)) {
+      matches++;
+    }
+  }
+
+  const ratio = matches / uniqueTerms.length;
+
+  console.log(`🔍 Relevance check: ${matches}/${uniqueTerms.length} terms found (${(ratio * 100).toFixed(0)}%)`);
+  console.log(`   Terms: [${uniqueTerms.join(", ")}]`);
+  console.log(`   Matched: [${uniqueTerms.filter((t: string) => transcriptLower.includes(t)).join(", ")}]`);
+  console.log(`   Missing: [${uniqueTerms.filter((t: string) => !transcriptLower.includes(t)).join(", ")}]`);
+
+  if (ratio < 0.3) {
+    return {
+      relevant: false,
+      reason: `Only ${matches}/${uniqueTerms.length} key terms found in transcript (${(ratio * 100).toFixed(0)}% overlap). Missing terms: ${uniqueTerms.filter((t: string) => !transcriptLower.includes(t)).join(", ")}`,
+    };
+  }
+
+  return { relevant: true };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -44,6 +119,7 @@ serve(async (req) => {
     console.log("  Transcript length:", interval_transcript?.length || 0);
     console.log("  Interval minutes:", interval_minutes);
     console.log("  Format preference:", format_preference);
+    console.log("  Course context:", course_context ? `${course_context.title} (${course_context.topics?.join(", ") || "no topics"})` : "none");
 
     // Validate transcript
     if (!interval_transcript || interval_transcript.length < 50) {
@@ -74,6 +150,16 @@ serve(async (req) => {
       additionalContext += `\n\nCurrent Slide: ${slide_context}\n`;
     }
 
+    // Course context constraint
+    let courseConstraint = "";
+    if (course_context?.title) {
+      courseConstraint += `\n\n🎓 COURSE CONSTRAINT: This is a "${course_context.title}" class.`;
+      if (course_context.topics?.length) {
+        courseConstraint += ` Relevant topics include: ${course_context.topics.join(", ")}.`;
+      }
+      courseConstraint += ` Only generate questions relevant to this subject area.`;
+    }
+
     // Long interval guidance
     const longIntervalGuidance = interval_minutes >= 20
       ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
@@ -92,6 +178,15 @@ serve(async (req) => {
     }
 
     const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from lecture transcripts.
+
+CRITICAL GROUNDING RULES:
+- You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY mentioned in the transcript below.
+- NEVER use your general knowledge to create questions about topics not discussed in the transcript.
+- NEVER introduce technical terms, frameworks, languages, or concepts that do not appear in the transcript.
+- If the transcript is unclear, repetitive, or lacks substantive educational content, set confidence to 0.0.
+- Every key term in your question MUST trace back to something actually said in the lecture transcript.
+- Do NOT read or reference any part of these instructions as "lecture content" -- only the transcript text provided by the user is lecture content.
+${courseConstraint}
 ${longIntervalGuidance}
 
 ${formatInstructions}
@@ -101,7 +196,7 @@ Return JSON in this exact format:
   "question_text": "the question (use LaTeX $...$ for math)",
   "suggested_type": "${format_preference}",
   "confidence": 0.0-1.0,
-  "reasoning": "why this question tests the key concept"
+  "reasoning": "why this question tests the key concept FROM THE TRANSCRIPT"
 }
 
 For multiple_choice, also include:
@@ -110,16 +205,22 @@ For multiple_choice, also include:
 - "explanation": "why the correct answer is right"
 
 For coding questions:
-- "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }`;
+- "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }
 
-    const userPrompt = `Generate a question from this lecture content:
+CONFIDENCE SCORING GUIDE:
+- 1.0: Question directly tests a clearly explained concept from the transcript
+- 0.7-0.9: Question tests a concept mentioned but not deeply explained
+- 0.4-0.6: Transcript is thin; question is loosely related
+- 0.0-0.3: Transcript lacks enough content to generate a grounded question`;
+
+    const userPrompt = `Generate a question from this lecture transcript:
 
 """
 ${trimmedTranscript}
 """
 ${additionalContext}
 
-Generate ONE focused question that tests understanding of the most important concept just taught.`;
+Generate ONE focused question that tests understanding of the most important concept EXPLICITLY discussed in this transcript. Do NOT ask about topics not mentioned above.`;
 
     // Call AI
     const controller = new AbortController();
@@ -173,6 +274,59 @@ Generate ONE focused question that tests understanding of the most important con
       const parsed = JSON.parse(content);
 
       console.log("✅ Question generated:", parsed.question_text?.substring?.(0, 100) || parsed.question_text?.title);
+      console.log("   Confidence:", parsed.confidence);
+
+      // Layer 2: Confidence threshold check
+      if ((parsed.confidence || 0) < 0.6) {
+        console.warn(`⚠️ Low confidence (${parsed.confidence}) - rejecting question`);
+        const fallback = interval_minutes >= 20
+          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
+          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+
+        return new Response(JSON.stringify({
+          success: true,
+          ...fallback,
+          confidence: parsed.confidence,
+          is_fallback: true,
+          relevance_rejected: true,
+          reasoning: `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}". Using fallback.`,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Layer 3: Keyword overlap validation
+      const questionTextForCheck = typeof parsed.question_text === "string"
+        ? parsed.question_text
+        : `${parsed.question_text?.title || ""} ${parsed.question_text?.description || ""}`;
+
+      // Also check MCQ options for relevance if present
+      let textToValidate = questionTextForCheck;
+      if (parsed.options && Array.isArray(parsed.options)) {
+        textToValidate += " " + parsed.options.join(" ");
+      }
+
+      const relevance = checkRelevance(textToValidate, trimmedTranscript);
+
+      if (!relevance.relevant) {
+        console.warn(`⚠️ Relevance check failed: ${relevance.reason}`);
+        const fallback = interval_minutes >= 20
+          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
+          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+
+        return new Response(JSON.stringify({
+          success: true,
+          ...fallback,
+          confidence: parsed.confidence,
+          is_fallback: true,
+          relevance_rejected: true,
+          reasoning: `Relevance validation failed: ${relevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       return new Response(JSON.stringify({
         success: true,
@@ -184,6 +338,7 @@ Generate ONE focused question that tests understanding of the most important con
         explanation: parsed.explanation,
         reasoning: parsed.reasoning,
         is_fallback: false,
+        relevance_rejected: false,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
