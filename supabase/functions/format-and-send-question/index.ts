@@ -239,7 +239,7 @@ CRITICAL REQUIREMENTS:
           {
             role: "system",
             content:
-              "You are an educational AI that creates coding challenges for students. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
