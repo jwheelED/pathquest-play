@@ -102,7 +102,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
           {
             role: "system",
             content:
-              "You are an educational AI that creates high-quality multiple choice questions. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates high-quality multiple choice questions grounded strictly in the provided lecture content. You MUST NOT use general knowledge or introduce topics not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
