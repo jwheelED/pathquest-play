@@ -62,6 +62,11 @@ FORMATTING RULES:
 
 Context from lecture: "${context}"${courseInfo}${mathGuidance}
 
+GROUNDING RULES:
+- All options and distractors MUST relate to the lecture content provided above, NOT general knowledge.
+- Do NOT introduce concepts, terms, or topics that were not mentioned in the lecture context.
+- Every option should be plausible based on what was actually taught.
+
 Generate a multiple choice question with 4 options:
 - One correct answer
 - Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""}${isMathQuestion ? " and typical calculation errors" : ""}
