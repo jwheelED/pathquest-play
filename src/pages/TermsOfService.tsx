@@ -36,7 +36,9 @@ const TermsOfService = () => {
         <Card className="mb-8">
           <CardContent className="pt-6">
             <p className="text-muted-foreground leading-relaxed">
-              Welcome to Edvana. These Terms of Service ("Terms") govern your access to and use of the Edvana platform, including our website, applications, and services (collectively, the "Service"). By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, please do not use the Service.
+              Welcome to Edvana. These Terms of Service ("Terms") govern your access to and use of the Edvana platform,
+              including our website, applications, and services (collectively, the "Service"). By accessing or using the
+              Service, you agree to be bound by these Terms. If you do not agree, please do not use the Service.
             </p>
           </CardContent>
         </Card>
@@ -45,7 +47,11 @@ const TermsOfService = () => {
           <AccordionItem value="acceptance" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">1. Acceptance of Terms</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
-              <p>By creating an account or using Edvana, you confirm that you are at least 18 years old (or the age of majority in your jurisdiction) or have parental/guardian consent. If you are using the Service on behalf of an institution, you represent that you have authority to bind that institution to these Terms.</p>
+              <p>
+                By creating an account or using Edvana, you confirm that you are at least 18 years old (or the age of
+                majority in your jurisdiction) or have parental/guardian consent. If you are using the Service on behalf
+                of an institution, you represent that you have authority to bind that institution to these Terms.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
@@ -61,7 +67,10 @@ const TermsOfService = () => {
                 <li>Study material management</li>
                 <li>Instructor dashboards and student engagement tools</li>
               </ul>
-              <p className="mt-4">We reserve the right to modify, suspend, or discontinue any part of the Service at any time with reasonable notice.</p>
+              <p className="mt-4">
+                We reserve the right to modify, suspend, or discontinue any part of the Service at any time with
+                reasonable notice.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
@@ -70,15 +79,24 @@ const TermsOfService = () => {
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
               <div>
                 <h4 className="font-medium text-foreground mb-2">Account Creation</h4>
-                <p>You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account credentials.</p>
+                <p>
+                  You must provide accurate and complete information when creating an account. You are responsible for
+                  maintaining the security of your account credentials.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Account Security</h4>
-                <p>You are responsible for all activities that occur under your account. Notify us immediately if you suspect unauthorized access to your account.</p>
+                <p>
+                  You are responsible for all activities that occur under your account. Notify us immediately if you
+                  suspect unauthorized access to your account.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">One Account Per Person</h4>
-                <p>Each user may only maintain one account. Creating multiple accounts to circumvent restrictions or for any deceptive purpose is prohibited.</p>
+                <p>
+                  Each user may only maintain one account. Creating multiple accounts to circumvent restrictions or for
+                  any deceptive purpose is prohibited.
+                </p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -89,7 +107,9 @@ const TermsOfService = () => {
               <div>
                 <h4 className="font-medium text-foreground mb-2">Students</h4>
                 <ul className="list-disc pl-6 space-y-1">
-                  <li>Use the platform honestly and in accordance with your institution's academic integrity policies</li>
+                  <li>
+                    Use the platform honestly and in accordance with your institution's academic integrity policies
+                  </li>
                   <li>Submit only your own work</li>
                   <li>Respect the learning environment and other users</li>
                 </ul>
@@ -137,15 +157,26 @@ const TermsOfService = () => {
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
               <div>
                 <h4 className="font-medium text-foreground mb-2">Edvana's Rights</h4>
-                <p>The Service, including its design, features, and content created by Edvana, is protected by intellectual property laws. You may not copy, modify, or distribute our proprietary materials without permission.</p>
+                <p>
+                  The Service, including its design, features, and content created by Edvana, is protected by
+                  intellectual property laws. You may not copy, modify, or distribute our proprietary materials without
+                  permission.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Your Content</h4>
-                <p>You retain ownership of content you upload to Edvana (such as lecture materials, study guides, and answer keys). By uploading content, you grant Edvana a limited license to process, store, and display that content to provide the Service.</p>
+                <p>
+                  You retain ownership of content you upload to Edvana (such as lecture materials, study guides, and
+                  answer keys). By uploading content, you grant Edvana a limited license to process, store, and display
+                  that content to provide the Service.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">AI-Generated Content</h4>
-                <p>Questions, explanations, and other content generated by our AI based on your inputs may be used freely within the platform. We do not claim ownership of AI-generated educational content.</p>
+                <p>
+                  Questions, explanations, and other content generated by our AI based on your inputs may be used freely
+                  within the platform. We do not claim ownership of AI-generated educational content.
+                </p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -155,19 +186,31 @@ const TermsOfService = () => {
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
               <div>
                 <h4 className="font-medium text-foreground mb-2">Free Tier</h4>
-                <p>Edvana offers a free tier with limited features. Usage limits and available features are subject to change.</p>
+                <p>
+                  Edvana offers a free tier with limited features. Usage limits and available features are subject to
+                  change.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Paid Subscriptions</h4>
-                <p>Paid plans provide additional features and capacity. Subscription fees are billed in advance and are non-refundable except as required by law or as specified in our refund policy.</p>
+                <p>
+                  Paid plans provide additional features and capacity. Subscription fees are billed in advance and are
+                  non-refundable except as required by law or as specified in our refund policy.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Institutional Licensing</h4>
-                <p>Institutions may enter into separate licensing agreements. Contact us for enterprise pricing and terms.</p>
+                <p>
+                  Institutions may enter into separate licensing agreements. Contact us for enterprise pricing and
+                  terms.
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Cancellation</h4>
-                <p>You may cancel your subscription at any time. Cancellation takes effect at the end of your current billing period.</p>
+                <p>
+                  You may cancel your subscription at any time. Cancellation takes effect at the end of your current
+                  billing period.
+                </p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -175,27 +218,38 @@ const TermsOfService = () => {
           <AccordionItem value="disclaimers" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">8. Disclaimers</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
-              <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED. WE DO NOT WARRANT THAT:</p>
+              <p>
+                THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED.
+                WE DO NOT WARRANT THAT:
+              </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>The Service will be uninterrupted, error-free, or secure</li>
                 <li>AI-generated content will be accurate or appropriate for all purposes</li>
                 <li>Using the Service will result in specific educational outcomes</li>
                 <li>The Service will meet all of your requirements</li>
               </ul>
-              <p className="mt-4">Edvana is a supplementary educational tool. It is not a substitute for professional instruction, and we do not guarantee academic success.</p>
+              <p className="mt-4">
+                Edvana is a supplementary educational tool. It is not a substitute for professional instruction, and we
+                do not guarantee academic success.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="liability" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">9. Limitation of Liability</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
-              <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, EDVANA AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AGENTS SHALL NOT BE LIABLE FOR:</p>
+              <p>
+                TO THE MAXIMUM EXTENT PERMITTED BY LAW, EDVANA AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AGENTS SHALL
+                NOT BE LIABLE FOR:
+              </p>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Any indirect, incidental, special, consequential, or punitive damages</li>
                 <li>Loss of profits, data, or goodwill</li>
                 <li>Any damages exceeding the amount you paid to Edvana in the 12 months prior to the claim</li>
               </ul>
-              <p className="mt-4">Some jurisdictions do not allow limitation of liability, so these limitations may not apply to you.</p>
+              <p className="mt-4">
+                Some jurisdictions do not allow limitation of liability, so these limitations may not apply to you.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
@@ -208,11 +262,17 @@ const TermsOfService = () => {
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Termination by Us</h4>
-                <p>We may suspend or terminate your account if you violate these Terms, engage in fraudulent activity, or for any other reason with reasonable notice (except in cases of severe violations).</p>
+                <p>
+                  We may suspend or terminate your account if you violate these Terms, engage in fraudulent activity, or
+                  for any other reason with reasonable notice (except in cases of severe violations).
+                </p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground mb-2">Effect of Termination</h4>
-                <p>Upon termination, your right to use the Service ends immediately. We may delete your data in accordance with our Privacy Policy.</p>
+                <p>
+                  Upon termination, your right to use the Service ends immediately. We may delete your data in
+                  accordance with our Privacy Policy.
+                </p>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -220,17 +280,33 @@ const TermsOfService = () => {
           <AccordionItem value="governing-law" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">11. Governing Law and Disputes</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
-              <p>These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict of law principles.</p>
-              <p className="mt-2">Any disputes arising from these Terms or the Service shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association, except that you may bring claims in small claims court if eligible.</p>
-              <p className="mt-2">You agree to waive any right to participate in class action lawsuits against Edvana.</p>
+              <p>
+                These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict
+                of law principles.
+              </p>
+              <p className="mt-2">
+                Any disputes arising from these Terms or the Service shall be resolved through binding arbitration in
+                accordance with the rules of the American Arbitration Association, except that you may bring claims in
+                small claims court if eligible.
+              </p>
+              <p className="mt-2">
+                You agree to waive any right to participate in class action lawsuits against Edvana.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="changes" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">12. Changes to These Terms</AccordionTrigger>
             <AccordionContent className="text-muted-foreground space-y-4 pb-4">
-              <p>We may update these Terms from time to time. We will notify you of material changes by posting the updated Terms and updating the "Last updated" date. For significant changes, we may also notify you via email or through the Service.</p>
-              <p className="mt-2">Your continued use of the Service after changes take effect constitutes your acceptance of the revised Terms.</p>
+              <p>
+                We may update these Terms from time to time. We will notify you of material changes by posting the
+                updated Terms and updating the "Last updated" date. For significant changes, we may also notify you via
+                email or through the Service.
+              </p>
+              <p className="mt-2">
+                Your continued use of the Service after changes take effect constitutes your acceptance of the revised
+                Terms.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
@@ -240,7 +316,7 @@ const TermsOfService = () => {
               <p>If you have questions about these Terms, please contact us at:</p>
               <div className="bg-muted/50 rounded-lg p-4 mt-2">
                 <p className="font-medium text-foreground">Edvana Legal Team</p>
-                <p>Email: legal@edvana.io</p>
+                <p>Email: Nigel@Edvana.dev</p>
               </div>
             </AccordionContent>
           </AccordionItem>
