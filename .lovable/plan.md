@@ -1,88 +1,74 @@
 
 
-## Plan: Add Relevance Guardrails to Auto-Generated Questions
+## Plan: Make Material Content Actually Reach the AI
 
 ### Problem
 
-During a pilot lecture, questions 4, 5, and 6 were completely unrelated to the lecture material (e.g., "Which of the following is not a valid JSON data type?" during a non-JSON lecture). The AI is generating generic CS trivia instead of questions grounded in the actual transcript content.
+The system is **already wired** to pass uploaded materials to the AI, but it silently fails at two points:
 
-### Root Cause
-
-The `generate-interval-question` edge function has no relevance enforcement:
-
-1. **Weak prompt grounding** -- The AI is told to "generate a question from this lecture content" but is never told it MUST NOT use outside knowledge or fabricate topics not mentioned in the transcript.
-2. **No confidence threshold** -- The AI returns a `confidence` score (0-1), but it is passed through without any validation. Even a 0.1 confidence question gets sent to students.
-3. **No relevance validation** -- There is no second check to verify the generated question actually relates to transcript keywords or the course context.
-4. **Course context underutilized** -- The `course_context` (course title, topics) is included as a footnote but not used as a constraint to reject off-topic output.
+1. **Missing edge function**: `parse-lecture-material` doesn't exist. The client calls it to extract text from PDFs, gets an error, catches it silently, and sends an empty `materialContext` to the AI.
+2. **course_id filter mismatch**: The materials query filters by `course_id`, but the uploaded materials have `course_id = NULL`, so they get excluded when a course is selected.
 
 ### Solution
 
-Add a multi-layer relevance enforcement system:
+#### Part 1: Create `parse-lecture-material` Edge Function
 
-#### Layer 1: Stronger Prompt Grounding (Primary Fix)
-In `generate-interval-question/index.ts`, add explicit anti-hallucination instructions to the system prompt:
+Create a new edge function at `supabase/functions/parse-lecture-material/index.ts` that:
 
-- "You MUST ONLY generate questions about topics explicitly mentioned in the transcript"
-- "NEVER use your general knowledge to create questions about topics not discussed"
-- "If the transcript doesn't contain enough substantive content, return a confidence of 0.0"
-- Include the course title/topics as a constraint: "This is a [Course Title] class -- only generate questions relevant to this subject"
+- Receives a `filePath` (the Supabase Storage path of the uploaded file)
+- Downloads the file from the `lecture-materials` storage bucket using the service role key
+- For PDF files: extracts text content (using a lightweight approach -- read the raw bytes and extract readable text strings)
+- For text-based files: returns the content directly
+- Returns `{ text: "extracted content..." }` to the caller
+- Has a reasonable size limit (return first ~4000 chars of extracted text)
 
-#### Layer 2: Confidence-Based Rejection
-After the AI responds, check the `confidence` field. If confidence is below 0.6, reject the question and use a generic fallback instead of sending an irrelevant question. This catches cases where the AI itself signals low confidence.
+Add the function to `supabase/config.toml` with `verify_jwt = false`.
 
-#### Layer 3: Keyword Overlap Validation
-Add a lightweight relevance check that compares significant words from the generated question against the transcript. If the question introduces multiple concepts that don't appear anywhere in the transcript (e.g., "JSON" when the transcript never mentions JSON), reject it.
+#### Part 2: Fix the course_id Filter
 
-- Extract non-stopword nouns/terms from the question
-- Check how many appear in the transcript
-- If fewer than 30% of the question's key terms appear in the transcript, flag as irrelevant and use fallback
+In `LectureTranscription.tsx`, update the materials query to also include materials where `course_id IS NULL` (instructor-level materials not yet assigned to a course). Change the filter logic from:
 
-#### Layer 4: Apply Same Fix to Voice Command Questions
-The `extract-voice-command-question` function doesn't have this problem (it extracts directly from speech), but the `format-and-send-question` function's MCQ/coding generators should also get the anti-hallucination prompt additions since they take the extracted question and may embellish it.
+```text
+if (selectedCourseId) {
+  materialsQuery.eq("course_id", selectedCourseId);
+}
+```
 
-### Changes
+to an OR filter that includes both course-specific AND unassigned materials:
 
-#### File 1: `supabase/functions/generate-interval-question/index.ts`
-- Enhance system prompt with strict grounding rules and anti-hallucination instructions
-- Add course context as a constraint (not just a hint)
-- Add confidence threshold check (reject < 0.6)
-- Add keyword overlap validation function
-- Return `relevance_rejected: true` when a question fails validation so the client knows what happened
+```text
+if (selectedCourseId) {
+  materialsQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+}
+```
 
-#### File 2: `supabase/functions/format-and-send-question/index.ts`
-- Add grounding instructions to `generateMCQ()` and `generateCodingQuestion()` prompts: "Options and distractors MUST relate to the lecture content provided, not general knowledge"
-- Pass course context more prominently in the prompt
+This ensures the "Genetic Algorithms UA.pdf" and "Simulated Annealing UA.pdf" files are included even though they have `course_id = NULL`.
+
+#### Part 3: Add Better Error Logging
+
+Replace the silent `console.warn` in the material parsing catch block with more visible logging so parsing failures are immediately obvious during live sessions:
+
+```text
+console.error("[MATERIAL PARSE FAILED]", material.title, error);
+```
 
 ### Technical Details
 
-**Keyword overlap validation (pseudocode):**
-```text
-function checkRelevance(questionText, transcript):
-    stopwords = {the, a, an, is, are, of, in, to, for, ...}
-    questionTerms = unique words from questionText, length > 3, not in stopwords
-    transcriptLower = transcript.toLowerCase()
-    
-    matches = count of questionTerms found in transcriptLower
-    ratio = matches / questionTerms.length
-    
-    if ratio < 0.3 and questionTerms.length >= 3:
-        return { relevant: false, reason: "Question introduces terms not in transcript" }
-    return { relevant: true }
-```
+**Edge Function (`parse-lecture-material`):**
+- Downloads file from Supabase Storage using service role
+- For PDFs: extracts text by scanning for text stream objects (lightweight, no external dependencies)
+- For plain text / markdown: returns content directly
+- Returns JSON `{ text: string, file_type: string, chars: number }`
+- Timeout: 15 seconds
+- Max output: 4000 characters per material
 
-**Enhanced system prompt addition:**
-```text
-CRITICAL GROUNDING RULES:
-- You MUST ONLY ask about concepts, terms, and ideas that appear in the transcript
-- NEVER generate questions about topics not explicitly discussed (e.g., don't ask about JSON if JSON was never mentioned)
-- If the transcript is unclear or lacks substantive content, set confidence to 0.0
-- Every key term in your question MUST trace back to something said in the lecture
-```
+**Files to create:**
+- `supabase/functions/parse-lecture-material/index.ts`
 
-### What This Prevents
+**Files to modify:**
+- `supabase/config.toml` -- add function entry
+- `src/components/instructor/LectureTranscription.tsx` -- fix course_id filter, improve error logging
 
-- Questions about JSON in a non-JSON lecture
-- Questions about "long-interval check-in instructions" (the AI was reading its own system prompt context as lecture content)
-- Generic CS trivia questions when transcript quality is low
-- Any question where the AI uses general knowledge instead of transcript content
+### Impact
 
+With this fix, when an instructor like Alice runs a live session on "Intelligent Optimization," the AI will actually receive text content from her "Genetic Algorithms UA.pdf" and "Simulated Annealing UA.pdf" uploads. Combined with the existing relevance guardrails (keyword overlap, confidence thresholding), this ensures questions are grounded in both the live transcript AND the uploaded course materials.
