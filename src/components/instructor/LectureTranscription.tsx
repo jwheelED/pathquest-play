@@ -99,7 +99,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useAuthRefresh(true);
   
   // Get selected course for proper assignment scoping
-  const { selectedCourseId } = useCourseContext();
+  const { selectedCourseId, selectedCourse } = useCourseContext();
   
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -1454,14 +1454,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       // Fetch and parse lecture materials for context
       console.log("📚 Fetching lecture materials...");
-      const { data: materials } = await supabase
+      const materialsQuery = supabase
         .from("lecture_materials")
         .select("id, title, description, file_path, file_type")
-        .eq("instructor_id", user.id)
+        .eq("instructor_id", user.id);
+      if (selectedCourseId) {
+        materialsQuery.eq("course_id", selectedCourseId);
+      }
+      const { data: materials } = await materialsQuery
         .order("created_at", { ascending: false })
         .limit(3); // Get most recent 3 materials for auto-questions
 
-      let materialContext: any[] = [];
+      interface MaterialContextItem {
+        title: string;
+        description: string | null;
+        content: string | undefined;
+      }
+
+      let materialContext: MaterialContextItem[] = [];
       if (materials && materials.length > 0) {
         console.log("📖 Parsing", materials.length, "materials...");
         const parsePromises = materials.map(async (material) => {
@@ -1488,6 +1498,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         console.log("✅ Successfully parsed", materialContext.length, "materials");
       }
 
+      // Build course context for relevance enforcement
+      const courseContext = selectedCourse ? {
+        title: selectedCourse.title,
+        topics: selectedCourse.topics || [],
+      } : null;
+
       // Call edge function with format preference, materials, and strict mode
       console.log("📡 Invoking generate-interval-question edge function...");
       console.log("🔗 Payload:", {
@@ -1498,6 +1514,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         strict_mode: strictModeEnabled,
         materials_count: materialContext.length,
         retry_queue_size: retryQueue.length,
+        course_context: courseContext,
       });
 
       const invokeStartTime = Date.now();
@@ -1509,6 +1526,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           force_send: autoQuestionForceSend,
           strict_mode: strictModeEnabled,
           materialContext: materialContext,
+          course_context: courseContext,
           retry_context: retryQueue.length > 0 ? retryQueue : null,
         },
       });

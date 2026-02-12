@@ -92,6 +92,78 @@ function checkRelevance(
   return { relevant: true };
 }
 
+/**
+ * Layer 4: Check if a generated question falls within the course's subject area.
+ * Builds a corpus from course title, topics, and material context, then checks
+ * what percentage of question terms appear in that corpus.
+ * Uses a lower threshold (20%) than transcript overlap since the course corpus is smaller.
+ */
+function checkCourseScopeRelevance(
+  questionText: string,
+  courseContext: { title: string; topics?: string[] } | null,
+  materialContext: Array<{ title: string; content?: string }>,
+): { relevant: boolean; reason?: string } {
+  // If no course context provided, skip this check
+  if (!courseContext?.title) {
+    return { relevant: true };
+  }
+
+  // Build course corpus from title + topics + material titles + material content snippets
+  let corpus = courseContext.title;
+  if (courseContext.topics?.length) {
+    corpus += " " + courseContext.topics.join(" ");
+  }
+  for (const material of materialContext) {
+    corpus += " " + material.title;
+    if (material.content) {
+      corpus += " " + material.content.slice(0, 500);
+    }
+  }
+
+  const corpusLower = corpus.toLowerCase();
+
+  // Extract significant terms from the question
+  const textToCheck = typeof questionText === "string"
+    ? questionText
+    : (questionText as Record<string, string>)?.title + " " + (questionText as Record<string, string>)?.description || "";
+
+  const questionWords = textToCheck
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w: string) => w.length > 3 && !STOPWORDS.has(w));
+
+  const uniqueTerms = [...new Set(questionWords)];
+
+  // If too few terms, skip validation
+  if (uniqueTerms.length < 3) {
+    return { relevant: true };
+  }
+
+  let matches = 0;
+  for (const term of uniqueTerms) {
+    if (corpusLower.includes(term)) {
+      matches++;
+    }
+  }
+
+  const ratio = matches / uniqueTerms.length;
+
+  console.log(`🎓 Course scope check: ${matches}/${uniqueTerms.length} terms found (${(ratio * 100).toFixed(0)}%)`);
+  console.log(`   Course: "${courseContext.title}"`);
+  console.log(`   Matched: [${uniqueTerms.filter((t: string) => corpusLower.includes(t)).join(", ")}]`);
+  console.log(`   Missing: [${uniqueTerms.filter((t: string) => !corpusLower.includes(t)).join(", ")}]`);
+
+  if (ratio < 0.2) {
+    return {
+      relevant: false,
+      reason: `Only ${matches}/${uniqueTerms.length} key terms found in course corpus (${(ratio * 100).toFixed(0)}% overlap). Course: "${courseContext.title}". Missing terms: ${uniqueTerms.filter((t: string) => !corpusLower.includes(t)).join(", ")}`,
+    };
+  }
+
+  return { relevant: true };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -143,7 +215,7 @@ serve(async (req) => {
     if (materialContext && materialContext.length > 0) {
       additionalContext += "\n\nCourse Materials Context:\n";
       for (const material of materialContext.slice(0, 2)) {
-        additionalContext += `- ${material.title}: ${material.content?.slice(0, 500) || ""}\n`;
+        additionalContext += `- ${material.title}: ${material.content?.slice(0, 1000) || ""}\n`;
       }
     }
     if (slide_context) {
@@ -322,6 +394,32 @@ Generate ONE focused question that tests understanding of the most important con
           is_fallback: true,
           relevance_rejected: true,
           reasoning: `Relevance validation failed: ${relevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Layer 4: Course scope validation
+      const courseScopeRelevance = checkCourseScopeRelevance(
+        textToValidate,
+        course_context,
+        materialContext,
+      );
+
+      if (!courseScopeRelevance.relevant) {
+        console.warn(`⚠️ Course scope check failed: ${courseScopeRelevance.reason}`);
+        const fallback = interval_minutes >= 20
+          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
+          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+
+        return new Response(JSON.stringify({
+          success: true,
+          ...fallback,
+          confidence: parsed.confidence,
+          is_fallback: true,
+          relevance_rejected: true,
+          reasoning: `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
         }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
