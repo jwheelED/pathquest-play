@@ -1459,7 +1459,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         .select("id, title, description, file_path, file_type")
         .eq("instructor_id", user.id);
       if (selectedCourseId) {
-        materialsQuery.eq("course_id", selectedCourseId);
+        materialsQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
       }
       const { data: materials } = await materialsQuery
         .order("created_at", { ascending: false })
@@ -1480,7 +1480,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               body: { filePath: material.file_path },
             });
             if (error) {
-              console.warn("Failed to parse material:", material.title, error);
+              console.error("[MATERIAL PARSE FAILED]", material.title, error);
               return null;
             }
             return {
@@ -1489,7 +1489,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               content: data.text?.slice(0, 2000), // Limit to 2000 chars per material
             };
           } catch (error) {
-            console.warn("Error parsing material:", material.title, error);
+            console.error("[MATERIAL PARSE FAILED]", material.title, error);
             return null;
           }
         });
@@ -2919,7 +2919,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             });
 
             if (error) {
-              console.warn("Failed to parse material:", material.title, error);
+              console.error("[MATERIAL PARSE FAILED]", material.title, error);
               return null;
             }
 
@@ -2929,7 +2929,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               content: data.text,
             };
           } catch (error) {
-            console.warn("Error parsing material:", material.title, error);
+            console.error("[MATERIAL PARSE FAILED]", material.title, error);
             return null;
           }
         });
