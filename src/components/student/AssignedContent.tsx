@@ -1378,7 +1378,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                                   {/* Problem Statement */}
                                   <div className="space-y-2">
                                     <h5 className="font-medium text-foreground">{isSimpleCoding ? 'Question' : 'Problem Statement'}</h5>
-                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{q.question}</p>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{q.question || q.problemText || q.title || 'No problem statement available'}</p>
                                   </div>
 
                                   {/* Constraints - only for full coding */}
