@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.parse-lecture-material]
 verify_jwt = false
+
+[functions.sync-grade-to-lms]
+verify_jwt = false
