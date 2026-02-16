@@ -1,74 +1,28 @@
 
 
-## Plan: Make Material Content Actually Reach the AI
+## Plan: Auto-Parse Materials on Tab Load
 
-### Problem
+### What Changes
 
-The system is **already wired** to pass uploaded materials to the AI, but it silently fails at two points:
+Remove the manual "Parse All" button and parsed/not-parsed status indicators. Instead, automatically parse any unparsed materials silently in the background whenever the instructor opens the Materials tab.
 
-1. **Missing edge function**: `parse-lecture-material` doesn't exist. The client calls it to extract text from PDFs, gets an error, catches it silently, and sends an empty `materialContext` to the AI.
-2. **course_id filter mismatch**: The materials query filters by `course_id`, but the uploaded materials have `course_id = NULL`, so they get excluded when a course is selected.
+### Changes to `src/components/instructor/LectureMaterialsUpload.tsx`
 
-### Solution
+1. **Remove the "Parse All" button and related UI** (lines 329-342): Delete the button and the `parseAllMaterials` function (lines 215-242). Remove the `parsing` state variable and the `RefreshCw` icon import.
 
-#### Part 1: Create `parse-lecture-material` Edge Function
+2. **Remove parsed status indicators** (line 355): Remove the `parsed_text ? ' Parsed' : ' Not parsed'` text from the material list items.
 
-Create a new edge function at `supabase/functions/parse-lecture-material/index.ts` that:
+3. **Add a `useEffect` that auto-parses on load**: After the `materials` query resolves, run a `useEffect` that filters for unparsed materials (where `parsed_text` is falsy) and parses them in the background -- no toast, no spinner, just silent background work. Use a `useRef` flag to prevent re-running on every render.
 
-- Receives a `filePath` (the Supabase Storage path of the uploaded file)
-- Downloads the file from the `lecture-materials` storage bucket using the service role key
-- For PDF files: extracts text content (using a lightweight approach -- read the raw bytes and extract readable text strings)
-- For text-based files: returns the content directly
-- Returns `{ text: "extracted content..." }` to the caller
-- Has a reasonable size limit (return first ~4000 chars of extracted text)
+4. **Keep the existing auto-parse on new upload** (lines 94-108): This stays as-is since new uploads already auto-parse.
 
-Add the function to `supabase/config.toml` with `verify_jwt = false`.
+### Technical Detail
 
-#### Part 2: Fix the course_id Filter
+The new `useEffect` will:
+- Depend on `materials` data
+- Use a `ref` to track which material IDs have already been queued for parsing (to avoid duplicate calls)
+- Loop through unparsed materials, invoke `parse-lecture-material`, save the result to the DB, and invalidate the query cache
+- Run silently with only `console.log` output -- no user-facing loading states
 
-In `LectureTranscription.tsx`, update the materials query to also include materials where `course_id IS NULL` (instructor-level materials not yet assigned to a course). Change the filter logic from:
-
-```text
-if (selectedCourseId) {
-  materialsQuery.eq("course_id", selectedCourseId);
-}
-```
-
-to an OR filter that includes both course-specific AND unassigned materials:
-
-```text
-if (selectedCourseId) {
-  materialsQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
-}
-```
-
-This ensures the "Genetic Algorithms UA.pdf" and "Simulated Annealing UA.pdf" files are included even though they have `course_id = NULL`.
-
-#### Part 3: Add Better Error Logging
-
-Replace the silent `console.warn` in the material parsing catch block with more visible logging so parsing failures are immediately obvious during live sessions:
-
-```text
-console.error("[MATERIAL PARSE FAILED]", material.title, error);
-```
-
-### Technical Details
-
-**Edge Function (`parse-lecture-material`):**
-- Downloads file from Supabase Storage using service role
-- For PDFs: extracts text by scanning for text stream objects (lightweight, no external dependencies)
-- For plain text / markdown: returns content directly
-- Returns JSON `{ text: string, file_type: string, chars: number }`
-- Timeout: 15 seconds
-- Max output: 4000 characters per material
-
-**Files to create:**
-- `supabase/functions/parse-lecture-material/index.ts`
-
-**Files to modify:**
-- `supabase/config.toml` -- add function entry
-- `src/components/instructor/LectureTranscription.tsx` -- fix course_id filter, improve error logging
-
-### Impact
-
-With this fix, when an instructor like Alice runs a live session on "Intelligent Optimization," the AI will actually receive text content from her "Genetic Algorithms UA.pdf" and "Simulated Annealing UA.pdf" uploads. Combined with the existing relevance guardrails (keyword overlap, confidence thresholding), this ensures questions are grounded in both the live transcript AND the uploaded course materials.
+### Files Modified
+- `src/components/instructor/LectureMaterialsUpload.tsx` -- remove Parse All button/status, add auto-parse useEffect
