@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -41,6 +42,9 @@ import { CourseProvider } from "./hooks/useCourseContext";
 const queryClient = new QueryClient();
 
 function App() {
+  // Check for new deployments
+  useVersionCheck();
+
   // PostHog user identification
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
