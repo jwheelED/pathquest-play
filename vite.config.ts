@@ -79,12 +79,14 @@ export default defineConfig(({ mode }) => ({
         ]
       }
     }),
-    // 2. Added Sentry Plugin (Must be last)
-    sentryVitePlugin({
-      authToken: process.env.SENTRY_AUTH_TOKEN,
-      org: "edvana",
-      project: "sentry-edvana",
-    }),
+    // Sentry plugin for source map uploads (only when auth token is available)
+    process.env.SENTRY_AUTH_TOKEN
+      ? sentryVitePlugin({
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          org: "edvana",
+          project: "sentry-edvana",
+        })
+      : undefined,
   ].filter(Boolean),
   build: {
     sourcemap: true, // <--- 3. Enabled Source Maps (Critical for Sentry)

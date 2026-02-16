@@ -1,15 +1,28 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import * as Sentry from "@sentry/react";
 import posthog from 'posthog-js'
 import './index.css'
-import App from './App.tsx' // I kept this as .tsx to match your file
+import App from './App.tsx'
 import { PostHogProvider } from 'posthog-js/react'
 
+// Initialize Sentry FIRST — before any other code that could throw
+Sentry.init({
+  dsn: "https://b6775a2c93348d29b14dc4548adcb722@o4510787448143872.ingest.us.sentry.io/4510787451289600",
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+});
+
 const options = {
-  api_host: 'https://us.i.posthog.com', // Change to 'https://eu.i.posthog.com' if in Europe
+  api_host: 'https://us.i.posthog.com',
 }
 
-// Global unhandled error capture
+// Global unhandled error capture (PostHog)
 window.onerror = (message, source, lineno, colno, error) => {
   posthog.capture('$exception', {
     $exception_message: String(message),
@@ -20,8 +33,7 @@ window.onerror = (message, source, lineno, colno, error) => {
   });
 };
 
-// Unhandled promise rejection
-window.onunhandledrejection = (event) => {
+window.onunhandledrejection = (event: PromiseRejectionEvent) => {
   posthog.capture('$exception', {
     $exception_message: event.reason?.message || String(event.reason),
     $exception_type: 'UnhandledPromiseRejection',
