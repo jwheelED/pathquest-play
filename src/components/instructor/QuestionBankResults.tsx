@@ -79,7 +79,7 @@ export function QuestionBankResults() {
         .from("student_assignments")
         .select("*")
         .eq("instructor_id", user.id)
-        .eq("course_id", selectedCourseId)
+        .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
         .eq("assignment_type", "lecture_checkin")
         .order("created_at", { ascending: false })
         .limit(200);

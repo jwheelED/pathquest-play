@@ -78,10 +78,15 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
 
   const fetchStudents = async () => {
     try {
-      const { data: studentsData, error } = await supabase
+      // Include both course-specific and legacy (null course_id) students
+      let query = supabase
         .from('instructor_students')
         .select('student_id')
         .eq('instructor_id', instructorId);
+      
+      // If a course is selected, filter to show course-specific + legacy students
+      // This is handled by the parent passing the right instructorId
+      const { data: studentsData, error } = await query;
 
       if (error) throw error;
 

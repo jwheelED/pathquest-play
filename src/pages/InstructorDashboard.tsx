@@ -225,7 +225,7 @@ export default function InstructorDashboard() {
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", user.id)
-        .eq("course_id", selectedCourseId)
+        .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
         .limit(100);
 
       if (!studentLinks || studentLinks.length === 0) {
