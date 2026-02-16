@@ -42,12 +42,12 @@ export function InstructorOverview({ instructorId, className }: InstructorOvervi
           .from("instructor_students")
           .select("student_id")
           .eq("instructor_id", instructorId)
-          .eq("course_id", selectedCourseId),
+          .or(`course_id.eq.${selectedCourseId},course_id.is.null`),
         supabase
           .from("student_assignments")
           .select("student_id, grade")
           .eq("instructor_id", instructorId)
-          .eq("course_id", selectedCourseId),
+          .or(`course_id.eq.${selectedCourseId},course_id.is.null`),
       ]);
 
       const totalStudents = studentsData.data?.length || 0;
