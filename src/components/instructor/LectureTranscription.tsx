@@ -1456,7 +1456,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("📚 Fetching lecture materials...");
       const materialsQuery = supabase
         .from("lecture_materials")
-        .select("id, title, description, file_path, file_type")
+        .select("id, title, description, file_path, file_type, parsed_text")
         .eq("instructor_id", user.id);
       if (selectedCourseId) {
         materialsQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
@@ -1474,8 +1474,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       let materialContext: MaterialContextItem[] = [];
       if (materials && materials.length > 0) {
         console.log("📖 Parsing", materials.length, "materials...");
-        const parsePromises = materials.map(async (material) => {
+        const parsePromises = materials.map(async (material: any) => {
           try {
+            // Use pre-parsed text if available
+            if (material.parsed_text) {
+              console.log("📖 Using cached parsed_text for:", material.title);
+              return {
+                title: material.title,
+                description: material.description,
+                content: material.parsed_text.slice(0, 2000),
+              };
+            }
             const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
               body: { filePath: material.file_path },
             });
@@ -1486,7 +1495,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             return {
               title: material.title,
               description: material.description,
-              content: data.text?.slice(0, 2000), // Limit to 2000 chars per material
+              content: data.text?.slice(0, 2000),
             };
           } catch (error) {
             console.error("[MATERIAL PARSE FAILED]", material.title, error);
@@ -2901,7 +2910,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Fetch uploaded lecture materials
       const { data: materials, error: materialsError } = await supabase
         .from("lecture_materials")
-        .select("id, title, description, file_path, file_type")
+        .select("id, title, description, file_path, file_type, parsed_text")
         .eq("instructor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(5); // Get most recent 5 materials
@@ -2911,8 +2920,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Parse content from materials
       let materialContext: any[] = [];
       if (materials && materials.length > 0) {
-        const parsePromises = materials.map(async (material) => {
+        const parsePromises = materials.map(async (material: any) => {
           try {
+            // Use pre-parsed text if available
+            if (material.parsed_text) {
+              console.log("📖 Using cached parsed_text for:", material.title);
+              return {
+                title: material.title,
+                description: material.description,
+                content: material.parsed_text,
+              };
+            }
             console.log("📖 Parsing material:", material.title);
             const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
               body: { filePath: material.file_path },
