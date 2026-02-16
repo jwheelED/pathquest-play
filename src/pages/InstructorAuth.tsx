@@ -88,23 +88,20 @@ export default function InstructorAuth() {
             .eq("role", "instructor")
             .maybeSingle();
           
-          if (roleData) {
-            // Check if user has completed onboarding - org_id is optional for existing instructors
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('org_id, onboarded, course_title, course_schedule, course_topics')
-              .eq('id', session.user.id)
-              .single();
-            
-            // First check if they have an organization
-            if (!profile?.org_id) {
-              navigate("/instructor/org-onboarding");
-            } else if (profile && profile.onboarded === false) {
-              // Only send to onboarding when the explicit `onboarded` flag is false.
-              navigate("/instructor/onboarding");
-            } else {
-              navigate("/instructor/dashboard");
-            }
+            if (roleData) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('org_id, onboarded')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (profile?.onboarded === true) {
+                navigate("/instructor/dashboard");
+              } else if (!profile?.org_id) {
+                navigate("/instructor/org-onboarding");
+              } else {
+                navigate("/instructor/onboarding");
+              }
           } else {
             // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
             const sessionCreatedAt = new Date(session.user.created_at).getTime();
@@ -153,17 +150,16 @@ export default function InstructorAuth() {
             if (roleData) {
               const { data: profile } = await supabase
                 .from('profiles')
-                .select('org_id, onboarded, course_title, course_schedule, course_topics')
+                .select('org_id, onboarded')
                 .eq('id', session.user.id)
                 .single();
               
-              if (!profile?.org_id) {
-                navigate("/instructor/org-onboarding");
-              } else if (profile && profile.onboarded === false) {
-                // Only send to onboarding when the explicit `onboarded` flag is false.
-                navigate("/instructor/onboarding");
-              } else {
+              if (profile?.onboarded === true) {
                 navigate("/instructor/dashboard");
+              } else if (!profile?.org_id) {
+                navigate("/instructor/org-onboarding");
+              } else {
+                navigate("/instructor/onboarding");
               }
             }
           }, 0);
@@ -281,28 +277,18 @@ export default function InstructorAuth() {
           }
 
           if (roleData) {  
-            // Check if user has completed onboarding - org_id is optional
             const { data: profile } = await supabase  
               .from('profiles')  
-              .select('org_id, onboarded, course_title, course_schedule, course_topics')  
+              .select('org_id, onboarded')  
               .eq('id', user.id)  
               .single();  
             
-            // Check if instructor has courses
-            const { data: courses } = await supabase
-              .from('courses')
-              .select('id')
-              .eq('instructor_id', user.id)
-              .limit(1);
-            
-            const hasCompletedOnboarding = profile?.onboarded && courses && courses.length > 0;
-              
-            if (hasCompletedOnboarding) {  
-              navigate("/instructor/dashboard");  
-            } else if (!profile?.onboarded || !profile?.course_title || !profile?.course_schedule || !profile?.course_topics || profile.course_topics.length === 0) {  
-              navigate("/instructor/onboarding");  
-            } else {  
-              navigate("/instructor/dashboard");  
+            if (profile?.onboarded === true) {
+              navigate("/instructor/dashboard");
+            } else if (!profile?.org_id) {
+              navigate("/instructor/org-onboarding");
+            } else {
+              navigate("/instructor/onboarding");
             }
           } else {
             toast.error("This account is not registered as an instructor");
