@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, FileText, Trash2, Download, Loader2, RefreshCw } from "lucide-react";
+import { Upload, FileText, Trash2, Download, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +24,6 @@ interface LectureMaterial {
 
 export function LectureMaterialsUpload() {
   const [uploading, setUploading] = useState(false);
-  const [parsing, setParsing] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -212,34 +211,31 @@ export function LectureMaterialsUpload() {
     URL.revokeObjectURL(url);
   };
 
-  const parseAllMaterials = async () => {
-    const unparsed = materials.filter((m: any) => !m.parsed_text);
-    if (unparsed.length === 0) {
-      toast.info("All materials are already parsed!");
-      return;
-    }
-    setParsing(true);
-    let successCount = 0;
+  // Auto-parse unparsed materials when tab loads
+  const parsingQueueRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!materials || materials.length === 0) return;
+    const unparsed = materials.filter(
+      (m: any) => !m.parsed_text && !parsingQueueRef.current.has(m.id)
+    );
+    if (unparsed.length === 0) return;
     for (const material of unparsed) {
-      try {
-        const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
-          body: { filePath: material.file_path },
-        });
-        if (!error && data?.text) {
-          await supabase
-            .from("lecture_materials")
-            .update({ parsed_text: data.text } as any)
-            .eq("id", material.id);
-          successCount++;
-        }
-      } catch (err) {
-        console.error("[PARSE FAILED]", material.title, err);
-      }
+      parsingQueueRef.current.add(material.id);
+      supabase.functions
+        .invoke("parse-lecture-material", { body: { filePath: material.file_path } })
+        .then(async (result) => {
+          if (result.data?.text) {
+            await supabase
+              .from("lecture_materials")
+              .update({ parsed_text: result.data.text } as any)
+              .eq("id", material.id);
+            queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+            console.log("✅ Auto-parsed on load:", material.title, result.data.chars, "chars");
+          }
+        })
+        .catch((err) => console.error("[AUTO-PARSE LOAD FAILED]", material.title, err));
     }
-    setParsing(false);
-    queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
-    toast.success(`Parsed ${successCount}/${unparsed.length} materials`);
-  };
+  }, [materials, queryClient]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + " B";
@@ -326,21 +322,7 @@ export function LectureMaterialsUpload() {
           </p>
         ) : (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-sm">Uploaded Materials</h4>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={parseAllMaterials}
-                disabled={parsing}
-              >
-                {parsing ? (
-                  <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Parsing...</>
-                ) : (
-                  <><RefreshCw className="w-3 h-3 mr-1.5" />Parse All</>
-                )}
-              </Button>
-            </div>
+            <h4 className="font-semibold text-sm">Uploaded Materials</h4>
             {materials.map((material) => (
               <div
                 key={material.id}
@@ -352,7 +334,6 @@ export function LectureMaterialsUpload() {
                     <p className="font-medium truncate">{material.title}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {material.file_name} • {formatFileSize(material.file_size)}
-                      {(material as any).parsed_text ? ' • ✅ Parsed' : ' • ⏳ Not parsed'}
                     </p>
                     {material.description && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
