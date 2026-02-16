@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { bulkSyncGradesToLMS } from "@/lib/lmsSync";
 import { 
   GraduationCap, 
   CheckCircle2, 
@@ -15,7 +16,8 @@ import {
   ArrowRight,
   ArrowLeft,
   ExternalLink,
-  Key
+  Key,
+  Send
 } from "lucide-react";
 
 interface LMSPlatform {
@@ -81,6 +83,7 @@ export function LMSIntegrationSettings() {
   const [platforms, setPlatforms] = useState<LMSPlatform[]>([]);
   const [syncLogs, setSyncLogs] = useState<GradeSyncLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Wizard state
   const [step, setStep] = useState<'list' | 'select' | 'connect'>('list');
@@ -178,6 +181,53 @@ export function LMSIntegrationSettings() {
       fetchPlatforms();
     } catch {
       toast.error('Failed to update platform status');
+    }
+  };
+
+  const handleBulkSync = async () => {
+    setIsSyncing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get recent graded assignments for this instructor's students
+      const { data: assignments, error } = await supabase
+        .from('student_assignments')
+        .select('id, student_id, grade, assignment_type')
+        .eq('instructor_id', user.id)
+        .eq('completed', true)
+        .not('grade', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      if (!assignments || assignments.length === 0) {
+        toast.info('No graded assignments to sync');
+        return;
+      }
+
+      const grades = assignments.map(a => ({
+        assignmentId: a.id,
+        studentId: a.student_id,
+        scoreGiven: a.grade ?? 0,
+        scoreMaximum: 100,
+        assignmentType: a.assignment_type,
+      }));
+
+      const { success, failed } = await bulkSyncGradesToLMS(grades);
+      
+      if (failed === 0) {
+        toast.success(`${success} grade(s) synced to LMS`);
+      } else {
+        toast.warning(`${success} synced, ${failed} failed`);
+      }
+      
+      fetchSyncLogs();
+    } catch (err: any) {
+      console.error('Bulk sync error:', err);
+      toast.error(err.message || 'Sync failed');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -334,6 +384,21 @@ export function LMSIntegrationSettings() {
               </div>
             ))}
           </div>
+        )}
+
+        {platforms.length > 0 && (
+          <Button 
+            variant="default" 
+            className="w-full" 
+            onClick={handleBulkSync} 
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Syncing...</>
+            ) : (
+              <><Send className="h-4 w-4 mr-2" /> Sync Grades Now</>
+            )}
+          </Button>
         )}
 
         <Button variant="outline" className="w-full" onClick={() => setStep('select')}>
