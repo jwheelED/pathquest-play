@@ -1,28 +1,50 @@
 
 
-## Plan: Auto-Parse Materials on Tab Load
+## Fix: Instructor Redirect to Onboarding Bug
 
-### What Changes
+### Root Cause
 
-Remove the manual "Parse All" button and parsed/not-parsed status indicators. Instead, automatically parse any unparsed materials silently in the background whenever the instructor opens the Materials tab.
+The instructor "Genetics Professor" has `org_id = NULL` in their profile. The sign-in redirect logic checks `if (!profile?.org_id)` and sends them to `/instructor/org-onboarding` every time they log in, even though they are fully onboarded with courses.
 
-### Changes to `src/components/instructor/LectureMaterialsUpload.tsx`
+This check exists in **three separate places** in `InstructorAuth.tsx`:
+- Line 100: `onAuthStateChange` handler
+- Line 160: `getSession` handler on mount
+- Line 298: `handleAuth` sign-in function
 
-1. **Remove the "Parse All" button and related UI** (lines 329-342): Delete the button and the `parseAllMaterials` function (lines 215-242). Remove the `parsing` state variable and the `RefreshCw` icon import.
+### Fix
 
-2. **Remove parsed status indicators** (line 355): Remove the `parsed_text ? ' Parsed' : ' Not parsed'` text from the material list items.
+Change the redirect logic in all three places to prioritize the `onboarded` flag and course existence over `org_id`. An instructor who has `onboarded = true` and at least one course should always go to the dashboard, regardless of `org_id`.
 
-3. **Add a `useEffect` that auto-parses on load**: After the `materials` query resolves, run a `useEffect` that filters for unparsed materials (where `parsed_text` is falsy) and parses them in the background -- no toast, no spinner, just silent background work. Use a `useRef` flag to prevent re-running on every render.
+**New logic (replacing the current 3-way check in each location):**
 
-4. **Keep the existing auto-parse on new upload** (lines 94-108): This stays as-is since new uploads already auto-parse.
+```text
+// If instructor is fully onboarded with courses -> dashboard
+// If instructor has no org -> org onboarding
+// If instructor has org but not onboarded -> onboarding
+// Otherwise -> dashboard
+```
 
-### Technical Detail
+Specifically, in the `handleAuth` function (lines 283-306), the logic already queries for courses but then applies a confusing compound condition. This will be simplified.
 
-The new `useEffect` will:
-- Depend on `materials` data
-- Use a `ref` to track which material IDs have already been queued for parsing (to avoid duplicate calls)
-- Loop through unparsed materials, invoke `parse-lecture-material`, save the result to the DB, and invalidate the query cache
-- Run silently with only `console.log` output -- no user-facing loading states
+In the `onAuthStateChange` and `getSession` handlers (lines 91-107 and 153-167), the logic does NOT check for courses at all and just looks at `org_id` first. These will be updated to also check `onboarded` first.
+
+### Changes to `src/components/instructor/InstructorAuth.tsx`
+
+**All three redirect decision blocks** will be replaced with this unified logic:
+
+```typescript
+if (profile?.onboarded === true) {
+  // Already onboarded - go straight to dashboard
+  navigate("/instructor/dashboard");
+} else if (!profile?.org_id) {
+  navigate("/instructor/org-onboarding");
+} else {
+  navigate("/instructor/onboarding");
+}
+```
+
+This ensures that any instructor with `onboarded = true` (like the Genetics Professor) always reaches the dashboard, even if their `org_id` is null. New instructors who haven't completed onboarding will still be routed through the setup flow.
 
 ### Files Modified
-- `src/components/instructor/LectureMaterialsUpload.tsx` -- remove Parse All button/status, add auto-parse useEffect
+- `src/pages/InstructorAuth.tsx` -- update redirect logic in 3 locations
+
