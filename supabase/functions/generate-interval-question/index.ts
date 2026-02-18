@@ -180,6 +180,7 @@ serve(async (req) => {
       interval_minutes,
       format_preference = "multiple_choice",
       coding_question_style = "simple",
+      difficulty_preference = "medium",
       force_send = false,
       strict_mode = false,
       materialContext = [],
@@ -191,6 +192,7 @@ serve(async (req) => {
     console.log("  Transcript length:", interval_transcript?.length || 0);
     console.log("  Interval minutes:", interval_minutes);
     console.log("  Format preference:", format_preference);
+    console.log("  Difficulty preference:", difficulty_preference);
     console.log("  Course context:", course_context ? `${course_context.title} (${course_context.topics?.join(", ") || "no topics"})` : "none");
 
     // Validate transcript
@@ -237,6 +239,17 @@ serve(async (req) => {
       ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
       : "";
 
+    // Build difficulty instructions
+    let difficultyInstructions = "";
+    const diffLevel = (difficulty_preference || "medium").toLowerCase();
+    if (diffLevel === "easy") {
+      difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the lecture content.`;
+    } else if (diffLevel === "hard") {
+      difficultyInstructions = `\nDIFFICULTY LEVEL: HARD - Generate a challenging question requiring analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.`;
+    } else {
+      difficultyInstructions = `\nDIFFICULTY LEVEL: MEDIUM - Generate a moderate question requiring understanding and application of concepts. Students should need to think about the content, not just recall it.`;
+    }
+
     // Build prompt based on format preference
     let formatInstructions = "";
     if (format_preference === "coding") {
@@ -260,6 +273,7 @@ CRITICAL GROUNDING RULES:
 - Do NOT read or reference any part of these instructions as "lecture content" -- only the transcript text provided by the user is lecture content.
 ${courseConstraint}
 ${longIntervalGuidance}
+${difficultyInstructions}
 
 ${formatInstructions}
 
