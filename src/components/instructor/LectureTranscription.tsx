@@ -851,7 +851,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('profiles')
-        .select('question_format_preference, coding_question_style')
+        .select('question_format_preference, coding_question_style, question_difficulty_preference')
         .eq('id', user?.id)
         .single();
 
@@ -861,6 +861,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           interval_minutes: 1,
           format_preference: profile?.question_format_preference || "multiple_choice",
           coding_question_style: profile?.coding_question_style || "simple",
+          difficulty_preference: profile?.question_difficulty_preference || "medium",
           force_send: true,
           strict_mode: true
         },
@@ -1445,12 +1446,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🔍 Fetching format preference...");
       const { data: profile } = await supabase
         .from("profiles")
-        .select("question_format_preference")
+        .select("question_format_preference, question_difficulty_preference")
         .eq("id", user.id)
         .single();
 
       const formatPreference = profile?.question_format_preference || "multiple_choice";
-      console.log("✅ Format preference:", formatPreference);
+      const difficultyPreference = profile?.question_difficulty_preference || "medium";
+      console.log("✅ Format preference:", formatPreference, "Difficulty:", difficultyPreference);
 
       // Fetch and parse lecture materials for context
       console.log("📚 Fetching lecture materials...");
@@ -1532,6 +1534,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           interval_transcript: intervalTranscript,
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
+          difficulty_preference: difficultyPreference,
           force_send: autoQuestionForceSend,
           strict_mode: strictModeEnabled,
           materialContext: materialContext,
