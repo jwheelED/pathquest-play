@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import * as Sentry from "@sentry/react";
 import { trackError } from '@/lib/posthogTracking';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,8 +27,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    // Track error in PostHog
+
+    // Report to Sentry (this triggers the PostHog integration automatically)
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: errorInfo.componentStack } },
+    });
+
+    // Keep PostHog tracking for custom analytics
     trackError(error, {
       component_stack: errorInfo.componentStack,
       error_boundary: true,

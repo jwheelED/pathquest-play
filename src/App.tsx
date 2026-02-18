@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import posthog from "posthog-js";
+import * as Sentry from "@sentry/react";
 import { supabase } from "@/integrations/supabase/client";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import Index from "./pages/Index";
@@ -46,14 +47,17 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session?.user) {
-          // Identify user in PostHog
           posthog.identify(session.user.id, {
             email: session.user.email,
             role: session.user.user_metadata?.role,
           });
+          Sentry.setUser({
+            id: session.user.id,
+            email: session.user.email,
+          });
         } else if (event === 'SIGNED_OUT') {
-          // Clear PostHog data on logout
           posthog.reset();
+          Sentry.setUser(null);
         }
       }
     );
