@@ -34,8 +34,14 @@ serve(async (req) => {
       );
     }
 
-    // Check cache first
-    const questionHash = await hashString(`${problemText}|${correctAnswer}|${userAnswer}`);
+    // Server-side correctness validation as safety net
+    // If userAnswer matches correctAnswer (after normalization), force wasCorrect = true
+    const effectiveWasCorrect = wasCorrect === true ||
+      (correctAnswer && userAnswer &&
+       userAnswer.trim().toUpperCase().charAt(0) === correctAnswer.trim().toUpperCase().charAt(0));
+
+    // Check cache first — include correctness in hash to avoid cross-contamination
+    const questionHash = await hashString(`${problemText}|${correctAnswer}|${userAnswer}|${effectiveWasCorrect}`);
     
     const { data: cached } = await supabaseClient
       .from("ai_explanation_cache")
@@ -49,7 +55,7 @@ serve(async (req) => {
       await supabaseClient
         .from("ai_explanation_cache")
         .update({
-          usage_count: 1, // Will be incremented by trigger or manually
+          usage_count: 1,
           last_used_at: new Date().toISOString(),
         })
         .eq("question_hash", questionHash);
@@ -63,16 +69,17 @@ serve(async (req) => {
     // Generate explanation via OpenAI
     const systemPrompt = `You are a helpful teaching assistant. Generate a clear, concise explanation for a quiz question. 
 Use simple language appropriate for students. If mathematical notation is needed, use LaTeX format with $ delimiters.
-Keep explanations focused and under 200 words.`;
+Keep explanations focused and under 200 words.
+IMPORTANT: If the student answered correctly, NEVER say their answer is wrong, incorrect, or that they misunderstood. Only reinforce why the answer is correct and deepen their understanding.`;
 
-    const userPrompt = wasCorrect
+    const userPrompt = effectiveWasCorrect
       ? `The student answered correctly! Reinforce their understanding.
 
 Question: ${problemText}
 Correct Answer: ${correctAnswer}
 ${courseContext ? `Course Context: ${courseContext}` : ""}
 
-Explain WHY this answer is correct and provide any additional insight that deepens understanding.`
+Explain WHY this answer is correct and provide any additional insight that deepens understanding. Do NOT mention anything about the answer being wrong.`
       : `The student answered incorrectly. Help them understand.
 
 Question: ${problemText}
@@ -85,7 +92,7 @@ Explain:
 2. Why the student's answer is wrong (common misconception)
 3. A tip to remember the correct concept`;
 
-    console.log("Generating explanation via OpenAI...");
+    console.log("Generating explanation via OpenAI...", { effectiveWasCorrect, wasCorrect });
 
     const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

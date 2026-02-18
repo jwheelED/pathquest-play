@@ -375,7 +375,7 @@ const LiveStudent = () => {
           problemText: currentQuestion.question_content.question,
           correctAnswer: currentQuestion.question_content.correctAnswer,
           userAnswer: selectedAnswer,
-          wasCorrect: isCorrect,
+          wasCorrect: isCorrect === true,
           courseContext: null
         }
       });
