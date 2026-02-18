@@ -1,50 +1,44 @@
 
 
-## Fix: Instructor Redirect to Onboarding Bug
+# Make Question Difficulty Actually Work Everywhere
 
-### Root Cause
+## Problem
+The difficulty setting (Easy/Medium/Hard) only works for slide-extracted questions. The two most-used question paths -- auto-generated interval questions and voice command questions -- completely ignore the difficulty preference.
 
-The instructor "Genetics Professor" has `org_id = NULL` in their profile. The sign-in redirect logic checks `if (!profile?.org_id)` and sends them to `/instructor/org-onboarding` every time they log in, even though they are fully onboarded with courses.
+## What Changes
 
-This check exists in **three separate places** in `InstructorAuth.tsx`:
-- Line 100: `onAuthStateChange` handler
-- Line 160: `getSession` handler on mount
-- Line 298: `handleAuth` sign-in function
+### 1. Update `generate-interval-question` edge function
+- Accept `difficulty_preference` from the request body (already passed as `format_preference` pattern)
+- Add difficulty-specific prompt instructions identical to the ones already working in `extract-slide-question`:
+  - **Easy**: "basic recall, simple definitions, straightforward facts"
+  - **Medium**: "understanding and application of concepts"
+  - **Hard**: "analysis, synthesis, evaluation, connecting multiple concepts"
+- Inject the difficulty instruction into the system prompt alongside existing format instructions
 
-### Fix
+### 2. Update `extract-voice-command-question` edge function
+- Fetch `question_difficulty_preference` from the instructor's profile (alongside the existing `question_format_preference` fetch)
+- Add difficulty instructions to the system prompt so extracted questions are phrased at the appropriate complexity level
 
-Change the redirect logic in all three places to prioritize the `onboarded` flag and course existence over `org_id`. An instructor who has `onboarded = true` and at least one course should always go to the dashboard, regardless of `org_id`.
+### 3. Update the frontend caller for interval questions
+- Find where `generate-interval-question` is invoked and pass the instructor's `question_difficulty_preference` from their profile in the request body
 
-**New logic (replacing the current 3-way check in each location):**
+### 4. Fix the build error (bonus)
+- The `parse-lecture-material` function has a broken `npm:jszip` import that needs to be changed to use the `esm.sh` CDN pattern used by all other edge functions
+
+## Technical Details
+
+### Edge function prompt addition (reusing existing pattern from `extract-slide-question`)
+The following difficulty instructions will be injected into the AI system prompt for both interval and voice functions:
 
 ```text
-// If instructor is fully onboarded with courses -> dashboard
-// If instructor has no org -> org onboarding
-// If instructor has org but not onboarded -> onboarding
-// Otherwise -> dashboard
+easy: "Generate an EASY question: focus on basic recall, simple definitions, or straightforward facts. The answer should be directly stated in the lecture content."
+medium: "Generate a MEDIUM difficulty question: require understanding and application of concepts. Students should need to think about the content, not just recall it."
+hard: "Generate a HARD question: require analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations."
 ```
 
-Specifically, in the `handleAuth` function (lines 283-306), the logic already queries for courses but then applies a confusing compound condition. This will be simplified.
-
-In the `onAuthStateChange` and `getSession` handlers (lines 91-107 and 153-167), the logic does NOT check for courses at all and just looks at `org_id` first. These will be updated to also check `onboarded` first.
-
-### Changes to `src/components/instructor/InstructorAuth.tsx`
-
-**All three redirect decision blocks** will be replaced with this unified logic:
-
-```typescript
-if (profile?.onboarded === true) {
-  // Already onboarded - go straight to dashboard
-  navigate("/instructor/dashboard");
-} else if (!profile?.org_id) {
-  navigate("/instructor/org-onboarding");
-} else {
-  navigate("/instructor/onboarding");
-}
-```
-
-This ensures that any instructor with `onboarded = true` (like the Genetics Professor) always reaches the dashboard, even if their `org_id` is null. New instructors who haven't completed onboarding will still be routed through the setup flow.
-
-### Files Modified
-- `src/pages/InstructorAuth.tsx` -- update redirect logic in 3 locations
+### Files to modify
+1. `supabase/functions/generate-interval-question/index.ts` -- add difficulty parameter and prompt logic
+2. `supabase/functions/extract-voice-command-question/index.ts` -- fetch difficulty from profile and add to prompt
+3. Frontend component that calls `generate-interval-question` (likely in `AutoQuestionDashboard` or `LectureTranscription`) -- pass `difficulty_preference` in the request
+4. `supabase/functions/parse-lecture-material/index.ts` -- fix jszip import
 
