@@ -212,6 +212,13 @@ export function QuestionBankResults() {
     }
   };
 
+  const getGrade = (assignment: Assignment): number | null => {
+    if (assignment.grade !== null && assignment.grade !== undefined) return assignment.grade;
+    const aiRec = assignment.quiz_responses?._ai_recommendations?.["0"];
+    if (aiRec?.grade !== undefined) return aiRec.grade;
+    return null;
+  };
+
   const getStudentName = (studentId: string) => {
     const profile = studentProfiles[studentId];
     return profile?.full_name || "Unknown Student";
@@ -451,9 +458,22 @@ export function QuestionBankResults() {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <ScrollArea className="max-h-80">
+                    <ScrollArea className="max-h-[600px]">
                       <div className="space-y-3 pr-4">
-                        {group.assignments.map(assignment => (
+                        {[...group.assignments].sort((a, b) => {
+                          const submittedA = a.completed;
+                          const submittedB = b.completed;
+                          if (submittedA && !submittedB) return -1;
+                          if (!submittedA && submittedB) return 1;
+                          if (submittedA && submittedB) {
+                            const gradeA = getGrade(a);
+                            const gradeB = getGrade(b);
+                            if (gradeA !== null && gradeB !== null) return gradeB - gradeA;
+                            if (gradeA !== null) return -1;
+                            if (gradeB !== null) return 1;
+                          }
+                          return 0;
+                        }).map(assignment => (
                           <div
                             key={assignment.id}
                             className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg"
