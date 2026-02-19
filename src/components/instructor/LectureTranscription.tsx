@@ -33,6 +33,7 @@ import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboa
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
 import { getOrgId } from "@/hooks/useOrgId";
+import { useCourseContext } from "@/hooks/useCourseContext";
 import { playNotificationSound } from "@/lib/audioNotification";
 import {
   AlertDialog,
@@ -96,6 +97,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
   // Proactive token refresh
   useAuthRefresh(true);
+  
+  // Get selected course for proper assignment scoping
+  const { selectedCourseId, selectedCourse } = useCourseContext();
+  
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
@@ -107,6 +112,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [voiceCommandDetected, setVoiceCommandDetected] = useState(false);
   const [lastTranscript, setLastTranscript] = useState<string>("");
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
+  const isSendingQuestionRef = useRef(false);
   const [nextQuestionAllowedAt, setNextQuestionAllowedAt] = useState<number>(0);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number>(0);
   const [studentCount, setStudentCount] = useState<number>(0);
@@ -140,9 +146,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [quotaCircuitBreakerRetryAt, setQuotaCircuitBreakerRetryAt] = useState<number>(0);
   const [quotaCircuitBreakerCountdown, setQuotaCircuitBreakerCountdown] = useState<number>(0);
 
-  // Answer Key MCQ integration
-  const [useAnswerKeyMcqs, setUseAnswerKeyMcqs] = useState(false);
-  const [verifiedProblemsCount, setVerifiedProblemsCount] = useState<number | null>(null);
   const [errorHistory, setErrorHistory] = useState<ErrorRecord[]>([]);
 
   // Extraction error dialog
@@ -191,6 +194,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isDeepgramConnected, setIsDeepgramConnected] = useState(false);
   
   const { toast } = useToast();
+
+  // Keep isSendingQuestion ref in sync with state
+  useEffect(() => {
+    isSendingQuestionRef.current = isSendingQuestion;
+  }, [isSendingQuestion]);
 
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
@@ -372,25 +380,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setDailyQuestionCount(count);
         }
 
-        // Fetch verified answer key problems count (only verified ones)
-        const { data: answerKeys } = await supabase
-          .from("instructor_answer_keys")
-          .select("id")
-          .eq("instructor_id", user.id)
-          .eq("status", "parsed");
-
-        if (answerKeys && answerKeys.length > 0) {
-          const answerKeyIds = answerKeys.map(ak => ak.id);
-          const { count: problemsCount } = await supabase
-            .from("answer_key_problems")
-            .select("id", { count: "exact", head: true })
-            .in("answer_key_id", answerKeyIds)
-            .eq("verified_by_instructor", true);
-          
-          setVerifiedProblemsCount(problemsCount ?? 0);
-        } else {
-          setVerifiedProblemsCount(0);
-        }
       } catch (error) {
         console.error("Error fetching counts:", error);
       }
@@ -720,6 +709,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("📝 Extracting question from transcript:", recentTranscript.length, "chars");
       console.log("🔍 Last 200 chars:", recentTranscript.slice(-200));
 
+      // Refresh auth session before edge function call to prevent 401 errors
+      console.log("🔑 Refreshing auth before voice command extraction...");
+      await supabase.auth.refreshSession();
+
       const { data, error } = await supabase.functions.invoke("extract-voice-command-question", {
         body: { recentTranscript },
       });
@@ -858,7 +851,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('profiles')
-        .select('question_format_preference, coding_question_style')
+        .select('question_format_preference, coding_question_style, question_difficulty_preference')
         .eq('id', user?.id)
         .single();
 
@@ -868,6 +861,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           interval_minutes: 1,
           format_preference: profile?.question_format_preference || "multiple_choice",
           coding_question_style: profile?.coding_question_style || "simple",
+          difficulty_preference: profile?.question_difficulty_preference || "medium",
           force_send: true,
           strict_mode: true
         },
@@ -1156,11 +1150,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             confidence: detectionData.confidence,
             expected_answer: detectionData.expected_answer || "", // Pass expected answer for short answer grading
             source: detectionData.source || "manual_button",
-            use_answer_key: useAnswerKeyMcqs,
+            use_answer_key: false,
             // Pass pre-generated MCQ options if available (from preview dialog)
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // Pass course_id for proper assignment scoping
+            course_id: selectedCourseId,
           },
         });
       });
@@ -1418,6 +1414,19 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
       }
 
+      // Refresh auth token before edge function call to prevent 401 errors
+      console.log("🔑 Refreshing auth token before auto-question generation");
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error("❌ Auth refresh failed:", refreshError);
+        toast({
+          title: "⚠️ Session expired",
+          description: "Please refresh the page to continue",
+          variant: "destructive",
+        });
+        return false;
+      }
+
       // Fetch instructor's format preference before generating
       console.log("🔍 Fetching user authentication...");
       const {
@@ -1437,41 +1446,61 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🔍 Fetching format preference...");
       const { data: profile } = await supabase
         .from("profiles")
-        .select("question_format_preference")
+        .select("question_format_preference, question_difficulty_preference")
         .eq("id", user.id)
         .single();
 
       const formatPreference = profile?.question_format_preference || "multiple_choice";
-      console.log("✅ Format preference:", formatPreference);
+      const difficultyPreference = profile?.question_difficulty_preference || "medium";
+      console.log("✅ Format preference:", formatPreference, "Difficulty:", difficultyPreference);
 
       // Fetch and parse lecture materials for context
       console.log("📚 Fetching lecture materials...");
-      const { data: materials } = await supabase
+      const materialsQuery = supabase
         .from("lecture_materials")
-        .select("id, title, description, file_path, file_type")
-        .eq("instructor_id", user.id)
+        .select("id, title, description, file_path, file_type, parsed_text")
+        .eq("instructor_id", user.id);
+      if (selectedCourseId) {
+        materialsQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+      }
+      const { data: materials } = await materialsQuery
         .order("created_at", { ascending: false })
         .limit(3); // Get most recent 3 materials for auto-questions
 
-      let materialContext: any[] = [];
+      interface MaterialContextItem {
+        title: string;
+        description: string | null;
+        content: string | undefined;
+      }
+
+      let materialContext: MaterialContextItem[] = [];
       if (materials && materials.length > 0) {
         console.log("📖 Parsing", materials.length, "materials...");
-        const parsePromises = materials.map(async (material) => {
+        const parsePromises = materials.map(async (material: any) => {
           try {
+            // Use pre-parsed text if available
+            if (material.parsed_text) {
+              console.log("📖 Using cached parsed_text for:", material.title);
+              return {
+                title: material.title,
+                description: material.description,
+                content: material.parsed_text.slice(0, 2000),
+              };
+            }
             const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
               body: { filePath: material.file_path },
             });
             if (error) {
-              console.warn("Failed to parse material:", material.title, error);
+              console.error("[MATERIAL PARSE FAILED]", material.title, error);
               return null;
             }
             return {
               title: material.title,
               description: material.description,
-              content: data.text?.slice(0, 2000), // Limit to 2000 chars per material
+              content: data.text?.slice(0, 2000),
             };
           } catch (error) {
-            console.warn("Error parsing material:", material.title, error);
+            console.error("[MATERIAL PARSE FAILED]", material.title, error);
             return null;
           }
         });
@@ -1479,6 +1508,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         materialContext = parsedMaterials.filter((m) => m !== null);
         console.log("✅ Successfully parsed", materialContext.length, "materials");
       }
+
+      // Build course context for relevance enforcement
+      const courseContext = selectedCourse ? {
+        title: selectedCourse.title,
+        topics: selectedCourse.topics || [],
+      } : null;
 
       // Call edge function with format preference, materials, and strict mode
       console.log("📡 Invoking generate-interval-question edge function...");
@@ -1490,6 +1525,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         strict_mode: strictModeEnabled,
         materials_count: materialContext.length,
         retry_queue_size: retryQueue.length,
+        course_context: courseContext,
       });
 
       const invokeStartTime = Date.now();
@@ -1498,9 +1534,11 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           interval_transcript: intervalTranscript,
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
+          difficulty_preference: difficultyPreference,
           force_send: autoQuestionForceSend,
           strict_mode: strictModeEnabled,
           materialContext: materialContext,
+          course_context: courseContext,
           retry_context: retryQueue.length > 0 ? retryQueue : null,
         },
       });
@@ -1958,10 +1996,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
-    if (isSendingQuestion) {
-      console.log("⏸️ Timer paused: already sending a question");
-      return;
-    }
+    // NOTE: isSendingQuestion check moved inside the interval callback via ref
+    // to avoid tearing down and recreating the timer interval
 
     const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
 
@@ -1977,7 +2013,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
-      if (isSendingQuestion) {
+      if (isSendingQuestionRef.current) {
         console.log("⏸️ Skipping check: already sending a question");
         return;
       }
@@ -2100,7 +2136,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🧹 Cleaning up auto-question timer");
       clearInterval(checkInterval);
     };
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, isSendingQuestion, retryAttempts]);
+  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, retryAttempts]);
 
   // Initialize timer when auto-questions are toggled on during recording
   useEffect(() => {
@@ -2525,6 +2561,14 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       setLectureSummaryData(null);
 
       try {
+        // Refresh auth token before lecture summary generation
+        console.log("🔑 Refreshing auth token before lecture summary generation");
+        const { error: summaryRefreshError } = await supabase.auth.refreshSession();
+        if (summaryRefreshError) {
+          console.warn("⚠️ Auth refresh before summary failed:", summaryRefreshError.message);
+          // Continue anyway - the edge function call might still work
+        }
+
         // Fetch today's check-in results for this instructor
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("Not authenticated");
@@ -2869,7 +2913,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Fetch uploaded lecture materials
       const { data: materials, error: materialsError } = await supabase
         .from("lecture_materials")
-        .select("id, title, description, file_path, file_type")
+        .select("id, title, description, file_path, file_type, parsed_text")
         .eq("instructor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(5); // Get most recent 5 materials
@@ -2879,15 +2923,24 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       // Parse content from materials
       let materialContext: any[] = [];
       if (materials && materials.length > 0) {
-        const parsePromises = materials.map(async (material) => {
+        const parsePromises = materials.map(async (material: any) => {
           try {
+            // Use pre-parsed text if available
+            if (material.parsed_text) {
+              console.log("📖 Using cached parsed_text for:", material.title);
+              return {
+                title: material.title,
+                description: material.description,
+                content: material.parsed_text,
+              };
+            }
             console.log("📖 Parsing material:", material.title);
             const { data, error } = await supabase.functions.invoke("parse-lecture-material", {
               body: { filePath: material.file_path },
             });
 
             if (error) {
-              console.warn("Failed to parse material:", material.title, error);
+              console.error("[MATERIAL PARSE FAILED]", material.title, error);
               return null;
             }
 
@@ -2897,7 +2950,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               content: data.text,
             };
           } catch (error) {
-            console.warn("Error parsing material:", material.title, error);
+            console.error("[MATERIAL PARSE FAILED]", material.title, error);
             return null;
           }
         });
@@ -3357,47 +3410,6 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </div>
                   
-                  {/* Answer Key MCQ toggle */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
-                    <Checkbox
-                      id="answer-key-toggle"
-                      checked={useAnswerKeyMcqs}
-                      onCheckedChange={(checked) => {
-                        setUseAnswerKeyMcqs(checked === true);
-                        if (checked) {
-                          if (verifiedProblemsCount === 0) {
-                            sonnerToast.warning("No answer key problems found. Upload a quiz with 'Parse as Answer Key' enabled first.", {
-                              duration: 5000,
-                            });
-                          } else {
-                            sonnerToast.success(`Using ${verifiedProblemsCount} verified answer key problems for matching`);
-                          }
-                        }
-                      }}
-                    />
-                    <Label 
-                      htmlFor="answer-key-toggle" 
-                      className="text-xs font-medium cursor-pointer whitespace-nowrap flex items-center gap-1"
-                    >
-                      <BookOpen className="h-3 w-3" />
-                      Answer Keys
-                      {verifiedProblemsCount !== null && verifiedProblemsCount > 0 && (
-                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
-                          {verifiedProblemsCount}
-                        </span>
-                      )}
-                    </Label>
-                  </div>
-                  
-                  {/* Answer Keys warning when enabled but no problems */}
-                  {useAnswerKeyMcqs && verifiedProblemsCount === 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-md">
-                      <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                      <span className="text-xs text-amber-700 dark:text-amber-300">
-                        No problems found. Upload materials with "Parse as Answer Key" enabled.
-                      </span>
-                    </div>
-                  )}
                   
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">

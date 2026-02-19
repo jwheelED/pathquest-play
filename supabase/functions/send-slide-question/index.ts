@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
 serve(async (req) => {
@@ -54,7 +54,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
-    const { questionType, extractedQuestion, slideNumber } = await req.json();
+    const { questionType, extractedQuestion, slideNumber, isPollMode = false } = await req.json();
 
     if (!extractedQuestion || !questionType) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -63,7 +63,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📋 Sending slide question (type: ${questionType}, slide: ${slideNumber})`);
+    console.log(`📋 Sending slide question (type: ${questionType}, slide: ${slideNumber}, poll: ${isPollMode})`);
 
     // Get instructor's org_id
     const { data: instructorProfile } = await supabase
@@ -87,13 +87,15 @@ serve(async (req) => {
         options: questionData.options || [],
         correctAnswer: questionData.correct_answer || questionData.correctAnswer || 'A',
         explanation: questionData.explanation || "",
+        isPoll: isPollMode,
       };
     } else if (questionType === "short_answer") {
       formattedQuestion = {
         question: questionData.question || '',
         type: "short_answer",
         expectedAnswer: questionData.expected_answer || questionData.expectedAnswer || "",
-        gradingMode: "manual_grade",
+        gradingMode: isPollMode ? "poll" : "manual_grade",
+        isPoll: isPollMode,
       };
     } else if (questionType === "coding") {
       formattedQuestion = {
@@ -111,8 +113,9 @@ serve(async (req) => {
     }
 
     const questionContent = {
-      type: "quiz",
+      type: isPollMode ? "poll" : "quiz",
       questions: [formattedQuestion],
+      isPoll: isPollMode,
     };
 
     // Get connected students
@@ -182,10 +185,12 @@ serve(async (req) => {
       const assignments = studentIds.map((studentId) => ({
         student_id: studentId,
         instructor_id: user.id,
-        title: `Slide Question ${slideNumber || ""}`.trim(),
+        title: isPollMode 
+          ? `Poll ${slideNumber || ""}`.trim() 
+          : `Slide Question ${slideNumber || ""}`.trim(),
         assignment_type: "lecture_checkin" as const,
         content: questionContent,
-        mode: questionType === "mcq" ? "auto_grade" as const : "manual_grade" as const,
+        mode: isPollMode ? "manual_grade" as const : (questionType === "mcq" ? "auto_grade" as const : "manual_grade" as const),
         org_id: instructorOrgId,
       }));
 

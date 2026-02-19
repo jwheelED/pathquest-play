@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
+import { CourseCodeCard } from "@/components/instructor/CourseCodeCard";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -17,12 +18,14 @@ import { LectureTranscription } from "@/components/instructor/LectureTranscripti
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
 import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterialsUpload";
-import { AnswerKeyManager } from "@/components/instructor/answer-keys/AnswerKeyManager";
 // InstructorConnectionCard removed - organization connection not needed unless for institutional licensing
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
+import { LiveSessionResults } from "@/components/instructor/LiveSessionResults";
+import { PastLiveSessions } from "@/components/instructor/PastLiveSessions";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
+import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 
@@ -36,12 +39,13 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "live", label: "Live Lecture", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
+  { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
 ];
@@ -57,6 +61,7 @@ export default function InstructorDashboard() {
   const [refreshQueue, setRefreshQueue] = useState(0);
   const [instructorProfile, setInstructorProfile] = useState<any>(null);
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
@@ -220,7 +225,7 @@ export default function InstructorDashboard() {
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", user.id)
-        .eq("course_id", selectedCourseId)
+        .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
         .limit(100);
 
       if (!studentLinks || studentLinks.length === 0) {
@@ -422,33 +427,7 @@ export default function InstructorDashboard() {
             {/* Organization connection card removed - not needed unless for institutional licensing */}
             
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {instructorCode && (
-                <Card className="headspace-card h-fit">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">Your Class Code</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block break-all">
-                      {instructorCode}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full rounded-xl"
-                      onClick={() => {
-                        navigator.clipboard.writeText(instructorCode);
-                        toast.success("Code copied to clipboard!");
-                      }}
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Code
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Share this code with your students
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+              <CourseCodeCard />
 
               {currentUser && (
                 <div className="xl:col-span-2">
@@ -463,12 +442,7 @@ export default function InstructorDashboard() {
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {currentUser && (
-                <div className="min-w-0">
-                  <LiveSessionControls onSessionChange={setLiveSessionId} />
-                </div>
-              )}
-
+              {/* LiveSessionControls is rendered outside switch to persist - shown here */}
               <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent h-fit">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -490,12 +464,21 @@ export default function InstructorDashboard() {
               </Card>
             </div>
 
-            <div className="min-w-0">
-              <LectureTranscription onQuestionGenerated={() => {}} />
-            </div>
+            {/* LectureTranscription is now rendered outside tabs to persist recording */}
             
+            {/* Live session responses - only shown when a live session is active */}
+            {activeSession?.id && (
+              <div className="min-w-0">
+                <LiveSessionResults sessionId={activeSession.id} />
+              </div>
+            )}
+
             <div className="min-w-0">
               <LectureCheckInResults />
+            </div>
+
+            <div className="min-w-0">
+              <PastLiveSessions />
             </div>
           </div>
         );
@@ -540,6 +523,9 @@ export default function InstructorDashboard() {
           </div>
         );
 
+      case "question-bank":
+        return <QuestionBankTab professorType={professorType} />;
+
       case "materials":
         return (
           <div className="space-y-6">
@@ -547,9 +533,6 @@ export default function InstructorDashboard() {
               <LectureMaterialsUpload />
             </div>
             
-            <div className="min-w-0">
-              <AnswerKeyManager />
-            </div>
             
             {professorType === "research" && (
               <Card className="headspace-card h-fit">
@@ -623,6 +606,24 @@ export default function InstructorDashboard() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
+          {/* Always mount LiveSessionControls to persist session state across tabs */}
+          {currentUser && (
+            <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <LiveSessionControls 
+                  onSessionChange={setLiveSessionId} 
+                  activeSession={activeSession}
+                  setActiveSession={setActiveSession}
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* Always mount LectureTranscription to persist recording across tabs */}
+          <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
+            <LectureTranscription onQuestionGenerated={() => {}} />
+          </div>
+          
           {renderTabContent()}
         </main>
       </div>

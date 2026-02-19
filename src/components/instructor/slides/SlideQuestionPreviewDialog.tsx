@@ -10,9 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { Send, X, Code, FileText, ListChecks } from 'lucide-react';
+import { Send, X, Code, FileText, ListChecks, BarChart3 } from 'lucide-react';
 
 export type QuestionType = 'mcq' | 'short_answer' | 'coding';
 
@@ -21,12 +20,14 @@ export interface MCQData {
   options: string[];
   correct_answer: string;
   explanation?: string;
+  isPoll?: boolean;
 }
 
 export interface ShortAnswerData {
   question: string;
   expected_answer: string;
   explanation?: string;
+  isPoll?: boolean;
 }
 
 export interface CodingData {
@@ -43,6 +44,7 @@ export interface ExtractedQuestionData {
   mcq?: MCQData;
   short_answer?: ShortAnswerData;
   coding?: CodingData;
+  isPoll?: boolean;
 }
 
 interface SlideQuestionPreviewDialogProps {
@@ -50,7 +52,7 @@ interface SlideQuestionPreviewDialogProps {
   onOpenChange: (open: boolean) => void;
   questionType: QuestionType;
   extractedData: ExtractedQuestionData | null;
-  onConfirmSend: (editedData: ExtractedQuestionData) => void;
+  onConfirmSend: (editedData: ExtractedQuestionData, isPollMode: boolean) => void;
   isSending?: boolean;
 }
 
@@ -62,6 +64,8 @@ export function SlideQuestionPreviewDialog({
   onConfirmSend,
   isSending = false,
 }: SlideQuestionPreviewDialogProps) {
+  // Poll mode is always enabled - no grading for slide presenter
+  const isPollMode = true;
   // Editable state for MCQ
   const [mcqQuestion, setMcqQuestion] = useState('');
   const [mcqOptions, setMcqOptions] = useState<string[]>(['', '', '', '']);
@@ -82,14 +86,27 @@ export function SlideQuestionPreviewDialog({
   const [codingConstraints, setCodingConstraints] = useState('');
   const [codingStarterCode, setCodingStarterCode] = useState('');
 
-  // Initialize state when extractedData changes
+  // Reset all form state when dialog opens - ensures fresh state on each open
+  // Uses `open` as trigger to force re-initialization even if extractedData reference is same
   useEffect(() => {
-    if (!extractedData) return;
+    if (!open || !extractedData) return;
+
+    console.log('📋 SlideQuestionPreviewDialog opened, initializing state from extractedData');
 
     if (questionType === 'mcq' && extractedData.mcq) {
       const mcq = extractedData.mcq;
       setMcqQuestion(mcq.question || '');
-      setMcqOptions(mcq.options?.length === 4 ? mcq.options : ['', '', '', '']);
+      
+      // Validate and pad options - filter out empty strings, then pad to 4
+      const validOptions = mcq.options?.filter(opt => opt && opt.trim() !== '') || [];
+      if (validOptions.length >= 4) {
+        setMcqOptions(mcq.options!.slice(0, 4));
+      } else {
+        // Pad with empty strings to always have 4 slots
+        const paddedOptions = [...validOptions, '', '', '', ''].slice(0, 4);
+        setMcqOptions(paddedOptions);
+      }
+      
       setMcqCorrectAnswer(mcq.correct_answer || 'A');
       setMcqExplanation(mcq.explanation || '');
     } else if (questionType === 'short_answer' && extractedData.short_answer) {
@@ -107,7 +124,7 @@ export function SlideQuestionPreviewDialog({
       setCodingConstraints(coding.constraints?.join('\n') || '');
       setCodingStarterCode(coding.starter_code || '');
     }
-  }, [extractedData, questionType]);
+  }, [open, extractedData, questionType]);
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...mcqOptions];
@@ -124,12 +141,14 @@ export function SlideQuestionPreviewDialog({
         options: mcqOptions,
         correct_answer: mcqCorrectAnswer,
         explanation: mcqExplanation,
+        isPoll: isPollMode,
       };
     } else if (questionType === 'short_answer') {
       editedData.short_answer = {
         question: saQuestion,
         expected_answer: saExpectedAnswer,
         explanation: saExplanation,
+        isPoll: isPollMode,
       };
     } else if (questionType === 'coding') {
       editedData.coding = {
@@ -143,7 +162,8 @@ export function SlideQuestionPreviewDialog({
       };
     }
 
-    onConfirmSend(editedData);
+    editedData.isPoll = isPollMode;
+    onConfirmSend(editedData, isPollMode);
   };
 
   const getTypeIcon = () => {
@@ -182,6 +202,16 @@ export function SlideQuestionPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Poll Mode Info - for MCQ and Short Answer */}
+          {(questionType === 'mcq' || questionType === 'short_answer') && (
+            <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+              <p className="text-sm text-blue-400">
+                📊 Responses will be collected as a poll (no grading)
+              </p>
+            </div>
+          )}
+
           {/* MCQ Editor */}
           {questionType === 'mcq' && (
             <>
@@ -198,84 +228,37 @@ export function SlideQuestionPreviewDialog({
 
               <div className="space-y-3">
                 <Label>Answer Options</Label>
-                <RadioGroup value={mcqCorrectAnswer} onValueChange={setMcqCorrectAnswer}>
+                <div className="space-y-2">
                   {['A', 'B', 'C', 'D'].map((letter, index) => (
                     <div key={letter} className="flex items-center gap-3">
-                      <RadioGroupItem value={letter} id={`option-${letter}`} />
-                      <Label
-                        htmlFor={`option-${letter}`}
-                        className="text-sm font-medium w-6"
-                      >
+                      <span className="text-sm font-medium w-6 text-muted-foreground">
                         {letter}:
-                      </Label>
+                      </span>
                       <Input
                         value={mcqOptions[index]}
                         onChange={(e) => handleOptionChange(index, e.target.value)}
                         placeholder={`Option ${letter}`}
                         className="flex-1"
                       />
-                      {mcqCorrectAnswer === letter && (
-                        <Badge variant="default" className="bg-green-600">
-                          Correct
-                        </Badge>
-                      )}
                     </div>
                   ))}
-                </RadioGroup>
-                <p className="text-xs text-muted-foreground">
-                  Select the radio button next to the correct answer
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mcq-explanation">Explanation (optional)</Label>
-                <Textarea
-                  id="mcq-explanation"
-                  value={mcqExplanation}
-                  onChange={(e) => setMcqExplanation(e.target.value)}
-                  placeholder="Explain why this is the correct answer..."
-                  className="min-h-[60px]"
-                />
+                </div>
               </div>
             </>
           )}
 
           {/* Short Answer Editor */}
           {questionType === 'short_answer' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="sa-question">Question</Label>
-                <Textarea
-                  id="sa-question"
-                  value={saQuestion}
-                  onChange={(e) => setSaQuestion(e.target.value)}
-                  placeholder="Enter the question..."
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sa-expected">Expected Answer</Label>
-                <Textarea
-                  id="sa-expected"
-                  value={saExpectedAnswer}
-                  onChange={(e) => setSaExpectedAnswer(e.target.value)}
-                  placeholder="Enter the expected answer for grading..."
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sa-explanation">Explanation (optional)</Label>
-                <Textarea
-                  id="sa-explanation"
-                  value={saExplanation}
-                  onChange={(e) => setSaExplanation(e.target.value)}
-                  placeholder="Additional context for grading..."
-                  className="min-h-[60px]"
-                />
-              </div>
-            </>
+            <div className="space-y-2">
+              <Label htmlFor="sa-question">Question</Label>
+              <Textarea
+                id="sa-question"
+                value={saQuestion}
+                onChange={(e) => setSaQuestion(e.target.value)}
+                placeholder="Enter the question..."
+                className="min-h-[80px]"
+              />
+            </div>
           )}
 
           {/* Coding Editor */}

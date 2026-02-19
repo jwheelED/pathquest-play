@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { usePresenterReceiver } from '@/hooks/useLecturePresenterChannel';
 import { useLecturePresenterData } from '@/hooks/useLecturePresenterData';
-import { Clock, Users, Send, CheckCircle, Timer } from 'lucide-react';
+import { MCQDistributionChart } from './MCQDistributionChart';
+import { Clock, Users, Send, CheckCircle, Timer, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DirectState {
@@ -25,13 +26,24 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
   const [flashNotification, setFlashNotification] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(directState?.autoQuestionEnabled || false);
+  const [showPollResults, setShowPollResults] = useState(false);
 
   // Fetch real-time question stats
-  const { currentQuestion, studentCount: fetchedStudentCount, calculateQuestionStats } = useLecturePresenterData();
+  const { currentQuestion, studentCount: fetchedStudentCount, calculateQuestionStats, calculateMCQDistribution } = useLecturePresenterData();
   
   // Calculate stats for the first question in current group
   const currentStats = currentQuestion && currentQuestion.questions.length > 0
     ? calculateQuestionStats(currentQuestion.assignments, 0, currentQuestion.questions[0])
+    : null;
+
+  // Check if current question is MCQ for bar chart display
+  const currentQuestionData = currentQuestion?.questions?.[0];
+  const isMCQ = currentQuestionData?.type === 'multiple_choice';
+  const isPoll = currentQuestionData?.isPoll === true;
+  
+  // Calculate MCQ distribution for bar chart
+  const mcqDistribution = isMCQ && currentQuestion 
+    ? calculateMCQDistribution(currentQuestion.assignments, 0, currentQuestionData)
     : null;
 
   // Update from direct props when they change
@@ -44,6 +56,11 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
       setNextQuestionIn(directState.nextAutoQuestionIn);
     }
   }, [directState]);
+
+  // Reset poll results visibility when question changes
+  useEffect(() => {
+    setShowPollResults(false);
+  }, [currentQuestion?.timestamp]);
 
   // Listen for broadcasts from main dashboard (fallback when not using direct props)
   usePresenterReceiver((message) => {
@@ -136,9 +153,9 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
             <Users className="w-3.5 h-3.5" />
             <span className="text-xs">{studentCount}</span>
           </div>
-          {currentStats && currentStats.responseCount > 0 && currentStats.correctPercentage !== null && (
-            <span className={cn("text-xs font-bold", getCorrectPercentColor(currentStats.correctPercentage))}>
-              {Math.round(currentStats.correctPercentage)}%
+          {currentStats && currentStats.responseCount > 0 && (
+            <span className="text-xs text-blue-400 font-medium">
+              {currentStats.responseCount} responses
             </span>
           )}
         </div>
@@ -211,41 +228,45 @@ export function SlidePresenterOverlay({ directState }: SlidePresenterOverlayProp
           </div>
         )}
 
-        {/* Response Stats */}
+        {/* Poll/Question Response Count - Shows for ALL question types */}
         {currentStats && currentStats.responseCount > 0 && (
           <div className="bg-slate-800/50 rounded-lg p-3">
-            <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-2">Last Question Stats</div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-slate-400 mb-1">
-                  <Users className="w-3 h-3" />
-                </div>
-                <div className="text-sm font-bold text-slate-200">
-                  {currentStats.responseCount}/{studentCount}
-                </div>
-                <div className="text-[9px] text-slate-500">Responses</div>
+            {/* Always visible: Response count + View Poll button (MCQ only) */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs text-slate-300">
+                  <span className="font-bold">{currentStats.responseCount}</span>
+                  <span className="text-slate-500">/{studentCount} responses</span>
+                </span>
               </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <CheckCircle className={cn("w-3 h-3", getCorrectPercentColor(currentStats.correctPercentage))} />
-                </div>
-                <div className={cn("text-sm font-bold", getCorrectPercentColor(currentStats.correctPercentage))}>
-                  {currentStats.correctPercentage !== null ? `${Math.round(currentStats.correctPercentage)}%` : '—'}
-                </div>
-                <div className="text-[9px] text-slate-500">Correct</div>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-slate-400 mb-1">
-                  <Timer className="w-3 h-3" />
-                </div>
-                <div className="text-sm font-bold text-slate-200">
-                  {currentStats.avgResponseTime}s
-                </div>
-                <div className="text-[9px] text-slate-500">Avg Time</div>
-              </div>
+              {/* View Poll button only for MCQ questions */}
+              {isMCQ && mcqDistribution && (
+                <button
+                  onClick={() => setShowPollResults(!showPollResults)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium 
+                             bg-blue-600 hover:bg-blue-500 text-white rounded transition-colors"
+                >
+                  <BarChart3 className="w-3 h-3" />
+                  {showPollResults ? 'Hide' : 'View Poll'}
+                </button>
+              )}
             </div>
+            
+            {/* MCQ Distribution Chart - conditionally visible */}
+            {isMCQ && mcqDistribution && showPollResults && (
+              <div className="mt-3">
+                <MCQDistributionChart
+                  distribution={mcqDistribution}
+                  isPoll={isPoll}
+                  totalResponses={currentStats.responseCount}
+                  totalStudents={studentCount}
+                />
+              </div>
+            )}
           </div>
         )}
+
 
         {/* Last Question Sent */}
         {lastQuestionText && (

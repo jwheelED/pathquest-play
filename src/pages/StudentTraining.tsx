@@ -58,10 +58,12 @@ export default function StudentTraining() {
   const fetchWrongAnswersCount = async (userId: string) => {
     try {
       const { count } = await supabase
-        .from("live_session_responses")
+        .from("student_assignments")
         .select("id", { count: "exact", head: true })
         .eq("student_id", userId)
-        .or("is_correct.eq.false,ai_grade.lt.70");
+        .eq("assignment_type", "lecture_checkin")
+        .eq("completed", true)
+        .or("grade.lt.70");
 
       setWrongAnswersCount(count || 0);
     } catch (error) {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
 import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/SlideViewer';
+import { PptxViewer, PptxViewerRef } from '@/components/instructor/slides/PptxViewer';
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
 import { SlideRecordingControls, SlideQuestionType } from '@/components/instructor/slides/SlideRecordingControls';
 import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from '@/components/instructor/slides/SlideQuestionPreviewDialog';
@@ -13,6 +14,7 @@ import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
+import { trackQuestionSent, trackSlidePresenterStarted } from '@/lib/posthogTracking';
 
 export interface SlideData {
   id: string;
@@ -20,6 +22,7 @@ export interface SlideData {
   slides: string[]; // Array of image URLs
   totalSlides: number;
   createdAt: string;
+  fileType: string; // 'application/pdf' or PPTX types
 }
 
 export default function SlidePresenter() {
@@ -56,23 +59,36 @@ export default function SlidePresenter() {
 
   // Refs to hold callbacks to avoid circular dependency with useLectureRecording
   const handleManualQuestionSendRef = useRef<(() => Promise<void>) | null>(null);
-  const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType) => Promise<void>) | null>(null);
+  const handleSendSlideQuestionRef = useRef<((type: SlideQuestionType, skipPreview?: boolean) => Promise<void>) | null>(null);
+  
+  // Guard ref to prevent duplicate voice command triggers
+  const isProcessingSlideQuestionRef = useRef(false);
 
   // Handle voice commands from lecture recording
   const handleVoiceCommand = useCallback((type: 'send_question' | 'send_slide_question') => {
     console.log(`🎤 Slide Presenter received voice command: ${type}`);
     
+    // Prevent duplicate slide question triggers
+    if (type === 'send_slide_question' && isProcessingSlideQuestionRef.current) {
+      console.log('⚠️ Skipping duplicate slide question trigger - already processing');
+      return;
+    }
+    
     // Play notification sound for voice command detection
     playNotificationSound().catch(() => {});
     
     if (type === 'send_slide_question') {
-      // Voice command to send slide question - default to MCQ
+      // Voice command to send slide question - default to MCQ, show preview
+      isProcessingSlideQuestionRef.current = true;
       toast.success('Voice command: Send Slide Question');
-      handleSendSlideQuestionRef.current?.('mcq');
+      handleSendSlideQuestionRef.current?.('mcq', false); // Show preview for review
     } else if (type === 'send_question') {
       // Voice command to send regular question from transcript
       toast.success('Voice command: Send Question');
-      handleManualQuestionSendRef.current?.();
+      // 500ms delay to ensure transcript buffer is fully populated with the spoken question
+      setTimeout(() => {
+        handleManualQuestionSendRef.current?.();
+      }, 500);
     }
   }, []);
 
@@ -106,6 +122,7 @@ export default function SlidePresenter() {
     slideContext: currentSlideText,
     onVoiceCommand: handleVoiceCommand,
     onQuestionExtracted: handleQuestionExtracted,
+    bypassPreviewSetting: true, // Slide Presenter always sends immediately
   });
 
   // Update ref when handleManualQuestionSend is available
@@ -145,8 +162,56 @@ export default function SlidePresenter() {
     }
   }, []);
 
+  // Handle confirming and sending the question from preview dialog
+  // (Moved above handleSendSlideQuestion so it can be referenced by it)
+  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData, isPollMode: boolean) => {
+    setIsSendingFromPreview(true);
+    
+    try {
+      // Refresh auth token before sending question
+      console.log('🔑 Refreshing auth token before sending slide question');
+      await supabase.auth.refreshSession();
+      
+      // Send the edited question to students via dedicated edge function
+      const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
+        body: {
+          questionType: previewQuestionType,
+          extractedQuestion: editedData,
+          slideNumber: currentSlideNumber,
+          isPollMode,
+        },
+      });
+
+      if (sendError) {
+        console.error('Error sending slide question:', sendError);
+        toast.error(sendError.message || 'Failed to send question to students');
+        return;
+      }
+
+      if (!sendData?.success) {
+        toast.error(sendData?.error || 'Failed to send question');
+        return;
+      }
+
+      // Track question sent in PostHog
+      trackQuestionSent(previewQuestionType, 'slide');
+
+      const modeLabel = isPollMode ? 'Poll' : previewQuestionType.toUpperCase();
+      toast.success(`${modeLabel} sent to students!`);
+      setIsPreviewOpen(false);
+      setPreviewExtractedData(null);
+      
+    } catch (err) {
+      console.error('Error in handleConfirmSendQuestion:', err);
+      toast.error('An error occurred while sending the question');
+    } finally {
+      setIsSendingFromPreview(false);
+      isProcessingSlideQuestionRef.current = false; // Reset guard
+    }
+  }, [previewQuestionType, currentSlideNumber]);
+
   // Handle sending a question from the current slide via OCR
-  const handleSendSlideQuestion = useCallback(async (questionType: SlideQuestionType) => {
+  const handleSendSlideQuestion = useCallback(async (questionType: SlideQuestionType, skipPreview: boolean = false) => {
     if (!slideViewerRef.current) {
       toast.error('Slide viewer not ready');
       return;
@@ -170,6 +235,10 @@ export default function SlidePresenter() {
     
     try {
       console.log(`📋 Extracting ${questionType} question from slide ${currentSlideNumber}${selection ? ' (region selected)' : ''}`);
+      
+      // Refresh auth token before edge function call
+      console.log('🔑 Refreshing auth token before slide extraction');
+      await supabase.auth.refreshSession();
       
       // Fetch instructor's difficulty preference
       const { data: { user } } = await supabase.auth.getUser();
@@ -242,6 +311,13 @@ export default function SlidePresenter() {
         };
       }
 
+      // If skipPreview (voice command), send immediately without dialog
+      if (skipPreview) {
+        await handleConfirmSendQuestion(transformedData, true); // isPollMode = true for voice commands
+        setExtractionStage('idle');
+        return;
+      }
+
       // Open preview dialog with transformed data
       setPreviewQuestionType(questionType as QuestionType);
       setPreviewExtractedData(transformedData);
@@ -252,45 +328,9 @@ export default function SlidePresenter() {
       console.error('Error in handleSendSlideQuestion:', err);
       toast.error('An error occurred while processing the slide');
       setExtractionStage('idle');
+      isProcessingSlideQuestionRef.current = false; // Reset guard on error
     }
-  }, [currentSlideNumber]);
-
-  // Handle confirming and sending the question from preview dialog
-  const handleConfirmSendQuestion = useCallback(async (editedData: ExtractedQuestionData) => {
-    setIsSendingFromPreview(true);
-    
-    try {
-      // Send the edited question to students via dedicated edge function
-      const { data: sendData, error: sendError } = await supabase.functions.invoke('send-slide-question', {
-        body: {
-          questionType: previewQuestionType,
-          extractedQuestion: editedData,
-          slideNumber: currentSlideNumber,
-        },
-      });
-
-      if (sendError) {
-        console.error('Error sending slide question:', sendError);
-        toast.error(sendError.message || 'Failed to send question to students');
-        return;
-      }
-
-      if (!sendData?.success) {
-        toast.error(sendData?.error || 'Failed to send question');
-        return;
-      }
-
-      toast.success(`${previewQuestionType.toUpperCase()} question sent to students!`);
-      setIsPreviewOpen(false);
-      setPreviewExtractedData(null);
-      
-    } catch (err) {
-      console.error('Error in handleConfirmSendQuestion:', err);
-      toast.error('An error occurred while sending the question');
-    } finally {
-      setIsSendingFromPreview(false);
-    }
-  }, [previewQuestionType, currentSlideNumber]);
+  }, [currentSlideNumber, handleConfirmSendQuestion]);
 
   // Handle confirming and sending voice question from preview dialog
   const handleConfirmVoiceQuestion = useCallback(async (editedQuestion: ExtractedVoiceQuestion) => {
@@ -318,6 +358,29 @@ export default function SlidePresenter() {
     handleSendSlideQuestionRef.current = handleSendSlideQuestion;
   }, [handleSendSlideQuestion]);
 
+  // Reset processing guard when preview dialog closes for ANY reason (cancel, click outside, etc.)
+  useEffect(() => {
+    if (!isPreviewOpen) {
+      isProcessingSlideQuestionRef.current = false;
+    }
+  }, [isPreviewOpen]);
+
+  // Proactive token refresh for extended slide presenter sessions
+  useEffect(() => {
+    if (!isRecording) return;
+
+    // Refresh every 5 minutes during recording
+    const refreshTimer = setInterval(async () => {
+      console.log('🔑 Proactive auth token refresh (Slide Presenter)');
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.warn('⚠️ Proactive auth refresh failed:', error.message);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(refreshTimer);
+  }, [isRecording]);
+
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -336,12 +399,12 @@ export default function SlidePresenter() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Fetch PDF materials that can be presented
+    // Fetch both PDF and PPTX materials that can be presented
     const { data, error } = await supabase
       .from('lecture_materials')
       .select('*')
       .eq('instructor_id', user.id)
-      .eq('file_type', 'application/pdf')
+      .or('file_type.eq.application/pdf,file_type.ilike.%presentation%,file_type.ilike.%powerpoint%')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -356,6 +419,7 @@ export default function SlidePresenter() {
       slides: [], // Will be populated when presenting
       totalSlides: 0,
       createdAt: m.created_at,
+      fileType: m.file_type || 'application/pdf',
     }));
 
     setPresentations(slides);
@@ -366,6 +430,9 @@ export default function SlidePresenter() {
     setIsFullscreen(true);
     setCurrentSlideText('');
     setCurrentSlideNumber(1);
+    
+    // Track slide presentation start in PostHog
+    trackSlidePresenterStarted(presentation.id);
     
     // Enter browser fullscreen
     try {
@@ -425,48 +492,65 @@ export default function SlidePresenter() {
 
   // Fullscreen presentation mode with integrated recording
   if (isFullscreen && activePresentation) {
+    // Check if this is a PPTX file (uses Office Online embed)
+    const isPptxPresentation = activePresentation.fileType?.includes('presentation') || 
+                               activePresentation.fileType?.includes('powerpoint');
+
     return (
       <div className="fixed inset-0 bg-black z-50">
-        {/* Voice Command Screen Flash Overlay */}
-        <div 
-          className={cn(
-            "absolute inset-0 pointer-events-none z-[60] transition-opacity duration-300",
-            voiceCommandDetected 
-              ? "opacity-100" 
-              : "opacity-0"
-          )}
-        >
-          {/* Border glow effect */}
-          <div className={cn(
-            "absolute inset-0 border-8 border-emerald-400 rounded-lg",
-            voiceCommandDetected && "animate-[border-flash_0.5s_ease-out]"
-          )} 
-          style={{
-            boxShadow: voiceCommandDetected 
-              ? 'inset 0 0 60px rgba(52, 211, 153, 0.3), 0 0 60px rgba(52, 211, 153, 0.5)' 
-              : 'none'
-          }}
-          />
-          
-          {/* Center mic icon indicator */}
-          {voiceCommandDetected && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[voice-icon-appear_0.3s_ease-out]">
-              <div className="bg-emerald-500/90 rounded-full p-6 shadow-[0_0_60px_rgba(52,211,153,0.8)]">
-                <Mic className="w-12 h-12 text-white animate-pulse" />
+        {/* Voice Command Screen Flash Overlay - only show for PDF (slide extraction works) */}
+        {!isPptxPresentation && (
+          <div 
+            className={cn(
+              "absolute inset-0 pointer-events-none z-[60] transition-opacity duration-300",
+              voiceCommandDetected 
+                ? "opacity-100" 
+                : "opacity-0"
+            )}
+          >
+            {/* Border glow effect */}
+            <div className={cn(
+              "absolute inset-0 border-8 border-emerald-400 rounded-lg",
+              voiceCommandDetected && "animate-[border-flash_0.5s_ease-out]"
+            )} 
+            style={{
+              boxShadow: voiceCommandDetected 
+                ? 'inset 0 0 60px rgba(52, 211, 153, 0.3), 0 0 60px rgba(52, 211, 153, 0.5)' 
+                : 'none'
+            }}
+            />
+            
+            {/* Center mic icon indicator */}
+            {voiceCommandDetected && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[voice-icon-appear_0.3s_ease-out]">
+                <div className="bg-emerald-500/90 rounded-full p-6 shadow-[0_0_60px_rgba(52,211,153,0.8)]">
+                  <Mic className="w-12 h-12 text-white animate-pulse" />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        <SlideViewer
-          ref={slideViewerRef}
-          presentationId={activePresentation.id}
-          title={activePresentation.title}
-          onExit={handleExitPresentation}
-          onSlideChange={handleSlideChange}
-          isSelectionMode={isSelectionMode}
-          onSelectionChange={handleSelectionChange}
-        />
+        {/* Render appropriate viewer based on file type */}
+        {isPptxPresentation ? (
+          <PptxViewer
+            ref={slideViewerRef as React.RefObject<PptxViewerRef>}
+            presentationId={activePresentation.id}
+            title={activePresentation.title}
+            onExit={handleExitPresentation}
+            onSlideChange={handleSlideChange}
+          />
+        ) : (
+          <SlideViewer
+            ref={slideViewerRef}
+            presentationId={activePresentation.id}
+            title={activePresentation.title}
+            onExit={handleExitPresentation}
+            onSlideChange={handleSlideChange}
+            isSelectionMode={isSelectionMode}
+            onSelectionChange={handleSelectionChange}
+          />
+        )}
         
         {/* Recording Controls - bottom left */}
         <SlideRecordingControls
@@ -571,28 +655,37 @@ export default function SlidePresenter() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {presentations.map((presentation) => (
-              <div
-                key={presentation.id}
-                className="border rounded-lg overflow-hidden bg-card hover:border-primary/50 transition-colors cursor-pointer group"
-                onClick={() => handleStartPresentation(presentation)}
-              >
-                <div className="aspect-video bg-muted flex items-center justify-center relative">
-                  <Presentation className="h-12 w-12 text-muted-foreground" />
-                  <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Button variant="secondary">
-                      Start Presenting
-                    </Button>
+            {presentations.map((presentation) => {
+              const isPptx = presentation.fileType?.includes('presentation') || 
+                             presentation.fileType?.includes('powerpoint');
+              return (
+                <div
+                  key={presentation.id}
+                  className="border rounded-lg overflow-hidden bg-card hover:border-primary/50 transition-colors cursor-pointer group"
+                  onClick={() => handleStartPresentation(presentation)}
+                >
+                  <div className="aspect-video bg-muted flex items-center justify-center relative">
+                    <Presentation className="h-12 w-12 text-muted-foreground" />
+                    {isPptx && (
+                      <div className="absolute top-2 right-2 bg-amber-500/90 text-white text-xs px-2 py-1 rounded">
+                        Animations
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button variant="secondary">
+                        Start Presenting
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold truncate">{presentation.title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {isPptx ? 'PowerPoint' : 'PDF'} • {new Date(presentation.createdAt).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-semibold truncate">{presentation.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(presentation.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

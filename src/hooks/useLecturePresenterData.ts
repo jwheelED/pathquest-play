@@ -27,6 +27,13 @@ interface QuestionStats {
   avgResponseTime: number | null;
 }
 
+export interface MCQDistribution {
+  option: string;
+  count: number;
+  percentage: number;
+  isCorrect?: boolean;
+}
+
 export const useLecturePresenterData = () => {
   const [studentCount, setStudentCount] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState<LectureQuestion | null>(null);
@@ -90,6 +97,60 @@ export const useLecturePresenterData = () => {
       correctPercentage: isManualGradeShortAnswer ? null : (completed.length > 0 ? (correct.length / completed.length) * 100 : 0),
       avgResponseTime,
     };
+  }, []);
+
+  const calculateMCQDistribution = useCallback((
+    assignments: Assignment[], 
+    questionIndex: number, 
+    question: any
+  ): MCQDistribution[] => {
+    const isPoll = question.isPoll === true;
+    const correctAnswer = question.overriddenAnswer || question.correctAnswer;
+
+    // Filter to assignments containing this question
+    const questionAssignments = assignments.filter((a) => {
+      const content = a.content as any;
+      const assignmentQuestions = content?.questions || [];
+      return assignmentQuestions.some((q: any) => q.question === question.question);
+    });
+
+    // Deduplicate by student
+    const uniqueStudents = new Map<string, Assignment>();
+    questionAssignments.forEach((assignment) => {
+      const existing = uniqueStudents.get(assignment.student_id);
+      if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+        uniqueStudents.set(assignment.student_id, assignment);
+      }
+    });
+
+    const uniqueAssignments = Array.from(uniqueStudents.values());
+    const completed = uniqueAssignments.filter((a) => a.completed);
+    const totalResponses = completed.length;
+
+    // Count responses for each option
+    const distribution: MCQDistribution[] = ['A', 'B', 'C', 'D'].map((letter) => {
+      const count = completed.filter((a) => {
+        const assignmentContent = a.content as any;
+        const assignmentQuestions = assignmentContent?.questions || [];
+        const studentQuestionIdx = assignmentQuestions.findIndex(
+          (q: any) => q.question === question.question
+        );
+        
+        const response = studentQuestionIdx >= 0 
+          ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
+          : null;
+        return response === letter;
+      }).length;
+
+      return {
+        option: letter,
+        count,
+        percentage: totalResponses > 0 ? (count / totalResponses) * 100 : 0,
+        isCorrect: isPoll ? undefined : letter === correctAnswer,
+      };
+    });
+
+    return distribution;
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -257,6 +318,7 @@ export const useLecturePresenterData = () => {
     currentQuestion,
     recentQuestions,
     calculateQuestionStats,
+    calculateMCQDistribution,
     loading,
     error,
     lectureStartTime,

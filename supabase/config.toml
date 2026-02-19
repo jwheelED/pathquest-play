@@ -20,3 +20,48 @@ verify_jwt = false
 
 [functions.convert-pptx-to-pdf]
 verify_jwt = false
+
+[functions.convert-pptx-background]
+verify_jwt = false
+
+[functions.generate-interval-question]
+verify_jwt = false
+
+[functions.generate-live-lecture-summary]
+verify_jwt = false
+
+[functions.health-check]
+verify_jwt = false
+
+[functions.generate-mcq-options]
+verify_jwt = false
+
+[functions.generate-expected-answer]
+verify_jwt = false
+
+[functions.submit-live-response]
+verify_jwt = false
+
+[functions.push-bank-question]
+verify_jwt = false
+
+[functions.generate-detailed-explanation]
+verify_jwt = false
+
+[functions.join-live-session]
+verify_jwt = false
+
+[functions.get-live-question]
+verify_jwt = false
+
+[functions.create-live-session]
+verify_jwt = false
+
+[functions.resolve-live-session]
+verify_jwt = false
+
+[functions.parse-lecture-material]
+verify_jwt = false
+
+[functions.sync-grade-to-lms]
+verify_jwt = false

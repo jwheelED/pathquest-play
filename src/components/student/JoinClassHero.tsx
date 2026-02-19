@@ -21,43 +21,80 @@ export function JoinClassHero({ userId, onClassJoined }: JoinClassHeroProps) {
 
     setJoining(true);
     try {
-      // Find instructor by code
-      const { data: instructor, error: findError } = await supabase
-        .from("profiles")
-        .select("id, full_name, course_title")
-        .eq("instructor_code", classCode.trim().toUpperCase())
-        .eq("role", "instructor")
-        .single();
+      // Try new course code validation first
+      const { data: courseData } = await supabase
+        .rpc("validate_course_code", { code: classCode.trim().toUpperCase() });
 
-      if (findError || !instructor) {
+      let instructorId: string | null = null;
+      let courseId: string | null = null;
+      let courseTitle: string | null = null;
+
+      if (courseData && courseData.length > 0) {
+        // Found course with new system
+        instructorId = courseData[0].instructor_id;
+        courseId = courseData[0].course_id;
+        courseTitle = courseData[0].course_title;
+      } else {
+        // Fallback to legacy instructor code validation
+        const { data: legacyInstructorId, error: validateError } = await supabase
+          .rpc("validate_instructor_code", { code: classCode.trim().toUpperCase() });
+
+        if (validateError || !legacyInstructorId) {
+          toast.error("Invalid class code. Please check and try again.");
+          return;
+        }
+        instructorId = legacyInstructorId;
+
+        // Get course title from profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("course_title")
+          .eq("id", instructorId)
+          .maybeSingle();
+        
+        courseTitle = profile?.course_title;
+      }
+
+      if (!instructorId) {
         toast.error("Invalid class code. Please check and try again.");
         return;
       }
 
       // Check if already connected
-      const { data: existing } = await supabase
+      let existingQuery = supabase
         .from("instructor_students")
         .select("id")
         .eq("student_id", userId)
-        .eq("instructor_id", instructor.id)
-        .maybeSingle();
+        .eq("instructor_id", instructorId);
+
+      if (courseId) {
+        existingQuery = existingQuery.eq("course_id", courseId);
+      }
+
+      const { data: existing } = await existingQuery.maybeSingle();
 
       if (existing) {
         toast.info("You're already enrolled in this class!");
         return;
       }
 
-      // Create connection
+      // Create connection with course_id if available
+      const insertData: { student_id: string; instructor_id: string; course_id?: string } = {
+        student_id: userId,
+        instructor_id: instructorId,
+      };
+
+      if (courseId) {
+        insertData.course_id = courseId;
+      }
+
       const { error: connectError } = await supabase
         .from("instructor_students")
-        .insert({
-          student_id: userId,
-          instructor_id: instructor.id,
-        });
+        .insert(insertData);
 
       if (connectError) throw connectError;
 
-      toast.success(`Joined ${instructor.course_title || "class"} successfully!`);
+      toast.success(`Joined ${courseTitle || "class"} successfully!`);
       setClassCode("");
       onClassJoined?.();
     } catch (error: any) {

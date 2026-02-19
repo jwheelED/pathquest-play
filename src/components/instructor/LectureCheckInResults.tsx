@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
@@ -15,6 +16,8 @@ import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { Progress } from "@/components/ui/progress";
 
 interface Assignment {
   id: string;
@@ -460,6 +463,149 @@ export const LectureCheckInResults = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
+  };
+
+  // Expandable code response component for coding questions
+  const ExpandableCodeResponse = ({ 
+    studentAnswer, 
+    studentAIFeedback 
+  }: { 
+    studentAnswer: string; 
+    studentAIFeedback: string | null;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full max-w-md">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-6 px-2 gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Code className="h-3 w-3" />
+            <span>{isOpen ? "Hide Code" : "View Code"}</span>
+            <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap text-left max-h-60">
+            {studentAnswer}
+          </pre>
+          {studentAIFeedback && (
+            <p className="mt-1 text-xs text-muted-foreground italic text-left p-2 bg-muted/50 rounded">
+              💬 {studentAIFeedback}
+            </p>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
+
+  // Coding submission card component with expandable code view
+  const CodingSubmissionCard = ({ 
+    assignment, 
+    studentAnswer, 
+    isCompleted, 
+    currentGrade,
+    questionAIRec,
+    qIdx,
+    fetchResults: fetchResultsFn
+  }: { 
+    assignment: Assignment;
+    studentAnswer: string | null;
+    isCompleted: boolean;
+    currentGrade: number | null;
+    questionAIRec: any;
+    qIdx: number;
+    fetchResults: () => void;
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+      <div className="bg-white dark:bg-gray-900 p-3 rounded border">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <span className="font-medium text-sm">{assignment.student_name}</span>
+          <div className="flex items-center gap-2">
+            {!isCompleted && (
+              <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                <Clock className="h-3 w-3" />
+                Not Answered
+              </Badge>
+            )}
+            {isCompleted && currentGrade !== null && (
+              <Badge variant="default" className="bg-green-600">
+                Grade: {currentGrade}/100
+              </Badge>
+            )}
+          </div>
+        </div>
+        {isCompleted && studentAnswer && (
+          <>
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs mb-2 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                  <Code className="h-3 w-3" />
+                  <span>{isOpen ? "Hide Code" : "View Code"}</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap mb-3 max-h-80">
+                  {studentAnswer}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
+            
+            {questionAIRec && (
+              <div className="mb-3 p-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded">
+                <p className="text-xs font-semibold text-purple-900 dark:text-purple-200 mb-1">
+                  🤖 AI Recommended Grade: {questionAIRec.grade}/100
+                </p>
+                <p className="text-xs text-purple-800 dark:text-purple-300">
+                  {questionAIRec.feedback}
+                </p>
+              </div>
+            )}
+            
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                placeholder="Grade (0-100)"
+                defaultValue={currentGrade ?? questionAIRec?.grade ?? ''}
+                className="w-24 px-2 py-1 text-sm border rounded"
+                id={`coding-grade-${assignment.id}`}
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  const input = document.getElementById(`coding-grade-${assignment.id}`) as HTMLInputElement;
+                  const grade = parseInt(input.value);
+                  
+                  if (isNaN(grade) || grade < 0 || grade > 100) {
+                    toast.error("Please enter a valid grade (0-100)");
+                    return;
+                  }
+
+                  const { error } = await supabase
+                    .from('student_assignments')
+                    .update({ grade })
+                    .eq('id', assignment.id);
+
+                  if (error) {
+                    toast.error("Failed to save grade");
+                    return;
+                  }
+
+                  toast.success(`Grade saved: ${grade}/100`);
+                  fetchResultsFn();
+                }}
+              >
+                Save Grade
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   const generateSummary = async (
@@ -915,14 +1061,83 @@ export const LectureCheckInResults = () => {
     }
   };
 
+  // Compute summary metrics across all groups
+  const summaryMetrics = (() => {
+    let totalQuestions = 0;
+    let totalCompleted = 0;
+    let totalExpected = 0;
+    const allPercentages: number[] = [];
+    const allResponseTimes: number[] = [];
+
+    groupedResults.forEach((group) => {
+      totalQuestions += group.questions.length;
+      group.questions.forEach((question, qIdx) => {
+        const stats = calculateQuestionStats(group.assignments, qIdx, question);
+        totalCompleted += stats.completed;
+        totalExpected += stats.total;
+        if (stats.percentage !== null) {
+          allPercentages.push(stats.percentage);
+        }
+        if (stats.avgResponseTime !== null) {
+          allResponseTimes.push(stats.avgResponseTime);
+        }
+      });
+    });
+
+    const avgAccuracy = allPercentages.length > 0
+      ? Math.round(allPercentages.reduce((s, v) => s + v, 0) / allPercentages.length)
+      : null;
+    const responseRate = totalExpected > 0
+      ? Math.round((totalCompleted / totalExpected) * 100)
+      : 0;
+    const avgTime = allResponseTimes.length > 0
+      ? Math.round(allResponseTimes.reduce((s, v) => s + v, 0) / allResponseTimes.length)
+      : null;
+
+    return { totalQuestions, avgAccuracy, responseRate, totalCompleted, totalExpected, avgTime };
+  })();
+
+  // Helper: relative time formatting for group headers
+  const formatRelativeTime = (timestamp: string): string => {
+    const diff = Date.now() - new Date(timestamp).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(timestamp).toLocaleString();
+  };
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Live Lecture Check-In Results</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            Check-In Results
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Loading results...</p>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="border rounded-2xl p-3 space-y-3">
+                <Skeleton className="h-8 w-8 rounded-xl" />
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            ))}
+          </div>
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="border rounded-lg p-5 space-y-3">
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-2 w-full rounded-full" />
+              <div className="space-y-2 pt-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
     );
@@ -932,9 +1147,22 @@ export const LectureCheckInResults = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Live Lecture Check-In Results</CardTitle>
-          <CardDescription>No lecture check-ins sent yet</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-6 w-6 text-primary" />
+            Check-In Results
+          </CardTitle>
         </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="rounded-full bg-muted p-4 mb-4">
+              <ClipboardList className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-medium text-muted-foreground mb-1">No check-ins yet</p>
+            <p className="text-sm text-muted-foreground/70 max-w-sm">
+              Send a lecture check-in question to your students during a live session to see results here.
+            </p>
+          </div>
+        </CardContent>
       </Card>
     );
   }
@@ -1014,14 +1242,61 @@ export const LectureCheckInResults = () => {
         </div>
       </CardHeader>
       <CardContent className="pt-6">
+        {/* Summary Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <MetricCard
+            icon={<FileText className="h-4 w-4" />}
+            label="Total Questions"
+            value={summaryMetrics.totalQuestions}
+            size="sm"
+            variant="primary"
+          />
+          <MetricCard
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Avg Accuracy"
+            value={summaryMetrics.avgAccuracy !== null ? `${summaryMetrics.avgAccuracy}%` : 'N/A'}
+            size="sm"
+            variant={summaryMetrics.avgAccuracy !== null && summaryMetrics.avgAccuracy >= 70 ? 'success' : 'warning'}
+          />
+          <MetricCard
+            icon={<Users className="h-4 w-4" />}
+            label="Response Rate"
+            value={`${summaryMetrics.responseRate}%`}
+            size="sm"
+            variant="default"
+          />
+          <MetricCard
+            icon={<Clock className="h-4 w-4" />}
+            label="Avg Response Time"
+            value={summaryMetrics.avgTime !== null ? formatTime(summaryMetrics.avgTime) : 'N/A'}
+            size="sm"
+            variant="default"
+          />
+        </div>
+
         <Accordion type="single" collapsible className="space-y-4" defaultValue="group-0">
           {groupedResults.map((group, groupIdx) => (
             <AccordionItem key={groupIdx} value={`group-${groupIdx}`} className="border-2 rounded-lg px-4 shadow-sm bg-card">
               <AccordionTrigger className="hover:no-underline py-4">
                 <div className="flex items-center justify-between w-full pr-4">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">{new Date(group.timestamp).toLocaleString()}</Badge>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge variant="outline">{formatRelativeTime(group.timestamp)}</Badge>
+                    <Badge variant="secondary" className="text-xs">{group.questions.length} question{group.questions.length !== 1 ? 's' : ''}</Badge>
                     <span className="text-sm text-muted-foreground">{group.assignments.length} student(s)</span>
+                    {(() => {
+                      const groupPercentages: number[] = [];
+                      group.questions.forEach((q, qi) => {
+                        const s = calculateQuestionStats(group.assignments, qi, q);
+                        if (s.percentage !== null) groupPercentages.push(s.percentage);
+                      });
+                      if (groupPercentages.length === 0) return null;
+                      const avg = Math.round(groupPercentages.reduce((a, b) => a + b, 0) / groupPercentages.length);
+                      return (
+                        <Badge variant="outline" className={`text-xs ${avg >= 70 ? 'border-green-500 text-green-600' : avg >= 50 ? 'border-amber-500 text-amber-600' : 'border-red-500 text-red-600'}`}>
+                          {avg}% avg
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center gap-3">
                     {group.assignments.filter((a) => a.completed).length === group.assignments.length ? (
@@ -1072,7 +1347,13 @@ export const LectureCheckInResults = () => {
                   const isOverridden = !!question.overriddenAnswer;
 
                   return (
-                    <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card ${isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
+                    <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card border-l-4 ${
+                      isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' :
+                      stats.percentage === null ? 'border-l-blue-500' :
+                      stats.percentage >= 80 ? 'border-l-green-500' :
+                      stats.percentage >= 50 ? 'border-l-amber-500' :
+                      'border-l-red-500'
+                    }`}>
                       {isOverridden && (
                         <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-400 text-sm">
                           <AlertTriangle className="h-4 w-4" />
@@ -1103,6 +1384,16 @@ export const LectureCheckInResults = () => {
                                 );
                               })}
                             </ul>
+                          )}
+                          {/* Completion Progress Bar */}
+                          {stats.total > 0 && (
+                            <div className="mt-3">
+                              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                <span>{stats.completed}/{stats.total} responded</span>
+                                <span>{Math.round((stats.completed / stats.total) * 100)}%</span>
+                              </div>
+                              <Progress value={(stats.completed / stats.total) * 100} className="h-2" />
+                            </div>
                           )}
                         </div>
                         <div className="text-right space-y-2">
@@ -1358,9 +1649,18 @@ export const LectureCheckInResults = () => {
                             return (
                               <div
                                 key={assignment.id}
-                                className="flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50"
+                                className={`flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50 ${
+                                  !isCompleted ? '' :
+                                  isCorrect === true ? 'bg-green-50/50 dark:bg-green-950/20' :
+                                  isCorrect === false ? 'bg-red-50/50 dark:bg-red-950/20' : ''
+                                }`}
                               >
-                                <span className="font-medium">{assignment.student_name}</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                    {(assignment.student_name || '?').charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="font-medium">{assignment.student_name}</span>
+                                </div>
                                 <div className="flex items-center gap-2">
                                   {!isCompleted ? (
                                     <Badge variant="outline" className="gap-1">
@@ -1385,19 +1685,10 @@ export const LectureCheckInResults = () => {
                                       </div>
                                       {/* Code viewer for coding questions */}
                                       {isCodingSimple && studentAnswer && (
-                                        <details className="text-xs w-full max-w-md">
-                                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground text-right">
-                                            View Code
-                                          </summary>
-                                          <pre className="mt-2 p-3 bg-slate-900 text-slate-100 rounded-md overflow-x-auto text-xs font-mono whitespace-pre-wrap text-left">
-                                            {studentAnswer}
-                                          </pre>
-                                          {studentAIFeedback && (
-                                            <p className="mt-1 text-xs text-muted-foreground italic text-left">
-                                              {studentAIFeedback}
-                                            </p>
-                                          )}
-                                        </details>
+                                        <ExpandableCodeResponse
+                                          studentAnswer={studentAnswer}
+                                          studentAIFeedback={studentAIFeedback}
+                                        />
                                       )}
                                     </div>
                                    ) : isManualGradeShortAnswer || (isCodingSimple && !hasAIGrade) ? (
@@ -1459,8 +1750,18 @@ export const LectureCheckInResults = () => {
                                   return assignmentQuestions.some((q: any) => q.question === question.question);
                                 });
 
-                                // FIX: Count using correct question index for each student's assignment
-                                const count = questionAssignments.filter((a) => {
+                                // DEDUPLICATION: Keep only the latest submission per student
+                                const uniqueStudents = new Map<string, Assignment>();
+                                questionAssignments.forEach((a) => {
+                                  const existing = uniqueStudents.get(a.student_id);
+                                  if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+                                    uniqueStudents.set(a.student_id, a);
+                                  }
+                                });
+                                const deduplicatedAssignments = Array.from(uniqueStudents.values());
+
+                                // Count using correct question index for each student's deduplicated assignment
+                                const count = deduplicatedAssignments.filter((a) => {
                                   if (!a.completed) return false;
                                   const assignmentContent = a.content as any;
                                   const assignmentQuestions = assignmentContent?.questions || [];
@@ -1472,7 +1773,7 @@ export const LectureCheckInResults = () => {
                                     : null;
                                   return studentAnswer === optionLetter;
                                 }).length;
-                                const total = questionAssignments.filter((a) => a.completed).length;
+                                const total = deduplicatedAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                                 const isCorrect = optionLetter === correctAnswerToUse;
@@ -1613,6 +1914,67 @@ export const LectureCheckInResults = () => {
                                   </div>
                                 );
                               });
+                              })()}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Coding review section */}
+                        {(question.type === "coding" || question.type === "coding_simple") && (
+                          <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                            <p className="text-xs font-medium mb-2 text-purple-900 dark:text-purple-200 flex items-center gap-2">
+                              <Code className="h-4 w-4" />
+                              Student Code Submissions & Grades:
+                            </p>
+                            <div className="space-y-2">
+                              {(() => {
+                                // Filter assignments to only those containing this specific question
+                                const questionAssignments = group.assignments.filter((a) => {
+                                  const content = a.content as any;
+                                  const assignmentQuestions = content?.questions || [];
+                                  return assignmentQuestions.some((q: any) => q.question === question.question);
+                                });
+
+                                // Deduplicate students - keep only the latest submission per student
+                                const uniqueStudents = new Map<string, Assignment>();
+                                questionAssignments.forEach((assignment) => {
+                                  const existing = uniqueStudents.get(assignment.student_id);
+                                  if (!existing || new Date(assignment.created_at) > new Date(existing.created_at)) {
+                                    uniqueStudents.set(assignment.student_id, assignment);
+                                  }
+                                });
+                                
+                                return Array.from(uniqueStudents.values()).map((assignment) => {
+                                  // Find the question index within THIS student's assignment
+                                  const assignmentContent = assignment.content as any;
+                                  const assignmentQuestions = assignmentContent?.questions || [];
+                                  const studentQuestionIdx = assignmentQuestions.findIndex(
+                                    (q: any) => q.question === question.question
+                                  );
+                                  
+                                  const studentAnswer = studentQuestionIdx >= 0 
+                                    ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
+                                    : null;
+                                  const isCompleted = assignment.completed;
+                                  const currentGrade = assignment.grade;
+                                  
+                                  // Get AI recommendations for this question
+                                  const aiRec = assignment.quiz_responses?._ai_recommendations;
+                                  const questionAIRec = Array.isArray(aiRec) ? aiRec[studentQuestionIdx] : aiRec?.[studentQuestionIdx];
+
+                                  return (
+                                    <CodingSubmissionCard
+                                      key={assignment.id}
+                                      assignment={assignment}
+                                      studentAnswer={studentAnswer}
+                                      isCompleted={isCompleted}
+                                      currentGrade={currentGrade}
+                                      questionAIRec={questionAIRec}
+                                      qIdx={qIdx}
+                                      fetchResults={fetchResults}
+                                    />
+                                  );
+                                });
                               })()}
                             </div>
                           </div>

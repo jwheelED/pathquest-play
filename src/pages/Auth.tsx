@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,14 +11,43 @@ import { Label } from "@/components/ui/label";
 export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [name, setName] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [session, setSession] = useState(null);
   const [isResetMode, setIsResetMode] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const isRecoveryModeRef = useRef(false);
 
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const redirectTo = searchParams.get("redirect");
+
+  const handlePasswordUpdate = async () => {
+    setError("");
+    setSuccess("");
+
+    if (!newPassword || newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    
+    if (error) {
+      setError(error.message);
+      toast.error(error.message);
+    } else {
+      setSuccess("Password updated successfully!");
+      toast.success("Password updated successfully! Please sign in.");
+      setIsRecoveryMode(false);
+      setNewPassword("");
+      await supabase.auth.signOut();
+    }
+  };
 
   // Helper to navigate user to the correct dashboard based on their role
   const navigateByRole = async (userId: string) => {
@@ -71,7 +100,7 @@ export default function AuthPage() {
         email: validData.email,
         password: validData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
+          emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
           data: {
             full_name: validData.name
           }
@@ -151,8 +180,13 @@ export default function AuthPage() {
         }
       } else {
         setSuccess("Signed in successfully!");
-        // Navigate based on user role
-        await navigateByRole(data.user.id);
+        // If there's a redirect (e.g. from live session), go there
+        if (redirectTo) {
+          navigate(redirectTo);
+        } else {
+          // Navigate based on user role
+          await navigateByRole(data.user.id);
+        }
       }
     }
   };
@@ -186,17 +220,30 @@ export default function AuthPage() {
     setSession(null);
   };
 
-  const fetchSession = async () => {
-    const { data, error } = await supabase.auth.getSession();
-    if (!error) {
-      setSession(data.session);
-    }
-  };
-
+  // Single consolidated auth lifecycle effect
   useEffect(() => {
-    fetchSession();
+    // Check URL hash on mount for recovery token (synchronous)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
+      setIsRecoveryMode(true);
+      toast.info("Please enter your new password");
+    }
 
-    const {data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle recovery FIRST, before any navigation logic
+      if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
+        setIsRecoveryMode(true);
+        toast.info("Please enter your new password");
+        return;
+      }
+
+      // If in recovery mode, suppress all navigation/session logic
+      if (isRecoveryModeRef.current) {
+        return;
+      }
+
       setSession(session);
 
       if (session) {
@@ -213,7 +260,7 @@ export default function AuthPage() {
             await supabase.from("profiles").upsert({
               id: session.user.id,
               full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-              onboarded: true, // All students are onboarded immediately
+              onboarded: true,
             });
 
             // Create user stats
@@ -224,7 +271,6 @@ export default function AuthPage() {
               // Errors are OK here - record might already exist
             });
           } else if (!profile.onboarded) {
-            // Mark existing users as onboarded
             await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
           }
 
@@ -232,7 +278,8 @@ export default function AuthPage() {
           await navigateByRole(session.user.id);
         };
 
-        initializeUser();
+        // Use setTimeout to avoid Supabase auth deadlock
+        setTimeout(initializeUser, 0);
       }
     });
 
@@ -253,6 +300,43 @@ export default function AuthPage() {
               Logout
             </button>
           </div>
+        ) : isRecoveryMode ? (
+          <>
+            <h2 className="text-2xl font-bold mb-6 text-center text-primary">
+              Set your new password
+            </h2>
+
+            {error && (
+              <div role="alert" className="text-destructive mb-4 text-sm">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div role="status" className="text-primary mb-4 text-sm">
+                {success}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <input
+                id="new-password"
+                type="password"
+                placeholder="Enter your new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
+                className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <button
+              onClick={handlePasswordUpdate}
+              className="w-full mt-4 bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow"
+            >
+              Update Password
+            </button>
+          </>
         ) : (
           <>
             <h2 className="text-2xl font-bold mb-6 text-center text-primary">

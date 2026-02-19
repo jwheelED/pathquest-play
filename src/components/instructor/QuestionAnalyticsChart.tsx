@@ -7,6 +7,7 @@ interface Assignment {
   completed: boolean;
   quiz_responses: any;
   grade: number | null;
+  created_at: string;
 }
 
 interface QuestionStats {
@@ -36,14 +37,40 @@ export const QuestionAnalyticsChart = ({
   const isMultipleChoice = question.type === "multiple_choice" && question.options;
   const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
-  // Calculate answer distribution for multiple choice
+  // DEDUPLICATION: Keep only the latest submission per student
+  const uniqueStudents = new Map<string, Assignment>();
+  assignments.forEach((a) => {
+    const existing = uniqueStudents.get(a.student_id);
+    if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+      uniqueStudents.set(a.student_id, a);
+    }
+  });
+  const deduplicatedAssignments = Array.from(uniqueStudents.values());
+
+  // Calculate answer distribution for multiple choice using deduplicated data
+  const correctAnswerLetter = question.overriddenAnswer || question.correctAnswer;
+  
   const answerDistribution = isMultipleChoice
     ? question.options?.map((opt: string, idx: number) => {
         const letter = String.fromCharCode(65 + idx);
-        const count = assignments.filter(
-          (a) => a.completed && a.quiz_responses?.[questionIndex.toString()] === letter
-        ).length;
-        const isCorrect = letter === (question.overriddenAnswer || question.correctAnswer);
+        
+        const count = deduplicatedAssignments.filter((a) => {
+          if (!a.completed) return false;
+          
+          // Find the question index within THIS student's assignment
+          const content = (a as any).content;
+          const assignmentQuestions = content?.questions || [];
+          const studentQuestionIdx = assignmentQuestions.findIndex(
+            (q: any) => q.question === question.question
+          );
+          
+          if (studentQuestionIdx < 0) return false;
+          
+          const studentAnswer = a.quiz_responses?.[studentQuestionIdx.toString()];
+          return studentAnswer === letter;
+        }).length;
+        
+        const isCorrect = letter === correctAnswerLetter;
 
         return {
           option: letter,
@@ -91,29 +118,29 @@ export const QuestionAnalyticsChart = ({
         },
       ].filter((d) => d.value > 0);
 
-  // Calculate grade distribution for auto-graded short answers
+  // Calculate grade distribution for auto-graded short answers (using deduplicated data)
   const gradeDistribution = isAutoGradedShortAnswer
     ? [
         {
           range: "90-100 (Excellent)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade >= 90).length,
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 90).length,
           fill: "hsl(var(--success))",
         },
         {
           range: "70-89 (Good)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade >= 70 && a.grade < 90)
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 70 && a.grade < 90)
             .length,
           fill: "hsl(var(--primary))",
         },
         {
           range: "50-69 (Pass)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade >= 50 && a.grade < 70)
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 50 && a.grade < 70)
             .length,
           fill: "hsl(var(--warning))",
         },
         {
           range: "0-49 (Needs Work)",
-          count: assignments.filter((a) => a.completed && a.grade && a.grade < 50).length,
+          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade < 50).length,
           fill: "hsl(var(--destructive))",
         },
       ].filter((d) => d.count > 0)

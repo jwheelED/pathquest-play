@@ -67,8 +67,10 @@ export const SlideViewer = forwardRef<SlideViewerRef, SlideViewerProps>(
       if (!canvas) return null;
       
       const sel = selection || activeSelection;
+      let sourceCanvas: HTMLCanvasElement = canvas;
+      
+      // If there's a selection, crop to that region first
       if (sel && sel.width > 10 && sel.height > 10) {
-        // Create a temp canvas with just the selected region
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = sel.width;
         tempCanvas.height = sel.height;
@@ -79,10 +81,31 @@ export const SlideViewer = forwardRef<SlideViewerRef, SlideViewerProps>(
           sel.x, sel.y, sel.width, sel.height,
           0, 0, sel.width, sel.height
         );
-        return tempCanvas.toDataURL('image/png');
+        sourceCanvas = tempCanvas;
       }
       
-      return canvas.toDataURL('image/png');
+      // Resize if too large (max 1920px on longest side)
+      const MAX_DIMENSION = 1920;
+      let finalCanvas: HTMLCanvasElement = sourceCanvas;
+      
+      if (sourceCanvas.width > MAX_DIMENSION || sourceCanvas.height > MAX_DIMENSION) {
+        const scale = Math.min(
+          MAX_DIMENSION / sourceCanvas.width,
+          MAX_DIMENSION / sourceCanvas.height
+        );
+        const resizedCanvas = document.createElement('canvas');
+        resizedCanvas.width = Math.round(sourceCanvas.width * scale);
+        resizedCanvas.height = Math.round(sourceCanvas.height * scale);
+        const ctx = resizedCanvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(sourceCanvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
+          finalCanvas = resizedCanvas;
+        }
+      }
+      
+      // Export as compressed JPEG (0.75 quality = good balance of size/quality)
+      // This typically reduces file size by 80-90% compared to PNG
+      return finalCanvas.toDataURL('image/jpeg', 0.75);
     },
     getCurrentSlideNumber: () => currentPage,
     getActiveSelection: () => activeSelection,

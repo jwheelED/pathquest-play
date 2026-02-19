@@ -39,6 +39,9 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
            file.name.toLowerCase().endsWith('.pptx') || file.name.toLowerCase().endsWith('.ppt');
   };
 
+  // State to track whether user wants to skip conversion (preserve animations)
+  const [skipConversion, setSkipConversion] = useState(false);
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -100,41 +103,65 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       let finalFileType = selectedFile.type;
       let finalFileName = selectedFile.name;
 
-      // Check if this is a PPTX file that needs conversion
+      // Check if this is a PPTX file
       if (isPptxFile(selectedFile)) {
-        setUploadStage('converting');
-        setUploadProgress(30);
-        
-        toast.info('Converting PowerPoint to PDF...', { duration: 5000 });
-        
-        // Convert file to base64
-        const fileBase64 = await fileToBase64(selectedFile);
-        
-        setUploadProgress(50);
-        
-        // Call edge function to convert PPTX to PDF
-        const { data, error } = await supabase.functions.invoke('convert-pptx-to-pdf', {
-          body: {
-            fileBase64,
-            fileName: selectedFile.name,
-            instructorId: user.id,
-          },
-        });
+        // If skipConversion is true, upload PPTX directly (preserves animations via Office Online)
+        // AND trigger background PDF conversion for slide extraction
+        if (skipConversion) {
+          setUploadProgress(30);
+          
+          const fileExt = selectedFile.name.split('.').pop();
+          const fileName = `${Date.now()}.${fileExt}`;
+          filePath = `${user.id}/slides/${fileName}`;
 
-        if (error) {
-          console.error('Conversion error:', error);
-          throw new Error(error.message || 'Failed to convert PowerPoint file');
+          const { error: uploadError } = await supabase.storage
+            .from('lecture-materials')
+            .upload(filePath, selectedFile, { upsert: true });
+
+          if (uploadError) throw uploadError;
+
+          // Keep original PPTX file type
+          finalFileType = selectedFile.type || 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          finalFileName = selectedFile.name;
+          
+          setUploadProgress(70);
+          toast.info('PowerPoint uploaded! Background PDF conversion starting...');
+        } else {
+          // Convert PPTX to PDF (default behavior)
+          setUploadStage('converting');
+          setUploadProgress(30);
+          
+          toast.info('Converting PowerPoint to PDF...', { duration: 5000 });
+          
+          // Convert file to base64
+          const fileBase64 = await fileToBase64(selectedFile);
+          
+          setUploadProgress(50);
+          
+          // Call edge function to convert PPTX to PDF
+          const { data, error } = await supabase.functions.invoke('convert-pptx-to-pdf', {
+            body: {
+              fileBase64,
+              fileName: selectedFile.name,
+              instructorId: user.id,
+            },
+          });
+
+          if (error) {
+            console.error('Conversion error:', error);
+            throw new Error(error.message || 'Failed to convert PowerPoint file');
+          }
+
+          if (!data?.success) {
+            throw new Error(data?.error || 'Conversion failed');
+          }
+
+          filePath = data.filePath;
+          finalFileType = 'application/pdf';
+          finalFileName = data.convertedName;
+          
+          setUploadProgress(80);
         }
-
-        if (!data?.success) {
-          throw new Error(data?.error || 'Conversion failed');
-        }
-
-        filePath = data.filePath;
-        finalFileType = 'application/pdf';
-        finalFileName = data.convertedName;
-        
-        setUploadProgress(80);
       } else {
         // Direct PDF upload
         setUploadProgress(30);
@@ -158,7 +185,11 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
       setUploadProgress(90);
       
       const orgId = await getOrgId(user.id);
-      const { error: dbError } = await supabase
+      
+      // Set conversion status for PPTX with preserved animations
+      const needsBackgroundConversion = isPptxFile(selectedFile) && skipConversion;
+      
+      const { data: insertedMaterial, error: dbError } = await supabase
         .from('lecture_materials')
         .insert({
           instructor_id: user.id,
@@ -169,12 +200,38 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           file_size: selectedFile.size,
           title: title.trim(),
           description: 'Presentation slides',
-        });
+          pdf_conversion_status: needsBackgroundConversion ? 'pending' : null,
+        })
+        .select('id')
+        .single();
 
       if (dbError) throw dbError;
+      
+      // Trigger background PDF conversion for PPTX with preserved animations
+      if (needsBackgroundConversion && insertedMaterial?.id) {
+        console.log('🔄 Triggering background PDF conversion for:', insertedMaterial.id);
+        
+        // Fire and forget - don't await, let it run in background
+        supabase.functions.invoke('convert-pptx-background', {
+          body: {
+            materialId: insertedMaterial.id,
+            filePath: filePath,
+            instructorId: user.id,
+          },
+        }).then(({ error }) => {
+          if (error) {
+            console.error('Background conversion trigger failed:', error);
+          } else {
+            console.log('✅ Background conversion started');
+          }
+        });
+      }
 
       setUploadProgress(100);
-      toast.success(isPptxFile(selectedFile) ? 'PowerPoint converted and uploaded!' : 'Slides uploaded successfully!');
+      const successMessage = isPptxFile(selectedFile) 
+        ? (skipConversion ? 'PowerPoint uploaded with animations!' : 'PowerPoint converted and uploaded!') 
+        : 'Slides uploaded successfully!';
+      toast.success(successMessage);
       
       // Invalidate queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
@@ -279,20 +336,52 @@ export function SlideUploader({ onComplete, onCancel }: SlideUploaderProps) {
           onDragOver={handleDragOver}
         >
           {selectedFile ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {getFileIcon()}
               <p className="font-medium">{selectedFile.name}</p>
               <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                {isPptxFile(selectedFile) && (
-                  <span className="ml-2 text-orange-500">(will be converted to PDF)</span>
-                )}
               </p>
+              
+              {/* PPTX animation preservation option */}
+              {isPptxFile(selectedFile) && (
+                <div className="bg-muted/50 rounded-lg p-3 text-left space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={skipConversion}
+                      onChange={(e) => setSkipConversion(e.target.checked)}
+                      className="mt-1 rounded border-border"
+                      disabled={uploading}
+                    />
+                    <div className="flex-1">
+                      <span className="font-medium text-sm">Preserve animations & formatting</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Uses Microsoft Office Online viewer. Best for presentations with animations, transitions, or complex formatting.
+                      </p>
+                    </div>
+                  </label>
+                  {!skipConversion && (
+                    <p className="text-xs text-amber-600 pl-6">
+                      Will convert to PDF (animations will be lost, but slide extraction works)
+                    </p>
+                  )}
+                  {skipConversion && (
+                    <p className="text-xs text-emerald-600 pl-6">
+                      ✓ Slide extraction will be enabled via background PDF conversion
+                    </p>
+                  )}
+                </div>
+              )}
+              
               {!uploading && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSelectedFile(null)}
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setSkipConversion(false);
+                  }}
                 >
                   Remove
                 </Button>

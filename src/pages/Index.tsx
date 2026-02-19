@@ -120,7 +120,7 @@ const Index = () => {
               variant="ghost" 
               size="sm" 
               onClick={() => navigate("/join")} 
-              className="text-muted-foreground hover:text-foreground hidden sm:block"
+              className="text-muted-foreground hover:text-foreground"
             >
               Join Session
             </Button>
@@ -130,14 +130,14 @@ const Index = () => {
               onClick={() => navigate("/auth")} 
               className="rounded-full hover:scale-105 transition-transform"
             >
-              Login
+              Student Login
             </Button>
             <Button
               size="sm"
               onClick={() => navigate("/instructor/auth")}
               className="rounded-full hidden md:flex"
             >
-              Get Started
+              Instructor Login
             </Button>
           </div>
         </div>
@@ -174,16 +174,18 @@ const Index = () => {
                 onClick={() => navigate("/instructor/auth")}
                 className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-105 group"
               >
-                Start Teaching Smarter
+                <Users className="w-4 h-4" />
+                For Instructors
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => navigate("/auth")}
-                className="rounded-full px-8 border-border/50 hover:bg-muted/50 hover:scale-105 transition-all"
+                className="rounded-full px-8 border-border/50 hover:bg-muted/50 hover:scale-105 transition-all gap-2"
               >
-                I'm a Student
+                <BookOpen className="w-4 h-4" />
+                For Students
               </Button>
             </div>
 

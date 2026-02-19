@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
+import { trackQuestionAnswered } from "@/lib/posthogTracking";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Question {
   id: string;
@@ -89,10 +91,54 @@ const LiveStudent = () => {
     setExplanation("");
   }, [currentQuestion?.id]);
 
+  // Session ID resolved from session_code for realtime subscription
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+
+  // Normalize question_content: slide questions nest data inside questions[0]
+  const normalizeQuestionContent = (qc: any): Question["question_content"] => {
+    // If question_content has a nested questions array (slide/format-and-send format),
+    // unwrap the first question and merge its fields to the top level
+    if (qc?.questions && Array.isArray(qc.questions) && qc.questions.length > 0) {
+      const inner = qc.questions[0];
+      return {
+        question: inner.question || inner.title || "",
+        options: inner.options || [],
+        correctAnswer: inner.correctAnswer || "",
+        type: inner.type || "short_answer",
+        language: inner.language,
+      };
+    }
+    // Already flat format
+    return qc;
+  };
+
+  // Shared logic for processing an incoming question (used by both realtime and polling)
+  const processIncomingQuestion = useCallback((question: Question) => {
+    const isNewQuestion = currentQuestionIdRef.current !== question.id;
+    const hasBeenAnswered = answeredQuestionsRef.current.has(question.id);
+    const userIsInteracting = hasStartedAnsweringRef.current || isTypingRef.current;
+
+    if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
+      // Normalize nested question_content (from slide presenter / format-and-send)
+      const normalized: Question = {
+        ...question,
+        question_content: normalizeQuestionContent(question.question_content),
+      };
+      setCurrentQuestion(normalized);
+      setSelectedAnswer("");
+      setCodeAnswer("");
+      setHasAnswered(false);
+      setIsCorrect(null);
+      setQuestionStartTime(Date.now());
+    }
+  }, []);
+
+  // On mount: validate participant, resolve session_id, fetch initial questions
   useEffect(() => {
     const storedParticipantId = localStorage.getItem("participantId");
     const storedNickname = localStorage.getItem("participantNickname");
-    
+
     if (!storedParticipantId) {
       toast.error("Please join the session first");
       navigate("/join");
@@ -102,62 +148,100 @@ const LiveStudent = () => {
     setParticipantId(storedParticipantId);
     setNickname(storedNickname || "");
 
-    // Start polling for questions
-    const pollInterval = setInterval(() => {
-      pollForQuestions();
-    }, 3000);
-
-    // Initial poll
-    pollForQuestions();
-
-    return () => clearInterval(pollInterval);
-  }, [sessionCode, navigate]);
-
-  const pollForQuestions = async () => {
     if (!sessionCode) return;
 
-    try {
-      const url = `https://otsmjgrhyteyvpufkwdh.supabase.co/functions/v1/get-live-question?sessionCode=${sessionCode}`;
-      const response = await fetch(url, {
-        headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90c21qZ3JoeXRleXZwdWZrd2RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3MTAwMjksImV4cCI6MjA2NTI4NjAyOX0.lECUFBdhoe2gxBJSvHSMlq1BGearE97kSOL-Pz8FZbw',
-        },
-      });
+    // Resolve session_code to session_id via edge function (bypasses RLS for anonymous users)
+    const initSession = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("resolve-live-session", {
+          body: { sessionCode },
+        });
 
-      if (!response.ok) {
-        if (response.status === 404) {
+        if (error || !data?.session) {
+          const errMsg = data?.error || "Session not found";
+          toast.error(errMsg, {
+            description: "Check the code and try again.",
+          });
+          navigate("/join");
+          return;
+        }
+
+        if (!data.session.is_active) {
           toast.error("Session ended", {
             description: "The live session has ended or is no longer active.",
           });
-          setTimeout(() => navigate("/join"), 2000);
+          navigate("/join");
+          return;
         }
-        return;
-      }
 
-      const result = await response.json();
-      
-      if (result.questions && result.questions.length > 0) {
-        const latestQuestion = result.questions[0];
-        
-        // Use REFS instead of state (always current, no stale closure)
-        const isNewQuestion = currentQuestionIdRef.current !== latestQuestion.id;
-        const hasBeenAnswered = answeredQuestionsRef.current.has(latestQuestion.id);
-        const userIsInteracting = hasStartedAnsweringRef.current || isTypingRef.current;
-        
-        // Only update if: 1) NEW question 2) Not answered 3) User not interacting
-        if (isNewQuestion && !hasBeenAnswered && !userIsInteracting) {
-          setCurrentQuestion(latestQuestion);
-          setSelectedAnswer("");
-          setCodeAnswer("");
-          setHasAnswered(false);
-          setIsCorrect(null);
-          setQuestionStartTime(Date.now());
+        setSessionId(data.session.id);
+
+        // Process any existing questions
+        if (data.questions && data.questions.length > 0) {
+          const latestQuestion = data.questions[0] as unknown as Question;
+          processIncomingQuestion(latestQuestion);
         }
+      } catch (err) {
+        console.error("Error initializing session:", err);
+        toast.error("Failed to connect to session");
+        navigate("/join");
       }
-    } catch (error) {
-      console.error("Error polling for questions:", error);
-    }
-  };
+    };
+
+    initSession();
+  }, [sessionCode, navigate, processIncomingQuestion]);
+
+  // Subscribe to realtime INSERT events on live_questions for this session
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const channel = supabase
+      .channel(`live-questions-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_questions',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const newQuestion = payload.new as unknown as Question;
+          processIncomingQuestion(newQuestion);
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Live questions realtime subscription: ${status}`);
+      });
+
+    realtimeChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      realtimeChannelRef.current = null;
+    };
+  }, [sessionId, processIncomingQuestion]);
+
+  // Fallback polling at reduced frequency (10s) in case realtime drops
+  useEffect(() => {
+    if (!sessionId || !sessionCode) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("resolve-live-session", {
+          body: { sessionCode },
+        });
+
+        if (!error && data?.questions?.length > 0) {
+          processIncomingQuestion(data.questions[0] as unknown as Question);
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 10000);
+
+    return () => clearInterval(pollInterval);
+  }, [sessionId, sessionCode, processIncomingQuestion]);
 
   // Handle MCQ answer selection - show confidence selector
   const handleAnswerSelect = (answer: string) => {
@@ -176,16 +260,38 @@ const LiveStudent = () => {
     handleSubmitWithConfidence(level, multiplier);
   };
 
+  // Extract just the letter from MCQ answer for reliable server-side comparison
+  const extractMCQLetter = (answer: string): string => {
+    // If already just a letter, return it
+    if (/^[A-Da-d]$/.test(answer.trim())) {
+      return answer.trim().toUpperCase();
+    }
+    // Extract letter from "B) 206 bones", "B. Answer", etc.
+    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
+    if (letterMatch) {
+      return letterMatch[1].toUpperCase();
+    }
+    // Fallback: return first character if A-D
+    if (/^[A-Da-d]/i.test(answer.trim())) {
+      return answer.trim().charAt(0).toUpperCase();
+    }
+    return answer; // Return original if no pattern matches
+  };
+
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
 
     setIsSubmitting(true);
     const responseTimeMs = Date.now() - questionStartTime;
 
+    // For MCQ, extract just the letter for reliable grading
+    const isMCQ = currentQuestion.question_content.type === 'multiple_choice';
+    const normalizedAnswer = isMCQ ? extractMCQLetter(selectedAnswer) : selectedAnswer;
+
     const responseData = {
       questionId: currentQuestion.id,
       participantId,
-      answer: selectedAnswer,
+      answer: normalizedAnswer,
       responseTimeMs,
       confidenceLevel: level,
       confidenceMultiplier: multiplier,
@@ -222,6 +328,12 @@ const LiveStudent = () => {
         setIsCorrect(result.data.isCorrect);
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
+        
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'multiple_choice',
+          responseTimeMs
+        );
         
         if (result.data.isCorrect) {
           toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
@@ -263,7 +375,7 @@ const LiveStudent = () => {
           problemText: currentQuestion.question_content.question,
           correctAnswer: currentQuestion.question_content.correctAnswer,
           userAnswer: selectedAnswer,
-          wasCorrect: isCorrect,
+          wasCorrect: isCorrect === true,
           courseContext: null
         }
       });
@@ -347,6 +459,12 @@ const LiveStudent = () => {
         setAiGradeComponents(result.data.gradeBreakdown?.components || null);
         setGradePending(result.data.gradePending || false);
         setShowAccountPrompt(true);
+        
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'short_answer',
+          responseTimeMs
+        );
         
         // Show appropriate feedback based on grading mode
         if (result.data.gradePending) {
@@ -446,6 +564,12 @@ const LiveStudent = () => {
         setPointsEarned(result.data.pointsEarned || 0);
         setShowAccountPrompt(true);
         
+        // Track question answered in PostHog
+        trackQuestionAnswered(
+          currentQuestion.question_content.type || 'coding',
+          responseTimeMs
+        );
+        
         if (result.data.aiGrade !== null) {
           const gradeText = `${result.data.aiGrade}%`;
           if (result.data.aiGrade >= 70) {
@@ -520,7 +644,7 @@ const LiveStudent = () => {
                 <p className="text-sm text-muted-foreground">Create an account to save your stats and compete on leaderboards</p>
               </div>
               <Button 
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate(`/auth?redirect=/live/${sessionCode}`)}
                 className="shrink-0"
               >
                 Create Account
@@ -677,25 +801,18 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
-              {/* MCQ Results */}
+              {/* MCQ Results - Poll-style neutral feedback */}
               {isMCQ && (
                 <>
-                  {isCorrect ? (
-                    <>
-                      <div className="relative">
-                        <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
-                      </div>
-                      <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Correct!</p>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-16 w-16 text-destructive mx-auto animate-in zoom-in-50 duration-300" />
-                      <p className="text-2xl font-bold text-destructive animate-in fade-in-0 slide-in-from-bottom-2 duration-500">Incorrect</p>
-                      <p className="text-muted-foreground">
-                        Correct answer: <MathRenderer content={currentQuestion.question_content.correctAnswer} />
-                      </p>
-                    </>
-                  )}
+                  <div className="relative">
+                    <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                    Response Recorded ✓
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your answer: <span className="font-semibold">{selectedAnswer}</span>
+                  </p>
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}

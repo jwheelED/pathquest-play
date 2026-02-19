@@ -10,6 +10,7 @@ import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
 import { sanitizeTranscript } from '@/lib/transcriptSanitizer';
+import { trackRecordingStarted, trackRecordingEnded, trackAutoQuestionTriggered, trackQuestionSent } from '@/lib/posthogTracking';
 
 // Constants
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -51,10 +52,62 @@ export interface UseLectureRecordingOptions {
   onVoiceCommand?: (type: 'send_question' | 'send_slide_question') => void;
   /** Callback when a voice command extracts a question - allows preview before sending */
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
+  /** When true, bypasses the question preview setting and sends questions immediately */
+  bypassPreviewSetting?: boolean;
 }
 
+// Direct voice command detection - checks raw text without relying on state
+const detectVoiceCommandDirect = (
+  text: string, 
+  lastDetectedRef: React.MutableRefObject<string>, 
+  lastTimeRef: React.MutableRefObject<number>, 
+  cooldownMs: number = 15000
+): 'send_question' | 'send_slide_question' | null => {
+  if (!text || text.length < 5) return null;
+  
+  const normalizedText = text.toLowerCase().trim();
+  const now = Date.now();
+  
+  // Cooldown check
+  if (now - lastTimeRef.current < cooldownMs) return null;
+  
+  // Skip if same command phrase detected recently
+  if (lastDetectedRef.current && normalizedText.includes(lastDetectedRef.current)) return null;
+  
+  // Check for slide commands FIRST (more specific)
+  const slidePatterns = [
+    /send\s+(this\s+)?slide(\s+question)?(\s+now)?/i,
+    /send\s+slide\s+question/i,
+    /slide\s+question(\s+now)?/i,
+  ];
+  
+  for (const pattern of slidePatterns) {
+    if (pattern.test(normalizedText)) {
+      lastTimeRef.current = now;
+      lastDetectedRef.current = normalizedText.substring(0, 30);
+      return 'send_slide_question';
+    }
+  }
+  
+  // Check for question commands
+  const questionPatterns = [
+    /send\s+(the\s+|a\s+|this\s+)?question(\s+now)?/i,
+    /question\s+now/i,
+  ];
+  
+  for (const pattern of questionPatterns) {
+    if (pattern.test(normalizedText)) {
+      lastTimeRef.current = now;
+      lastDetectedRef.current = normalizedText.substring(0, 30);
+      return 'send_question';
+    }
+  }
+  
+  return null;
+};
+
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
@@ -133,6 +186,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   
   // Deepgram streaming refs for real-time transcription
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
+  
+  // Direct voice command detection refs (independent of state-based detection)
+  const directVoiceLastDetectedRef = useRef<string>('');
+  const directVoiceLastTimeRef = useRef<number>(0);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
 
   // Keep refs updated when state changes (avoids stale closures in timer callbacks)
@@ -384,12 +441,13 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('question_format_preference, coding_question_style')
+        .select('question_format_preference, coding_question_style, question_difficulty_preference')
         .eq('id', user.id)
         .single();
 
       const formatPreference = profile?.question_format_preference || 'multiple_choice';
       const codingStyle = profile?.coding_question_style || 'simple';
+      const difficultyPref = profile?.question_difficulty_preference || 'medium';
 
       toast({
         title: '⏰ Auto-question!',
@@ -405,6 +463,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_minutes: autoQuestionInterval,
           format_preference: formatPreference,
           coding_question_style: codingStyle,
+          difficulty_preference: difficultyPref,
           force_send: autoQuestionForceSend,
           strict_mode: true,
           slide_context: slideContextRef.current,
@@ -421,6 +480,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return false;
       }
 
+      // Track auto-question triggered in PostHog
+      trackAutoQuestionTriggered(autoQuestionInterval);
+      
       // Auto-generated questions always send directly - no preview
       await handleQuestionSend({
         question_text: data.question_text,
@@ -430,6 +492,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         extraction_method: 'auto_interval',
         source: 'auto_interval',
       });
+      
+      // Track question sent in PostHog
+      trackQuestionSent(data.suggested_type || 'unknown', 'auto');
 
       return true;
     } catch (error) {
@@ -646,6 +711,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       isGeneratingAutoQuestionRef.current = false;
       resetVoiceCommandCooldown();
       
+      // Reset direct voice command detection refs
+      directVoiceLastDetectedRef.current = '';
+      directVoiceLastTimeRef.current = 0;
+      
       // Stop and cleanup timer
       if (reliableTimerRef.current) {
         reliableTimerRef.current.stop();
@@ -823,7 +892,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           
           console.log('📝 Deepgram final transcript:', cleanText);
           
-          // Append to rolling buffers
+          // CRITICAL: Append to rolling buffers FIRST before voice command detection
+          // This ensures the current transcript chunk is available when extraction happens
           transcriptBufferRef.current += ' ' + cleanText;
           intervalTranscriptRef.current += ' ' + cleanText;
           
@@ -831,6 +901,24 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           if (intervalTranscriptRef.current.length > TRANSCRIPT_MAX_LENGTH) {
             intervalTranscriptRef.current = intervalTranscriptRef.current.slice(-TRANSCRIPT_MAX_LENGTH);
             console.log('✂️ Trimmed interval transcript to max length');
+          }
+          
+          // DIRECT voice command detection - check AFTER buffer append
+          // so the spoken question is included when extraction happens
+          if (onVoiceCommand) {
+            const command = detectVoiceCommandDirect(
+              cleanText,
+              directVoiceLastDetectedRef,
+              directVoiceLastTimeRef,
+              15000 // 15s cooldown
+            );
+            
+            if (command) {
+              console.log(`🎤 Direct voice command detected: ${command}`);
+              setVoiceCommandDetected(true);
+              setTimeout(() => setVoiceCommandDetected(false), 2000);
+              onVoiceCommand(command);
+            }
           }
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
@@ -898,6 +986,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       await startDeepgramStreaming();
 
       broadcast('recording_status', { isRecording: true });
+      
+      // Track recording start in PostHog
+      trackRecordingStarted();
 
       toast({
         title: '🎙️ Recording started',
@@ -950,8 +1041,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
 
     broadcast('recording_status', { isRecording: false });
+    
+    // Track recording end in PostHog (using current recordingDuration)
+    trackRecordingEnded(recordingDuration);
+    
     toast({ title: 'Recording stopped' });
-  }, [broadcast, toast, stopDeepgramStreaming]);
+  }, [broadcast, toast, stopDeepgramStreaming, recordingDuration]);
 
   // Manual question send
   const handleManualQuestionSend = useCallback(async () => {
@@ -991,8 +1086,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         return;
       }
 
-      // If preview is enabled AND callback is provided, show preview dialog
-      if (questionPreviewEnabledRef.current && onQuestionExtracted) {
+      // If preview is enabled AND callback is provided AND not bypassed, show preview dialog
+      if (questionPreviewEnabledRef.current && onQuestionExtracted && !bypassPreviewSetting) {
         console.log('📋 Question extracted, opening preview dialog (preview enabled)');
         onQuestionExtracted({
           question_text: data.question_text,
@@ -1086,7 +1181,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('question_format_preference, coding_question_style')
+        .select('question_format_preference, coding_question_style, question_difficulty_preference')
         .eq('id', user.id)
         .single();
 
@@ -1096,6 +1191,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           interval_minutes: autoQuestionInterval,
           format_preference: profile?.question_format_preference || 'multiple_choice',
           coding_question_style: profile?.coding_question_style || 'simple',
+          difficulty_preference: profile?.question_difficulty_preference || 'medium',
           force_send: true,
           strict_mode: true,
           slide_context: slideContextRef.current,

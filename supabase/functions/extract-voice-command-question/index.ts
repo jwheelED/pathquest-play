@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
 serve(async (req) => {
@@ -21,6 +21,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     let instructorPreference = "multiple_choice";
     let codingQuestionStyle = "full";
+    let difficultyPreference = "medium";
 
     if (authHeader) {
       try {
@@ -34,14 +35,15 @@ serve(async (req) => {
         if (user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("question_format_preference, coding_question_style")
+            .select("question_format_preference, coding_question_style, question_difficulty_preference")
             .eq("id", user.id)
             .single();
 
           if (profile) {
             instructorPreference = profile.question_format_preference || "multiple_choice";
             codingQuestionStyle = profile.coding_question_style || "full";
-            console.log(`👤 Instructor preference: ${instructorPreference}, coding style: ${codingQuestionStyle}`);
+            difficultyPreference = profile.question_difficulty_preference || "medium";
+            console.log(`👤 Instructor preference: ${instructorPreference}, coding style: ${codingQuestionStyle}, difficulty: ${difficultyPreference}`);
           }
         }
       } catch (e) {
@@ -93,6 +95,17 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
+    }
+
+    // Build difficulty instruction for voice command
+    let difficultyInstruction = "";
+    const diffLevel = (difficultyPreference || "medium").toLowerCase();
+    if (diffLevel === "easy") {
+      difficultyInstruction = `\n\nDIFFICULTY LEVEL: EASY - When extracting and phrasing the question, keep it simple. Focus on basic recall, definitions, or straightforward facts.`;
+    } else if (diffLevel === "hard") {
+      difficultyInstruction = `\n\nDIFFICULTY LEVEL: HARD - When extracting and phrasing the question, make it challenging. Focus on analysis, synthesis, evaluation, or connecting multiple concepts.`;
+    } else {
+      difficultyInstruction = `\n\nDIFFICULTY LEVEL: MEDIUM - When extracting and phrasing the question, target understanding and application of concepts.`;
     }
 
     const systemPrompt = `You are an expert at extracting questions from lecture transcripts with PERFECT accuracy.
@@ -169,6 +182,8 @@ Output: "Evaluate $\\int_0^{\\pi} \\sin(x) \\, dx$."
 
 Spoken: "what is the sum from n equals 1 to infinity of 1 over n squared"
 Output: "What is $\\sum_{n=1}^{\\infty} \\frac{1}{n^2}$?"
+
+${difficultyInstruction}
 
 If you cannot find a COMPLETE question, respond with exactly: NO_QUESTION_FOUND`;
 

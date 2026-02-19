@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -62,6 +62,11 @@ FORMATTING RULES:
 
 Context from lecture: "${context}"${courseInfo}${mathGuidance}
 
+GROUNDING RULES:
+- All options and distractors MUST relate to the lecture content provided above, NOT general knowledge.
+- Do NOT introduce concepts, terms, or topics that were not mentioned in the lecture context.
+- Every option should be plausible based on what was actually taught.
+
 Generate a multiple choice question with 4 options:
 - One correct answer
 - Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""}${isMathQuestion ? " and typical calculation errors" : ""}
@@ -97,7 +102,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
           {
             role: "system",
             content:
-              "You are an educational AI that creates high-quality multiple choice questions. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates high-quality multiple choice questions grounded strictly in the provided lecture content. You MUST NOT use general knowledge or introduce topics not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
@@ -214,7 +219,8 @@ CRITICAL REQUIREMENTS:
 4. Provide at least 2 examples with clear explanations
 5. Include 2-3 hints that reference lecture concepts
 6. Starter code should match the detected language syntax
-7. Problem should be solvable based on lecture content`;
+7. Problem should be solvable based on lecture content
+8. GROUNDING: The problem MUST be based on concepts from the lecture context above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
 
   // Add timeout handling (30 seconds)
   const controller = new AbortController();
@@ -233,7 +239,7 @@ CRITICAL REQUIREMENTS:
           {
             role: "system",
             content:
-              "You are an educational AI that creates coding challenges for students. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
@@ -434,6 +440,7 @@ serve(async (req) => {
       options = null,
       correct_answer = null,
       explanation = null,
+      course_id = null,
     } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
@@ -767,10 +774,12 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    // If live session active, send to BOTH live_questions AND student_assignments
-    // This ensures anonymous participants AND registered students both receive questions
+    // If live session active, send to live_questions for anonymous participants
+    // Then ALSO fall through to send to student_assignments for registered students (dual delivery)
+    let liveQuestionNumber: number | null = null;
+    let liveParticipantCount = 0;
     if (liveSession) {
-      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using hybrid mode`);
+      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - Using dual delivery mode`);
 
       // Get question number for this session
       const { count: questionCount } = await supabase
@@ -778,19 +787,18 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("session_id", liveSession.id);
 
-      const questionNumber = (questionCount || 0) + 1;
+      liveQuestionNumber = (questionCount || 0) + 1;
 
       // Insert into live_questions for anonymous participants
       const { error: liveInsertError } = await supabase.from("live_questions").insert({
         session_id: liveSession.id,
         instructor_id: user.id,
         question_content: formattedQuestion,
-        question_number: questionNumber,
+        question_number: liveQuestionNumber,
       });
 
       if (liveInsertError) {
         console.error("❌ Failed to insert live question:", liveInsertError);
-        // Continue anyway - try to send to registered students
       }
 
       // Get participant count for logging
@@ -799,90 +807,57 @@ serve(async (req) => {
         .select("*", { count: "exact", head: true })
         .eq("session_id", liveSession.id);
 
-      console.log(`✅ Live question sent to ${participantCount || 0} anonymous participants`);
-
-      // ALSO send to registered students via student_assignments
-      const { data: studentLinks } = await supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id);
-
-      let registeredStudentCount = 0;
-      if (studentLinks && studentLinks.length > 0) {
-        console.log(`📚 Also sending to ${studentLinks.length} registered students`);
-
-        const assignmentMode = getAssignmentMode(finalType);
-        const assignments = studentLinks.map((link) => ({
-          instructor_id: user.id,
-          student_id: link.student_id,
-          org_id: instructorOrgId,
-          assignment_type: "lecture_checkin",
-          mode: assignmentMode,
-          title: "🎯 Live Lecture Question",
-          content: {
-            questions: [formattedQuestion],
-            isLive: true,
-            detectedAutomatically: true,
-            source: source,
-          },
-          completed: false,
-          auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        }));
-
-        const { error: assignmentError } = await supabase.from("student_assignments").insert(assignments);
-
-        if (assignmentError) {
-          console.error("❌ Failed to send to registered students:", assignmentError.message);
-        } else {
-          registeredStudentCount = studentLinks.length;
-          console.log(`✅ Sent to ${registeredStudentCount} registered students`);
-        }
-      }
-
-      const processingTime = Date.now() - startTime;
-
-      // Log success
-      await supabase.from("question_send_logs").insert({
-        instructor_id: user.id,
-        success: true,
-        student_count: (participantCount || 0) + registeredStudentCount,
-        successful_sends: (participantCount || 0) + registeredStudentCount,
-        failed_sends: 0,
-        batch_count: 1,
-        processing_time_ms: processingTime,
-        question_text: questionPreview,
-        question_type: finalType,
-        source: source,
-      });
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          liveMode: true,
-          sessionCode: liveSession.session_code,
-          participantCount: participantCount || 0,
-          registeredStudentCount,
-          questionNumber,
-          processingTime,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      liveParticipantCount = participantCount || 0;
+      console.log(`✅ Live question sent to ${liveParticipantCount} anonymous participants`);
+      // Fall through to also send to student_assignments below
     }
 
     // No live session - use traditional student_assignments (authenticated users)
     console.log("📚 Standard mode - sending via student_assignments");
 
-    // Fetch students linked to this instructor
-    const { data: studentLinks, error: linkError } = await supabase
-      .from("instructor_students")
-      .select("student_id")
-      .eq("instructor_id", user.id);
-
-    if (linkError) {
-      throw new Error(`Failed to fetch students: ${linkError.message}`);
+    // Fetch students linked to this instructor, including legacy students for backward compatibility
+    let studentLinks: { student_id: string }[] = [];
+    
+    if (course_id) {
+      // Query 1: Students explicitly enrolled in this course
+      const { data: courseStudents, error: courseError } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id)
+        .eq("course_id", course_id);
+      
+      // Query 2: Legacy students with no course_id (joined via instructor code)
+      const { data: legacyStudents, error: legacyError } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id)
+        .is("course_id", null);
+      
+      if (courseError || legacyError) {
+        throw new Error(`Failed to fetch students: ${(courseError || legacyError)?.message}`);
+      }
+      
+      // Combine and deduplicate
+      const allStudents = [...(courseStudents || []), ...(legacyStudents || [])];
+      const uniqueIds = [...new Set(allStudents.map(s => s.student_id))];
+      studentLinks = uniqueIds.map(id => ({ student_id: id }));
+      
+      console.log(`📚 Found ${studentLinks.length} students (${courseStudents?.length || 0} course-enrolled, ${legacyStudents?.length || 0} legacy)`);
+    } else {
+      // No course_id - get all instructor's students
+      const { data: allStudents, error: linkError } = await supabase
+        .from("instructor_students")
+        .select("student_id")
+        .eq("instructor_id", user.id);
+      
+      if (linkError) {
+        throw new Error(`Failed to fetch students: ${linkError.message}`);
+      }
+      studentLinks = allStudents || [];
+      console.log(`📚 No course filter - sending to all ${studentLinks.length} students`);
     }
+    
+    // Error handling is now done within the conditionals above
 
     if (!studentLinks || studentLinks.length === 0) {
       return new Response(
@@ -932,6 +907,7 @@ serve(async (req) => {
         instructor_id: user.id,
         student_id: studentId,
         org_id: instructorOrgId,
+        course_id: course_id,
         assignment_type: "lecture_checkin",
         mode: assignmentMode,
         title: "🎯 Live Lecture Question",
@@ -984,6 +960,8 @@ serve(async (req) => {
       const retryAssignments = failedStudents.map((studentId) => ({
         instructor_id: user.id,
         student_id: studentId,
+        org_id: instructorOrgId,
+        course_id: course_id,
         assignment_type: "lecture_checkin",
         mode: retryMode,
         title: "🎯 Live Lecture Question",
@@ -1090,18 +1068,28 @@ serve(async (req) => {
     });
     await supabase.removeChannel(broadcastChannel);
 
+    const responsePayload: Record<string, any> = {
+      success: true,
+      sent_to: successCount,
+      total_students: studentIds.length,
+      failed_count: failedStudents.length,
+      question_type: finalType,
+      question: formattedQuestion,
+      batches_processed: batches.length,
+      processing_time_ms: processingTime,
+      parallel_batches: true,
+    };
+
+    // Include live session info if dual delivery was used
+    if (liveSession) {
+      responsePayload.liveMode = true;
+      responsePayload.sessionCode = liveSession.session_code;
+      responsePayload.liveParticipantCount = liveParticipantCount;
+      responsePayload.liveQuestionNumber = liveQuestionNumber;
+    }
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        sent_to: successCount,
-        total_students: studentIds.length,
-        failed_count: failedStudents.length,
-        question_type: finalType,
-        question: formattedQuestion,
-        batches_processed: batches.length,
-        processing_time_ms: processingTime,
-        parallel_batches: true,
-      }),
+      JSON.stringify(responsePayload),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },

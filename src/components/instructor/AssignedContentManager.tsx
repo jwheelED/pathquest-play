@@ -44,7 +44,7 @@ export function AssignedContentManager() {
         .from("student_assignments")
         .select("id, title, assignment_type, mode, completed, grade, created_at, student_id")
         .eq("instructor_id", user.id)
-        .eq("course_id", selectedCourseId)
+        .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
