@@ -98,23 +98,44 @@ serve(async (req) => {
     // Check if this is a YouTube URL - use caption extraction first, fallback to audio extraction
     if (lectureVideo.video_url && isYouTubeUrl(lectureVideo.video_url)) {
       console.log('Detected YouTube URL, trying caption extraction first...');
+      console.log('Video URL:', lectureVideo.video_url);
       
       // Try caption extraction first (faster and cheaper)
-      const ytResponse = await fetch(`${supabaseUrl}/functions/v1/get-youtube-transcript`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`
-        },
-        body: JSON.stringify({ videoUrl: lectureVideo.video_url })
-      });
+      let ytResponse;
+      let ytError = null;
+      
+      try {
+        ytResponse = await fetch(`${supabaseUrl}/functions/v1/get-youtube-transcript`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({ videoUrl: lectureVideo.video_url })
+        });
+        
+        console.log('YouTube transcript response status:', ytResponse.status);
+      } catch (fetchError) {
+        console.error('Failed to call get-youtube-transcript:', fetchError);
+        ytError = fetchError;
+      }
 
-      if (ytResponse.ok) {
+      if (ytResponse?.ok) {
         const ytResult = await ytResponse.json();
         console.log('YouTube captions extracted:', ytResult.transcript?.length, 'segments');
         transcriptSegments = ytResult.transcript || [];
         duration = ytResult.duration || 0;
       } else {
+        // Log the error from caption extraction
+        if (ytResponse) {
+          try {
+            const ytErrorBody = await ytResponse.json();
+            console.log('Caption extraction failed:', ytErrorBody);
+          } catch (e) {
+            console.log('Caption extraction failed with status:', ytResponse.status);
+          }
+        }
+        
         // Captions not available - fallback to audio extraction via Cloudinary
         console.log('Captions not available, falling back to audio extraction...');
         
@@ -124,17 +145,34 @@ serve(async (req) => {
           .eq('id', lectureVideoId);
 
         // Extract audio and upload to Cloudinary
-        const audioResponse = await fetch(`${supabaseUrl}/functions/v1/extract-youtube-audio`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${serviceRoleKey}`
-          },
-          body: JSON.stringify({ videoUrl: lectureVideo.video_url })
-        });
+        let audioResponse;
+        try {
+          audioResponse = await fetch(`${supabaseUrl}/functions/v1/extract-youtube-audio`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`
+            },
+            body: JSON.stringify({ videoUrl: lectureVideo.video_url })
+          });
+          
+          console.log('Audio extraction response status:', audioResponse.status);
+        } catch (audioFetchError) {
+          console.error('Failed to call extract-youtube-audio:', audioFetchError);
+          await supabase
+            .from('lecture_videos')
+            .update({ status: 'error', error_message: 'Failed to connect to audio extraction service' })
+            .eq('id', lectureVideoId);
+          throw new Error('Failed to connect to audio extraction service');
+        }
 
         if (!audioResponse.ok) {
-          const audioError = await audioResponse.json();
+          let audioError;
+          try {
+            audioError = await audioResponse.json();
+          } catch (e) {
+            audioError = { error: `Audio extraction failed with status ${audioResponse.status}` };
+          }
           console.error('Audio extraction failed:', audioError);
           await supabase
             .from('lecture_videos')
