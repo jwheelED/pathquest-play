@@ -28,13 +28,16 @@ serve(async (req) => {
     // Step 1: Get audio download URL from RapidAPI
     const rapidApiKey = Deno.env.get('RAPIDAPI_KEY');
     if (!rapidApiKey) {
-      throw new Error('RAPIDAPI_KEY not configured');
+      console.error('RAPIDAPI_KEY is not set in Supabase secrets');
+      throw new Error('RAPIDAPI_KEY not configured. Please add it to Supabase Edge Function secrets.');
     }
 
+    console.log('RapidAPI key found, requesting audio URL...');
     const audioUrl = await getYouTubeAudioUrl(videoId, rapidApiKey);
     console.log('Got audio URL from RapidAPI');
 
     // Step 2: Download audio and upload to Cloudinary
+    console.log('Uploading to Cloudinary...');
     const cloudinaryUrl = await uploadToCloudinary(audioUrl, videoId);
     console.log('Uploaded to Cloudinary:', cloudinaryUrl);
 
@@ -78,6 +81,8 @@ function extractVideoId(url: string): string | null {
 
 async function getYouTubeAudioUrl(videoId: string, apiKey: string): Promise<string> {
   // Using YouTube MP3 Download API from RapidAPI
+  console.log(`Calling RapidAPI for video ID: ${videoId}`);
+  
   const response = await fetch(
     `https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`,
     {
@@ -88,17 +93,34 @@ async function getYouTubeAudioUrl(videoId: string, apiKey: string): Promise<stri
     }
   );
 
+  console.log('RapidAPI response status:', response.status);
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('RapidAPI error:', errorText);
-    throw new Error(`RapidAPI request failed: ${response.status}`);
+    console.error('RapidAPI error response:', errorText);
+    
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('RapidAPI authentication failed. Please check your RAPIDAPI_KEY is valid and has an active subscription.');
+    }
+    if (response.status === 429) {
+      throw new Error('RapidAPI rate limit exceeded. Please try again later or upgrade your plan.');
+    }
+    throw new Error(`RapidAPI request failed: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
+  console.log('RapidAPI response data:', JSON.stringify(data).substring(0, 200));
   
   if (data.status !== 'ok' || !data.link) {
-    console.error('RapidAPI response:', data);
-    throw new Error(data.msg || 'Failed to extract audio from YouTube');
+    console.error('RapidAPI response indicates failure:', data);
+    
+    if (data.status === 'processing') {
+      throw new Error('Video is still being processed by RapidAPI. Please try again in a few moments.');
+    }
+    if (data.msg?.includes('private') || data.msg?.includes('unavailable')) {
+      throw new Error('This YouTube video is private or unavailable. Please use a public video.');
+    }
+    throw new Error(data.msg || 'Failed to extract audio from YouTube. The video may be too long or restricted.');
   }
 
   return data.link;
@@ -109,9 +131,20 @@ async function uploadToCloudinary(audioUrl: string, videoId: string): Promise<st
   const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
   const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
 
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error('Cloudinary credentials not configured');
+  if (!cloudName) {
+    console.error('CLOUDINARY_CLOUD_NAME is not set');
+    throw new Error('CLOUDINARY_CLOUD_NAME not configured in Supabase secrets');
   }
+  if (!apiKey) {
+    console.error('CLOUDINARY_API_KEY is not set');
+    throw new Error('CLOUDINARY_API_KEY not configured in Supabase secrets');
+  }
+  if (!apiSecret) {
+    console.error('CLOUDINARY_API_SECRET is not set');
+    throw new Error('CLOUDINARY_API_SECRET not configured in Supabase secrets');
+  }
+
+  console.log(`Uploading to Cloudinary cloud: ${cloudName}`);
 
   // Generate signature for upload
   const timestamp = Math.floor(Date.now() / 1000);
@@ -142,15 +175,22 @@ async function uploadToCloudinary(audioUrl: string, videoId: string): Promise<st
     }
   );
 
+  console.log('Cloudinary upload response status:', uploadResponse.status);
+
   if (!uploadResponse.ok) {
     const errorText = await uploadResponse.text();
     console.error('Cloudinary upload error:', errorText);
+    
+    if (uploadResponse.status === 401) {
+      throw new Error('Cloudinary authentication failed. Please check your API credentials.');
+    }
     throw new Error(`Cloudinary upload failed: ${uploadResponse.status}`);
   }
 
   const uploadResult = await uploadResponse.json();
   
   if (!uploadResult.secure_url) {
+    console.error('Cloudinary response missing URL:', uploadResult);
     throw new Error('Cloudinary did not return a URL');
   }
 
