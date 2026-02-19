@@ -59,8 +59,9 @@ async function syncToCanvas(
           : "Grade logged. Configure course mapping for full passback.",
       },
     };
-  } catch (err) {
-    return { success: false, error: `Canvas sync error: ${err.message}` };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Canvas sync error: ${message}` };
   }
 }
 
@@ -88,8 +89,9 @@ async function syncToBlackboard(
         note: "Grade logged. Configure course-column mapping for full passback.",
       },
     };
-  } catch (err) {
-    return { success: false, error: `Blackboard sync error: ${err.message}` };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Blackboard sync error: ${message}` };
   }
 }
 
@@ -119,8 +121,9 @@ async function syncToMoodle(
         note: "Grade logged. Configure activity mapping for full grade passback.",
       },
     };
-  } catch (err) {
-    return { success: false, error: `Moodle sync error: ${err.message}` };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Moodle sync error: ${message}` };
   }
 }
 
@@ -148,8 +151,9 @@ async function syncToBrightspace(
         note: "Grade logged. Configure grade item mapping for full passback.",
       },
     };
-  } catch (err) {
-    return { success: false, error: `Brightspace sync error: ${err.message}` };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Brightspace sync error: ${message}` };
   }
 }
 
@@ -274,9 +278,10 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ synced: true, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("sync-grade-to-lms error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
