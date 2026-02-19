@@ -345,7 +345,14 @@ export function QuestionBankResults() {
     const feedback = aiRec?.feedback;
 
     // Filter out _ai_recommendations from being treated as an answer
-    const actualAnswer = typeof answer === 'string' ? answer : undefined;
+    // Coding responses may be stored as objects with a `code` field
+    const actualAnswer = typeof answer === 'string' 
+      ? answer 
+      : (answer && typeof answer === 'object' && 'code' in answer) 
+        ? (answer as any).code 
+        : (answer && typeof answer === 'object')
+          ? JSON.stringify(answer, null, 2)
+          : undefined;
 
     if (!actualAnswer && !assignment.completed) {
       return (
