@@ -458,7 +458,7 @@ export function QuestionBankResults() {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <ScrollArea className="max-h-[600px]">
+                    <div className="max-h-[600px] overflow-y-auto">
                       <div className="space-y-3 pr-4">
                         {[...group.assignments].sort((a, b) => {
                           const submittedA = a.completed;
@@ -490,7 +490,7 @@ export function QuestionBankResults() {
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               );
