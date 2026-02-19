@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const YOUTUBE_API_KEY = Deno.env.get("AIzaSyBVAUlc5S8BbmZ4FaOsPem3CCMs7Hkzxnc");
+// Get YouTube API key from environment (optional - used for better error detection)
+const YOUTUBE_API_KEY = Deno.env.get("YOUTUBE_API_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
