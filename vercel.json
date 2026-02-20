@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd frontend && yarn build",
+  "buildCommand": "yarn build",
   "outputDirectory": "frontend/build",
-  "installCommand": "cd frontend && yarn install",
-  "framework": "vite"
+  "installCommand": "yarn install",
+  "framework": null
 }
