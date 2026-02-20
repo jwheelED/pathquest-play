@@ -26,6 +26,28 @@ import { ContextualTutorChat } from './ContextualTutorChat';
 import { MasterySummary } from './MasterySummary';
 import { QuestionReportDialog } from './QuestionReportDialog';
 
+type VideoSourceType = 'youtube' | 'vimeo' | 'direct';
+
+function getVideoSourceType(url: string): VideoSourceType {
+  if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+  if (/vimeo\.com/.test(url)) return 'vimeo';
+  return 'direct';
+}
+
+function getYouTubeEmbedUrl(url: string): string {
+  const match = url.match(/(?:v=|youtu\.be\/)([^&?#]+)/);
+  return match
+    ? `https://www.youtube.com/embed/${match[1]}?enablejsapi=1&modestbranding=1&rel=0`
+    : url;
+}
+
+function getVimeoEmbedUrl(url: string): string {
+  const match = url.match(/vimeo\.com\/(\d+)/);
+  return match
+    ? `https://player.vimeo.com/video/${match[1]}?title=0&byline=0&portrait=0`
+    : url;
+}
+
 interface PausePoint {
   id: string;
   pause_timestamp: number;
@@ -762,29 +784,41 @@ export const InteractiveLecturePlayer = ({
       
       {/* Video Player */}
       <div className={cn("relative bg-black overflow-hidden", isFullscreen ? "h-full" : "aspect-video", !isPreview && "rounded-lg", isPreview && "rounded-b-lg")}>
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          className="w-full h-full"
-          onTimeUpdate={handleTimeUpdate}
-          onSeeking={handleSeeking}
-          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          aria-label={`Video: ${title}`}
-        >
-          {/* Captions track for WCAG 2.1 AA compliance */}
-          {captionUrl && (
-            <track
-              kind="captions"
-              src={captionUrl}
-              srcLang="en"
-              label="English captions"
-              default
-            />
-          )}
-          Your browser does not support the video tag.
-        </video>
+        {getVideoSourceType(videoUrl) === 'direct' ? (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            className="w-full h-full"
+            onTimeUpdate={handleTimeUpdate}
+            onSeeking={handleSeeking}
+            onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            aria-label={`Video: ${title}`}
+          >
+            {/* Captions track for WCAG 2.1 AA compliance */}
+            {captionUrl && (
+              <track
+                kind="captions"
+                src={captionUrl}
+                srcLang="en"
+                label="English captions"
+                default
+              />
+            )}
+            Your browser does not support the video tag.
+          </video>
+        ) : (
+          <iframe
+            src={getVideoSourceType(videoUrl) === 'youtube'
+              ? getYouTubeEmbedUrl(videoUrl)
+              : getVimeoEmbedUrl(videoUrl)}
+            className="w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title={title}
+          />
+        )}
 
         {/* Question Overlay */}
         {currentQuestion && (
