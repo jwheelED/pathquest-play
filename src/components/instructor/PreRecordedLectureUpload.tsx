@@ -340,13 +340,25 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               setTimeout(pollStatus, 5000);
             }
           }, 5000);
-        } else if (updated?.status === "ready") {
+      } else if (updated?.status === "ready") {
           if (updated.duration_seconds) {
             setEstimatedDuration(updated.duration_seconds);
           }
           setStatus("ready");
           setCreatedLectureId(lectureVideo.id);
-          toast.success("Lecture processed successfully!");
+
+          // Check if questions were generated
+          const { data: questionCount } = await supabase
+            .from("lecture_pause_points")
+            .select("id", { count: "exact", head: true })
+            .eq("lecture_video_id", lectureVideo.id);
+
+          const count = questionCount?.length ?? 0;
+          if (count === 0) {
+            toast.warning("Video processed but no questions were generated. Captions may not be available for this video. Try uploading a video file instead for best results.");
+          } else {
+            toast.success(`Lecture processed with ${count} questions!`);
+          }
           onUploadComplete?.(lectureVideo.id);
         } else if (updated?.status === "error") {
           setStatus("error");
