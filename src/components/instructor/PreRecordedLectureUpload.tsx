@@ -552,28 +552,8 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 }}
                 disabled={status !== "idle"}
               />
-              <div className="flex items-center gap-3">
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">Est. duration:</Label>
-                <Slider
-                  value={[Math.floor(estimatedDuration / 60)]}
-                  onValueChange={([mins]) => {
-                    const newDuration = mins * 60;
-                    setEstimatedDuration(newDuration);
-                    const count = calculateRecommendedPausePoints(newDuration, flowLevel);
-                    setPausePoints(generateAutoPausePoints(newDuration, count));
-                  }}
-                  min={5}
-                  max={120}
-                  step={5}
-                  disabled={status !== "idle"}
-                  className="flex-1"
-                />
-                <Badge variant="outline" className="font-mono text-xs w-16 justify-center">
-                  {Math.floor(estimatedDuration / 60)} min
-                </Badge>
-              </div>
               <p className="text-xs text-muted-foreground">
-                Paste a YouTube, Vimeo, or direct video link. Adjust estimated duration for accurate pause point placement.
+                Paste a YouTube, Vimeo, or direct video link. Duration will be detected automatically during processing.
               </p>
             </div>
           )}
