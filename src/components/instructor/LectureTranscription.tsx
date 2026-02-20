@@ -2025,6 +2025,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
+      if (isPreviewOpen) {
+        console.log("⏸️ Skipping check: preview dialog is open");
+        return;
+      }
       if (isSendingQuestionRef.current) {
         console.log("⏸️ Skipping check: already sending a question");
         return;

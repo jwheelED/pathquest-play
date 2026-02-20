@@ -258,7 +258,19 @@ Return ONLY the complete question text, nothing else.`;
       }
     }
 
-    console.log("🔧 After auto-fix:", extractedQuestion);
+    // Strip HTML tags (AI sometimes includes markup)
+    extractedQuestion = extractedQuestion.replace(/<[^>]*>/g, '').trim();
+
+    // Strip YouTube UI text artifacts that leak into transcripts
+    extractedQuestion = extractedQuestion
+      .replace(/Show activity for more options\.?/gi, '')
+      .replace(/Show more\.?/gi, '')
+      .trim();
+
+    // Remove duplicate trailing punctuation (e.g., "question??")
+    extractedQuestion = extractedQuestion.replace(/([?.!])\1+$/, '$1');
+
+    console.log("🔧 After auto-fix + sanitization:", extractedQuestion);
 
     // Enhanced validation with more aggressive truncation detection
     const validateQuestionCompleteness = (question: string): { isValid: boolean; reason?: string } => {
