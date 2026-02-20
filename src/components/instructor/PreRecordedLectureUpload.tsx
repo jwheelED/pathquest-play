@@ -468,37 +468,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             </div>
           )}
           
-          {/* Advanced configuration collapsible */}
-          {(selectedFile || videoUrl) && estimatedDuration > 0 && (
-            <Collapsible open={showAdvancedConfig} onOpenChange={setShowAdvancedConfig}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between">
-                  <span className="flex items-center gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    Advanced: Edit pause points
-                  </span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedConfig ? "rotate-180" : ""}`} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <PausePointEditor
-                  durationSeconds={estimatedDuration}
-                  pausePoints={pausePoints}
-                  onPausePointsChange={setPausePoints}
-                  flowLevel={flowLevel}
-                  onFlowLevelChange={(val) => {
-                    setFlowLevel(val);
-                    const count = calculateRecommendedPausePoints(estimatedDuration, val);
-                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
-                  }}
-                  highYieldOnly={highYieldOnly}
-                  onHighYieldOnlyChange={setHighYieldOnly}
-                  recommendedCount={recommendedCount}
-                  disabled={status !== "idle"}
-                />
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {/* Advanced pause point editor removed - AI determines optimal pause points during analysis */}
           
           <p className="text-xs text-muted-foreground">
             AI will place {effectiveQuestionCount} pause points at optimal learning moments
