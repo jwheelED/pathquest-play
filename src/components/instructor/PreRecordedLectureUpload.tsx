@@ -268,15 +268,39 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
       setStatus("analyzing");
 
-      // Poll for status updates
+      // Poll for status updates with timeout
+      let pollAttempts = 0;
+      const MAX_POLL_ATTEMPTS = 24; // ~2 minutes
+
       const pollStatus = async () => {
+        pollAttempts++;
+        if (pollAttempts > MAX_POLL_ATTEMPTS) {
+          setStatus("error");
+          setErrorMessage("Processing timed out. Please try again.");
+          return;
+        }
+
         const { data: updated } = await supabase
           .from("lecture_videos")
-          .select("status, transcript, error_message")
+          .select("status, transcript, error_message, duration_seconds")
           .eq("id", lectureVideo.id)
           .single();
 
         if (updated?.status === "analyzing" && updated.transcript) {
+          // Update duration from backend if available
+          if (updated.duration_seconds) {
+            setEstimatedDuration(updated.duration_seconds);
+          }
+
+          // Check for placeholder transcript
+          const transcriptText = typeof updated.transcript === 'object' && updated.transcript !== null
+            ? (updated.transcript as Record<string, unknown>).text as string || ''
+            : String(updated.transcript);
+          
+          if (transcriptText.startsWith("[Transcript unavailable")) {
+            toast.warning("Captions not available for this video. AI will generate general comprehension questions.");
+          }
+
           // Get user profile for professor type
           const { data: profile } = await supabase.from("profiles").select("professor_type").eq("id", user.id).single();
 
@@ -284,8 +308,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           await supabase.functions.invoke("analyze-lecture-cognitive-load", {
             body: {
               lectureVideoId: lectureVideo.id,
-              transcript: updated.transcript,
-              // In smart mode, AI determines question count; otherwise use manual setting
+              transcript: transcriptText,
               smartMode: highYieldOnly,
               questionCount: highYieldOnly ? undefined : effectiveQuestionCount,
               professorType: professorType || "stem",
@@ -297,9 +320,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           setTimeout(async () => {
             const { data: final } = await supabase
               .from("lecture_videos")
-              .select("status, error_message")
+              .select("status, error_message, duration_seconds")
               .eq("id", lectureVideo.id)
               .single();
+
+            if (final?.duration_seconds) {
+              setEstimatedDuration(final.duration_seconds);
+            }
 
             if (final?.status === "ready") {
               setStatus("ready");
@@ -310,11 +337,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               setStatus("error");
               setErrorMessage(final.error_message || "Processing failed");
             } else {
-              // Keep polling
-              setTimeout(pollStatus, 3000);
+              setTimeout(pollStatus, 5000);
             }
           }, 5000);
         } else if (updated?.status === "ready") {
+          if (updated.duration_seconds) {
+            setEstimatedDuration(updated.duration_seconds);
+          }
           setStatus("ready");
           setCreatedLectureId(lectureVideo.id);
           toast.success("Lecture processed successfully!");
@@ -323,8 +352,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           setStatus("error");
           setErrorMessage(updated.error_message || "Processing failed");
         } else {
-          // Keep polling
-          setTimeout(pollStatus, 3000);
+          setTimeout(pollStatus, 5000);
         }
       };
 
