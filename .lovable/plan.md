@@ -1,84 +1,89 @@
 
+# Fix Voice Question Preview Bugs
 
-# Fix YouTube Video Question Generation
+## Bug 1: Preview Regenerates When More Transcript Arrives
 
-## Root Cause (confirmed from database)
+### Root Cause
+When the preview dialog is open (`isPreviewOpen === true`), the system does **not** block new voice command detections or auto-question triggers from firing. Here's what happens:
 
-Every YouTube video in the database has the transcript `"[Transcript unavailable - video will play without AI-generated questions]"` and `question_count: 0`. This means **both** transcript extraction methods are failing:
+1. Instructor says "send question now" -- voice command detected, preview opens
+2. While the instructor reviews the preview, they keep talking
+3. Their continued speech (e.g., "Hello. Hello. Class, how are you doing?") can trigger **another** voice command detection (the fuzzy matcher finds patterns in the new transcript)
+4. The auto-question interval timer also has **no check** for `isPreviewOpen` -- if the timer fires while preview is open, it calls `generateAndSendAutoQuestion` which sends directly via `handleQuestionSend` (bypassing preview entirely)
+5. A new voice command overwrites `previewQuestionData` and `pendingQuestionDataRef`, causing the preview to "regenerate" with different content
 
-1. **YouTube Data API v3 captions.list** -- This API can list caption track IDs, but downloading third-party video captions requires **OAuth authentication**, not just an API key. The current code tries to use the `timedtext` endpoint as a workaround, but this endpoint is unreliable and frequently blocked.
+The evidence is in the edge function logs: the `extract-voice-command-question` function was called **twice** within 12 seconds (at timestamps `1771618175` and `1771618186`), producing two different questions from different transcript snapshots.
 
-2. **Page scraping fallback** -- YouTube returns HTTP 429 (rate limited) or blocks the request from Deno edge function IPs.
+### Fix
+Add guards in three places:
 
-Since no transcript is extracted, `analyze-lecture-cognitive-load` correctly skips AI analysis and sets `question_count: 0`. The video plays fine but with zero pause points/questions.
+**A. Voice command detection (`checkForVoiceCommand` function, ~line 570)**
+- Add an early return if `isPreviewOpen` is true: "Preview dialog is open, skipping voice command detection"
 
-## Solution: Use Deepgram to transcribe YouTube audio
+**B. Auto-question timer (interval check, ~line 2015)**
+- Add `isPreviewOpen` to the skip conditions alongside `isSendingQuestion` and `isGeneratingAutoQuestionRef`
 
-The system already has Deepgram configured and working (file uploads produce transcripts successfully). The fix is to route YouTube videos through a proxy that extracts the audio stream URL, then send that to Deepgram for transcription.
+**C. Manual question send (`handleManualQuestionSend`, ~line 821)**
+- Add an early return if `isPreviewOpen` is true
 
-However, Deepgram cannot directly access YouTube URLs. The practical approach is to use a **YouTube audio extraction service** via the existing `RAPIDAPI_KEY` secret, or alternatively, use a lightweight proxy approach.
+## Bug 2: HTML Tags (`<h1>`) Appearing in Preview
 
-### Recommended approach: Use an open YouTube transcript API
+### Root Cause
+The edge function logs show the exact problem:
 
-There are free/reliable YouTube transcript extraction services that don't require OAuth. We will use the `youtube-transcript` npm package pattern -- making direct requests to YouTube's internal `get_transcript` endpoint which is more reliable than both the Data API and page scraping.
+```
+Extracted question: How many bones are inside of the human body?</h1>?
+```
 
-## Changes
+The AI (Gemini 2.5 Flash) is returning raw HTML tags in its extracted question. The `extract-voice-command-question` edge function has no HTML sanitization step -- it takes the raw AI output, validates it for completeness (punctuation, length), and returns it directly. The validation passes because the question ends with `?`.
 
-### File 1: `supabase/functions/transcribe-video/index.ts`
+The `</h1>` tag also appears in the second extraction (`Show activity for more options.` -- this is unrelated junk text the AI included from context).
 
-**Replace the `fetchYouTubeTranscriptViaAPI` function** with a more reliable approach that uses YouTube's internal transcript API (the same one used by the youtube-transcript npm package):
+### Fix
+**A. Edge function: Strip HTML tags from extracted question (`extract-voice-command-question/index.ts`, after line 261)**
+- Add a sanitization step after the auto-fix logic that strips all HTML tags: `extractedQuestion = extractedQuestion.replace(/<[^>]*>/g, '').trim()`
+- Also strip common AI artifacts like "Show activity for more options" which is a YouTube UI element leaking into transcripts
 
-- Fetch the YouTube video page to get the `innertubeApiKey` and video details
-- Use the `youtubei/v1/get_transcript` endpoint to fetch transcript data directly
-- This endpoint is the same one YouTube's own UI uses and is significantly more reliable than the captions API or timedtext endpoint
-- Keep the existing `fetchYouTubeDuration` function (uses Data API for duration, which works fine with just an API key)
+**B. Frontend fallback: Sanitize in `VoiceQuestionPreviewDialog` (line 60)**
+- Add HTML stripping when initializing `questionText` from `extractedQuestion.question_text` as a defense-in-depth measure
 
-**Fallback chain:**
-1. YouTube innertube `get_transcript` endpoint (primary -- most reliable)
-2. YouTube Data API v3 timedtext (existing, kept as fallback)
-3. Page scraping (existing, kept as last resort)
+## Build Error Fix
 
-**If ALL transcript methods fail**, instead of setting `question_count: 0` and giving up:
-- Set status to `ready` with a user-friendly message
-- Allow the video to still be played, but show a clear indicator that no questions could be generated
-- Suggest the instructor upload a transcript file manually (future enhancement)
+The `dist: Cannot open: No such file or directory` error needs investigation. This is likely a TypeScript compilation failure preventing the build from producing output. Will check for any type errors in the modified files and fix them.
 
-### File 2: `supabase/functions/analyze-lecture-cognitive-load/index.ts`
+## Files to Modify
 
-**Already handles placeholder transcripts correctly** (skips AI analysis, sets status to `ready` with 0 questions). No changes needed here.
-
-### File 3: `src/components/instructor/PreRecordedLectureUpload.tsx`
-
-**No structural changes needed**, but add a clearer message when a video finishes processing with 0 questions, explaining that captions weren't available and suggesting the instructor try a different video or upload a file instead.
-
-### File 4: Fix the build error
-
-The current build is failing with `dist: Cannot open: No such file or directory`. This is likely caused by a TypeScript compilation error introduced in the previous edits. Will investigate and fix any type errors preventing the build.
+1. **`src/components/instructor/LectureTranscription.tsx`** -- Add `isPreviewOpen` guard to voice command detection, auto-question timer, and manual send
+2. **`supabase/functions/extract-voice-command-question/index.ts`** -- Add HTML tag stripping and AI artifact cleanup after extraction
+3. **`src/components/instructor/VoiceQuestionPreviewDialog.tsx`** -- Add defensive HTML stripping on question text initialization
+4. **Any file causing the build error** -- Fix TypeScript compilation issues
 
 ## Technical Details
 
-### YouTube innertube transcript endpoint
-
+### Preview guard implementation
 ```text
-POST https://www.youtube.com/youtubei/v1/get_transcript
-Body: {
-  "context": { "client": { "clientName": "WEB", "clientVersion": "2.0" } },
-  "params": <base64-encoded protobuf with video ID>
+// In checkForVoiceCommand (~line 570):
+if (isPreviewOpen) {
+  console.log("⏸️ Preview dialog open, skipping voice command detection");
+  return false;
+}
+
+// In auto-question timer (~line 2016):
+if (isPreviewOpen) {
+  console.log("⏸️ Skipping check: preview dialog is open");
+  return;
 }
 ```
 
-This is the same internal API that YouTube's own frontend uses to show transcripts. It:
-- Does not require authentication or API keys
-- Is not subject to the same rate limiting as page scraping
-- Works for any video that has captions enabled (auto-generated or manual)
-- Returns timestamped segments directly
+### HTML sanitization in edge function
+```text
+// After auto-fix (line 261):
+// Strip HTML tags (AI sometimes includes markup)
+extractedQuestion = extractedQuestion.replace(/<[^>]*>/g, '').trim();
 
-### Params encoding
-
-The `params` field is a base64-encoded protobuf message containing the video ID. The encoding follows a known pattern used by the youtube-transcript library.
-
-## Files to Modify
-1. `supabase/functions/transcribe-video/index.ts` -- Replace unreliable transcript methods with innertube API
-2. `src/components/instructor/PreRecordedLectureUpload.tsx` -- Better messaging for 0-question results
-3. Any files causing the current build error
-
+// Strip YouTube UI text artifacts
+extractedQuestion = extractedQuestion
+  .replace(/Show activity for more options\.?/gi, '')
+  .replace(/Show more\.?/gi, '')
+  .trim();
+```
