@@ -67,6 +67,24 @@ serve(async (req) => {
       );
     }
 
+    // Handle placeholder transcripts - skip AI analysis
+    if (transcript.startsWith("[Transcript unavailable")) {
+      console.log(`Skipping AI analysis for ${lectureVideoId} - transcript unavailable`);
+      await supabaseClient
+        .from("lecture_videos")
+        .update({
+          status: "ready",
+          question_count: 0,
+          cognitive_analysis: { note: "Transcript was unavailable. No AI questions generated." },
+        })
+        .eq("id", lectureVideoId);
+
+      return new Response(
+        JSON.stringify({ success: true, questionCount: 0, skipped: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Truncate very long transcripts to avoid token limits
     const maxTranscriptLength = 30000;
     const truncatedTranscript =

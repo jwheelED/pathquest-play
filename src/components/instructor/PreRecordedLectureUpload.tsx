@@ -620,6 +620,11 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               <Upload className="h-4 w-4 mr-2" />
               {uploadMode === "url" ? "Add & Process Lecture" : "Upload & Process Lecture"}
             </>
+          ) : status === "error" ? (
+            <>
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Try Again
+            </>
           ) : status === "ready" ? (
             <>
               <Play className="h-4 w-4 mr-2" />
