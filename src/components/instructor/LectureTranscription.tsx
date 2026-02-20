@@ -825,6 +825,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const handleManualQuestionSend = async () => {
+    // Prevent sends while preview dialog is open
+    if (isPreviewOpen) {
+      console.log("⏸️ Skipping manual send: preview dialog is open");
+      return;
+    }
+
     // Prevent multiple simultaneous sends
     if (isSendingQuestion) {
       console.log("🚫 Already processing a question");
