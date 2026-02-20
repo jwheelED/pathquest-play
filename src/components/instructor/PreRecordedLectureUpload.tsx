@@ -592,13 +592,20 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         {/* Submit Button */}
         <Button
           onClick={() => {
-            if (status === "ready" && createdLectureId) {
+            if (status === "error") {
+              // Reset for retry
+              setStatus("idle");
+              setErrorMessage("");
+              setUploadProgress(0);
+              setCreatedLectureId(null);
+            } else if (status === "ready" && createdLectureId) {
               window.open(`/instructor/preview/${createdLectureId}`, '_blank');
             } else {
               handleUpload();
             }
           }}
           disabled={
+            status === "error" ? false :
             status === "ready" ? false :
             (uploadMode === "file" && !selectedFile) ||
             (uploadMode === "url" && !videoUrl.trim()) ||
