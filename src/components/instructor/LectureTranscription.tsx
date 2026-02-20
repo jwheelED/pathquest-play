@@ -524,6 +524,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, [transcriptChunks, isRecording]);
 
   const checkForVoiceCommand = (text: string, currentChunkIndex: number): boolean => {
+    // Prevent detection while preview dialog is open
+    if (isPreviewOpen) {
+      console.log("⏸️ Preview dialog open, skipping voice command detection");
+      return false;
+    }
+
     // Prevent detection while already sending a question
     if (isSendingQuestion) {
       console.log("🚫 Already sending a question, skipping detection");
