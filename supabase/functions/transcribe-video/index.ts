@@ -26,14 +26,87 @@ function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
- * Fetch YouTube captions using the free timedtext API.
- * Falls back to fetching caption tracks from the video page.
+ * Fetch YouTube transcript using the YouTube Data API v3 as primary method,
+ * with page-scraping as fallback.
  */
 async function fetchYouTubeTranscript(
   videoId: string
 ): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
+  // Try YouTube Data API v3 first
+  const apiKey = Deno.env.get("YOUTUBE_API_KEY");
+  if (apiKey) {
+    try {
+      const apiResult = await fetchYouTubeTranscriptViaAPI(videoId, apiKey);
+      if (apiResult) {
+        console.log(`YouTube API transcript fetched: ${apiResult.text.length} chars`);
+        return apiResult;
+      }
+    } catch (error) {
+      console.error("YouTube API transcript failed, trying scraping fallback:", error);
+    }
+  }
+
+  // Fallback: scrape YouTube page for captions
+  return await fetchYouTubeTranscriptViaScraping(videoId);
+}
+
+/**
+ * Fetch transcript via YouTube Data API v3 captions endpoint.
+ */
+async function fetchYouTubeTranscriptViaAPI(
+  videoId: string,
+  apiKey: string
+): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
+  // List available caption tracks
+  const listUrl = `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${apiKey}`;
+  const listResponse = await fetch(listUrl);
+
+  if (!listResponse.ok) {
+    const errorText = await listResponse.text();
+    console.error("YouTube captions.list API error:", listResponse.status, errorText);
+    return null;
+  }
+
+  const listData = await listResponse.json();
+  const tracks = listData.items || [];
+
+  if (tracks.length === 0) {
+    console.log("No caption tracks available via API for:", videoId);
+    return null;
+  }
+
+  // Prefer English captions
+  const englishTrack = tracks.find(
+    (t: { snippet: { language: string } }) =>
+      t.snippet.language === "en" || t.snippet.language?.startsWith("en")
+  );
+  const track = englishTrack || tracks[0];
+
+  // The captions.download endpoint requires OAuth for third-party videos,
+  // so we fall back to the timedtext approach using the video ID
+  const timedtextUrl = `https://www.youtube.com/api/timedtext?lang=${track.snippet.language || 'en'}&v=${videoId}&fmt=json3`;
+  const captionResponse = await fetch(timedtextUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    },
+  });
+
+  if (!captionResponse.ok) {
+    console.error("Timedtext API error:", captionResponse.status);
+    return null;
+  }
+
+  const captionJson = await captionResponse.json();
+  return parseTimedTextJson(captionJson);
+}
+
+/**
+ * Fetch transcript by scraping YouTube page (fallback method).
+ */
+async function fetchYouTubeTranscriptViaScraping(
+  videoId: string
+): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
   try {
-    // Approach: fetch the YouTube video page to extract caption track info
     const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
     const pageResponse = await fetch(pageUrl, {
       headers: {
@@ -50,7 +123,6 @@ async function fetchYouTubeTranscript(
 
     const pageHtml = await pageResponse.text();
 
-    // Extract captions player response JSON
     const captionMatch = pageHtml.match(
       /"captions":\s*(\{.*?"playerCaptionsTracklistRenderer".*?\})\s*,\s*"videoDetails"/s
     );
@@ -75,7 +147,6 @@ async function fetchYouTubeTranscript(
       return null;
     }
 
-    // Prefer English captions, fall back to first available
     const englishTrack = tracks.find(
       (t: { languageCode: string }) =>
         t.languageCode === "en" || t.languageCode?.startsWith("en")
@@ -87,7 +158,6 @@ async function fetchYouTubeTranscript(
       return null;
     }
 
-    // Fetch the caption XML
     const captionUrl = track.baseUrl + "&fmt=json3";
     const captionResponse = await fetch(captionUrl);
 
@@ -97,40 +167,78 @@ async function fetchYouTubeTranscript(
     }
 
     const captionJson = await captionResponse.json();
-    const events = captionJson.events || [];
-
-    const segments: Array<{ text: string; start: number; duration: number }> =
-      [];
-    const textParts: string[] = [];
-
-    for (const event of events) {
-      if (!event.segs) continue;
-      const segText = event.segs
-        .map((s: { utf8: string }) => s.utf8 || "")
-        .join("")
-        .trim();
-      if (!segText || segText === "\n") continue;
-
-      const startMs = event.tStartMs || 0;
-      const durationMs = event.dDurationMs || 0;
-
-      segments.push({
-        text: segText,
-        start: startMs / 1000,
-        duration: durationMs / 1000,
-      });
-      textParts.push(segText);
-    }
-
-    if (textParts.length === 0) return null;
-
-    return {
-      text: textParts.join(" "),
-      segments,
-    };
+    return parseTimedTextJson(captionJson);
   } catch (error) {
-    console.error("YouTube transcript extraction failed:", error);
+    console.error("YouTube transcript scraping failed:", error);
     return null;
+  }
+}
+
+/**
+ * Parse YouTube json3 timed text format into transcript segments.
+ */
+function parseTimedTextJson(
+  captionJson: { events?: Array<{ segs?: Array<{ utf8: string }>; tStartMs?: number; dDurationMs?: number }> }
+): { text: string; segments: Array<{ text: string; start: number; duration: number }> } | null {
+  const events = captionJson.events || [];
+  const segments: Array<{ text: string; start: number; duration: number }> = [];
+  const textParts: string[] = [];
+
+  for (const event of events) {
+    if (!event.segs) continue;
+    const segText = event.segs
+      .map((s) => s.utf8 || "")
+      .join("")
+      .trim();
+    if (!segText || segText === "\n") continue;
+
+    const startMs = event.tStartMs || 0;
+    const durationMs = event.dDurationMs || 0;
+
+    segments.push({
+      text: segText,
+      start: startMs / 1000,
+      duration: durationMs / 1000,
+    });
+    textParts.push(segText);
+  }
+
+  if (textParts.length === 0) return null;
+
+  return {
+    text: textParts.join(" "),
+    segments,
+  };
+}
+
+/**
+ * Fetch YouTube video duration via Data API v3.
+ */
+async function fetchYouTubeDuration(videoId: string): Promise<number> {
+  const apiKey = Deno.env.get("YOUTUBE_API_KEY");
+  if (!apiKey) return 0;
+
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoId}&key=${apiKey}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      await response.text();
+      return 0;
+    }
+    const data = await response.json();
+    const duration = data.items?.[0]?.contentDetails?.duration;
+    if (!duration) return 0;
+
+    // Parse ISO 8601 duration (PT1H2M3S)
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    const hours = parseInt(match[1] || "0");
+    const minutes = parseInt(match[2] || "0");
+    const seconds = parseInt(match[3] || "0");
+    return hours * 3600 + minutes * 60 + seconds;
+  } catch (error) {
+    console.error("Failed to fetch YouTube duration:", error);
+    return 0;
   }
 }
 
@@ -140,6 +248,24 @@ async function fetchYouTubeTranscript(
 function extractVimeoVideoId(url: string): string | null {
   const match = url.match(/vimeo\.com\/(\d+)/);
   return match ? match[1] : null;
+}
+
+/**
+ * Fetch Vimeo video duration via oEmbed API.
+ */
+async function fetchVimeoDuration(videoId: string): Promise<number> {
+  try {
+    const url = `https://vimeo.com/api/oembed.json?url=https://vimeo.com/${videoId}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      await response.text();
+      return 0;
+    }
+    const data = await response.json();
+    return data.duration || 0;
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -190,8 +316,6 @@ async function transcribeWithDeepgram(
     }
 
     const duration = result.metadata?.duration || 0;
-
-    // Build segments from paragraphs or utterances
     const segments: Array<{ text: string; start: number; duration: number }> = [];
     const utterances = result.results?.utterances || [];
 
@@ -204,7 +328,6 @@ async function transcribeWithDeepgram(
         });
       }
     } else {
-      // Fallback: use the full transcript as a single segment
       segments.push({
         text: alternative.transcript,
         start: 0,
@@ -242,7 +365,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY")!
     );
 
-    // Verify user auth
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -268,7 +390,6 @@ serve(async (req) => {
 
     console.log(`Transcribing lecture: ${lectureVideoId}, path: ${videoPath}`);
 
-    // Fetch the lecture record to get video_url if external
     const { data: lecture, error: lectureError } = await supabaseClient
       .from("lecture_videos")
       .select("video_url, video_path, instructor_id")
@@ -282,7 +403,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify ownership
     if (lecture.instructor_id !== user.id) {
       return new Response(
         JSON.stringify({ error: "Access denied" }),
@@ -304,23 +424,34 @@ serve(async (req) => {
         console.log(`YouTube video detected: ${ytVideoId}`);
         transcript = await fetchYouTubeTranscript(ytVideoId);
 
+        // Get duration from transcript segments or YouTube API
         if (transcript && transcript.segments.length > 0) {
           const lastSeg = transcript.segments[transcript.segments.length - 1];
           durationSeconds = Math.round(lastSeg.start + lastSeg.duration);
         }
+        // Always try to get accurate duration from YouTube API
+        const ytDuration = await fetchYouTubeDuration(ytVideoId);
+        if (ytDuration > 0) {
+          durationSeconds = ytDuration;
+        }
       }
 
-      // Check if Vimeo (limited free transcription support)
+      // Check if Vimeo
       const vimeoId = extractVimeoVideoId(url);
       if (vimeoId && !transcript) {
         console.log(`Vimeo video detected: ${vimeoId}, attempting Deepgram`);
-        // Vimeo doesn't expose captions publicly; try Deepgram if URL is accessible
+        // Get duration from Vimeo oEmbed
+        const vimeoDuration = await fetchVimeoDuration(vimeoId);
+        if (vimeoDuration > 0) {
+          durationSeconds = vimeoDuration;
+        }
+
         const deepgramKey = Deno.env.get("DEEPGRAM_API_KEY");
         if (deepgramKey) {
           const result = await transcribeWithDeepgram(url, deepgramKey);
           if (result) {
             transcript = { text: result.text, segments: result.segments };
-            durationSeconds = result.duration;
+            if (!durationSeconds) durationSeconds = result.duration;
           }
         }
       }
@@ -348,7 +479,7 @@ serve(async (req) => {
         }
       }
 
-      // If it's a non-direct URL (not YouTube, not Vimeo, not a direct file) - try Deepgram as last resort
+      // Unknown URL type - try Deepgram as last resort
       if (!transcript && !ytVideoId && !vimeoId) {
         console.log("Unknown URL type, attempting Deepgram as fallback");
         const deepgramKey = Deno.env.get("DEEPGRAM_API_KEY");
@@ -401,7 +532,6 @@ serve(async (req) => {
 
     // If no transcript was generated, handle gracefully
     if (!transcript || !transcript.text) {
-      // For YouTube/Vimeo without captions, create a placeholder so the lecture can still be used
       const ytId = isExternal && lecture.video_url ? extractYouTubeVideoId(lecture.video_url) : null;
       const vimeoId = isExternal && lecture.video_url ? extractVimeoVideoId(lecture.video_url) : null;
 
@@ -412,7 +542,6 @@ serve(async (req) => {
           segments: [],
         };
 
-        // Update lecture to analyzing so it can proceed (with generic questions)
         await supabaseClient
           .from("lecture_videos")
           .update({
@@ -423,7 +552,7 @@ serve(async (req) => {
           .eq("id", lectureVideoId);
 
         return new Response(
-          JSON.stringify({ success: true, hasTranscript: false }),
+          JSON.stringify({ success: true, hasTranscript: false, durationSeconds }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
