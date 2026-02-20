@@ -524,6 +524,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, [transcriptChunks, isRecording]);
 
   const checkForVoiceCommand = (text: string, currentChunkIndex: number): boolean => {
+    // Prevent detection while preview dialog is open
+    if (isPreviewOpen) {
+      console.log("⏸️ Preview dialog open, skipping voice command detection");
+      return false;
+    }
+
     // Prevent detection while already sending a question
     if (isSendingQuestion) {
       console.log("🚫 Already sending a question, skipping detection");
@@ -819,6 +825,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   };
 
   const handleManualQuestionSend = async () => {
+    // Prevent sends while preview dialog is open
+    if (isPreviewOpen) {
+      console.log("⏸️ Skipping manual send: preview dialog is open");
+      return;
+    }
+
     // Prevent multiple simultaneous sends
     if (isSendingQuestion) {
       console.log("🚫 Already processing a question");
@@ -2013,6 +2025,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
     // Check if interval has elapsed
     const checkInterval = setInterval(() => {
+      if (isPreviewOpen) {
+        console.log("⏸️ Skipping check: preview dialog is open");
+        return;
+      }
       if (isSendingQuestionRef.current) {
         console.log("⏸️ Skipping check: already sending a question");
         return;
