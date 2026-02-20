@@ -14,6 +14,7 @@ interface LectureVideo {
   title: string;
   description: string | null;
   video_path: string;
+  video_url: string | null;
   duration_seconds: number | null;
   status: string;
   question_count: number;
@@ -153,18 +154,23 @@ export default function InteractiveLecture() {
           setProgress(progressData);
         }
 
-        // Get signed URL for video - handle missing files gracefully
+        // Get video URL - handle external URLs vs uploaded files
         try {
-          const { data: signedUrl, error: urlError } = await supabase.storage
-            .from('lecture-videos')
-            .createSignedUrl(lectureData.video_path, 3600);
+          if (lectureData.video_path && !lectureData.video_path.startsWith('external-')) {
+            const { data: signedUrl, error: urlError } = await supabase.storage
+              .from('lecture-videos')
+              .createSignedUrl(lectureData.video_path, 3600);
 
-          if (urlError) {
-            console.error('Video file not found:', urlError);
-            // Don't throw - let the page load without video
-            setVideoUrl(null);
+            if (urlError) {
+              console.error('Video file not found:', urlError);
+              setVideoUrl(null);
+            } else {
+              setVideoUrl(signedUrl.signedUrl);
+            }
+          } else if (lectureData.video_url) {
+            setVideoUrl(lectureData.video_url);
           } else {
-            setVideoUrl(signedUrl.signedUrl);
+            setVideoUrl(null);
           }
         } catch (storageErr) {
           console.error('Storage error:', storageErr);

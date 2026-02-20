@@ -20,6 +20,7 @@ interface LectureVideo {
   title: string;
   description: string | null;
   video_path: string;
+  video_url: string | null;
   duration_seconds: number | null;
   status: string;
   question_count: number;
