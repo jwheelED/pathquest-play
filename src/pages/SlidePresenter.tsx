@@ -125,6 +125,7 @@ export default function SlidePresenter() {
     onVoiceCommand: handleVoiceCommand,
     onQuestionExtracted: handleQuestionExtracted,
     bypassPreviewSetting: true, // Slide Presenter always sends immediately
+    courseId: selectedCourseId || undefined,
   });
 
   // Update ref when handleManualQuestionSend is available

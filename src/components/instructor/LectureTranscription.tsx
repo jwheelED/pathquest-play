@@ -336,11 +336,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch student count
-        const { data: students, error } = await supabase
+        // Fetch student count (scoped to selected course)
+        let studentQuery = supabase
           .from("instructor_students")
           .select("student_id")
           .eq("instructor_id", user.id);
+
+        if (selectedCourseId) {
+          studentQuery = studentQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+        }
+
+        const { data: students, error } = await studentQuery;
 
         if (!error && students) {
           setStudentCount(students.length);

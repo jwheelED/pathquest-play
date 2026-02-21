@@ -239,12 +239,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch student count
-        const { data: students } = await supabase
+        // Fetch student count (scoped to course if available)
+        let studentQuery = supabase
           .from('instructor_students')
           .select('student_id')
           .eq('instructor_id', user.id);
+        
+        if (courseIdRef.current) {
+          studentQuery = studentQuery.or(`course_id.eq.${courseIdRef.current},course_id.is.null`);
+        }
 
+        const { data: students } = await studentQuery;
         if (students) setStudentCount(students.length);
 
         // Fetch profile settings including course context and preview preference

@@ -87,8 +87,11 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
         .select('student_id')
         .eq('instructor_id', instructorId);
       
-      // If a course is selected, filter to show course-specific + legacy students
-      // This is handled by the parent passing the right instructorId
+      // Scope to selected course + legacy students
+      if (selectedCourseId) {
+        query = query.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+      }
+
       const { data: studentsData, error } = await query;
 
       if (error) throw error;
