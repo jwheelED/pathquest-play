@@ -28,6 +28,7 @@ export interface SlideData {
 
 export default function SlidePresenter() {
   const navigate = useNavigate();
+  const { selectedCourseId } = useCourseContext();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [presentations, setPresentations] = useState<SlideData[]>([]);
   const [activePresentation, setActivePresentation] = useState<SlideData | null>(null);
