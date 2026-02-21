@@ -373,6 +373,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         body: {
           ...detectionData,
           course_context: courseContextRef.current,
+          course_id: courseIdRef.current,
         },
       });
 
