@@ -905,7 +905,22 @@ export const InteractiveLecturePlayer = ({
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                {!showResult ? (
+                {isPreview ? (
+                  /* Preview mode: just show a continue button, answer is shown in header */
+                  <Button 
+                    onClick={() => {
+                      setCurrentQuestion(null);
+                      setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
+                      videoRef.current?.play();
+                      setIsPlaying(true);
+                    }} 
+                    className="w-full" 
+                    size="lg"
+                  >
+                    <ChevronRight className="h-4 w-4 mr-2" />
+                    Continue Lecture
+                  </Button>
+                ) : !showResult ? (
                   <>
                     {/* Answer Input */}
                     {currentQuestion.question_type === 'multiple_choice' ? (
