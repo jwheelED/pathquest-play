@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, TrendingDown, Brain, Target, Lightbulb, AlertCircle, Users, BookOpen, CheckCircle, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface AnalyticsData {
   engagementChange: number;
