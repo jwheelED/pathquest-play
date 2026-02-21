@@ -836,11 +836,70 @@ export const InteractiveLecturePlayer = ({
                     <Brain className="h-3 w-3" aria-hidden="true" />
                     <span>Cognitive Load: {currentQuestion.cognitive_load_score}/10</span>
                   </Badge>
-                  <Badge variant="outline">
-                    Question {currentQuestion.order_index + 1}/{totalQuestions}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      Question {currentQuestion.order_index + 1}/{totalQuestions}
+                    </Badge>
+                    {isPreview && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentQuestion(null);
+                          setSelectedAnswer('');
+                          setShortAnswer('');
+                          setConfidenceLevel('');
+                          setShowResult(false);
+                          setShortAnswerGrade(null);
+                          setShortAnswerFeedback(null);
+                          setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
+                          videoRef.current?.play();
+                          setIsPlaying(true);
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        Skip →
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <CardTitle id="question-title" className="mt-4">{currentQuestion.question_content.question}</CardTitle>
+                {isPreview && (
+                  <div className="mt-3 space-y-3">
+                    {/* Show answer immediately in preview */}
+                    {currentQuestion.question_type === 'multiple_choice' && currentQuestion.question_content.options && (
+                      <div className="space-y-1.5">
+                        {currentQuestion.question_content.options.map((opt, i) => {
+                          const isCorrectOpt = opt.startsWith(currentQuestion.question_content.correctAnswer || '');
+                          return (
+                            <div key={i} className={cn(
+                              "text-sm p-2 rounded border",
+                              isCorrectOpt
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                                : "bg-muted/30 border-border"
+                            )}>
+                              {opt}
+                              {isCorrectOpt && <CheckCircle2 className="h-3.5 w-3.5 inline ml-2" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {(currentQuestion.question_content.correctAnswer || currentQuestion.question_content.expectedAnswer) && (
+                      <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-sm">
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                          {currentQuestion.question_type === 'multiple_choice' ? 'Correct: ' : 'Expected: '}
+                        </span>
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          {currentQuestion.question_content.correctAnswer || currentQuestion.question_content.expectedAnswer}
+                        </span>
+                      </div>
+                    )}
+                    {currentQuestion.question_content.explanation && (
+                      <p className="text-xs text-muted-foreground italic">{currentQuestion.question_content.explanation}</p>
+                    )}
+                  </div>
+                )}
                 <p id="question-instructions" className="sr-only">
                   Answer the question below and select your confidence level before submitting.
                 </p>
