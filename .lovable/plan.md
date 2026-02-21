@@ -1,89 +1,107 @@
 
-# Fix Voice Question Preview Bugs
+# Fix Multi-Course Data Isolation Bugs
 
-## Bug 1: Preview Regenerates When More Transcript Arrives
+## Problem Summary
 
-### Root Cause
-When the preview dialog is open (`isPreviewOpen === true`), the system does **not** block new voice command detections or auto-question triggers from firing. Here's what happens:
+Two related bugs cause courses to bleed into each other:
 
-1. Instructor says "send question now" -- voice command detected, preview opens
-2. While the instructor reviews the preview, they keep talking
-3. Their continued speech (e.g., "Hello. Hello. Class, how are you doing?") can trigger **another** voice command detection (the fuzzy matcher finds patterns in the new transcript)
-4. The auto-question interval timer also has **no check** for `isPreviewOpen` -- if the timer fires while preview is open, it calls `generateAndSendAutoQuestion` which sends directly via `handleQuestionSend` (bypassing preview entirely)
-5. A new voice command overwrites `previewQuestionData` and `pendingQuestionDataRef`, causing the preview to "regenerate" with different content
+1. **Questions sent to ALL courses** -- The `useLectureRecording.ts` hook does not pass `course_id` when calling the `format-and-send-question` edge function, so the function falls into a fallback path that sends questions to every student across all courses.
 
-The evidence is in the edge function logs: the `extract-voice-command-question` function was called **twice** within 12 seconds (at timestamps `1771618175` and `1771618186`), producing two different questions from different transcript snapshots.
+2. **Same students shown in all courses** -- Several instructor dashboard components query `instructor_students` without filtering by `course_id`, so the same student list appears regardless of which course is selected.
 
-### Fix
-Add guards in three places:
+## Root Cause Analysis
 
-**A. Voice command detection (`checkForVoiceCommand` function, ~line 570)**
-- Add an early return if `isPreviewOpen` is true: "Preview dialog is open, skipping voice command detection"
+### Bug 1: Missing `course_id` in `useLectureRecording.ts`
 
-**B. Auto-question timer (interval check, ~line 2015)**
-- Add `isPreviewOpen` to the skip conditions alongside `isSendingQuestion` and `isGeneratingAutoQuestionRef`
+The `LectureTranscription.tsx` component correctly passes `course_id: selectedCourseId` (line 1171), but the `useLectureRecording.ts` hook (used for slide-based lectures) does NOT accept or pass `course_id` at all (line 364-368). It just spreads `detectionData` which never contains a `course_id`.
 
-**C. Manual question send (`handleManualQuestionSend`, ~line 821)**
-- Add an early return if `isPreviewOpen` is true
-
-## Bug 2: HTML Tags (`<h1>`) Appearing in Preview
-
-### Root Cause
-The edge function logs show the exact problem:
-
+In the edge function `format-and-send-question`, when `course_id` is null/missing, lines 846-857 execute:
 ```
-Extracted question: How many bones are inside of the human body?</h1>?
+// No course_id - get all instructor's students
+const { data: allStudents } = await supabase
+  .from("instructor_students")
+  .select("student_id")
+  .eq("instructor_id", user.id);
 ```
+This returns every student across every course.
 
-The AI (Gemini 2.5 Flash) is returning raw HTML tags in its extracted question. The `extract-voice-command-question` edge function has no HTML sanitization step -- it takes the raw AI output, validates it for completeness (punctuation, length), and returns it directly. The validation passes because the question ends with `?`.
+### Bug 2: Unscoped student queries in dashboard components
 
-The `</h1>` tag also appears in the second extraction (`Show activity for more options.` -- this is unrelated junk text the AI included from context).
+| Component | Issue |
+|-----------|-------|
+| `StudentProgressCard.tsx` (line 82-85) | Fetches all students with no `course_id` filter |
+| `TeachingAnalytics.tsx` (line 44-47) | Fetches all students with no `course_id` filter |
+| `LectureTranscription.tsx` (line 340-343) | Student count is unscoped -- shows total across all courses |
 
-### Fix
-**A. Edge function: Strip HTML tags from extracted question (`extract-voice-command-question/index.ts`, after line 261)**
-- Add a sanitization step after the auto-fix logic that strips all HTML tags: `extractedQuestion = extractedQuestion.replace(/<[^>]*>/g, '').trim()`
-- Also strip common AI artifacts like "Show activity for more options" which is a YouTube UI element leaking into transcripts
+The `InstructorDashboard.tsx` `fetchStudents` and `InstructorOverview.tsx` already have proper course filtering using `.or('course_id.eq.{id},course_id.is.null')`, so those are fine.
 
-**B. Frontend fallback: Sanitize in `VoiceQuestionPreviewDialog` (line 60)**
-- Add HTML stripping when initializing `questionText` from `extractedQuestion.question_text` as a defense-in-depth measure
+## Fix Plan
 
-## Build Error Fix
+### 1. Add `course_id` support to `useLectureRecording.ts`
 
-The `dist: Cannot open: No such file or directory` error needs investigation. This is likely a TypeScript compilation failure preventing the build from producing output. Will check for any type errors in the modified files and fix them.
+- Add `courseId?: string` to the `UseLectureRecordingOptions` interface
+- Store it in a ref so it stays current
+- Pass `course_id: courseIdRef.current` in the `format-and-send-question` invocation body (line 364-368)
+- Update the student count fetch (if present) to filter by course
+
+### 2. Pass `selectedCourseId` when using `useLectureRecording`
+
+- Find the component(s) that call `useLectureRecording()` and pass the `courseId` option from `useCourseContext()`
+
+### 3. Fix `StudentProgressCard.tsx` -- scope to selected course
+
+- Import `useCourseContext`
+- Add `selectedCourseId` to the dependency array
+- Filter `instructor_students` query with `.or('course_id.eq.{selectedCourseId},course_id.is.null')` when a course is selected
+- Also scope the Realtime subscription filter to include course_id
+
+### 4. Fix `TeachingAnalytics.tsx` -- scope to selected course
+
+- Import `useCourseContext`
+- Filter `instructor_students` query by `selectedCourseId`
+- Add `selectedCourseId` to dependency array for re-fetch
+
+### 5. Fix `LectureTranscription.tsx` student count -- scope to selected course
+
+- The student count fetch at line 340-343 should filter by `selectedCourseId` (which is already available in the component)
 
 ## Files to Modify
 
-1. **`src/components/instructor/LectureTranscription.tsx`** -- Add `isPreviewOpen` guard to voice command detection, auto-question timer, and manual send
-2. **`supabase/functions/extract-voice-command-question/index.ts`** -- Add HTML tag stripping and AI artifact cleanup after extraction
-3. **`src/components/instructor/VoiceQuestionPreviewDialog.tsx`** -- Add defensive HTML stripping on question text initialization
-4. **Any file causing the build error** -- Fix TypeScript compilation issues
+1. **`src/hooks/useLectureRecording.ts`** -- Accept `courseId` option, pass it to edge function
+2. **`src/components/instructor/StudentProgressCard.tsx`** -- Add course filtering to student query
+3. **`src/components/instructor/TeachingAnalytics.tsx`** -- Add course filtering to student query
+4. **`src/components/instructor/LectureTranscription.tsx`** -- Filter student count by course
+5. **Any component calling `useLectureRecording`** -- Pass `courseId` from course context
 
 ## Technical Details
 
-### Preview guard implementation
-```text
-// In checkForVoiceCommand (~line 570):
-if (isPreviewOpen) {
-  console.log("⏸️ Preview dialog open, skipping voice command detection");
-  return false;
-}
+### useLectureRecording fix
 
-// In auto-question timer (~line 2016):
-if (isPreviewOpen) {
-  console.log("⏸️ Skipping check: preview dialog is open");
-  return;
+```text
+// In UseLectureRecordingOptions:
+courseId?: string;
+
+// In the hook body:
+const courseIdRef = useRef(options.courseId);
+useEffect(() => { courseIdRef.current = options.courseId; }, [options.courseId]);
+
+// In format-and-send-question call (line 364-368):
+body: {
+  ...detectionData,
+  course_context: courseContextRef.current,
+  course_id: courseIdRef.current,  // <-- ADD THIS
 }
 ```
 
-### HTML sanitization in edge function
-```text
-// After auto-fix (line 261):
-// Strip HTML tags (AI sometimes includes markup)
-extractedQuestion = extractedQuestion.replace(/<[^>]*>/g, '').trim();
+### Student query filter pattern (consistent across all components)
 
-// Strip YouTube UI text artifacts
-extractedQuestion = extractedQuestion
-  .replace(/Show activity for more options\.?/gi, '')
-  .replace(/Show more\.?/gi, '')
-  .trim();
+```text
+// When selectedCourseId is available:
+.eq("instructor_id", instructorId)
+.or(`course_id.eq.${selectedCourseId},course_id.is.null`)
+
+// When no course selected:
+// Show empty or skip fetch
 ```
+
+This matches the existing pattern already used in `InstructorDashboard.tsx` and `InstructorOverview.tsx`.
