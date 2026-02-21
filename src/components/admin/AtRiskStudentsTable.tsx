@@ -3,21 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, Download, Search, TrendingDown, Clock, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,7 +31,7 @@ export function calculateRiskScore(
   daysSinceActive: number,
   incompleteAssignments: number,
   streakBroken: boolean = false,
-  weakConcepts: number = 0
+  weakConcepts: number = 0,
 ): { score: number; level: "critical" | "high" | "medium"; factors: string[] } {
   let score = 0;
   const factors: string[] = [];
@@ -120,7 +107,16 @@ export default function AtRiskStudentsTable({ students, loading }: AtRiskStudent
     const csvContent = [
       ["Name", "Email", "Instructor", "Avg Grade", "Last Active", "Incomplete", "Risk Level", "Risk Score"].join(","),
       ...filteredStudents.map((s) =>
-        [s.name, s.email, s.instructorName, s.avgGrade, s.lastActive, s.incompleteAssignments, s.riskLevel, s.riskScore].join(",")
+        [
+          s.name,
+          s.email,
+          s.instructorName,
+          s.avgGrade,
+          s.lastActive,
+          s.incompleteAssignments,
+          s.riskLevel,
+          s.riskScore,
+        ].join(","),
       ),
     ].join("\n");
 
@@ -158,9 +154,7 @@ export default function AtRiskStudentsTable({ students, loading }: AtRiskStudent
               <AlertTriangle className="w-5 h-5 text-destructive" />
               At-Risk Students
             </CardTitle>
-            <CardDescription className="mt-1">
-              Students who may need intervention to prevent dropout
-            </CardDescription>
+            <CardDescription className="mt-1">Students who may need help</CardDescription>
           </div>
           <Button onClick={handleExport} variant="outline" size="sm" className="gap-2">
             <Download className="w-4 h-4" />
@@ -253,8 +247,8 @@ export default function AtRiskStudentsTable({ students, loading }: AtRiskStudent
                           student.avgGrade < 60
                             ? "text-destructive font-semibold"
                             : student.avgGrade < 70
-                            ? "text-orange-500 font-semibold"
-                            : ""
+                              ? "text-orange-500 font-semibold"
+                              : ""
                         }
                       >
                         {student.avgGrade.toFixed(1)}%
