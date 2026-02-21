@@ -132,6 +132,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Store course context (topics, title) for AI question generation
   const courseContextRef = useRef<{ title: string; topics: string[] } | null>(null);
 
+  // Store course ID in a ref so it stays current for async callbacks
+  const courseIdRef = useRef<string | undefined>(courseId);
+  useEffect(() => {
+    courseIdRef.current = courseId;
+  }, [courseId]);
+
   // Core state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
