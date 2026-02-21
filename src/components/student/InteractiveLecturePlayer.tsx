@@ -1138,13 +1138,33 @@ export const InteractiveLecturePlayer = ({
             {sortedPausePoints.map((point) => (
               <div
                 key={point.id}
-                className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 ${
+                className={cn(
+                  "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-10",
                   answeredQuestions.has(point.id)
                     ? 'bg-emerald-500 border-emerald-400'
-                    : 'bg-amber-500 border-amber-400'
-                }`}
+                    : 'bg-amber-500 border-amber-400',
+                  isPreview && 'cursor-pointer hover:scale-150 transition-transform'
+                )}
                 style={{ left: `${(point.pause_timestamp / duration) * 100}%` }}
-                title={`Question ${point.order_index + 1}`}
+                title={`Q${point.order_index + 1} at ${formatTime(point.pause_timestamp)}`}
+                onClick={isPreview ? (e) => {
+                  e.stopPropagation();
+                  if (videoRef.current) {
+                    videoRef.current.pause();
+                    setIsPlaying(false);
+                    videoRef.current.currentTime = point.pause_timestamp;
+                    setCurrentTime(point.pause_timestamp);
+                    // Reset answer state and show question
+                    setSelectedAnswer('');
+                    setShortAnswer('');
+                    setConfidenceLevel('');
+                    setShowResult(false);
+                    setShortAnswerGrade(null);
+                    setShortAnswerFeedback(null);
+                    setCurrentQuestion(point);
+                    onQuestionSelect?.(point.id);
+                  }
+                } : undefined}
               />
             ))}
             {/* No-skip indicator */}
