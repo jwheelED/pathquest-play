@@ -109,7 +109,7 @@ const detectVoiceCommandDirect = (
 };
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false, courseId } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
