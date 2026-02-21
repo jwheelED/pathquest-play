@@ -50,7 +50,7 @@ export default function RetentionHealthCard({
           <TrendingUp className="w-5 h-5 text-primary" />
           Retention Health
         </CardTitle>
-        <CardDescription>Key metrics for dropout prevention</CardDescription>
+        <CardDescription>Key metrics for help indication</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -61,13 +61,8 @@ export default function RetentionHealthCard({
               <span className="text-sm font-medium text-muted-foreground">At-Risk</span>
             </div>
             <div className={`text-3xl font-bold ${getAtRiskColor()}`}>{atRiskCount}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {atRiskPercentage.toFixed(1)}% of students
-            </div>
-            <Progress
-              value={100 - atRiskPercentage}
-              className="h-1.5 mt-2"
-            />
+            <div className="text-xs text-muted-foreground mt-1">{atRiskPercentage.toFixed(1)}% of students</div>
+            <Progress value={100 - atRiskPercentage} className="h-1.5 mt-2" />
           </div>
 
           {/* Pass Rate */}
@@ -79,13 +74,8 @@ export default function RetentionHealthCard({
             <div className={`text-3xl font-bold ${getHealthColor(passRate, { danger: 70, warning: 80 })}`}>
               {passRate.toFixed(1)}%
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Students above 60%
-            </div>
-            <Progress
-              value={passRate}
-              className="h-1.5 mt-2"
-            />
+            <div className="text-xs text-muted-foreground mt-1">Students above 60%</div>
+            <Progress value={passRate} className="h-1.5 mt-2" />
           </div>
 
           {/* 7-Day Retention */}
@@ -97,13 +87,8 @@ export default function RetentionHealthCard({
             <div className={`text-3xl font-bold ${getHealthColor(retentionRate, { danger: 60, warning: 75 })}`}>
               {retentionRate.toFixed(1)}%
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Active in last 7 days
-            </div>
-            <Progress
-              value={retentionRate}
-              className="h-1.5 mt-2"
-            />
+            <div className="text-xs text-muted-foreground mt-1">Active in last 7 days</div>
+            <Progress value={retentionRate} className="h-1.5 mt-2" />
           </div>
 
           {/* Completion Rate */}
@@ -115,13 +100,8 @@ export default function RetentionHealthCard({
             <div className={`text-3xl font-bold ${getHealthColor(avgCompletionRate, { danger: 50, warning: 70 })}`}>
               {avgCompletionRate.toFixed(1)}%
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Avg assignment completion
-            </div>
-            <Progress
-              value={avgCompletionRate}
-              className="h-1.5 mt-2"
-            />
+            <div className="text-xs text-muted-foreground mt-1">Avg assignment completion</div>
+            <Progress value={avgCompletionRate} className="h-1.5 mt-2" />
           </div>
         </div>
       </CardContent>
