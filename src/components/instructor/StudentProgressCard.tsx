@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, Trophy, Target, GraduationCap } from "lucide-react";
 import StudentDetailDialog from "./StudentDetailDialog";
 import { Badge } from "@/components/ui/badge";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface StudentStats {
   id: string;
@@ -17,13 +18,17 @@ interface StudentStats {
 export const StudentProgressCard = ({ instructorId }: { instructorId: string }) => {
   const [students, setStudents] = useState<(StudentStats & { id: string })[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
     fetchStudents();
 
     // Real-time updates for student progress
+    const channelName = selectedCourseId 
+      ? `instructor-students-${instructorId}-${selectedCourseId}`
+      : `instructor-students-${instructorId}`;
     const channel = supabase
-      .channel(`instructor-students-${instructorId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -47,7 +52,6 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
         },
         (payload) => {
           console.log('📚 Student assignment updated:', payload);
-          // Refetch when students complete assignments
           fetchStudents();
         }
       )
@@ -60,7 +64,6 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
         },
         (payload) => {
           console.log('📈 Student stats updated:', payload);
-          // Refetch to show updated stats
           fetchStudents();
         }
       )
@@ -74,7 +77,7 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [instructorId]);
+  }, [instructorId, selectedCourseId]);
 
   const fetchStudents = async () => {
     try {
@@ -84,8 +87,11 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
         .select('student_id')
         .eq('instructor_id', instructorId);
       
-      // If a course is selected, filter to show course-specific + legacy students
-      // This is handled by the parent passing the right instructorId
+      // Scope to selected course + legacy students
+      if (selectedCourseId) {
+        query = query.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+      }
+
       const { data: studentsData, error } = await query;
 
       if (error) throw error;
