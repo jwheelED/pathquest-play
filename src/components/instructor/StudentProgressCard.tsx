@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, Trophy, Target, GraduationCap } from "lucide-react";
 import StudentDetailDialog from "./StudentDetailDialog";
 import { Badge } from "@/components/ui/badge";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface StudentStats {
   id: string;
