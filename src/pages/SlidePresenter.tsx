@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useCourseContext } from '@/hooks/useCourseContext';
 import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
 import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/SlideViewer';
 import { PptxViewer, PptxViewerRef } from '@/components/instructor/slides/PptxViewer';
