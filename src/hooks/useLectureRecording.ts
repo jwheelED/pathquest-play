@@ -54,6 +54,8 @@ export interface UseLectureRecordingOptions {
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
   /** When true, bypasses the question preview setting and sends questions immediately */
   bypassPreviewSetting?: boolean;
+  /** Course ID to scope question delivery to a specific course */
+  courseId?: string;
 }
 
 // Direct voice command detection - checks raw text without relying on state
