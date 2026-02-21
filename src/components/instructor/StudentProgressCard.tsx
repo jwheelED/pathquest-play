@@ -18,13 +18,17 @@ interface StudentStats {
 export const StudentProgressCard = ({ instructorId }: { instructorId: string }) => {
   const [students, setStudents] = useState<(StudentStats & { id: string })[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
     fetchStudents();
 
     // Real-time updates for student progress
+    const channelName = selectedCourseId 
+      ? `instructor-students-${instructorId}-${selectedCourseId}`
+      : `instructor-students-${instructorId}`;
     const channel = supabase
-      .channel(`instructor-students-${instructorId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -48,7 +52,6 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
         },
         (payload) => {
           console.log('📚 Student assignment updated:', payload);
-          // Refetch when students complete assignments
           fetchStudents();
         }
       )
@@ -61,7 +64,6 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
         },
         (payload) => {
           console.log('📈 Student stats updated:', payload);
-          // Refetch to show updated stats
           fetchStudents();
         }
       )
@@ -75,7 +77,7 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [instructorId]);
+  }, [instructorId, selectedCourseId]);
 
   const fetchStudents = async () => {
     try {
