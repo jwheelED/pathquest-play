@@ -329,7 +329,10 @@ export default function ClassDashboard() {
                 return (
                   <button
                     key={item.value}
-                    onClick={() => setActiveTab(item.value)}
+                    onClick={() => {
+                      console.log('🔄 Tab clicked:', item.value, '| Current:', activeTab);
+                      setActiveTab(item.value);
+                    }}
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left",
                       isActive
