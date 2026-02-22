@@ -149,6 +149,8 @@ export default function ClassDashboard() {
   };
 
   const renderTabContent = () => {
+    console.log('🎯 Rendering tab content for:', activeTab);
+    
     switch (activeTab) {
       case "overview":
         return (
