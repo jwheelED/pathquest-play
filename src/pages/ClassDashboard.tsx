@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Calendar, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, Brain, FileText } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
-// FlowStateCard removed
 import { FloatingDecorations } from "@/components/student/FloatingDecorations";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
+import { StudentLectureQuestions } from "@/components/student/StudentLectureQuestions";
+import { cn } from "@/lib/utils";
 
 interface User {
   id: string;
@@ -23,6 +23,15 @@ interface CourseInfo {
   courseSchedule?: string;
 }
 
+type TabValue = "overview" | "lectures" | "lecture-questions" | "assigned";
+
+const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
+  { value: "overview", label: "Overview", icon: LayoutDashboard },
+  { value: "lectures", label: "Lectures", icon: Video },
+  { value: "lecture-questions", label: "Lecture Questions", icon: Brain },
+  { value: "assigned", label: "Assigned Content", icon: FileText },
+];
+
 export default function ClassDashboard() {
   const { instructorId } = useParams<{ instructorId: string }>();
   const [searchParams] = useSearchParams();
@@ -32,6 +41,7 @@ export default function ClassDashboard() {
   const [userName, setUserName] = useState("");
   const [courseInfo, setCourseInfo] = useState<CourseInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabValue>("overview");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -138,7 +148,90 @@ export default function ClassDashboard() {
     navigate("/");
   };
 
-  // Flow state removed
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "overview":
+        return (
+          <div className="space-y-6">
+            {/* Course Information - Headspace Style */}
+            {courseInfo && (
+              <div className="animate-fade-in">
+                <div className="headspace-card p-6">
+                  <div className="flex items-start gap-4 mb-5">
+                    <div className="w-14 h-14 rounded-3xl bg-accent flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-7 h-7 text-foreground" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground mb-1">Course Information</h2>
+                      <p className="text-muted-foreground text-sm">
+                        Instructor: {courseInfo.instructorName}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {courseInfo.courseSchedule && (
+                      <div className="flex items-center gap-3 p-3 rounded-2xl bg-accent/50">
+                        <Calendar className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Schedule</p>
+                          <p className="text-sm font-medium text-foreground">{courseInfo.courseSchedule}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {courseInfo.courseTopics && courseInfo.courseTopics.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Topics Covered</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {courseInfo.courseTopics.map((topic, idx) => (
+                            <span
+                              key={idx}
+                              className="px-4 py-2 bg-secondary/15 text-secondary rounded-full text-sm font-medium"
+                            >
+                              {topic}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case "lectures":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <PreRecordedLectureList instructorId={instructorId} />
+          </div>
+        );
+
+      case "lecture-questions":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <StudentLectureQuestions instructorId={instructorId} />
+          </div>
+        );
+
+      case "assigned":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {user && (
+              <AssignedContent 
+                userId={user.id} 
+                instructorId={instructorId}
+              />
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   if (loading) {
     return (
@@ -199,67 +292,61 @@ export default function ClassDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
-          {/* Course Information - Headspace Style */}
-          {courseInfo && (
-            <div className="col-span-1 lg:col-span-5 animate-fade-in">
-              <div className="headspace-card p-6 h-full">
-                <div className="flex items-start gap-4 mb-5">
-                  <div className="w-14 h-14 rounded-3xl bg-accent flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="w-7 h-7 text-foreground" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground mb-1">Course Information</h2>
-                    <p className="text-muted-foreground text-sm">
-                      Instructor: {courseInfo.instructorName}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  {courseInfo.courseSchedule && (
-                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-accent/50">
-                      <Calendar className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Schedule</p>
-                        <p className="text-sm font-medium text-foreground">{courseInfo.courseSchedule}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {courseInfo.courseTopics && courseInfo.courseTopics.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Topics Covered</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {courseInfo.courseTopics.map((topic, idx) => (
-                          <span
-                            key={idx}
-                            className="px-4 py-2 bg-secondary/15 text-secondary rounded-full text-sm font-medium"
-                          >
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+        <div className="flex min-h-[calc(100vh-12rem)]">
+          {/* Sidebar Navigation - Desktop Only */}
+          <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
+            <nav className="flex flex-col gap-1 sticky top-24">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    onClick={() => setActiveTab(item.value)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {/* Mobile Tab Navigation */}
+          <div className="lg:hidden w-full mb-4">
+            <div className="flex gap-1 p-1 bg-muted/50 rounded-xl overflow-x-auto">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    onClick={() => setActiveTab(item.value)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-1 justify-center",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
-          )}
-
-
-          {/* Interactive Pre-Recorded Lectures */}
-          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-2">
-            <PreRecordedLectureList instructorId={instructorId} />
           </div>
 
-          {/* Assigned Content for this class */}
-          <div className="col-span-1 lg:col-span-12 animate-fade-in stagger-3">
-            <AssignedContent 
-              userId={user.id} 
-              instructorId={instructorId}
-            />
-          </div>
+          {/* Main Content */}
+          <main className="flex-1 min-w-0 lg:mt-0 mt-0">
+            {renderTabContent()}
+          </main>
         </div>
       </div>
 
