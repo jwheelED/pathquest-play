@@ -54,7 +54,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
-    const { questionType, extractedQuestion, slideNumber, isPollMode = false } = await req.json();
+    const { questionType, extractedQuestion, slideNumber, isPollMode = false, course_id = null } = await req.json();
 
     if (!extractedQuestion || !questionType) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
