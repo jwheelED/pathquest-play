@@ -104,8 +104,8 @@
 
 user_problem_statement: |
   Add a tabbed interface to the student class dashboard (ClassDashboard.tsx) similar to the instructor dashboard.
-  Include tabs for: Overview, Lectures, Lecture Questions, Assigned Content.
-  The Lecture Questions tab should show the student's responses across all pre-recorded lectures with grades and feedback.
+  Include tabs for: Overview, Assigned Content (live lecture + question bank questions), Pre-Recorded Lectures, Results.
+  The Results tab should show the student's responses across all lectures with grades and feedback.
 
 frontend:
   - task: "Student Class Dashboard Tabbed Interface"
@@ -118,9 +118,9 @@ frontend:
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Implemented tabbed interface with Overview, Lectures, Lecture Questions, Assigned Content tabs. Added sidebar navigation for desktop and horizontal tabs for mobile."
+        comment: "Implemented tabbed interface with Overview, Assigned Content, Pre-Recorded Lectures, Results tabs. Added sidebar navigation for desktop and horizontal tabs for mobile."
 
-  - task: "Student Lecture Questions Component"
+  - task: "Student Results Component"
     implemented: true
     working: "NA"
     file: "src/components/student/StudentLectureQuestions.tsx"
@@ -130,7 +130,7 @@ frontend:
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Created new component to display student's responses to pre-recorded lecture questions with grades, feedback, and progress tracking."
+        comment: "Updated component to show BOTH live lecture/quiz results AND pre-recorded lecture results with sub-tabs. Shows grades, feedback, correct/incorrect answers for all completed work."
 
 metadata:
   created_by: "main_agent"
