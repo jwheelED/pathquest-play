@@ -216,15 +216,21 @@ export function VoiceQuestionPreviewDialog({
 
     setIsGeneratingOptions(true);
     try {
+      console.log('🔄 Auto-generating MCQ options for:', questionText.substring(0, 50));
+      
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error from generate-mcq-options:', error);
+        throw error;
+      }
 
       if (data?.options && data.options.length === 4) {
+        console.log('✅ MCQ options generated successfully:', data.options);
         setMcqOptions(data.options);
         if (data.correct_answer) {
           setCorrectAnswer(data.correct_answer);
@@ -233,10 +239,18 @@ export function VoiceQuestionPreviewDialog({
           title: "Options generated",
           description: "MCQ options have been generated. You can edit them before sending.",
         });
+      } else {
+        console.warn('⚠️ Invalid MCQ options response:', data);
+        // Don't throw - just log and let user manually generate
       }
     } catch (error: any) {
       console.error("Failed to auto-generate MCQ options:", error);
-      // Silent fail for auto-generation, user can click regenerate
+      // Show a subtle toast to let user know they need to manually generate
+      toast({
+        title: "Auto-generation unavailable",
+        description: "Click 'Generate Options' to create MCQ choices.",
+        variant: "default",
+      });
     } finally {
       setIsGeneratingOptions(false);
     }
