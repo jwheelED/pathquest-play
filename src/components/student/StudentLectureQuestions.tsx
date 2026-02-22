@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
-import { Video, TrendingUp, CheckCircle, XCircle, Clock, Brain, Loader2, MessageSquare } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Video, TrendingUp, CheckCircle, XCircle, Clock, Brain, Loader2, MessageSquare, Radio, BookOpen } from "lucide-react";
+
+// ==================== PRE-RECORDED LECTURE RESULTS ====================
 
 interface StudentProgress {
   id: string;
@@ -32,25 +34,47 @@ interface LectureWithResponses {
   pausePoints: PausePoint[];
 }
 
+// ==================== LIVE LECTURE / QUIZ RESULTS ====================
+
+interface Assignment {
+  id: string;
+  title: string;
+  assignment_type: string;
+  mode: string;
+  content: any;
+  completed: boolean;
+  created_at: string;
+  grade?: number | null;
+  quiz_responses?: any;
+  answers_released?: boolean;
+}
+
 interface StudentLectureQuestionsProps {
   instructorId?: string;
 }
 
 export function StudentLectureQuestions({ instructorId }: StudentLectureQuestionsProps) {
+  // Pre-recorded lecture state
   const [lectures, setLectures] = useState<LectureWithResponses[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingLectures, setLoadingLectures] = useState(true);
   const [expandedLecture, setExpandedLecture] = useState<string | null>(null);
+
+  // Live/Quiz assignments state
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLectureResponses();
+    fetchAssignmentResults();
   }, [instructorId]);
 
+  // ==================== FETCH PRE-RECORDED LECTURE RESULTS ====================
   const fetchLectureResponses = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Build query for lectures
       let lecturesQuery = supabase
         .from("lecture_videos")
         .select("id, title, question_count")
@@ -66,13 +90,12 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
 
       if (lecturesError) throw lecturesError;
       if (!lecturesData || lecturesData.length === 0) {
-        setLoading(false);
+        setLoadingLectures(false);
         return;
       }
 
       const lectureIds = lecturesData.map(l => l.id);
 
-      // Fetch student's progress for these lectures
       const { data: progressData, error: progressError } = await supabase
         .from("student_lecture_progress")
         .select("*")
@@ -81,7 +104,6 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
 
       if (progressError) throw progressError;
 
-      // Fetch pause points for question reference
       const { data: pausePointsData, error: pauseError } = await supabase
         .from("lecture_pause_points")
         .select("id, lecture_video_id, question_content, question_type, order_index")
@@ -90,7 +112,6 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
 
       if (pauseError) throw pauseError;
 
-      // Organize data by lecture
       const lecturesWithResponses: LectureWithResponses[] = lecturesData.map(lecture => {
         const progress = progressData?.find(p => p.lecture_video_id === lecture.id) || null;
         const pausePoints = (pausePointsData || []).filter(pp => pp.lecture_video_id === lecture.id);
@@ -103,15 +124,43 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
         };
       });
 
-      // Show all lectures - even those not started yet
       setLectures(lecturesWithResponses);
     } catch (error) {
       console.error("Error fetching lecture responses:", error);
     } finally {
-      setLoading(false);
+      setLoadingLectures(false);
     }
   };
 
+  // ==================== FETCH LIVE LECTURE / QUIZ RESULTS ====================
+  const fetchAssignmentResults = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let query = supabase
+        .from('student_assignments')
+        .select('*')
+        .eq('student_id', user.id)
+        .eq('completed', true)
+        .order('created_at', { ascending: false });
+
+      if (instructorId) {
+        query = query.eq('instructor_id', instructorId);
+      }
+
+      const { data, error } = await query.limit(50);
+
+      if (error) throw error;
+      setAssignments(data || []);
+    } catch (error) {
+      console.error("Error fetching assignment results:", error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
+  // ==================== UTILITY FUNCTIONS ====================
   const calculateOverallScore = (progress: StudentProgress | null, pausePoints: PausePoint[]) => {
     if (!progress?.responses) return null;
     
@@ -154,7 +203,8 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
     return Math.round((progress.completed_pause_points?.length || 0) / questionCount * 100);
   };
 
-  const renderResponses = (progress: StudentProgress | null, pausePoints: PausePoint[]) => {
+  // ==================== RENDER PRE-RECORDED LECTURE RESPONSES ====================
+  const renderLectureResponses = (progress: StudentProgress | null, pausePoints: PausePoint[]) => {
     if (!progress?.responses) {
       return (
         <div className="text-center py-6 text-muted-foreground">
@@ -260,7 +310,94 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
     );
   };
 
-  if (loading) {
+  // ==================== RENDER LIVE LECTURE / QUIZ RESPONSES ====================
+  const renderAssignmentResponses = (assignment: Assignment) => {
+    const questions = assignment.content?.questions || [];
+    const responses = assignment.quiz_responses || {};
+    const aiRecommendations = responses._ai_recommendations || {};
+
+    if (questions.length === 0) {
+      return (
+        <div className="text-center py-6 text-muted-foreground">
+          <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No questions in this assignment</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {questions.map((q: any, idx: number) => {
+          const studentAnswer = responses[idx];
+          const aiRec = aiRecommendations[idx];
+          const correctAnswer = q.correctAnswer;
+          const isCorrect = studentAnswer === correctAnswer || (aiRec && aiRec.grade >= 70);
+          const grade = aiRec?.grade;
+          const feedback = aiRec?.feedback;
+
+          return (
+            <div key={idx} className="p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="text-xs font-medium text-muted-foreground">Q{idx + 1} • {q.type || 'multiple_choice'}</span>
+                {grade !== undefined ? (
+                  <Badge variant={getGradeBadgeVariant(grade)} className="text-xs">
+                    {grade}%
+                  </Badge>
+                ) : correctAnswer ? (
+                  isCorrect ? (
+                    <Badge className="bg-emerald-500 text-xs">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Correct
+                    </Badge>
+                  ) : (
+                    <Badge variant="destructive" className="text-xs">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Incorrect
+                    </Badge>
+                  )
+                ) : (
+                  <Badge variant="outline" className="text-xs">Submitted</Badge>
+                )}
+              </div>
+              
+              <p className="text-sm font-medium mb-3">{q.question}</p>
+              
+              <div className="space-y-2 text-sm">
+                <div className="p-2 rounded bg-background">
+                  <span className="text-xs text-muted-foreground block mb-1">Your Answer:</span>
+                  <span className={isCorrect ? "text-emerald-600 font-medium" : "text-foreground"}>
+                    {studentAnswer || "No answer provided"}
+                  </span>
+                </div>
+                
+                {assignment.answers_released && !isCorrect && correctAnswer && (
+                  <div className="p-2 rounded bg-emerald-50 dark:bg-emerald-950/30">
+                    <span className="text-xs text-muted-foreground block mb-1">Correct Answer:</span>
+                    <span className="text-emerald-600 font-medium">{correctAnswer}</span>
+                  </div>
+                )}
+
+                {feedback && (
+                  <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MessageSquare className="h-3 w-3 text-primary" />
+                      <span className="text-xs font-medium text-primary">Feedback</span>
+                    </div>
+                    <p className="text-sm text-foreground">{feedback}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ==================== RENDER COMPONENT ====================
+  const isLoading = loadingLectures || loadingAssignments;
+  
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
@@ -270,123 +407,194 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
     );
   }
 
-  if (lectures.length === 0) {
+  const completedAssignments = assignments.filter(a => a.completed);
+  const lecturesWithProgress = lectures.filter(l => l.progress);
+  
+  const hasNoResults = lectures.length === 0 && completedAssignments.length === 0;
+
+  if (hasNoResults) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            Lecture Questions
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Results
           </CardTitle>
           <CardDescription>
-            Your responses and grades for lecture questions
+            Your grades and feedback will appear here
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <Video className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No lectures available yet</p>
-            <p className="text-sm">Check back when your instructor uploads lectures</p>
+            <Brain className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>No results yet</p>
+            <p className="text-sm">Complete assignments and lectures to see your grades</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  const lecturesWithProgress = lectures.filter(l => l.progress);
-  const totalAnswered = lecturesWithProgress.reduce((acc, l) => {
-    return acc + (l.progress?.completed_pause_points?.length || 0);
-  }, 0);
-  const totalQuestions = lectures.reduce((acc, l) => acc + l.question_count, 0);
-
   return (
     <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-primary" />
-          Lecture Questions
+          <TrendingUp className="h-5 w-5 text-primary" />
+          Results
         </CardTitle>
         <CardDescription>
-          Your responses and grades for pre-recorded lecture questions
+          Your grades and feedback for all completed work
         </CardDescription>
-        
-        {/* Summary Stats */}
-        <div className="flex items-center gap-4 pt-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Video className="h-4 w-4 text-muted-foreground" />
-            <span>{lecturesWithProgress.length}/{lectures.length} lectures started</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            <span>{totalAnswered}/{totalQuestions} questions answered</span>
-          </div>
-        </div>
       </CardHeader>
       
       <CardContent>
-        <Accordion type="single" collapsible value={expandedLecture || undefined} onValueChange={setExpandedLecture}>
-          {lectures.map(lecture => {
-            const overallScore = calculateOverallScore(lecture.progress, lecture.pausePoints);
-            const progressPct = getProgressPercentage(lecture.progress, lecture.question_count);
-            const isCompleted = !!lecture.progress?.completed_at;
-            const isStarted = !!lecture.progress;
-            const answeredCount = lecture.progress?.completed_pause_points?.length || 0;
-            
-            return (
-              <AccordionItem key={lecture.id} value={lecture.id} className="border rounded-lg mb-3 px-4">
-                <AccordionTrigger className="hover:no-underline py-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-left w-full pr-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium truncate">{lecture.title}</h4>
-                        {isCompleted && (
-                          <Badge className="bg-emerald-500 shrink-0 text-xs">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Complete
+        <Tabs defaultValue="live" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="live" className="flex items-center gap-2">
+              <Radio className="h-4 w-4" />
+              <span className="hidden sm:inline">Live Lectures</span>
+              <span className="sm:hidden">Live</span>
+              {completedAssignments.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">{completedAssignments.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="recorded" className="flex items-center gap-2">
+              <Video className="h-4 w-4" />
+              <span className="hidden sm:inline">Pre-Recorded</span>
+              <span className="sm:hidden">Recorded</span>
+              {lecturesWithProgress.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">{lecturesWithProgress.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Live Lecture / Quiz Results Tab */}
+          <TabsContent value="live" className="mt-0">
+            {completedAssignments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Radio className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No completed live lecture questions yet</p>
+              </div>
+            ) : (
+              <Accordion type="single" collapsible value={expandedAssignment || undefined} onValueChange={setExpandedAssignment}>
+                {completedAssignments.map(assignment => (
+                  <AccordionItem key={assignment.id} value={assignment.id} className="border rounded-lg mb-3 px-4">
+                    <AccordionTrigger className="hover:no-underline py-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-left w-full pr-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium truncate">{assignment.title}</h4>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {assignment.assignment_type === 'lecture_checkin' ? 'Live Check-in' : 'Quiz'}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(assignment.created_at).toLocaleDateString()}
+                            </span>
+                            {assignment.grade !== null && assignment.grade !== undefined && (
+                              <span className={`flex items-center gap-1 ${getGradeColor(assignment.grade)}`}>
+                                <TrendingUp className="h-3 w-3" />
+                                Grade: {Math.round(assignment.grade)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {assignment.grade !== null && assignment.grade !== undefined && (
+                          <Badge variant={getGradeBadgeVariant(assignment.grade)} className="shrink-0">
+                            {Math.round(assignment.grade)}%
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Brain className="h-3 w-3" />
-                          {answeredCount}/{lecture.question_count} answered
-                        </span>
-                        {overallScore !== null && (
-                          <span className={`flex items-center gap-1 ${getGradeColor(overallScore)}`}>
-                            <TrendingUp className="h-3 w-3" />
-                            Grade: {overallScore}%
-                          </span>
-                        )}
-                        {lecture.progress?.total_points_earned !== null && lecture.progress?.total_points_earned !== undefined && (
-                          <span className="flex items-center gap-1 text-primary">
-                            {lecture.progress.total_points_earned} pts
-                          </span>
-                        )}
-                      </div>
-                      {isStarted && !isCompleted && (
-                        <div className="mt-2 max-w-xs">
-                          <Progress value={progressPct} className="h-1.5" />
-                        </div>
-                      )}
-                    </div>
+                    </AccordionTrigger>
                     
-                    {overallScore !== null && (
-                      <Badge variant={getGradeBadgeVariant(overallScore)} className="shrink-0">
-                        {overallScore}%
-                      </Badge>
-                    )}
-                  </div>
-                </AccordionTrigger>
-                
-                <AccordionContent>
-                  <div className="pt-2 pb-4">
-                    {renderResponses(lecture.progress, lecture.pausePoints)}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                    <AccordionContent>
+                      <div className="pt-2 pb-4">
+                        {renderAssignmentResponses(assignment)}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            )}
+          </TabsContent>
+
+          {/* Pre-Recorded Lecture Results Tab */}
+          <TabsContent value="recorded" className="mt-0">
+            {lectures.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Video className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No pre-recorded lectures available yet</p>
+              </div>
+            ) : (
+              <Accordion type="single" collapsible value={expandedLecture || undefined} onValueChange={setExpandedLecture}>
+                {lectures.map(lecture => {
+                  const overallScore = calculateOverallScore(lecture.progress, lecture.pausePoints);
+                  const progressPct = getProgressPercentage(lecture.progress, lecture.question_count);
+                  const isCompleted = !!lecture.progress?.completed_at;
+                  const isStarted = !!lecture.progress;
+                  const answeredCount = lecture.progress?.completed_pause_points?.length || 0;
+                  
+                  return (
+                    <AccordionItem key={lecture.id} value={lecture.id} className="border rounded-lg mb-3 px-4">
+                      <AccordionTrigger className="hover:no-underline py-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-left w-full pr-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium truncate">{lecture.title}</h4>
+                              {isCompleted && (
+                                <Badge className="bg-emerald-500 shrink-0 text-xs">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Complete
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Brain className="h-3 w-3" />
+                                {answeredCount}/{lecture.question_count} answered
+                              </span>
+                              {overallScore !== null && (
+                                <span className={`flex items-center gap-1 ${getGradeColor(overallScore)}`}>
+                                  <TrendingUp className="h-3 w-3" />
+                                  Grade: {overallScore}%
+                                </span>
+                              )}
+                              {lecture.progress?.total_points_earned !== null && lecture.progress?.total_points_earned !== undefined && (
+                                <span className="flex items-center gap-1 text-primary">
+                                  {lecture.progress.total_points_earned} pts
+                                </span>
+                              )}
+                            </div>
+                            {isStarted && !isCompleted && (
+                              <div className="mt-2 max-w-xs">
+                                <Progress value={progressPct} className="h-1.5" />
+                              </div>
+                            )}
+                          </div>
+                          
+                          {overallScore !== null && (
+                            <Badge variant={getGradeBadgeVariant(overallScore)} className="shrink-0">
+                              {overallScore}%
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      
+                      <AccordionContent>
+                        <div className="pt-2 pb-4">
+                          {renderLectureResponses(lecture.progress, lecture.pausePoints)}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
