@@ -199,6 +199,7 @@ serve(async (req) => {
         content: questionContent,
         mode: isPollMode ? "manual_grade" as const : (questionType === "mcq" ? "auto_grade" as const : "manual_grade" as const),
         org_id: instructorOrgId,
+        course_id: course_id,
       }));
 
       const { data: insertedAssignments, error: insertError } = await supabase
