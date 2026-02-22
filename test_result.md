@@ -132,6 +132,30 @@ frontend:
         agent: "main"
         comment: "Updated component to show BOTH live lecture/quiz results AND pre-recorded lecture results with sub-tabs. Shows grades, feedback, correct/incorrect answers for all completed work."
 
+  - task: "Peaceful Question Incoming Animation"
+    implemented: true
+    working: "NA"
+    file: "src/components/student/AssignedContent.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Replaced aggressive bouncing bell animation with peaceful breathing circle animation. Added calming message and subtle flowing dots."
+
+  - task: "MCQ Options Auto-Generation Consistency"
+    implemented: true
+    working: "NA"
+    file: "src/components/instructor/VoiceQuestionPreviewDialog.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Improved auto-generation logic with tracking to prevent duplicate attempts. Added auto-generation trigger when switching question types. Better logging and error handling."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
