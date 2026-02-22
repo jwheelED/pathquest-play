@@ -118,11 +118,18 @@ serve(async (req) => {
       isPoll: isPollMode,
     };
 
-    // Get connected students
-    const { data: students, error: studentsError } = await supabase
+    // Get connected students - scoped by course_id if provided
+    let studentsQuery = supabase
       .from("instructor_students")
       .select("student_id")
       .eq("instructor_id", user.id);
+
+    if (course_id) {
+      studentsQuery = studentsQuery.or(`course_id.eq.${course_id},course_id.is.null`);
+      console.log(`📚 Filtering students by course_id: ${course_id}`);
+    }
+
+    const { data: students, error: studentsError } = await studentsQuery;
 
     if (studentsError) {
       console.error("Error fetching students:", studentsError);

@@ -182,6 +182,7 @@ export default function SlidePresenter() {
           extractedQuestion: editedData,
           slideNumber: currentSlideNumber,
           isPollMode,
+          course_id: selectedCourseId,
         },
       });
 
