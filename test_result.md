@@ -148,4 +148,4 @@ test_plan:
 
 agent_communication:
   - agent: "main"
-    message: "Implemented tabbed student class dashboard with 4 tabs: Overview (course info), Lectures (pre-recorded lecture list), Lecture Questions (student responses with grades/feedback), and Assigned Content. The UI follows the same pattern as the instructor dashboard with sidebar navigation on desktop and horizontal tabs on mobile."
+    message: "Updated student class dashboard with new tab structure: Overview (course info), Assigned Content (live lecture questions + question bank), Pre-Recorded Lectures, Results (grades/feedback). The Results tab has sub-tabs for Live Lectures and Pre-Recorded lectures showing all completed work with grades and feedback."
