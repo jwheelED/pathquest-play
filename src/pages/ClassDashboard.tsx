@@ -330,7 +330,7 @@ export default function ClassDashboard() {
                   <button
                     key={item.value}
                     onClick={() => {
-                      console.log('🔄 Tab clicked:', item.value, '| Current:', activeTab);
+                      console.log('🔄 Desktop sidebar tab clicked:', item.value);
                       setActiveTab(item.value);
                     }}
                     className={cn(
