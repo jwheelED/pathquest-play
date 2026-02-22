@@ -399,6 +399,11 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
         query = query.eq('instructor_id', instructorId);
       }
 
+      // Filter by course if provided
+      if (courseId) {
+        query = query.or(`course_id.eq.${courseId},course_id.is.null`);
+      }
+
       const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(30);
