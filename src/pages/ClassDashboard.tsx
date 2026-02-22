@@ -350,9 +350,76 @@ export default function ClassDashboard() {
 
           {/* Main Content */}
           <main className="flex-1 min-w-0">
-            <div key={activeTab}>
-              {renderTabContent()}
-            </div>
+            {activeTab === "overview" && (
+              <div className="space-y-6">
+                {courseInfo && (
+                  <div className="animate-fade-in">
+                    <div className="headspace-card p-6">
+                      <div className="flex items-start gap-4 mb-5">
+                        <div className="w-14 h-14 rounded-3xl bg-accent flex items-center justify-center flex-shrink-0">
+                          <BookOpen className="w-7 h-7 text-foreground" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-bold text-foreground mb-1">Course Information</h2>
+                          <p className="text-muted-foreground text-sm">
+                            Instructor: {courseInfo.instructorName}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {courseInfo.courseSchedule && (
+                          <div className="flex items-center gap-3 p-3 rounded-2xl bg-accent/50">
+                            <Calendar className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Schedule</p>
+                              <p className="text-sm font-medium text-foreground">{courseInfo.courseSchedule}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {courseInfo.courseTopics && courseInfo.courseTopics.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Topics Covered</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {courseInfo.courseTopics.map((topic, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-4 py-2 bg-secondary/15 text-secondary rounded-full text-sm font-medium"
+                                >
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {activeTab === "assigned" && user && (
+              <div className="space-y-6 animate-fade-in">
+                <AssignedContent 
+                  userId={user.id} 
+                  instructorId={instructorId}
+                />
+              </div>
+            )}
+            
+            {activeTab === "lectures" && (
+              <div className="space-y-6 animate-fade-in">
+                <PreRecordedLectureList instructorId={instructorId} />
+              </div>
+            )}
+            
+            {activeTab === "results" && (
+              <div className="space-y-6 animate-fade-in">
+                <StudentLectureQuestions instructorId={instructorId} />
+              </div>
+            )}
           </main>
         </div>
       </div>
