@@ -346,7 +346,19 @@ export function VoiceQuestionPreviewDialog({
             <Label>Question Type</Label>
             <RadioGroup
               value={questionType}
-              onValueChange={(value: 'short_answer' | 'multiple_choice') => setQuestionType(value)}
+              onValueChange={(value: 'short_answer' | 'multiple_choice') => {
+                setQuestionType(value);
+                // Auto-generate options when switching to MCQ and options are empty
+                if (value === 'multiple_choice' && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
+                  console.log('📋 Switching to MCQ - triggering option generation');
+                  setTimeout(() => handleGenerateOptionsAuto(), 100);
+                }
+                // Auto-generate expected answer when switching to short answer and it's empty
+                if (value === 'short_answer' && !expectedAnswer.trim() && questionText.trim() && !isGeneratingExpectedAnswer) {
+                  console.log('📋 Switching to Short Answer - triggering expected answer generation');
+                  setTimeout(() => handleGenerateExpectedAnswerAuto(), 100);
+                }
+              }}
               className="flex gap-4"
             >
               <div className="flex items-center space-x-2">
