@@ -292,6 +292,31 @@ export default function ClassDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative">
+        {/* Mobile Tab Navigation - Outside the flex container */}
+        <div className="lg:hidden mb-4">
+          <div className="flex gap-1 p-1 bg-muted/50 rounded-xl overflow-x-auto">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.value;
+              return (
+                <button
+                  key={item.value}
+                  onClick={() => setActiveTab(item.value)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-1 justify-center",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex min-h-[calc(100vh-12rem)]">
           {/* Sidebar Navigation - Desktop Only */}
           <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
@@ -318,33 +343,8 @@ export default function ClassDashboard() {
             </nav>
           </aside>
 
-          {/* Mobile Tab Navigation */}
-          <div className="lg:hidden w-full mb-4">
-            <div className="flex gap-1 p-1 bg-muted/50 rounded-xl overflow-x-auto">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.value;
-                return (
-                  <button
-                    key={item.value}
-                    onClick={() => setActiveTab(item.value)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-1 justify-center",
-                      isActive
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Main Content */}
-          <main className="flex-1 min-w-0 lg:mt-0 mt-0">
+          <main className="flex-1 min-w-0">
             {renderTabContent()}
           </main>
         </div>
