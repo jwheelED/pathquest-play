@@ -207,7 +207,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
               return;
             }
             
-            const newAssignment = payload.new as Assignment;
+            const typedAssignment = payload.new as Assignment;
             
             if (newAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
