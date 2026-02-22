@@ -85,9 +85,20 @@ export function VoiceQuestionPreviewDialog({
 
   const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
 
+  // Track if we've already attempted auto-generation for this question
+  const [hasAttemptedAutoGenerate, setHasAttemptedAutoGenerate] = useState(false);
+
+  // Reset auto-generate flag when question changes
+  useEffect(() => {
+    if (extractedQuestion) {
+      setHasAttemptedAutoGenerate(false);
+    }
+  }, [extractedQuestion?.question_text]);
+
   // Auto-generate options when dialog opens with MCQ type and empty options
   useEffect(() => {
     if (!open) return; // Only trigger when dialog is open
+    if (hasAttemptedAutoGenerate) return; // Don't auto-generate twice
     
     const optionsEmpty = !mcqOptions.some(opt => opt.trim() !== '');
     const shouldAutoGenerate = 
@@ -97,13 +108,26 @@ export function VoiceQuestionPreviewDialog({
       !isGeneratingOptions;
       
     if (shouldAutoGenerate) {
+      console.log('📋 Auto-generating MCQ options...');
+      setHasAttemptedAutoGenerate(true);
       handleGenerateOptionsAuto();
     }
-  }, [questionType, open, questionText]);
+  }, [questionType, open, questionText, hasAttemptedAutoGenerate, mcqOptions, isGeneratingOptions]);
+
+  // Track if we've already attempted auto-generation for expected answer
+  const [hasAttemptedExpectedAnswerGenerate, setHasAttemptedExpectedAnswerGenerate] = useState(false);
+
+  // Reset expected answer auto-generate flag when question changes
+  useEffect(() => {
+    if (extractedQuestion) {
+      setHasAttemptedExpectedAnswerGenerate(false);
+    }
+  }, [extractedQuestion?.question_text]);
 
   // Auto-generate expected answer when dialog opens with Short Answer type and empty expected answer
   useEffect(() => {
     if (!open) return; // Only trigger when dialog is open
+    if (hasAttemptedExpectedAnswerGenerate) return; // Don't auto-generate twice
     
     const shouldAutoGenerate = 
       questionType === 'short_answer' && 
@@ -112,9 +136,11 @@ export function VoiceQuestionPreviewDialog({
       !isGeneratingExpectedAnswer;
       
     if (shouldAutoGenerate) {
+      console.log('📋 Auto-generating expected answer...');
+      setHasAttemptedExpectedAnswerGenerate(true);
       handleGenerateExpectedAnswerAuto();
     }
-  }, [questionType, open, questionText]);
+  }, [questionType, open, questionText, hasAttemptedExpectedAnswerGenerate, expectedAnswer, isGeneratingExpectedAnswer]);
 
   const handleGenerateExpectedAnswerAuto = async () => {
     if (!questionText.trim() || isGeneratingExpectedAnswer) return;
