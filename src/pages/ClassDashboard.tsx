@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, Brain, FileText } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, FileText, Trophy } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
@@ -23,13 +23,13 @@ interface CourseInfo {
   courseSchedule?: string;
 }
 
-type TabValue = "overview" | "lectures" | "lecture-questions" | "assigned";
+type TabValue = "overview" | "assigned" | "lectures" | "results";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "lectures", label: "Lectures", icon: Video },
-  { value: "lecture-questions", label: "Lecture Questions", icon: Brain },
   { value: "assigned", label: "Assigned Content", icon: FileText },
+  { value: "lectures", label: "Pre-Recorded Lectures", icon: Video },
+  { value: "results", label: "Results", icon: Trophy },
 ];
 
 export default function ClassDashboard() {
@@ -202,20 +202,6 @@ export default function ClassDashboard() {
           </div>
         );
 
-      case "lectures":
-        return (
-          <div className="space-y-6 animate-fade-in">
-            <PreRecordedLectureList instructorId={instructorId} />
-          </div>
-        );
-
-      case "lecture-questions":
-        return (
-          <div className="space-y-6 animate-fade-in">
-            <StudentLectureQuestions instructorId={instructorId} />
-          </div>
-        );
-
       case "assigned":
         return (
           <div className="space-y-6 animate-fade-in">
@@ -225,6 +211,20 @@ export default function ClassDashboard() {
                 instructorId={instructorId}
               />
             )}
+          </div>
+        );
+
+      case "lectures":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <PreRecordedLectureList instructorId={instructorId} />
+          </div>
+        );
+
+      case "results":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <StudentLectureQuestions instructorId={instructorId} />
           </div>
         );
 
