@@ -372,7 +372,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
       }
       subscription.unsubscribe();
     };
-  }, [userId, instructorId, retryCount]);
+  }, [userId, instructorId, courseId, retryCount]);
 
   const fetchAssignments = async () => {
     setIsRefreshing(true);
