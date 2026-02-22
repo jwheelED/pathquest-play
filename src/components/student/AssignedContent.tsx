@@ -60,6 +60,7 @@ interface Assignment {
 interface AssignedContentProps {
   userId: string;
   instructorId?: string; // Optional: filter by instructor
+  courseId?: string; // Optional: filter by course
   // onAnswerResult removed - Flow State no longer used
 }
 
