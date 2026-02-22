@@ -345,7 +345,9 @@ export default function ClassDashboard() {
 
           {/* Main Content */}
           <main className="flex-1 min-w-0">
-            {renderTabContent()}
+            <div key={activeTab}>
+              {renderTabContent()}
+            </div>
           </main>
         </div>
       </div>
