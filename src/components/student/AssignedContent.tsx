@@ -209,7 +209,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
             
             const typedAssignment = payload.new as Assignment;
             
-            if (newAssignment.assignment_type === 'lecture_checkin') {
+            if (typedAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
               setQuestionIncoming(true);
               
@@ -224,28 +224,28 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                 
                 // Add assignment to state with proper deduplication
                 setAssignments(prev => {
-                  if (prev.some(a => a.id === newAssignment.id)) {
-                    console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                  if (prev.some(a => a.id === typedAssignment.id)) {
+                    console.log('⚠️ Assignment already exists, skipping duplicate:', typedAssignment.id);
                     return prev;
                   }
-                  console.log('✅ Adding new assignment:', newAssignment.id);
-                  return [newAssignment, ...prev];
+                  console.log('✅ Adding new assignment:', typedAssignment.id);
+                  return [typedAssignment, ...prev];
                 });
                 
                 // Show notification
                 sonnerToast.success("New Question!", {
-                  description: `"${newAssignment.title}" is ready`
+                  description: `"${typedAssignment.title}" is ready`
                 });
               }, 1500);
             } else {
               // For non-lecture assignments, add immediately with deduplication
               setAssignments(prev => {
-                if (prev.some(a => a.id === newAssignment.id)) {
-                  console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                if (prev.some(a => a.id === typedAssignment.id)) {
+                  console.log('⚠️ Assignment already exists, skipping duplicate:', typedAssignment.id);
                   return prev;
                 }
-                console.log('✅ Adding new assignment:', newAssignment.id);
-                return [newAssignment, ...prev];
+                console.log('✅ Adding new assignment:', typedAssignment.id);
+                return [typedAssignment, ...prev];
               });
             }
           }
