@@ -258,6 +258,7 @@ export default function ClassDashboard() {
             <AssignedContent 
               userId={user.id} 
               instructorId={instructorId}
+              courseId={courseId || undefined}
             />
           </div>
         </div>
