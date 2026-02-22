@@ -71,7 +71,7 @@ interface ConfidenceData {
   locked: boolean;
 }
 
-export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) => {
+export const AssignedContent = ({ userId, instructorId, courseId }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
