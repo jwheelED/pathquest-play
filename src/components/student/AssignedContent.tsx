@@ -192,12 +192,20 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
           (payload) => {
             // Server-side filtering already applied - no client-side check needed
             console.log('📬 New assignment received via realtime:', payload);
+            const newAssignment = payload.new as any;
             console.log('📊 Assignment details:', {
-              id: payload.new?.id,
-              title: (payload.new as any)?.title,
-              type: (payload.new as any)?.assignment_type,
-              student_id: (payload.new as any)?.student_id
+              id: newAssignment?.id,
+              title: newAssignment?.title,
+              type: newAssignment?.assignment_type,
+              student_id: newAssignment?.student_id,
+              course_id: newAssignment?.course_id
             });
+
+            // Client-side course filter: skip if assignment belongs to a different course
+            if (courseId && newAssignment?.course_id && newAssignment.course_id !== courseId) {
+              console.log('⏭️ Skipping assignment from different course:', newAssignment.course_id);
+              return;
+            }
             
             const newAssignment = payload.new as Assignment;
             
