@@ -487,23 +487,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           </p>
         </div>
 
-        {/* Upload Mode Tabs */}
+        {/* File Upload */}
         <div className="space-y-4">
-          <Label>Video Source *</Label>
-          <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as UploadMode)} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="file" disabled={status !== "idle"}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </TabsTrigger>
-              <TabsTrigger value="url" disabled={status !== "idle"}>
-                <Link className="h-4 w-4 mr-2" />
-                Video URL
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {uploadMode === "file" ? (
+          <Label>Video File *</Label>
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                 isDragging ? "border-primary bg-primary/10" : selectedFile ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
@@ -549,26 +535,6 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 </>
               )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              <Input
-                placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
-                value={videoUrl}
-                onChange={(e) => {
-                  setVideoUrl(e.target.value);
-                  // When URL is entered, use default/user-set duration
-                  if (e.target.value.trim() && pausePoints.length === 0) {
-                    const count = calculateRecommendedPausePoints(estimatedDuration, flowLevel);
-                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
-                  }
-                }}
-                disabled={status !== "idle"}
-              />
-              <p className="text-xs text-muted-foreground">
-                Paste a YouTube, Vimeo, or direct video link. Duration will be detected automatically during processing.
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Progress/Status */}
