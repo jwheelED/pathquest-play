@@ -195,32 +195,24 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       if (!user) throw new Error("Not authenticated");
 
       let filePath = "";
-      let externalVideoUrl: string | null = null;
 
-      if (uploadMode === "file" && selectedFile) {
-        // Upload video to storage
-        const fileExt = selectedFile.name.split(".").pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        filePath = `${user.id}/${fileName}`;
+      // Upload video to storage
+      const fileExt = selectedFile.name.split(".").pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      filePath = `${user.id}/${fileName}`;
 
-        // Simulate upload progress
-        const progressInterval = setInterval(() => {
-          setUploadProgress((prev) => Math.min(prev + 10, 90));
-        }, 500);
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90));
+      }, 500);
 
-        const { error: uploadError } = await supabase.storage.from("lecture-videos").upload(filePath, selectedFile);
+      const { error: uploadError } = await supabase.storage.from("lecture-videos").upload(filePath, selectedFile);
 
-        clearInterval(progressInterval);
-        setUploadProgress(100);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
-        if (uploadError) {
-          throw new Error(`Upload failed: ${uploadError.message}`);
-        }
-      } else {
-        // Using external URL
-        externalVideoUrl = videoUrl.trim();
-        filePath = `external-${Date.now()}`; // Placeholder path for external videos
-        setUploadProgress(100);
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       // Create lecture video record (question_count set later by AI in smart mode)
