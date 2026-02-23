@@ -1,84 +1,107 @@
 
+# Fix Multi-Course Data Isolation Bugs
 
-# Fix YouTube Video Question Generation
+## Problem Summary
 
-## Root Cause (confirmed from database)
+Two related bugs cause courses to bleed into each other:
 
-Every YouTube video in the database has the transcript `"[Transcript unavailable - video will play without AI-generated questions]"` and `question_count: 0`. This means **both** transcript extraction methods are failing:
+1. **Questions sent to ALL courses** -- The `useLectureRecording.ts` hook does not pass `course_id` when calling the `format-and-send-question` edge function, so the function falls into a fallback path that sends questions to every student across all courses.
 
-1. **YouTube Data API v3 captions.list** -- This API can list caption track IDs, but downloading third-party video captions requires **OAuth authentication**, not just an API key. The current code tries to use the `timedtext` endpoint as a workaround, but this endpoint is unreliable and frequently blocked.
+2. **Same students shown in all courses** -- Several instructor dashboard components query `instructor_students` without filtering by `course_id`, so the same student list appears regardless of which course is selected.
 
-2. **Page scraping fallback** -- YouTube returns HTTP 429 (rate limited) or blocks the request from Deno edge function IPs.
+## Root Cause Analysis
 
-Since no transcript is extracted, `analyze-lecture-cognitive-load` correctly skips AI analysis and sets `question_count: 0`. The video plays fine but with zero pause points/questions.
+### Bug 1: Missing `course_id` in `useLectureRecording.ts`
 
-## Solution: Use Deepgram to transcribe YouTube audio
+The `LectureTranscription.tsx` component correctly passes `course_id: selectedCourseId` (line 1171), but the `useLectureRecording.ts` hook (used for slide-based lectures) does NOT accept or pass `course_id` at all (line 364-368). It just spreads `detectionData` which never contains a `course_id`.
 
-The system already has Deepgram configured and working (file uploads produce transcripts successfully). The fix is to route YouTube videos through a proxy that extracts the audio stream URL, then send that to Deepgram for transcription.
+In the edge function `format-and-send-question`, when `course_id` is null/missing, lines 846-857 execute:
+```
+// No course_id - get all instructor's students
+const { data: allStudents } = await supabase
+  .from("instructor_students")
+  .select("student_id")
+  .eq("instructor_id", user.id);
+```
+This returns every student across every course.
 
-However, Deepgram cannot directly access YouTube URLs. The practical approach is to use a **YouTube audio extraction service** via the existing `RAPIDAPI_KEY` secret, or alternatively, use a lightweight proxy approach.
+### Bug 2: Unscoped student queries in dashboard components
 
-### Recommended approach: Use an open YouTube transcript API
+| Component | Issue |
+|-----------|-------|
+| `StudentProgressCard.tsx` (line 82-85) | Fetches all students with no `course_id` filter |
+| `TeachingAnalytics.tsx` (line 44-47) | Fetches all students with no `course_id` filter |
+| `LectureTranscription.tsx` (line 340-343) | Student count is unscoped -- shows total across all courses |
 
-There are free/reliable YouTube transcript extraction services that don't require OAuth. We will use the `youtube-transcript` npm package pattern -- making direct requests to YouTube's internal `get_transcript` endpoint which is more reliable than both the Data API and page scraping.
+The `InstructorDashboard.tsx` `fetchStudents` and `InstructorOverview.tsx` already have proper course filtering using `.or('course_id.eq.{id},course_id.is.null')`, so those are fine.
 
-## Changes
+## Fix Plan
 
-### File 1: `supabase/functions/transcribe-video/index.ts`
+### 1. Add `course_id` support to `useLectureRecording.ts`
 
-**Replace the `fetchYouTubeTranscriptViaAPI` function** with a more reliable approach that uses YouTube's internal transcript API (the same one used by the youtube-transcript npm package):
+- Add `courseId?: string` to the `UseLectureRecordingOptions` interface
+- Store it in a ref so it stays current
+- Pass `course_id: courseIdRef.current` in the `format-and-send-question` invocation body (line 364-368)
+- Update the student count fetch (if present) to filter by course
 
-- Fetch the YouTube video page to get the `innertubeApiKey` and video details
-- Use the `youtubei/v1/get_transcript` endpoint to fetch transcript data directly
-- This endpoint is the same one YouTube's own UI uses and is significantly more reliable than the captions API or timedtext endpoint
-- Keep the existing `fetchYouTubeDuration` function (uses Data API for duration, which works fine with just an API key)
+### 2. Pass `selectedCourseId` when using `useLectureRecording`
 
-**Fallback chain:**
-1. YouTube innertube `get_transcript` endpoint (primary -- most reliable)
-2. YouTube Data API v3 timedtext (existing, kept as fallback)
-3. Page scraping (existing, kept as last resort)
+- Find the component(s) that call `useLectureRecording()` and pass the `courseId` option from `useCourseContext()`
 
-**If ALL transcript methods fail**, instead of setting `question_count: 0` and giving up:
-- Set status to `ready` with a user-friendly message
-- Allow the video to still be played, but show a clear indicator that no questions could be generated
-- Suggest the instructor upload a transcript file manually (future enhancement)
+### 3. Fix `StudentProgressCard.tsx` -- scope to selected course
 
-### File 2: `supabase/functions/analyze-lecture-cognitive-load/index.ts`
+- Import `useCourseContext`
+- Add `selectedCourseId` to the dependency array
+- Filter `instructor_students` query with `.or('course_id.eq.{selectedCourseId},course_id.is.null')` when a course is selected
+- Also scope the Realtime subscription filter to include course_id
 
-**Already handles placeholder transcripts correctly** (skips AI analysis, sets status to `ready` with 0 questions). No changes needed here.
+### 4. Fix `TeachingAnalytics.tsx` -- scope to selected course
 
-### File 3: `src/components/instructor/PreRecordedLectureUpload.tsx`
+- Import `useCourseContext`
+- Filter `instructor_students` query by `selectedCourseId`
+- Add `selectedCourseId` to dependency array for re-fetch
 
-**No structural changes needed**, but add a clearer message when a video finishes processing with 0 questions, explaining that captions weren't available and suggesting the instructor try a different video or upload a file instead.
+### 5. Fix `LectureTranscription.tsx` student count -- scope to selected course
 
-### File 4: Fix the build error
+- The student count fetch at line 340-343 should filter by `selectedCourseId` (which is already available in the component)
 
-The current build is failing with `dist: Cannot open: No such file or directory`. This is likely caused by a TypeScript compilation error introduced in the previous edits. Will investigate and fix any type errors preventing the build.
+## Files to Modify
+
+1. **`src/hooks/useLectureRecording.ts`** -- Accept `courseId` option, pass it to edge function
+2. **`src/components/instructor/StudentProgressCard.tsx`** -- Add course filtering to student query
+3. **`src/components/instructor/TeachingAnalytics.tsx`** -- Add course filtering to student query
+4. **`src/components/instructor/LectureTranscription.tsx`** -- Filter student count by course
+5. **Any component calling `useLectureRecording`** -- Pass `courseId` from course context
 
 ## Technical Details
 
-### YouTube innertube transcript endpoint
+### useLectureRecording fix
 
 ```text
-POST https://www.youtube.com/youtubei/v1/get_transcript
-Body: {
-  "context": { "client": { "clientName": "WEB", "clientVersion": "2.0" } },
-  "params": <base64-encoded protobuf with video ID>
+// In UseLectureRecordingOptions:
+courseId?: string;
+
+// In the hook body:
+const courseIdRef = useRef(options.courseId);
+useEffect(() => { courseIdRef.current = options.courseId; }, [options.courseId]);
+
+// In format-and-send-question call (line 364-368):
+body: {
+  ...detectionData,
+  course_context: courseContextRef.current,
+  course_id: courseIdRef.current,  // <-- ADD THIS
 }
 ```
 
-This is the same internal API that YouTube's own frontend uses to show transcripts. It:
-- Does not require authentication or API keys
-- Is not subject to the same rate limiting as page scraping
-- Works for any video that has captions enabled (auto-generated or manual)
-- Returns timestamped segments directly
+### Student query filter pattern (consistent across all components)
 
-### Params encoding
+```text
+// When selectedCourseId is available:
+.eq("instructor_id", instructorId)
+.or(`course_id.eq.${selectedCourseId},course_id.is.null`)
 
-The `params` field is a base64-encoded protobuf message containing the video ID. The encoding follows a known pattern used by the youtube-transcript library.
+// When no course selected:
+// Show empty or skip fetch
+```
 
-## Files to Modify
-1. `supabase/functions/transcribe-video/index.ts` -- Replace unreliable transcript methods with innertube API
-2. `src/components/instructor/PreRecordedLectureUpload.tsx` -- Better messaging for 0-question results
-3. Any files causing the current build error
-
+This matches the existing pattern already used in `InstructorDashboard.tsx` and `InstructorOverview.tsx`.

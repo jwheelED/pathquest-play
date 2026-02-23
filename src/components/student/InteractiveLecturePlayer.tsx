@@ -836,17 +836,91 @@ export const InteractiveLecturePlayer = ({
                     <Brain className="h-3 w-3" aria-hidden="true" />
                     <span>Cognitive Load: {currentQuestion.cognitive_load_score}/10</span>
                   </Badge>
-                  <Badge variant="outline">
-                    Question {currentQuestion.order_index + 1}/{totalQuestions}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      Question {currentQuestion.order_index + 1}/{totalQuestions}
+                    </Badge>
+                    {isPreview && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCurrentQuestion(null);
+                          setSelectedAnswer('');
+                          setShortAnswer('');
+                          setConfidenceLevel('');
+                          setShowResult(false);
+                          setShortAnswerGrade(null);
+                          setShortAnswerFeedback(null);
+                          setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
+                          videoRef.current?.play();
+                          setIsPlaying(true);
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        Skip →
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <CardTitle id="question-title" className="mt-4">{currentQuestion.question_content.question}</CardTitle>
+                {isPreview && (
+                  <div className="mt-3 space-y-3">
+                    {/* Show answer immediately in preview */}
+                    {currentQuestion.question_type === 'multiple_choice' && currentQuestion.question_content.options && (
+                      <div className="space-y-1.5">
+                        {currentQuestion.question_content.options.map((opt, i) => {
+                          const isCorrectOpt = opt.startsWith(currentQuestion.question_content.correctAnswer || '');
+                          return (
+                            <div key={i} className={cn(
+                              "text-sm p-2 rounded border",
+                              isCorrectOpt
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                                : "bg-muted/30 border-border"
+                            )}>
+                              {opt}
+                              {isCorrectOpt && <CheckCircle2 className="h-3.5 w-3.5 inline ml-2" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {(currentQuestion.question_content.correctAnswer || currentQuestion.question_content.expectedAnswer) && (
+                      <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-sm">
+                        <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                          {currentQuestion.question_type === 'multiple_choice' ? 'Correct: ' : 'Expected: '}
+                        </span>
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          {currentQuestion.question_content.correctAnswer || currentQuestion.question_content.expectedAnswer}
+                        </span>
+                      </div>
+                    )}
+                    {currentQuestion.question_content.explanation && (
+                      <p className="text-xs text-muted-foreground italic">{currentQuestion.question_content.explanation}</p>
+                    )}
+                  </div>
+                )}
                 <p id="question-instructions" className="sr-only">
                   Answer the question below and select your confidence level before submitting.
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                {!showResult ? (
+                {isPreview ? (
+                  /* Preview mode: just show a continue button, answer is shown in header */
+                  <Button 
+                    onClick={() => {
+                      setCurrentQuestion(null);
+                      setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
+                      videoRef.current?.play();
+                      setIsPlaying(true);
+                    }} 
+                    className="w-full" 
+                    size="lg"
+                  >
+                    <ChevronRight className="h-4 w-4 mr-2" />
+                    Continue Lecture
+                  </Button>
+                ) : !showResult ? (
                   <>
                     {/* Answer Input */}
                     {currentQuestion.question_type === 'multiple_choice' ? (
@@ -1079,13 +1153,33 @@ export const InteractiveLecturePlayer = ({
             {sortedPausePoints.map((point) => (
               <div
                 key={point.id}
-                className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 ${
+                className={cn(
+                  "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-10",
                   answeredQuestions.has(point.id)
                     ? 'bg-emerald-500 border-emerald-400'
-                    : 'bg-amber-500 border-amber-400'
-                }`}
+                    : 'bg-amber-500 border-amber-400',
+                  isPreview && 'cursor-pointer hover:scale-150 transition-transform'
+                )}
                 style={{ left: `${(point.pause_timestamp / duration) * 100}%` }}
-                title={`Question ${point.order_index + 1}`}
+                title={`Q${point.order_index + 1} at ${formatTime(point.pause_timestamp)}`}
+                onClick={isPreview ? (e) => {
+                  e.stopPropagation();
+                  if (videoRef.current) {
+                    videoRef.current.pause();
+                    setIsPlaying(false);
+                    videoRef.current.currentTime = point.pause_timestamp;
+                    setCurrentTime(point.pause_timestamp);
+                    // Reset answer state and show question
+                    setSelectedAnswer('');
+                    setShortAnswer('');
+                    setConfidenceLevel('');
+                    setShowResult(false);
+                    setShortAnswerGrade(null);
+                    setShortAnswerFeedback(null);
+                    setCurrentQuestion(point);
+                    onQuestionSelect?.(point.id);
+                  }
+                } : undefined}
               />
             ))}
             {/* No-skip indicator */}

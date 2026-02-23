@@ -57,7 +57,9 @@ export function VoiceQuestionPreviewDialog({
   // Initialize state when extracted question changes
   useEffect(() => {
     if (extractedQuestion) {
-      setQuestionText(extractedQuestion.question_text);
+      // Strip any HTML tags as defense-in-depth (AI sometimes returns markup)
+      const sanitizedText = extractedQuestion.question_text.replace(/<[^>]*>/g, '').trim();
+      setQuestionText(sanitizedText);
       setQuestionType(extractedQuestion.suggested_type);
       
       // Initialize MCQ options from pre-generated data or reset

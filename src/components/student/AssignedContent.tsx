@@ -60,6 +60,7 @@ interface Assignment {
 interface AssignedContentProps {
   userId: string;
   instructorId?: string; // Optional: filter by instructor
+  courseId?: string; // Optional: filter by course
   // onAnswerResult removed - Flow State no longer used
 }
 
@@ -70,7 +71,7 @@ interface ConfidenceData {
   locked: boolean;
 }
 
-export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) => {
+export const AssignedContent = ({ userId, instructorId, courseId }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
@@ -191,16 +192,24 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
           (payload) => {
             // Server-side filtering already applied - no client-side check needed
             console.log('📬 New assignment received via realtime:', payload);
+            const newAssignment = payload.new as any;
             console.log('📊 Assignment details:', {
-              id: payload.new?.id,
-              title: (payload.new as any)?.title,
-              type: (payload.new as any)?.assignment_type,
-              student_id: (payload.new as any)?.student_id
+              id: newAssignment?.id,
+              title: newAssignment?.title,
+              type: newAssignment?.assignment_type,
+              student_id: newAssignment?.student_id,
+              course_id: newAssignment?.course_id
             });
+
+            // Client-side course filter: skip if assignment belongs to a different course
+            if (courseId && newAssignment?.course_id && newAssignment.course_id !== courseId) {
+              console.log('⏭️ Skipping assignment from different course:', newAssignment.course_id);
+              return;
+            }
             
-            const newAssignment = payload.new as Assignment;
+            const typedAssignment = payload.new as Assignment;
             
-            if (newAssignment.assignment_type === 'lecture_checkin') {
+            if (typedAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
               setQuestionIncoming(true);
               
@@ -215,28 +224,28 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                 
                 // Add assignment to state with proper deduplication
                 setAssignments(prev => {
-                  if (prev.some(a => a.id === newAssignment.id)) {
-                    console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                  if (prev.some(a => a.id === typedAssignment.id)) {
+                    console.log('⚠️ Assignment already exists, skipping duplicate:', typedAssignment.id);
                     return prev;
                   }
-                  console.log('✅ Adding new assignment:', newAssignment.id);
-                  return [newAssignment, ...prev];
+                  console.log('✅ Adding new assignment:', typedAssignment.id);
+                  return [typedAssignment, ...prev];
                 });
                 
                 // Show notification
                 sonnerToast.success("New Question!", {
-                  description: `"${newAssignment.title}" is ready`
+                  description: `"${typedAssignment.title}" is ready`
                 });
               }, 1500);
             } else {
               // For non-lecture assignments, add immediately with deduplication
               setAssignments(prev => {
-                if (prev.some(a => a.id === newAssignment.id)) {
-                  console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                if (prev.some(a => a.id === typedAssignment.id)) {
+                  console.log('⚠️ Assignment already exists, skipping duplicate:', typedAssignment.id);
                   return prev;
                 }
-                console.log('✅ Adding new assignment:', newAssignment.id);
-                return [newAssignment, ...prev];
+                console.log('✅ Adding new assignment:', typedAssignment.id);
+                return [typedAssignment, ...prev];
               });
             }
           }
@@ -371,7 +380,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       }
       subscription.unsubscribe();
     };
-  }, [userId, instructorId, retryCount]);
+  }, [userId, instructorId, courseId, retryCount]);
 
   const fetchAssignments = async () => {
     setIsRefreshing(true);
@@ -396,6 +405,11 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       // Filter by instructor if provided
       if (instructorId) {
         query = query.eq('instructor_id', instructorId);
+      }
+
+      // Filter by course if provided
+      if (courseId) {
+        query = query.or(`course_id.eq.${courseId},course_id.is.null`);
       }
 
       const { data, error } = await query
