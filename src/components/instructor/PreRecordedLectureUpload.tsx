@@ -24,7 +24,7 @@ interface PreRecordedLectureUploadProps {
   onUploadComplete?: (lectureId: string) => void;
 }
 
-type UploadMode = "file" | "url";
+type UploadMode = "file";
 
 export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectureUploadProps) => {
   const [uploadMode, setUploadMode] = useState<UploadMode>("file");
