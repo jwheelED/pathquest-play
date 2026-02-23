@@ -20,6 +20,7 @@ export default function AuthPage() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
+  const isHandlingAuthRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
