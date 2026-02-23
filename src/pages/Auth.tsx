@@ -249,6 +249,11 @@ export default function AuthPage() {
       setSession(session);
 
       if (session) {
+        // Skip if handleAuth is already managing sign-in navigation
+        if (isHandlingAuthRef.current) {
+          return;
+        }
+
         const initializeUser = async () => {
           // Ensure profile exists with onboarded true
           const { data: profile } = await supabase
