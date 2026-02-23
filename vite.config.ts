@@ -90,7 +90,7 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   build: {
     sourcemap: true, // <--- 3. Enabled Source Maps (Critical for Sentry)
-    outDir: 'build',
+    outDir: 'dist',
     rollupOptions: {
       output: {
         manualChunks: {
