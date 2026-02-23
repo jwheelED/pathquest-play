@@ -78,6 +78,7 @@ export default function AuthPage() {
   const handleAuth = async () => {
     setError("");
     setSuccess("");
+    isHandlingAuthRef.current = true;
 
     if (isSignUp) {
       // Validate student signup inputs
