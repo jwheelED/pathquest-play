@@ -98,11 +98,11 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // Check file size (50MB limit)
-      if (selectedFile.size > 52428800) {
+      // Check file size (200MB limit with Cloudinary)
+      if (selectedFile.size > 200 * 1024 * 1024) {
         toast({
           title: "File too large",
-          description: "Maximum file size is 50MB",
+          description: "Maximum file size is 200MB",
           variant: "destructive",
         });
         return;
@@ -173,17 +173,20 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
     try {
       let filePath = null;
 
-      // Upload file to storage if needed
+      // Upload file via Cloudinary edge function
       if (file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${userId}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('student-materials')
-          .upload(fileName, file);
+        const uploadForm = new FormData();
+        uploadForm.append("file", file);
+        uploadForm.append("folder", `student-materials/${userId}`);
 
-        if (uploadError) throw uploadError;
-        filePath = fileName;
+        const { data: cloudData, error: cloudError } = await supabase.functions.invoke(
+          "upload-to-cloudinary",
+          { body: uploadForm }
+        );
+
+        if (cloudError) throw new Error(cloudError.message || "File upload failed");
+        if (cloudData?.error) throw new Error(cloudData.error);
+        filePath = cloudData.url;
       }
 
       // Get user's org_id
@@ -429,7 +432,7 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
                 ) : (
                   <div>
                     <p className="text-sm font-medium text-foreground">Click to upload</p>
-                    <p className="text-xs text-muted-foreground">Max 50MB</p>
+                    <p className="text-xs text-muted-foreground">Max 200MB</p>
                   </div>
                 )}
               </label>
