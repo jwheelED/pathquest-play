@@ -55,12 +55,25 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        navigateFallback: null,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: "NetworkFirst",
+            urlPattern: ({ request }: { request: Request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst' as const,
             options: {
-              cacheName: "supabase-api",
+              cacheName: 'html-navigation',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 86400
+              },
+              networkTimeoutSeconds: 3
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            handler: 'NetworkFirst' as const,
+            options: {
+              cacheName: 'supabase-api',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 300
@@ -70,9 +83,9 @@ export default defineConfig(({ mode }) => ({
           },
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
-            handler: "CacheFirst",
+            handler: 'CacheFirst' as const,
             options: {
-              cacheName: "images",
+              cacheName: 'images',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30
