@@ -56,6 +56,15 @@ export function useVersionCheck() {
   }, []);
 
   useEffect(() => {
+    // Listen for service worker updates and reload immediately
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hasNotified.current) {
+          window.location.reload();
+        }
+      });
+    }
+
     // First check after a short delay
     const timeout = setTimeout(check, 10_000);
     const interval = setInterval(check, CHECK_INTERVAL_MS);
