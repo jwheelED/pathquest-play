@@ -223,7 +223,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             title: title.trim(),
             description: description.trim() || null,
             video_path: filePath,
-            video_url: externalVideoUrl,
+            video_url: null,
             question_count: highYieldOnly ? null : effectiveQuestionCount,
             status: "processing",
             instructor_id: user.id,
