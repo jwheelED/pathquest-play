@@ -66,7 +66,7 @@ export function useVersionCheck() {
     }
 
     // First check after a short delay
-    const timeout = setTimeout(check, 10_000);
+    const timeout = setTimeout(check, 5_000);
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     return () => {
       clearTimeout(timeout);
