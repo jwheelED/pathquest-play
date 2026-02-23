@@ -46,8 +46,8 @@ export function QuickUploadSheet({ userId, trigger, onUploadComplete }: QuickUpl
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.size > 52428800) {
-        toast.error('File too large. Maximum is 50MB.');
+      if (selectedFile.size > 200 * 1024 * 1024) {
+        toast.error('File too large. Maximum is 200MB.');
         return;
       }
       setFile(selectedFile);
