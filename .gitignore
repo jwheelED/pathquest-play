@@ -152,3 +152,15 @@ android-sdk/ -e
 
 # Sentry Config File
 .env.sentry-build-plugin
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*

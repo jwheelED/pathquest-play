@@ -9,7 +9,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"; // <--- 1. Added Import
 export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
-    port: 8080,
+    port: 3000,
     allowedHosts: true
   },
   plugins: [
