@@ -585,8 +585,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           disabled={
             status === "error" ? false :
             status === "ready" ? false :
-            (uploadMode === "file" && !selectedFile) ||
-            (uploadMode === "url" && !videoUrl.trim()) ||
+            !selectedFile ||
             !title.trim() ||
             (status !== "idle")
           }
