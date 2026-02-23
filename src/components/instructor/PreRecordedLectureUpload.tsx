@@ -31,7 +31,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState("");
+  
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "analyzing" | "ready" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
