@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "Edvana - Live Lecture Capture & Learning Platform",
