@@ -595,7 +595,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           {status === "idle" ? (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              {uploadMode === "url" ? "Add & Process Lecture" : "Upload & Process Lecture"}
+              Upload & Process Lecture
             </>
           ) : status === "error" ? (
             <>
