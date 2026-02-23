@@ -176,20 +176,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   };
 
   const handleUpload = async () => {
-    if (uploadMode === "file" && !selectedFile) {
+    if (!selectedFile) {
       toast.error("Please select a video file");
-      return;
-    }
-    if (uploadMode === "url" && !videoUrl.trim()) {
-      toast.error("Please enter a video URL");
       return;
     }
     if (!title.trim()) {
       toast.error("Please provide a title");
-      return;
-    }
-    if (uploadMode === "url" && !isValidVideoUrl(videoUrl)) {
-      toast.error("Please enter a valid video URL (YouTube, Vimeo, or direct link)");
       return;
     }
 
