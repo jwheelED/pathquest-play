@@ -9,7 +9,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"; // <--- 1. Added Import
 export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
-    port: 3000,
+    port: 8080,
     allowedHosts: true
   },
   plugins: [
@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      devOptions: { enabled: false },
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "Edvana - Live Lecture Capture & Learning Platform",
@@ -51,6 +52,8 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
         runtimeCaching: [
           {
@@ -90,7 +93,7 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   build: {
     sourcemap: true, // <--- 3. Enabled Source Maps (Critical for Sentry)
-    outDir: 'build',
+    outDir: 'dist',
     rollupOptions: {
       output: {
         manualChunks: {
