@@ -32,6 +32,14 @@ async function getSignatureKey(secretKey: string, dateStamp: string, region: str
   return key;
 }
 
+function encodeRfc3986(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function encodeObjectKey(key: string): string {
+  return key.split("/").map(encodeRfc3986).join("/");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -77,9 +85,11 @@ serve(async (req) => {
     const body = new Uint8Array(arrayBuffer);
     const fileContentType = file.type || "application/octet-stream";
 
-    // Sign and upload to R2 using AWS Signature V4
-    const host = `${R2_BUCKET_NAME}.${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
-    const url = `https://${host}/${key}`;
+    // Sign and upload to R2 using AWS Signature V4 (path-style endpoint)
+    const encodedKey = encodeObjectKey(key);
+    const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+    const canonicalUri = `/${encodeRfc3986(R2_BUCKET_NAME)}/${encodedKey}`;
+    const url = `https://${host}${canonicalUri}`;
     const now = new Date();
     const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
     const dateStamp = amzDate.slice(0, 8);
@@ -89,9 +99,9 @@ serve(async (req) => {
 
     const payloadHash = await sha256(body);
 
-    const canonicalHeaders = `content-type:${fileContentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
-    const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
-    const canonicalRequest = `PUT\n/${key}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+    const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+    const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+    const canonicalRequest = `PUT\n${canonicalUri}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
 
     const canonicalRequestHash = await sha256(canonicalRequest);
     const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${canonicalRequestHash}`;
@@ -102,13 +112,12 @@ serve(async (req) => {
 
     const authHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
-    console.log("Uploading to R2:", { host, key, contentType: fileContentType, bodyLength: body.length });
+    console.log("Uploading to R2:", { host, key, canonicalUri, contentType: fileContentType, bodyLength: body.length });
 
     const uploadRes = await fetch(url, {
       method: "PUT",
       headers: {
         "Content-Type": fileContentType,
-        "Host": host,
         "x-amz-content-sha256": payloadHash,
         "x-amz-date": amzDate,
         "Authorization": authHeader,
