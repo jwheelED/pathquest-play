@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
+import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
 import { CourseCodeCard } from "@/components/instructor/CourseCodeCard";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
@@ -424,7 +425,7 @@ export default function InstructorDashboard() {
       case "overview":
         return (
           <div className="space-y-6">
-            {/* Organization connection card removed - not needed unless for institutional licensing */}
+            <PendingOrgInvites />
             
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <CourseCodeCard />
