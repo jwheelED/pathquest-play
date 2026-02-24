@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       const userOrgId = profile?.org_id;
       
       if (!userOrgId) {
-        toast.error("No organization assigned");
+        // No org yet — let OrganizationSetup handle creation
         setLoading(false);
         return;
       }
