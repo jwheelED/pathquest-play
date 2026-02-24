@@ -32,7 +32,11 @@ interface InstructorInvite {
   expires_at: string;
 }
 
-export default function OrganizationSetup() {
+interface OrganizationSetupProps {
+  onOrgCreated?: () => void;
+}
+
+export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupProps) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [domains, setDomains] = useState<OrganizationDomain[]>([]);
   const [invites, setInvites] = useState<InstructorInvite[]>([]);
