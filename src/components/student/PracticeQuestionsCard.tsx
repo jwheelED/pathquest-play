@@ -128,22 +128,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   }
 
   if (questions.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Brain className="w-5 h-5 text-primary" />
-            Practice Questions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center py-8">
-          <Sparkles className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground text-sm">
-            Upload study materials to generate practice questions!
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null; // Hide card entirely when no material-based questions exist
   }
 
   const progressPercent =
