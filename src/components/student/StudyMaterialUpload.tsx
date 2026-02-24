@@ -98,11 +98,11 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // Check file size (200MB limit with Cloudinary)
-      if (selectedFile.size > 200 * 1024 * 1024) {
+      // Check file size (50MB limit with Supabase Storage)
+      if (selectedFile.size > 50 * 1024 * 1024) {
         toast({
           title: "File too large",
-          description: "Maximum file size is 200MB",
+          description: "Maximum file size is 50MB",
           variant: "destructive",
         });
         return;
