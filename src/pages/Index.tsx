@@ -509,8 +509,6 @@ const Index = () => {
         </div>
       </footer>
 
-      {/* Sticky CTA Bar */}
-      <StickyCtaBar />
     </div>
   );
 };
