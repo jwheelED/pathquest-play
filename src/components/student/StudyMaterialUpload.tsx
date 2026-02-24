@@ -434,7 +434,7 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
                 ) : (
                   <div>
                     <p className="text-sm font-medium text-foreground">Click to upload</p>
-                    <p className="text-xs text-muted-foreground">Max 200MB</p>
+                    <p className="text-xs text-muted-foreground">Max 50MB</p>
                   </div>
                 )}
               </label>
