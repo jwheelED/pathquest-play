@@ -173,20 +173,22 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
     try {
       let filePath = null;
 
-      // Upload file via Cloudinary edge function
+      // Upload file directly to Supabase Storage
       if (file) {
-        const uploadForm = new FormData();
-        uploadForm.append("file", file);
-        uploadForm.append("folder", `student-materials/${userId}`);
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const uniqueName = `${userId}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
 
-        const { data: cloudData, error: cloudError } = await supabase.functions.invoke(
-          "upload-to-cloudinary",
-          { body: uploadForm }
-        );
+        const { error: storageError } = await supabase.storage
+          .from("student-materials")
+          .upload(uniqueName, file);
 
-        if (cloudError) throw new Error(cloudError.message || "File upload failed");
-        if (cloudData?.error) throw new Error(cloudData.error);
-        filePath = cloudData.url;
+        if (storageError) throw new Error(storageError.message || "File upload failed");
+
+        const { data: urlData } = supabase.storage
+          .from("student-materials")
+          .getPublicUrl(uniqueName);
+
+        filePath = urlData.publicUrl;
       }
 
       // Get user's org_id

@@ -97,22 +97,22 @@ export function QuickUploadSheet({ userId, trigger, onUploadComplete }: QuickUpl
       let filePath = null;
       let materialType = 'note';
 
-      // Upload file via Cloudinary
+      // Upload file directly to Supabase Storage
       if (file) {
-        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const uniqueName = `${userId}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
 
-        const uploadForm = new FormData();
-        uploadForm.append("file", file);
-        uploadForm.append("folder", `student-materials/${userId}`);
+        const { error: storageError } = await supabase.storage
+          .from("student-materials")
+          .upload(uniqueName, file);
 
-        const { data: cloudData, error: cloudError } = await supabase.functions.invoke(
-          "upload-to-cloudinary",
-          { body: uploadForm }
-        );
+        if (storageError) throw new Error(storageError.message || "File upload failed");
 
-        if (cloudError) throw new Error(cloudError.message || "File upload failed");
-        if (cloudData?.error) throw new Error(cloudData.error);
-        filePath = cloudData.url;
+        const { data: urlData } = supabase.storage
+          .from("student-materials")
+          .getPublicUrl(uniqueName);
+
+        filePath = urlData.publicUrl;
         materialType = fileExt === 'pdf' ? 'pdf' : 'note';
       }
 
