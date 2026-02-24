@@ -1,5 +1,6 @@
+// upload-to-cloudinary: uploads files to Cloudflare R2 (S3-compatible)
+// Uses manual AWS Signature V4 + native fetch (no AWS SDK — Deno compatible)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { HmacSha256 } from "https://deno.land/std@0.168.0/hash/sha256.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +8,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// AWS Signature V4 helpers
 function toHex(buffer: ArrayBuffer): string {
   return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
@@ -44,9 +44,21 @@ serve(async (req) => {
     const R2_BUCKET_NAME = Deno.env.get("R2_BUCKET_NAME");
     const R2_PUBLIC_URL = Deno.env.get("R2_PUBLIC_URL");
 
+    // Log secret presence (not values) for debugging
+    console.log("R2 config check:", {
+      hasAccountId: !!R2_ACCOUNT_ID,
+      hasAccessKey: !!R2_ACCESS_KEY_ID,
+      hasSecretKey: !!R2_SECRET_ACCESS_KEY,
+      hasBucket: !!R2_BUCKET_NAME,
+      hasPublicUrl: !!R2_PUBLIC_URL,
+    });
+
     if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
       throw new Error("Cloudflare R2 credentials not configured");
     }
+
+    const contentType = req.headers.get("content-type") || "";
+    console.log("Request content-type:", contentType);
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -56,12 +68,14 @@ serve(async (req) => {
       throw new Error("No file provided");
     }
 
+    console.log("File received:", { name: file.name, size: file.size, type: file.type });
+
     const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
     const uniqueId = crypto.randomUUID();
     const key = `${folder}/${uniqueId}.${ext}`;
     const arrayBuffer = await file.arrayBuffer();
     const body = new Uint8Array(arrayBuffer);
-    const contentType = file.type || "application/octet-stream";
+    const fileContentType = file.type || "application/octet-stream";
 
     // Sign and upload to R2 using AWS Signature V4
     const host = `${R2_BUCKET_NAME}.${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
@@ -75,7 +89,7 @@ serve(async (req) => {
 
     const payloadHash = await sha256(body);
 
-    const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+    const canonicalHeaders = `content-type:${fileContentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
     const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
     const canonicalRequest = `PUT\n/${key}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
 
@@ -88,10 +102,12 @@ serve(async (req) => {
 
     const authHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
+    console.log("Uploading to R2:", { host, key, contentType: fileContentType, bodyLength: body.length });
+
     const uploadRes = await fetch(url, {
       method: "PUT",
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": fileContentType,
         "Host": host,
         "x-amz-content-sha256": payloadHash,
         "x-amz-date": amzDate,
@@ -103,11 +119,13 @@ serve(async (req) => {
     if (!uploadRes.ok) {
       const errText = await uploadRes.text();
       console.error("R2 upload failed:", uploadRes.status, errText);
-      throw new Error(`R2 upload failed: ${uploadRes.status}`);
+      throw new Error(`R2 upload failed: ${uploadRes.status} - ${errText.slice(0, 200)}`);
     }
 
     const publicBase = R2_PUBLIC_URL.replace(/\/+$/, "");
     const publicUrl = `${publicBase}/${key}`;
+
+    console.log("Upload successful:", { publicUrl, bytes: arrayBuffer.byteLength });
 
     return new Response(
       JSON.stringify({
