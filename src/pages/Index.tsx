@@ -8,7 +8,7 @@ import step1Image from "@/assets/step1-live-lecture.png";
 import step2Image from "@/assets/step2-question.png";
 import step3Image from "@/assets/step3-feedback.png";
 import { useScrollAnimation, useScrollPosition } from "@/hooks/useScrollAnimation";
-import { StickyCtaBar } from "@/components/StickyCtaBar";
+
 
 const Index = () => {
   const [session, setSession] = useState(null);
