@@ -133,7 +133,9 @@ function App() {
           } />
           <Route path="/instructor/slides" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <SlidePresenter />
+              <CourseProvider>
+                <SlidePresenter />
+              </CourseProvider>
             </ProtectedRoute>
           } />
           <Route path="/instructor/preview/:lectureId" element={
