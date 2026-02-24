@@ -469,7 +469,7 @@ export default function AdminDashboard() {
           {activeTab === "overview" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               {/* Organization Setup */}
-              <OrganizationSetup />
+              <OrganizationSetup onOrgCreated={fetchDashboardData} />
 
               {/* Aggregate Metrics */}
               <AggregateMetricsCard metrics={metrics} loading={aggregateLoading} />
