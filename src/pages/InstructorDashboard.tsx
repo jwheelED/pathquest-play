@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
+import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
 import { CourseCodeCard } from "@/components/instructor/CourseCodeCard";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
