@@ -53,6 +53,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
         .from("personalized_questions")
         .select("*")
         .eq("user_id", userId)
+        .not("source_material_id", "is", null)
         .order("times_attempted", { ascending: true })
         .limit(20);
 
@@ -123,32 +124,11 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   // ---- Rendering ----
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-8 flex items-center justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
+    return null; // Don't show anything while loading
   }
 
   if (questions.length === 0) {
-    return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Brain className="w-5 h-5 text-primary" />
-            Practice Questions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center py-8">
-          <Sparkles className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground text-sm">
-            Upload study materials to generate practice questions!
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null; // Hide card entirely when no material-based questions exist
   }
 
   const progressPercent =
