@@ -32,6 +32,14 @@ async function getSignatureKey(secretKey: string, dateStamp: string, region: str
   return key;
 }
 
+function encodeRfc3986(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function encodeObjectKey(key: string): string {
+  return key.split("/").map(encodeRfc3986).join("/");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
