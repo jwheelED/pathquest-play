@@ -15,7 +15,7 @@ interface Question {
   id: string;
   question_text: string;
   question_type: string;
-  options: string[] | null;
+  options: unknown;
   correct_answer: string;
   explanation: string;
   difficulty: string;
