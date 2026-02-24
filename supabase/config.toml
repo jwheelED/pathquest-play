@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.upload-to-cloudinary]
 verify_jwt = false
+
+[functions.generate-personalized-questions]
+verify_jwt = false
