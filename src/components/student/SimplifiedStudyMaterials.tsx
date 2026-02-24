@@ -280,7 +280,7 @@ export function SimplifiedStudyMaterials({ userId, onMaterialCountChange }: Simp
                         <div>
                           <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                           <p className="text-sm">Click to upload PDF or image</p>
-                          <p className="text-xs text-muted-foreground">Max 50MB</p>
+                          <p className="text-xs text-muted-foreground">Max 200MB</p>
                         </div>
                       )}
                     </label>
