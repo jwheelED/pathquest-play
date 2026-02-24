@@ -1,11 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { S3Client, PutObjectCommand } from "https://esm.sh/@aws-sdk/client-s3@3.614.0";
+import { HmacSha256 } from "https://deno.land/std@0.168.0/hash/sha256.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+// AWS Signature V4 helpers
+function toHex(buffer: ArrayBuffer): string {
+  return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256(data: Uint8Array | string): Promise<string> {
+  const encoded = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  const hash = await crypto.subtle.digest("SHA-256", encoded);
+  return toHex(hash);
+}
+
+async function hmac(key: Uint8Array, data: string): Promise<Uint8Array> {
+  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data));
+  return new Uint8Array(sig);
+}
+
+async function getSignatureKey(secretKey: string, dateStamp: string, region: string, service: string): Promise<Uint8Array> {
+  let key = await hmac(new TextEncoder().encode("AWS4" + secretKey), dateStamp);
+  key = await hmac(key, region);
+  key = await hmac(key, service);
+  key = await hmac(key, "aws4_request");
+  return key;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -23,15 +48,6 @@ serve(async (req) => {
       throw new Error("Cloudflare R2 credentials not configured");
     }
 
-    const s3 = new S3Client({
-      region: "auto",
-      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID,
-        secretAccessKey: R2_SECRET_ACCESS_KEY,
-      },
-    });
-
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const folder = (formData.get("folder") as string) || "student-materials";
@@ -40,23 +56,56 @@ serve(async (req) => {
       throw new Error("No file provided");
     }
 
-    // Generate a unique key
     const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
     const uniqueId = crypto.randomUUID();
     const key = `${folder}/${uniqueId}.${ext}`;
-
     const arrayBuffer = await file.arrayBuffer();
+    const body = new Uint8Array(arrayBuffer);
+    const contentType = file.type || "application/octet-stream";
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: key,
-        Body: new Uint8Array(arrayBuffer),
-        ContentType: file.type || "application/octet-stream",
-      })
-    );
+    // Sign and upload to R2 using AWS Signature V4
+    const host = `${R2_BUCKET_NAME}.${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
+    const url = `https://${host}/${key}`;
+    const now = new Date();
+    const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const dateStamp = amzDate.slice(0, 8);
+    const region = "auto";
+    const service = "s3";
+    const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
 
-    // Ensure public URL doesn't have trailing slash
+    const payloadHash = await sha256(body);
+
+    const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+    const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+    const canonicalRequest = `PUT\n/${key}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+
+    const canonicalRequestHash = await sha256(canonicalRequest);
+    const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${canonicalRequestHash}`;
+
+    const signingKey = await getSignatureKey(R2_SECRET_ACCESS_KEY, dateStamp, region, service);
+    const signatureBuffer = await hmac(signingKey, stringToSign);
+    const signature = toHex(signatureBuffer.buffer);
+
+    const authHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    const uploadRes = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+        "Host": host,
+        "x-amz-content-sha256": payloadHash,
+        "x-amz-date": amzDate,
+        "Authorization": authHeader,
+      },
+      body: body,
+    });
+
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text();
+      console.error("R2 upload failed:", uploadRes.status, errText);
+      throw new Error(`R2 upload failed: ${uploadRes.status}`);
+    }
+
     const publicBase = R2_PUBLIC_URL.replace(/\/+$/, "");
     const publicUrl = `${publicBase}/${key}`;
 
