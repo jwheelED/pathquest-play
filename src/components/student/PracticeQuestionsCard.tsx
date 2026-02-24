@@ -53,6 +53,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
         .from("personalized_questions")
         .select("*")
         .eq("user_id", userId)
+        .not("source_material_id", "is", null)
         .order("times_attempted", { ascending: true })
         .limit(20);
 
