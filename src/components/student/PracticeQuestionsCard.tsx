@@ -124,13 +124,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   // ---- Rendering ----
 
   if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-8 flex items-center justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
+    return null; // Don't show anything while loading
   }
 
   if (questions.length === 0) {
