@@ -212,8 +212,8 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
         </p>
 
         {/* Answer area */}
-        {currentQuestion!.question_type === "multiple_choice" &&
-        currentQuestion!.options ? (
+        currentQuestion!.question_type === "multiple_choice" &&
+        Array.isArray(currentQuestion!.options) ? (
           <div className="space-y-2">
             {(currentQuestion!.options as string[]).map((option, idx) => {
               const letter = String.fromCharCode(65 + idx);

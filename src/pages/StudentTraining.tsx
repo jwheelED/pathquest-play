@@ -152,6 +152,11 @@ export default function StudentTraining() {
           />
         </section>
 
+        {/* Practice Questions */}
+        <section className="animate-fade-in">
+          <PracticeQuestionsCard userId={user.id} />
+        </section>
+
         {/* Study Materials - Simplified upload and library */}
         <section className="animate-fade-in">
           <SimplifiedStudyMaterials 
