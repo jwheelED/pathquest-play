@@ -101,7 +101,7 @@ serve(async (req) => {
 
     const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
     const signedHeaders = "host;x-amz-content-sha256;x-amz-date";
-    const canonicalRequest = `PUT\n${canonicalUri}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+    const canonicalRequest = `PUT\n${canonicalUri}\n\n${canonicalHeaders}${signedHeaders}\n${payloadHash}`;
 
     const canonicalRequestHash = await sha256(canonicalRequest);
     const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${canonicalRequestHash}`;
