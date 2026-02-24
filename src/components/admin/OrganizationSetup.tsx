@@ -137,7 +137,7 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
 
       setOrganization(newOrg);
       toast.success("Organization created successfully!");
-    } catch (error: any) {
+      onOrgCreated?.();
       console.error("Error creating organization:", error);
       toast.error(error.message || "Failed to create organization");
     } finally {
