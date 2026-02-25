@@ -153,6 +153,24 @@ export const InteractiveLecturePlayer = ({
   
   const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
   const [maxAllowedTime, setMaxAllowedTime] = useState(0);
+  const isReplayingRef = useRef(false);
+
+  // Safe play helper — catches AbortError when pause() interrupts a pending play()
+  const safePlay = useCallback(() => {
+    if (!videoRef.current) return;
+    const playPromise = videoRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        if (err.name === 'AbortError') {
+          // Expected when pause() interrupts play() — harmless, ignore
+          console.log('Play interrupted by pause — safe to ignore');
+        } else {
+          console.error('Video play error:', err);
+        }
+      });
+    }
+    setIsPlaying(true);
+  }, []);
   
   // Question overlay state
   const [currentQuestion, setCurrentQuestion] = useState<PausePoint | null>(null);
@@ -298,18 +316,20 @@ export const InteractiveLecturePlayer = ({
       setMaxAllowedTime(time);
     }
 
-    // Check for pause points
-    for (const point of sortedPausePoints) {
-      if (
-        time >= point.pause_timestamp && 
-        time < point.pause_timestamp + 0.5 &&
-        !answeredQuestions.has(point.id) &&
-        !currentQuestion
-      ) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-        setCurrentQuestion(point);
-        break;
+    // Check for pause points (skip during replay)
+    if (!isReplayingRef.current) {
+      for (const point of sortedPausePoints) {
+        if (
+          time >= point.pause_timestamp && 
+          time < point.pause_timestamp + 0.5 &&
+          !answeredQuestions.has(point.id) &&
+          !currentQuestion
+        ) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+          setCurrentQuestion(point);
+          break;
+        }
       }
     }
   };
@@ -336,10 +356,10 @@ export const InteractiveLecturePlayer = ({
     
     if (isPlaying) {
       videoRef.current.pause();
+      setIsPlaying(false);
     } else {
-      videoRef.current.play();
+      safePlay();
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleVolumeToggle = () => {
@@ -640,8 +660,7 @@ export const InteractiveLecturePlayer = ({
     setRemediation(prev => ({ ...prev, active: false }));
     setShowFollowUp(false);
     
-    videoRef.current.play();
-    setIsPlaying(true);
+    safePlay();
 
     // Set up listener to pause at end of remediation segment and show follow-up
     const handleRemediationEnd = () => {
@@ -703,8 +722,7 @@ export const InteractiveLecturePlayer = ({
     });
 
     // Resume video
-    videoRef.current?.play();
-    setIsPlaying(true);
+    safePlay();
   };
 
   const handleContinue = () => {
@@ -743,23 +761,36 @@ export const InteractiveLecturePlayer = ({
       }
     } else {
       // Resume video
-      videoRef.current?.play();
-      setIsPlaying(true);
+      safePlay();
     }
   };
 
   // Handle replay last 20 seconds
   const handleReplayLast20 = () => {
     if (!videoRef.current || !currentQuestion) return;
+    const pausePointId = currentQuestion.id;
     const replayTime = Math.max(0, currentQuestion.pause_timestamp - 20);
+    
+    // Temporarily suppress pause-point detection during replay
+    isReplayingRef.current = true;
+    
     videoRef.current.currentTime = replayTime;
     setCurrentQuestion(null);
     setShowResult(false);
     setSelectedAnswer('');
     setShortAnswer('');
     setConfidenceLevel('');
-    videoRef.current.play();
-    setIsPlaying(true);
+    
+    // Re-enable pause-point detection after passing the original pause timestamp
+    const reEnableCheck = () => {
+      if (videoRef.current && videoRef.current.currentTime >= currentQuestion.pause_timestamp + 0.6) {
+        isReplayingRef.current = false;
+        videoRef.current.removeEventListener('timeupdate', reEnableCheck);
+      }
+    };
+    videoRef.current.addEventListener('timeupdate', reEnableCheck);
+    
+    safePlay();
   };
 
   const formatTime = (seconds: number) => {
