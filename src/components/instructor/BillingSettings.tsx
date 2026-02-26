@@ -195,7 +195,7 @@ export function BillingSettings() {
               )}
               {currentTier === 'free' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Limited to 1 course and 25 students
+                  Limited to 1 course and 60 min of lecture time per week
                 </p>
               )}
             </div>
@@ -273,14 +273,23 @@ export function BillingSettings() {
                   )}
 
                   <ul className="space-y-2 mb-4">
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      {tier.student_limit === null ? 'Unlimited students' : `Up to ${tier.student_limit} students`}
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
-                    </li>
+                    {tier.name === 'institutional' && (
+                      <li className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        Everything in Instructor, plus:
+                      </li>
+                    )}
+                    {tier.name !== 'institutional' && (
+                      <>
+                        <li className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          {tier.name === 'free' ? '60 min lecture time/week' : 'Unlimited students'}
+                        </li>
+                        <li className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
+                        </li>
+                      </>
+                    )}
                     {tier.features.map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-sm">
                         <CheckCircle className="h-4 w-4 text-green-500" />
