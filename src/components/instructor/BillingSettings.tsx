@@ -195,7 +195,7 @@ export function BillingSettings() {
               )}
               {currentTier === 'free' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Limited to 1 course and 25 students
+                  Limited to 1 course and 60 min of lecture time per week
                 </p>
               )}
             </div>
