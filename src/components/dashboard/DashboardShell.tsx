@@ -80,8 +80,8 @@ export function DashboardShell({
         <div className="max-w-6xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                {getRoleIcon()}
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-secondary to-primary flex items-center justify-center shadow-md">
+                <EdvanaIcon className="w-6 h-6" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-foreground">
