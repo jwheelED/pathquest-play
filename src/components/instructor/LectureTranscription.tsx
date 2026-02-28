@@ -3289,10 +3289,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             {/* Voice Command Flash Overlay */}
             {voiceCommandDetected && (
               <div className="absolute inset-0 z-50 pointer-events-none">
-                <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
+                <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 to-primary/20 animate-[fade-out_0.5s_ease-out]" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
-                    <Zap className="h-12 w-12 animate-pulse" />
+                  <div className="bg-gradient-to-br from-secondary to-primary rounded-full p-4 shadow-2xl animate-[scale-in_0.3s_ease-out]">
+                    <EdvanaIcon className="h-14 w-14 animate-pulse" />
                   </div>
                 </div>
               </div>
