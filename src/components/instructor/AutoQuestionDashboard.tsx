@@ -303,10 +303,10 @@ export const AutoQuestionDashboard = ({
 
         {/* Countdown Animation */}
         {autoQuestionEnabled && nextAutoQuestionIn <= 10 && nextAutoQuestionIn > 0 && healthStatus.status === 'healthy' && (
-          <div className="animate-pulse bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+          <div className="animate-pulse bg-gradient-to-r from-secondary/10 to-primary/10 border border-secondary/30 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-blue-600 animate-bounce" />
-              <span className="font-bold text-blue-900 dark:text-blue-200">
+              <EdvanaIcon className="h-6 w-6 animate-bounce" />
+              <span className="font-bold text-secondary">
                 Auto-question in {nextAutoQuestionIn}s...
               </span>
             </div>
