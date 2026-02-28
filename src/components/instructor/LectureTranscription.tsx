@@ -11,7 +11,6 @@ import {
   Radio,
   Loader2,
   AlertCircle,
-  Zap,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -22,6 +21,7 @@ import {
   BookOpen,
   Award,
 } from "lucide-react";
+import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
