@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Zap, TrendingUp, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { Clock, Users, TrendingUp, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 
 export interface SkipReason {
   timestamp: Date;
