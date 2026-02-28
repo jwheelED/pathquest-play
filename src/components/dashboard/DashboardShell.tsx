@@ -48,7 +48,7 @@ export function DashboardShell({
       case "admin":
         return <Settings className="w-4 h-4 text-primary-foreground" />;
       default:
-        return <Sparkles className="w-4 h-4 text-primary-foreground" />;
+        return <EdvanaIcon className="w-4 h-4" />;
     }
   };
 
