@@ -125,7 +125,7 @@ export const AutoQuestionDashboard = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Zap className="h-4 w-4" />
+            <EdvanaIcon className="h-5 w-5" />
             Auto-Question Monitor
           </CardTitle>
           <Badge 
