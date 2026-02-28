@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { Button } from "@/components/ui/button";
-import { LogOut, Sparkles, Settings, Users } from "lucide-react";
+import { LogOut, Settings, Users } from "lucide-react";
+import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 
 interface DashboardShellProps {
   children: ReactNode;
