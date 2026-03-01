@@ -569,7 +569,7 @@ export default function InstructorDashboard() {
               {currentUser && (
                 <>
                   <BillingSettings />
-                  <QuestionFormatSettings instructorId={currentUser.id} professorType={professorProfile?.professor_type} />
+                  <QuestionFormatSettings instructorId={currentUser.id} professorType={instructorProfile?.professor_type} />
                   <QuestionPreviewSettings />
                   <QuestionDifficultySettings />
                   <AdaptiveTutoringSettings />
