@@ -918,6 +918,8 @@ serve(async (req) => {
           detectedAutomatically: true,
           source: source,
           idempotency_key: idempotencyKey,
+          // Include transcript context for voice-sent questions
+          source_transcript: source_transcript || null,
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
