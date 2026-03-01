@@ -10,6 +10,7 @@ import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw,
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
+import { TranscriptContext } from "./TranscriptContext";
 import { toast as sonnerToast } from "sonner";
 import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 import { playNotificationSound } from "@/lib/audioNotification";
