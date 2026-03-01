@@ -80,9 +80,7 @@ export function DashboardShell({
         <div className="max-w-6xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-secondary flex items-center justify-center">
-                <EdvanaIcon className="w-6 h-6" />
-              </div>
+              <EdvanaIcon className="w-9 h-9" />
               <div>
                 <h1 className="text-lg font-bold text-foreground">
                   {title || getDefaultTitle()}
