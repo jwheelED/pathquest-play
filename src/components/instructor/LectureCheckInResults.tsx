@@ -1621,6 +1621,17 @@ export const LectureCheckInResults = () => {
                                 ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
                                 : null;
                               const isCompleted = assignment.completed;
+                              
+                              // Debug logging
+                              console.log(`📊 Student Response Debug - ${assignment.student_name}:`, {
+                                isCompleted,
+                                studentQuestionIdx,
+                                hasQuizResponses: !!assignment.quiz_responses,
+                                quizResponsesKeys: assignment.quiz_responses ? Object.keys(assignment.quiz_responses) : [],
+                                studentAnswer,
+                                grade: assignment.grade,
+                              });
+                              
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
                               // Check for AI grade in quiz_responses._ai_recommendations
