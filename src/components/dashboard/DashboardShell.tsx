@@ -46,7 +46,7 @@ export function DashboardShell({
       case "instructor":
         return <Users className="w-4 h-4 text-primary-foreground" />;
       case "admin":
-        return <Settings className="w-4 h-4 text-primary-foreground" />;
+        return <Shield className="w-4 h-4 text-primary-foreground" />;
       default:
         return <EdvanaIcon className="w-4 h-4" />;
     }
