@@ -3676,6 +3676,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         extractedQuestion={previewQuestionData}
         onConfirmSend={handleConfirmPreviewSend}
         isSending={isSendingFromPreview}
+        sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
     </>
   );
