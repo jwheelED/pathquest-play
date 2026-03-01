@@ -360,32 +360,17 @@ export function VoiceQuestionPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Transcript Context - Show where question came from */}
+          {/* Transcript Context - Shows where question came from */}
           {sourceTranscript && (
-            <Collapsible open={showTranscriptContext} onOpenChange={setShowTranscriptContext}>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-between text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 h-8 px-3 border border-dashed"
-                >
-                  <span className="flex items-center gap-2">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    <span>View source transcript</span>
-                  </span>
-                  {showTranscriptContext ? (
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-2 p-3 bg-muted/30 rounded-lg border border-border/50 text-sm text-muted-foreground leading-relaxed max-h-32 overflow-y-auto">
-                  <p className="italic">"...{sourceTranscript.trim()}..."</p>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+            <div className="mb-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="font-medium">From lecture transcript:</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border border-border/50 text-sm text-muted-foreground leading-relaxed max-h-32 overflow-y-auto">
+                <p className="italic">"...{sourceTranscript.trim()}..."</p>
+              </div>
+            </div>
           )}
 
           {/* Question Type Selector */}
