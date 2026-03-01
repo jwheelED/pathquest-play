@@ -82,19 +82,14 @@ export const LectureCheckInResults = () => {
     if (!user) return;
     
     const courseId = selectedCourse?.id;
-    if (!courseId) {
-      setGroupedResults([]);
-      setLoading(false);
-      return;
-    }
 
     // Optimized query: Fetch only recent check-ins (last 24 hours) to reduce load
     // For classroom of 40 students, this limits data transfer significantly
     const oneDayAgo = new Date();
     oneDayAgo.setHours(oneDayAgo.getHours() - 24);
 
-    // Fetch all lecture check-in assignments with optimized select - filtered by course
-    const { data: assignments, error } = await supabase
+    // Build query - fetch all lecture check-in assignments
+    let query = supabase
       .from("student_assignments")
       .select(
         `
@@ -111,17 +106,30 @@ export const LectureCheckInResults = () => {
       `,
       )
       .eq("instructor_id", user.id)
-      .eq("course_id", courseId)
       .eq("assignment_type", "lecture_checkin")
       .gte("created_at", oneDayAgo.toISOString())
       .order("created_at", { ascending: false })
       .limit(200); // Limit to prevent excessive data with large classes
+
+    // Filter by course if selected, otherwise get all
+    if (courseId) {
+      query = query.eq("course_id", courseId);
+    }
+
+    const { data: assignments, error } = await query;
 
     if (error) {
       console.error("Error fetching results:", error);
       setLoading(false);
       return;
     }
+
+    console.log("📊 Check-in results fetched:", {
+      total: assignments?.length || 0,
+      courseId,
+      hasCompleted: assignments?.filter(a => a.completed).length,
+      hasResponses: assignments?.filter(a => a.quiz_responses).length,
+    });
 
     // Get student names from profiles table only (RLS-aware)
     const studentIds = [...new Set(assignments?.map((a) => a.student_id) || [])];
