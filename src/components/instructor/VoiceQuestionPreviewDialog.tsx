@@ -58,7 +58,6 @@ export function VoiceQuestionPreviewDialog({
   const [expectedAnswer, setExpectedAnswer] = useState('');
   const [isGeneratingExpectedAnswer, setIsGeneratingExpectedAnswer] = useState(false);
   const [showMathPreview, setShowMathPreview] = useState(false);
-  const [showTranscriptContext, setShowTranscriptContext] = useState(false);
 
   // Initialize state when extracted question changes
   useEffect(() => {
