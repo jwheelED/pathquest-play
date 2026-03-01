@@ -441,6 +441,7 @@ serve(async (req) => {
       correct_answer = null,
       explanation = null,
       course_id = null,
+      source_transcript = null, // Raw transcript to display with question
     } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
