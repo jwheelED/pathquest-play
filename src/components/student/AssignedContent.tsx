@@ -1330,6 +1330,14 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                     </Alert>
                   )}
 
+                  {/* Source Transcript Context - Shows where question came from */}
+                  {assignment.assignment_type === 'lecture_checkin' && assignment.content?.source_transcript && (
+                    <TranscriptContext 
+                      transcript={assignment.content.source_transcript}
+                      questionText={assignment.content.questions?.[0]?.question || ''}
+                    />
+                  )}
+
                   {/* Quiz/Lecture Check-in Display */}
                   {(assignment.assignment_type === 'quiz' || assignment.assignment_type === 'lecture_checkin') && assignment.content.questions && (
                     <div className="space-y-4">
