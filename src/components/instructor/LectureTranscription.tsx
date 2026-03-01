@@ -1138,6 +1138,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       // Provide richer context for better question formatting
       const fullContext = transcriptBufferRef.current.slice(-1500);
+      
+      // Get the recent transcript for display (for voice-sent questions)
+      const isVoiceSent = detectionData.source === "voice_command" || detectionData.source === "manual_button";
+      const sourceTranscript = isVoiceSent ? transcriptBufferRef.current.slice(-500) : null;
 
       // Retry logic for transient failures with progress tracking
       const sendStartTime = Date.now();
@@ -1157,6 +1161,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             explanation: detectionData.explanation,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
+            // Pass source transcript for voice-sent questions (to show students where question came from)
+            source_transcript: sourceTranscript,
           },
         });
       });
