@@ -11,6 +11,7 @@ import { LectureCheckInHistory } from "@/components/student/LectureCheckInHistor
 import { RecommendedNextSteps } from "@/components/student/RecommendedNextSteps";
 import { SimplifiedStudyMaterials } from "@/components/student/SimplifiedStudyMaterials";
 import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
+import { PracticeQuestionsCard } from "@/components/student/PracticeQuestionsCard";
 
 import { logger } from "@/lib/logger";
 
@@ -149,6 +150,11 @@ export default function StudentTraining() {
             limit={10}
             showOnlyWrong={false}
           />
+        </section>
+
+        {/* Practice Questions */}
+        <section className="animate-fade-in">
+          <PracticeQuestionsCard userId={user.id} />
         </section>
 
         {/* Study Materials - Simplified upload and library */}

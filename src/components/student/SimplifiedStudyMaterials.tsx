@@ -98,17 +98,22 @@ export function SimplifiedStudyMaterials({ userId, onMaterialCountChange }: Simp
       let filePath = null;
       let materialType = "note";
 
-      // Upload file if present
+      // Upload file directly to Supabase Storage
       if (file) {
         const fileExt = file.name.split('.').pop()?.toLowerCase();
-        const fileName = `${userId}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from("student-materials")
-          .upload(fileName, file);
+        const uniqueName = `${userId}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
 
-        if (uploadError) throw uploadError;
-        filePath = fileName;
+        const { error: storageError } = await supabase.storage
+          .from("student-materials")
+          .upload(uniqueName, file);
+
+        if (storageError) throw new Error(storageError.message || "File upload failed");
+
+        const { data: urlData } = supabase.storage
+          .from("student-materials")
+          .getPublicUrl(uniqueName);
+
+        filePath = urlData.publicUrl;
         materialType = fileExt === "pdf" ? "pdf" : "image";
       }
 

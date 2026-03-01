@@ -46,7 +46,7 @@ export function QuickUploadSheet({ userId, trigger, onUploadComplete }: QuickUpl
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.size > 52428800) {
+      if (selectedFile.size > 50 * 1024 * 1024) {
         toast.error('File too large. Maximum is 50MB.');
         return;
       }
@@ -97,17 +97,22 @@ export function QuickUploadSheet({ userId, trigger, onUploadComplete }: QuickUpl
       let filePath = null;
       let materialType = 'note';
 
-      // Upload file if present
+      // Upload file directly to Supabase Storage
       if (file) {
-        const fileExt = file.name.split('.').pop()?.toLowerCase();
-        const fileName = `${userId}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('student-materials')
-          .upload(fileName, file);
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const uniqueName = `${userId}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
 
-        if (uploadError) throw uploadError;
-        filePath = fileName;
+        const { error: storageError } = await supabase.storage
+          .from("student-materials")
+          .upload(uniqueName, file);
+
+        if (storageError) throw new Error(storageError.message || "File upload failed");
+
+        const { data: urlData } = supabase.storage
+          .from("student-materials")
+          .getPublicUrl(uniqueName);
+
+        filePath = urlData.publicUrl;
         materialType = fileExt === 'pdf' ? 'pdf' : 'note';
       }
 

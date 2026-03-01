@@ -48,7 +48,27 @@ export const QuestionAnalyticsChart = ({
   const deduplicatedAssignments = Array.from(uniqueStudents.values());
 
   // Calculate answer distribution for multiple choice using deduplicated data
-  const correctAnswerLetter = question.overriddenAnswer || question.correctAnswer;
+  const correctAnswerRaw = question.overriddenAnswer || question.correctAnswer;
+  
+  // Normalize correct answer: extract leading letter if it's "A. something" or just "A"
+  const correctAnswerLetter = (() => {
+    if (!correctAnswerRaw) return '';
+    const raw = String(correctAnswerRaw).trim();
+    // If it's a single letter (A-D), use it directly
+    if (/^[A-Da-d]$/.test(raw)) return raw.toUpperCase();
+    // If it starts with a letter prefix like "A. " or "A) ", extract the letter
+    const prefixMatch = raw.match(/^([A-Da-d])[.):\s]/);
+    if (prefixMatch) return prefixMatch[1].toUpperCase();
+    // If it matches the full text of an option, find the corresponding letter
+    if (question.options) {
+      const idx = question.options.findIndex((opt: string) => {
+        const optClean = opt.replace(/^[A-Da-d][.):\s]+/, '').trim();
+        return optClean === raw || opt === raw;
+      });
+      if (idx >= 0) return String.fromCharCode(65 + idx);
+    }
+    return raw.toUpperCase();
+  })();
   
   const answerDistribution = isMultipleChoice
     ? question.options?.map((opt: string, idx: number) => {
@@ -67,7 +87,18 @@ export const QuestionAnalyticsChart = ({
           if (studentQuestionIdx < 0) return false;
           
           const studentAnswer = a.quiz_responses?.[studentQuestionIdx.toString()];
-          return studentAnswer === letter;
+          if (!studentAnswer) return false;
+          
+          // Normalize student answer: extract leading letter
+          const normalizedAnswer = (() => {
+            const ans = String(studentAnswer).trim();
+            if (/^[A-Da-d]$/.test(ans)) return ans.toUpperCase();
+            const match = ans.match(/^([A-Da-d])[.):\s]/);
+            if (match) return match[1].toUpperCase();
+            return ans.toUpperCase();
+          })();
+          
+          return normalizedAnswer === letter;
         }).length;
         
         const isCorrect = letter === correctAnswerLetter;
