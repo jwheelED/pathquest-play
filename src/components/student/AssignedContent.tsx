@@ -1358,19 +1358,9 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                             medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
                             hard: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
                           };
-
-                          const sourceTranscript = assignment.content?.source_transcript;
                           
                           return (
                             <div key={idx} className="border rounded-lg p-6 space-y-4">
-                              {/* Show transcript context for voice-sent live lecture questions */}
-                              {assignment.assignment_type === 'lecture_checkin' && sourceTranscript && (
-                                <TranscriptContext 
-                                  transcript={sourceTranscript}
-                                  questionText={q.question || q.problemText || q.title || ''}
-                                />
-                              )}
-                              
                               {/* Header with Difficulty and Language */}
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-2">
