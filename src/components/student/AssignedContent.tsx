@@ -1711,18 +1711,9 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                         
                         // Handle multiple choice questions
                         const selectedAnswer = selectedAnswers[assignment.id]?.[idx];
-                        const sourceTranscript = assignment.content?.source_transcript;
                         
                         return (
                           <div key={idx} className="border rounded-lg p-4 space-y-3">
-                            {/* Show transcript context for voice-sent live lecture questions */}
-                            {assignment.assignment_type === 'lecture_checkin' && sourceTranscript && (
-                              <TranscriptContext 
-                                transcript={sourceTranscript}
-                                questionText={q.question}
-                              />
-                            )}
-                            
                             <div onCopy={(e) => {
                               // Track question copying for MCQ
                               const versionHistory = textAnswers[assignment.id]?.[`${idx}_version_history`] || {};
