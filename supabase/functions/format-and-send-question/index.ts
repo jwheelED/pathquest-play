@@ -973,6 +973,7 @@ serve(async (req) => {
           isLive: true,
           detectedAutomatically: true,
           source: source, // 'voice_command', 'auto_interval', or 'manual_button'
+          source_transcript: source_transcript || null,
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
