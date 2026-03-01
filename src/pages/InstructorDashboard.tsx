@@ -39,7 +39,7 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "settings";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
@@ -48,6 +48,7 @@ const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = 
   { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
+  { value: "settings", label: "Settings", icon: Settings },
 ];
 
 export default function InstructorDashboard() {
