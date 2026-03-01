@@ -1632,18 +1632,9 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                         // Handle short answer questions
                         if (q.type === 'short_answer') {
                           const textAnswer = textAnswers[assignment.id]?.[idx] || '';
-                          const sourceTranscript = assignment.content?.source_transcript;
                           
                           return (
                             <div key={idx} className="border rounded-lg p-4 space-y-3">
-                              {/* Show transcript context for voice-sent live lecture questions */}
-                              {assignment.assignment_type === 'lecture_checkin' && sourceTranscript && (
-                                <TranscriptContext 
-                                  transcript={sourceTranscript}
-                                  questionText={q.question}
-                                />
-                              )}
-                              
                               <h4 className="font-semibold">Question {idx + 1}: {q.question}</h4>
                               <VersionHistoryTracker
                                 value={textAnswer}
