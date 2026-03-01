@@ -96,18 +96,6 @@ export function DashboardShell({
             <div className="flex items-center gap-2">
               {headerActions}
 
-              {role === "instructor" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/instructor/settings")}
-                  className="rounded-full gap-2 text-xs"
-                >
-                  <Settings className="w-3 h-3" />
-                  Settings
-                </Button>
-              )}
-
               <div className="h-6 w-px bg-border" />
 
               <span className="text-sm text-muted-foreground hidden lg:block">
