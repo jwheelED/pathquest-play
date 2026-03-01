@@ -3292,13 +3292,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           )}
 
           <Card className="relative overflow-hidden">
-            {/* Voice Command Flash Overlay */}
+            {/* Voice Command Flash Overlay - Simple header flash */}
             {voiceCommandDetected && (
               <div className="absolute inset-0 z-50 pointer-events-none">
-                <div className="absolute inset-0 bg-gradient-to-br from-secondary/20 to-primary/20 animate-[fade-out_0.5s_ease-out]" />
+                <div className="absolute top-0 left-0 right-0 h-1 bg-secondary animate-pulse" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-gradient-to-br from-secondary to-primary rounded-full p-4 shadow-2xl animate-[scale-in_0.3s_ease-out]">
-                    <EdvanaIcon className="h-14 w-14 animate-pulse" />
+                  <div className="bg-card border-2 border-secondary rounded-2xl p-5 shadow-lg animate-[scale-in_0.3s_ease-out]">
+                    <EdvanaIcon className="h-12 w-12 animate-pulse" />
                   </div>
                 </div>
               </div>
