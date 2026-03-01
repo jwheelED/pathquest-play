@@ -3491,7 +3491,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                       <>⏱️ Wait {rateLimitSecondsLeft}s</>
                     ) : (
                       <>
-                        <EdvanaIcon className="mr-2 h-4 w-4" />
+                        <Zap className="mr-2 h-4 w-4" />
                         Send Question
                       </>
                     )}
