@@ -214,13 +214,17 @@ export const LectureCheckInResults = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user || !selectedCourse?.id) return;
+      if (!user) return;
 
       // Set up real-time subscription for assignment updates
       // Note: Supabase Realtime only supports single-column filters, so we filter by instructor_id
       // and do client-side filtering for course_id and assignment_type
+      const channelName = selectedCourse?.id 
+        ? `instructor-checkin-results-${selectedCourse.id}`
+        : `instructor-checkin-results-all`;
+        
       channel = supabase
-        .channel(`instructor-checkin-results-${selectedCourse.id}`)
+        .channel(channelName)
         .on(
           "postgres_changes",
           {
@@ -232,12 +236,17 @@ export const LectureCheckInResults = () => {
           (payload) => {
             // Handle INSERT (new questions) and UPDATE (student answers)
             const record = (payload.new || payload.old) as any;
-            // Client-side filtering for course_id and assignment_type
-            if (!record || 
-                record.assignment_type !== 'lecture_checkin' ||
-                record.course_id !== selectedCourse.id) return;
+            // Client-side filtering for assignment_type
+            if (!record || record.assignment_type !== 'lecture_checkin') return;
             
-            console.log("✅ Check-in result updated:", payload.eventType, record);
+            // Client-side filtering for course_id (if course is selected)
+            if (selectedCourse?.id && record.course_id !== selectedCourse.id) return;
+            
+            console.log("✅ Check-in result updated:", payload.eventType, {
+              studentId: record.student_id,
+              completed: record.completed,
+              hasResponses: !!record.quiz_responses,
+            });
             toast.info("Student response received", { duration: 2000 });
             
             // Debounce to handle multiple rapid updates from 40+ students
