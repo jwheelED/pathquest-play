@@ -98,8 +98,8 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // Check file size (50MB limit)
-      if (selectedFile.size > 52428800) {
+      // Check file size (50MB limit with Supabase Storage)
+      if (selectedFile.size > 50 * 1024 * 1024) {
         toast({
           title: "File too large",
           description: "Maximum file size is 50MB",
@@ -173,17 +173,22 @@ export function StudyMaterialUpload({ userId, onUploadComplete, adaptiveDifficul
     try {
       let filePath = null;
 
-      // Upload file to storage if needed
+      // Upload file directly to Supabase Storage
       if (file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${userId}/${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('student-materials')
-          .upload(fileName, file);
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'bin';
+        const uniqueName = `${userId}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`;
 
-        if (uploadError) throw uploadError;
-        filePath = fileName;
+        const { error: storageError } = await supabase.storage
+          .from("student-materials")
+          .upload(uniqueName, file);
+
+        if (storageError) throw new Error(storageError.message || "File upload failed");
+
+        const { data: urlData } = supabase.storage
+          .from("student-materials")
+          .getPublicUrl(uniqueName);
+
+        filePath = urlData.publicUrl;
       }
 
       // Get user's org_id

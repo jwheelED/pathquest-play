@@ -1,107 +1,64 @@
 
-# Fix Multi-Course Data Isolation Bugs
+Goal: fix the persistent “Failed to send a request to the Edge Function” error for file uploads.
 
-## Problem Summary
+What I found from logs and code
+1. The current runtime error is not a generic network issue; it is a hard crash in the Edge Function runtime:
+   - `[unenv] fs.readFile is not implemented yet!`
+   - Stack trace references `@smithy/shared-ini-file-loader` and `@smithy/node-config-provider`.
+2. That stack trace is specific to AWS SDK-for-Node dependency resolution, which means the deployed function is still executing an old AWS SDK-based bundle.
+3. The repository code for `supabase/functions/upload-to-cloudinary/index.ts` is now the manual AWS Signature V4 + fetch implementation (no `@aws-sdk/client-s3` imports), so code and deployed runtime are out of sync.
+4. A direct function call currently returns `502 Bad Gateway`, consistent with boot-time/runtime crash before normal request handling.
 
-Two related bugs cause courses to bleed into each other:
+Root cause
+- The deployed `upload-to-cloudinary` function version is stale (or deployment did not switch active version), so Supabase is still running the previous AWS SDK-based code path that is incompatible with Deno Edge runtime.
 
-1. **Questions sent to ALL courses** -- The `useLectureRecording.ts` hook does not pass `course_id` when calling the `format-and-send-question` edge function, so the function falls into a fallback path that sends questions to every student across all courses.
+Fix plan (implementation sequence)
+1. Confirm deployment mismatch before changing behavior
+   - Trigger one controlled request to `/upload-to-cloudinary`.
+   - Capture fresh logs timestamp to confirm crash still points to `@smithy/*`.
+   - This establishes a known baseline and avoids chasing secondary issues.
 
-2. **Same students shown in all courses** -- Several instructor dashboard components query `instructor_students` without filtering by `course_id`, so the same student list appears regardless of which course is selected.
+2. Stabilize function source for deployment
+   - Keep the fetch-based R2 uploader as the canonical implementation.
+   - Remove the unused `HmacSha256` import to reduce any unnecessary module load surface.
+   - Add structured error logs around:
+     - secret presence checks,
+     - signed request creation,
+     - R2 response status/body.
+   - Preserve CORS behavior and response schema so existing frontend calls remain unchanged.
 
-## Root Cause Analysis
+3. Force function runtime refresh
+   - Explicitly deploy `upload-to-cloudinary` (do not rely on implicit auto-sync in this recovery case).
+   - If stale bundle persists, perform a hard reset:
+     - delete deployed function,
+     - redeploy from current source.
+   - Rationale: this clears stuck deployment/version state and guarantees the active artifact matches repo code.
 
-### Bug 1: Missing `course_id` in `useLectureRecording.ts`
+4. Validate edge behavior outside UI
+   - Call function directly and verify:
+     - no boot-time `@smithy/*` errors,
+     - function returns expected JSON error for missing file instead of 502 crash,
+     - OPTIONS preflight responds with correct CORS headers.
 
-The `LectureTranscription.tsx` component correctly passes `course_id: selectedCourseId` (line 1171), but the `useLectureRecording.ts` hook (used for slide-based lectures) does NOT accept or pass `course_id` at all (line 364-368). It just spreads `detectionData` which never contains a `course_id`.
+5. Validate end-to-end from app UI
+   - Test upload path used by:
+     - `SimplifiedStudyMaterials.tsx`
+     - `StudyMaterialUpload.tsx`
+     - `QuickUploadSheet.tsx`
+   - Confirm network request reaches function and receives JSON response.
+   - Confirm DB insert and post-upload question generation still trigger.
 
-In the edge function `format-and-send-question`, when `course_id` is null/missing, lines 846-857 execute:
-```
-// No course_id - get all instructor's students
-const { data: allStudents } = await supabase
-  .from("instructor_students")
-  .select("student_id")
-  .eq("instructor_id", user.id);
-```
-This returns every student across every course.
+6. Add guardrails for faster future diagnosis
+   - Improve frontend toast for function invocation failures to show actionable detail (edge error message/status).
+   - Keep function name unchanged (`upload-to-cloudinary`) to avoid refactoring multiple callers, but annotate in code that it now targets R2 to prevent confusion.
 
-### Bug 2: Unscoped student queries in dashboard components
+Technical notes
+- No database schema changes are required.
+- No additional secrets are required beyond the R2 secrets already added.
+- Expected successful outcome: boot errors disappear, 502 is replaced by normal function responses, and uploads work again.
 
-| Component | Issue |
-|-----------|-------|
-| `StudentProgressCard.tsx` (line 82-85) | Fetches all students with no `course_id` filter |
-| `TeachingAnalytics.tsx` (line 44-47) | Fetches all students with no `course_id` filter |
-| `LectureTranscription.tsx` (line 340-343) | Student count is unscoped -- shows total across all courses |
-
-The `InstructorDashboard.tsx` `fetchStudents` and `InstructorOverview.tsx` already have proper course filtering using `.or('course_id.eq.{id},course_id.is.null')`, so those are fine.
-
-## Fix Plan
-
-### 1. Add `course_id` support to `useLectureRecording.ts`
-
-- Add `courseId?: string` to the `UseLectureRecordingOptions` interface
-- Store it in a ref so it stays current
-- Pass `course_id: courseIdRef.current` in the `format-and-send-question` invocation body (line 364-368)
-- Update the student count fetch (if present) to filter by course
-
-### 2. Pass `selectedCourseId` when using `useLectureRecording`
-
-- Find the component(s) that call `useLectureRecording()` and pass the `courseId` option from `useCourseContext()`
-
-### 3. Fix `StudentProgressCard.tsx` -- scope to selected course
-
-- Import `useCourseContext`
-- Add `selectedCourseId` to the dependency array
-- Filter `instructor_students` query with `.or('course_id.eq.{selectedCourseId},course_id.is.null')` when a course is selected
-- Also scope the Realtime subscription filter to include course_id
-
-### 4. Fix `TeachingAnalytics.tsx` -- scope to selected course
-
-- Import `useCourseContext`
-- Filter `instructor_students` query by `selectedCourseId`
-- Add `selectedCourseId` to dependency array for re-fetch
-
-### 5. Fix `LectureTranscription.tsx` student count -- scope to selected course
-
-- The student count fetch at line 340-343 should filter by `selectedCourseId` (which is already available in the component)
-
-## Files to Modify
-
-1. **`src/hooks/useLectureRecording.ts`** -- Accept `courseId` option, pass it to edge function
-2. **`src/components/instructor/StudentProgressCard.tsx`** -- Add course filtering to student query
-3. **`src/components/instructor/TeachingAnalytics.tsx`** -- Add course filtering to student query
-4. **`src/components/instructor/LectureTranscription.tsx`** -- Filter student count by course
-5. **Any component calling `useLectureRecording`** -- Pass `courseId` from course context
-
-## Technical Details
-
-### useLectureRecording fix
-
-```text
-// In UseLectureRecordingOptions:
-courseId?: string;
-
-// In the hook body:
-const courseIdRef = useRef(options.courseId);
-useEffect(() => { courseIdRef.current = options.courseId; }, [options.courseId]);
-
-// In format-and-send-question call (line 364-368):
-body: {
-  ...detectionData,
-  course_context: courseContextRef.current,
-  course_id: courseIdRef.current,  // <-- ADD THIS
-}
-```
-
-### Student query filter pattern (consistent across all components)
-
-```text
-// When selectedCourseId is available:
-.eq("instructor_id", instructorId)
-.or(`course_id.eq.${selectedCourseId},course_id.is.null`)
-
-// When no course selected:
-// Show empty or skip fetch
-```
-
-This matches the existing pattern already used in `InstructorDashboard.tsx` and `InstructorOverview.tsx`.
+Acceptance criteria
+1. Edge logs for `upload-to-cloudinary` show no `fs.readFile` / `@smithy/*` runtime errors.
+2. Direct function call no longer returns 502 due to crash.
+3. At least one real file upload from the UI succeeds and returns a valid public R2 URL.
+4. Existing upload entry points continue working without client API contract changes.
