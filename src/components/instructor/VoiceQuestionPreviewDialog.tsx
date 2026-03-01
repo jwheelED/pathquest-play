@@ -27,6 +27,8 @@ export interface ExtractedVoiceQuestion {
   explanation?: string;
   // Short answer expected answer (for grading reference)
   expected_answer?: string;
+  // Source transcript for context display
+  source_transcript?: string;
 }
 
 interface VoiceQuestionPreviewDialogProps {
@@ -35,6 +37,7 @@ interface VoiceQuestionPreviewDialogProps {
   extractedQuestion: ExtractedVoiceQuestion | null;
   onConfirmSend: (editedQuestion: ExtractedVoiceQuestion) => void;
   isSending: boolean;
+  sourceTranscript?: string;
 }
 
 export function VoiceQuestionPreviewDialog({
@@ -43,6 +46,7 @@ export function VoiceQuestionPreviewDialog({
   extractedQuestion,
   onConfirmSend,
   isSending,
+  sourceTranscript,
 }: VoiceQuestionPreviewDialogProps) {
   const { toast } = useToast();
   const [questionText, setQuestionText] = useState('');
@@ -357,6 +361,19 @@ export function VoiceQuestionPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Transcript Context - Shows where question came from */}
+          {sourceTranscript && (
+            <div className="mb-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="font-medium">From lecture transcript:</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border border-border/50 text-sm text-muted-foreground leading-relaxed max-h-32 overflow-y-auto">
+                <p className="italic">"...{sourceTranscript.trim()}..."</p>
+              </div>
+            </div>
+          )}
+
           {/* Question Type Selector */}
           <div className="space-y-2">
             <Label>Question Type</Label>

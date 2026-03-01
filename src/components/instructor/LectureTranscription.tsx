@@ -22,6 +22,7 @@ import {
   BookOpen,
   Award,
 } from "lucide-react";
+import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -1156,6 +1157,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       // Provide richer context for better question formatting
       const fullContext = transcriptBufferRef.current.slice(-1500);
+      
+      // Get the recent transcript for display (for voice-sent questions)
+      const isVoiceSent = detectionData.source === "voice_command" || detectionData.source === "manual_button";
+      const sourceTranscript = isVoiceSent ? transcriptBufferRef.current.slice(-500) : null;
 
       // Retry logic for transient failures with progress tracking
       const sendStartTime = Date.now();
@@ -1175,6 +1180,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             explanation: detectionData.explanation,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
+            // Pass source transcript for voice-sent questions (to show students where question came from)
+            source_transcript: sourceTranscript,
           },
         });
       });
@@ -3308,13 +3315,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           )}
 
           <Card className="relative overflow-hidden">
-            {/* Voice Command Flash Overlay */}
+            {/* Voice Command Flash Overlay - Simple header flash */}
             {voiceCommandDetected && (
               <div className="absolute inset-0 z-50 pointer-events-none">
-                <div className="absolute inset-0 bg-primary/20 animate-[fade-out_0.5s_ease-out]" />
+                <div className="absolute top-0 left-0 right-0 h-1 bg-secondary animate-pulse" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-primary text-primary-foreground rounded-full p-6 shadow-2xl animate-[scale-in_0.3s_ease-out]">
-                    <Zap className="h-12 w-12 animate-pulse" />
+                  <div className="bg-card border-2 border-secondary rounded-2xl p-5 shadow-lg animate-[scale-in_0.3s_ease-out]">
+                    <EdvanaIcon className="h-12 w-12 animate-pulse" />
                   </div>
                 </div>
               </div>
@@ -3692,6 +3699,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         extractedQuestion={previewQuestionData}
         onConfirmSend={handleConfirmPreviewSend}
         isSending={isSendingFromPreview}
+        sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
     </>
   );

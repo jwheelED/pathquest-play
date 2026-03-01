@@ -10,6 +10,7 @@ import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw,
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
+import { TranscriptContext } from "./TranscriptContext";
 import { toast as sonnerToast } from "sonner";
 import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 import { playNotificationSound } from "@/lib/audioNotification";
@@ -1341,6 +1342,14 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                         Tab switching and answer input detection is enabled to ensure academic integrity.
                       </AlertDescription>
                     </Alert>
+                  )}
+
+                  {/* Source Transcript Context - Shows where question came from */}
+                  {assignment.assignment_type === 'lecture_checkin' && assignment.content?.source_transcript && (
+                    <TranscriptContext 
+                      transcript={assignment.content.source_transcript}
+                      questionText={assignment.content.questions?.[0]?.question || ''}
+                    />
                   )}
 
                   {/* Quiz/Lecture Check-in Display */}

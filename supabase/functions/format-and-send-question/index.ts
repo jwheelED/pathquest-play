@@ -441,6 +441,7 @@ serve(async (req) => {
       correct_answer = null,
       explanation = null,
       course_id = null,
+      source_transcript = null, // Raw transcript to display with question
     } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
@@ -922,6 +923,8 @@ serve(async (req) => {
           detectedAutomatically: true,
           source: source,
           idempotency_key: idempotencyKey,
+          // Include transcript context for voice-sent questions
+          source_transcript: source_transcript || null,
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
@@ -975,6 +978,7 @@ serve(async (req) => {
           isLive: true,
           detectedAutomatically: true,
           source: source, // 'voice_command', 'auto_interval', or 'manual_button'
+          source_transcript: source_transcript || null,
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),

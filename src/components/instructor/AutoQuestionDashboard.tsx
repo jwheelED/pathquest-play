@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Zap, TrendingUp, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { Clock, Users, TrendingUp, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 
 export interface SkipReason {
   timestamp: Date;
@@ -124,7 +125,7 @@ export const AutoQuestionDashboard = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Zap className="h-4 w-4" />
+            <EdvanaIcon className="h-5 w-5" />
             Auto-Question Monitor
           </CardTitle>
           <Badge 
@@ -302,10 +303,10 @@ export const AutoQuestionDashboard = ({
 
         {/* Countdown Animation */}
         {autoQuestionEnabled && nextAutoQuestionIn <= 10 && nextAutoQuestionIn > 0 && healthStatus.status === 'healthy' && (
-          <div className="animate-pulse bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+          <div className="animate-pulse bg-gradient-to-r from-secondary/10 to-primary/10 border border-secondary/30 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-blue-600 animate-bounce" />
-              <span className="font-bold text-blue-900 dark:text-blue-200">
+              <EdvanaIcon className="h-6 w-6 animate-bounce" />
+              <span className="font-bold text-secondary">
                 Auto-question in {nextAutoQuestionIn}s...
               </span>
             </div>
