@@ -13,10 +13,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye } from 'lucide-react';
+import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MathRenderer } from '@/components/ui/math-renderer';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export interface ExtractedVoiceQuestion {
   question_text: string;
@@ -27,6 +28,8 @@ export interface ExtractedVoiceQuestion {
   explanation?: string;
   // Short answer expected answer (for grading reference)
   expected_answer?: string;
+  // Source transcript for context display
+  source_transcript?: string;
 }
 
 interface VoiceQuestionPreviewDialogProps {
@@ -35,6 +38,7 @@ interface VoiceQuestionPreviewDialogProps {
   extractedQuestion: ExtractedVoiceQuestion | null;
   onConfirmSend: (editedQuestion: ExtractedVoiceQuestion) => void;
   isSending: boolean;
+  sourceTranscript?: string;
 }
 
 export function VoiceQuestionPreviewDialog({
