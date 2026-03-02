@@ -860,14 +860,20 @@ export const InteractiveLecturePlayer = ({
 
   // Handle replay last 20 seconds
   const handleReplayLast20 = () => {
-    if (!videoRef.current || !currentQuestion) return;
-    const pausePointId = currentQuestion.id;
+    if (!currentQuestion) return;
+    if (!isYouTube && !videoRef.current) return;
+    
     const replayTime = Math.max(0, currentQuestion.pause_timestamp - 20);
     
     // Temporarily suppress pause-point detection during replay
     isReplayingRef.current = true;
     
-    videoRef.current.currentTime = replayTime;
+    if (isYouTube) {
+      ytPlayer.seekTo(replayTime, true);
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = replayTime;
+    }
+    
     setCurrentQuestion(null);
     setShowResult(false);
     setSelectedAnswer('');
@@ -875,13 +881,23 @@ export const InteractiveLecturePlayer = ({
     setConfidenceLevel('');
     
     // Re-enable pause-point detection after passing the original pause timestamp
-    const reEnableCheck = () => {
-      if (videoRef.current && videoRef.current.currentTime >= currentQuestion.pause_timestamp + 0.6) {
-        isReplayingRef.current = false;
-        videoRef.current.removeEventListener('timeupdate', reEnableCheck);
-      }
-    };
-    videoRef.current.addEventListener('timeupdate', reEnableCheck);
+    if (isYouTube) {
+      const reEnableInterval = setInterval(() => {
+        const t = ytPlayer.getCurrentTime();
+        if (t >= currentQuestion.pause_timestamp + 0.8) {
+          isReplayingRef.current = false;
+          clearInterval(reEnableInterval);
+        }
+      }, 300);
+    } else if (videoRef.current) {
+      const reEnableCheck = () => {
+        if (videoRef.current && videoRef.current.currentTime >= currentQuestion.pause_timestamp + 0.6) {
+          isReplayingRef.current = false;
+          videoRef.current.removeEventListener('timeupdate', reEnableCheck);
+        }
+      };
+      videoRef.current.addEventListener('timeupdate', reEnableCheck);
+    }
     
     safePlay();
   };
@@ -908,7 +924,7 @@ export const InteractiveLecturePlayer = ({
       
       {/* Video Player */}
       <div className={cn("relative bg-black overflow-hidden", isFullscreen ? "h-full" : "aspect-video", !isPreview && "rounded-lg", isPreview && "rounded-b-lg")}>
-        {getVideoSourceType(videoUrl) === 'direct' ? (
+        {videoSourceType === 'direct' ? (
           <video
             ref={videoRef}
             src={videoUrl}
@@ -920,7 +936,6 @@ export const InteractiveLecturePlayer = ({
             onPause={() => setIsPlaying(false)}
             aria-label={`Video: ${title}`}
           >
-            {/* Captions track for WCAG 2.1 AA compliance */}
             {captionUrl && (
               <track
                 kind="captions"
@@ -932,11 +947,11 @@ export const InteractiveLecturePlayer = ({
             )}
             Your browser does not support the video tag.
           </video>
+        ) : isYouTube ? (
+          <div id={ytContainerId} className="w-full h-full" />
         ) : (
           <iframe
-            src={getVideoSourceType(videoUrl) === 'youtube'
-              ? getYouTubeEmbedUrl(videoUrl)
-              : getVimeoEmbedUrl(videoUrl)}
+            src={getVimeoEmbedUrl(videoUrl)}
             className="w-full h-full"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
