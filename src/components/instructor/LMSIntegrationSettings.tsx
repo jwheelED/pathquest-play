@@ -414,9 +414,13 @@ export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSe
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <GraduationCap className="h-5 w-5" />
-          LMS Integration
+          {isAdmin ? "Organization LMS Integration" : "LMS Integration"}
         </CardTitle>
-        <CardDescription>Connect your LMS for automatic grade sync</CardDescription>
+        <CardDescription>
+          {isAdmin
+            ? "Connect your institution's LMS — available to all instructors in your org"
+            : "Connect your LMS for automatic grade sync"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Connected platforms */}
@@ -429,7 +433,14 @@ export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSe
                 <XCircle className="h-5 w-5 text-muted-foreground" />
               )}
               <div>
-                <p className="font-medium text-sm">{platform.platform_name}</p>
+                <p className="font-medium text-sm flex items-center gap-1.5">
+                  {platform.platform_name}
+                  {!isAdmin && platform.org_id && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                      Org
+                    </Badge>
+                  )}
+                </p>
                 <p className="text-xs text-muted-foreground capitalize">{platform.platform_type}</p>
               </div>
             </div>
