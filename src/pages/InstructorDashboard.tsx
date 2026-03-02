@@ -33,6 +33,8 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
+import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
+import { KalturaSettings } from "@/components/instructor/KalturaSettings";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 
@@ -575,6 +577,8 @@ export default function InstructorDashboard() {
                   <QuestionDifficultySettings />
                   <AdaptiveTutoringSettings />
                   <AutoGradeSettings />
+                  <LMSIntegrationSettings />
+                  <KalturaSettings instructorId={currentUser.id} />
                 </>
               )}
             </div>
