@@ -332,7 +332,7 @@ export const InteractiveLecturePlayer = ({
     return () => clearInterval(interval);
   }, [saveProgress, isPreview]);
 
-  // Handle time update and pause point detection
+  // Handle time update and pause point detection (for direct video)
   const handleTimeUpdate = () => {
     if (!videoRef.current) return;
     
@@ -344,25 +344,51 @@ export const InteractiveLecturePlayer = ({
       setMaxAllowedTime(time);
     }
 
-    // Check for pause points (skip during replay)
-    if (!isReplayingRef.current) {
-      for (const point of sortedPausePoints) {
-        if (
-          time >= point.pause_timestamp && 
-          time < point.pause_timestamp + 0.5 &&
-          !answeredQuestions.has(point.id) &&
-          !currentQuestion
-        ) {
-          videoRef.current.pause();
-          setIsPlaying(false);
-          setCurrentQuestion(point);
-          break;
-        }
-      }
-    }
+    checkPausePoints(time);
   };
 
-  // Prevent seeking forward (allow in preview mode)
+  // Shared pause-point detection (used by both direct video and YouTube polling)
+  const currentQuestionRef = useRef(currentQuestion);
+  currentQuestionRef.current = currentQuestion;
+
+  const checkPausePoints = useCallback((time: number) => {
+    if (isReplayingRef.current) return;
+    for (const point of sortedPausePoints) {
+      if (
+        time >= point.pause_timestamp && 
+        time < point.pause_timestamp + 0.8 &&
+        !answeredQuestions.has(point.id) &&
+        !currentQuestionRef.current
+      ) {
+        // Pause video (works for both sources)
+        if (isYouTube) {
+          ytPlayer.pause();
+        } else if (videoRef.current) {
+          videoRef.current.pause();
+        }
+        setIsPlaying(false);
+        setCurrentQuestion(point);
+        break;
+      }
+    }
+  }, [sortedPausePoints, answeredQuestions, isYouTube, ytPlayer]);
+
+  // YouTube: check pause points on time updates from the hook
+  useEffect(() => {
+    if (!isYouTube) return;
+    checkPausePoints(currentTime);
+  }, [currentTime, isYouTube, checkPausePoints]);
+
+  // YouTube: prevent seeking forward
+  useEffect(() => {
+    if (!isYouTube || isPreview) return;
+    if (currentTime > maxAllowedTime + 1.5) {
+      ytPlayer.seekTo(maxAllowedTime, true);
+      toast.info("You can't skip ahead. Answer questions to progress.");
+    }
+  }, [currentTime, maxAllowedTime, isYouTube, isPreview, ytPlayer]);
+
+  // Prevent seeking forward (allow in preview mode) — direct video
   const handleSeeking = () => {
     if (!videoRef.current || isPreview) return;
     
@@ -374,14 +400,28 @@ export const InteractiveLecturePlayer = ({
 
   // Jump to specific timestamp (for preview mode question panel)
   const jumpToTimestamp = (timestamp: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = timestamp;
+    if (isYouTube) {
+      ytPlayer.seekTo(timestamp, true);
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = timestamp;
+    }
     setCurrentTime(timestamp);
   };
 
   const handlePlayPause = () => {
-    if (!videoRef.current || currentQuestion) return;
+    if (currentQuestion) return;
     
+    if (isYouTube) {
+      if (isPlaying) {
+        ytPlayer.pause();
+      } else {
+        ytPlayer.play();
+      }
+      setIsPlaying(!isPlaying);
+      return;
+    }
+
+    if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
@@ -391,25 +431,50 @@ export const InteractiveLecturePlayer = ({
   };
 
   const handleVolumeToggle = () => {
+    if (isYouTube) {
+      if (isMuted) {
+        ytPlayer.unMute();
+      } else {
+        ytPlayer.mute();
+      }
+      setIsMuted(!isMuted);
+      return;
+    }
     if (!videoRef.current) return;
     videoRef.current.muted = !isMuted;
     setIsMuted(!isMuted);
   };
 
   const handleRewind = () => {
+    if (isYouTube) {
+      const newTime = Math.max(0, ytPlayer.getCurrentTime() - 10);
+      ytPlayer.seekTo(newTime, true);
+      return;
+    }
     if (!videoRef.current) return;
     videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
   };
 
   const handleVolumeChange = (value: number[]) => {
-    if (!videoRef.current) return;
     const newVolume = value[0];
+    if (isYouTube) {
+      ytPlayer.setVolume(newVolume);
+      setVolume(newVolume);
+      setIsMuted(newVolume === 0);
+      return;
+    }
+    if (!videoRef.current) return;
     videoRef.current.volume = newVolume;
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
   };
 
   const handleSpeedChange = (speed: number) => {
+    if (isYouTube) {
+      ytPlayer.setPlaybackRate(speed);
+      setPlaybackSpeed(speed);
+      return;
+    }
     if (!videoRef.current) return;
     videoRef.current.playbackRate = speed;
     setPlaybackSpeed(speed);
