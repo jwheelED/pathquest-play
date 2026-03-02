@@ -744,10 +744,14 @@ export const InteractiveLecturePlayer = ({
 
   // Handle jumping to remediation timestamp
   const handleWatchRemediation = () => {
-    if (!videoRef.current) return;
+    if (!isYouTube && !videoRef.current) return;
     
-    // Allow seeking to remediation point (override no-skip for this)
-    videoRef.current.currentTime = remediation.jumpToTimestamp;
+    // Allow seeking to remediation point
+    if (isYouTube) {
+      ytPlayer.seekTo(remediation.jumpToTimestamp, true);
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = remediation.jumpToTimestamp;
+    }
     setCurrentQuestion(null);
     setShowResult(false);
     setRemediation(prev => ({ ...prev, active: false }));
@@ -756,18 +760,31 @@ export const InteractiveLecturePlayer = ({
     safePlay();
 
     // Set up listener to pause at end of remediation segment and show follow-up
-    const handleRemediationEnd = () => {
-      if (videoRef.current && videoRef.current.currentTime >= remediation.endTimestamp) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-        if (remediation.followUpQuestion) {
-          setShowFollowUp(true);
+    if (isYouTube) {
+      const checkEnd = setInterval(() => {
+        const t = ytPlayer.getCurrentTime();
+        if (t >= remediation.endTimestamp) {
+          ytPlayer.pause();
+          setIsPlaying(false);
+          if (remediation.followUpQuestion) {
+            setShowFollowUp(true);
+          }
+          clearInterval(checkEnd);
         }
-        videoRef.current.removeEventListener('timeupdate', handleRemediationEnd);
-      }
-    };
-    
-    videoRef.current.addEventListener('timeupdate', handleRemediationEnd);
+      }, 300);
+    } else if (videoRef.current) {
+      const handleRemediationEnd = () => {
+        if (videoRef.current && videoRef.current.currentTime >= remediation.endTimestamp) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+          if (remediation.followUpQuestion) {
+            setShowFollowUp(true);
+          }
+          videoRef.current.removeEventListener('timeupdate', handleRemediationEnd);
+        }
+      };
+      videoRef.current.addEventListener('timeupdate', handleRemediationEnd);
+    }
   };
 
   // Handle follow-up question submission
