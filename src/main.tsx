@@ -42,12 +42,13 @@ try {
   console.warn('PostHogProvider failed to load, running without it:', e);
 }
 
-const Wrapper = PostHogProviderComponent
-  ? ({ children }: { children: React.ReactNode }) => (
-      <PostHogProviderComponent! client={posthog}>{children}</PostHogProviderComponent!>
-    )
-  : ({ children }: { children: React.ReactNode }) => <>{children}</>;
-
+const Wrapper = ({ children }: { children: React.ReactNode }) => {
+  if (PostHogProviderComponent) {
+    const Provider = PostHogProviderComponent;
+    return <Provider client={posthog}>{children}</Provider>;
+  }
+  return <>{children}</>;
+};
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Wrapper>
