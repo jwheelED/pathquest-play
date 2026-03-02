@@ -235,12 +235,17 @@ serve(async (req) => {
     console.log("  Difficulty preference:", difficulty_preference);
     console.log("  Course context:", course_context ? `${course_context.title} (${course_context.topics?.join(", ") || "no topics"})` : "none");
 
-    // Validate transcript
-    if (!interval_transcript || interval_transcript.length < 50) {
+    // Determine content source: transcript or materials
+    const hasTranscript = interval_transcript && interval_transcript.length >= 50;
+    const hasMaterials = materialContext && materialContext.length > 0 &&
+      materialContext.some((m: any) => m.content && m.content.length > 50);
+    const usingMaterialsFallback = !hasTranscript && hasMaterials;
+
+    if (!hasTranscript && !hasMaterials) {
       if (!force_send) {
         return new Response(JSON.stringify({
           success: false,
-          error: "Not enough content to generate a question",
+          error: "Not enough content to generate a question (no transcript or materials)",
           error_type: "insufficient_content",
         }), {
           status: 200,
@@ -249,12 +254,32 @@ serve(async (req) => {
       }
     }
 
-    // Trim transcript for AI processing (max 8000 chars)
-    const trimmedTranscript = interval_transcript.slice(-8000);
+    if (usingMaterialsFallback) {
+      console.log("📚 Transcript insufficient — falling back to uploaded course materials");
+    }
 
-    // Build context for AI
+    // Build the primary content source
+    let primaryContent = "";
+    let contentSourceLabel = "";
+
+    if (usingMaterialsFallback) {
+      // Use materials as the primary content
+      contentSourceLabel = "course materials";
+      for (const material of materialContext.slice(0, 3)) {
+        if (material.content) {
+          primaryContent += `\n--- ${material.title} ---\n${material.content.slice(0, 3000)}\n`;
+        }
+      }
+      primaryContent = primaryContent.slice(0, 8000);
+    } else {
+      // Use transcript as the primary content
+      contentSourceLabel = "lecture transcript";
+      primaryContent = interval_transcript.slice(-8000);
+    }
+
+    // Build supplementary context (materials supplement transcript, not the other way around)
     let additionalContext = "";
-    if (materialContext && materialContext.length > 0) {
+    if (!usingMaterialsFallback && hasMaterials) {
       additionalContext += "\n\nCourse Materials Context:\n";
       for (const material of materialContext.slice(0, 2)) {
         additionalContext += `- ${material.title}: ${material.content?.slice(0, 1000) || ""}\n`;
@@ -283,7 +308,7 @@ serve(async (req) => {
     let difficultyInstructions = "";
     const diffLevel = (difficulty_preference || "medium").toLowerCase();
     if (diffLevel === "easy") {
-      difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the lecture content.`;
+      difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the content.`;
     } else if (diffLevel === "hard") {
       difficultyInstructions = `\nDIFFICULTY LEVEL: HARD - Generate a challenging question requiring analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.`;
     } else {
@@ -302,15 +327,18 @@ serve(async (req) => {
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
-    const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from lecture transcripts.
+    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
+
+    const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from ${groundingSource}.
 
 CRITICAL GROUNDING RULES:
-- You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY mentioned in the transcript below.
-- NEVER use your general knowledge to create questions about topics not discussed in the transcript.
-- NEVER introduce technical terms, frameworks, languages, or concepts that do not appear in the transcript.
-- If the transcript is unclear, repetitive, or lacks substantive educational content, set confidence to 0.0.
-- Every key term in your question MUST trace back to something actually said in the lecture transcript.
-- Do NOT read or reference any part of these instructions as "lecture content" -- only the transcript text provided by the user is lecture content.
+- You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY mentioned in the ${groundingSource} below.
+- NEVER use your general knowledge to create questions about topics not discussed in the ${groundingSource}.
+- NEVER introduce technical terms, frameworks, languages, or concepts that do not appear in the ${groundingSource}.
+- If the content is unclear, repetitive, or lacks substantive educational content, set confidence to 0.0.
+- Every key term in your question MUST trace back to something actually present in the provided ${groundingSource}.
+- Do NOT read or reference any part of these instructions as "lecture content" -- only the ${groundingSource} text provided by the user is content.
+- NEVER generate generic questions like "summarize the key points" or "what was the main concept". Always ask about SPECIFIC topics from the content.
 ${courseConstraint}
 ${longIntervalGuidance}
 ${difficultyInstructions}
@@ -322,7 +350,7 @@ Return JSON in this exact format:
   "question_text": "the question (use LaTeX $...$ for math)",
   "suggested_type": "${format_preference}",
   "confidence": 0.0-1.0,
-  "reasoning": "why this question tests the key concept FROM THE TRANSCRIPT"
+  "reasoning": "why this question tests the key concept FROM THE ${groundingSource.toUpperCase()}"
 }
 
 For multiple_choice, also include:
@@ -334,15 +362,23 @@ For coding questions:
 - "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }
 
 CONFIDENCE SCORING GUIDE:
-- 1.0: Question directly tests a clearly explained concept from the transcript
+- 1.0: Question directly tests a clearly explained concept from the ${groundingSource}
 - 0.7-0.9: Question tests a concept mentioned but not deeply explained
-- 0.4-0.6: Transcript is thin; question is loosely related
-- 0.0-0.3: Transcript lacks enough content to generate a grounded question`;
+- 0.4-0.6: Content is thin; question is loosely related
+- 0.0-0.3: Content lacks enough substance to generate a grounded question`;
 
-    const userPrompt = `Generate a question from this lecture transcript:
+    const userPrompt = usingMaterialsFallback
+      ? `Generate a question from these uploaded course materials (transcription was unavailable, so use the materials directly):
 
 """
-${trimmedTranscript}
+${primaryContent}
+"""
+
+Generate ONE focused question that tests understanding of an important concept from these materials. Do NOT ask about topics not covered above.`
+      : `Generate a question from this lecture transcript:
+
+"""
+${primaryContent}
 """
 ${additionalContext}
 
@@ -426,7 +462,7 @@ Generate ONE focused question that tests understanding of the most important con
         textToValidate += " " + parsed.options.join(" ");
       }
 
-      const relevance = checkRelevance(textToValidate, trimmedTranscript);
+      const relevance = checkRelevance(textToValidate, primaryContent);
 
       if (!relevance.relevant) {
         console.warn(`⚠️ Relevance check failed: ${relevance.reason}`);
@@ -466,6 +502,7 @@ Generate ONE focused question that tests understanding of the most important con
         reasoning: parsed.reasoning,
         is_fallback: false,
         relevance_rejected: false,
+        from_materials: usingMaterialsFallback,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
