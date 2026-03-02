@@ -1,11 +1,11 @@
-import React, { StrictMode } from 'react'
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import posthog from 'posthog-js'
 import * as Sentry from "@sentry/react";
 import './index.css'
 import App from './App.tsx'
 
-// 1. Initialize PostHog FIRST (required for Sentry integration)
+// 1. Initialize PostHog (global instance — no React provider needed)
 posthog.init('phc_vRUtKXaLgYpSzc9H4jOmN2fsc72gn39wsRDx0IZspxq', {
   api_host: 'https://us.i.posthog.com',
   session_recording: {
@@ -32,27 +32,8 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
 });
 
-// Lazy-load PostHogProvider to avoid duplicate React instance issues
-let PostHogProviderComponent: React.ComponentType<{ client: typeof posthog; children: React.ReactNode }> | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const mod = await import('posthog-js/react');
-  PostHogProviderComponent = mod.PostHogProvider;
-} catch (e) {
-  console.warn('PostHogProvider failed to load, running without it:', e);
-}
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => {
-  if (PostHogProviderComponent) {
-    const Provider = PostHogProviderComponent;
-    return <Provider client={posthog}>{children}</Provider>;
-  }
-  return <>{children}</>;
-};
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Wrapper>
-      <App />
-    </Wrapper>
+    <App />
   </StrictMode>
 )
