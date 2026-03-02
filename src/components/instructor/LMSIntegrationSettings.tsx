@@ -49,6 +49,14 @@ const LMS_OPTIONS = [
     helpUrl: "https://www.youtube.com/watch?v=cZ5cn8stjM0&t=101s",
     urlPlaceholder: "https://your-school.instructure.com",
     tokenHelp: "Go to Canvas → Account → Settings → New Access Token",
+    steps: [
+      "Log in to your Canvas account at your institution's URL (e.g. your-school.instructure.com).",
+      "Click your profile picture (top-left) → Settings.",
+      "Scroll down to \"Approved Integrations\" and click + New Access Token.",
+      "Enter a purpose like \"Edvana Grade Sync\" and leave the expiry blank (or set one).",
+      "Click Generate Token — copy the token immediately (you won't see it again).",
+      "Paste the full Canvas URL and the token below.",
+    ],
   },
   {
     value: "blackboard",
@@ -58,6 +66,14 @@ const LMS_OPTIONS = [
     helpUrl: "https://developer.anthology.com/portal/displayApi",
     urlPlaceholder: "https://your-school.blackboard.com",
     tokenHelp: "Go to Admin → REST API Integrations → Create Integration",
+    steps: [
+      "Log in to Blackboard Learn as an Administrator.",
+      "Go to System Admin → Integrations → REST API Integrations.",
+      "Click Create Integration — set a name like \"Edvana\" and a description.",
+      "Set the Authorized User to your admin account and End User Access to \"Yes\".",
+      "After saving, copy the Application Key (this is your API token).",
+      "Paste your Blackboard URL (e.g. your-school.blackboard.com) and the Application Key below.",
+    ],
   },
   {
     value: "moodle",
@@ -68,6 +84,14 @@ const LMS_OPTIONS = [
       "https://supportus.moodle.com/support/solutions/articles/80001016973-using-the-web-services-application-programming-interface-api-in-moodle",
     urlPlaceholder: "https://your-moodle-site.edu",
     tokenHelp: "Go to Site Admin → Plugins → Web services → Manage tokens",
+    steps: [
+      "Log in to Moodle as a Site Administrator.",
+      "Go to Site Administration → Server → Web services → Overview and follow the setup checklist.",
+      "Enable web services (Step 1) and enable the REST protocol (Step 2).",
+      "Create a specific user or use your admin account, then create a new Service with the functions: core_course_get_courses, mod_assign_save_grade.",
+      "Go to Site Administration → Server → Web services → Manage tokens.",
+      "Create a token for the user/service you configured — copy it and paste it below along with your Moodle site URL.",
+    ],
   },
   {
     value: "brightspace",
@@ -77,6 +101,13 @@ const LMS_OPTIONS = [
     helpUrl: "https://docs.valence.desire2learn.com/",
     urlPlaceholder: "https://your-brightspace.edu",
     tokenHelp: "Contact your Brightspace admin for API credentials",
+    steps: [
+      "Ask your institution's Brightspace administrator to create an OAuth 2.0 API application for Edvana.",
+      "The admin goes to Admin Tools → Manage Extensibility → OAuth 2.0 and registers a new app.",
+      "Scopes needed: grades:write, enrollments:read (at minimum).",
+      "After approval, the admin will provide you with a Bearer token (or you'll complete an OAuth flow to get one).",
+      "Enter your Brightspace instance URL (e.g. your-school.brightspace.com) and the Bearer token below.",
+    ],
   },
 ];
 
@@ -289,6 +320,24 @@ export function LMSIntegrationSettings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Step-by-step instructions */}
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-semibold text-foreground">How to get your {selectedLMS.label} API token:</p>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+              {selectedLMS.steps.map((s, i) => (
+                <li key={i} className="leading-relaxed">{s}</li>
+              ))}
+            </ol>
+            <a
+              href={selectedLMS.helpUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary inline-flex items-center gap-0.5 hover:underline mt-1"
+            >
+              <ExternalLink className="h-3 w-3" /> Full guide
+            </a>
+          </div>
+
           <div className="space-y-2">
             <Label>Your {selectedLMS.label} URL</Label>
             <Input
@@ -308,17 +357,6 @@ export function LMSIntegrationSettings() {
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
             />
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>{selectedLMS.tokenHelp}</span>
-              <a
-                href={selectedLMS.helpUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary inline-flex items-center gap-0.5 hover:underline"
-              >
-                Guide <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
           </div>
 
           <Button onClick={handleConnect} disabled={isConnecting} className="w-full">
