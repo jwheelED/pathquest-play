@@ -137,12 +137,50 @@ export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSe
 
   const fetchPlatforms = async () => {
     try {
-      const { data, error } = await supabase
-        .from("lti_platforms")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setPlatforms(data || []);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("id", user.id)
+        .single();
+
+      const orgId = profile?.org_id;
+
+      if (isAdmin) {
+        // Admin mode: only show org-level platforms
+        if (!orgId) {
+          setPlatforms([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from("lti_platforms")
+          .select("*")
+          .eq("org_id", orgId)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        setPlatforms(data || []);
+      } else {
+        // Instructor mode: show all platforms they can access (personal + org-level)
+        const queries: Promise<any>[] = [];
+
+        // Personal platforms (ones they created)
+        queries.push(
+          supabase
+            .from("lti_platforms")
+            .select("*")
+            .order("created_at", { ascending: false })
+        );
+
+        const results = await Promise.all(queries);
+        const personalData = results[0].data || [];
+
+        // Mark which are org-level vs personal
+        // Org-level platforms are ones where org_id matches but the instructor didn't create them
+        // For simplicity, we show all platforms the user has access to via RLS
+        setPlatforms(personalData);
+      }
     } catch (error) {
       console.error("Error fetching platforms:", error);
     } finally {
