@@ -1303,21 +1303,24 @@ export const InteractiveLecturePlayer = ({
                 title={`Q${point.order_index + 1} at ${formatTime(point.pause_timestamp)}`}
                 onClick={isPreview ? (e) => {
                   e.stopPropagation();
-                  if (videoRef.current) {
+                  if (isYouTube) {
+                    ytPlayer.pause();
+                    setIsPlaying(false);
+                    ytPlayer.seekTo(point.pause_timestamp, true);
+                  } else if (videoRef.current) {
                     videoRef.current.pause();
                     setIsPlaying(false);
                     videoRef.current.currentTime = point.pause_timestamp;
-                    setCurrentTime(point.pause_timestamp);
-                    // Reset answer state and show question
-                    setSelectedAnswer('');
-                    setShortAnswer('');
-                    setConfidenceLevel('');
-                    setShowResult(false);
-                    setShortAnswerGrade(null);
-                    setShortAnswerFeedback(null);
-                    setCurrentQuestion(point);
-                    onQuestionSelect?.(point.id);
                   }
+                  setCurrentTime(point.pause_timestamp);
+                  setSelectedAnswer('');
+                  setShortAnswer('');
+                  setConfidenceLevel('');
+                  setShowResult(false);
+                  setShortAnswerGrade(null);
+                  setShortAnswerFeedback(null);
+                  setCurrentQuestion(point);
+                  onQuestionSelect?.(point.id);
                 } : undefined}
               />
             ))}
