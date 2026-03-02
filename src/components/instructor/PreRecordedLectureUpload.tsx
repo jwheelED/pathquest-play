@@ -559,10 +559,23 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           Upload Pre-Recorded Lecture
         </CardTitle>
         <CardDescription>
-          Upload a lecture video and AI will analyze it to insert questions at optimal learning moments
+          Upload a video file or paste a YouTube URL — AI will analyze it to insert questions at optimal learning moments
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Mode Toggle */}
+        <Tabs value={uploadMode} onValueChange={(v) => { setUploadMode(v as UploadMode); }} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="file" disabled={status !== "idle"}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload File
+            </TabsTrigger>
+            <TabsTrigger value="url" disabled={status !== "idle"}>
+              <Link className="h-4 w-4 mr-2" />
+              YouTube URL
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         {/* Title */}
         <div className="space-y-2">
           <Label htmlFor="title">Lecture Title *</Label>
