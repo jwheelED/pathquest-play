@@ -1521,7 +1521,11 @@ export const InteractiveLecturePlayer = ({
             responses={allResponses}
             onRewatch={(timestamp) => {
               setShowMasterySummary(false);
-              if (videoRef.current) {
+              if (isYouTube) {
+                ytPlayer.seekTo(timestamp, true);
+                ytPlayer.play();
+                setIsPlaying(true);
+              } else if (videoRef.current) {
                 videoRef.current.currentTime = timestamp;
                 videoRef.current.play();
                 setIsPlaying(true);
@@ -1529,7 +1533,14 @@ export const InteractiveLecturePlayer = ({
             }}
             onStartReview={() => {
               // Restart lecture from beginning for review
-              if (videoRef.current) {
+              if (isYouTube) {
+                ytPlayer.seekTo(0, true);
+                setCurrentTime(0);
+                setShowMasterySummary(false);
+                ytPlayer.play();
+                setIsPlaying(true);
+                toast.success('Restarting lecture for review');
+              } else if (videoRef.current) {
                 videoRef.current.currentTime = 0;
                 setCurrentTime(0);
                 setShowMasterySummary(false);
