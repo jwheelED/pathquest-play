@@ -166,11 +166,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const isValidVideoUrl = (url: string): boolean => {
     try {
       const parsed = new URL(url);
-      // Accept YouTube, Vimeo, or direct video links
+      // Accept YouTube, Vimeo, Kaltura, or direct video links
       const validHosts = ["youtube.com", "www.youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"];
       const isKnownHost = validHosts.some((host) => parsed.hostname.includes(host));
+      const isKaltura = /kaltura\.com|mediaspace\./i.test(parsed.hostname) || /\/media\/[^/]+\/[01]_/.test(parsed.pathname);
       const isDirectVideo = /\.(mp4|webm|mov|avi|mkv)$/i.test(parsed.pathname);
-      return isKnownHost || isDirectVideo || parsed.protocol === "https:";
+      return isKnownHost || isKaltura || isDirectVideo || parsed.protocol === "https:";
     } catch {
       return false;
     }
