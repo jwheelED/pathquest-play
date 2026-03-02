@@ -156,14 +156,41 @@ export const InteractiveLecturePlayer = ({
   const [maxAllowedTime, setMaxAllowedTime] = useState(0);
   const isReplayingRef = useRef(false);
 
-  // Safe play helper — catches AbortError when pause() interrupts a pending play()
+  const videoSourceType = useMemo(() => getVideoSourceType(videoUrl), [videoUrl]);
+  const isYouTube = videoSourceType === 'youtube';
+  const ytContainerId = `yt-player-${lectureId}`;
+
+  // YouTube Player API hook
+  const ytPlayer = useYouTubePlayer({
+    videoUrl,
+    containerId: ytContainerId,
+    onTimeUpdate: useCallback((time: number) => {
+      setCurrentTime(time);
+      // Update max allowed time
+      if (time > maxAllowedTime) {
+        setMaxAllowedTime(time);
+      }
+    }, [maxAllowedTime]),
+    onDurationReady: useCallback((dur: number) => {
+      setDuration(dur);
+    }, []),
+    onStateChange: useCallback((playing: boolean) => {
+      setIsPlaying(playing);
+    }, []),
+  });
+
+  // Safe play helper — works for both direct video and YouTube
   const safePlay = useCallback(() => {
+    if (isYouTube) {
+      ytPlayer.play();
+      setIsPlaying(true);
+      return;
+    }
     if (!videoRef.current) return;
     const playPromise = videoRef.current.play();
     if (playPromise !== undefined) {
       playPromise.catch((err) => {
         if (err.name === 'AbortError') {
-          // Expected when pause() interrupts play() — harmless, ignore
           console.log('Play interrupted by pause — safe to ignore');
         } else {
           console.error('Video play error:', err);
@@ -171,8 +198,8 @@ export const InteractiveLecturePlayer = ({
       });
     }
     setIsPlaying(true);
-  }, []);
-  
+  }, [isYouTube, ytPlayer]);
+
   // Question overlay state
   const [currentQuestion, setCurrentQuestion] = useState<PausePoint | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState('');
