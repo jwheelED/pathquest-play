@@ -27,6 +27,8 @@ export interface ExtractedVoiceQuestion {
   explanation?: string;
   // Short answer expected answer (for grading reference)
   expected_answer?: string;
+  // Source transcript for context display
+  source_transcript?: string;
 }
 
 interface VoiceQuestionPreviewDialogProps {
@@ -35,6 +37,7 @@ interface VoiceQuestionPreviewDialogProps {
   extractedQuestion: ExtractedVoiceQuestion | null;
   onConfirmSend: (editedQuestion: ExtractedVoiceQuestion) => void;
   isSending: boolean;
+  sourceTranscript?: string;
 }
 
 export function VoiceQuestionPreviewDialog({
@@ -43,6 +46,7 @@ export function VoiceQuestionPreviewDialog({
   extractedQuestion,
   onConfirmSend,
   isSending,
+  sourceTranscript,
 }: VoiceQuestionPreviewDialogProps) {
   const { toast } = useToast();
   const [questionText, setQuestionText] = useState('');
@@ -57,7 +61,9 @@ export function VoiceQuestionPreviewDialog({
   // Initialize state when extracted question changes
   useEffect(() => {
     if (extractedQuestion) {
-      setQuestionText(extractedQuestion.question_text);
+      // Strip any HTML tags as defense-in-depth (AI sometimes returns markup)
+      const sanitizedText = extractedQuestion.question_text.replace(/<[^>]*>/g, '').trim();
+      setQuestionText(sanitizedText);
       setQuestionType(extractedQuestion.suggested_type);
       
       // Initialize MCQ options from pre-generated data or reset
@@ -85,9 +91,20 @@ export function VoiceQuestionPreviewDialog({
 
   const hasOptions = mcqOptions.some(opt => opt.trim() !== '');
 
+  // Track if we've already attempted auto-generation for this question
+  const [hasAttemptedAutoGenerate, setHasAttemptedAutoGenerate] = useState(false);
+
+  // Reset auto-generate flag when question changes
+  useEffect(() => {
+    if (extractedQuestion) {
+      setHasAttemptedAutoGenerate(false);
+    }
+  }, [extractedQuestion?.question_text]);
+
   // Auto-generate options when dialog opens with MCQ type and empty options
   useEffect(() => {
     if (!open) return; // Only trigger when dialog is open
+    if (hasAttemptedAutoGenerate) return; // Don't auto-generate twice
     
     const optionsEmpty = !mcqOptions.some(opt => opt.trim() !== '');
     const shouldAutoGenerate = 
@@ -97,13 +114,26 @@ export function VoiceQuestionPreviewDialog({
       !isGeneratingOptions;
       
     if (shouldAutoGenerate) {
+      console.log('📋 Auto-generating MCQ options...');
+      setHasAttemptedAutoGenerate(true);
       handleGenerateOptionsAuto();
     }
-  }, [questionType, open, questionText]);
+  }, [questionType, open, questionText, hasAttemptedAutoGenerate, mcqOptions, isGeneratingOptions]);
+
+  // Track if we've already attempted auto-generation for expected answer
+  const [hasAttemptedExpectedAnswerGenerate, setHasAttemptedExpectedAnswerGenerate] = useState(false);
+
+  // Reset expected answer auto-generate flag when question changes
+  useEffect(() => {
+    if (extractedQuestion) {
+      setHasAttemptedExpectedAnswerGenerate(false);
+    }
+  }, [extractedQuestion?.question_text]);
 
   // Auto-generate expected answer when dialog opens with Short Answer type and empty expected answer
   useEffect(() => {
     if (!open) return; // Only trigger when dialog is open
+    if (hasAttemptedExpectedAnswerGenerate) return; // Don't auto-generate twice
     
     const shouldAutoGenerate = 
       questionType === 'short_answer' && 
@@ -112,9 +142,11 @@ export function VoiceQuestionPreviewDialog({
       !isGeneratingExpectedAnswer;
       
     if (shouldAutoGenerate) {
+      console.log('📋 Auto-generating expected answer...');
+      setHasAttemptedExpectedAnswerGenerate(true);
       handleGenerateExpectedAnswerAuto();
     }
-  }, [questionType, open, questionText]);
+  }, [questionType, open, questionText, hasAttemptedExpectedAnswerGenerate, expectedAnswer, isGeneratingExpectedAnswer]);
 
   const handleGenerateExpectedAnswerAuto = async () => {
     if (!questionText.trim() || isGeneratingExpectedAnswer) return;
@@ -190,15 +222,21 @@ export function VoiceQuestionPreviewDialog({
 
     setIsGeneratingOptions(true);
     try {
+      console.log('🔄 Auto-generating MCQ options for:', questionText.substring(0, 50));
+      
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error from generate-mcq-options:', error);
+        throw error;
+      }
 
       if (data?.options && data.options.length === 4) {
+        console.log('✅ MCQ options generated successfully:', data.options);
         setMcqOptions(data.options);
         if (data.correct_answer) {
           setCorrectAnswer(data.correct_answer);
@@ -207,10 +245,18 @@ export function VoiceQuestionPreviewDialog({
           title: "Options generated",
           description: "MCQ options have been generated. You can edit them before sending.",
         });
+      } else {
+        console.warn('⚠️ Invalid MCQ options response:', data);
+        // Don't throw - just log and let user manually generate
       }
     } catch (error: any) {
       console.error("Failed to auto-generate MCQ options:", error);
-      // Silent fail for auto-generation, user can click regenerate
+      // Show a subtle toast to let user know they need to manually generate
+      toast({
+        title: "Auto-generation unavailable",
+        description: "Click 'Generate Options' to create MCQ choices.",
+        variant: "default",
+      });
     } finally {
       setIsGeneratingOptions(false);
     }
@@ -315,12 +361,37 @@ export function VoiceQuestionPreviewDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Transcript Context - Shows where question came from */}
+          {sourceTranscript && (
+            <div className="mb-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span className="font-medium">From lecture transcript:</span>
+              </div>
+              <div className="p-3 bg-muted/40 rounded-lg border border-border/50 text-sm text-muted-foreground leading-relaxed max-h-32 overflow-y-auto">
+                <p className="italic">"...{sourceTranscript.trim()}..."</p>
+              </div>
+            </div>
+          )}
+
           {/* Question Type Selector */}
           <div className="space-y-2">
             <Label>Question Type</Label>
             <RadioGroup
               value={questionType}
-              onValueChange={(value: 'short_answer' | 'multiple_choice') => setQuestionType(value)}
+              onValueChange={(value: 'short_answer' | 'multiple_choice') => {
+                setQuestionType(value);
+                // Auto-generate options when switching to MCQ and options are empty
+                if (value === 'multiple_choice' && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
+                  console.log('📋 Switching to MCQ - triggering option generation');
+                  setTimeout(() => handleGenerateOptionsAuto(), 100);
+                }
+                // Auto-generate expected answer when switching to short answer and it's empty
+                if (value === 'short_answer' && !expectedAnswer.trim() && questionText.trim() && !isGeneratingExpectedAnswer) {
+                  console.log('📋 Switching to Short Answer - triggering expected answer generation');
+                  setTimeout(() => handleGenerateExpectedAnswerAuto(), 100);
+                }
+              }}
               className="flex gap-4"
             >
               <div className="flex items-center space-x-2">

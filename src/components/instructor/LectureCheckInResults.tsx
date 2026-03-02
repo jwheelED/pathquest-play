@@ -82,19 +82,14 @@ export const LectureCheckInResults = () => {
     if (!user) return;
     
     const courseId = selectedCourse?.id;
-    if (!courseId) {
-      setGroupedResults([]);
-      setLoading(false);
-      return;
-    }
 
     // Optimized query: Fetch only recent check-ins (last 24 hours) to reduce load
     // For classroom of 40 students, this limits data transfer significantly
     const oneDayAgo = new Date();
     oneDayAgo.setHours(oneDayAgo.getHours() - 24);
 
-    // Fetch all lecture check-in assignments with optimized select - filtered by course
-    const { data: assignments, error } = await supabase
+    // Build query - fetch all lecture check-in assignments
+    let query = supabase
       .from("student_assignments")
       .select(
         `
@@ -111,17 +106,30 @@ export const LectureCheckInResults = () => {
       `,
       )
       .eq("instructor_id", user.id)
-      .eq("course_id", courseId)
       .eq("assignment_type", "lecture_checkin")
       .gte("created_at", oneDayAgo.toISOString())
       .order("created_at", { ascending: false })
       .limit(200); // Limit to prevent excessive data with large classes
+
+    // Filter by course if selected, otherwise get all
+    if (courseId) {
+      query = query.eq("course_id", courseId);
+    }
+
+    const { data: assignments, error } = await query;
 
     if (error) {
       console.error("Error fetching results:", error);
       setLoading(false);
       return;
     }
+
+    console.log("📊 Check-in results fetched:", {
+      total: assignments?.length || 0,
+      courseId,
+      hasCompleted: assignments?.filter(a => a.completed).length,
+      hasResponses: assignments?.filter(a => a.quiz_responses).length,
+    });
 
     // Get student names from profiles table only (RLS-aware)
     const studentIds = [...new Set(assignments?.map((a) => a.student_id) || [])];
@@ -206,13 +214,17 @@ export const LectureCheckInResults = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user || !selectedCourse?.id) return;
+      if (!user) return;
 
       // Set up real-time subscription for assignment updates
       // Note: Supabase Realtime only supports single-column filters, so we filter by instructor_id
       // and do client-side filtering for course_id and assignment_type
+      const channelName = selectedCourse?.id 
+        ? `instructor-checkin-results-${selectedCourse.id}`
+        : `instructor-checkin-results-all`;
+        
       channel = supabase
-        .channel(`instructor-checkin-results-${selectedCourse.id}`)
+        .channel(channelName)
         .on(
           "postgres_changes",
           {
@@ -224,12 +236,17 @@ export const LectureCheckInResults = () => {
           (payload) => {
             // Handle INSERT (new questions) and UPDATE (student answers)
             const record = (payload.new || payload.old) as any;
-            // Client-side filtering for course_id and assignment_type
-            if (!record || 
-                record.assignment_type !== 'lecture_checkin' ||
-                record.course_id !== selectedCourse.id) return;
+            // Client-side filtering for assignment_type
+            if (!record || record.assignment_type !== 'lecture_checkin') return;
             
-            console.log("✅ Check-in result updated:", payload.eventType, record);
+            // Client-side filtering for course_id (if course is selected)
+            if (selectedCourse?.id && record.course_id !== selectedCourse.id) return;
+            
+            console.log("✅ Check-in result updated:", payload.eventType, {
+              studentId: record.student_id,
+              completed: record.completed,
+              hasResponses: !!record.quiz_responses,
+            });
             toast.info("Student response received", { duration: 2000 });
             
             // Debounce to handle multiple rapid updates from 40+ students
@@ -1604,6 +1621,17 @@ export const LectureCheckInResults = () => {
                                 ? (assignment.quiz_responses?.[studentQuestionIdx.toString()] || assignment.quiz_responses?.[studentQuestionIdx])
                                 : null;
                               const isCompleted = assignment.completed;
+                              
+                              // Debug logging
+                              console.log(`📊 Student Response Debug - ${assignment.student_name}:`, {
+                                isCompleted,
+                                studentQuestionIdx,
+                                hasQuizResponses: !!assignment.quiz_responses,
+                                quizResponsesKeys: assignment.quiz_responses ? Object.keys(assignment.quiz_responses) : [],
+                                studentAnswer,
+                                grade: assignment.grade,
+                              });
+                              
                               const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
                             
                               // Check for AI grade in quiz_responses._ai_recommendations

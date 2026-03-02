@@ -54,7 +54,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
-    const { questionType, extractedQuestion, slideNumber, isPollMode = false } = await req.json();
+    const { questionType, extractedQuestion, slideNumber, isPollMode = false, course_id = null } = await req.json();
 
     if (!extractedQuestion || !questionType) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -118,11 +118,18 @@ serve(async (req) => {
       isPoll: isPollMode,
     };
 
-    // Get connected students
-    const { data: students, error: studentsError } = await supabase
+    // Get connected students - scoped by course_id if provided
+    let studentsQuery = supabase
       .from("instructor_students")
       .select("student_id")
       .eq("instructor_id", user.id);
+
+    if (course_id) {
+      studentsQuery = studentsQuery.or(`course_id.eq.${course_id},course_id.is.null`);
+      console.log(`📚 Filtering students by course_id: ${course_id}`);
+    }
+
+    const { data: students, error: studentsError } = await studentsQuery;
 
     if (studentsError) {
       console.error("Error fetching students:", studentsError);
@@ -192,6 +199,7 @@ serve(async (req) => {
         content: questionContent,
         mode: isPollMode ? "manual_grade" as const : (questionType === "mcq" ? "auto_grade" as const : "manual_grade" as const),
         org_id: instructorOrgId,
+        course_id: course_id,
       }));
 
       const { data: insertedAssignments, error: insertError } = await supabase

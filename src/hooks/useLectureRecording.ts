@@ -54,6 +54,8 @@ export interface UseLectureRecordingOptions {
   onQuestionExtracted?: (data: ExtractedVoiceQuestion) => void;
   /** When true, bypasses the question preview setting and sends questions immediately */
   bypassPreviewSetting?: boolean;
+  /** Course ID to scope question delivery to a specific course */
+  courseId?: string;
 }
 
 // Direct voice command detection - checks raw text without relying on state
@@ -107,7 +109,7 @@ const detectVoiceCommandDirect = (
 };
 
 export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
-  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false } = options;
+  const { onQuestionGenerated, slideContext, onVoiceCommand, onQuestionExtracted, bypassPreviewSetting = false, courseId } = options;
   const { toast } = useToast();
   const { broadcast } = usePresenterBroadcast();
   
@@ -129,6 +131,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   
   // Store course context (topics, title) for AI question generation
   const courseContextRef = useRef<{ title: string; topics: string[] } | null>(null);
+
+  // Store course ID in a ref so it stays current for async callbacks
+  const courseIdRef = useRef<string | undefined>(courseId);
+  useEffect(() => {
+    courseIdRef.current = courseId;
+  }, [courseId]);
 
   // Core state
   const [isRecording, setIsRecording] = useState(false);
@@ -231,12 +239,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch student count
-        const { data: students } = await supabase
+        // Fetch student count (scoped to course if available)
+        let studentQuery = supabase
           .from('instructor_students')
           .select('student_id')
           .eq('instructor_id', user.id);
+        
+        if (courseIdRef.current) {
+          studentQuery = studentQuery.or(`course_id.eq.${courseIdRef.current},course_id.is.null`);
+        }
 
+        const { data: students } = await studentQuery;
         if (students) setStudentCount(students.length);
 
         // Fetch profile settings including course context and preview preference
@@ -365,6 +378,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         body: {
           ...detectionData,
           course_context: courseContextRef.current,
+          course_id: courseIdRef.current,
         },
       });
 

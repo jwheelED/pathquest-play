@@ -32,7 +32,11 @@ interface InstructorInvite {
   expires_at: string;
 }
 
-export default function OrganizationSetup() {
+interface OrganizationSetupProps {
+  onOrgCreated?: () => void;
+}
+
+export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupProps) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [domains, setDomains] = useState<OrganizationDomain[]>([]);
   const [invites, setInvites] = useState<InstructorInvite[]>([]);
@@ -133,6 +137,7 @@ export default function OrganizationSetup() {
 
       setOrganization(newOrg);
       toast.success("Organization created successfully!");
+      onOrgCreated?.();
     } catch (error: any) {
       console.error("Error creating organization:", error);
       toast.error(error.message || "Failed to create organization");

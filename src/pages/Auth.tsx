@@ -20,6 +20,7 @@ export default function AuthPage() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
+  const isHandlingAuthRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
@@ -77,6 +78,7 @@ export default function AuthPage() {
   const handleAuth = async () => {
     setError("");
     setSuccess("");
+    isHandlingAuthRef.current = true;
 
     if (isSignUp) {
       // Validate student signup inputs
@@ -247,6 +249,11 @@ export default function AuthPage() {
       setSession(session);
 
       if (session) {
+        // Skip if handleAuth is already managing sign-in navigation
+        if (isHandlingAuthRef.current) {
+          return;
+        }
+
         const initializeUser = async () => {
           // Ensure profile exists with onboarded true
           const { data: profile } = await supabase

@@ -65,3 +65,9 @@ verify_jwt = false
 
 [functions.sync-grade-to-lms]
 verify_jwt = false
+
+[functions.upload-to-cloudinary]
+verify_jwt = false
+
+[functions.generate-personalized-questions]
+verify_jwt = false

@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { Button } from "@/components/ui/button";
-import { LogOut, Sparkles, Settings, Users } from "lucide-react";
+import { LogOut, Users, Shield } from "lucide-react";
+import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 
 interface DashboardShellProps {
   children: ReactNode;
@@ -45,9 +46,9 @@ export function DashboardShell({
       case "instructor":
         return <Users className="w-4 h-4 text-primary-foreground" />;
       case "admin":
-        return <Settings className="w-4 h-4 text-primary-foreground" />;
+        return <Shield className="w-4 h-4 text-primary-foreground" />;
       default:
-        return <Sparkles className="w-4 h-4 text-primary-foreground" />;
+        return <EdvanaIcon className="w-4 h-4" />;
     }
   };
 
@@ -79,9 +80,7 @@ export function DashboardShell({
         <div className="max-w-6xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-                {getRoleIcon()}
-              </div>
+              <EdvanaIcon className="w-9 h-9" />
               <div>
                 <h1 className="text-lg font-bold text-foreground">
                   {title || getDefaultTitle()}
@@ -94,18 +93,6 @@ export function DashboardShell({
 
             <div className="flex items-center gap-2">
               {headerActions}
-
-              {role === "instructor" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/instructor/settings")}
-                  className="rounded-full gap-2 text-xs"
-                >
-                  <Settings className="w-3 h-3" />
-                  Settings
-                </Button>
-              )}
 
               <div className="h-6 w-px bg-border" />
 

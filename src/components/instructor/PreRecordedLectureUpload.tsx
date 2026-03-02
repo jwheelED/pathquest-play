@@ -7,9 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, Link, ChevronDown, Settings2, X, Sparkles } from "lucide-react";
+import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, ChevronDown, Settings2, X, Sparkles } from "lucide-react";
 import { QuestionStudioDialog } from "./QuestionStudioDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,14 +23,14 @@ interface PreRecordedLectureUploadProps {
   onUploadComplete?: (lectureId: string) => void;
 }
 
-type UploadMode = "file" | "url";
+type UploadMode = "file";
 
 export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectureUploadProps) => {
   const [uploadMode, setUploadMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState("");
+  
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "analyzing" | "ready" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -176,20 +175,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   };
 
   const handleUpload = async () => {
-    if (uploadMode === "file" && !selectedFile) {
+    if (!selectedFile) {
       toast.error("Please select a video file");
-      return;
-    }
-    if (uploadMode === "url" && !videoUrl.trim()) {
-      toast.error("Please enter a video URL");
       return;
     }
     if (!title.trim()) {
       toast.error("Please provide a title");
-      return;
-    }
-    if (uploadMode === "url" && !isValidVideoUrl(videoUrl)) {
-      toast.error("Please enter a valid video URL (YouTube, Vimeo, or direct link)");
       return;
     }
 
@@ -203,32 +194,24 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       if (!user) throw new Error("Not authenticated");
 
       let filePath = "";
-      let externalVideoUrl: string | null = null;
 
-      if (uploadMode === "file" && selectedFile) {
-        // Upload video to storage
-        const fileExt = selectedFile.name.split(".").pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        filePath = `${user.id}/${fileName}`;
+      // Upload video to storage
+      const fileExt = selectedFile.name.split(".").pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      filePath = `${user.id}/${fileName}`;
 
-        // Simulate upload progress
-        const progressInterval = setInterval(() => {
-          setUploadProgress((prev) => Math.min(prev + 10, 90));
-        }, 500);
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90));
+      }, 500);
 
-        const { error: uploadError } = await supabase.storage.from("lecture-videos").upload(filePath, selectedFile);
+      const { error: uploadError } = await supabase.storage.from("lecture-videos").upload(filePath, selectedFile);
 
-        clearInterval(progressInterval);
-        setUploadProgress(100);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
 
-        if (uploadError) {
-          throw new Error(`Upload failed: ${uploadError.message}`);
-        }
-      } else {
-        // Using external URL
-        externalVideoUrl = videoUrl.trim();
-        filePath = `external-${Date.now()}`; // Placeholder path for external videos
-        setUploadProgress(100);
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       // Create lecture video record (question_count set later by AI in smart mode)
@@ -239,7 +222,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             title: title.trim(),
             description: description.trim() || null,
             video_path: filePath,
-            video_url: externalVideoUrl,
+            video_url: null,
             question_count: highYieldOnly ? null : effectiveQuestionCount,
             status: "processing",
             instructor_id: user.id,
@@ -268,15 +251,39 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
       setStatus("analyzing");
 
-      // Poll for status updates
+      // Poll for status updates with timeout
+      let pollAttempts = 0;
+      const MAX_POLL_ATTEMPTS = 24; // ~2 minutes
+
       const pollStatus = async () => {
+        pollAttempts++;
+        if (pollAttempts > MAX_POLL_ATTEMPTS) {
+          setStatus("error");
+          setErrorMessage("Processing timed out. Please try again.");
+          return;
+        }
+
         const { data: updated } = await supabase
           .from("lecture_videos")
-          .select("status, transcript, error_message")
+          .select("status, transcript, error_message, duration_seconds")
           .eq("id", lectureVideo.id)
           .single();
 
         if (updated?.status === "analyzing" && updated.transcript) {
+          // Update duration from backend if available
+          if (updated.duration_seconds) {
+            setEstimatedDuration(updated.duration_seconds);
+          }
+
+          // Check for placeholder transcript
+          const transcriptText = typeof updated.transcript === 'object' && updated.transcript !== null
+            ? (updated.transcript as Record<string, unknown>).text as string || ''
+            : String(updated.transcript);
+          
+          if (transcriptText.startsWith("[Transcript unavailable")) {
+            toast.warning("Captions not available for this video. AI will generate general comprehension questions.");
+          }
+
           // Get user profile for professor type
           const { data: profile } = await supabase.from("profiles").select("professor_type").eq("id", user.id).single();
 
@@ -284,8 +291,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           await supabase.functions.invoke("analyze-lecture-cognitive-load", {
             body: {
               lectureVideoId: lectureVideo.id,
-              transcript: updated.transcript,
-              // In smart mode, AI determines question count; otherwise use manual setting
+              transcript: transcriptText,
               smartMode: highYieldOnly,
               questionCount: highYieldOnly ? undefined : effectiveQuestionCount,
               professorType: professorType || "stem",
@@ -297,9 +303,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           setTimeout(async () => {
             const { data: final } = await supabase
               .from("lecture_videos")
-              .select("status, error_message")
+              .select("status, error_message, duration_seconds")
               .eq("id", lectureVideo.id)
               .single();
+
+            if (final?.duration_seconds) {
+              setEstimatedDuration(final.duration_seconds);
+            }
 
             if (final?.status === "ready") {
               setStatus("ready");
@@ -310,21 +320,34 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               setStatus("error");
               setErrorMessage(final.error_message || "Processing failed");
             } else {
-              // Keep polling
-              setTimeout(pollStatus, 3000);
+              setTimeout(pollStatus, 5000);
             }
           }, 5000);
-        } else if (updated?.status === "ready") {
+      } else if (updated?.status === "ready") {
+          if (updated.duration_seconds) {
+            setEstimatedDuration(updated.duration_seconds);
+          }
           setStatus("ready");
           setCreatedLectureId(lectureVideo.id);
-          toast.success("Lecture processed successfully!");
+
+          // Check if questions were generated
+          const { data: questionCount } = await supabase
+            .from("lecture_pause_points")
+            .select("id", { count: "exact", head: true })
+            .eq("lecture_video_id", lectureVideo.id);
+
+          const count = questionCount?.length ?? 0;
+          if (count === 0) {
+            toast.warning("Video processed but no questions were generated. Captions may not be available for this video. Try uploading a video file instead for best results.");
+          } else {
+            toast.success(`Lecture processed with ${count} questions!`);
+          }
           onUploadComplete?.(lectureVideo.id);
         } else if (updated?.status === "error") {
           setStatus("error");
           setErrorMessage(updated.error_message || "Processing failed");
         } else {
-          // Keep polling
-          setTimeout(pollStatus, 3000);
+          setTimeout(pollStatus, 5000);
         }
       };
 
@@ -440,60 +463,16 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             </div>
           )}
           
-          {/* Advanced configuration collapsible */}
-          {(selectedFile || videoUrl) && estimatedDuration > 0 && (
-            <Collapsible open={showAdvancedConfig} onOpenChange={setShowAdvancedConfig}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between">
-                  <span className="flex items-center gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    Advanced: Edit pause points
-                  </span>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedConfig ? "rotate-180" : ""}`} />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <PausePointEditor
-                  durationSeconds={estimatedDuration}
-                  pausePoints={pausePoints}
-                  onPausePointsChange={setPausePoints}
-                  flowLevel={flowLevel}
-                  onFlowLevelChange={(val) => {
-                    setFlowLevel(val);
-                    const count = calculateRecommendedPausePoints(estimatedDuration, val);
-                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
-                  }}
-                  highYieldOnly={highYieldOnly}
-                  onHighYieldOnlyChange={setHighYieldOnly}
-                  recommendedCount={recommendedCount}
-                  disabled={status !== "idle"}
-                />
-              </CollapsibleContent>
-            </Collapsible>
-          )}
+          {/* Advanced pause point editor removed - AI determines optimal pause points during analysis */}
           
           <p className="text-xs text-muted-foreground">
             AI will place {effectiveQuestionCount} pause points at optimal learning moments
           </p>
         </div>
 
-        {/* Upload Mode Tabs */}
+        {/* File Upload */}
         <div className="space-y-4">
-          <Label>Video Source *</Label>
-          <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as UploadMode)} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="file" disabled={status !== "idle"}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </TabsTrigger>
-              <TabsTrigger value="url" disabled={status !== "idle"}>
-                <Link className="h-4 w-4 mr-2" />
-                Video URL
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {uploadMode === "file" ? (
+          <Label>Video File *</Label>
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
                 isDragging ? "border-primary bg-primary/10" : selectedFile ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
@@ -539,46 +518,6 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 </>
               )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              <Input
-                placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
-                value={videoUrl}
-                onChange={(e) => {
-                  setVideoUrl(e.target.value);
-                  // When URL is entered, use default/user-set duration
-                  if (e.target.value.trim() && pausePoints.length === 0) {
-                    const count = calculateRecommendedPausePoints(estimatedDuration, flowLevel);
-                    setPausePoints(generateAutoPausePoints(estimatedDuration, count));
-                  }
-                }}
-                disabled={status !== "idle"}
-              />
-              <div className="flex items-center gap-3">
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">Est. duration:</Label>
-                <Slider
-                  value={[Math.floor(estimatedDuration / 60)]}
-                  onValueChange={([mins]) => {
-                    const newDuration = mins * 60;
-                    setEstimatedDuration(newDuration);
-                    const count = calculateRecommendedPausePoints(newDuration, flowLevel);
-                    setPausePoints(generateAutoPausePoints(newDuration, count));
-                  }}
-                  min={5}
-                  max={120}
-                  step={5}
-                  disabled={status !== "idle"}
-                  className="flex-1"
-                />
-                <Badge variant="outline" className="font-mono text-xs w-16 justify-center">
-                  {Math.floor(estimatedDuration / 60)} min
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Paste a YouTube, Vimeo, or direct video link. Adjust estimated duration for accurate pause point placement.
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Progress/Status */}
@@ -614,16 +553,22 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         {/* Submit Button */}
         <Button
           onClick={() => {
-            if (status === "ready" && createdLectureId) {
+            if (status === "error") {
+              // Reset for retry
+              setStatus("idle");
+              setErrorMessage("");
+              setUploadProgress(0);
+              setCreatedLectureId(null);
+            } else if (status === "ready" && createdLectureId) {
               window.open(`/instructor/preview/${createdLectureId}`, '_blank');
             } else {
               handleUpload();
             }
           }}
           disabled={
+            status === "error" ? false :
             status === "ready" ? false :
-            (uploadMode === "file" && !selectedFile) ||
-            (uploadMode === "url" && !videoUrl.trim()) ||
+            !selectedFile ||
             !title.trim() ||
             (status !== "idle")
           }
@@ -633,7 +578,12 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           {status === "idle" ? (
             <>
               <Upload className="h-4 w-4 mr-2" />
-              {uploadMode === "url" ? "Add & Process Lecture" : "Upload & Process Lecture"}
+              Upload & Process Lecture
+            </>
+          ) : status === "error" ? (
+            <>
+              <AlertCircle className="h-4 w-4 mr-2" />
+              Try Again
             </>
           ) : status === "ready" ? (
             <>

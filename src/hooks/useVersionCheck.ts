@@ -56,12 +56,34 @@ export function useVersionCheck() {
   }, []);
 
   useEffect(() => {
+    // Listen for service worker updates and reload immediately
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hasNotified.current) {
+          window.location.reload();
+        }
+      });
+    }
+
+    // Check when user returns to the tab (biggest win for freshness)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        check();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also check on window focus (catches alt-tab scenarios)
+    window.addEventListener('focus', check);
+
     // First check after a short delay
-    const timeout = setTimeout(check, 10_000);
+    const timeout = setTimeout(check, 3_000);
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', check);
     };
   }, [check]);
 }

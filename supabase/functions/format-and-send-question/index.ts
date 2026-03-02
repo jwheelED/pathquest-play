@@ -441,6 +441,7 @@ serve(async (req) => {
       correct_answer = null,
       explanation = null,
       course_id = null,
+      source_transcript = null, // Raw transcript to display with question
     } = await req.json();
 
     // Fetch instructor's question format preference and auto-grading settings
@@ -484,6 +485,11 @@ serve(async (req) => {
       // Preview dialog with edited options - respect user's explicit choice
       finalType = suggested_type;
       console.log(`📝 Using preview dialog type: ${finalType}`);
+    } else if (suggested_type === 'short_answer' && (expected_answer || !hasPreGeneratedOptions)) {
+      // Instructor explicitly chose short answer in preview dialog - respect it
+      // Don't override with instructor's default preference
+      finalType = 'short_answer';
+      console.log(`📝 Respecting explicit short_answer type from preview dialog`);
     } else if (instructorPreference === "coding") {
       // When instructor prefers coding, fetch their coding style and use it
       const { data: codingPref } = await supabase
@@ -917,6 +923,8 @@ serve(async (req) => {
           detectedAutomatically: true,
           source: source,
           idempotency_key: idempotencyKey,
+          // Include transcript context for voice-sent questions
+          source_transcript: source_transcript || null,
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
@@ -970,6 +978,7 @@ serve(async (req) => {
           isLive: true,
           detectedAutomatically: true,
           source: source, // 'voice_command', 'auto_interval', or 'manual_button'
+          source_transcript: source_transcript || null,
         },
         completed: false,
         auto_delete_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),

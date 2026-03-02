@@ -10,6 +10,7 @@ import { BookOpen, CheckCircle, Eye, Bell, AlertCircle, Save, Trash2, RefreshCw,
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { VersionHistoryTracker } from "./VersionHistoryTracker";
+import { TranscriptContext } from "./TranscriptContext";
 import { toast as sonnerToast } from "sonner";
 import { useTabSwitchingDetection } from "@/hooks/useTabSwitchingDetection";
 import { playNotificationSound } from "@/lib/audioNotification";
@@ -60,6 +61,7 @@ interface Assignment {
 interface AssignedContentProps {
   userId: string;
   instructorId?: string; // Optional: filter by instructor
+  courseId?: string; // Optional: filter by course
   // onAnswerResult removed - Flow State no longer used
 }
 
@@ -70,7 +72,7 @@ interface ConfidenceData {
   locked: boolean;
 }
 
-export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) => {
+export const AssignedContent = ({ userId, instructorId, courseId }: AssignedContentProps) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
@@ -191,16 +193,24 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
           (payload) => {
             // Server-side filtering already applied - no client-side check needed
             console.log('📬 New assignment received via realtime:', payload);
+            const newAssignment = payload.new as any;
             console.log('📊 Assignment details:', {
-              id: payload.new?.id,
-              title: (payload.new as any)?.title,
-              type: (payload.new as any)?.assignment_type,
-              student_id: (payload.new as any)?.student_id
+              id: newAssignment?.id,
+              title: newAssignment?.title,
+              type: newAssignment?.assignment_type,
+              student_id: newAssignment?.student_id,
+              course_id: newAssignment?.course_id
             });
+
+            // Client-side course filter: skip if assignment belongs to a different course
+            if (courseId && newAssignment?.course_id && newAssignment.course_id !== courseId) {
+              console.log('⏭️ Skipping assignment from different course:', newAssignment.course_id);
+              return;
+            }
             
-            const newAssignment = payload.new as Assignment;
+            const typedAssignment = payload.new as Assignment;
             
-            if (newAssignment.assignment_type === 'lecture_checkin') {
+            if (typedAssignment.assignment_type === 'lecture_checkin') {
               // Trigger animation
               setQuestionIncoming(true);
               
@@ -215,28 +225,28 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                 
                 // Add assignment to state with proper deduplication
                 setAssignments(prev => {
-                  if (prev.some(a => a.id === newAssignment.id)) {
-                    console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                  if (prev.some(a => a.id === typedAssignment.id)) {
+                    console.log('⚠️ Assignment already exists, skipping duplicate:', typedAssignment.id);
                     return prev;
                   }
-                  console.log('✅ Adding new assignment:', newAssignment.id);
-                  return [newAssignment, ...prev];
+                  console.log('✅ Adding new assignment:', typedAssignment.id);
+                  return [typedAssignment, ...prev];
                 });
                 
                 // Show notification
                 sonnerToast.success("New Question!", {
-                  description: `"${newAssignment.title}" is ready`
+                  description: `"${typedAssignment.title}" is ready`
                 });
               }, 1500);
             } else {
               // For non-lecture assignments, add immediately with deduplication
               setAssignments(prev => {
-                if (prev.some(a => a.id === newAssignment.id)) {
-                  console.log('⚠️ Assignment already exists, skipping duplicate:', newAssignment.id);
+                if (prev.some(a => a.id === typedAssignment.id)) {
+                  console.log('⚠️ Assignment already exists, skipping duplicate:', typedAssignment.id);
                   return prev;
                 }
-                console.log('✅ Adding new assignment:', newAssignment.id);
-                return [newAssignment, ...prev];
+                console.log('✅ Adding new assignment:', typedAssignment.id);
+                return [typedAssignment, ...prev];
               });
             }
           }
@@ -371,7 +381,7 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       }
       subscription.unsubscribe();
     };
-  }, [userId, instructorId, retryCount]);
+  }, [userId, instructorId, courseId, retryCount]);
 
   const fetchAssignments = async () => {
     setIsRefreshing(true);
@@ -396,6 +406,11 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
       // Filter by instructor if provided
       if (instructorId) {
         query = query.eq('instructor_id', instructorId);
+      }
+
+      // Filter by course if provided
+      if (courseId) {
+        query = query.or(`course_id.eq.${courseId},course_id.is.null`);
       }
 
       const { data, error } = await query
@@ -1159,24 +1174,28 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
         </Alert>
       )}
 
-      {/* Question Incoming Animation Overlay */}
+      {/* Question Incoming Animation Overlay - Peaceful Design */}
       {questionIncoming && (
         <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
-          <div className="absolute inset-0 bg-primary/20 animate-pulse" />
-          <div className="relative z-10 bg-background/95 border-2 border-primary rounded-lg p-8 shadow-2xl animate-scale-in">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <Bell className="h-16 w-16 text-primary animate-bounce" />
-                <div className="absolute inset-0 bg-primary/30 rounded-full blur-xl animate-pulse" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10" />
+          <div className="relative z-10 bg-background/98 backdrop-blur-sm border border-primary/30 rounded-3xl p-10 shadow-xl">
+            <div className="flex flex-col items-center gap-6">
+              {/* Peaceful breathing circle animation */}
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-primary/10 animate-[breathe_3s_ease-in-out_infinite]" />
+                <div className="absolute inset-2 rounded-full bg-primary/15 animate-[breathe_3s_ease-in-out_infinite_0.3s]" />
+                <div className="absolute inset-4 rounded-full bg-primary/20 animate-[breathe_3s_ease-in-out_infinite_0.6s]" />
+                <Bell className="h-10 w-10 text-primary relative z-10" />
               </div>
-              <div className="text-center space-y-2">
-                <h3 className="text-2xl font-bold text-primary">Question Incoming!</h3>
-                <p className="text-muted-foreground">Your instructor is sending a new question...</p>
+              <div className="text-center space-y-3">
+                <h3 className="text-xl font-semibold text-foreground">New Question Arriving</h3>
+                <p className="text-muted-foreground text-sm max-w-[200px]">Take a breath, your instructor is preparing something for you...</p>
               </div>
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              {/* Subtle flowing dots */}
+              <div className="flex gap-2">
+                <div className="w-2 h-2 bg-primary/40 rounded-full animate-[flow_1.5s_ease-in-out_infinite]" />
+                <div className="w-2 h-2 bg-primary/40 rounded-full animate-[flow_1.5s_ease-in-out_infinite_0.2s]" />
+                <div className="w-2 h-2 bg-primary/40 rounded-full animate-[flow_1.5s_ease-in-out_infinite_0.4s]" />
               </div>
             </div>
           </div>
@@ -1323,6 +1342,14 @@ export const AssignedContent = ({ userId, instructorId }: AssignedContentProps) 
                         Tab switching and answer input detection is enabled to ensure academic integrity.
                       </AlertDescription>
                     </Alert>
+                  )}
+
+                  {/* Source Transcript Context - Shows where question came from */}
+                  {assignment.assignment_type === 'lecture_checkin' && assignment.content?.source_transcript && (
+                    <TranscriptContext 
+                      transcript={assignment.content.source_transcript}
+                      questionText={assignment.content.questions?.[0]?.question || ''}
+                    />
                   )}
 
                   {/* Quiz/Lecture Check-in Display */}

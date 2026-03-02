@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, TrendingDown, Brain, Target, Lightbulb, AlertCircle, Users, BookOpen, CheckCircle, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 interface AnalyticsData {
   engagementChange: number;
@@ -33,18 +34,25 @@ interface AnalyticsData {
 export function TeachingAnalytics({ instructorId }: { instructorId: string }) {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
     fetchAnalytics();
-  }, [instructorId]);
+  }, [instructorId, selectedCourseId]);
 
   const fetchAnalytics = async () => {
     try {
-      // Get students for this instructor
-      const { data: studentLinks } = await supabase
+      // Get students for this instructor (scoped to course)
+      let studentQuery = supabase
         .from("instructor_students")
         .select("student_id")
         .eq("instructor_id", instructorId);
+
+      if (selectedCourseId) {
+        studentQuery = studentQuery.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+      }
+
+      const { data: studentLinks } = await studentQuery;
 
       if (!studentLinks || studentLinks.length === 0) {
         setLoading(false);

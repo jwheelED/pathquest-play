@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library, Settings } from "lucide-react";
+import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
 import { CourseCodeCard } from "@/components/instructor/CourseCodeCard";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
@@ -26,6 +27,12 @@ import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLec
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
+import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
+import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
+import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
+import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
+import { BillingSettings } from "@/components/instructor/BillingSettings";
+import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 
@@ -39,7 +46,7 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "settings";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
@@ -48,6 +55,7 @@ const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = 
   { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
+  { value: "settings", label: "Settings", icon: Settings },
 ];
 
 export default function InstructorDashboard() {
@@ -424,7 +432,7 @@ export default function InstructorDashboard() {
       case "overview":
         return (
           <div className="space-y-6">
-            {/* Organization connection card removed - not needed unless for institutional licensing */}
+            <PendingOrgInvites />
             
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <CourseCodeCard />
@@ -552,6 +560,24 @@ export default function InstructorDashboard() {
                 </CardContent>
               </Card>
             )}
+          </div>
+        );
+
+      case "settings":
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl">
+              {currentUser && (
+                <>
+                  <BillingSettings />
+                  <QuestionFormatSettings instructorId={currentUser.id} professorType={instructorProfile?.professor_type} />
+                  <QuestionPreviewSettings />
+                  <QuestionDifficultySettings />
+                  <AdaptiveTutoringSettings />
+                  <AutoGradeSettings />
+                </>
+              )}
+            </div>
           </div>
         );
 
