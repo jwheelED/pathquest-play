@@ -54,85 +54,113 @@ function buildInnertubeParams(videoId: string): string {
 }
 
 /**
+ * Helper: sleep for ms
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Primary method: YouTube Innertube get_transcript endpoint.
  * This is the same internal API YouTube's own frontend uses.
+ * Includes retry with backoff for 429 rate limits.
  */
 async function fetchTranscriptViaInnertube(
   videoId: string
 ): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
-  try {
-    console.log(`[Innertube] Attempting transcript for ${videoId}`);
-    
-    // First, fetch the video page to get the INNERTUBE_API_KEY
-    const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const pageResp = await fetch(pageUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
-      },
-    });
-
-    if (!pageResp.ok) {
-      console.error(`[Innertube] Page fetch failed: ${pageResp.status}`);
-      return null;
-    }
-
-    const html = await pageResp.text();
-    
-    // Extract INNERTUBE_API_KEY
-    const apiKeyMatch = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
-    const apiKey = apiKeyMatch?.[1] || "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"; // fallback to well-known key
-    
-    console.log(`[Innertube] Got API key: ${apiKey.substring(0, 10)}...`);
-
-    // Try to extract captions directly from the page first (faster)
-    const captionsResult = await extractCaptionsFromPage(html, videoId);
-    if (captionsResult) {
-      console.log(`[Innertube] Got captions from page: ${captionsResult.text.length} chars, ${captionsResult.segments.length} segments`);
-      return captionsResult;
-    }
-
-    // If page extraction failed, try the get_transcript endpoint
-    const params = buildInnertubeParams(videoId);
-    
-    const transcriptResp = await fetch(
-      `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}`,
-      {
-        method: "POST",
+  const maxRetries = 2;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delayMs = attempt * 2000; // 2s, 4s
+        console.log(`[Innertube] Retry ${attempt}/${maxRetries} after ${delayMs}ms`);
+        await sleep(delayMs);
+      }
+      
+      console.log(`[Innertube] Attempting transcript for ${videoId} (attempt ${attempt + 1})`);
+      
+      // Fetch the video page to get the INNERTUBE_API_KEY
+      const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const pageResp = await fetch(pageUrl, {
         headers: {
-          "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
         },
-        body: JSON.stringify({
-          context: {
-            client: {
-              clientName: "WEB",
-              clientVersion: "2.20240313.05.00",
-              hl: "en",
-              gl: "US",
-            },
-          },
-          params,
-        }),
-      }
-    );
+      });
 
-    if (!transcriptResp.ok) {
-      console.error(`[Innertube] get_transcript failed: ${transcriptResp.status}`);
-      const errBody = await transcriptResp.text();
-      console.error(`[Innertube] Response: ${errBody.substring(0, 500)}`);
+      if (pageResp.status === 429) {
+        console.warn(`[Innertube] Rate limited (429), attempt ${attempt + 1}`);
+        await pageResp.text(); // consume body
+        if (attempt < maxRetries) continue;
+        return null;
+      }
+
+      if (!pageResp.ok) {
+        console.error(`[Innertube] Page fetch failed: ${pageResp.status}`);
+        await pageResp.text();
+        return null;
+      }
+
+      const html = await pageResp.text();
+      
+      // Extract INNERTUBE_API_KEY
+      const apiKeyMatch = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
+      const apiKey = apiKeyMatch?.[1] || "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+      
+      console.log(`[Innertube] Got API key: ${apiKey.substring(0, 10)}...`);
+
+      // Try to extract captions directly from the page first (faster)
+      const captionsResult = await extractCaptionsFromPage(html, videoId);
+      if (captionsResult) {
+        console.log(`[Innertube] Got captions from page: ${captionsResult.text.length} chars, ${captionsResult.segments.length} segments`);
+        return captionsResult;
+      }
+
+      // If page extraction failed, try the get_transcript endpoint
+      const params = buildInnertubeParams(videoId);
+      
+      const transcriptResp = await fetch(
+        `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+          },
+          body: JSON.stringify({
+            context: {
+              client: {
+                clientName: "WEB",
+                clientVersion: "2.20240313.05.00",
+                hl: "en",
+                gl: "US",
+              },
+            },
+            params,
+          }),
+        }
+      );
+
+      if (!transcriptResp.ok) {
+        console.error(`[Innertube] get_transcript failed: ${transcriptResp.status}`);
+        const errBody = await transcriptResp.text();
+        console.error(`[Innertube] Response: ${errBody.substring(0, 500)}`);
+        return null;
+      }
+
+      const data = await transcriptResp.json();
+      return parseInnertubeTranscript(data);
+    } catch (error) {
+      console.error("[Innertube] Error:", error);
+      if (attempt < maxRetries) continue;
       return null;
     }
-
-    const data = await transcriptResp.json();
-    return parseInnertubeTranscript(data);
-  } catch (error) {
-    console.error("[Innertube] Error:", error);
-    return null;
   }
+  return null;
 }
 
 /**
