@@ -254,6 +254,17 @@ export default function AuthPage() {
           return;
         }
 
+        // Only auto-navigate for OAuth callbacks (has code/token in URL)
+        // Otherwise, show "You are signed in" screen so user can switch accounts
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
+        
+        if (!hasOAuthCallback && event === 'INITIAL_SESSION') {
+          // User navigated to /auth while already logged in - don't auto-redirect
+          // They can see "You are signed in" and logout to switch accounts
+          return;
+        }
+
         const initializeUser = async () => {
           // Ensure profile exists with onboarded true
           const { data: profile } = await supabase
