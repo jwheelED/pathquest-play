@@ -28,6 +28,11 @@ interface LMSPlatform {
   client_id: string;
   is_active: boolean;
   created_at: string;
+  org_id: string | null;
+}
+
+interface LMSIntegrationSettingsProps {
+  mode?: "instructor" | "admin";
 }
 
 interface GradeSyncLog {
@@ -111,7 +116,8 @@ const LMS_OPTIONS = [
   },
 ];
 
-export function LMSIntegrationSettings() {
+export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSettingsProps) {
+  const isAdmin = mode === "admin";
   const [platforms, setPlatforms] = useState<LMSPlatform[]>([]);
   const [syncLogs, setSyncLogs] = useState<GradeSyncLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,12 +137,39 @@ export function LMSIntegrationSettings() {
 
   const fetchPlatforms = async () => {
     try {
-      const { data, error } = await supabase
-        .from("lti_platforms")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setPlatforms(data || []);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("id", user.id)
+        .single();
+
+      const orgId = profile?.org_id;
+
+      if (isAdmin) {
+        // Admin mode: only show org-level platforms
+        if (!orgId) {
+          setPlatforms([]);
+          return;
+        }
+        const { data, error } = await supabase
+          .from("lti_platforms")
+          .select("*")
+          .eq("org_id", orgId)
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        setPlatforms(data || []);
+      } else {
+        // Instructor mode: show all platforms accessible via RLS
+        const { data, error } = await supabase
+          .from("lti_platforms")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        setPlatforms(data || []);
+      }
     } catch (error) {
       console.error("Error fetching platforms:", error);
     } finally {
@@ -381,9 +414,13 @@ export function LMSIntegrationSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <GraduationCap className="h-5 w-5" />
-          LMS Integration
+          {isAdmin ? "Organization LMS Integration" : "LMS Integration"}
         </CardTitle>
-        <CardDescription>Connect your LMS for automatic grade sync</CardDescription>
+        <CardDescription>
+          {isAdmin
+            ? "Connect your institution's LMS — available to all instructors in your org"
+            : "Connect your LMS for automatic grade sync"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Connected platforms */}
@@ -396,7 +433,14 @@ export function LMSIntegrationSettings() {
                 <XCircle className="h-5 w-5 text-muted-foreground" />
               )}
               <div>
-                <p className="font-medium text-sm">{platform.platform_name}</p>
+                <p className="font-medium text-sm flex items-center gap-1.5">
+                  {platform.platform_name}
+                  {!isAdmin && platform.org_id && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary">
+                      Org
+                    </Badge>
+                  )}
+                </p>
                 <p className="text-xs text-muted-foreground capitalize">{platform.platform_type}</p>
               </div>
             </div>
@@ -413,7 +457,7 @@ export function LMSIntegrationSettings() {
         ))}
 
         {/* Recent syncs summary */}
-        {syncLogs.length > 0 && (
+        {!isAdmin && syncLogs.length > 0 && (
           <div className="text-xs text-muted-foreground border-t pt-3">
             <p className="font-medium mb-1">Recent syncs</p>
             {syncLogs.slice(0, 3).map((log) => (
@@ -432,7 +476,7 @@ export function LMSIntegrationSettings() {
           </div>
         )}
 
-        {platforms.length > 0 && (
+        {!isAdmin && platforms.length > 0 && (
           <Button variant="default" className="w-full" onClick={handleBulkSync} disabled={isSyncing}>
             {isSyncing ? (
               <>
