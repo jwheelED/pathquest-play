@@ -467,12 +467,84 @@ async function fetchTranscriptViaDirect(
 }
 
 /**
+ * Primary method: Supadata.ai API — reliable third-party transcript service.
+ * Handles both manual and auto-generated captions.
+ */
+async function fetchTranscriptViaSupadata(
+  videoId: string
+): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
+  const apiKey = Deno.env.get("SUPADATA_API_KEY");
+  if (!apiKey) {
+    console.log("[Supadata] API key not configured, skipping");
+    return null;
+  }
+
+  try {
+    const url = `https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&lang=en`;
+    console.log(`[Supadata] Fetching transcript for ${videoId}`);
+
+    const resp = await fetch(url, {
+      headers: {
+        "x-api-key": apiKey,
+      },
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`[Supadata] API error ${resp.status}: ${errText.substring(0, 300)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const content = data.content;
+
+    if (!content || !Array.isArray(content) || content.length === 0) {
+      console.log("[Supadata] No content in response");
+      return null;
+    }
+
+    const segments: Array<{ text: string; start: number; duration: number }> = [];
+    const textParts: string[] = [];
+
+    for (const item of content) {
+      const text = (item.text || "").trim();
+      if (!text) continue;
+      segments.push({
+        text,
+        start: (item.offset || 0) / 1000,
+        duration: (item.duration || 0) / 1000,
+      });
+      textParts.push(text);
+    }
+
+    if (textParts.length === 0) {
+      console.log("[Supadata] Parsed 0 segments from response");
+      return null;
+    }
+
+    console.log(`[Supadata] Success: ${textParts.join(" ").length} chars, ${segments.length} segments`);
+    return { text: textParts.join(" "), segments };
+  } catch (error) {
+    console.error("[Supadata] Error:", error);
+    return null;
+  }
+}
+
+/**
  * Orchestrate all YouTube transcript methods with fallbacks.
  */
 async function fetchYouTubeTranscript(
   videoId: string
 ): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
-  // Method 1: Direct timedtext (fastest, no page fetch needed)
+  // Method 1: Supadata API (most reliable, uses third-party service)
+  try {
+    const result = await fetchTranscriptViaSupadata(videoId);
+    if (result) return result;
+  } catch (error) {
+    console.error("[YouTube] Supadata method failed:", error);
+  }
+
+  // Method 2: Direct timedtext (fastest scraping, no page fetch needed)
   try {
     const result = await fetchTranscriptViaDirect(videoId);
     if (result) return result;
@@ -480,7 +552,7 @@ async function fetchYouTubeTranscript(
     console.error("[YouTube] Direct timedtext method failed:", error);
   }
 
-  // Method 2: Innertube API (page fetch + transcript endpoint, with retry)
+  // Method 3: Innertube API (page fetch + transcript endpoint, with retry)
   try {
     const result = await fetchTranscriptViaInnertube(videoId);
     if (result) return result;
@@ -488,7 +560,7 @@ async function fetchYouTubeTranscript(
     console.error("[YouTube] Innertube method failed:", error);
   }
 
-  // Method 3: YouTube Data API timedtext
+  // Method 4: YouTube Data API timedtext
   const apiKey = Deno.env.get("YOUTUBE_API_KEY");
   if (apiKey) {
     try {
