@@ -462,7 +462,7 @@ Generate ONE focused question that tests understanding of the most important con
         textToValidate += " " + parsed.options.join(" ");
       }
 
-      const relevance = checkRelevance(textToValidate, trimmedTranscript);
+      const relevance = checkRelevance(textToValidate, primaryContent);
 
       if (!relevance.relevant) {
         console.warn(`⚠️ Relevance check failed: ${relevance.reason}`);
