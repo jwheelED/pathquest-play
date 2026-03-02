@@ -227,7 +227,7 @@ export const InteractiveLecturePlayer = ({
       });
     }
     setIsPlaying(true);
-  }, [isYouTube, ytPlayer]);
+  }, [isExternalPlayer, extPlayer]);
 
   // Question overlay state
   const [currentQuestion, setCurrentQuestion] = useState<PausePoint | null>(null);
@@ -389,9 +389,9 @@ export const InteractiveLecturePlayer = ({
         !answeredQuestions.has(point.id) &&
         !currentQuestionRef.current
       ) {
-        // Pause video (works for both sources)
-        if (isYouTube) {
-          ytPlayer.pause();
+        // Pause video (works for all sources)
+        if (isExternalPlayer) {
+          extPlayer.pause();
         } else if (videoRef.current) {
           videoRef.current.pause();
         }
@@ -400,22 +400,22 @@ export const InteractiveLecturePlayer = ({
         break;
       }
     }
-  }, [sortedPausePoints, answeredQuestions, isYouTube, ytPlayer]);
+  }, [sortedPausePoints, answeredQuestions, isExternalPlayer, extPlayer]);
 
-  // YouTube: check pause points on time updates from the hook
+  // External player: check pause points on time updates from the hook
   useEffect(() => {
-    if (!isYouTube) return;
+    if (!isExternalPlayer) return;
     checkPausePoints(currentTime);
-  }, [currentTime, isYouTube, checkPausePoints]);
+  }, [currentTime, isExternalPlayer, checkPausePoints]);
 
-  // YouTube: prevent seeking forward
+  // External player: prevent seeking forward
   useEffect(() => {
-    if (!isYouTube || isPreview) return;
+    if (!isExternalPlayer || isPreview) return;
     if (currentTime > maxAllowedTime + 1.5) {
-      ytPlayer.seekTo(maxAllowedTime, true);
+      extPlayer.seekTo(maxAllowedTime);
       toast.info("You can't skip ahead. Answer questions to progress.");
     }
-  }, [currentTime, maxAllowedTime, isYouTube, isPreview, ytPlayer]);
+  }, [currentTime, maxAllowedTime, isExternalPlayer, isPreview, extPlayer]);
 
   // Prevent seeking forward (allow in preview mode) — direct video
   const handleSeeking = () => {
@@ -429,8 +429,8 @@ export const InteractiveLecturePlayer = ({
 
   // Jump to specific timestamp (for preview mode question panel)
   const jumpToTimestamp = (timestamp: number) => {
-    if (isYouTube) {
-      ytPlayer.seekTo(timestamp, true);
+    if (isExternalPlayer) {
+      extPlayer.seekTo(timestamp);
     } else if (videoRef.current) {
       videoRef.current.currentTime = timestamp;
     }
@@ -440,11 +440,11 @@ export const InteractiveLecturePlayer = ({
   const handlePlayPause = () => {
     if (currentQuestion) return;
     
-    if (isYouTube) {
+    if (isExternalPlayer) {
       if (isPlaying) {
-        ytPlayer.pause();
+        extPlayer.pause();
       } else {
-        ytPlayer.play();
+        extPlayer.play();
       }
       setIsPlaying(!isPlaying);
       return;
@@ -460,11 +460,11 @@ export const InteractiveLecturePlayer = ({
   };
 
   const handleVolumeToggle = () => {
-    if (isYouTube) {
+    if (isExternalPlayer) {
       if (isMuted) {
-        ytPlayer.unMute();
+        extPlayer.unMute();
       } else {
-        ytPlayer.mute();
+        extPlayer.mute();
       }
       setIsMuted(!isMuted);
       return;
@@ -475,9 +475,9 @@ export const InteractiveLecturePlayer = ({
   };
 
   const handleRewind = () => {
-    if (isYouTube) {
-      const newTime = Math.max(0, ytPlayer.getCurrentTime() - 10);
-      ytPlayer.seekTo(newTime, true);
+    if (isExternalPlayer) {
+      const newTime = Math.max(0, extPlayer.getCurrentTime() - 10);
+      extPlayer.seekTo(newTime);
       return;
     }
     if (!videoRef.current) return;
@@ -486,8 +486,8 @@ export const InteractiveLecturePlayer = ({
 
   const handleVolumeChange = (value: number[]) => {
     const newVolume = value[0];
-    if (isYouTube) {
-      ytPlayer.setVolume(newVolume);
+    if (isExternalPlayer) {
+      extPlayer.setVolume(newVolume);
       setVolume(newVolume);
       setIsMuted(newVolume === 0);
       return;
@@ -499,8 +499,8 @@ export const InteractiveLecturePlayer = ({
   };
 
   const handleSpeedChange = (speed: number) => {
-    if (isYouTube) {
-      ytPlayer.setPlaybackRate(speed);
+    if (isExternalPlayer) {
+      extPlayer.setPlaybackRate(speed);
       setPlaybackSpeed(speed);
       return;
     }
