@@ -750,13 +750,14 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         <Button
           onClick={() => {
             if (status === "error") {
-              // Reset for retry
               setStatus("idle");
               setErrorMessage("");
               setUploadProgress(0);
               setCreatedLectureId(null);
             } else if (status === "ready" && createdLectureId) {
               window.open(`/instructor/preview/${createdLectureId}`, '_blank');
+            } else if (uploadMode === "url") {
+              handleUrlUpload();
             } else {
               handleUpload();
             }
@@ -764,7 +765,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           disabled={
             status === "error" ? false :
             status === "ready" ? false :
-            !selectedFile ||
+            (uploadMode === "file" ? !selectedFile : (!videoUrl.trim() || !isValidVideoUrl(videoUrl.trim()))) ||
             !title.trim() ||
             (status !== "idle")
           }
@@ -773,8 +774,8 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
         >
           {status === "idle" ? (
             <>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload & Process Lecture
+              {uploadMode === "file" ? <Upload className="h-4 w-4 mr-2" /> : <Link className="h-4 w-4 mr-2" />}
+              {uploadMode === "file" ? "Upload & Process Lecture" : "Add & Process Lecture"}
             </>
           ) : status === "error" ? (
             <>
