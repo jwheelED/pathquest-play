@@ -362,6 +362,168 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
     }
   };
 
+  const handleUrlUpload = async () => {
+    if (!videoUrl.trim() || !isValidVideoUrl(videoUrl.trim())) {
+      toast.error("Please enter a valid YouTube URL");
+      return;
+    }
+    if (!title.trim()) {
+      toast.error("Please provide a title");
+      return;
+    }
+
+    try {
+      setStatus("uploading");
+      setUploadProgress(50);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const externalPath = `external-${Date.now()}`;
+      setUploadProgress(100);
+
+      // Create lecture video record with URL
+      const { data: lectureVideo, error: insertError } = await supabase
+        .from("lecture_videos")
+        .insert([
+          {
+            title: title.trim(),
+            description: description.trim() || null,
+            video_path: externalPath,
+            video_url: videoUrl.trim(),
+            question_count: highYieldOnly ? null : effectiveQuestionCount,
+            status: "processing",
+            instructor_id: user.id,
+          },
+        ])
+        .select()
+        .single();
+
+      if (insertError) {
+        throw new Error(`Failed to create lecture: ${insertError.message}`);
+      }
+
+      setStatus("transcribing");
+
+      // Start transcription — the edge function detects external- prefix and fetches YouTube captions
+      const { error: transcribeError } = await supabase.functions.invoke("transcribe-video", {
+        body: {
+          lectureVideoId: lectureVideo.id,
+          videoPath: externalPath,
+        },
+      });
+
+      if (transcribeError) {
+        throw new Error(`Transcription failed: ${transcribeError.message}`);
+      }
+
+      setStatus("analyzing");
+
+      // Reuse the same polling logic as file upload
+      let pollAttempts = 0;
+      const MAX_POLL_ATTEMPTS = 24;
+
+      const pollStatus = async () => {
+        pollAttempts++;
+        if (pollAttempts > MAX_POLL_ATTEMPTS) {
+          setStatus("error");
+          setErrorMessage("Processing timed out. Please try again.");
+          return;
+        }
+
+        const { data: updated } = await supabase
+          .from("lecture_videos")
+          .select("status, transcript, error_message, duration_seconds")
+          .eq("id", lectureVideo.id)
+          .single();
+
+        if (updated?.status === "analyzing" && updated.transcript) {
+          if (updated.duration_seconds) {
+            setEstimatedDuration(updated.duration_seconds);
+          }
+
+          const transcriptText = typeof updated.transcript === 'object' && updated.transcript !== null
+            ? (updated.transcript as Record<string, unknown>).text as string || ''
+            : String(updated.transcript);
+
+          if (transcriptText.startsWith("[Transcript unavailable")) {
+            toast.warning("Captions not available for this video. AI will generate general comprehension questions.");
+          }
+
+          const { data: profile } = await supabase.from("profiles").select("professor_type").eq("id", user.id).single();
+
+          await supabase.functions.invoke("analyze-lecture-cognitive-load", {
+            body: {
+              lectureVideoId: lectureVideo.id,
+              transcript: transcriptText,
+              smartMode: highYieldOnly,
+              questionCount: highYieldOnly ? undefined : effectiveQuestionCount,
+              professorType: professorType || "stem",
+              examStyle: professorType === "medical" ? examStyle : undefined,
+            },
+          });
+
+          setTimeout(async () => {
+            const { data: final } = await supabase
+              .from("lecture_videos")
+              .select("status, error_message, duration_seconds")
+              .eq("id", lectureVideo.id)
+              .single();
+
+            if (final?.duration_seconds) {
+              setEstimatedDuration(final.duration_seconds);
+            }
+
+            if (final?.status === "ready") {
+              setStatus("ready");
+              setCreatedLectureId(lectureVideo.id);
+              toast.success("Lecture processed successfully!");
+              onUploadComplete?.(lectureVideo.id);
+            } else if (final?.status === "error") {
+              setStatus("error");
+              setErrorMessage(final.error_message || "Processing failed");
+            } else {
+              setTimeout(pollStatus, 5000);
+            }
+          }, 5000);
+        } else if (updated?.status === "ready") {
+          if (updated.duration_seconds) {
+            setEstimatedDuration(updated.duration_seconds);
+          }
+          setStatus("ready");
+          setCreatedLectureId(lectureVideo.id);
+
+          const { data: questionCount } = await supabase
+            .from("lecture_pause_points")
+            .select("id", { count: "exact", head: true })
+            .eq("lecture_video_id", lectureVideo.id);
+
+          const count = questionCount?.length ?? 0;
+          if (count === 0) {
+            toast.warning("Video processed but no questions were generated. Captions may not be available for this video.");
+          } else {
+            toast.success(`Lecture processed with ${count} questions!`);
+          }
+          onUploadComplete?.(lectureVideo.id);
+        } else if (updated?.status === "error") {
+          setStatus("error");
+          setErrorMessage(updated.error_message || "Processing failed");
+        } else {
+          setTimeout(pollStatus, 5000);
+        }
+      };
+
+      setTimeout(pollStatus, 5000);
+    } catch (error: any) {
+      console.error("URL upload error:", error);
+      setStatus("error");
+      setErrorMessage(error.message);
+      toast.error(error.message);
+    }
+  };
+
   const getStatusDisplay = () => {
     switch (status) {
       case "uploading":
