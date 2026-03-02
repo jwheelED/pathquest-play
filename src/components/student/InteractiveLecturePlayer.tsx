@@ -907,15 +907,15 @@ export const InteractiveLecturePlayer = ({
   // Handle replay last 20 seconds
   const handleReplayLast20 = () => {
     if (!currentQuestion) return;
-    if (!isYouTube && !videoRef.current) return;
+    if (!isExternalPlayer && !videoRef.current) return;
     
     const replayTime = Math.max(0, currentQuestion.pause_timestamp - 20);
     
     // Temporarily suppress pause-point detection during replay
     isReplayingRef.current = true;
     
-    if (isYouTube) {
-      ytPlayer.seekTo(replayTime, true);
+    if (isExternalPlayer) {
+      extPlayer.seekTo(replayTime);
     } else if (videoRef.current) {
       videoRef.current.currentTime = replayTime;
     }
@@ -927,9 +927,9 @@ export const InteractiveLecturePlayer = ({
     setConfidenceLevel('');
     
     // Re-enable pause-point detection after passing the original pause timestamp
-    if (isYouTube) {
+    if (isExternalPlayer) {
       const reEnableInterval = setInterval(() => {
-        const t = ytPlayer.getCurrentTime();
+        const t = extPlayer.getCurrentTime();
         if (t >= currentQuestion.pause_timestamp + 0.8) {
           isReplayingRef.current = false;
           clearInterval(reEnableInterval);
@@ -995,6 +995,8 @@ export const InteractiveLecturePlayer = ({
           </video>
         ) : isYouTube ? (
           <div id={ytContainerId} className="w-full h-full" />
+        ) : isKaltura ? (
+          <div id={kalturaContainerId} className="w-full h-full" />
         ) : (
           <iframe
             src={getVimeoEmbedUrl(videoUrl)}
@@ -1038,7 +1040,7 @@ export const InteractiveLecturePlayer = ({
                           setShortAnswerGrade(null);
                           setShortAnswerFeedback(null);
                           setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
-                          if (isYouTube) { ytPlayer.play(); } else { videoRef.current?.play(); }
+                          if (isExternalPlayer) { extPlayer.play(); } else { videoRef.current?.play(); }
                           setIsPlaying(true);
                         }}
                         className="text-muted-foreground hover:text-foreground"
@@ -1349,10 +1351,10 @@ export const InteractiveLecturePlayer = ({
                 title={`Q${point.order_index + 1} at ${formatTime(point.pause_timestamp)}`}
                 onClick={isPreview ? (e) => {
                   e.stopPropagation();
-                  if (isYouTube) {
-                    ytPlayer.pause();
+                  if (isExternalPlayer) {
+                    extPlayer.pause();
                     setIsPlaying(false);
-                    ytPlayer.seekTo(point.pause_timestamp, true);
+                    extPlayer.seekTo(point.pause_timestamp);
                   } else if (videoRef.current) {
                     videoRef.current.pause();
                     setIsPlaying(false);
@@ -1570,9 +1572,9 @@ export const InteractiveLecturePlayer = ({
             responses={allResponses}
             onRewatch={(timestamp) => {
               setShowMasterySummary(false);
-              if (isYouTube) {
-                ytPlayer.seekTo(timestamp, true);
-                ytPlayer.play();
+              if (isExternalPlayer) {
+                extPlayer.seekTo(timestamp);
+                extPlayer.play();
                 setIsPlaying(true);
               } else if (videoRef.current) {
                 videoRef.current.currentTime = timestamp;
@@ -1582,11 +1584,11 @@ export const InteractiveLecturePlayer = ({
             }}
             onStartReview={() => {
               // Restart lecture from beginning for review
-              if (isYouTube) {
-                ytPlayer.seekTo(0, true);
+              if (isExternalPlayer) {
+                extPlayer.seekTo(0);
                 setCurrentTime(0);
                 setShowMasterySummary(false);
-                ytPlayer.play();
+                extPlayer.play();
                 setIsPlaying(true);
                 toast.success('Restarting lecture for review');
               } else if (videoRef.current) {
