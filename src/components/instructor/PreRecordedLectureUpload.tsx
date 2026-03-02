@@ -24,13 +24,14 @@ interface PreRecordedLectureUploadProps {
   onUploadComplete?: (lectureId: string) => void;
 }
 
-type UploadMode = "file";
+type UploadMode = "file" | "url";
 
 export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectureUploadProps) => {
   const [uploadMode, setUploadMode] = useState<UploadMode>("file");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
   
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "analyzing" | "ready" | "error">("idle");
