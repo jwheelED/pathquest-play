@@ -64,7 +64,8 @@ const LMS_OPTIONS = [
     label: "Moodle",
     icon: "🎓",
     description: "Moodle LMS",
-    helpUrl: "https://docs.moodle.org/en/Managing_tokens",
+    helpUrl:
+      "https://supportus.moodle.com/support/solutions/articles/80001016973-using-the-web-services-application-programming-interface-api-in-moodle",
     urlPlaceholder: "https://your-moodle-site.edu",
     tokenHelp: "Go to Site Admin → Plugins → Web services → Manage tokens",
   },
