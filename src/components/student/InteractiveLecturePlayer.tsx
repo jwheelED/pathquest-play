@@ -992,7 +992,7 @@ export const InteractiveLecturePlayer = ({
                           setShortAnswerGrade(null);
                           setShortAnswerFeedback(null);
                           setAnsweredQuestions(prev => new Set([...prev, currentQuestion.id]));
-                          videoRef.current?.play();
+                          if (isYouTube) { ytPlayer.play(); } else { videoRef.current?.play(); }
                           setIsPlaying(true);
                         }}
                         className="text-muted-foreground hover:text-foreground"
