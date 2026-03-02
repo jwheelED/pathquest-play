@@ -457,7 +457,7 @@ export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSe
         ))}
 
         {/* Recent syncs summary */}
-        {syncLogs.length > 0 && (
+        {!isAdmin && syncLogs.length > 0 && (
           <div className="text-xs text-muted-foreground border-t pt-3">
             <p className="font-medium mb-1">Recent syncs</p>
             {syncLogs.slice(0, 3).map((log) => (
@@ -476,7 +476,7 @@ export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSe
           </div>
         )}
 
-        {platforms.length > 0 && (
+        {!isAdmin && platforms.length > 0 && (
           <Button variant="default" className="w-full" onClick={handleBulkSync} disabled={isSyncing}>
             {isSyncing ? (
               <>
