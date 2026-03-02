@@ -18,6 +18,7 @@ interface LectureVideo {
   duration_seconds: number | null;
   status: string;
   question_count: number;
+  instructor_id: string;
 }
 
 interface PausePoint {
@@ -56,6 +57,8 @@ export default function InteractiveLecture() {
   const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [kalturaPartnerId, setKalturaPartnerId] = useState<string | undefined>();
+  const [kalturaUiConfId, setKalturaUiConfId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -175,6 +178,20 @@ export default function InteractiveLecture() {
         } catch (storageErr) {
           console.error('Storage error:', storageErr);
           setVideoUrl(null);
+        }
+
+        // Fetch instructor's Kaltura config if needed
+        if (lectureData.video_url && /kaltura|mediaspace/i.test(lectureData.video_url)) {
+          const { data: instructorProfile } = await supabase
+            .from('profiles')
+            .select('kaltura_partner_id, kaltura_uiconf_id')
+            .eq('id', lectureData.instructor_id)
+            .single();
+          
+          if (instructorProfile?.kaltura_partner_id && instructorProfile?.kaltura_uiconf_id) {
+            setKalturaPartnerId(instructorProfile.kaltura_partner_id);
+            setKalturaUiConfId(instructorProfile.kaltura_uiconf_id);
+          }
         }
 
       } catch (err: any) {
@@ -311,6 +328,8 @@ export default function InteractiveLecture() {
             videoUrl={videoUrl}
             title={lecture.title}
             pausePoints={pausePoints}
+            kalturaPartnerId={kalturaPartnerId}
+            kalturaUiConfId={kalturaUiConfId}
             onComplete={() => {
               toast.success('🎉 Congratulations! You completed the lecture!');
             }}

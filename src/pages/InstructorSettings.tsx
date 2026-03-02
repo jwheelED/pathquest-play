@@ -11,6 +11,7 @@ import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSe
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
+import { KalturaSettings } from "@/components/instructor/KalturaSettings";
 
 export default function InstructorSettings() {
   const navigate = useNavigate();
@@ -92,6 +93,7 @@ export default function InstructorSettings() {
               <AdaptiveTutoringSettings />
               <AutoGradeSettings />
               <LMSIntegrationSettings />
+              <KalturaSettings instructorId={currentUser.id} />
             </>
           )}
         </div>

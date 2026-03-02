@@ -50,6 +50,8 @@ export default function InstructorLecturePreview() {
   const [lecture, setLecture] = useState<LectureVideo | null>(null);
   const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [kalturaPartnerId, setKalturaPartnerId] = useState<string | undefined>();
+  const [kalturaUiConfId, setKalturaUiConfId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
@@ -108,6 +110,19 @@ export default function InstructorLecturePreview() {
           }
         } else if (lectureData.video_url) {
           setVideoUrl(lectureData.video_url);
+        }
+
+        // Load Kaltura config if needed
+        if (lectureData.video_url && /kaltura|mediaspace/i.test(lectureData.video_url)) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('kaltura_partner_id, kaltura_uiconf_id')
+            .eq('id', user.id)
+            .single();
+          if (profile?.kaltura_partner_id && profile?.kaltura_uiconf_id) {
+            setKalturaPartnerId(profile.kaltura_partner_id);
+            setKalturaUiConfId(profile.kaltura_uiconf_id);
+          }
         }
 
       } catch (err: any) {
@@ -219,6 +234,8 @@ export default function InstructorLecturePreview() {
                 pausePoints={pausePoints}
                 isPreview={true}
                 onQuestionSelect={setSelectedQuestionId}
+                kalturaPartnerId={kalturaPartnerId}
+                kalturaUiConfId={kalturaUiConfId}
               />
             ) : (
               <Card className="aspect-video flex items-center justify-center border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">

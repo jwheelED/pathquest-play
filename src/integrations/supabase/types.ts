@@ -2409,6 +2409,8 @@ export type Database = {
           id: string
           instructor_code: string | null
           interval_question_model: string
+          kaltura_partner_id: string | null
+          kaltura_uiconf_id: string | null
           last_auto_question_at: string | null
           lecture_preferences: Json | null
           medical_specialty: string | null
@@ -2450,6 +2452,8 @@ export type Database = {
           id: string
           instructor_code?: string | null
           interval_question_model?: string
+          kaltura_partner_id?: string | null
+          kaltura_uiconf_id?: string | null
           last_auto_question_at?: string | null
           lecture_preferences?: Json | null
           medical_specialty?: string | null
@@ -2491,6 +2495,8 @@ export type Database = {
           id?: string
           instructor_code?: string | null
           interval_question_model?: string
+          kaltura_partner_id?: string | null
+          kaltura_uiconf_id?: string | null
           last_auto_question_at?: string | null
           lecture_preferences?: Json | null
           medical_specialty?: string | null
