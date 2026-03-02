@@ -312,10 +312,16 @@ export default function AuthPage() {
             <h2 className="text-2xl font-bold mb-6 text-center text-foreground">You are signed in</h2>
             <p className="text-center text-sm mb-4 text-muted-foreground">{session.user.email}</p>
             <button
+              onClick={() => navigateByRole(session.user.id)}
+              className="w-full bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow mb-3"
+            >
+              Go to Dashboard
+            </button>
+            <button
               onClick={handleLogout}
               className="w-full bg-destructive text-destructive-foreground p-2 rounded-lg hover:bg-destructive/90 transition"
             >
-              Logout
+              Sign out &amp; switch account
             </button>
           </div>
         ) : isRecoveryMode ? (
