@@ -9,15 +9,28 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Video, Loader2, CheckCircle2, AlertCircle, Brain, Play, ChevronDown, Settings2, X, Sparkles, Link } from "lucide-react";
+import {
+  Upload,
+  Video,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Brain,
+  Play,
+  ChevronDown,
+  Settings2,
+  X,
+  Sparkles,
+  Link,
+} from "lucide-react";
 import { QuestionStudioDialog } from "./QuestionStudioDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { 
-  PausePointEditor, 
-  PausePoint, 
-  calculateRecommendedPausePoints, 
-  generateAutoPausePoints 
+import {
+  PausePointEditor,
+  PausePoint,
+  calculateRecommendedPausePoints,
+  generateAutoPausePoints,
 } from "./PausePointEditor";
 
 interface PreRecordedLectureUploadProps {
@@ -32,7 +45,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
-  
+
   const [uploadProgress, setUploadProgress] = useState(0);
   const [status, setStatus] = useState<"idle" | "uploading" | "transcribing" | "analyzing" | "ready" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -41,23 +54,23 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [createdLectureId, setCreatedLectureId] = useState<string | null>(null);
-  
+
   // New state for pause point configuration
   const [estimatedDuration, setEstimatedDuration] = useState<number>(600); // Default 10 min
   const [flowLevel, setFlowLevel] = useState(3); // 1-5 scale
   const [highYieldOnly, setHighYieldOnly] = useState(true); // Default to high-yield for smarter questions
   const [pausePoints, setPausePoints] = useState<PausePoint[]>([]);
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
-  
+
   // Calculate recommended count based on duration and flow level
   const recommendedCount = useMemo(() => {
     return calculateRecommendedPausePoints(estimatedDuration, flowLevel);
   }, [estimatedDuration, flowLevel]);
-  
+
   // Actual question count to use (filtered by high-yield if enabled)
   const effectiveQuestionCount = useMemo(() => {
     if (highYieldOnly && pausePoints.length > 0) {
-      return pausePoints.filter(p => p.isHighYield).length;
+      return pausePoints.filter((p) => p.isHighYield).length;
     }
     return pausePoints.length || recommendedCount;
   }, [pausePoints, highYieldOnly, recommendedCount]);
@@ -108,7 +121,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       setSelectedFile(file);
       setStatus("idle");
       setErrorMessage("");
-      
+
       // Detect duration and generate initial pause points
       const duration = await detectVideoDuration(file);
       setEstimatedDuration(duration);
@@ -139,9 +152,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
+
     if (status !== "idle") return;
-    
+
     const file = e.dataTransfer.files?.[0];
     if (file) {
       if (!file.type.startsWith("video/")) {
@@ -155,7 +168,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       setSelectedFile(file);
       setStatus("idle");
       setErrorMessage("");
-      
+
       const duration = await detectVideoDuration(file);
       setEstimatedDuration(duration);
       const count = calculateRecommendedPausePoints(duration, flowLevel);
@@ -169,7 +182,8 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
       // Accept YouTube, Vimeo, Kaltura, or direct video links
       const validHosts = ["youtube.com", "www.youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"];
       const isKnownHost = validHosts.some((host) => parsed.hostname.includes(host));
-      const isKaltura = /kaltura\.com|mediaspace\./i.test(parsed.hostname) || /\/media\/[^/]+\/[01]_/.test(parsed.pathname);
+      const isKaltura =
+        /kaltura\.com|mediaspace\./i.test(parsed.hostname) || /\/media\/[^/]+\/[01]_/.test(parsed.pathname);
       const isDirectVideo = /\.(mp4|webm|mov|avi|mkv)$/i.test(parsed.pathname);
       return isKnownHost || isKaltura || isDirectVideo || parsed.protocol === "https:";
     } catch {
@@ -279,10 +293,11 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           }
 
           // Check for placeholder transcript
-          const transcriptText = typeof updated.transcript === 'object' && updated.transcript !== null
-            ? (updated.transcript as Record<string, unknown>).text as string || ''
-            : String(updated.transcript);
-          
+          const transcriptText =
+            typeof updated.transcript === "object" && updated.transcript !== null
+              ? ((updated.transcript as Record<string, unknown>).text as string) || ""
+              : String(updated.transcript);
+
           if (transcriptText.startsWith("[Transcript unavailable")) {
             toast.warning("Captions not available for this video. AI will generate general comprehension questions.");
           }
@@ -326,7 +341,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               setTimeout(pollStatus, 5000);
             }
           }, 5000);
-      } else if (updated?.status === "ready") {
+        } else if (updated?.status === "ready") {
           if (updated.duration_seconds) {
             setEstimatedDuration(updated.duration_seconds);
           }
@@ -341,7 +356,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
           const count = questionCount?.length ?? 0;
           if (count === 0) {
-            toast.warning("Video processed but no questions were generated. Captions may not be available for this video. Try uploading a video file instead for best results.");
+            toast.warning(
+              "Video processed but no questions were generated. Captions may not be available for this video. Try uploading a video file instead for best results.",
+            );
           } else {
             toast.success(`Lecture processed with ${count} questions!`);
           }
@@ -365,7 +382,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
   const handleUrlUpload = async () => {
     if (!videoUrl.trim() || !isValidVideoUrl(videoUrl.trim())) {
-      toast.error("Please enter a valid YouTube URL");
+      toast.error("Please enter a valid URL");
       return;
     }
     if (!title.trim()) {
@@ -445,9 +462,10 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             setEstimatedDuration(updated.duration_seconds);
           }
 
-          const transcriptText = typeof updated.transcript === 'object' && updated.transcript !== null
-            ? (updated.transcript as Record<string, unknown>).text as string || ''
-            : String(updated.transcript);
+          const transcriptText =
+            typeof updated.transcript === "object" && updated.transcript !== null
+              ? ((updated.transcript as Record<string, unknown>).text as string) || ""
+              : String(updated.transcript);
 
           if (transcriptText.startsWith("[Transcript unavailable")) {
             toast.warning("Captions not available for this video. AI will generate general comprehension questions.");
@@ -503,7 +521,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
           const count = questionCount?.length ?? 0;
           if (count === 0) {
-            toast.warning("Video processed but no questions were generated. Captions may not be available for this video.");
+            toast.warning(
+              "Video processed but no questions were generated. Captions may not be available for this video.",
+            );
           } else {
             toast.success(`Lecture processed with ${count} questions!`);
           }
@@ -560,12 +580,18 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           Upload Pre-Recorded Lecture
         </CardTitle>
         <CardDescription>
-          Upload a video file or paste a YouTube URL — AI will analyze it to insert questions at optimal learning moments
+          Upload a video file or paste a URL link — AI will analyze it to insert questions at optimal learning moments
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Mode Toggle */}
-        <Tabs value={uploadMode} onValueChange={(v) => { setUploadMode(v as UploadMode); }} className="w-full">
+        <Tabs
+          value={uploadMode}
+          onValueChange={(v) => {
+            setUploadMode(v as UploadMode);
+          }}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="file" disabled={status !== "idle"}>
               <Upload className="h-4 w-4 mr-2" />
@@ -573,7 +599,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             </TabsTrigger>
             <TabsTrigger value="url" disabled={status !== "idle"}>
               <Link className="h-4 w-4 mr-2" />
-              YouTube URL
+              URL link
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -602,7 +628,6 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           />
         </div>
 
-
         <div className="space-y-2">
           <button
             type="button"
@@ -612,7 +637,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           >
             {highYieldOnly ? "Customize question timing →" : "← Use automatic timing"}
           </button>
-          
+
           {!highYieldOnly && (
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between">
@@ -640,9 +665,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               </div>
             </div>
           )}
-          
+
           {/* Advanced pause point editor removed - AI determines optimal pause points during analysis */}
-          
+
           <p className="text-xs text-muted-foreground">
             AI will place {effectiveQuestionCount} pause points at optimal learning moments
           </p>
@@ -650,11 +675,15 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
 
         {/* File Upload or URL Input */}
         {uploadMode === "file" ? (
-        <div className="space-y-4">
-          <Label>Video File *</Label>
+          <div className="space-y-4">
+            <Label>Video File *</Label>
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                isDragging ? "border-primary bg-primary/10" : selectedFile ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
+                isDragging
+                  ? "border-primary bg-primary/10"
+                  : selectedFile
+                    ? "border-primary bg-primary/5"
+                    : "border-muted-foreground/25 hover:border-primary/50"
               } ${status !== "idle" ? "pointer-events-none opacity-50" : ""}`}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
@@ -697,24 +726,24 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 </>
               )}
             </div>
-        </div>
+          </div>
         ) : (
-        <div className="space-y-2">
-          <Label htmlFor="video-url">YouTube URL *</Label>
-          <Input
-            id="video-url"
-            placeholder="https://www.youtube.com/watch?v=..."
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            disabled={status !== "idle"}
-          />
-          {videoUrl && !isValidVideoUrl(videoUrl) && (
-            <p className="text-xs text-destructive">Please enter a valid YouTube URL</p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Paste a YouTube video link. AI will extract captions and generate questions automatically.
-          </p>
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="video-url">URL link *</Label>
+            <Input
+              id="video-url"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              disabled={status !== "idle"}
+            />
+            {videoUrl && !isValidVideoUrl(videoUrl) && (
+              <p className="text-xs text-destructive">Please enter a valid URL link</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Paste a URL video link. AI will extract captions and generate questions automatically.
+            </p>
+          </div>
         )}
 
         {/* Progress/Status */}
@@ -730,9 +759,9 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
                 <QuestionStudioDialog
                   lectureId={createdLectureId}
                   trigger={
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="gap-1.5 animate-fade-in hover:scale-105 transition-transform"
                     >
                       <Sparkles className="h-3.5 w-3.5 animate-pulse text-amber-500" />
@@ -756,7 +785,7 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               setUploadProgress(0);
               setCreatedLectureId(null);
             } else if (status === "ready" && createdLectureId) {
-              window.open(`/instructor/preview/${createdLectureId}`, '_blank');
+              window.open(`/instructor/preview/${createdLectureId}`, "_blank");
             } else if (uploadMode === "url") {
               handleUrlUpload();
             } else {
@@ -764,11 +793,13 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
             }
           }}
           disabled={
-            status === "error" ? false :
-            status === "ready" ? false :
-            (uploadMode === "file" ? !selectedFile : (!videoUrl.trim() || !isValidVideoUrl(videoUrl.trim()))) ||
-            !title.trim() ||
-            (status !== "idle")
+            status === "error"
+              ? false
+              : status === "ready"
+                ? false
+                : (uploadMode === "file" ? !selectedFile : !videoUrl.trim() || !isValidVideoUrl(videoUrl.trim())) ||
+                  !title.trim() ||
+                  status !== "idle"
           }
           className="w-full"
           size="lg"

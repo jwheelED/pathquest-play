@@ -8,16 +8,16 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { bulkSyncGradesToLMS } from "@/lib/lmsSync";
-import { 
-  GraduationCap, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  GraduationCap,
+  CheckCircle2,
+  XCircle,
   RefreshCw,
   ArrowRight,
   ArrowLeft,
   ExternalLink,
   Key,
-  Send
+  Send,
 } from "lucide-react";
 
 interface LMSPlatform {
@@ -41,41 +41,41 @@ interface GradeSyncLog {
 }
 
 const LMS_OPTIONS = [
-  { 
-    value: 'canvas', 
-    label: 'Canvas', 
-    icon: '🎨',
-    description: 'Instructure Canvas LMS',
-    helpUrl: 'https://community.canvaslms.com/t5/Admin-Guide/How-do-I-manage-API-access-tokens/ta-p/89',
-    urlPlaceholder: 'https://your-school.instructure.com',
-    tokenHelp: 'Go to Canvas → Account → Settings → New Access Token',
+  {
+    value: "canvas",
+    label: "Canvas",
+    icon: "🎨",
+    description: "Instructure Canvas LMS",
+    helpUrl: "https://www.youtube.com/watch?v=cZ5cn8stjM0&t=101s",
+    urlPlaceholder: "https://your-school.instructure.com",
+    tokenHelp: "Go to Canvas → Account → Settings → New Access Token",
   },
-  { 
-    value: 'blackboard', 
-    label: 'Blackboard', 
-    icon: '📚',
-    description: 'Blackboard Learn',
-    helpUrl: 'https://developer.anthology.com/portal/displayApi',
-    urlPlaceholder: 'https://your-school.blackboard.com',
-    tokenHelp: 'Go to Admin → REST API Integrations → Create Integration',
+  {
+    value: "blackboard",
+    label: "Blackboard",
+    icon: "📚",
+    description: "Blackboard Learn",
+    helpUrl: "https://developer.anthology.com/portal/displayApi",
+    urlPlaceholder: "https://your-school.blackboard.com",
+    tokenHelp: "Go to Admin → REST API Integrations → Create Integration",
   },
-  { 
-    value: 'moodle', 
-    label: 'Moodle', 
-    icon: '🎓',
-    description: 'Moodle LMS',
-    helpUrl: 'https://docs.moodle.org/en/Managing_tokens',
-    urlPlaceholder: 'https://your-moodle-site.edu',
-    tokenHelp: 'Go to Site Admin → Plugins → Web services → Manage tokens',
+  {
+    value: "moodle",
+    label: "Moodle",
+    icon: "🎓",
+    description: "Moodle LMS",
+    helpUrl: "https://docs.moodle.org/en/Managing_tokens",
+    urlPlaceholder: "https://your-moodle-site.edu",
+    tokenHelp: "Go to Site Admin → Plugins → Web services → Manage tokens",
   },
-  { 
-    value: 'brightspace', 
-    label: 'D2L Brightspace', 
-    icon: '💡',
-    description: 'D2L Brightspace',
-    helpUrl: 'https://docs.valence.desire2learn.com/',
-    urlPlaceholder: 'https://your-brightspace.edu',
-    tokenHelp: 'Contact your Brightspace admin for API credentials',
+  {
+    value: "brightspace",
+    label: "D2L Brightspace",
+    icon: "💡",
+    description: "D2L Brightspace",
+    helpUrl: "https://docs.valence.desire2learn.com/",
+    urlPlaceholder: "https://your-brightspace.edu",
+    tokenHelp: "Contact your Brightspace admin for API credentials",
   },
 ];
 
@@ -84,12 +84,12 @@ export function LMSIntegrationSettings() {
   const [syncLogs, setSyncLogs] = useState<GradeSyncLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  
+
   // Wizard state
-  const [step, setStep] = useState<'list' | 'select' | 'connect'>('list');
-  const [selectedLMS, setSelectedLMS] = useState<typeof LMS_OPTIONS[0] | null>(null);
-  const [instanceUrl, setInstanceUrl] = useState('');
-  const [apiToken, setApiToken] = useState('');
+  const [step, setStep] = useState<"list" | "select" | "connect">("list");
+  const [selectedLMS, setSelectedLMS] = useState<(typeof LMS_OPTIONS)[0] | null>(null);
+  const [instanceUrl, setInstanceUrl] = useState("");
+  const [apiToken, setApiToken] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
@@ -100,13 +100,13 @@ export function LMSIntegrationSettings() {
   const fetchPlatforms = async () => {
     try {
       const { data, error } = await supabase
-        .from('lti_platforms')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("lti_platforms")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       setPlatforms(data || []);
     } catch (error) {
-      console.error('Error fetching platforms:', error);
+      console.error("Error fetching platforms:", error);
     } finally {
       setLoading(false);
     }
@@ -114,48 +114,46 @@ export function LMSIntegrationSettings() {
 
   const fetchSyncLogs = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data, error } = await supabase
-        .from('grade_sync_log')
-        .select('id, assignment_type, score_given, score_maximum, sync_status, error_message, synced_at')
-        .order('synced_at', { ascending: false })
+        .from("grade_sync_log")
+        .select("id, assignment_type, score_given, score_maximum, sync_status, error_message, synced_at")
+        .order("synced_at", { ascending: false })
         .limit(10);
       if (error) throw error;
       setSyncLogs(data || []);
     } catch (error) {
-      console.error('Error fetching sync logs:', error);
+      console.error("Error fetching sync logs:", error);
     }
   };
 
   const handleConnect = async () => {
     if (!selectedLMS || !instanceUrl || !apiToken) {
-      toast.error('Please fill in both fields');
+      toast.error("Please fill in both fields");
       return;
     }
     setIsConnecting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single();
+      const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
 
-      const { error } = await supabase
-        .from('lti_platforms')
-        .insert({
-          org_id: profile?.org_id,
-          platform_type: selectedLMS.value,
-          platform_name: `${selectedLMS.label} — ${new URL(instanceUrl).hostname}`,
-          issuer: instanceUrl,
-          client_id: apiToken,
-          auth_url: instanceUrl,
-          token_url: instanceUrl,
-          jwks_url: instanceUrl,
-        });
+      const { error } = await supabase.from("lti_platforms").insert({
+        org_id: profile?.org_id,
+        platform_type: selectedLMS.value,
+        platform_name: `${selectedLMS.label} — ${new URL(instanceUrl).hostname}`,
+        issuer: instanceUrl,
+        client_id: apiToken,
+        auth_url: instanceUrl,
+        token_url: instanceUrl,
+        jwks_url: instanceUrl,
+      });
 
       if (error) throw error;
 
@@ -163,8 +161,8 @@ export function LMSIntegrationSettings() {
       fetchPlatforms();
       resetWizard();
     } catch (error: any) {
-      console.error('Error connecting:', error);
-      toast.error(error.message || 'Failed to connect');
+      console.error("Error connecting:", error);
+      toast.error(error.message || "Failed to connect");
     } finally {
       setIsConnecting(false);
     }
@@ -172,41 +170,40 @@ export function LMSIntegrationSettings() {
 
   const togglePlatformActive = async (platformId: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('lti_platforms')
-        .update({ is_active: !isActive })
-        .eq('id', platformId);
+      const { error } = await supabase.from("lti_platforms").update({ is_active: !isActive }).eq("id", platformId);
       if (error) throw error;
-      toast.success(`Platform ${isActive ? 'disabled' : 'enabled'}`);
+      toast.success(`Platform ${isActive ? "disabled" : "enabled"}`);
       fetchPlatforms();
     } catch {
-      toast.error('Failed to update platform status');
+      toast.error("Failed to update platform status");
     }
   };
 
   const handleBulkSync = async () => {
     setIsSyncing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
       // Get recent graded assignments for this instructor's students
       const { data: assignments, error } = await supabase
-        .from('student_assignments')
-        .select('id, student_id, grade, assignment_type')
-        .eq('instructor_id', user.id)
-        .eq('completed', true)
-        .not('grade', 'is', null)
-        .order('created_at', { ascending: false })
+        .from("student_assignments")
+        .select("id, student_id, grade, assignment_type")
+        .eq("instructor_id", user.id)
+        .eq("completed", true)
+        .not("grade", "is", null)
+        .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) throw error;
       if (!assignments || assignments.length === 0) {
-        toast.info('No graded assignments to sync');
+        toast.info("No graded assignments to sync");
         return;
       }
 
-      const grades = assignments.map(a => ({
+      const grades = assignments.map((a) => ({
         assignmentId: a.id,
         studentId: a.student_id,
         scoreGiven: a.grade ?? 0,
@@ -215,31 +212,31 @@ export function LMSIntegrationSettings() {
       }));
 
       const { success, failed } = await bulkSyncGradesToLMS(grades);
-      
+
       if (failed === 0) {
         toast.success(`${success} grade(s) synced to LMS`);
       } else {
         toast.warning(`${success} synced, ${failed} failed`);
       }
-      
+
       fetchSyncLogs();
     } catch (err: any) {
-      console.error('Bulk sync error:', err);
-      toast.error(err.message || 'Sync failed');
+      console.error("Bulk sync error:", err);
+      toast.error(err.message || "Sync failed");
     } finally {
       setIsSyncing(false);
     }
   };
 
   const resetWizard = () => {
-    setStep('list');
+    setStep("list");
     setSelectedLMS(null);
-    setInstanceUrl('');
-    setApiToken('');
+    setInstanceUrl("");
+    setApiToken("");
   };
 
   // Step: Select LMS type
-  if (step === 'select') {
+  if (step === "select") {
     return (
       <Card>
         <CardHeader>
@@ -257,7 +254,10 @@ export function LMSIntegrationSettings() {
           {LMS_OPTIONS.map((lms) => (
             <button
               key={lms.value}
-              onClick={() => { setSelectedLMS(lms); setStep('connect'); }}
+              onClick={() => {
+                setSelectedLMS(lms);
+                setStep("connect");
+              }}
               className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-accent/50 transition-all text-center"
             >
               <span className="text-2xl">{lms.icon}</span>
@@ -271,12 +271,12 @@ export function LMSIntegrationSettings() {
   }
 
   // Step: Enter credentials
-  if (step === 'connect' && selectedLMS) {
+  if (step === "connect" && selectedLMS) {
     return (
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setStep('select')} className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" onClick={() => setStep("select")} className="h-8 w-8 p-0">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
@@ -309,7 +309,12 @@ export function LMSIntegrationSettings() {
             />
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <span>{selectedLMS.tokenHelp}</span>
-              <a href={selectedLMS.helpUrl} target="_blank" rel="noopener noreferrer" className="text-primary inline-flex items-center gap-0.5 hover:underline">
+              <a
+                href={selectedLMS.helpUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary inline-flex items-center gap-0.5 hover:underline"
+              >
                 Guide <ExternalLink className="h-3 w-3" />
               </a>
             </div>
@@ -317,9 +322,13 @@ export function LMSIntegrationSettings() {
 
           <Button onClick={handleConnect} disabled={isConnecting} className="w-full">
             {isConnecting ? (
-              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Connecting...</>
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Connecting...
+              </>
             ) : (
-              <>Connect {selectedLMS.label} <ArrowRight className="h-4 w-4 ml-2" /></>
+              <>
+                Connect {selectedLMS.label} <ArrowRight className="h-4 w-4 ml-2" />
+              </>
             )}
           </Button>
         </CardContent>
@@ -335,9 +344,7 @@ export function LMSIntegrationSettings() {
           <GraduationCap className="h-5 w-5" />
           LMS Integration
         </CardTitle>
-        <CardDescription>
-          Connect your LMS for automatic grade sync
-        </CardDescription>
+        <CardDescription>Connect your LMS for automatic grade sync</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Connected platforms */}
@@ -356,7 +363,7 @@ export function LMSIntegrationSettings() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={platform.is_active ? "default" : "secondary"} className="text-xs">
-                {platform.is_active ? 'Active' : 'Off'}
+                {platform.is_active ? "Active" : "Off"}
               </Badge>
               <Switch
                 checked={platform.is_active}
@@ -372,10 +379,10 @@ export function LMSIntegrationSettings() {
             <p className="font-medium mb-1">Recent syncs</p>
             {syncLogs.slice(0, 3).map((log) => (
               <div key={log.id} className="flex items-center justify-between py-1">
-                <span className="capitalize">{log.assignment_type.replace('_', ' ')}</span>
+                <span className="capitalize">{log.assignment_type.replace("_", " ")}</span>
                 <span className="flex items-center gap-1">
                   {log.score_given}/{log.score_maximum}
-                  {log.sync_status === 'success' ? (
+                  {log.sync_status === "success" ? (
                     <CheckCircle2 className="h-3 w-3 text-primary" />
                   ) : (
                     <XCircle className="h-3 w-3 text-destructive" />
@@ -387,23 +394,22 @@ export function LMSIntegrationSettings() {
         )}
 
         {platforms.length > 0 && (
-          <Button 
-            variant="default" 
-            className="w-full" 
-            onClick={handleBulkSync} 
-            disabled={isSyncing}
-          >
+          <Button variant="default" className="w-full" onClick={handleBulkSync} disabled={isSyncing}>
             {isSyncing ? (
-              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Syncing...</>
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Syncing...
+              </>
             ) : (
-              <><Send className="h-4 w-4 mr-2" /> Sync Grades Now</>
+              <>
+                <Send className="h-4 w-4 mr-2" /> Sync Grades Now
+              </>
             )}
           </Button>
         )}
 
-        <Button variant="outline" className="w-full" onClick={() => setStep('select')}>
+        <Button variant="outline" className="w-full" onClick={() => setStep("select")}>
           <GraduationCap className="h-4 w-4 mr-2" />
-          {platforms.length > 0 ? 'Connect Another LMS' : 'Connect Your LMS'}
+          {platforms.length > 0 ? "Connect Another LMS" : "Connect Your LMS"}
         </Button>
       </CardContent>
     </Card>
