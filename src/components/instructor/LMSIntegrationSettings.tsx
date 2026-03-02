@@ -320,6 +320,24 @@ export function LMSIntegrationSettings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Step-by-step instructions */}
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-semibold text-foreground">How to get your {selectedLMS.label} API token:</p>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+              {selectedLMS.steps.map((s, i) => (
+                <li key={i} className="leading-relaxed">{s}</li>
+              ))}
+            </ol>
+            <a
+              href={selectedLMS.helpUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary inline-flex items-center gap-0.5 hover:underline mt-1"
+            >
+              <ExternalLink className="h-3 w-3" /> Full guide
+            </a>
+          </div>
+
           <div className="space-y-2">
             <Label>Your {selectedLMS.label} URL</Label>
             <Input
@@ -339,17 +357,6 @@ export function LMSIntegrationSettings() {
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
             />
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>{selectedLMS.tokenHelp}</span>
-              <a
-                href={selectedLMS.helpUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary inline-flex items-center gap-0.5 hover:underline"
-              >
-                Guide <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
           </div>
 
           <Button onClick={handleConnect} disabled={isConnecting} className="w-full">
