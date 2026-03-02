@@ -26,12 +26,14 @@ import { ContextualTutorChat } from './ContextualTutorChat';
 import { MasterySummary } from './MasterySummary';
 import { QuestionReportDialog } from './QuestionReportDialog';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
+import { useKalturaPlayer } from '@/hooks/useKalturaPlayer';
 
-type VideoSourceType = 'youtube' | 'vimeo' | 'direct';
+type VideoSourceType = 'youtube' | 'vimeo' | 'kaltura' | 'direct';
 
 function getVideoSourceType(url: string): VideoSourceType {
   if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
   if (/vimeo\.com/.test(url)) return 'vimeo';
+  if (/kaltura\.com|mediaspace\.|kaltura|\/media\/[^/]+\/[01]_/.test(url)) return 'kaltura';
   return 'direct';
 }
 
@@ -91,6 +93,8 @@ interface InteractiveLecturePlayerProps {
   isPreview?: boolean;
   onQuestionSelect?: (questionId: string) => void;
   captionUrl?: string;
+  kalturaPartnerId?: string;
+  kalturaUiConfId?: string;
 }
 
 // Inline confidence selector for interactive lectures
@@ -139,7 +143,9 @@ export const InteractiveLecturePlayer = ({
   onComplete,
   isPreview = false,
   onQuestionSelect,
-  captionUrl
+  captionUrl,
+  kalturaPartnerId,
+  kalturaUiConfId
 }: InteractiveLecturePlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
