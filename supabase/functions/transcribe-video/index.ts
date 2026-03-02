@@ -191,7 +191,7 @@ async function extractCaptionsFromPage(
     }
   }
 
-  return await fetchCaptionTracksData(captions);
+  return await fetchCaptionTracksData(captions!);
 }
 
 /**

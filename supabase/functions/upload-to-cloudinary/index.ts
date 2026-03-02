@@ -14,12 +14,12 @@ function toHex(buffer: ArrayBuffer): string {
 
 async function sha256(data: Uint8Array | string): Promise<string> {
   const encoded = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  const hash = await crypto.subtle.digest("SHA-256", encoded);
+  const hash = await crypto.subtle.digest("SHA-256", encoded.buffer as ArrayBuffer);
   return toHex(hash);
 }
 
 async function hmac(key: Uint8Array, data: string): Promise<Uint8Array> {
-  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const cryptoKey = await crypto.subtle.importKey("raw", key.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data));
   return new Uint8Array(sig);
 }
@@ -108,7 +108,7 @@ serve(async (req) => {
 
     const signingKey = await getSignatureKey(R2_SECRET_ACCESS_KEY, dateStamp, region, service);
     const signatureBuffer = await hmac(signingKey, stringToSign);
-    const signature = toHex(signatureBuffer.buffer);
+    const signature = toHex(signatureBuffer.buffer as ArrayBuffer);
 
     const authHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
