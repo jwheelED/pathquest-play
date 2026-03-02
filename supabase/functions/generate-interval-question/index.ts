@@ -502,6 +502,7 @@ Generate ONE focused question that tests understanding of the most important con
         reasoning: parsed.reasoning,
         is_fallback: false,
         relevance_rejected: false,
+        from_materials: usingMaterialsFallback,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
