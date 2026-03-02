@@ -475,18 +475,9 @@ Generate ONE focused question that tests understanding of the most important con
       clearTimeout(timeoutId);
       console.error("AI error:", aiError);
 
-      // Use fallback on any AI error
-      const fallback = interval_minutes >= 20
-        ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-        : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-      return new Response(JSON.stringify({
-        success: true,
-        ...fallback,
-        confidence: 0.5,
-        is_fallback: true,
-        reasoning: `AI error: ${aiError.message}, using fallback`,
-      }), {
+      // Return failure instead of generic fallback
+      const fallbackResult = getFallbackResponse(format_preference, 0.5, `AI error: ${aiError.message}`);
+      return new Response(JSON.stringify(fallbackResult), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
