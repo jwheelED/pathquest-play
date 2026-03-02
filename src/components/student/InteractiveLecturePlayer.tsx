@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { ContextualTutorChat } from './ContextualTutorChat';
 import { MasterySummary } from './MasterySummary';
 import { QuestionReportDialog } from './QuestionReportDialog';
+import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 
 type VideoSourceType = 'youtube' | 'vimeo' | 'direct';
 
