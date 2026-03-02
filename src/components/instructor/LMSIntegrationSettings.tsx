@@ -28,6 +28,11 @@ interface LMSPlatform {
   client_id: string;
   is_active: boolean;
   created_at: string;
+  org_id: string | null;
+}
+
+interface LMSIntegrationSettingsProps {
+  mode?: "instructor" | "admin";
 }
 
 interface GradeSyncLog {
@@ -111,7 +116,8 @@ const LMS_OPTIONS = [
   },
 ];
 
-export function LMSIntegrationSettings() {
+export function LMSIntegrationSettings({ mode = "instructor" }: LMSIntegrationSettingsProps) {
+  const isAdmin = mode === "admin";
   const [platforms, setPlatforms] = useState<LMSPlatform[]>([]);
   const [syncLogs, setSyncLogs] = useState<GradeSyncLog[]>([]);
   const [loading, setLoading] = useState(true);
