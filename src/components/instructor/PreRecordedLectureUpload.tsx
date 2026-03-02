@@ -647,7 +647,8 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
           </p>
         </div>
 
-        {/* File Upload */}
+        {/* File Upload or URL Input */}
+        {uploadMode === "file" ? (
         <div className="space-y-4">
           <Label>Video File *</Label>
             <div
@@ -696,6 +697,24 @@ export const PreRecordedLectureUpload = ({ onUploadComplete }: PreRecordedLectur
               )}
             </div>
         </div>
+        ) : (
+        <div className="space-y-2">
+          <Label htmlFor="video-url">YouTube URL *</Label>
+          <Input
+            id="video-url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            disabled={status !== "idle"}
+          />
+          {videoUrl && !isValidVideoUrl(videoUrl) && (
+            <p className="text-xs text-destructive">Please enter a valid YouTube URL</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Paste a YouTube video link. AI will extract captions and generate questions automatically.
+          </p>
+        </div>
+        )}
 
         {/* Progress/Status */}
         {status !== "idle" && statusDisplay && (
