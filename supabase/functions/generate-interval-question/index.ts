@@ -5,17 +5,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
-// Fallback questions for when AI fails
-const FALLBACK_QUESTIONS = [
-  { question_text: "What was the main concept just discussed?", suggested_type: "short_answer" },
-  { question_text: "Can you summarize the key point from the last few minutes?", suggested_type: "short_answer" },
-  { question_text: "What is the most important takeaway from what was just covered?", suggested_type: "short_answer" },
+// Generic/vague question patterns that should never be sent
+const GENERIC_QUESTION_PATTERNS = [
+  /can you summarize/i,
+  /summarize the key point/i,
+  /summarize the main/i,
+  /what was the main concept/i,
+  /what is the most important takeaway/i,
+  /what was the most important concept/i,
+  /what did you learn/i,
+  /what have we covered/i,
+  /what was just discussed/i,
+  /recap what was/i,
 ];
 
-const LONG_INTERVAL_FALLBACK_QUESTIONS = [
-  { question_text: "What was the most important concept covered in the last section of the lecture?", suggested_type: "short_answer" },
-  { question_text: "Summarize the main learning objective from the past segment.", suggested_type: "short_answer" },
-];
+/**
+ * Check if a question is too generic/vague to send.
+ */
+function isGenericQuestion(text: string): boolean {
+  if (!text || typeof text !== "string") return false;
+  for (const pattern of GENERIC_QUESTION_PATTERNS) {
+    if (pattern.test(text)) return true;
+  }
+  return false;
+}
+
+/**
+ * Get a fallback response that respects the format preference.
+ * Instead of sending a generic question, return a failure so the system
+ * can skip this interval rather than sending a useless question.
+ */
+function getFallbackResponse(formatPreference: string, confidence: number, reason: string) {
+  // If MCQ is preferred, we can't generate a proper MCQ fallback without AI,
+  // so return a failure instead of sending a wrong-format generic question.
+  if (formatPreference === "multiple_choice" || formatPreference === "coding") {
+    return {
+      success: false,
+      error: "Could not generate a relevant question in the requested format",
+      error_type: "fallback_format_mismatch",
+      confidence,
+      reasoning: reason,
+    };
+  }
+  // For short_answer, we also skip generic questions now
+  return {
+    success: false,
+    error: "Could not generate a relevant question",
+    error_type: "no_relevant_fallback",
+    confidence,
+    reasoning: reason,
+  };
+}
 
 // Stopwords for keyword overlap validation
 const STOPWORDS = new Set([
