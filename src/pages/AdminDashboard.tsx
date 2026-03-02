@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings } from "lucide-react";
+import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
@@ -15,10 +15,11 @@ import InstructorPerformanceCard, { InstructorPerformance } from "@/components/a
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
+import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
-type TabValue = "overview" | "adoption" | "support";
+type TabValue = "overview" | "adoption" | "support" | "settings";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -388,6 +389,7 @@ export default function AdminDashboard() {
     { value: "overview" as TabValue, label: "Overview", icon: LayoutDashboard },
     { value: "adoption" as TabValue, label: "Adoption", icon: BarChart3 },
     { value: "support" as TabValue, label: "Support Workflow", icon: HeartHandshake },
+    { value: "settings" as TabValue, label: "Settings", icon: Settings },
   ];
 
   if (loading) {
@@ -508,6 +510,12 @@ export default function AdminDashboard() {
                 avgCompletionRate={retentionMetrics.avgCompletionRate}
               />
               <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
+            </div>
+          )}
+
+          {activeTab === "settings" && (
+            <div className="space-y-6 max-w-3xl mx-auto">
+              <LMSIntegrationSettings mode="admin" />
             </div>
           )}
         </div>
