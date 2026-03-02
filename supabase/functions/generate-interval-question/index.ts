@@ -5,17 +5,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
-// Fallback questions for when AI fails
-const FALLBACK_QUESTIONS = [
-  { question_text: "What was the main concept just discussed?", suggested_type: "short_answer" },
-  { question_text: "Can you summarize the key point from the last few minutes?", suggested_type: "short_answer" },
-  { question_text: "What is the most important takeaway from what was just covered?", suggested_type: "short_answer" },
+// Generic/vague question patterns that should never be sent
+const GENERIC_QUESTION_PATTERNS = [
+  /can you summarize/i,
+  /summarize the key point/i,
+  /summarize the main/i,
+  /what was the main concept/i,
+  /what is the most important takeaway/i,
+  /what was the most important concept/i,
+  /what did you learn/i,
+  /what have we covered/i,
+  /what was just discussed/i,
+  /recap what was/i,
 ];
 
-const LONG_INTERVAL_FALLBACK_QUESTIONS = [
-  { question_text: "What was the most important concept covered in the last section of the lecture?", suggested_type: "short_answer" },
-  { question_text: "Summarize the main learning objective from the past segment.", suggested_type: "short_answer" },
-];
+/**
+ * Check if a question is too generic/vague to send.
+ */
+function isGenericQuestion(text: string): boolean {
+  if (!text || typeof text !== "string") return false;
+  for (const pattern of GENERIC_QUESTION_PATTERNS) {
+    if (pattern.test(text)) return true;
+  }
+  return false;
+}
+
+/**
+ * Get a fallback response that respects the format preference.
+ * Instead of sending a generic question, return a failure so the system
+ * can skip this interval rather than sending a useless question.
+ */
+function getFallbackResponse(formatPreference: string, confidence: number, reason: string) {
+  // If MCQ is preferred, we can't generate a proper MCQ fallback without AI,
+  // so return a failure instead of sending a wrong-format generic question.
+  if (formatPreference === "multiple_choice" || formatPreference === "coding") {
+    return {
+      success: false,
+      error: "Could not generate a relevant question in the requested format",
+      error_type: "fallback_format_mismatch",
+      confidence,
+      reasoning: reason,
+    };
+  }
+  // For short_answer, we also skip generic questions now
+  return {
+    success: false,
+    error: "Could not generate a relevant question",
+    error_type: "no_relevant_fallback",
+    confidence,
+    reasoning: reason,
+  };
+}
 
 // Stopwords for keyword overlap validation
 const STOPWORDS = new Set([
@@ -335,18 +375,8 @@ Generate ONE focused question that tests understanding of the most important con
 
       if (!response.ok) {
         console.error("AI API error:", response.status);
-        // Use fallback
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-        
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: 0.5,
-          is_fallback: true,
-          reasoning: "AI service unavailable, using fallback question",
-        }), {
+        const fallbackResult = getFallbackResponse(format_preference, 0.5, "AI service unavailable");
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -365,18 +395,21 @@ Generate ONE focused question that tests understanding of the most important con
       // Layer 2: Confidence threshold check
       if ((parsed.confidence || 0) < 0.6) {
         console.warn(`⚠️ Low confidence (${parsed.confidence}) - rejecting question`);
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+          `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}".`);
+        return new Response(JSON.stringify(fallbackResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: parsed.confidence,
-          is_fallback: true,
-          relevance_rejected: true,
-          reasoning: `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}". Using fallback.`,
-        }), {
+      // Layer 2b: Generic/vague question filter
+      const questionTextStr = typeof parsed.question_text === "string" ? parsed.question_text : "";
+      if (isGenericQuestion(questionTextStr)) {
+        console.warn(`⚠️ Generic question blocked: "${questionTextStr.substring(0, 80)}"`);
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence || 0.5,
+          `Generic/vague question blocked: "${questionTextStr.substring(0, 80)}". Will retry next interval.`);
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -397,18 +430,9 @@ Generate ONE focused question that tests understanding of the most important con
 
       if (!relevance.relevant) {
         console.warn(`⚠️ Relevance check failed: ${relevance.reason}`);
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: parsed.confidence,
-          is_fallback: true,
-          relevance_rejected: true,
-          reasoning: `Relevance validation failed: ${relevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
-        }), {
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+          `Relevance validation failed: ${relevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}".`);
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -423,18 +447,9 @@ Generate ONE focused question that tests understanding of the most important con
 
       if (!courseScopeRelevance.relevant) {
         console.warn(`⚠️ Course scope check failed: ${courseScopeRelevance.reason}`);
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: parsed.confidence,
-          is_fallback: true,
-          relevance_rejected: true,
-          reasoning: `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
-        }), {
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+          `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}".`);
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -460,18 +475,9 @@ Generate ONE focused question that tests understanding of the most important con
       clearTimeout(timeoutId);
       console.error("AI error:", aiError);
 
-      // Use fallback on any AI error
-      const fallback = interval_minutes >= 20
-        ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-        : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-      return new Response(JSON.stringify({
-        success: true,
-        ...fallback,
-        confidence: 0.5,
-        is_fallback: true,
-        reasoning: `AI error: ${aiError.message}, using fallback`,
-      }), {
+      // Return failure instead of generic fallback
+      const fallbackResult = getFallbackResponse(format_preference, 0.5, `AI error: ${aiError.message}`);
+      return new Response(JSON.stringify(fallbackResult), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
