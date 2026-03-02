@@ -355,12 +355,132 @@ function parseInnertubeTranscript(
 }
 
 /**
+ * Direct timedtext scraping — no page fetch or API key needed.
+ * Tries multiple language/kind combos for maximum coverage.
+ */
+async function fetchTranscriptViaDirect(
+  videoId: string
+): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
+  // Try: manual English, auto English, manual any common languages
+  const attempts = [
+    { lang: "en", kind: "" },
+    { lang: "en", kind: "asr" },
+    { lang: "en-US", kind: "" },
+    { lang: "en-US", kind: "asr" },
+  ];
+
+  for (const { lang, kind } of attempts) {
+    try {
+      const kindParam = kind ? `&kind=${kind}` : "";
+      const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}${kindParam}&fmt=json3`;
+      console.log(`[DirectTimedtext] Trying: lang=${lang}, kind=${kind || "manual"}`);
+
+      const resp = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+        },
+      });
+
+      if (!resp.ok) {
+        console.log(`[DirectTimedtext] HTTP ${resp.status} for lang=${lang}, kind=${kind}`);
+        await resp.text();
+        continue;
+      }
+
+      const text = await resp.text();
+      if (!text || text.length < 20) {
+        console.log(`[DirectTimedtext] Empty response for lang=${lang}, kind=${kind} (${text.length} chars)`);
+        continue;
+      }
+
+      try {
+        const json = JSON.parse(text);
+        const result = parseTimedTextJson(json);
+        if (result && result.text.length > 50) {
+          console.log(`[DirectTimedtext] Success: ${result.text.length} chars, ${result.segments.length} segments (lang=${lang}, kind=${kind})`);
+          return result;
+        }
+      } catch {
+        // Try XML parse
+        const result = parseXmlCaptions(text);
+        if (result && result.text.length > 50) {
+          console.log(`[DirectTimedtext] Success (XML): ${result.text.length} chars`);
+          return result;
+        }
+      }
+    } catch (error) {
+      console.error(`[DirectTimedtext] Error for lang=${lang}:`, error);
+    }
+  }
+
+  // Also try the list endpoint to discover available languages
+  try {
+    const listUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
+    const listResp = await fetch(listUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+      },
+    });
+    if (listResp.ok) {
+      const listXml = await listResp.text();
+      // Extract first language from <track> elements
+      const trackMatch = listXml.match(/lang_code="([^"]+)"/);
+      if (trackMatch) {
+        const discoveredLang = trackMatch[1];
+        console.log(`[DirectTimedtext] Discovered language: ${discoveredLang}`);
+        const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${discoveredLang}&fmt=json3`;
+        const resp = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+          },
+        });
+        if (resp.ok) {
+          const text = await resp.text();
+          if (text && text.length > 20) {
+            try {
+              const result = parseTimedTextJson(JSON.parse(text));
+              if (result && result.text.length > 50) {
+                console.log(`[DirectTimedtext] Success with discovered lang=${discoveredLang}: ${result.text.length} chars`);
+                return result;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        } else {
+          await resp.text();
+        }
+      }
+    } else {
+      await listResp.text();
+    }
+  } catch (error) {
+    console.error("[DirectTimedtext] List discovery error:", error);
+  }
+
+  console.log("[DirectTimedtext] All direct attempts failed");
+  return null;
+}
+
+/**
  * Orchestrate all YouTube transcript methods with fallbacks.
  */
 async function fetchYouTubeTranscript(
   videoId: string
 ): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
-  // Method 1: Innertube API (most reliable)
+  // Method 1: Direct timedtext (fastest, no page fetch needed)
+  try {
+    const result = await fetchTranscriptViaDirect(videoId);
+    if (result) return result;
+  } catch (error) {
+    console.error("[YouTube] Direct timedtext method failed:", error);
+  }
+
+  // Method 2: Innertube API (page fetch + transcript endpoint, with retry)
   try {
     const result = await fetchTranscriptViaInnertube(videoId);
     if (result) return result;
@@ -368,7 +488,7 @@ async function fetchYouTubeTranscript(
     console.error("[YouTube] Innertube method failed:", error);
   }
 
-  // Method 2: YouTube Data API timedtext
+  // Method 3: YouTube Data API timedtext
   const apiKey = Deno.env.get("YOUTUBE_API_KEY");
   if (apiKey) {
     try {
