@@ -164,31 +164,54 @@ export const InteractiveLecturePlayer = ({
 
   const videoSourceType = useMemo(() => getVideoSourceType(videoUrl), [videoUrl]);
   const isYouTube = videoSourceType === 'youtube';
+  const isKaltura = videoSourceType === 'kaltura';
+  const isExternalPlayer = isYouTube || isKaltura;
   const ytContainerId = `yt-player-${lectureId}`;
+  const kalturaContainerId = `kaltura-player-${lectureId}`;
+
+  // Shared time update handler for external players
+  const handleExternalTimeUpdate = useCallback((time: number) => {
+    setCurrentTime(time);
+    if (time > maxAllowedTime) {
+      setMaxAllowedTime(time);
+    }
+  }, [maxAllowedTime]);
+
+  const handleExternalDuration = useCallback((dur: number) => {
+    setDuration(dur);
+  }, []);
+
+  const handleExternalStateChange = useCallback((playing: boolean) => {
+    setIsPlaying(playing);
+  }, []);
 
   // YouTube Player API hook
   const ytPlayer = useYouTubePlayer({
     videoUrl,
     containerId: ytContainerId,
-    onTimeUpdate: useCallback((time: number) => {
-      setCurrentTime(time);
-      // Update max allowed time
-      if (time > maxAllowedTime) {
-        setMaxAllowedTime(time);
-      }
-    }, [maxAllowedTime]),
-    onDurationReady: useCallback((dur: number) => {
-      setDuration(dur);
-    }, []),
-    onStateChange: useCallback((playing: boolean) => {
-      setIsPlaying(playing);
-    }, []),
+    onTimeUpdate: handleExternalTimeUpdate,
+    onDurationReady: handleExternalDuration,
+    onStateChange: handleExternalStateChange,
   });
 
-  // Safe play helper — works for both direct video and YouTube
+  // Kaltura Player hook
+  const kalturaPlayer = useKalturaPlayer({
+    videoUrl,
+    containerId: kalturaContainerId,
+    partnerId: kalturaPartnerId || '',
+    uiConfId: kalturaUiConfId || '',
+    onTimeUpdate: handleExternalTimeUpdate,
+    onDurationReady: handleExternalDuration,
+    onStateChange: handleExternalStateChange,
+  });
+
+  // Unified external player interface
+  const extPlayer = isYouTube ? ytPlayer : kalturaPlayer;
+
+  // Safe play helper — works for direct video, YouTube, and Kaltura
   const safePlay = useCallback(() => {
-    if (isYouTube) {
-      ytPlayer.play();
+    if (isExternalPlayer) {
+      extPlayer.play();
       setIsPlaying(true);
       return;
     }
