@@ -773,11 +773,11 @@ export const InteractiveLecturePlayer = ({
 
   // Handle jumping to remediation timestamp
   const handleWatchRemediation = () => {
-    if (!isYouTube && !videoRef.current) return;
+    if (!isExternalPlayer && !videoRef.current) return;
     
     // Allow seeking to remediation point
-    if (isYouTube) {
-      ytPlayer.seekTo(remediation.jumpToTimestamp, true);
+    if (isExternalPlayer) {
+      extPlayer.seekTo(remediation.jumpToTimestamp);
     } else if (videoRef.current) {
       videoRef.current.currentTime = remediation.jumpToTimestamp;
     }
@@ -789,11 +789,11 @@ export const InteractiveLecturePlayer = ({
     safePlay();
 
     // Set up listener to pause at end of remediation segment and show follow-up
-    if (isYouTube) {
+    if (isExternalPlayer) {
       const checkEnd = setInterval(() => {
-        const t = ytPlayer.getCurrentTime();
+        const t = extPlayer.getCurrentTime();
         if (t >= remediation.endTimestamp) {
-          ytPlayer.pause();
+          extPlayer.pause();
           setIsPlaying(false);
           if (remediation.followUpQuestion) {
             setShowFollowUp(true);
