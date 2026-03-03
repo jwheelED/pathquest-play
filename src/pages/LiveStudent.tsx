@@ -324,9 +324,11 @@ const LiveStudent = () => {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        // Edge function returns { success, response: { isCorrect, pointsEarned, ... } }
+        const responseData = result.data.response || result.data;
         setHasAnswered(true);
-        setIsCorrect(result.data.isCorrect);
-        setPointsEarned(result.data.pointsEarned || 0);
+        setIsCorrect(responseData.isCorrect);
+        setPointsEarned(responseData.pointsEarned || 0);
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -335,10 +337,10 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        if (result.data.isCorrect) {
-          toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
+        if (responseData.isCorrect) {
+          toast.success(`Correct! +${responseData.pointsEarned} XP 🎉`);
         } else {
-          const penalty = result.data.pointsEarned < 0 ? ` ${result.data.pointsEarned} XP` : '';
+          const penalty = responseData.pointsEarned < 0 ? ` ${responseData.pointsEarned} XP` : '';
           toast.error(`Incorrect${penalty}`);
         }
       } else if (result.error) {
@@ -450,14 +452,16 @@ const LiveStudent = () => {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        // Edge function returns { success, response: { isCorrect, pointsEarned, ... } }
+        const responseData = result.data.response || result.data;
         toast.dismiss(gradingToastId);
         setIsGrading(false);
         setHasAnswered(true);
-        setIsCorrect(result.data.isCorrect);
-        setAiGrade(result.data.aiGrade || null);
-        setAiFeedback(result.data.aiFeedback || null);
-        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setGradePending(result.data.gradePending || false);
+        setIsCorrect(responseData.isCorrect);
+        setAiGrade(responseData.aiGrade || null);
+        setAiFeedback(responseData.aiFeedback || null);
+        setAiGradeComponents(responseData.gradeBreakdown?.components || null);
+        setGradePending(responseData.gradePending || false);
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -467,13 +471,13 @@ const LiveStudent = () => {
         );
         
         // Show appropriate feedback based on grading mode
-        if (result.data.gradePending) {
+        if (responseData.gradePending) {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
-        } else if (result.data.aiGrade !== null) {
-          const gradeText = `${result.data.aiGrade}%`;
-          if (result.data.aiGrade >= 70) {
+        } else if (responseData.aiGrade !== null) {
+          const gradeText = `${responseData.aiGrade}%`;
+          if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
-          } else if (result.data.aiGrade >= 50) {
+          } else if (responseData.aiGrade >= 50) {
             toast.info(`Score: ${gradeText} - Good effort!`);
           } else {
             toast.error(`Score: ${gradeText} - Keep practicing!`);
@@ -553,15 +557,17 @@ const LiveStudent = () => {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        // Edge function returns { success, response: { isCorrect, pointsEarned, ... } }
+        const responseData = result.data.response || result.data;
         toast.dismiss(gradingToastId);
         setIsGrading(false);
         setHasAnswered(true);
-        setIsCorrect(result.data.isCorrect);
-        setAiGrade(result.data.aiGrade || null);
-        setAiFeedback(result.data.aiFeedback || null);
-        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
-        setPointsEarned(result.data.pointsEarned || 0);
+        setIsCorrect(responseData.isCorrect);
+        setAiGrade(responseData.aiGrade || null);
+        setAiFeedback(responseData.aiFeedback || null);
+        setAiGradeComponents(responseData.gradeBreakdown?.components || null);
+        setUnderstandsConcept(responseData.gradeBreakdown?.understandsConcept ?? null);
+        setPointsEarned(responseData.pointsEarned || 0);
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -570,11 +576,11 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        if (result.data.aiGrade !== null) {
-          const gradeText = `${result.data.aiGrade}%`;
-          if (result.data.aiGrade >= 70) {
+        if (responseData.aiGrade !== null) {
+          const gradeText = `${responseData.aiGrade}%`;
+          if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
-          } else if (result.data.aiGrade >= 50) {
+          } else if (responseData.aiGrade >= 50) {
             toast.info(`Score: ${gradeText} - Good effort!`);
           } else {
             toast.error(`Score: ${gradeText} - Keep practicing!`);
