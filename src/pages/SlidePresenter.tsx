@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useCourseContext } from '@/hooks/useCourseContext';
 import { SlideUploader } from '@/components/instructor/slides/SlideUploader';
+import { SlideQuestionGenerator } from '@/components/instructor/slides/SlideQuestionGenerator';
+import { SlideQuestionReview } from '@/components/instructor/slides/SlideQuestionReview';
 import { SlideViewer, SlideViewerRef } from '@/components/instructor/slides/SlideViewer';
 import { PptxViewer, PptxViewerRef } from '@/components/instructor/slides/PptxViewer';
 import { SlidePresenterOverlay } from '@/components/instructor/slides/SlidePresenterOverlay';
@@ -11,7 +13,8 @@ import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from 
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components/instructor/VoiceQuestionPreviewDialog';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
@@ -36,6 +39,24 @@ export default function SlidePresenter() {
   const [showUploader, setShowUploader] = useState(false);
   const [loading, setLoading] = useState(true);
   const [extractionStage, setExtractionStage] = useState<'idle' | 'capturing' | 'analyzing' | 'sending'>('idle');
+  
+  // Post-upload question generation workflow
+  const [generatingMaterialId, setGeneratingMaterialId] = useState<string | null>(null);
+  const [generatingFilePath, setGeneratingFilePath] = useState<string>('');
+  const [generatingFileType, setGeneratingFileType] = useState<string>('');
+  const [reviewingMaterialId, setReviewingMaterialId] = useState<string | null>(null);
+  const [reviewingMaterialTitle, setReviewingMaterialTitle] = useState<string>('');
+  const [reviewingTotalSlides, setReviewingTotalSlides] = useState<number>(0);
+  
+  // Preset questions for current presentation
+  const [presetQuestions, setPresetQuestions] = useState<Array<{
+    id: string;
+    slide_number: number;
+    question_type: string;
+    question_content: any;
+    is_enabled: boolean;
+  }>>([]);
+  const [sentPresetIds, setSentPresetIds] = useState<Set<string>>(new Set());
   
   // Slide question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -430,21 +451,49 @@ export default function SlidePresenter() {
   };
 
   const handleStartPresentation = async (presentation: SlideData) => {
+    // Load preset questions for this presentation
+    const { data: presets } = await supabase
+      .from('slide_preset_questions')
+      .select('id, slide_number, question_type, question_content, is_enabled')
+      .eq('material_id', presentation.id)
+      .eq('is_enabled', true)
+      .order('slide_number');
+
+    setPresetQuestions(presets || []);
+    setSentPresetIds(new Set());
+
     setActivePresentation(presentation);
     setIsFullscreen(true);
     setCurrentSlideText('');
     setCurrentSlideNumber(1);
     
-    // Track slide presentation start in PostHog
     trackSlidePresenterStarted(presentation.id);
     
-    // Enter browser fullscreen
     try {
       await document.documentElement.requestFullscreen();
     } catch (e) {
       console.log('Fullscreen not available');
     }
   };
+
+  // Send a preset question for the current slide
+  const handleSendPresetQuestion = useCallback(() => {
+    const currentPresets = presetQuestions.filter(
+      q => q.slide_number === currentSlideNumber && q.is_enabled && !sentPresetIds.has(q.id)
+    );
+    if (currentPresets.length === 0) return;
+
+    const preset = currentPresets[0];
+    setPreviewQuestionType(preset.question_type as QuestionType);
+    setPreviewExtractedData(preset.question_content);
+    setIsPreviewOpen(true);
+    setSentPresetIds(prev => new Set([...prev, preset.id]));
+  }, [presetQuestions, currentSlideNumber, sentPresetIds]);
+
+  // Get preset questions for current slide
+  const currentSlidePresets = presetQuestions.filter(
+    q => q.slide_number === currentSlideNumber && q.is_enabled && !sentPresetIds.has(q.id)
+  );
 
   const handleExitPresentation = useCallback(() => {
     setIsFullscreen(false);
@@ -457,10 +506,28 @@ export default function SlidePresenter() {
     }
   }, []);
 
-  const handleUploadComplete = () => {
+  const handleUploadComplete = async () => {
     setShowUploader(false);
-    fetchPresentations();
-    toast.success('Slides uploaded successfully!');
+    await fetchPresentations();
+    
+    // Get the most recently uploaded material to trigger question generation
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: latest } = await supabase
+        .from('lecture_materials')
+        .select('id, file_path, file_type, title')
+        .eq('instructor_id', user.id)
+        .or('file_type.eq.application/pdf,file_type.ilike.%presentation%,file_type.ilike.%powerpoint%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (latest) {
+        setGeneratingMaterialId(latest.id);
+        setGeneratingFilePath(latest.file_path);
+        setGeneratingFileType(latest.file_type || 'application/pdf');
+      }
+    }
   };
 
   // Handle ESC key to exit presentation
@@ -556,6 +623,19 @@ export default function SlidePresenter() {
           />
         )}
         
+        {/* Preset Question Send Button - shows when current slide has a ready question */}
+        {currentSlidePresets.length > 0 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+            <Button
+              onClick={handleSendPresetQuestion}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg gap-2 animate-in fade-in slide-in-from-top-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Send Question (Slide {currentSlideNumber})
+            </Button>
+          </div>
+        )}
+
         {/* Recording Controls - bottom left */}
         <SlideRecordingControls
           isRecording={isRecording}
@@ -640,7 +720,33 @@ export default function SlidePresenter() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {showUploader ? (
+        {generatingMaterialId ? (
+          <SlideQuestionGenerator
+            materialId={generatingMaterialId}
+            filePath={generatingFilePath}
+            fileType={generatingFileType}
+            courseId={selectedCourseId}
+            onComplete={() => {
+              setReviewingMaterialId(generatingMaterialId);
+              setReviewingMaterialTitle('New Presentation');
+              setReviewingTotalSlides(30); // Will be refined by review component
+              setGeneratingMaterialId(null);
+            }}
+            onSkip={() => setGeneratingMaterialId(null)}
+          />
+        ) : reviewingMaterialId ? (
+          <SlideQuestionReview
+            materialId={reviewingMaterialId}
+            materialTitle={reviewingMaterialTitle}
+            totalSlides={reviewingTotalSlides}
+            onStartPresenting={() => {
+              const pres = presentations.find(p => p.id === reviewingMaterialId);
+              if (pres) handleStartPresentation(pres);
+              setReviewingMaterialId(null);
+            }}
+            onBack={() => setReviewingMaterialId(null)}
+          />
+        ) : showUploader ? (
           <SlideUploader
             onComplete={handleUploadComplete}
             onCancel={() => setShowUploader(false)}

@@ -2820,6 +2820,76 @@ export type Database = {
           },
         ]
       }
+      slide_preset_questions: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          generation_source: string
+          id: string
+          instructor_id: string
+          is_enabled: boolean
+          material_id: string
+          order_index: number
+          org_id: string | null
+          question_content: Json
+          question_type: string
+          slide_number: number
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          generation_source?: string
+          id?: string
+          instructor_id: string
+          is_enabled?: boolean
+          material_id: string
+          order_index?: number
+          org_id?: string | null
+          question_content?: Json
+          question_type?: string
+          slide_number: number
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          generation_source?: string
+          id?: string
+          instructor_id?: string
+          is_enabled?: boolean
+          material_id?: string
+          order_index?: number
+          org_id?: string | null
+          question_content?: Json
+          question_type?: string
+          slide_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slide_preset_questions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slide_preset_questions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slide_preset_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spaced_repetition: {
         Row: {
           created_at: string
