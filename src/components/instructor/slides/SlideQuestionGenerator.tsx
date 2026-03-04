@@ -70,6 +70,7 @@ export function SlideQuestionGenerator({
   }, []);
 
   const startGeneration = useCallback(async () => {
+    abortRef.current = false; // Reset abort flag for fresh run
     try {
       // Get PDF URL (either direct or from pdf_fallback_path for PPTX)
       let pdfPath = filePath;

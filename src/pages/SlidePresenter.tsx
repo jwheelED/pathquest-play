@@ -769,31 +769,51 @@ export default function SlidePresenter() {
               const isPptx = presentation.fileType?.includes('presentation') || 
                              presentation.fileType?.includes('powerpoint');
               return (
-                <div
-                  key={presentation.id}
-                  className="border rounded-lg overflow-hidden bg-card hover:border-primary/50 transition-colors cursor-pointer group"
-                  onClick={() => handleStartPresentation(presentation)}
-                >
-                  <div className="aspect-video bg-muted flex items-center justify-center relative">
-                    <Presentation className="h-12 w-12 text-muted-foreground" />
-                    {isPptx && (
-                      <div className="absolute top-2 right-2 bg-amber-500/90 text-white text-xs px-2 py-1 rounded">
-                        Animations
+                  <div
+                    key={presentation.id}
+                    className="border rounded-lg overflow-hidden bg-card hover:border-primary/50 transition-colors group"
+                  >
+                    <div 
+                      className="aspect-video bg-muted flex items-center justify-center relative cursor-pointer"
+                      onClick={() => handleStartPresentation(presentation)}
+                    >
+                      <Presentation className="h-12 w-12 text-muted-foreground" />
+                      {isPptx && (
+                        <div className="absolute top-2 right-2 bg-amber-500/90 text-white text-xs px-2 py-1 rounded">
+                          Animations
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Button variant="secondary">
+                          Start Presenting
+                        </Button>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button variant="secondary">
-                        Start Presenting
-                      </Button>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold truncate">{presentation.title}</h3>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-sm text-muted-foreground">
+                          {isPptx ? 'PowerPoint' : 'PDF'} • {new Date(presentation.createdAt).toLocaleDateString()}
+                        </p>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReviewingMaterialId(presentation.id);
+                              setReviewingMaterialTitle(presentation.title);
+                              setReviewingTotalSlides(presentation.totalSlides || 30);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Edit Questions
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold truncate">{presentation.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {isPptx ? 'PowerPoint' : 'PDF'} • {new Date(presentation.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
               );
             })}
           </div>
