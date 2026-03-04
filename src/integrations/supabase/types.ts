@@ -2832,6 +2832,7 @@ export type Database = {
           order_index: number
           org_id: string | null
           question_content: Json
+          question_name: string | null
           question_type: string
           slide_number: number
           updated_at: string
@@ -2847,6 +2848,7 @@ export type Database = {
           order_index?: number
           org_id?: string | null
           question_content?: Json
+          question_name?: string | null
           question_type?: string
           slide_number: number
           updated_at?: string
@@ -2862,6 +2864,7 @@ export type Database = {
           order_index?: number
           org_id?: string | null
           question_content?: Json
+          question_name?: string | null
           question_type?: string
           slide_number?: number
           updated_at?: string

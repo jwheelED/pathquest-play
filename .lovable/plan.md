@@ -1,56 +1,64 @@
 
+Goal: fix the persistent “Failed to send a request to the Edge Function” error for file uploads.
 
-## Plan: Slide Presenter Workflow Improvements
+What I found from logs and code
+1. The current runtime error is not a generic network issue; it is a hard crash in the Edge Function runtime:
+   - `[unenv] fs.readFile is not implemented yet!`
+   - Stack trace references `@smithy/shared-ini-file-loader` and `@smithy/node-config-provider`.
+2. That stack trace is specific to AWS SDK-for-Node dependency resolution, which means the deployed function is still executing an old AWS SDK-based bundle.
+3. The repository code for `supabase/functions/upload-to-cloudinary/index.ts` is now the manual AWS Signature V4 + fetch implementation (no `@aws-sdk/client-s3` imports), so code and deployed runtime are out of sync.
+4. A direct function call currently returns `502 Bad Gateway`, consistent with boot-time/runtime crash before normal request handling.
 
-### Changes Overview
+Root cause
+- The deployed `upload-to-cloudinary` function version is stale (or deployment did not switch active version), so Supabase is still running the previous AWS SDK-based code path that is incompatible with Deno Edge runtime.
 
-Three modifications to the slide presenter workflow:
+Fix plan (implementation sequence)
+1. Confirm deployment mismatch before changing behavior
+   - Trigger one controlled request to `/upload-to-cloudinary`.
+   - Capture fresh logs timestamp to confirm crash still points to `@smithy/*`.
+   - This establishes a known baseline and avoids chasing secondary issues.
 
-1. **Remove auto-generation after upload** — Instead, add a "Generate Questions" button on each presentation card
-2. **Skip question preview dialog when sending preset questions** — Send directly without showing the edit dialog
-3. **Add question names** — Allow instructors to name questions, and display the name in the "Send Question" button during presentation
+2. Stabilize function source for deployment
+   - Keep the fetch-based R2 uploader as the canonical implementation.
+   - Remove the unused `HmacSha256` import to reduce any unnecessary module load surface.
+   - Add structured error logs around:
+     - secret presence checks,
+     - signed request creation,
+     - R2 response status/body.
+   - Preserve CORS behavior and response schema so existing frontend calls remain unchanged.
 
----
+3. Force function runtime refresh
+   - Explicitly deploy `upload-to-cloudinary` (do not rely on implicit auto-sync in this recovery case).
+   - If stale bundle persists, perform a hard reset:
+     - delete deployed function,
+     - redeploy from current source.
+   - Rationale: this clears stuck deployment/version state and guarantees the active artifact matches repo code.
 
-### 1. Remove Auto-Generation After Upload
+4. Validate edge behavior outside UI
+   - Call function directly and verify:
+     - no boot-time `@smithy/*` errors,
+     - function returns expected JSON error for missing file instead of 502 crash,
+     - OPTIONS preflight responds with correct CORS headers.
 
-**File: `src/pages/SlidePresenter.tsx`**
+5. Validate end-to-end from app UI
+   - Test upload path used by:
+     - `SimplifiedStudyMaterials.tsx`
+     - `StudyMaterialUpload.tsx`
+     - `QuickUploadSheet.tsx`
+   - Confirm network request reaches function and receives JSON response.
+   - Confirm DB insert and post-upload question generation still trigger.
 
-- Modify `handleUploadComplete` (lines 509-531): Remove the logic that automatically sets `generatingMaterialId`. Just refresh presentations and close the uploader.
-- Add a "Generate Questions" button to each presentation card (alongside "Edit Questions"), which sets `generatingMaterialId/FilePath/FileType` to trigger the `SlideQuestionGenerator`.
-- Need to fetch `file_path` and `file_type` from the material when the button is clicked (these aren't currently stored in `SlideData`). Extend `SlideData` to include `filePath` and store it from the query.
+6. Add guardrails for faster future diagnosis
+   - Improve frontend toast for function invocation failures to show actionable detail (edge error message/status).
+   - Keep function name unchanged (`upload-to-cloudinary`) to avoid refactoring multiple callers, but annotate in code that it now targets R2 to prevent confusion.
 
-### 2. Skip Preview Dialog for Preset Questions
+Technical notes
+- No database schema changes are required.
+- No additional secrets are required beyond the R2 secrets already added.
+- Expected successful outcome: boot errors disappear, 502 is replaced by normal function responses, and uploads work again.
 
-**File: `src/pages/SlidePresenter.tsx`**
-
-- Modify `handleSendPresetQuestion` (lines 480-491): Instead of opening the preview dialog, send the question directly by calling `handleConfirmSendQuestion` with the preset's question content and `isPollMode: true`.
-- This makes preset question sending a true one-click action.
-
-### 3. Add Question Names
-
-**Database: `slide_preset_questions` table**
-- Add a `question_name` column (text, nullable) via migration.
-
-**File: `src/components/instructor/slides/SlideQuestionReview.tsx`**
-- Add a name field to the question card (display + edit mode).
-- When adding a new question manually, default name to empty (instructor can set it).
-- Auto-generated questions get a default name like "Q1", "Q2" etc. from the edge function.
-- Update the `SlidePresetQuestion` interface and mutations to include `question_name`.
-
-**File: `supabase/functions/generate-slide-questions/index.ts`**
-- Include a `question_name` field when inserting generated questions (e.g., derived from slide content or just "Slide X Question").
-
-**File: `src/pages/SlidePresenter.tsx`**
-- Include `question_name` in the preset questions fetch.
-- Update the "Send Question" button text: `Send Question: {name} (Slide {number})` or `Send Question (Slide {number})` if no name.
-
----
-
-### Implementation Order
-
-1. Database migration — add `question_name` column
-2. Update edge function — include `question_name` in generated questions
-3. Update `SlideQuestionReview` — add name field to display/edit
-4. Update `SlidePresenter.tsx` — remove auto-generation, add generate button, skip preview for presets, show question name in send button
-
+Acceptance criteria
+1. Edge logs for `upload-to-cloudinary` show no `fs.readFile` / `@smithy/*` runtime errors.
+2. Direct function call no longer returns 502 due to crash.
+3. At least one real file upload from the UI succeeds and returns a valid public R2 URL.
+4. Existing upload entry points continue working without client API contract changes.

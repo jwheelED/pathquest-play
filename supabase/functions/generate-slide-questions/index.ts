@@ -193,6 +193,7 @@ Return ONLY valid JSON.`;
         }
 
         // Insert into slide_preset_questions
+        const questionName = `Slide ${slide.number} Question`;
         const { error: insertError } = await supabase
           .from("slide_preset_questions")
           .insert({
@@ -201,6 +202,7 @@ Return ONLY valid JSON.`;
             slide_number: slide.number,
             question_type: questionType,
             question_content: questionContent,
+            question_name: questionName,
             is_enabled: true,
             order_index: 0,
             generation_source: "auto",
