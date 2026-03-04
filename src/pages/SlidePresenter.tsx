@@ -478,10 +478,28 @@ export default function SlidePresenter() {
     }
   }, []);
 
-  const handleUploadComplete = () => {
+  const handleUploadComplete = async () => {
     setShowUploader(false);
-    fetchPresentations();
-    toast.success('Slides uploaded successfully!');
+    await fetchPresentations();
+    
+    // Get the most recently uploaded material to trigger question generation
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: latest } = await supabase
+        .from('lecture_materials')
+        .select('id, file_path, file_type, title')
+        .eq('instructor_id', user.id)
+        .or('file_type.eq.application/pdf,file_type.ilike.%presentation%,file_type.ilike.%powerpoint%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (latest) {
+        setGeneratingMaterialId(latest.id);
+        setGeneratingFilePath(latest.file_path);
+        setGeneratingFileType(latest.file_type || 'application/pdf');
+      }
+    }
   };
 
   // Handle ESC key to exit presentation
