@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, Users, Zap, CheckCircle2, Shield, BookOpen, Mic, Eye, Brain, BarChart3 } from "lucide-react";
+import { ArrowRight, Sparkles, Users, Zap, CheckCircle2, Shield, BookOpen, Mic, Square, Eye, Brain, BarChart3 } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
@@ -18,6 +18,32 @@ const Index = () => {
   const step3Ref = useScrollAnimation(0.2);
   const benefitsRef = useScrollAnimation(0.2);
   const testimonialsRef = useScrollAnimation(0.2);
+
+  // Step 1 recording animation state
+  const [isRecording, setIsRecording] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const recordingTriggered = useRef(false);
+
+  useEffect(() => {
+    if (step1Ref.isVisible && !recordingTriggered.current) {
+      recordingTriggered.current = true;
+      const t1 = setTimeout(() => setIsRecording(true), 1500);
+      const t2 = setTimeout(() => setShowTranscript(true), 2200);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+  }, [step1Ref.isVisible]);
+
+  // Step 3 bar chart animation state
+  const [barsAnimated, setBarsAnimated] = useState(false);
+  const barsTriggered = useRef(false);
+
+  useEffect(() => {
+    if (step3Ref.isVisible && !barsTriggered.current) {
+      barsTriggered.current = true;
+      const t = setTimeout(() => setBarsAnimated(true), 400);
+      return () => clearTimeout(t);
+    }
+  }, [step3Ref.isVisible]);
 
   useEffect(() => {
     const checkSessionAndRedirect = async (session: any) => {
