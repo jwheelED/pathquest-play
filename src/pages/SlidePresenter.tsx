@@ -13,7 +13,8 @@ import { SlideQuestionPreviewDialog, ExtractedQuestionData, QuestionType } from 
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components/instructor/VoiceQuestionPreviewDialog';
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Presentation, Upload, Mic } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
