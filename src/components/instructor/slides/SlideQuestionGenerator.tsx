@@ -112,9 +112,10 @@ export function SlideQuestionGenerator({
       if (!pdfjsLib) throw new Error('PDF.js failed to load');
 
       setStage('rendering');
+      console.log(`📄 PDF loaded: ${numPages} pages`);
       const pdf = await pdfjsLib.getDocument(signedData.signedUrl).promise;
-      const numPages = pdf.numPages;
-      setTotalSlides(numPages);
+      const numPages2 = pdf.numPages;
+      setTotalSlides(numPages2);
 
       // Determine which slides to send for question generation
       // Strategy: send all slides and let AI decide which ones to skip
