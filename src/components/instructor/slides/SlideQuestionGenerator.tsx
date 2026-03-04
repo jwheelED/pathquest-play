@@ -153,6 +153,8 @@ export function SlideQuestionGenerator({
         setProgress(batchProgress);
         setCurrentSlide(batch[batch.length - 1].number);
 
+        console.log(`🚀 Sending batch ${bIdx + 1}/${batches.length} (slides ${batch[0].number}-${batch[batch.length - 1].number})`);
+
         try {
           const { data, error } = await supabase.functions.invoke('generate-slide-questions', {
             body: {
