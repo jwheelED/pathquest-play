@@ -70,6 +70,7 @@ export function SlideQuestionGenerator({
   }, []);
 
   const startGeneration = useCallback(async () => {
+    abortRef.current = false; // Reset abort flag for fresh run
     try {
       // Get PDF URL (either direct or from pdf_fallback_path for PPTX)
       let pdfPath = filePath;
@@ -113,6 +114,7 @@ export function SlideQuestionGenerator({
       setStage('rendering');
       const pdf = await pdfjsLib.getDocument(signedData.signedUrl).promise;
       const numPages = pdf.numPages;
+      console.log(`📄 PDF loaded: ${numPages} pages`);
       setTotalSlides(numPages);
 
       // Determine which slides to send for question generation
@@ -150,6 +152,8 @@ export function SlideQuestionGenerator({
         const batchProgress = 40 + Math.round(((bIdx + 1) / batches.length) * 55); // 40-95%
         setProgress(batchProgress);
         setCurrentSlide(batch[batch.length - 1].number);
+
+        console.log(`🚀 Sending batch ${bIdx + 1}/${batches.length} (slides ${batch[0].number}-${batch[batch.length - 1].number})`);
 
         try {
           const { data, error } = await supabase.functions.invoke('generate-slide-questions', {
