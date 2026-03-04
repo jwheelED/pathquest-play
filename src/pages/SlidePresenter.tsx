@@ -40,6 +40,24 @@ export default function SlidePresenter() {
   const [loading, setLoading] = useState(true);
   const [extractionStage, setExtractionStage] = useState<'idle' | 'capturing' | 'analyzing' | 'sending'>('idle');
   
+  // Post-upload question generation workflow
+  const [generatingMaterialId, setGeneratingMaterialId] = useState<string | null>(null);
+  const [generatingFilePath, setGeneratingFilePath] = useState<string>('');
+  const [generatingFileType, setGeneratingFileType] = useState<string>('');
+  const [reviewingMaterialId, setReviewingMaterialId] = useState<string | null>(null);
+  const [reviewingMaterialTitle, setReviewingMaterialTitle] = useState<string>('');
+  const [reviewingTotalSlides, setReviewingTotalSlides] = useState<number>(0);
+  
+  // Preset questions for current presentation
+  const [presetQuestions, setPresetQuestions] = useState<Array<{
+    id: string;
+    slide_number: number;
+    question_type: string;
+    question_content: any;
+    is_enabled: boolean;
+  }>>([]);
+  const [sentPresetIds, setSentPresetIds] = useState<Set<string>>(new Set());
+  
   // Slide question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewQuestionType, setPreviewQuestionType] = useState<QuestionType>('mcq');
