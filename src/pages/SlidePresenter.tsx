@@ -729,7 +729,7 @@ export default function SlidePresenter() {
             onComplete={() => {
               setReviewingMaterialId(generatingMaterialId);
               setReviewingMaterialTitle('New Presentation');
-              setReviewingTotalSlides(30); // Will be refined by review component
+              // Use actual slide count from generator if available
               setGeneratingMaterialId(null);
             }}
             onSkip={() => setGeneratingMaterialId(null)}
