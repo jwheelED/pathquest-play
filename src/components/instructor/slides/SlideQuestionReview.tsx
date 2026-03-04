@@ -220,7 +220,7 @@ export function SlideQuestionReview({
               {materialTitle}
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {enabledCount} question{enabledCount !== 1 ? 's' : ''} ready across {totalSlides} slides
+              {enabledCount} question{enabledCount !== 1 ? 's' : ''} ready across {effectiveTotalSlides} slides
             </p>
           </div>
           <div className="flex gap-2">
