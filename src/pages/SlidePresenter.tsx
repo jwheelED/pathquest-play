@@ -14,7 +14,7 @@ import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil, Sparkles } from 'lucide-react';
+import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
