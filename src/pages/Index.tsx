@@ -348,37 +348,40 @@ const Index = () => {
                   <p className="text-sm font-medium text-text-muted-landing uppercase tracking-wider mb-2">Answer Distribution</p>
                   <p className="text-base text-text-main font-semibold mb-6">What type of bond shares electrons?</p>
                   
-                  {/* Vertical bars */}
-                  <div className="flex items-end justify-center gap-4 h-48 mb-4">
+                  {/* Kahoot-style vertical bar chart */}
+                  <div className="flex items-end justify-center gap-3 h-52 mb-4">
                     {[
-                      { label: "A", count: 5, pct: 16, correct: false },
-                      { label: "B", count: 22, pct: 69, correct: true },
-                      { label: "C", count: 3, pct: 9, correct: false },
-                      { label: "D", count: 2, pct: 6, correct: false },
+                      { label: "A", text: "Ionic", count: 5, pct: 23, correct: false, color: "bg-red-500" },
+                      { label: "B", text: "Covalent", count: 22, pct: 100, correct: true, color: "bg-emerald-500" },
+                      { label: "C", text: "Metallic", count: 3, pct: 14, correct: false, color: "bg-orange-500" },
+                      { label: "D", text: "Hydrogen", count: 2, pct: 9, correct: false, color: "bg-blue-500" },
                     ].map((bar) => (
-                      <div key={bar.label} className="flex flex-col items-center gap-2 flex-1">
-                        {/* Count label */}
-                        <span className={`text-sm font-bold transition-all duration-700 ${
-                          barsAnimated ? "opacity-100" : "opacity-0"
-                        } ${bar.correct ? "text-primary" : "text-text-muted-landing"}`}>
+                      <div key={bar.label} className="flex flex-col items-center gap-1 flex-1 h-full">
+                        {/* Count above bar */}
+                        <span className={`text-base font-extrabold transition-all duration-700 delay-500 ${
+                          barsAnimated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+                        } text-text-main`}>
                           {bar.count}
                         </span>
-                        {/* Bar */}
-                        <div className="w-full max-w-[60px] bg-slate-100 rounded-t-lg overflow-hidden relative" style={{ height: "100%" }}>
+                        {/* Bar container */}
+                        <div className="w-full flex-1 flex items-end">
                           <div
-                            className={`absolute bottom-0 left-0 right-0 rounded-t-lg transition-all duration-1000 ease-out ${
-                              bar.correct ? "bg-primary" : "bg-destructive/70"
+                            className={`w-full rounded-t-md transition-all duration-1000 ease-out ${bar.color} ${
+                              bar.correct ? "shadow-lg shadow-emerald-500/30" : ""
                             }`}
-                            style={{ height: barsAnimated ? `${bar.pct}%` : "0%" }}
+                            style={{ 
+                              height: barsAnimated ? `${bar.pct}%` : "0%",
+                              minHeight: barsAnimated ? "8px" : "0px"
+                            }}
                           />
                         </div>
-                        {/* Label */}
-                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                          bar.correct
-                            ? "bg-primary/10 text-primary"
-                            : "bg-slate-100 text-text-muted-landing"
-                        }`}>
+                        {/* Option label pill */}
+                        <div className={`w-full rounded-md py-1.5 text-center text-xs font-bold text-white ${bar.color}`}>
                           {bar.label}
+                        </div>
+                        {/* Answer text */}
+                        <span className="text-xs text-text-muted-landing font-medium truncate w-full text-center">
+                          {bar.text}
                         </span>
                       </div>
                     ))}
