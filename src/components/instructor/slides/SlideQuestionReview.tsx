@@ -50,6 +50,7 @@ export function SlideQuestionReview({
   const [editCorrectAnswer, setEditCorrectAnswer] = useState('A');
   const [editExpectedAnswer, setEditExpectedAnswer] = useState('');
 
+  // Fetch questions
   const { data: questions = [], isLoading } = useQuery({
     queryKey: ['slide-preset-questions', materialId],
     queryFn: async () => {
@@ -64,6 +65,12 @@ export function SlideQuestionReview({
       return (data || []) as SlidePresetQuestion[];
     },
   });
+
+  // Use the larger of totalSlides prop or max slide_number from questions
+  const maxSlideFromQuestions = questions.length > 0 
+    ? Math.max(...questions.map(q => q.slide_number)) 
+    : 0;
+  const effectiveTotalSlides = Math.max(totalSlides, maxSlideFromQuestions);
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
@@ -189,7 +196,7 @@ export function SlideQuestionReview({
 
   // Build list of all slides (1..totalSlides) with their questions
   const slideEntries: Array<{ slideNumber: number; questions: SlidePresetQuestion[] }> = [];
-  for (let i = 1; i <= totalSlides; i++) {
+  for (let i = 1; i <= effectiveTotalSlides; i++) {
     slideEntries.push({ slideNumber: i, questions: slideMap.get(i) || [] });
   }
 
