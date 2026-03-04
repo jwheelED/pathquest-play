@@ -14,7 +14,7 @@ import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil } from 'lucide-react';
+import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,7 @@ export default function SlidePresenter() {
     slide_number: number;
     question_type: string;
     question_content: any;
+    question_name: string | null;
     is_enabled: boolean;
   }>>([]);
   const [sentPresetIds, setSentPresetIds] = useState<Set<string>>(new Set());
@@ -454,7 +455,7 @@ export default function SlidePresenter() {
     // Load preset questions for this presentation
     const { data: presets } = await supabase
       .from('slide_preset_questions')
-      .select('id, slide_number, question_type, question_content, is_enabled')
+      .select('id, slide_number, question_type, question_content, question_name, is_enabled')
       .eq('material_id', presentation.id)
       .eq('is_enabled', true)
       .order('slide_number');
@@ -476,8 +477,8 @@ export default function SlidePresenter() {
     }
   };
 
-  // Send a preset question for the current slide
-  const handleSendPresetQuestion = useCallback(() => {
+  // Send a preset question for the current slide — directly, no preview
+  const handleSendPresetQuestion = useCallback(async () => {
     const currentPresets = presetQuestions.filter(
       q => q.slide_number === currentSlideNumber && q.is_enabled && !sentPresetIds.has(q.id)
     );
@@ -485,10 +486,9 @@ export default function SlidePresenter() {
 
     const preset = currentPresets[0];
     setPreviewQuestionType(preset.question_type as QuestionType);
-    setPreviewExtractedData(preset.question_content);
-    setIsPreviewOpen(true);
     setSentPresetIds(prev => new Set([...prev, preset.id]));
-  }, [presetQuestions, currentSlideNumber, sentPresetIds]);
+    await handleConfirmSendQuestion(preset.question_content, true);
+  }, [presetQuestions, currentSlideNumber, sentPresetIds, handleConfirmSendQuestion]);
 
   // Get preset questions for current slide
   const currentSlidePresets = presetQuestions.filter(
@@ -509,24 +509,21 @@ export default function SlidePresenter() {
   const handleUploadComplete = async () => {
     setShowUploader(false);
     await fetchPresentations();
+    toast.success('Slides uploaded! Use "Generate Questions" to create questions.');
+  };
+
+  // Trigger question generation for a specific presentation
+  const handleGenerateQuestions = async (presentationId: string) => {
+    const { data: material } = await supabase
+      .from('lecture_materials')
+      .select('id, file_path, file_type, title')
+      .eq('id', presentationId)
+      .single();
     
-    // Get the most recently uploaded material to trigger question generation
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: latest } = await supabase
-        .from('lecture_materials')
-        .select('id, file_path, file_type, title')
-        .eq('instructor_id', user.id)
-        .or('file_type.eq.application/pdf,file_type.ilike.%presentation%,file_type.ilike.%powerpoint%')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (latest) {
-        setGeneratingMaterialId(latest.id);
-        setGeneratingFilePath(latest.file_path);
-        setGeneratingFileType(latest.file_type || 'application/pdf');
-      }
+    if (material) {
+      setGeneratingMaterialId(material.id);
+      setGeneratingFilePath(material.file_path);
+      setGeneratingFileType(material.file_type || 'application/pdf');
     }
   };
 
@@ -631,7 +628,9 @@ export default function SlidePresenter() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg gap-2 animate-in fade-in slide-in-from-top-2"
             >
               <MessageSquare className="h-4 w-4" />
-              Send Question (Slide {currentSlideNumber})
+              {currentSlidePresets[0].question_name 
+                ? `Send Question: ${currentSlidePresets[0].question_name} (Slide ${currentSlideNumber})`
+                : `Send Question (Slide ${currentSlideNumber})`}
             </Button>
           </div>
         )}
@@ -795,7 +794,19 @@ export default function SlidePresenter() {
                         <p className="text-sm text-muted-foreground">
                           {isPptx ? 'PowerPoint' : 'PDF'} • {new Date(presentation.createdAt).toLocaleDateString()}
                         </p>
-                        <div className="flex gap-1">
+                      <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerateQuestions(presentation.id);
+                            }}
+                          >
+                            <Sparkles className="h-3 w-3" />
+                            Generate
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -808,7 +819,7 @@ export default function SlidePresenter() {
                             }}
                           >
                             <Pencil className="h-3 w-3" />
-                            Edit Questions
+                            Edit
                           </Button>
                         </div>
                       </div>
