@@ -220,15 +220,40 @@ const Index = () => {
               }`}
             >
               <div className="order-2 lg:order-1">
-                {/* Stylized mockup — Mic + transcription bubble */}
+                {/* Stylized mockup — Recording animation */}
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-card p-8 md:p-12">
                   <div className="flex flex-col items-center gap-6">
-                    <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
-                      <Mic className="w-10 h-10 text-primary" strokeWidth={1.5} />
-                    </div>
-                    <div className="w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-100">
+                    {/* Start/Stop Recording Button */}
+                    <button
+                      className={`flex items-center gap-3 px-6 py-3 rounded-full font-semibold text-white text-sm transition-all duration-500 ${
+                        isRecording
+                          ? "bg-destructive shadow-lg scale-105"
+                          : "bg-primary shadow-glow"
+                      }`}
+                      style={{ pointerEvents: "none" }}
+                    >
+                      {isRecording ? (
+                        <>
+                          <Square className="w-4 h-4" fill="currentColor" />
+                          Stop Recording
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-4 h-4" />
+                          Start Recording
+                        </>
+                      )}
+                    </button>
+
+                    {/* Transcription bubble — fades in */}
+                    <div
+                      className={`w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-100 transition-all duration-700 ${
+                        showTranscript ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 max-h-0 overflow-hidden"
+                      }`}
+                      style={showTranscript ? { maxHeight: 200 } : { maxHeight: 0 }}
+                    >
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
                         <span className="text-xs font-medium text-text-muted-landing uppercase tracking-wider">Live Transcription</span>
                       </div>
                       <p className="text-lg text-text-main font-medium leading-relaxed">
@@ -318,31 +343,53 @@ const Index = () => {
               }`}
             >
               <div className="order-2 lg:order-1">
-                {/* Stylized mockup — Bar chart */}
+                {/* Stylized mockup — Kahoot-style vertical bar chart */}
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-card p-8">
-                  <p className="text-sm font-medium text-text-muted-landing uppercase tracking-wider mb-6">Class Understanding</p>
-                  <div className="space-y-5">
+                  <p className="text-sm font-medium text-text-muted-landing uppercase tracking-wider mb-2">Answer Distribution</p>
+                  <p className="text-base text-text-main font-semibold mb-6">What type of bond shares electrons?</p>
+                  
+                  {/* Vertical bars */}
+                  <div className="flex items-end justify-center gap-4 h-48 mb-4">
                     {[
-                      { label: "Got it", pct: 78, color: "bg-primary" },
-                      { label: "Confused", pct: 22, color: "bg-destructive" },
+                      { label: "A", count: 5, pct: 16, correct: false },
+                      { label: "B", count: 22, pct: 69, correct: true },
+                      { label: "C", count: 3, pct: 9, correct: false },
+                      { label: "D", count: 2, pct: 6, correct: false },
                     ].map((bar) => (
-                      <div key={bar.label} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="font-medium text-text-main">{bar.label}</span>
-                          <span className="font-bold text-text-main">{bar.pct}%</span>
-                        </div>
-                        <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                      <div key={bar.label} className="flex flex-col items-center gap-2 flex-1">
+                        {/* Count label */}
+                        <span className={`text-sm font-bold transition-all duration-700 ${
+                          barsAnimated ? "opacity-100" : "opacity-0"
+                        } ${bar.correct ? "text-primary" : "text-text-muted-landing"}`}>
+                          {bar.count}
+                        </span>
+                        {/* Bar */}
+                        <div className="w-full max-w-[60px] bg-slate-100 rounded-t-lg overflow-hidden relative" style={{ height: "100%" }}>
                           <div
-                            className={`h-full ${bar.color} rounded-full transition-all duration-1000`}
-                            style={{ width: `${bar.pct}%` }}
+                            className={`absolute bottom-0 left-0 right-0 rounded-t-lg transition-all duration-1000 ease-out ${
+                              bar.correct ? "bg-primary" : "bg-destructive/70"
+                            }`}
+                            style={{ height: barsAnimated ? `${bar.pct}%` : "0%" }}
                           />
                         </div>
+                        {/* Label */}
+                        <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
+                          bar.correct
+                            ? "bg-primary/10 text-primary"
+                            : "bg-slate-100 text-text-muted-landing"
+                        }`}>
+                          {bar.label}
+                        </span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-text-muted-landing">
-                    <Users className="w-4 h-4" />
-                    <span>32 students responded</span>
+
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-sm text-text-muted-landing">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>32 students responded</span>
+                    </div>
+                    <span className="font-semibold text-primary">69% correct</span>
                   </div>
                 </div>
               </div>
