@@ -476,6 +476,25 @@ export default function SlidePresenter() {
     }
   };
 
+  // Send a preset question for the current slide
+  const handleSendPresetQuestion = useCallback(() => {
+    const currentPresets = presetQuestions.filter(
+      q => q.slide_number === currentSlideNumber && q.is_enabled && !sentPresetIds.has(q.id)
+    );
+    if (currentPresets.length === 0) return;
+
+    const preset = currentPresets[0];
+    setPreviewQuestionType(preset.question_type as QuestionType);
+    setPreviewExtractedData(preset.question_content);
+    setIsPreviewOpen(true);
+    setSentPresetIds(prev => new Set([...prev, preset.id]));
+  }, [presetQuestions, currentSlideNumber, sentPresetIds]);
+
+  // Get preset questions for current slide
+  const currentSlidePresets = presetQuestions.filter(
+    q => q.slide_number === currentSlideNumber && q.is_enabled && !sentPresetIds.has(q.id)
+  );
+
   const handleExitPresentation = useCallback(() => {
     setIsFullscreen(false);
     setActivePresentation(null);
