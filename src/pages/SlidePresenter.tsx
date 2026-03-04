@@ -451,15 +451,24 @@ export default function SlidePresenter() {
   };
 
   const handleStartPresentation = async (presentation: SlideData) => {
+    // Load preset questions for this presentation
+    const { data: presets } = await supabase
+      .from('slide_preset_questions')
+      .select('id, slide_number, question_type, question_content, is_enabled')
+      .eq('material_id', presentation.id)
+      .eq('is_enabled', true)
+      .order('slide_number');
+
+    setPresetQuestions(presets || []);
+    setSentPresetIds(new Set());
+
     setActivePresentation(presentation);
     setIsFullscreen(true);
     setCurrentSlideText('');
     setCurrentSlideNumber(1);
     
-    // Track slide presentation start in PostHog
     trackSlidePresenterStarted(presentation.id);
     
-    // Enter browser fullscreen
     try {
       await document.documentElement.requestFullscreen();
     } catch (e) {
