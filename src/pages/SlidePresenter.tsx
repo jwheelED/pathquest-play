@@ -623,6 +623,19 @@ export default function SlidePresenter() {
           />
         )}
         
+        {/* Preset Question Send Button - shows when current slide has a ready question */}
+        {currentSlidePresets.length > 0 && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+            <Button
+              onClick={handleSendPresetQuestion}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg gap-2 animate-in fade-in slide-in-from-top-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              Send Question (Slide {currentSlideNumber})
+            </Button>
+          </div>
+        )}
+
         {/* Recording Controls - bottom left */}
         <SlideRecordingControls
           isRecording={isRecording}
@@ -707,7 +720,33 @@ export default function SlidePresenter() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {showUploader ? (
+        {generatingMaterialId ? (
+          <SlideQuestionGenerator
+            materialId={generatingMaterialId}
+            filePath={generatingFilePath}
+            fileType={generatingFileType}
+            courseId={selectedCourseId}
+            onComplete={() => {
+              setReviewingMaterialId(generatingMaterialId);
+              setReviewingMaterialTitle('New Presentation');
+              setReviewingTotalSlides(30); // Will be refined by review component
+              setGeneratingMaterialId(null);
+            }}
+            onSkip={() => setGeneratingMaterialId(null)}
+          />
+        ) : reviewingMaterialId ? (
+          <SlideQuestionReview
+            materialId={reviewingMaterialId}
+            materialTitle={reviewingMaterialTitle}
+            totalSlides={reviewingTotalSlides}
+            onStartPresenting={() => {
+              const pres = presentations.find(p => p.id === reviewingMaterialId);
+              if (pres) handleStartPresentation(pres);
+              setReviewingMaterialId(null);
+            }}
+            onBack={() => setReviewingMaterialId(null)}
+          />
+        ) : showUploader ? (
           <SlideUploader
             onComplete={handleUploadComplete}
             onCancel={() => setShowUploader(false)}
