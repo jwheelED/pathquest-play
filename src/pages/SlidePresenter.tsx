@@ -14,7 +14,7 @@ import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from '@/components
 import { useLectureRecording } from '@/hooks/useLectureRecording';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil, Sparkles } from 'lucide-react';
+import { ArrowLeft, Presentation, Upload, Mic, MessageSquare, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { cn } from '@/lib/utils';
@@ -527,6 +527,48 @@ export default function SlidePresenter() {
     }
   };
 
+  // Delete a presentation (lecture material + associated preset questions + storage file)
+  const handleDeletePresentation = async (presentationId: string) => {
+    if (!confirm('Delete this presentation and all its questions? This cannot be undone.')) return;
+
+    try {
+      // Get file path for storage cleanup
+      const { data: material } = await supabase
+        .from('lecture_materials')
+        .select('file_path, pdf_fallback_path')
+        .eq('id', presentationId)
+        .single();
+
+      // Delete preset questions first (FK dependency)
+      await supabase
+        .from('slide_preset_questions')
+        .delete()
+        .eq('material_id', presentationId);
+
+      // Delete the material record
+      const { error } = await supabase
+        .from('lecture_materials')
+        .delete()
+        .eq('id', presentationId);
+
+      if (error) throw error;
+
+      // Clean up storage files (best-effort)
+      if (material?.file_path) {
+        await supabase.storage.from('lecture-materials').remove([material.file_path]);
+      }
+      if (material?.pdf_fallback_path) {
+        await supabase.storage.from('lecture-materials').remove([material.pdf_fallback_path]);
+      }
+
+      setPresentations(prev => prev.filter(p => p.id !== presentationId));
+      toast.success('Presentation deleted');
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete presentation');
+    }
+  };
+
   // Handle ESC key to exit presentation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -820,6 +862,17 @@ export default function SlidePresenter() {
                           >
                             <Pencil className="h-3 w-3" />
                             Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePresentation(presentation.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </div>
