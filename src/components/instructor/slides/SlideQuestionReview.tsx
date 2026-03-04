@@ -20,6 +20,7 @@ interface SlidePresetQuestion {
   slide_number: number;
   question_type: string;
   question_content: ExtractedQuestionData;
+  question_name: string | null;
   is_enabled: boolean;
   order_index: number;
   generation_source: string;
@@ -46,6 +47,7 @@ export function SlideQuestionReview({
 
   // Inline edit state
   const [editQuestion, setEditQuestion] = useState('');
+  const [editQuestionName, setEditQuestionName] = useState('');
   const [editOptions, setEditOptions] = useState<string[]>(['', '', '', '']);
   const [editCorrectAnswer, setEditCorrectAnswer] = useState('A');
   const [editExpectedAnswer, setEditExpectedAnswer] = useState('');
@@ -98,10 +100,10 @@ export function SlideQuestionReview({
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, content }: { id: string; content: ExtractedQuestionData }) => {
+    mutationFn: async ({ id, content, questionName }: { id: string; content: ExtractedQuestionData; questionName: string }) => {
       const { error } = await supabase
         .from('slide_preset_questions')
-        .update({ question_content: content as any })
+        .update({ question_content: content as any, question_name: questionName || null })
         .eq('id', id);
       if (error) throw error;
     },
@@ -152,6 +154,7 @@ export function SlideQuestionReview({
 
   const startEdit = useCallback((q: SlidePresetQuestion) => {
     setEditingId(q.id);
+    setEditQuestionName(q.question_name || '');
     const content = q.question_content;
     if (q.question_type === 'mcq' && content.mcq) {
       setEditQuestion(content.mcq.question || '');
@@ -183,8 +186,8 @@ export function SlideQuestionReview({
         },
       };
     }
-    updateMutation.mutate({ id: q.id, content });
-  }, [editQuestion, editOptions, editCorrectAnswer, editExpectedAnswer, updateMutation]);
+    updateMutation.mutate({ id: q.id, content, questionName: editQuestionName });
+  }, [editQuestion, editQuestionName, editOptions, editCorrectAnswer, editExpectedAnswer, updateMutation]);
 
   // Group questions by slide number
   const slideMap = new Map<number, SlidePresetQuestion[]>();
@@ -290,6 +293,12 @@ export function SlideQuestionReview({
                           {/* Question display or edit */}
                           {isEditing ? (
                             <div className="space-y-3">
+                              <Input
+                                value={editQuestionName}
+                                onChange={e => setEditQuestionName(e.target.value)}
+                                placeholder="Question name (e.g. 'Mitosis recap')"
+                                className="h-8 text-sm"
+                              />
                               <Textarea
                                 value={editQuestion}
                                 onChange={e => setEditQuestion(e.target.value)}
@@ -347,6 +356,11 @@ export function SlideQuestionReview({
                             </div>
                           ) : (
                             <>
+                              {(q as SlidePresetQuestion).question_name && (
+                                <p className="text-xs font-semibold text-primary mb-1">
+                                  {(q as SlidePresetQuestion).question_name}
+                                </p>
+                              )}
                               <p className="text-sm font-medium">
                                 {mcq?.question || sa?.question || 'No question text'}
                               </p>
