@@ -345,9 +345,20 @@ ${difficultyInstructions}
 
 ${formatInstructions}
 
+MATH FORMATTING - CRITICAL:
+Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
+Write all math as plain readable text using Unicode:
+- Fractions: a/b (never \\frac)
+- Integrals: ∫(a to b) f(x) dx
+- Square roots: √x, √(x+1)
+- Exponents: x², x³, e^(x²)
+- Greek letters: π, θ, α, β
+- Derivatives: d/dx, d²/dx², f'(x), dy/dx
+- Apply to question AND all answer options
+
 Return JSON in this exact format:
 {
-  "question_text": "the question (use LaTeX $...$ for math)",
+  "question_text": "the question (use plain Unicode math, no LaTeX)",
   "suggested_type": "${format_preference}",
   "confidence": 0.0-1.0,
   "reasoning": "why this question tests the key concept FROM THE ${groundingSource.toUpperCase()}"

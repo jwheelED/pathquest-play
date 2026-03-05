@@ -132,56 +132,54 @@ PUNCTUATION FIXES:
 ✅ "what is the capital of France" → "what is the capital of France?"
 
 MATHEMATICS HANDLING - CRITICAL FOR STEM LECTURES:
-When you detect spoken mathematics in the transcript, convert ALL mathematical expressions to proper LaTeX notation.
-Wrap equations in $...$ for inline math or $$...$$ for display math (complex/centered equations).
+When you detect spoken mathematics in the transcript, convert ALL mathematical expressions to plain readable Unicode text.
+Do NOT use LaTeX syntax. No $, \frac, \int, {, }, or backslash commands.
 
-SPOKEN MATH → LATEX CONVERSION PATTERNS:
-- "limit as h approaches zero" → $\\lim_{h \\to 0}$
-- "limit as x approaches infinity" → $\\lim_{x \\to \\infty}$
-- "x plus h quantity squared" or "(x + h) squared" → $(x+h)^2$
-- "all over h" or "divided by h" → use \\frac{numerator}{h}
-- "x squared" → $x^2$
-- "x cubed" → $x^3$
-- "x to the n" or "x to the power n" → $x^n$
-- "square root of x" → $\\sqrt{x}$
-- "cube root of x" → $\\sqrt[3]{x}$
-- "the integral from a to b" → $\\int_a^b$
-- "the derivative of f" → $\\frac{df}{dx}$ or $f'(x)$
-- "d y d x" or "dy dx" → $\\frac{dy}{dx}$
-- "partial derivative" → $\\frac{\\partial f}{\\partial x}$
-- "sum from n equals 1 to infinity" → $\\sum_{n=1}^{\\infty}$
-- "product from" → $\\prod$
-- "f of x" → $f(x)$
-- "sine of x" / "sin x" → $\\sin(x)$
-- "cosine" / "cos" → $\\cos$
-- "tangent" / "tan" → $\\tan$
-- "log of x" / "log x" → $\\log(x)$
-- "natural log" / "ln" → $\\ln(x)$
-- "e to the x" → $e^x$
-- "pi" → $\\pi$
-- "theta" → $\\theta$
-- "alpha", "beta", "gamma", etc. → $\\alpha$, $\\beta$, $\\gamma$
-- "infinity" → $\\infty$
-- "plus or minus" → $\\pm$
-- "not equal to" → $\\neq$
-- "less than or equal to" → $\\leq$
-- "greater than or equal to" → $\\geq$
-- "approximately equal" → $\\approx$
-- "vector x" → $\\vec{x}$
-- "matrix" → use \\begin{matrix}...\\end{matrix}
+SPOKEN MATH → PLAIN TEXT CONVERSION PATTERNS:
+- "limit as h approaches zero" → lim(h→0)
+- "limit as x approaches infinity" → lim(x→∞)
+- "x plus h quantity squared" or "(x + h) squared" → (x+h)²
+- "all over h" or "divided by h" → .../h or use fraction notation like numerator/h
+- "x squared" → x²
+- "x cubed" → x³
+- "x to the n" or "x to the power n" → xⁿ
+- "square root of x" → √x
+- "cube root of x" → ∛x
+- "the integral from a to b" → ∫(a to b)
+- "the derivative of f" → df/dx or f'(x)
+- "d y d x" or "dy dx" → dy/dx
+- "partial derivative" → ∂f/∂x
+- "sum from n equals 1 to infinity" → Σ(n=1 to ∞)
+- "product from" → Π
+- "f of x" → f(x)
+- "sine of x" / "sin x" → sin(x)
+- "cosine" / "cos" → cos
+- "tangent" / "tan" → tan
+- "log of x" / "log x" → log(x)
+- "natural log" / "ln" → ln(x)
+- "e to the x" → eˣ
+- "pi" → π
+- "theta" → θ
+- "alpha", "beta", "gamma" → α, β, γ
+- "infinity" → ∞
+- "plus or minus" → ±
+- "not equal to" → ≠
+- "less than or equal to" → ≤
+- "greater than or equal to" → ≥
+- "approximately equal" → ≈
 
 EXAMPLE CONVERSIONS:
 Spoken: "what is the limit as h approaches zero of x plus h quantity squared minus x squared all over h"
-Output: "What is $\\lim_{h \\to 0} \\frac{(x+h)^2 - x^2}{h}$?"
+Output: "What is lim(h→0) [(x+h)² − x²] / h?"
 
 Spoken: "find the derivative of x squared plus 3x"
-Output: "Find the derivative of $x^2 + 3x$."
+Output: "Find the derivative of x² + 3x."
 
 Spoken: "evaluate the integral from 0 to pi of sine x dx"
-Output: "Evaluate $\\int_0^{\\pi} \\sin(x) \\, dx$."
+Output: "Evaluate ∫(0 to π) sin(x) dx."
 
 Spoken: "what is the sum from n equals 1 to infinity of 1 over n squared"
-Output: "What is $\\sum_{n=1}^{\\infty} \\frac{1}{n^2}$?"
+Output: "What is Σ(n=1 to ∞) 1/n²?"
 
 ${difficultyInstruction}
 

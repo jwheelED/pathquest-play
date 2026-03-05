@@ -82,6 +82,20 @@ SKIP slides that are: title slides, table of contents, "thank you" slides, trans
 
 Difficulty level: ${difficulty}
 
+MATH FORMATTING - CRITICAL:
+Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
+Write all math as plain readable text using Unicode:
+- Fractions: a/b, cos x / sin x (never \\frac)
+- Integrals: ∫(a to b) f(x) dx
+- Square roots: √x, √(x+1)
+- Exponents: x², x³, e^(x²)
+- Greek letters: π, θ, α, β
+- Derivatives: d/dx, d²/dx², f'(x), dy/dx
+- Limits: lim(h→0), lim(x→∞)
+- Summation: Σ(n=1 to ∞) 1/n²
+- Apply to the question AND all answer options
+- Reproduce the EXACT notation from the slide using Unicode
+
 If the slide has meaningful educational content, generate a multiple choice question.
 
 For graphs, charts, diagrams:
@@ -94,7 +108,7 @@ If question can be generated:
 {
   "found": true,
   "questionType": "mcq",
-  "question": "Clear, specific question based on slide content",
+  "question": "Clear, specific question based on slide content (plain Unicode math, no LaTeX)",
   "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
   "correctAnswer": "A",
   "explanation": "Brief explanation of the correct answer",
