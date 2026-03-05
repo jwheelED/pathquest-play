@@ -68,7 +68,7 @@ serve(async (req) => {
 
     // Generate explanation via OpenAI
     const systemPrompt = `You are a helpful teaching assistant. Generate a clear, concise explanation for a quiz question. 
-Use simple language appropriate for students. If mathematical notation is needed, use LaTeX format with $ delimiters.
+Use simple language appropriate for students. If mathematical notation is needed, use plain readable Unicode text (√, π, ∫, x², fractions as a/b). Do NOT use LaTeX syntax — no $, \\frac, \\int, {, }, or backslash commands.
 Keep explanations focused and under 200 words.
 IMPORTANT: If the student answered correctly, NEVER say their answer is wrong, incorrect, or that they misunderstood. Only reinforce why the answer is correct and deepen their understanding.`;
 
