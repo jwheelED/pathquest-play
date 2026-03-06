@@ -24,7 +24,7 @@ export function QuickActions({ actions, className }: QuickActionsProps) {
           size="sm"
           onClick={action.onClick}
           className={cn(
-            "rounded-full gap-2 text-xs",
+            "rounded-lg gap-2 text-xs",
             action.variant === "primary" && "bg-primary hover:bg-primary/90"
           )}
         >

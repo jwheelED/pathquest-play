@@ -10,7 +10,7 @@
 @layer base {
   :root {
     /* Base system colors - Sky Blue Theme */
-    --background: 200 60% 94%;
+    --background: 210 20% 98%;
     --foreground: 220 25% 15%;
 
     --card: 0 0% 100%;

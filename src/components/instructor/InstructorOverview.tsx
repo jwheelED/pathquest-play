@@ -126,7 +126,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Engagement Score"
         value={`${metrics.avgEngagement} / 100`}
         variant="primary"
-        trend={{ direction: "neutral", value: "Participation + responses" }}
+        description="Based on participation and responses"
       />
 
       <MetricCard
@@ -134,7 +134,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Active Today"
         value={metrics.totalStudents > 0 ? metrics.activeToday : "--"}
         variant="default"
-        trend={{ direction: "neutral", value: `of ${metrics.totalStudents} students` }}
+        description={`of ${metrics.totalStudents} students`}
       />
 
       <div
