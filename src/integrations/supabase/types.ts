@@ -914,6 +914,8 @@ export type Database = {
           org_id: string | null
           question_content: Json
           question_type: string
+          source_material_id: string | null
+          source_material_title: string | null
           tags: string[] | null
           times_used: number | null
           title: string
@@ -929,6 +931,8 @@ export type Database = {
           org_id?: string | null
           question_content?: Json
           question_type: string
+          source_material_id?: string | null
+          source_material_title?: string | null
           tags?: string[] | null
           times_used?: number | null
           title: string
@@ -944,6 +948,8 @@ export type Database = {
           org_id?: string | null
           question_content?: Json
           question_type?: string
+          source_material_id?: string | null
+          source_material_title?: string | null
           tags?: string[] | null
           times_used?: number | null
           title?: string
@@ -969,6 +975,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_question_bank_source_material_id_fkey"
+            columns: ["source_material_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_materials"
             referencedColumns: ["id"]
           },
         ]
