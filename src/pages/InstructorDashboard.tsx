@@ -549,6 +549,9 @@ export default function InstructorDashboard() {
       case "question-bank":
         return <QuestionBankTab professorType={professorType} />;
 
+      case "summaries":
+        return <SavedSummariesTab />;
+
       case "materials":
         return (
           <div className="space-y-6">
