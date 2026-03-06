@@ -43,13 +43,13 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editQuestion, setEditQuestion] = useState<BankQuestion | null>(null);
   const [pushQuestion, setPushQuestion] = useState<BankQuestion | null>(null);
   const [deleteQuestion, setDeleteQuestion] = useState<BankQuestion | null>(null);
+  const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   
   // Upload flow
@@ -68,17 +68,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         { value: "short_answer", label: "Short Answer" },
         { value: "coding", label: "Coding" },
       ];
-
-  // Derive unique sources from loaded questions
-  const sourceOptions = useMemo(() => {
-    const sources = new Map<string, string>();
-    questions.forEach(q => {
-      if (q.source_material_id && q.source_material_title) {
-        sources.set(q.source_material_id, q.source_material_title);
-      }
-    });
-    return Array.from(sources, ([id, title]) => ({ value: id, label: title }));
-  }, [questions]);
 
   const fetchQuestions = async () => {
     try {
@@ -136,22 +125,36 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
     }
   };
 
-  // Filter questions
-  const filteredQuestions = questions.filter(q => {
-    // Type filter
+  const handleDeleteAllFromSource = async () => {
+    if (!deleteSourceId) return;
+    
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("instructor_question_bank")
+        .delete()
+        .eq("source_material_id", deleteSourceId);
+
+      if (error) throw error;
+
+      const sourceTitle = questions.find(q => q.source_material_id === deleteSourceId)?.source_material_title;
+      toast.success(`Deleted all questions from "${sourceTitle}"`);
+      setQuestions(questions.filter(q => q.source_material_id !== deleteSourceId));
+    } catch (error) {
+      console.error("Error deleting source questions:", error);
+      toast.error("Failed to delete questions");
+    } finally {
+      setDeleting(false);
+      setDeleteSourceId(null);
+    }
+  };
+
+  // Apply search + type filters
+  const applyFilters = (q: BankQuestion) => {
     if (typeFilter !== "all") {
       const normalizedType = q.question_type === "coding_simple" ? "coding" : q.question_type;
       if (normalizedType !== typeFilter) return false;
     }
-    
-    // Source filter
-    if (sourceFilter === "manual") {
-      if (q.source_material_id) return false;
-    } else if (sourceFilter !== "all") {
-      if (q.source_material_id !== sourceFilter) return false;
-    }
-    
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchesTitle = q.title.toLowerCase().includes(query);
@@ -160,9 +163,26 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
       const matchesSource = q.source_material_title?.toLowerCase().includes(query);
       if (!matchesTitle && !matchesTags && !matchesContent && !matchesSource) return false;
     }
-    
     return true;
-  });
+  };
+
+  // Split: manual questions vs source-grouped questions
+  const manualQuestions = questions.filter(q => !q.source_material_id).filter(applyFilters);
+  
+  const sourceGroups = useMemo(() => {
+    const groups = new Map<string, { title: string; questions: BankQuestion[] }>();
+    questions
+      .filter(q => q.source_material_id && q.source_material_title)
+      .filter(applyFilters)
+      .forEach(q => {
+        const key = q.source_material_id!;
+        if (!groups.has(key)) {
+          groups.set(key, { title: q.source_material_title!, questions: [] });
+        }
+        groups.get(key)!.questions.push(q);
+      });
+    return Array.from(groups, ([id, group]) => ({ id, ...group }));
+  }, [questions, typeFilter, searchQuery]);
 
   // Show upload flow
   if (showUploadFlow) {
