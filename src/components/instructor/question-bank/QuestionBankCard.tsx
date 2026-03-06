@@ -15,6 +15,7 @@ import {
   Send, 
   Code, 
   FileText, 
+  FileUp,
   CheckSquare,
   Star
 } from "lucide-react";
@@ -30,6 +31,8 @@ export interface BankQuestion {
   last_used_at: string | null;
   question_content: Record<string, any>;
   created_at: string;
+  source_material_id?: string | null;
+  source_material_title?: string | null;
 }
 
 interface QuestionBankCardProps {
@@ -113,7 +116,13 @@ export function QuestionBankCard({ question, onEdit, onDelete, onPush }: Questio
             </p>
             
             {/* Meta info */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+              {question.source_material_title && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+                  <FileUp className="w-2.5 h-2.5" />
+                  {question.source_material_title}
+                </Badge>
+              )}
               {question.times_used !== null && question.times_used > 0 && (
                 <span>📊 Used {question.times_used} time{question.times_used !== 1 ? 's' : ''}</span>
               )}

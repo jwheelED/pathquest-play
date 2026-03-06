@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Library, Loader2 } from "lucide-react";
+import { Plus, Search, Library, Loader2, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -27,6 +27,7 @@ import {
   QuestionBankCard, 
   CreateQuestionDialog, 
   PushQuestionDialog,
+  SlideUploadFlow,
   type BankQuestion 
 } from "./question-bank";
 import { QuestionBankResults } from "./QuestionBankResults";
@@ -41,6 +42,7 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -48,6 +50,9 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [pushQuestion, setPushQuestion] = useState<BankQuestion | null>(null);
   const [deleteQuestion, setDeleteQuestion] = useState<BankQuestion | null>(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Upload flow
+  const [showUploadFlow, setShowUploadFlow] = useState(false);
   
   // Available types based on professor type
   const availableTypes = professorType === "humanities" 
@@ -62,6 +67,17 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         { value: "short_answer", label: "Short Answer" },
         { value: "coding", label: "Coding" },
       ];
+
+  // Derive unique sources from loaded questions
+  const sourceOptions = useMemo(() => {
+    const sources = new Map<string, string>();
+    questions.forEach(q => {
+      if (q.source_material_id && q.source_material_title) {
+        sources.set(q.source_material_id, q.source_material_title);
+      }
+    });
+    return Array.from(sources, ([id, title]) => ({ value: id, label: title }));
+  }, [questions]);
 
   const fetchQuestions = async () => {
     try {
@@ -83,7 +99,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
 
       if (error) throw error;
       
-      // Cast the data to BankQuestion[] - the question_content is JSONB so it comes as Record<string, any>
       setQuestions((data || []) as BankQuestion[]);
     } catch (error) {
       console.error("Error fetching questions:", error);
@@ -124,9 +139,15 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const filteredQuestions = questions.filter(q => {
     // Type filter
     if (typeFilter !== "all") {
-      // Handle coding_simple as coding
       const normalizedType = q.question_type === "coding_simple" ? "coding" : q.question_type;
       if (normalizedType !== typeFilter) return false;
+    }
+    
+    // Source filter
+    if (sourceFilter === "manual") {
+      if (q.source_material_id) return false;
+    } else if (sourceFilter !== "all") {
+      if (q.source_material_id !== sourceFilter) return false;
     }
     
     // Search filter
@@ -135,11 +156,30 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
       const matchesTitle = q.title.toLowerCase().includes(query);
       const matchesTags = q.tags?.some(t => t.toLowerCase().includes(query));
       const matchesContent = JSON.stringify(q.question_content).toLowerCase().includes(query);
-      if (!matchesTitle && !matchesTags && !matchesContent) return false;
+      const matchesSource = q.source_material_title?.toLowerCase().includes(query);
+      if (!matchesTitle && !matchesTags && !matchesContent && !matchesSource) return false;
     }
     
     return true;
   });
+
+  // Show upload flow
+  if (showUploadFlow) {
+    return (
+      <div className="space-y-6">
+        <SlideUploadFlow
+          onComplete={(count) => {
+            setShowUploadFlow(false);
+            fetchQuestions();
+            if (count > 0) {
+              toast.success(`${count} questions added to your bank!`);
+            }
+          }}
+          onCancel={() => setShowUploadFlow(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -155,10 +195,16 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 Create and manage questions to push to students on-demand
               </CardDescription>
             </div>
-            <Button onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Question
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
+                <FileUp className="w-4 h-4 mr-2" />
+                Upload Slides
+              </Button>
+              <Button onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Question
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -185,6 +231,22 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 ))}
               </SelectContent>
             </Select>
+            {sourceOptions.length > 0 && (
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="manual">Manual Only</SelectItem>
+                  {sourceOptions.map(src => (
+                    <SelectItem key={src.value} value={src.value}>
+                      {src.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Questions List */}
@@ -200,15 +262,21 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {questions.length === 0 
-                  ? "Create your first question to get started" 
+                  ? "Create your first question or upload slides to get started" 
                   : "Try adjusting your search or filters"
                 }
               </p>
               {questions.length === 0 && (
-                <Button onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Question
-                </Button>
+                <div className="flex gap-2 justify-center">
+                  <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
+                    <FileUp className="w-4 h-4 mr-2" />
+                    Upload Slides
+                  </Button>
+                  <Button onClick={() => setCreateDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Question
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
