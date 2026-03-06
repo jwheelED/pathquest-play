@@ -52,7 +52,7 @@ type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "q
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "live", label: "Live Lecture", icon: Radio },
+  { value: "live", label: "Live Session", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "students", label: "Students", icon: Users },
