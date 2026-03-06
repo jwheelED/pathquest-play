@@ -373,11 +373,21 @@ export function CreateQuestionDialog({
                   onChange={(e) => setMcqQuestion(e.target.value)}
                   rows={3}
                 />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Options *</Label>
-                {["A", "B", "C", "D"].map((letter, i) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={generatingMcq || !mcqQuestion.trim()}
+                  onClick={handleAiGenerateMcqOptions}
+                >
+                  {generatingMcq ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  {generatingMcq ? "Generating..." : "AI Suggest Options"}
+                </Button>
                   <div key={letter} className="flex items-center gap-2">
                     <span className="w-6 text-sm font-medium">{letter}.</span>
                     <Input
