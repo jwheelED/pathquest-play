@@ -1,6 +1,6 @@
 
-## Plan: Redesign Instructor Overview Tab
+## Plan: Overview Page Visual & UX Fixes
 
 **STATUS: COMPLETED**
 
-Redesigned the instructor overview tab with a 12-column grid layout, refactored CourseCodeCard (renamed to "Student Join Code" with invite link), replaced the donut chart with 3 KPI MetricCards (Engagement Score, Active Today, Assignment Completion), added InstructorQuickActions card (4-button action hub), and LastSessionSummary component. Sidebar nav renamed "Live Lecture" → "Live Session". All components include skeleton loading and empty states.
+Applied all 6 fixes: changed global background from baby blue to neutral off-white (#F9FAFB), restructured MetricCard with label-on-top layout and `description` prop (no more truncated trend text), removed redundant "Start Live Session" from Quick Actions, added visible borders to Quick Action and CourseCodeCard buttons, fixed Assignment Completion card layout, and standardized header button radii from `rounded-full` to `rounded-lg`.
