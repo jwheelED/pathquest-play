@@ -100,7 +100,7 @@ export const LectureSummarySheet = ({
         questions_asked: questionsAsked,
         student_count: studentCount,
         summary_data: summaryData as unknown as Record<string, unknown>,
-      });
+      } as never);
 
       if (error) throw error;
       setSaved(true);
