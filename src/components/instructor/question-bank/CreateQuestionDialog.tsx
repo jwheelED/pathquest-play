@@ -45,6 +45,56 @@ export function CreateQuestionDialog({
 }: CreateQuestionDialogProps) {
   const { selectedCourseId } = useCourseContext();
   const [saving, setSaving] = useState(false);
+  const [generatingMcq, setGeneratingMcq] = useState(false);
+  const [generatingExpected, setGeneratingExpected] = useState(false);
+
+  const handleAiGenerateMcqOptions = async () => {
+    if (!mcqQuestion.trim()) {
+      toast.error("Enter a question first");
+      return;
+    }
+    setGeneratingMcq(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-mcq-options", {
+        body: { question_text: mcqQuestion },
+      });
+      if (error) throw error;
+      if (data?.options?.length === 4) {
+        setMcqOptions(data.options.map((o: string) => o.replace(/^[A-D][\).\s]+/, "")));
+        setMcqCorrectAnswer(data.correct_answer || "A");
+        if (data.explanation) setMcqExplanation(data.explanation);
+        toast.success("AI options generated — review & adjust as needed");
+      }
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error("Failed to generate options");
+    } finally {
+      setGeneratingMcq(false);
+    }
+  };
+
+  const handleAiGenerateExpectedAnswer = async () => {
+    if (!shortQuestion.trim()) {
+      toast.error("Enter a question first");
+      return;
+    }
+    setGeneratingExpected(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-expected-answer", {
+        body: { question_text: shortQuestion },
+      });
+      if (error) throw error;
+      if (data?.expected_answer) {
+        setShortExpectedAnswer(data.expected_answer);
+        toast.success("AI answer generated — review & adjust as needed");
+      }
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error("Failed to generate expected answer");
+    } finally {
+      setGeneratingExpected(false);
+    }
+  };
   
   // Common fields
   const [title, setTitle] = useState("");
