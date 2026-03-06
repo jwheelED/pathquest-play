@@ -99,7 +99,7 @@ export function CourseCodeCard() {
           <Button
             variant="outline"
             size="sm"
-            className="w-full rounded-xl"
+            className="w-full rounded-xl border border-border hover:bg-accent"
             onClick={handleCopyCode}
           >
             {codeCopied ? <Check className="w-4 h-4 mr-1 text-success" /> : <Copy className="w-4 h-4 mr-1" />}

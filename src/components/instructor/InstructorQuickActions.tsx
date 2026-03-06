@@ -1,4 +1,4 @@
-import { Radio, HelpCircle, Upload } from "lucide-react";
+import { HelpCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -14,27 +14,20 @@ export function InstructorQuickActions({ onNavigate }: InstructorQuickActionsPro
       </CardHeader>
       <CardContent className="space-y-2">
         <Button
-          className="w-full justify-start gap-3 rounded-xl bg-success text-success-foreground hover:bg-success/90 truncate"
-          onClick={() => onNavigate("live")}
-        >
-          <Radio className="w-4 h-4 shrink-0" />
-          <span className="truncate">Start Live Session</span>
-        </Button>
-        <Button
           variant="outline"
-          className="w-full justify-start gap-3 rounded-xl truncate"
+          className="w-full justify-start gap-3 rounded-xl bg-card border border-border hover:bg-accent"
           onClick={() => onNavigate("question-bank")}
         >
-          <HelpCircle className="w-4 h-4 shrink-0" />
-          <span className="truncate">Create Question</span>
+          <HelpCircle className="w-4 h-4 shrink-0 text-primary" />
+          <span>Create Question</span>
         </Button>
         <Button
           variant="outline"
-          className="w-full justify-start gap-3 rounded-xl truncate"
+          className="w-full justify-start gap-3 rounded-xl bg-card border border-border hover:bg-accent"
           onClick={() => onNavigate("materials")}
         >
-          <Upload className="w-4 h-4 shrink-0" />
-          <span className="truncate">Upload Slides</span>
+          <Upload className="w-4 h-4 shrink-0 text-primary" />
+          <span>Upload Slides</span>
         </Button>
       </CardContent>
     </Card>

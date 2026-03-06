@@ -1,15 +1,11 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface MetricCardProps {
   icon: ReactNode;
   label: string;
   value: string | number;
-  trend?: {
-    direction: "up" | "down" | "neutral";
-    value: string;
-  };
+  description?: string;
   size?: "sm" | "md" | "lg";
   variant?: "default" | "primary" | "success" | "warning" | "streak";
   className?: string;
@@ -20,7 +16,7 @@ export function MetricCard({
   icon,
   label,
   value,
-  trend,
+  description,
   size = "md",
   variant = "default",
   className,
@@ -30,12 +26,6 @@ export function MetricCard({
     sm: "p-3",
     md: "p-4",
     lg: "p-6",
-  };
-
-  const iconSizeClasses = {
-    sm: "w-8 h-8",
-    md: "w-10 h-10",
-    lg: "w-12 h-12",
   };
 
   const valueSizeClasses = {
@@ -52,14 +42,6 @@ export function MetricCard({
     streak: "bg-streak/5 border-streak/20",
   };
 
-  const iconBgClasses = {
-    default: "bg-muted",
-    primary: "bg-primary/10",
-    success: "bg-success/10",
-    warning: "bg-warning/10",
-    streak: "bg-streak/10",
-  };
-
   const iconColorClasses = {
     default: "text-muted-foreground",
     primary: "text-primary",
@@ -67,18 +49,6 @@ export function MetricCard({
     warning: "text-warning",
     streak: "text-streak",
   };
-
-  const TrendIcon = trend?.direction === "up" 
-    ? TrendingUp 
-    : trend?.direction === "down" 
-    ? TrendingDown 
-    : Minus;
-
-  const trendColorClass = trend?.direction === "up" 
-    ? "text-success" 
-    : trend?.direction === "down" 
-    ? "text-destructive" 
-    : "text-muted-foreground";
 
   return (
     <div
@@ -91,29 +61,23 @@ export function MetricCard({
       )}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between">
-        <div
-          className={cn(
-            "rounded-xl flex items-center justify-center",
-            iconSizeClasses[size],
-            iconBgClasses[variant]
-          )}
-        >
-          <div className={iconColorClasses[variant]}>{icon}</div>
-        </div>
-        {trend && (
-          <div className={cn("flex items-center gap-1 text-xs min-w-0", trendColorClass)}>
-            <TrendIcon className="w-3 h-3 shrink-0" />
-            <span className="truncate">{trend.value}</span>
-          </div>
-        )}
+      {/* Label row with icon */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className={cn("shrink-0", iconColorClasses[variant])}>{icon}</div>
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
       </div>
-      <div className="mt-3 min-w-0">
-        <p className={cn("font-bold text-foreground truncate", valueSizeClasses[size])}>
-          {value}
+
+      {/* Value */}
+      <p className={cn("font-bold text-foreground", valueSizeClasses[size])}>
+        {value}
+      </p>
+
+      {/* Description (never truncated) */}
+      {description && (
+        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+          {description}
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">{label}</p>
-      </div>
+      )}
     </div>
   );
 }

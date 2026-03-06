@@ -126,7 +126,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Engagement Score"
         value={`${metrics.avgEngagement} / 100`}
         variant="primary"
-        trend={{ direction: "neutral", value: "Participation + responses" }}
+        description="Based on participation and responses"
       />
 
       <MetricCard
@@ -134,7 +134,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Active Today"
         value={metrics.totalStudents > 0 ? metrics.activeToday : "--"}
         variant="default"
-        trend={{ direction: "neutral", value: `of ${metrics.totalStudents} students` }}
+        description={`of ${metrics.totalStudents} students`}
       />
 
       <div
@@ -146,30 +146,24 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         )}
         onClick={() => onNavigate?.("students")}
       >
-        <div className="flex items-start justify-between">
-          <div
-            className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center",
-              completionVariant === "warning" ? "bg-warning/10" : "bg-success/10"
-            )}
-          >
+        {/* Label row with icon */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className={completionVariant === "warning" ? "text-warning" : "text-success"}>
             {completionVariant === "warning" ? (
-              <AlertTriangle className="w-5 h-5 text-warning" />
+              <AlertTriangle className="w-5 h-5" />
             ) : (
-              <CheckCircle2 className="w-5 h-5 text-success" />
+              <CheckCircle2 className="w-5 h-5" />
             )}
           </div>
+          <p className="text-sm font-medium text-muted-foreground">Assignment Completion</p>
         </div>
-        <div className="mt-3 min-w-0">
-          <p className="text-2xl font-bold text-foreground truncate">
-            {metrics.avgCompletion}%
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">Assignment Completion</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {metrics.completedCount} of {metrics.totalAssignmentStudents} students
-          </p>
-          <p className="text-xs text-primary mt-1.5 hover:underline truncate">View assignments →</p>
-        </div>
+        <p className="text-2xl font-bold text-foreground">
+          {metrics.avgCompletion}%
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {metrics.completedCount} of {metrics.totalAssignmentStudents} students
+        </p>
+        <p className="text-xs text-primary mt-1.5 hover:underline">View assignments →</p>
       </div>
     </div>
   );
