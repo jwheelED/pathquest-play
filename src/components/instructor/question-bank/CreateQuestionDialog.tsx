@@ -447,7 +447,23 @@ export function CreateQuestionDialog({
               </div>
               
               <div className="space-y-2">
-                <Label>Expected Answer (optional)</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Expected Answer (optional)</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={generatingExpected || !shortQuestion.trim()}
+                    onClick={handleAiGenerateExpectedAnswer}
+                  >
+                    {generatingExpected ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    {generatingExpected ? "Generating..." : "AI Generate"}
+                  </Button>
+                </div>
                 <Textarea
                   placeholder="Model answer for grading reference..."
                   value={shortExpectedAnswer}
