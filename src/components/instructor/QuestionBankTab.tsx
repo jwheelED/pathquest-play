@@ -80,15 +80,12 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         .eq("instructor_id", user.id)
         .order("created_at", { ascending: false });
 
-      // Optionally filter by course
       if (selectedCourseId) {
         query = query.or(`course_id.eq.${selectedCourseId},course_id.is.null`);
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
-      
       setQuestions((data || []) as BankQuestion[]);
     } catch (error) {
       console.error("Error fetching questions:", error);
@@ -104,16 +101,13 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
 
   const handleDelete = async () => {
     if (!deleteQuestion) return;
-    
     setDeleting(true);
     try {
       const { error } = await supabase
         .from("instructor_question_bank")
         .delete()
         .eq("id", deleteQuestion.id);
-
       if (error) throw error;
-
       toast.success("Question deleted");
       setQuestions(questions.filter(q => q.id !== deleteQuestion.id));
     } catch (error) {
@@ -127,16 +121,13 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
 
   const handleDeleteAllFromSource = async () => {
     if (!deleteSourceId) return;
-    
     setDeleting(true);
     try {
       const { error } = await supabase
         .from("instructor_question_bank")
         .delete()
         .eq("source_material_id", deleteSourceId);
-
       if (error) throw error;
-
       const sourceTitle = questions.find(q => q.source_material_id === deleteSourceId)?.source_material_title;
       toast.success(`Deleted all questions from "${sourceTitle}"`);
       setQuestions(questions.filter(q => q.source_material_id !== deleteSourceId));
@@ -156,11 +147,11 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
       if (normalizedType !== typeFilter) return false;
     }
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesTitle = q.title.toLowerCase().includes(query);
-      const matchesTags = q.tags?.some(t => t.toLowerCase().includes(query));
-      const matchesContent = JSON.stringify(q.question_content).toLowerCase().includes(query);
-      const matchesSource = q.source_material_title?.toLowerCase().includes(query);
+      const s = searchQuery.toLowerCase();
+      const matchesTitle = q.title.toLowerCase().includes(s);
+      const matchesTags = q.tags?.some(t => t.toLowerCase().includes(s));
+      const matchesContent = JSON.stringify(q.question_content).toLowerCase().includes(s);
+      const matchesSource = q.source_material_title?.toLowerCase().includes(s);
       if (!matchesTitle && !matchesTags && !matchesContent && !matchesSource) return false;
     }
     return true;
@@ -252,30 +243,14 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 ))}
               </SelectContent>
             </Select>
-            {sourceOptions.length > 0 && (
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="manual">Manual Only</SelectItem>
-                  {sourceOptions.map(src => (
-                    <SelectItem key={src.value} value={src.value}>
-                      {src.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
           </div>
 
-          {/* Questions List */}
+          {/* Manual Questions List */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredQuestions.length === 0 ? (
+          ) : manualQuestions.length === 0 && sourceGroups.length === 0 ? (
             <div className="text-center py-12">
               <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
               <h3 className="font-medium text-muted-foreground mb-1">
@@ -300,9 +275,9 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 </div>
               )}
             </div>
-          ) : (
+          ) : manualQuestions.length > 0 ? (
             <div className="space-y-3">
-              {filteredQuestions.map(question => (
+              {manualQuestions.map(question => (
                 <QuestionBankCard
                   key={question.id}
                   question={question}
@@ -315,9 +290,33 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 />
               ))}
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
+
+      {/* Source Material Cards — grouped by uploaded PDF/PPTX */}
+      {sourceGroups.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground px-1">
+            Questions from Uploaded Slides
+          </h3>
+          {sourceGroups.map(group => (
+            <SourceMaterialCard
+              key={group.id}
+              sourceId={group.id}
+              sourceTitle={group.title}
+              questions={group.questions}
+              onEdit={(q) => {
+                setEditQuestion(q);
+                setCreateDialogOpen(true);
+              }}
+              onDelete={(q) => setDeleteQuestion(q)}
+              onPush={(q) => setPushQuestion(q)}
+              onDeleteAll={(id) => setDeleteSourceId(id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Create/Edit Dialog */}
       <CreateQuestionDialog
@@ -339,7 +338,7 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         onSuccess={fetchQuestions}
       />
 
-      {/* Delete Confirmation */}
+      {/* Delete Single Question Confirmation */}
       <AlertDialog open={!!deleteQuestion} onOpenChange={(open) => !open && setDeleteQuestion(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -356,6 +355,28 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All From Source Confirmation */}
+      <AlertDialog open={!!deleteSourceId} onOpenChange={(open) => !open && setDeleteSourceId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Questions from This Source?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all questions generated from this uploaded file. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAllFromSource}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting..." : "Delete All"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
