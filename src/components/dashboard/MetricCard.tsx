@@ -102,17 +102,17 @@ export function MetricCard({
           <div className={iconColorClasses[variant]}>{icon}</div>
         </div>
         {trend && (
-          <div className={cn("flex items-center gap-1 text-xs", trendColorClass)}>
-            <TrendIcon className="w-3 h-3" />
-            <span>{trend.value}</span>
+          <div className={cn("flex items-center gap-1 text-xs min-w-0", trendColorClass)}>
+            <TrendIcon className="w-3 h-3 shrink-0" />
+            <span className="truncate">{trend.value}</span>
           </div>
         )}
       </div>
-      <div className="mt-3">
-        <p className={cn("font-bold text-foreground", valueSizeClasses[size])}>
+      <div className="mt-3 min-w-0">
+        <p className={cn("font-bold text-foreground truncate", valueSizeClasses[size])}>
           {value}
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">{label}</p>
       </div>
     </div>
   );

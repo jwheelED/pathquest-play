@@ -160,15 +160,15 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
             )}
           </div>
         </div>
-        <div className="mt-3">
-          <p className="text-2xl font-bold text-foreground">
+        <div className="mt-3 min-w-0">
+          <p className="text-2xl font-bold text-foreground truncate">
             {metrics.avgCompletion}%
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Assignment Completion</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">Assignment Completion</p>
+          <p className="text-xs text-muted-foreground truncate">
             {metrics.completedCount} of {metrics.totalAssignmentStudents} students
           </p>
-          <p className="text-xs text-primary mt-1.5 hover:underline">View assignments →</p>
+          <p className="text-xs text-primary mt-1.5 hover:underline truncate">View assignments →</p>
         </div>
       </div>
     </div>
