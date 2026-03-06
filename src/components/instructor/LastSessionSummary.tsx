@@ -56,12 +56,12 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
 
       const [participantsRes, questionsRes] = await Promise.all([
         supabase
-          .from("live_session_participants")
-          .select("id", { count: "exact", head: true })
+          .from("live_participants")
+          .select("session_id")
           .eq("session_id", s.id),
         supabase
-          .from("student_assignments")
-          .select("id", { count: "exact", head: true })
+          .from("live_questions")
+          .select("session_id")
           .eq("session_id", s.id),
       ]);
 
