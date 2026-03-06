@@ -610,7 +610,7 @@ export default function InstructorDashboard() {
     >
       <div className="flex min-h-[calc(100vh-12rem)]">
         {/* Sidebar Navigation - Desktop Only */}
-        <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
+        <aside className="hidden lg:flex w-56 flex-col border-r border-border pr-6 mr-6 shrink-0">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
