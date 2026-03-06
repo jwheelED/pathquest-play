@@ -120,15 +120,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
   const completionVariant: "success" | "warning" = metrics.avgCompletion >= 50 ? "success" : "warning";
 
   return (
-    <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-4", className)}>
-      <MetricCard
-        icon={<TrendingUp className="w-5 h-5" />}
-        label="Engagement Score"
-        value={`${metrics.avgEngagement} / 100`}
-        variant="primary"
-        description="Based on participation and responses"
-      />
-
+    <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-4", className)}>
       <MetricCard
         icon={<Users className="w-5 h-5" />}
         label="Active Today"
@@ -144,7 +136,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
             ? "bg-warning/5 border-warning/20"
             : "bg-success/5 border-success/20"
         )}
-        onClick={() => onNavigate?.("students")}
+        onClick={() => onNavigate?.("summaries")}
       >
         {/* Label row with icon */}
         <div className="flex items-center gap-2 mb-2">
@@ -163,7 +155,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         <p className="text-xs text-muted-foreground mt-1">
           {metrics.completedCount} of {metrics.totalAssignmentStudents} students
         </p>
-        <p className="text-xs text-primary mt-1.5 hover:underline">View assignments →</p>
+        <p className="text-xs text-primary mt-1.5 hover:underline">View full summary →</p>
       </div>
     </div>
   );
