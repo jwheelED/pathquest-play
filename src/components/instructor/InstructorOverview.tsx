@@ -126,7 +126,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Engagement Score"
         value={`${metrics.avgEngagement} / 100`}
         variant="primary"
-        trend={{ direction: "neutral", value: "Based on participation + responses" }}
+        trend={{ direction: "neutral", value: "Participation + responses" }}
       />
 
       <MetricCard

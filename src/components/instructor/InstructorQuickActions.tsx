@@ -1,23 +1,12 @@
-import { Radio, HelpCircle, Upload, UserPlus } from "lucide-react";
+import { Radio, HelpCircle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useCourseContext } from "@/hooks/useCourseContext";
-import { toast } from "sonner";
 
 interface InstructorQuickActionsProps {
   onNavigate: (tab: string) => void;
 }
 
 export function InstructorQuickActions({ onNavigate }: InstructorQuickActionsProps) {
-  const { selectedCourse } = useCourseContext();
-
-  const handleInviteStudents = () => {
-    if (selectedCourse) {
-      navigator.clipboard.writeText(selectedCourse.course_code);
-      toast.success("Join code copied — share it with your students!");
-    }
-  };
-
   return (
     <Card className="headspace-card h-fit">
       <CardHeader className="pb-3">
@@ -25,35 +14,27 @@ export function InstructorQuickActions({ onNavigate }: InstructorQuickActionsPro
       </CardHeader>
       <CardContent className="space-y-2">
         <Button
-          className="w-full justify-start gap-3 rounded-xl bg-success text-success-foreground hover:bg-success/90"
+          className="w-full justify-start gap-3 rounded-xl bg-success text-success-foreground hover:bg-success/90 truncate"
           onClick={() => onNavigate("live")}
         >
-          <Radio className="w-4 h-4" />
-          Start Live Session
+          <Radio className="w-4 h-4 shrink-0" />
+          <span className="truncate">Start Live Session</span>
         </Button>
         <Button
           variant="outline"
-          className="w-full justify-start gap-3 rounded-xl"
+          className="w-full justify-start gap-3 rounded-xl truncate"
           onClick={() => onNavigate("question-bank")}
         >
-          <HelpCircle className="w-4 h-4" />
-          Create Question
+          <HelpCircle className="w-4 h-4 shrink-0" />
+          <span className="truncate">Create Question</span>
         </Button>
         <Button
           variant="outline"
-          className="w-full justify-start gap-3 rounded-xl"
-          onClick={() => onNavigate("question-bank")}
+          className="w-full justify-start gap-3 rounded-xl truncate"
+          onClick={() => onNavigate("materials")}
         >
-          <Upload className="w-4 h-4" />
-          Upload Slides
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-3 rounded-xl"
-          onClick={handleInviteStudents}
-        >
-          <UserPlus className="w-4 h-4" />
-          Invite Students
+          <Upload className="w-4 h-4 shrink-0" />
+          <span className="truncate">Upload Slides</span>
         </Button>
       </CardContent>
     </Card>
