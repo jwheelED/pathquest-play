@@ -1334,6 +1334,73 @@ export type Database = {
           },
         ]
       }
+      lecture_summaries: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          duration_seconds: number
+          id: string
+          instructor_id: string
+          org_id: string | null
+          questions_asked: number
+          session_id: string | null
+          student_count: number
+          summary_data: Json
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          questions_asked?: number
+          session_id?: string | null
+          student_count?: number
+          summary_data?: Json
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          questions_asked?: number
+          session_id?: string | null
+          student_count?: number
+          summary_data?: Json
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_summaries_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_summaries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_summaries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lecture_videos: {
         Row: {
           cognitive_analysis: Json | null
