@@ -28,6 +28,7 @@ import {
   CreateQuestionDialog, 
   PushQuestionDialog,
   SlideUploadFlow,
+  SourceMaterialCard,
   type BankQuestion 
 } from "./question-bank";
 import { QuestionBankResults } from "./QuestionBankResults";
