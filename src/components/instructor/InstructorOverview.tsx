@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, TrendingUp, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Users, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { Skeleton } from "@/components/ui/skeleton";
