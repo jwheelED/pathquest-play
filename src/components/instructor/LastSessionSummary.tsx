@@ -69,8 +69,8 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
         id: s.id,
         title: s.title,
         created_at: s.created_at,
-        participantCount: participantsRes.count || 0,
-        questionCount: questionsRes.count || 0,
+        participantCount: participantsRes.data?.length || 0,
+        questionCount: questionsRes.data?.length || 0,
       });
     } catch (error) {
       console.error("Error fetching last session:", error);
