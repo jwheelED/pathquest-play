@@ -132,7 +132,7 @@ export function SlideUploadFlow({ onComplete, onCancel }: SlideUploadFlowProps) 
 
         // Trigger conversion
         await supabase.functions.invoke("convert-pptx-background", {
-          body: { material_id: materialId },
+          body: { materialId, filePath: storagePath, instructorId: user.id },
         });
 
         // Poll for completion (max 3 min)
