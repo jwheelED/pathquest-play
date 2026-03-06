@@ -11,6 +11,8 @@ import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { InstructorOverview } from "@/components/instructor/InstructorOverview";
+import { InstructorQuickActions } from "@/components/instructor/InstructorQuickActions";
+import { LastSessionSummary } from "@/components/instructor/LastSessionSummary";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
@@ -436,14 +438,23 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <PendingOrgInvites />
             
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <CourseCodeCard />
-
-              {currentUser && (
-                <div className="xl:col-span-2">
-                  <InstructorOverview instructorId={currentUser.id} />
-                </div>
-              )}
+            <div className="grid grid-cols-12 gap-6">
+              {/* Left column */}
+              <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                <CourseCodeCard />
+                <InstructorQuickActions onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              </div>
+              
+              {/* Right column */}
+              <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
+                {currentUser && (
+                  <InstructorOverview 
+                    instructorId={currentUser.id} 
+                    onNavigate={(tab) => setActiveTab(tab as TabValue)}
+                  />
+                )}
+                <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              </div>
             </div>
           </div>
         );
