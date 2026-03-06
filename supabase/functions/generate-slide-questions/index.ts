@@ -44,8 +44,9 @@ serve(async (req) => {
       });
     }
 
-    const { material_id, slides, course_id } = await req.json();
+    const { material_id, slides, course_id, target, source_material_title } = await req.json();
     // slides: Array<{ number: number, image: string (data URL) }>
+    // target: "question_bank" | "slide_preset" (default: "slide_preset" for backward compat)
 
     if (!material_id || !slides || !Array.isArray(slides) || slides.length === 0) {
       return new Response(JSON.stringify({ error: "material_id and slides array required" }), {
@@ -206,23 +207,59 @@ Return ONLY valid JSON.`;
           };
         }
 
-        // Insert into slide_preset_questions
+        // Insert into appropriate table based on target
         const questionName = `Slide ${slide.number} Question`;
-        const { error: insertError } = await supabase
-          .from("slide_preset_questions")
-          .insert({
-            material_id,
-            instructor_id: user.id,
-            slide_number: slide.number,
-            question_type: questionType,
-            question_content: questionContent,
-            question_name: questionName,
-            is_enabled: true,
-            order_index: 0,
-            generation_source: "auto",
-            org_id: orgId,
-            course_id: course_id || null,
-          });
+        let insertError;
+
+        if (target === "question_bank") {
+          // Insert into instructor_question_bank
+          // Flatten question_content for bank format
+          const bankContent: Record<string, unknown> = {};
+          if (questionType === "mcq" && questionContent.mcq) {
+            bankContent.question = (questionContent.mcq as Record<string, unknown>).question;
+            bankContent.options = (questionContent.mcq as Record<string, unknown>).options;
+            bankContent.correctAnswer = (questionContent.mcq as Record<string, unknown>).correct_answer;
+            bankContent.explanation = (questionContent.mcq as Record<string, unknown>).explanation;
+          } else if (questionType === "short_answer" && questionContent.short_answer) {
+            bankContent.question = (questionContent.short_answer as Record<string, unknown>).question;
+            bankContent.expectedAnswer = (questionContent.short_answer as Record<string, unknown>).expected_answer;
+            bankContent.explanation = (questionContent.short_answer as Record<string, unknown>).explanation;
+          }
+
+          const bankQuestionType = questionType === "mcq" ? "multiple_choice" : questionType;
+          const { error } = await supabase
+            .from("instructor_question_bank")
+            .insert({
+              instructor_id: user.id,
+              title: questionName,
+              question_type: bankQuestionType,
+              question_content: bankContent,
+              difficulty: difficulty,
+              source_material_id: material_id,
+              source_material_title: source_material_title || null,
+              org_id: orgId,
+              course_id: course_id || null,
+            });
+          insertError = error;
+        } else {
+          // Legacy: insert into slide_preset_questions
+          const { error } = await supabase
+            .from("slide_preset_questions")
+            .insert({
+              material_id,
+              instructor_id: user.id,
+              slide_number: slide.number,
+              question_type: questionType,
+              question_content: questionContent,
+              question_name: questionName,
+              is_enabled: true,
+              order_index: 0,
+              generation_source: "auto",
+              org_id: orgId,
+              course_id: course_id || null,
+            });
+          insertError = error;
+        }
 
         if (insertError) {
           console.error(`DB insert error for slide ${slide.number}:`, insertError);
