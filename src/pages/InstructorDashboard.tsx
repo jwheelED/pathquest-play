@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library, Settings } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library, Settings, Award } from "lucide-react";
 import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
 import { CourseCodeCard } from "@/components/instructor/CourseCodeCard";
 import { toast } from "sonner";
@@ -39,6 +39,7 @@ import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSe
 import { KalturaSettings } from "@/components/instructor/KalturaSettings";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
 
 interface Student {
   id: string;
@@ -50,13 +51,14 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "settings";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "summaries" | "settings";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "live", label: "Live Session", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
+  { value: "summaries", label: "Summaries", icon: Award },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
   { value: "settings", label: "Settings", icon: Settings },
