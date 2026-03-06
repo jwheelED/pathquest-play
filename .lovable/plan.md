@@ -1,6 +1,6 @@
 
-## Plan: Move Slide Question Generation into Question Bank
+## Plan: Redesign Instructor Overview Tab
 
 **STATUS: COMPLETED**
 
-Slide question generation has been moved from Slide Presenter to Question Bank. Instructors now upload PDF/PPTX directly in the Question Bank tab, AI generates questions stored as regular bank questions with source tracking. Slide Presenter is now purely a presentation tool. DB columns `source_material_id` and `source_material_title` added to `instructor_question_bank`. Edge function updated to support `target: "question_bank"`.
+Redesigned the instructor overview tab with a 12-column grid layout, refactored CourseCodeCard (renamed to "Student Join Code" with invite link), replaced the donut chart with 3 KPI MetricCards (Engagement Score, Active Today, Assignment Completion), added InstructorQuickActions card (4-button action hub), and LastSessionSummary component. Sidebar nav renamed "Live Lecture" → "Live Session". All components include skeleton loading and empty states.
