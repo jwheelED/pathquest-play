@@ -11,6 +11,8 @@ import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { InstructorOverview } from "@/components/instructor/InstructorOverview";
+import { InstructorQuickActions } from "@/components/instructor/InstructorQuickActions";
+import { LastSessionSummary } from "@/components/instructor/LastSessionSummary";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
@@ -52,7 +54,7 @@ type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "q
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "live", label: "Live Lecture", icon: Radio },
+  { value: "live", label: "Live Session", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "students", label: "Students", icon: Users },
@@ -436,14 +438,23 @@ export default function InstructorDashboard() {
           <div className="space-y-6">
             <PendingOrgInvites />
             
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <CourseCodeCard />
-
-              {currentUser && (
-                <div className="xl:col-span-2">
-                  <InstructorOverview instructorId={currentUser.id} />
-                </div>
-              )}
+            <div className="grid grid-cols-12 gap-6">
+              {/* Left column */}
+              <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                <CourseCodeCard />
+                <InstructorQuickActions onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              </div>
+              
+              {/* Right column */}
+              <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
+                {currentUser && (
+                  <InstructorOverview 
+                    instructorId={currentUser.id} 
+                    onNavigate={(tab) => setActiveTab(tab as TabValue)}
+                  />
+                )}
+                <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              </div>
             </div>
           </div>
         );
@@ -610,7 +621,7 @@ export default function InstructorDashboard() {
     >
       <div className="flex min-h-[calc(100vh-12rem)]">
         {/* Sidebar Navigation - Desktop Only */}
-        <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
+        <aside className="hidden lg:flex w-56 flex-col border-r border-border pr-6 mr-6 shrink-0">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
