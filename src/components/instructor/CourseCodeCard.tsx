@@ -1,4 +1,4 @@
-import { Copy, Settings, Archive, Link, Check } from "lucide-react";
+import { Copy, Settings, Archive, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,7 +32,6 @@ export function CourseCodeCard() {
   const { selectedCourse, archiveCourse } = useCourseContext();
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
 
   if (!selectedCourse) {
     return null;
@@ -43,14 +42,6 @@ export function CourseCodeCard() {
     setCodeCopied(true);
     toast.success("Join code copied to clipboard ✓");
     setTimeout(() => setCodeCopied(false), 2000);
-  };
-
-  const handleCopyInviteLink = () => {
-    const inviteUrl = `${window.location.origin}/join?code=${selectedCourse.course_code}`;
-    navigator.clipboard.writeText(inviteUrl);
-    setLinkCopied(true);
-    toast.success("Invite link copied to clipboard ✓");
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handleArchive = async () => {
@@ -78,10 +69,6 @@ export function CourseCodeCard() {
                         <Copy className="mr-2 h-4 w-4" />
                         Copy Join Code
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCopyInviteLink}>
-                        <Link className="mr-2 h-4 w-4" />
-                        Copy Invite Link
-                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => setArchiveDialogOpen(true)}
@@ -102,33 +89,22 @@ export function CourseCodeCard() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground truncate">
               {selectedCourse.title}
             </p>
             <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block break-all">
               {selectedCourse.course_code}
             </code>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onClick={handleCopyCode}
-            >
-              {codeCopied ? <Check className="w-4 h-4 mr-1 text-success" /> : <Copy className="w-4 h-4 mr-1" />}
-              {codeCopied ? "Copied!" : "Copy Join Code"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl"
-              onClick={handleCopyInviteLink}
-            >
-              {linkCopied ? <Check className="w-4 h-4 mr-1 text-success" /> : <Link className="w-4 h-4 mr-1" />}
-              {linkCopied ? "Copied!" : "Invite Link"}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full rounded-xl"
+            onClick={handleCopyCode}
+          >
+            {codeCopied ? <Check className="w-4 h-4 mr-1 text-success" /> : <Copy className="w-4 h-4 mr-1" />}
+            {codeCopied ? "Copied!" : "Copy Join Code"}
+          </Button>
           <p className="text-xs text-muted-foreground text-center">
             Students enter this code in Edvana to join your class.
           </p>
