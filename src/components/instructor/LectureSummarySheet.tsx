@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import {
   Award,
   Clock,
@@ -23,7 +24,13 @@ import {
   Loader2,
   Sparkles,
   Star,
+  Save,
+  Check,
 } from "lucide-react";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useCourseContext } from "@/hooks/useCourseContext";
 
 export interface LectureSummaryData {
   topicsIdentified: string[];
@@ -49,6 +56,7 @@ interface LectureSummarySheetProps {
   recordingDuration: number;
   questionsAsked: number;
   studentCount: number;
+  sessionId?: string | null;
   onExport?: () => void;
 }
 
@@ -66,9 +74,53 @@ export const LectureSummarySheet = ({
   recordingDuration,
   questionsAsked,
   studentCount,
+  sessionId,
 }: LectureSummarySheetProps) => {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const { selectedCourseId } = useCourseContext();
+
+  const handleSave = async () => {
+    if (!summaryData) return;
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const title = summaryData.topicsIdentified?.length > 0
+        ? summaryData.topicsIdentified.slice(0, 3).join(", ")
+        : `Lecture Summary`;
+
+      const { error } = await supabase.from("lecture_summaries").insert({
+        instructor_id: user.id,
+        session_id: sessionId || null,
+        course_id: selectedCourseId || null,
+        title,
+        duration_seconds: recordingDuration,
+        questions_asked: questionsAsked,
+        student_count: studentCount,
+        summary_data: summaryData as unknown as Record<string, unknown>,
+      } as never);
+
+      if (error) throw error;
+      setSaved(true);
+      toast.success("Lecture summary saved!");
+    } catch (error) {
+      console.error("Error saving summary:", error);
+      toast.error("Failed to save summary");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Reset saved state when sheet reopens with new data
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) setSaved(false);
+    onOpenChange(isOpen);
+  };
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-hidden">
         <SheetHeader className="pb-4">
           <div className="flex items-center justify-between">
@@ -76,6 +128,24 @@ export const LectureSummarySheet = ({
               <Award className="h-5 w-5 text-primary" />
               Teaching Summary
             </SheetTitle>
+            {summaryData && !isLoading && (
+              <Button
+                size="sm"
+                variant={saved ? "outline" : "default"}
+                onClick={handleSave}
+                disabled={saving || saved}
+                className="rounded-xl gap-2"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : saved ? (
+                  <Check className="h-4 w-4 text-success" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {saved ? "Saved" : "Save Summary"}
+              </Button>
+            )}
           </div>
           <SheetDescription>
             Post-lecture analysis and teaching insights
@@ -126,10 +196,10 @@ export const LectureSummarySheet = ({
                       <span className="text-sm">Overall Accuracy</span>
                       <span className={`font-bold ${
                         Number(summaryData.checkInResults.accuracy) >= 70 
-                          ? "text-green-600" 
+                          ? "text-success" 
                           : Number(summaryData.checkInResults.accuracy) >= 50 
-                            ? "text-yellow-600" 
-                            : "text-red-600"
+                            ? "text-warning" 
+                            : "text-destructive"
                       }`}>
                         {summaryData.checkInResults.accuracy}%
                       </span>
@@ -176,7 +246,7 @@ export const LectureSummarySheet = ({
                     <ul className="space-y-2">
                       {summaryData.keyConceptsCovered.map((concept, i) => (
                         <li key={i} className="text-sm flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                          <CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
                           {concept}
                         </li>
                       ))}
@@ -190,7 +260,7 @@ export const LectureSummarySheet = ({
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Star className="h-4 w-4 text-yellow-500" />
+                      <Star className="h-4 w-4 text-warning" />
                       Lecture Highlights
                     </CardTitle>
                   </CardHeader>
@@ -198,7 +268,7 @@ export const LectureSummarySheet = ({
                     <ul className="space-y-2">
                       {summaryData.lectureHighlights.map((highlight, i) => (
                         <li key={i} className="text-sm flex items-start gap-2">
-                          <span className="text-yellow-500 mt-0.5">•</span>
+                          <span className="text-warning mt-0.5">•</span>
                           {highlight}
                         </li>
                       ))}
@@ -237,7 +307,7 @@ export const LectureSummarySheet = ({
                     <ul className="space-y-2">
                       {summaryData.teachingSuggestions.map((suggestion, i) => (
                         <li key={i} className="text-sm flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                          <CheckCircle className="h-4 w-4 text-success mt-0.5 shrink-0" />
                           {suggestion}
                         </li>
                       ))}
@@ -259,7 +329,7 @@ export const LectureSummarySheet = ({
                     <ul className="space-y-2">
                       {summaryData.conceptsToReview.map((concept, i) => (
                         <li key={i} className="text-sm flex items-start gap-2 bg-primary/5 p-2 rounded-lg">
-                          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+                          <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
                           {concept}
                         </li>
                       ))}
