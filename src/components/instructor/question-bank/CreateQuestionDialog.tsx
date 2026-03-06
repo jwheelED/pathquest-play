@@ -388,6 +388,11 @@ export function CreateQuestionDialog({
                   )}
                   {generatingMcq ? "Generating..." : "AI Suggest Options"}
                 </Button>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Options *</Label>
+                {["A", "B", "C", "D"].map((letter, i) => (
                   <div key={letter} className="flex items-center gap-2">
                     <span className="w-6 text-sm font-medium">{letter}.</span>
                     <Input
