@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -58,6 +58,11 @@ const LiveStudent = () => {
   const [confidenceMultiplier, setConfidenceMultiplier] = useState<number>(1);
   const [pointsEarned, setPointsEarned] = useState<number>(0);
   
+  // Session XP tracker
+  const [sessionTotalXP, setSessionTotalXP] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [showXPPulse, setShowXPPulse] = useState(false);
+
   // AI Explanation state
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanation, setExplanation] = useState<string>("");
@@ -329,6 +334,13 @@ const LiveStudent = () => {
         setHasAnswered(true);
         setIsCorrect(responseData.isCorrect);
         setPointsEarned(responseData.pointsEarned || 0);
+        const earned = responseData.pointsEarned || 0;
+        if (earned !== 0) {
+          setSessionTotalXP(prev => prev + earned);
+          setQuestionsAnswered(prev => prev + 1);
+          setShowXPPulse(true);
+          setTimeout(() => setShowXPPulse(false), 1500);
+        }
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -568,6 +580,13 @@ const LiveStudent = () => {
         setAiGradeComponents(responseData.gradeBreakdown?.components || null);
         setUnderstandsConcept(responseData.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(responseData.pointsEarned || 0);
+        const earned = responseData.pointsEarned || 0;
+        if (earned !== 0) {
+          setSessionTotalXP(prev => prev + earned);
+          setQuestionsAnswered(prev => prev + 1);
+          setShowXPPulse(true);
+          setTimeout(() => setShowXPPulse(false), 1500);
+        }
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -640,7 +659,23 @@ const LiveStudent = () => {
   const isMCQ = currentQuestion.question_content.type === "multiple_choice";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+      {/* Session XP Tracker - Fixed top right */}
+      {questionsAnswered > 0 && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg transition-all duration-300 ${showXPPulse ? 'scale-110 ring-2 ring-primary/50' : 'scale-100'}`}>
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-5 h-5 text-primary fill-primary" />
+            <span className="text-lg font-bold text-foreground">
+              {sessionTotalXP > 0 ? '+' : ''}{sessionTotalXP}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">XP</span>
+          </div>
+          <div className="w-px h-5 bg-border" />
+          <span className="text-xs text-muted-foreground">
+            {questionsAnswered} Q{questionsAnswered !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
       <div className="w-full max-w-2xl space-y-4">
         {showAccountPrompt && (
           <Card className="bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary">
