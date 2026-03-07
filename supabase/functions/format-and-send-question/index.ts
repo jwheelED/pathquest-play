@@ -9,6 +9,40 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+// Shuffle MCQ options so the correct answer isn't always A
+const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {
+  if (!mcq?.options || mcq.options.length !== 4 || !mcq.correctAnswer) return mcq;
+
+  const letters = ['A', 'B', 'C', 'D'];
+  const correctIdx = letters.indexOf(mcq.correctAnswer.trim().toUpperCase());
+  if (correctIdx === -1) return mcq;
+
+  // Strip letter prefixes to get raw text
+  const rawOptions = mcq.options.map(opt => opt.replace(/^[A-D][\).\-\s]+\s*/i, '').trim());
+  const correctText = rawOptions[correctIdx];
+
+  // Fisher-Yates shuffle
+  for (let i = rawOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+  }
+
+  // Find where the correct answer ended up
+  const newCorrectIdx = rawOptions.indexOf(correctText);
+  const newCorrectLetter = letters[newCorrectIdx];
+
+  // Re-prefix with letters
+  const newOptions = rawOptions.map((text, i) => `${letters[i]}. ${text}`);
+
+  console.log(`🔀 Shuffled MCQ: correct answer moved from ${mcq.correctAnswer} → ${newCorrectLetter}`);
+
+  return {
+    ...mcq,
+    options: newOptions,
+    correctAnswer: newCorrectLetter,
+  };
+};
+
 const generateMCQ = async (
   questionText: string,
   context: string,
@@ -117,13 +151,15 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
       .trim();
 
     try {
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return shuffleMCQOptions(parsed);
     } catch (parseError) {
       console.error("JSON parse failed, content:", content);
       // Fallback: try to extract JSON from text
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        return shuffleMCQOptions(parsed);
       }
       throw new Error("Failed to parse AI response as JSON");
     }
