@@ -511,13 +511,35 @@ Generate ONE focused question that tests understanding of the most important con
         console.log("ℹ️ Skipping course scope check — question is grounded in live transcript");
       }
 
+      // Shuffle MCQ options so correct answer isn't always A
+      let finalOptions = parsed.options;
+      let finalCorrectAnswer = parsed.correct_answer;
+      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
+        if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
+          const letters = ['A', 'B', 'C', 'D'];
+          const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
+          if (correctIdx !== -1) {
+            const rawOpts = finalOptions.map((o: string) => o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim());
+            const correctText = rawOpts[correctIdx];
+            for (let i = rawOpts.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [rawOpts[i], rawOpts[j]] = [rawOpts[j], rawOpts[i]];
+            }
+            const newIdx = rawOpts.indexOf(correctText);
+            finalCorrectAnswer = letters[newIdx];
+            finalOptions = rawOpts.map((t: string, i: number) => `${letters[i]}. ${t}`);
+            console.log(`🔀 Shuffled interval MCQ: correct answer → ${finalCorrectAnswer}`);
+          }
+        }
+      }
+
       return new Response(JSON.stringify({
         success: true,
         question_text: parsed.question_text,
         suggested_type: parsed.suggested_type || format_preference,
         confidence: parsed.confidence || 0.8,
-        options: parsed.options,
-        correct_answer: parsed.correct_answer,
+        options: finalOptions,
+        correct_answer: finalCorrectAnswer,
         explanation: parsed.explanation,
         reasoning: parsed.reasoning,
         is_fallback: false,
