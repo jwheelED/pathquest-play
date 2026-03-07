@@ -1,6 +1,6 @@
 
-## Plan: Overview Page Visual & UX Fixes
+## Plan: Rework Live Session Logic — Grading Accuracy & Timer Reliability
 
 **STATUS: COMPLETED**
 
-Applied all 6 fixes: changed global background from baby blue to neutral off-white (#F9FAFB), restructured MetricCard with label-on-top layout and `description` prop (no more truncated trend text), removed redundant "Start Live Session" from Quick Actions, added visible borders to Quick Action and CourseCodeCard buttons, fixed Assignment Completion card layout, and standardized header button radii from `rounded-full` to `rounded-lg`.
+Fixed 4 bugs: (1) MCQ result display now shows Correct/Incorrect with green/red feedback instead of generic "Response Recorded", (2) Empty correctAnswer guard prevents all-answers-wrong bug by returning 422 error, (3) Removed dangerous first-char fallback in normalizeAnswer that misinterpreted words starting with A-D as answer letters, (4) Stabilized auto-question timer by using refs instead of state in useEffect dependencies to prevent interval teardown/recreation.
