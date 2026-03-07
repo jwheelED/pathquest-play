@@ -360,7 +360,24 @@ const LiveStudent = () => {
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
-      if (error.message?.includes("Already answered")) {
+      
+      // Handle 409 "already submitted" from edge function
+      let errorBody: string | null = null;
+      try {
+        // FunctionsHttpError stores the Response in error.context
+        if (error?.context?.json) {
+          const body = await error.context.json();
+          errorBody = body?.error || '';
+        }
+      } catch { /* ignore parse errors */ }
+      
+      const isAlreadySubmitted = 
+        error.message?.includes("Already answered") || 
+        error.message?.includes("already submitted") ||
+        errorBody?.includes("already submitted") ||
+        errorBody?.includes("Already answered");
+      
+      if (isAlreadySubmitted) {
         toast.info("You already answered this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
