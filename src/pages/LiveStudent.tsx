@@ -807,18 +807,54 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
-              {/* MCQ Results - Poll-style neutral feedback */}
+              {/* MCQ Results - Correct/Incorrect feedback */}
               {isMCQ && (
                 <>
-                  <div className="relative">
-                    <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-                    Response Recorded ✓
-                  </p>
-                  <p className="text-muted-foreground">
-                    Your answer: <span className="font-semibold">{selectedAnswer}</span>
-                  </p>
+                  {isCorrect === true ? (
+                    <>
+                      <div className="relative">
+                        <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Correct! 🎉
+                      </p>
+                      <p className="text-muted-foreground">
+                        Your answer: <span className="font-semibold text-green-600 dark:text-green-400">{selectedAnswer}</span>
+                      </p>
+                    </>
+                  ) : isCorrect === false ? (
+                    <>
+                      <div className="relative">
+                        <XCircle className="h-16 w-16 text-red-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Incorrect
+                      </p>
+                      <p className="text-muted-foreground">
+                        Your answer: <span className="font-semibold text-red-600 dark:text-red-400">{selectedAnswer}</span>
+                      </p>
+                      {currentQuestion?.question_content?.correctAnswer && (
+                        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3 max-w-md mx-auto">
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            <span className="font-medium">Correct answer:</span>{" "}
+                            {currentQuestion.question_content.correctAnswer}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Response Recorded ✓
+                      </p>
+                      <p className="text-muted-foreground">
+                        Your answer: <span className="font-semibold">{selectedAnswer}</span>
+                      </p>
+                    </>
+                  )}
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}

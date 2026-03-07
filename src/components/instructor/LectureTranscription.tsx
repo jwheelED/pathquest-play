@@ -2002,12 +2002,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, [isRecording]);
 
   // Auto-question timer logic with comprehensive logging
+  // Refs to read inside the stable timer interval (avoids stale closures & effect re-runs)
+  const lastAutoQuestionTimeRef = useRef(lastAutoQuestionTime);
+  useEffect(() => { lastAutoQuestionTimeRef.current = lastAutoQuestionTime; }, [lastAutoQuestionTime]);
+
+  const retryAttemptsRef = useRef(retryAttempts);
+  useEffect(() => { retryAttemptsRef.current = retryAttempts; }, [retryAttempts]);
+
   useEffect(() => {
     console.log("🔍 Auto-question timer effect triggered:", {
       isRecording,
       autoQuestionEnabled,
-      isSendingQuestion,
-      lastAutoQuestionTime,
       autoQuestionInterval,
     });
 
@@ -2021,48 +2026,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
-    // NOTE: isSendingQuestion check moved inside the interval callback via ref
-    // to avoid tearing down and recreating the timer interval
-
-    const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
+    const intervalMs = autoQuestionInterval * 60 * 1000;
 
     // Initialize timer on first recording start
-    if (lastAutoQuestionTime === 0) {
+    if (lastAutoQuestionTimeRef.current === 0) {
       const now = Date.now();
       setLastAutoQuestionTime(now);
-      intervalStartTimeRef.current = now; // Track actual start time
+      lastAutoQuestionTimeRef.current = now;
+      intervalStartTimeRef.current = now;
       setAutoQuestionCount(0);
       console.log(`🟢 Auto-questions initialized: every ${autoQuestionInterval} minutes (${intervalMs}ms)`);
       console.log("🕐 First question will trigger at:", new Date(now + intervalMs).toLocaleTimeString());
     }
 
-    // Check if interval has elapsed
+    // Stable interval — reads from refs, not state
     const checkInterval = setInterval(() => {
-      if (isPreviewOpen) {
-        console.log("⏸️ Skipping check: preview dialog is open");
-        return;
-      }
-      if (isSendingQuestionRef.current) {
-        console.log("⏸️ Skipping check: already sending a question");
-        return;
-      }
-      if (isGeneratingAutoQuestionRef.current) {
-        console.log("⏸️ Skipping check: generation in progress");
-        return;
-      }
-      if (isProcessing) {
-        console.log("⏸️ Skipping check: audio processing");
-        return;
-      }
+      if (isPreviewOpen) return;
+      if (isSendingQuestionRef.current) return;
+      if (isGeneratingAutoQuestionRef.current) return;
+      if (isProcessing) return;
 
       const now = Date.now();
-      const elapsed = now - lastAutoQuestionTime;
+      const elapsed = now - lastAutoQuestionTimeRef.current;
       const timeLeft = intervalMs - elapsed;
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
 
       setNextAutoQuestionIn(secondsLeft);
 
-      // Broadcast countdown tick to presenter popup (BroadcastChannel)
+      // Broadcast countdown tick to presenter popup
       broadcast('countdown_tick', {
         nextAutoQuestionIn: secondsLeft,
         autoQuestionEnabled,
@@ -2086,14 +2077,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
       }
 
-      // Log countdown at key intervals
       if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {
         console.log(`⏰ Auto-question in ${secondsLeft} seconds`);
       }
 
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
-        // Set lock IMMEDIATELY before any async work
         isGeneratingAutoQuestionRef.current = true;
 
         console.log("🚀 AUTO-QUESTION INTERVAL REACHED");
@@ -2102,29 +2091,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           intervalMs: `${(intervalMs / 1000).toFixed(0)}s`,
           transcriptLength: intervalTranscriptRef.current.length,
           transcriptWords: intervalTranscriptRef.current.split(/\s+/).length,
-          lastAutoQuestionTime: new Date(lastAutoQuestionTime).toLocaleTimeString(),
-          intervalStartTime: new Date(intervalStartTimeRef.current).toLocaleTimeString(),
+          lastAutoQuestionTime: new Date(lastAutoQuestionTimeRef.current).toLocaleTimeString(),
           now: new Date(now).toLocaleTimeString(),
-          autoQuestionEnabled,
-          isSendingQuestion,
         });
 
-        // Call async function with enhanced error handling and retry logic
         handleAutoQuestionGeneration()
           .then((success) => {
             if (success) {
-              // Question sent successfully - reset timer
               const newTime = Date.now();
               setLastAutoQuestionTime(newTime);
+              lastAutoQuestionTimeRef.current = newTime;
               intervalStartTimeRef.current = newTime;
               setRetryAttempts(0);
+              retryAttemptsRef.current = 0;
               setLastAutoQuestionError(null);
               console.log("✅ Timer reset after successful send");
               console.log("🕐 Next question at:", new Date(newTime + intervalMs).toLocaleTimeString());
             } else {
-              // Quality check failed - reset timer with 30-second delay
               const retryTime = Date.now() - (intervalMs - 30000);
               setLastAutoQuestionTime(retryTime);
+              lastAutoQuestionTimeRef.current = retryTime;
               console.log("⏭️ Quality check failed, will retry in 30 seconds");
             }
           })
@@ -2134,25 +2120,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             setLastAutoQuestionError(errorMsg);
             setLastAutoQuestionErrorTime(new Date());
 
-            // Retry logic: wait 5 seconds then try again
-            if (retryAttempts < 1) {
+            if (retryAttemptsRef.current < 1) {
               console.log("🔄 Will retry in 5 seconds...");
               setRetryAttempts((prev) => prev + 1);
+              retryAttemptsRef.current += 1;
               setTimeout(() => {
                 console.log("🔄 Retrying auto-question generation...");
-                const retryTime = Date.now() - (intervalMs - 5000); // Retry in 5s
+                const retryTime = Date.now() - (intervalMs - 5000);
                 setLastAutoQuestionTime(retryTime);
+                lastAutoQuestionTimeRef.current = retryTime;
                 isGeneratingAutoQuestionRef.current = false;
               }, 5000);
             } else {
               console.log("❌ Max retries reached, resetting timer");
               setRetryAttempts(0);
-              const retryTime = Date.now() - (intervalMs - 60000); // Retry in 1 minute
+              retryAttemptsRef.current = 0;
+              const retryTime = Date.now() - (intervalMs - 60000);
               setLastAutoQuestionTime(retryTime);
+              lastAutoQuestionTimeRef.current = retryTime;
             }
           })
           .finally(() => {
-            if (retryAttempts >= 1) {
+            if (retryAttemptsRef.current >= 1) {
               // Don't unlock if we're about to retry
               return;
             }
@@ -2165,7 +2154,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🧹 Cleaning up auto-question timer");
       clearInterval(checkInterval);
     };
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, retryAttempts]);
+  }, [isRecording, autoQuestionEnabled, autoQuestionInterval]);
 
   // Initialize timer when auto-questions are toggled on during recording
   useEffect(() => {
