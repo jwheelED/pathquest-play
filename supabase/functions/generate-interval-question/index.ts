@@ -485,21 +485,30 @@ Generate ONE focused question that tests understanding of the most important con
         });
       }
 
-      // Layer 4: Course scope validation
-      const courseScopeRelevance = checkCourseScopeRelevance(
-        textToValidate,
-        course_context,
-        materialContext,
-      );
+      // Layer 4: Course scope validation — ONLY when using materials fallback.
+      // When using live transcript, the transcript IS the ground truth of what the
+      // instructor is teaching right now. The course title/topics may not reflect
+      // the current lecture topic (e.g. a guest lecture, topic detour, or
+      // course metadata that hasn't been updated). Since Layer 3 already confirmed
+      // the question is grounded in the transcript, skip this check.
+      if (usingMaterialsFallback) {
+        const courseScopeRelevance = checkCourseScopeRelevance(
+          textToValidate,
+          course_context,
+          materialContext,
+        );
 
-      if (!courseScopeRelevance.relevant) {
-        console.warn(`⚠️ Course scope check failed: ${courseScopeRelevance.reason}`);
-        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
-          `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}".`);
-        return new Response(JSON.stringify(fallbackResult), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        if (!courseScopeRelevance.relevant) {
+          console.warn(`⚠️ Course scope check failed: ${courseScopeRelevance.reason}`);
+          const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+            `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}".`);
+          return new Response(JSON.stringify(fallbackResult), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        console.log("ℹ️ Skipping course scope check — question is grounded in live transcript");
       }
 
       return new Response(JSON.stringify({
