@@ -117,13 +117,15 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
       .trim();
 
     try {
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return shuffleMCQOptions(parsed);
     } catch (parseError) {
       console.error("JSON parse failed, content:", content);
       // Fallback: try to extract JSON from text
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        return shuffleMCQOptions(parsed);
       }
       throw new Error("Failed to parse AI response as JSON");
     }
