@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -58,6 +58,11 @@ const LiveStudent = () => {
   const [confidenceMultiplier, setConfidenceMultiplier] = useState<number>(1);
   const [pointsEarned, setPointsEarned] = useState<number>(0);
   
+  // Session XP tracker
+  const [sessionTotalXP, setSessionTotalXP] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [showXPPulse, setShowXPPulse] = useState(false);
+
   // AI Explanation state
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanation, setExplanation] = useState<string>("");
