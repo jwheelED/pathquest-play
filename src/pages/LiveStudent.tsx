@@ -334,6 +334,13 @@ const LiveStudent = () => {
         setHasAnswered(true);
         setIsCorrect(responseData.isCorrect);
         setPointsEarned(responseData.pointsEarned || 0);
+        const earned = responseData.pointsEarned || 0;
+        if (earned !== 0) {
+          setSessionTotalXP(prev => prev + earned);
+          setQuestionsAnswered(prev => prev + 1);
+          setShowXPPulse(true);
+          setTimeout(() => setShowXPPulse(false), 1500);
+        }
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -573,6 +580,13 @@ const LiveStudent = () => {
         setAiGradeComponents(responseData.gradeBreakdown?.components || null);
         setUnderstandsConcept(responseData.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(responseData.pointsEarned || 0);
+        const earned = responseData.pointsEarned || 0;
+        if (earned !== 0) {
+          setSessionTotalXP(prev => prev + earned);
+          setQuestionsAnswered(prev => prev + 1);
+          setShowXPPulse(true);
+          setTimeout(() => setShowXPPulse(false), 1500);
+        }
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
