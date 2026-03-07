@@ -335,9 +335,9 @@ const LiveStudent = () => {
         setIsCorrect(responseData.isCorrect);
         setPointsEarned(responseData.pointsEarned || 0);
         const earned = responseData.pointsEarned || 0;
+        setSessionTotalXP(prev => prev + earned);
+        setQuestionsAnswered(prev => prev + 1);
         if (earned !== 0) {
-          setSessionTotalXP(prev => prev + earned);
-          setQuestionsAnswered(prev => prev + 1);
           setShowXPPulse(true);
           setTimeout(() => setShowXPPulse(false), 1500);
         }
@@ -598,9 +598,9 @@ const LiveStudent = () => {
         setUnderstandsConcept(responseData.gradeBreakdown?.understandsConcept ?? null);
         setPointsEarned(responseData.pointsEarned || 0);
         const earned = responseData.pointsEarned || 0;
+        setSessionTotalXP(prev => prev + earned);
+        setQuestionsAnswered(prev => prev + 1);
         if (earned !== 0) {
-          setSessionTotalXP(prev => prev + earned);
-          setQuestionsAnswered(prev => prev + 1);
           setShowXPPulse(true);
           setTimeout(() => setShowXPPulse(false), 1500);
         }
