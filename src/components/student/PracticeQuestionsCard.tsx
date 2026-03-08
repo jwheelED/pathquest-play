@@ -41,6 +41,8 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
