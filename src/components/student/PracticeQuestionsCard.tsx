@@ -91,6 +91,28 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setSessionTotal((p) => p + 1);
     if (isCorrect) setSessionCorrect((p) => p + 1);
 
+    // For incorrect short answers, get AI feedback explaining why their answer is wrong
+    if (!isCorrect && currentQuestion.question_type !== "multiple_choice") {
+      setAiFeedbackLoading(true);
+      try {
+        const { data } = await supabase.functions.invoke("generate-detailed-explanation", {
+          body: {
+            questionText: currentQuestion.question_text,
+            correctAnswer: currentQuestion.correct_answer,
+            studentAnswer: answer,
+            wasCorrect: false,
+          },
+        });
+        if (data?.explanation) {
+          setAiFeedback(data.explanation);
+        }
+      } catch {
+        // non-blocking
+      } finally {
+        setAiFeedbackLoading(false);
+      }
+    }
+
     // Update stats in background
     try {
       await supabase
