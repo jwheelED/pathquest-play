@@ -52,25 +52,26 @@ export function QuickMetricsGrid() {
       let avgRate = 0;
 
       if (sessionIds.length > 0) {
-        // Fetch questions for these sessions
-        const { data: qData } = await supabase
-          .from("live_questions")
-          .select("session_id")
-          .in("session_id", sessionIds as string[]);
-        questionsCount = qData?.length || 0;
+        // Fetch questions for these sessions - batch by filtering
+        const questionCounts = await Promise.all(
+          sessionIds.map(id =>
+            supabase.from("live_questions").select("id", { count: "exact", head: true }).eq("session_id", id)
+          )
+        );
+        questionsCount = questionCounts.reduce((sum, r) => sum + (r.count || 0), 0);
 
         // Avg response rate from recent 10 sessions
         const recentIds = sessionIds.slice(0, 10);
-        const { data: pData } = await supabase
-          .from("live_participants")
-          .select("session_id")
-          .in("session_id", recentIds as string[]);
-        const { data: rData } = await supabase
-          .from("live_responses")
-          .select("session_id")
-          .in("session_id", recentIds as string[]);
-        const totalP = pData?.length || 0;
-        const totalR = rData?.length || 0;
+        const [pCounts, rCounts] = await Promise.all([
+          Promise.all(recentIds.map(id =>
+            supabase.from("live_participants").select("id", { count: "exact", head: true }).eq("session_id", id)
+          )),
+          Promise.all(recentIds.map(id =>
+            supabase.from("live_responses").select("id", { count: "exact", head: true }).eq("session_id", id)
+          )),
+        ]);
+        const totalP = pCounts.reduce((sum, r) => sum + (r.count || 0), 0);
+        const totalR = rCounts.reduce((sum, r) => sum + (r.count || 0), 0);
         avgRate = totalP > 0 ? Math.round((totalR / totalP) * 100) : 0;
       }
 
