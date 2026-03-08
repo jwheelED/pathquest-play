@@ -6,10 +6,20 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ChevronDown, ChevronRight, FileUp, Trash2 } from "lucide-react";
 import { QuestionBankCard, type BankQuestion } from "./QuestionBankCard";
 
+function naturalSort(a: BankQuestion, b: BankQuestion): number {
+  const numA = parseInt(a.title.match(/Slide\s*(\d+)/i)?.[1] || "0");
+  const numB = parseInt(b.title.match(/Slide\s*(\d+)/i)?.[1] || "0");
+  if (numA !== numB) return numA - numB;
+  return a.title.localeCompare(b.title);
+}
+
 interface SourceMaterialCardProps {
   sourceTitle: string;
   sourceId: string;
   questions: BankQuestion[];
+  mode?: "prep" | "live";
+  selectedQuestionId?: string | null;
+  onSelect?: (q: BankQuestion) => void;
   onEdit: (q: BankQuestion) => void;
   onDelete: (q: BankQuestion) => void;
   onPush: (q: BankQuestion) => void;
@@ -20,12 +30,21 @@ export function SourceMaterialCard({
   sourceTitle,
   sourceId,
   questions,
+  mode = "prep",
+  selectedQuestionId,
+  onSelect,
   onEdit,
   onDelete,
   onPush,
   onDeleteAll,
 }: SourceMaterialCardProps) {
-  const [open, setOpen] = useState(false);
+  const isLive = mode === "live";
+  const [open, setOpen] = useState(isLive);
+
+  const sortedQuestions = [...questions].sort(naturalSort);
+
+  const readyCount = questions.filter(q => !q.times_used || q.times_used === 0).length;
+  const pushedCount = questions.filter(q => q.times_used && q.times_used > 0).length;
 
   return (
     <Card className="headspace-card">
@@ -44,31 +63,47 @@ export function SourceMaterialCard({
                 <Badge variant="secondary" className="text-xs shrink-0">
                   {questions.length} question{questions.length !== 1 ? "s" : ""}
                 </Badge>
+                <span className="text-[10px] text-muted-foreground shrink-0">
+                  {readyCount} ready · {pushedCount} pushed
+                </span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteAll(sourceId);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {!isLive && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteAll(sourceId);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </CardHeader>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0 pb-3 px-4 space-y-2">
-            {questions.map((question) => (
-              <QuestionBankCard
-                key={question.id}
-                question={question}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onPush={onPush}
-              />
+            {sortedQuestions.map((question, idx) => (
+              <div key={question.id} className="flex items-start gap-2">
+                {isLive && (
+                  <span className="text-xs text-muted-foreground font-mono mt-4 w-5 text-right shrink-0">
+                    {idx + 1}.
+                  </span>
+                )}
+                <div className="flex-1">
+                  <QuestionBankCard
+                    question={question}
+                    mode={mode}
+                    selected={selectedQuestionId === question.id}
+                    onSelect={onSelect}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onPush={onPush}
+                  />
+                </div>
+              </div>
             ))}
           </CardContent>
         </CollapsibleContent>
