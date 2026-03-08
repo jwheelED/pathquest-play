@@ -327,7 +327,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
         {showExplanation && (
           <div
             className={cn(
-              "rounded-lg p-4 text-sm space-y-1",
+              "rounded-lg p-4 text-sm space-y-2",
               answerState === "correct"
                 ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20"
                 : "bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20"
@@ -349,21 +349,21 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
                 </>
               )}
             </p>
-            <p className="text-muted-foreground">
-              {currentQuestion!.explanation}
-            </p>
-            {answerState === "incorrect" && currentQuestion!.question_type !== "multiple_choice" && (
-              <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
-                <p className="font-medium text-foreground text-xs uppercase tracking-wide">Why your answer needs work</p>
-                {aiFeedbackLoading ? (
-                  <p className="text-muted-foreground flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Analyzing your answer...
-                  </p>
-                ) : aiFeedback ? (
-                  <p className="text-muted-foreground">{aiFeedback}</p>
-                ) : null}
-              </div>
+
+            {/* For short answer: show AI feedback as the primary explanation */}
+            {currentQuestion!.question_type !== "multiple_choice" ? (
+              aiFeedbackLoading ? (
+                <p className="text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Analyzing your answer...
+                </p>
+              ) : aiFeedback ? (
+                <p className="text-muted-foreground whitespace-pre-line">{aiFeedback}</p>
+              ) : (
+                <p className="text-muted-foreground">{currentQuestion!.explanation}</p>
+              )
+            ) : (
+              <p className="text-muted-foreground">{currentQuestion!.explanation}</p>
             )}
           </div>
         )}
