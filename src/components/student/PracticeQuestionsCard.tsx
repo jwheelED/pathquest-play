@@ -41,6 +41,8 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
@@ -89,6 +91,28 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setSessionTotal((p) => p + 1);
     if (isCorrect) setSessionCorrect((p) => p + 1);
 
+    // For incorrect short answers, get AI feedback explaining why their answer is wrong
+    if (!isCorrect && currentQuestion.question_type !== "multiple_choice") {
+      setAiFeedbackLoading(true);
+      try {
+        const { data } = await supabase.functions.invoke("generate-detailed-explanation", {
+          body: {
+            questionText: currentQuestion.question_text,
+            correctAnswer: currentQuestion.correct_answer,
+            studentAnswer: answer,
+            wasCorrect: false,
+          },
+        });
+        if (data?.explanation) {
+          setAiFeedback(data.explanation);
+        }
+      } catch {
+        // non-blocking
+      } finally {
+        setAiFeedbackLoading(false);
+      }
+    }
+
     // Update stats in background
     try {
       await supabase
@@ -108,6 +132,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setShortAnswer("");
     setAnswerState("unanswered");
     setShowExplanation(false);
+    setAiFeedback(null);
     setCurrentIndex((prev) => (prev + 1) % questions.length);
   };
 
@@ -117,6 +142,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setShortAnswer("");
     setAnswerState("unanswered");
     setShowExplanation(false);
+    setAiFeedback(null);
     setSessionCorrect(0);
     setSessionTotal(0);
   };
@@ -311,6 +337,19 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
             <p className="text-muted-foreground">
               {currentQuestion!.explanation}
             </p>
+            {answerState === "incorrect" && currentQuestion!.question_type !== "multiple_choice" && (
+              <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
+                <p className="font-medium text-foreground text-xs uppercase tracking-wide">Why your answer needs work</p>
+                {aiFeedbackLoading ? (
+                  <p className="text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Analyzing your answer...
+                  </p>
+                ) : aiFeedback ? (
+                  <p className="text-muted-foreground">{aiFeedback}</p>
+                ) : null}
+              </div>
+            )}
           </div>
         )}
 
