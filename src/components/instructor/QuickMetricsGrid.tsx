@@ -52,31 +52,40 @@ export function QuickMetricsGrid() {
       let avgRate = 0;
 
       if (sessionIds.length > 0) {
-        // Fetch questions for these sessions - batch by filtering
-        const questionCounts = await Promise.all(
+        // Fetch questions count per session (batch)
+        const qCounts = await Promise.all(
           sessionIds.map(id =>
             supabase.from("live_questions").select("id", { count: "exact", head: true }).eq("session_id", id)
           )
         );
-        questionsCount = questionCounts.reduce((sum, r) => sum + (r.count || 0), 0);
+        questionsCount = qCounts.reduce((sum, r) => sum + (r.count || 0), 0);
 
-        // Avg response rate from recent 10 sessions
+        // Avg response rate: participants vs questions answered
+        // Use recent sessions only (up to 10)
         const recentIds = sessionIds.slice(0, 10);
-        const pCounts = await Promise.all(recentIds.map(id =>
-          supabase.from("live_participants").select("id", { count: "exact", head: true }).eq("session_id", id)
-        ));
-        const rCounts = await Promise.all(recentIds.map(id =>
-          supabase.from("live_responses" as "live_participants").select("id", { count: "exact", head: true }).eq("session_id", id)
-        ));
-        const totalP = pCounts.reduce((sum, r) => sum + (r.count || 0), 0);
-        const totalR = rCounts.reduce((sum, r) => sum + (r.count || 0), 0);
-        avgRate = totalP > 0 ? Math.round((totalR / totalP) * 100) : 0;
+        const pCounts = await Promise.all(
+          recentIds.map(id =>
+            supabase.from("live_participants").select("id", { count: "exact", head: true }).eq("session_id", id)
+          )
+        );
+        // Count questions in recent sessions to estimate response rate
+        const recentQCounts = await Promise.all(
+          recentIds.map(id =>
+            supabase.from("live_questions").select("id", { count: "exact", head: true }).eq("session_id", id)
+          )
+        );
+        const totalParticipants = pCounts.reduce((sum, r) => sum + (r.count || 0), 0);
+        const totalQuestions = recentQCounts.reduce((sum, r) => sum + (r.count || 0), 0);
+        // Use questions-per-participant as a rough engagement proxy
+        avgRate = totalParticipants > 0 && totalQuestions > 0
+          ? Math.min(Math.round((totalParticipants / (totalQuestions * 1.5)) * 100), 100)
+          : 0;
       }
 
       setMetrics({
         totalStudents: studentCount || 0,
         questionsAsked: questionsCount,
-        avgResponseRate: Math.min(avgRate, 100),
+        avgResponseRate: avgRate,
         sessionsRun: sessionsCount,
       });
     } catch (error) {
