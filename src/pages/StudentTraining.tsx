@@ -141,14 +141,14 @@ export default function StudentTraining() {
           />
         </section>
 
-        {/* 2. My Classes + Join a Class */}
-        <section className="animate-fade-in grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div key={refreshKey} className="lg:col-span-2">
-            <SimpleClassList userId={user.id} onClassesLoaded={handleClassesLoaded} />
-          </div>
-          <div>
-            <JoinClassHero userId={user.id} onClassJoined={handleClassJoined} />
-          </div>
+        {/* 2. Join a Class */}
+        <section className="animate-fade-in">
+          <JoinClassHero userId={user.id} onClassJoined={handleClassJoined} />
+        </section>
+
+        {/* 3. My Classes */}
+        <section key={refreshKey} className="animate-fade-in">
+          <SimpleClassList userId={user.id} onClassesLoaded={handleClassesLoaded} />
         </section>
 
         {/* 3. Questions to Review */}
