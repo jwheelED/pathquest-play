@@ -30,53 +30,52 @@ export function QuickMetricsGrid() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [studentsRes, sessionsRes] = await Promise.all([
-        supabase
-          .from("instructor_students")
-          .select("id", { count: "exact", head: true })
-          .eq("instructor_id", user.id)
-          .or(`course_id.eq.${selectedCourseId},course_id.is.null`),
-        supabase
-          .from("live_sessions")
-          .select("id")
-          .eq("instructor_id", user.id)
-          .eq("is_active", false)
-          .or(`course_id.eq.${selectedCourseId},course_id.is.null`),
-      ]);
+      // Fetch students count
+      const { count: studentCount } = await supabase
+        .from("instructor_students")
+        .select("id", { count: "exact", head: true })
+        .eq("instructor_id", user.id)
+        .or(`course_id.eq.${selectedCourseId},course_id.is.null`);
 
-      const sessionIds = (sessionsRes.data || []).map(s => s.id);
+      // Fetch sessions
+      const { data: sessionsData } = await supabase
+        .from("live_sessions")
+        .select("id")
+        .eq("instructor_id", user.id)
+        .eq("is_active", false)
+        .or(`course_id.eq.${selectedCourseId},course_id.is.null`);
+
+      const sessionIds = (sessionsData || []).map(s => s.id);
+      const sessionsCount = sessionIds.length;
+
       let questionsCount = 0;
-      if (sessionIds.length > 0) {
-        const { count } = await supabase
-          .from("live_questions")
-          .select("id", { count: "exact", head: true })
-          .in("session_id", sessionIds);
-        questionsCount = count || 0;
-      }
-
-      const sessionsCount = sessionsRes.data?.length || 0;
-
-      // Compute avg response rate from recent sessions
       let avgRate = 0;
-      if (sessionsCount > 0) {
-        const recentSessionIds = (sessionsRes.data || []).slice(0, 10).map(s => s.id);
-        if (recentSessionIds.length > 0) {
-          const { count: pCount } = await supabase
-            .from("live_participants")
-            .select("id", { count: "exact", head: true })
-            .in("session_id", recentSessionIds);
-          const { count: rCount } = await supabase
-            .from("live_responses")
-            .select("id", { count: "exact", head: true })
-            .in("session_id", recentSessionIds);
-          const totalP = participantsRes.count || 0;
-          const totalR = responsesRes.count || 0;
-          avgRate = totalP > 0 ? Math.round((totalR / totalP) * 100) : 0;
-        }
+
+      if (sessionIds.length > 0) {
+        // Fetch questions for these sessions
+        const { data: qData } = await supabase
+          .from("live_questions")
+          .select("session_id")
+          .in("session_id", sessionIds as string[]);
+        questionsCount = qData?.length || 0;
+
+        // Avg response rate from recent 10 sessions
+        const recentIds = sessionIds.slice(0, 10);
+        const { data: pData } = await supabase
+          .from("live_participants")
+          .select("session_id")
+          .in("session_id", recentIds as string[]);
+        const { data: rData } = await supabase
+          .from("live_responses")
+          .select("session_id")
+          .in("session_id", recentIds as string[]);
+        const totalP = pData?.length || 0;
+        const totalR = rData?.length || 0;
+        avgRate = totalP > 0 ? Math.round((totalR / totalP) * 100) : 0;
       }
 
       setMetrics({
-        totalStudents: studentsRes.count || 0,
+        totalStudents: studentCount || 0,
         questionsAsked: questionsCount,
         avgResponseRate: Math.min(avgRate, 100),
         sessionsRun: sessionsCount,
