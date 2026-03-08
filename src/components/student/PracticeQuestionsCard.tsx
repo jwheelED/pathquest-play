@@ -337,6 +337,19 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
             <p className="text-muted-foreground">
               {currentQuestion!.explanation}
             </p>
+            {answerState === "incorrect" && currentQuestion!.question_type !== "multiple_choice" && (
+              <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
+                <p className="font-medium text-foreground text-xs uppercase tracking-wide">Why your answer needs work</p>
+                {aiFeedbackLoading ? (
+                  <p className="text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Analyzing your answer...
+                  </p>
+                ) : aiFeedback ? (
+                  <p className="text-muted-foreground">{aiFeedback}</p>
+                ) : null}
+              </div>
+            )}
           </div>
         )}
 
