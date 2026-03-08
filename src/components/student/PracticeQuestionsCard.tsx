@@ -83,35 +83,50 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
       return;
     }
 
-    const isCorrect =
-      answer.toLowerCase() === currentQuestion.correct_answer.toLowerCase();
+    let isCorrect: boolean;
+
+    if (currentQuestion.question_type === "multiple_choice") {
+      isCorrect = answer.toLowerCase() === currentQuestion.correct_answer.toLowerCase();
+    } else {
+      // For short answer, use AI grading instead of exact match
+      isCorrect = false; // default, will be updated by AI
+      setAiFeedbackLoading(true);
+      try {
+        const { data } = await supabase.functions.invoke("generate-detailed-explanation", {
+          body: {
+            problemText: currentQuestion.question_text,
+            correctAnswer: currentQuestion.correct_answer,
+            userAnswer: answer,
+            wasCorrect: false,
+          },
+        });
+        if (data?.explanation) {
+          // Check if the AI determined the answer was actually correct
+          // by looking at the effectiveWasCorrect logic on the server
+          const explanationLower = data.explanation.toLowerCase();
+          const looksCorrect = explanationLower.includes("you are correct") || 
+            explanationLower.includes("your answer is correct") ||
+            explanationLower.includes("well done") ||
+            explanationLower.includes("that's right") ||
+            explanationLower.includes("you got it");
+          
+          if (looksCorrect) {
+            isCorrect = true;
+          }
+          setAiFeedback(data.explanation);
+        }
+      } catch {
+        // Fallback to simple comparison
+        isCorrect = answer.toLowerCase().trim() === currentQuestion.correct_answer.toLowerCase().trim();
+      } finally {
+        setAiFeedbackLoading(false);
+      }
+    }
 
     setAnswerState(isCorrect ? "correct" : "incorrect");
     setShowExplanation(true);
     setSessionTotal((p) => p + 1);
     if (isCorrect) setSessionCorrect((p) => p + 1);
-
-    // For incorrect short answers, get AI feedback explaining why their answer is wrong
-    if (!isCorrect && currentQuestion.question_type !== "multiple_choice") {
-      setAiFeedbackLoading(true);
-      try {
-        const { data } = await supabase.functions.invoke("generate-detailed-explanation", {
-          body: {
-            questionText: currentQuestion.question_text,
-            correctAnswer: currentQuestion.correct_answer,
-            studentAnswer: answer,
-            wasCorrect: false,
-          },
-        });
-        if (data?.explanation) {
-          setAiFeedback(data.explanation);
-        }
-      } catch {
-        // non-blocking
-      } finally {
-        setAiFeedbackLoading(false);
-      }
-    }
 
     // Update stats in background
     try {
@@ -312,7 +327,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
         {showExplanation && (
           <div
             className={cn(
-              "rounded-lg p-4 text-sm space-y-1",
+              "rounded-lg p-4 text-sm space-y-2",
               answerState === "correct"
                 ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20"
                 : "bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20"
@@ -334,21 +349,21 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
                 </>
               )}
             </p>
-            <p className="text-muted-foreground">
-              {currentQuestion!.explanation}
-            </p>
-            {answerState === "incorrect" && currentQuestion!.question_type !== "multiple_choice" && (
-              <div className="mt-3 pt-3 border-t border-border/50 space-y-1">
-                <p className="font-medium text-foreground text-xs uppercase tracking-wide">Why your answer needs work</p>
-                {aiFeedbackLoading ? (
-                  <p className="text-muted-foreground flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Analyzing your answer...
-                  </p>
-                ) : aiFeedback ? (
-                  <p className="text-muted-foreground">{aiFeedback}</p>
-                ) : null}
-              </div>
+
+            {/* For short answer: show AI feedback as the primary explanation */}
+            {currentQuestion!.question_type !== "multiple_choice" ? (
+              aiFeedbackLoading ? (
+                <p className="text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Analyzing your answer...
+                </p>
+              ) : aiFeedback ? (
+                <p className="text-muted-foreground whitespace-pre-line">{aiFeedback}</p>
+              ) : (
+                <p className="text-muted-foreground">{currentQuestion!.explanation}</p>
+              )
+            ) : (
+              <p className="text-muted-foreground">{currentQuestion!.explanation}</p>
             )}
           </div>
         )}
