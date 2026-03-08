@@ -1,6 +1,6 @@
 
-## Plan: Instructor Dashboard Redesign
+## Plan: Question Bank Redesign
 
 **STATUS: COMPLETED**
 
-Redesigned the instructor dashboard overview tab into a cohesive control center. Created 4 new components: SessionReadyModule (course name + join code + CTAs), QuickMetricsGrid (2x2 Edvana-specific metrics), CheckInPreview (live results preview with empty state), RecentSessionsTable (last 5 sessions in a scannable table). Updated LastSessionSummary with actionable insights based on session metrics. Improved sidebar styling with left-border accent and better font weights. Removed CourseCodeCard, InstructorQuickActions, and InstructorOverview from overview (absorbed into new modules).
+Redesigned the Question Bank tab into a two-column operational layout with Prep/Live Push mode tabs, top control bar with stats, right-side preview panel with inline results, natural slide sorting (ascending), and status lifecycle badges (Ready/Pushed). Removed standalone QuestionBankResults section and integrated results into the preview panel. Updated QuestionBankCard with mode-aware rendering (larger push buttons in Live mode, edit/delete hidden), and SourceMaterialCard with natural sort and auto-expand in Live mode.

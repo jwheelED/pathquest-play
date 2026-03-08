@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -19,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Library, Loader2, FileUp } from "lucide-react";
+import { Plus, Search, Library, Loader2, FileUp, Zap, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -31,7 +33,7 @@ import {
   SourceMaterialCard,
   type BankQuestion 
 } from "./question-bank";
-import { QuestionBankResults } from "./QuestionBankResults";
+import { QuestionPreviewPanel } from "./question-bank/QuestionPreviewPanel";
 
 interface QuestionBankTabProps {
   professorType: string | null;
@@ -43,6 +45,8 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [mode, setMode] = useState<"prep" | "live">("prep");
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -51,11 +55,8 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [deleteQuestion, setDeleteQuestion] = useState<BankQuestion | null>(null);
   const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  
-  // Upload flow
   const [showUploadFlow, setShowUploadFlow] = useState(false);
   
-  // Available types based on professor type
   const availableTypes = professorType === "humanities" 
     ? [
         { value: "all", label: "All Types" },
@@ -69,7 +70,7 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         { value: "coding", label: "Coding" },
       ];
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -93,11 +94,11 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCourseId]);
 
   useEffect(() => {
     fetchQuestions();
-  }, [selectedCourseId]);
+  }, [fetchQuestions]);
 
   const handleDelete = async () => {
     if (!deleteQuestion) return;
@@ -109,7 +110,8 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         .eq("id", deleteQuestion.id);
       if (error) throw error;
       toast.success("Question deleted");
-      setQuestions(questions.filter(q => q.id !== deleteQuestion.id));
+      setQuestions(prev => prev.filter(q => q.id !== deleteQuestion.id));
+      if (selectedQuestionId === deleteQuestion.id) setSelectedQuestionId(null);
     } catch (error) {
       console.error("Error deleting question:", error);
       toast.error("Failed to delete question");
@@ -130,7 +132,8 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
       if (error) throw error;
       const sourceTitle = questions.find(q => q.source_material_id === deleteSourceId)?.source_material_title;
       toast.success(`Deleted all questions from "${sourceTitle}"`);
-      setQuestions(questions.filter(q => q.source_material_id !== deleteSourceId));
+      setQuestions(prev => prev.filter(q => q.source_material_id !== deleteSourceId));
+      setSelectedQuestionId(null);
     } catch (error) {
       console.error("Error deleting source questions:", error);
       toast.error("Failed to delete questions");
@@ -140,7 +143,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
     }
   };
 
-  // Apply search + type filters
   const applyFilters = (q: BankQuestion) => {
     if (typeFilter !== "all") {
       const normalizedType = q.question_type === "coding_simple" ? "coding" : q.question_type;
@@ -157,14 +159,13 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
     return true;
   };
 
-  // Split: manual questions vs source-grouped questions
-  const manualQuestions = questions.filter(q => !q.source_material_id).filter(applyFilters);
+  const filteredQuestions = useMemo(() => questions.filter(applyFilters), [questions, typeFilter, searchQuery]);
+  const manualQuestions = filteredQuestions.filter(q => !q.source_material_id);
   
   const sourceGroups = useMemo(() => {
     const groups = new Map<string, { title: string; questions: BankQuestion[] }>();
-    questions
+    filteredQuestions
       .filter(q => q.source_material_id && q.source_material_title)
-      .filter(applyFilters)
       .forEach(q => {
         const key = q.source_material_id!;
         if (!groups.has(key)) {
@@ -173,9 +174,18 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         groups.get(key)!.questions.push(q);
       });
     return Array.from(groups, ([id, group]) => ({ id, ...group }));
-  }, [questions, typeFilter, searchQuery]);
+  }, [filteredQuestions]);
 
-  // Show upload flow
+  const selectedQuestion = useMemo(
+    () => questions.find(q => q.id === selectedQuestionId) || null,
+    [questions, selectedQuestionId]
+  );
+
+  // Stats
+  const totalCount = filteredQuestions.length;
+  const readyCount = filteredQuestions.filter(q => !q.times_used || q.times_used === 0).length;
+  const pushedCount = filteredQuestions.filter(q => q.times_used && q.times_used > 0).length;
+
   if (showUploadFlow) {
     return (
       <div className="space-y-6">
@@ -183,9 +193,7 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
           onComplete={(count) => {
             setShowUploadFlow(false);
             fetchQuestions();
-            if (count > 0) {
-              toast.success(`${count} questions added to your bank!`);
-            }
+            if (count > 0) toast.success(`${count} questions added to your bank!`);
           }}
           onCancel={() => setShowUploadFlow(false)}
         />
@@ -194,131 +202,190 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Top Control Bar */}
       <Card className="headspace-card">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg">
+        <CardContent className="py-4 px-5">
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Title + Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <Library className="h-5 w-5 text-primary" />
-                Question Bank
-              </CardTitle>
-              <CardDescription>
-                Create and manage questions to push to students on-demand
-              </CardDescription>
+                <h2 className="text-lg font-semibold text-foreground">Question Bank</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowUploadFlow(true)}>
+                  <FileUp className="w-4 h-4 mr-1.5" />
+                  Upload Slides
+                </Button>
+                <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New Question
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
-                <FileUp className="w-4 h-4 mr-2" />
-                Upload Slides
-              </Button>
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                New Question
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search questions..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableTypes.map(type => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
-          {/* Manual Questions List */}
+            {/* Row 2: Mode tabs + search + filter */}
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <Tabs value={mode} onValueChange={(v) => setMode(v as "prep" | "live")} className="shrink-0">
+                <TabsList className="h-9">
+                  <TabsTrigger value="prep" className="text-xs px-3 gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    Prep
+                  </TabsTrigger>
+                  <TabsTrigger value="live" className="text-xs px-3 gap-1.5">
+                    <Zap className="w-3.5 h-3.5" />
+                    Live Push
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search questions..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[150px] h-9">
+                  <SelectValue placeholder="Filter type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Row 3: Stats */}
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{totalCount} question{totalCount !== 1 ? "s" : ""}</span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-primary" />
+                {readyCount} ready
+              </span>
+              <span>·</span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-secondary" />
+                {pushedCount} pushed
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: Question List (2/3) */}
+        <div className="lg:col-span-2 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : manualQuestions.length === 0 && sourceGroups.length === 0 ? (
-            <div className="text-center py-12">
-              <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-              <h3 className="font-medium text-muted-foreground mb-1">
-                {questions.length === 0 ? "No questions yet" : "No matching questions"}
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {questions.length === 0 
-                  ? "Create your first question or upload slides to get started" 
-                  : "Try adjusting your search or filters"
-                }
-              </p>
-              {questions.length === 0 && (
-                <div className="flex gap-2 justify-center">
-                  <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
-                    <FileUp className="w-4 h-4 mr-2" />
-                    Upload Slides
-                  </Button>
-                  <Button onClick={() => setCreateDialogOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Question
-                  </Button>
+            <Card className="headspace-card">
+              <CardContent className="text-center py-12">
+                <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                <h3 className="font-medium text-muted-foreground mb-1">
+                  {questions.length === 0 ? "No questions yet" : "No matching questions"}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {questions.length === 0 
+                    ? "Create your first question or upload slides to get started" 
+                    : "Try adjusting your search or filters"
+                  }
+                </p>
+                {questions.length === 0 && (
+                  <div className="flex gap-2 justify-center">
+                    <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
+                      <FileUp className="w-4 h-4 mr-2" />
+                      Upload Slides
+                    </Button>
+                    <Button onClick={() => setCreateDialogOpen(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Question
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Manual questions */}
+              {manualQuestions.length > 0 && (
+                <div className="space-y-2">
+                  {manualQuestions.map(question => (
+                    <QuestionBankCard
+                      key={question.id}
+                      question={question}
+                      mode={mode}
+                      selected={selectedQuestionId === question.id}
+                      onSelect={(q) => setSelectedQuestionId(q.id)}
+                      onEdit={(q) => {
+                        setEditQuestion(q);
+                        setCreateDialogOpen(true);
+                      }}
+                      onDelete={(q) => setDeleteQuestion(q)}
+                      onPush={(q) => setPushQuestion(q)}
+                    />
+                  ))}
                 </div>
               )}
-            </div>
-          ) : manualQuestions.length > 0 ? (
-            <div className="space-y-3">
-              {manualQuestions.map(question => (
-                <QuestionBankCard
-                  key={question.id}
-                  question={question}
-                  onEdit={(q) => {
-                    setEditQuestion(q);
-                    setCreateDialogOpen(true);
-                  }}
-                  onDelete={(q) => setDeleteQuestion(q)}
-                  onPush={(q) => setPushQuestion(q)}
-                />
-              ))}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
 
-      {/* Source Material Cards — grouped by uploaded PDF/PPTX */}
-      {sourceGroups.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground px-1">
-            Questions from Uploaded Slides
-          </h3>
-          {sourceGroups.map(group => (
-            <SourceMaterialCard
-              key={group.id}
-              sourceId={group.id}
-              sourceTitle={group.title}
-              questions={group.questions}
+              {/* Source material groups */}
+              {sourceGroups.length > 0 && (
+                <div className="space-y-3">
+                  {manualQuestions.length > 0 && (
+                    <h3 className="text-sm font-medium text-muted-foreground px-1 pt-2">
+                      From Uploaded Slides
+                    </h3>
+                  )}
+                  {sourceGroups.map(group => (
+                    <SourceMaterialCard
+                      key={group.id}
+                      sourceId={group.id}
+                      sourceTitle={group.title}
+                      questions={group.questions}
+                      mode={mode}
+                      selectedQuestionId={selectedQuestionId}
+                      onSelect={(q) => setSelectedQuestionId(q.id)}
+                      onEdit={(q) => {
+                        setEditQuestion(q);
+                        setCreateDialogOpen(true);
+                      }}
+                      onDelete={(q) => setDeleteQuestion(q)}
+                      onPush={(q) => setPushQuestion(q)}
+                      onDeleteAll={(id) => setDeleteSourceId(id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Right: Preview Panel (1/3) */}
+        <div className="hidden lg:block">
+          <div className="sticky top-4">
+            <QuestionPreviewPanel
+              question={selectedQuestion}
+              onPush={(q) => setPushQuestion(q)}
               onEdit={(q) => {
                 setEditQuestion(q);
                 setCreateDialogOpen(true);
               }}
-              onDelete={(q) => setDeleteQuestion(q)}
-              onPush={(q) => setPushQuestion(q)}
-              onDeleteAll={(id) => setDeleteSourceId(id)}
             />
-          ))}
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Create/Edit Dialog */}
+      {/* Dialogs (unchanged) */}
       <CreateQuestionDialog
         open={createDialogOpen}
         onOpenChange={(open) => {
@@ -330,7 +397,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         professorType={professorType}
       />
 
-      {/* Push Dialog */}
       <PushQuestionDialog
         question={pushQuestion}
         open={!!pushQuestion}
@@ -338,7 +404,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         onSuccess={fetchQuestions}
       />
 
-      {/* Delete Single Question Confirmation */}
       <AlertDialog open={!!deleteQuestion} onOpenChange={(open) => !open && setDeleteQuestion(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -360,7 +425,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete All From Source Confirmation */}
       <AlertDialog open={!!deleteSourceId} onOpenChange={(open) => !open && setDeleteSourceId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -381,9 +445,6 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Results Section */}
-      <QuestionBankResults />
     </div>
   );
 }
