@@ -15,7 +15,6 @@ import { QuickMetricsGrid } from "@/components/instructor/QuickMetricsGrid";
 import { CheckInPreview } from "@/components/instructor/CheckInPreview";
 import { RecentSessionsTable } from "@/components/instructor/RecentSessionsTable";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
-import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
