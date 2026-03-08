@@ -120,7 +120,7 @@ const Index = () => {
   };
 
   const handleBookDemo = () => {
-    window.location.href = "mailto:hello@edvana.io?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
   };
 
   return (
@@ -193,19 +193,20 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center animate-fade-in stagger-3">
               <Button
                 size="lg"
-                onClick={handleBookDemo}
+                onClick={() => navigate("/auth")}
                 className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-105 group"
               >
-                Book a Demo
+                Student Login
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => scrollToSection("how-it-works")}
+                onClick={() => navigate("/instructor/auth")}
                 className="rounded-full px-8 border-2 border-slate-300 text-text-main hover:bg-slate-100 transition-all gap-2"
               >
-                See How It Works
+                Instructor Login
+                <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
 
@@ -558,17 +559,19 @@ const Index = () => {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                context: "Intro Biology Lecture",
+                context: "Intro to Writing",
                 sessions: 12,
                 responseRate: 78,
                 repeatUse: "4 of 5 class sessions",
-                quote: "Edvana made it easier to check whether the room was with me before moving on.",
+                role: "University Professor",
+                quote: "I demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.",
               },
               {
                 context: "Engineering Fundamentals",
                 sessions: 8,
                 responseRate: 85,
                 repeatUse: "Every session after week 2",
+                role: "Instructor",
                 quote: "I stopped guessing and started knowing which concepts needed more time.",
               },
               {
@@ -576,7 +579,8 @@ const Index = () => {
                 sessions: 15,
                 responseRate: 72,
                 repeatUse: "3 of 4 class sessions",
-                quote: "My students said the check-ins kept them more focused during lecture.",
+                role: "Graduate Engineering Student",
+                quote: "It was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!",
               },
             ].map((card, i) => (
               <div key={i} className="bg-white rounded-xl border border-slate-200 shadow-card p-6 flex flex-col">
@@ -601,6 +605,7 @@ const Index = () => {
                 <div className="mt-auto pt-4 border-t border-slate-100">
                   <MessageSquare className="w-4 h-4 text-muted-foreground mb-2" />
                   <p className="text-sm text-text-main italic leading-relaxed">"{card.quote}"</p>
+                  {card.role && <p className="text-xs text-text-muted-landing mt-2 font-medium">— {card.role}</p>}
                 </div>
               </div>
             ))}
@@ -630,7 +635,7 @@ const Index = () => {
                   size="lg"
                   variant="outline"
                   onClick={handleBookDemo}
-                  className="rounded-full px-10 text-lg h-14 border-2 border-white/40 text-white hover:bg-white/10 hover:text-white transition-all"
+                  className="rounded-full px-10 text-lg h-14 border-2 border-white/40 text-primary hover:bg-white/10 hover:text-primary transition-all"
                 >
                   Start a Pilot Conversation
                 </Button>
