@@ -132,6 +132,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setShortAnswer("");
     setAnswerState("unanswered");
     setShowExplanation(false);
+    setAiFeedback(null);
     setCurrentIndex((prev) => (prev + 1) % questions.length);
   };
 
