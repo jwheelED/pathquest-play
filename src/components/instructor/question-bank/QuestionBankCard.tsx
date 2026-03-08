@@ -29,7 +29,7 @@ export interface BankQuestion {
   tags: string[] | null;
   times_used: number | null;
   last_used_at: string | null;
-  question_content: Record<string, unknown>;
+  question_content: Record<string, any>;
   created_at: string;
   source_material_id?: string | null;
   source_material_title?: string | null;
