@@ -441,25 +441,20 @@ export default function InstructorDashboard() {
         return (
           <div className="space-y-6">
             <PendingOrgInvites />
-            
-            <div className="grid grid-cols-12 gap-6">
-              {/* Left column */}
-              <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                <CourseCodeCard />
-                <InstructorQuickActions onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-              </div>
-              
-              {/* Right column */}
-              <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
-                {currentUser && (
-                  <InstructorOverview 
-                    instructorId={currentUser.id} 
-                    onNavigate={(tab) => setActiveTab(tab as TabValue)}
-                  />
-                )}
-                <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-              </div>
+            <SessionReadyModule
+              activeSession={activeSession}
+              onStartLive={() => setActiveTab("live")}
+              onPresentSlides={() => navigate("/instructor/slides")}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              <QuickMetricsGrid />
             </div>
+            <CheckInPreview
+              activeSessionId={activeSession?.id}
+              onNavigate={(tab) => setActiveTab(tab as TabValue)}
+            />
+            <RecentSessionsTable onNavigate={(tab) => setActiveTab(tab as TabValue)} />
           </div>
         );
 
