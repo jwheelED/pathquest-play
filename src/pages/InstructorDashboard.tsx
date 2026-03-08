@@ -623,7 +623,7 @@ export default function InstructorDashboard() {
     >
       <div className="flex min-h-[calc(100vh-12rem)]">
         {/* Sidebar Navigation - Desktop Only */}
-        <aside className="hidden lg:flex w-56 flex-col border-r border-border pr-6 mr-6 shrink-0">
+        <aside className="hidden lg:flex w-56 flex-col border-r border-border/60 pr-6 mr-6 shrink-0">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -633,13 +633,13 @@ export default function InstructorDashboard() {
                   key={item.value}
                   onClick={() => setActiveTab(item.value)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left",
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all text-left",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-primary/10 text-primary font-semibold border-l-3 border-primary"
+                      : "text-muted-foreground font-medium hover:text-foreground hover:bg-muted/50"
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
                   {item.label}
                 </button>
               );

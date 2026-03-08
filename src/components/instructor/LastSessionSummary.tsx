@@ -139,10 +139,22 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             </div>
           </div>
         </div>
+
+        {/* Actionable insight */}
+        <div className="mt-4 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+          {session.questionCount === 0 && session.participantCount === 0
+            ? "No questions were sent and no students joined. Try sharing your join code before the next session."
+            : session.questionCount === 0
+            ? "No questions were sent. Try enabling auto-questions next time."
+            : session.participantCount === 0
+            ? "No students joined. Verify your join code is shared before the next session."
+            : `${session.participantCount} student${session.participantCount !== 1 ? "s" : ""} responded to ${session.questionCount} question${session.questionCount !== 1 ? "s" : ""}.`}
+        </div>
+
         {onNavigate && (
           <button
             onClick={() => onNavigate("live")}
-            className="flex items-center gap-1 text-xs text-primary hover:underline mt-4"
+            className="flex items-center gap-1 text-xs text-primary hover:underline mt-3"
           >
             View full summary <ArrowRight className="w-3 h-3" />
           </button>
