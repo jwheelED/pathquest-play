@@ -104,7 +104,7 @@ export function SimpleClassList({ userId, onClassesLoaded }: SimpleClassListProp
             classData.push({
               enrollmentId: enrollment.id,
               instructorId: course.instructor_id,
-              instructorName: instructorMap.get(course.instructor_id) || "Unknown Instructor",
+              instructorName: instructorMap.get(course.instructor_id) || "Instructor",
               courseId: course.id,
               courseTitle: course.title,
               courseCode: course.course_code,
