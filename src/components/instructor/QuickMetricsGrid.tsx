@@ -30,7 +30,7 @@ export function QuickMetricsGrid() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [studentsRes, sessionsRes, questionsRes] = await Promise.all([
+      const [studentsRes, sessionsRes] = await Promise.all([
         supabase
           .from("instructor_students")
           .select("id", { count: "exact", head: true })
@@ -42,19 +42,17 @@ export function QuickMetricsGrid() {
           .eq("instructor_id", user.id)
           .eq("is_active", false)
           .or(`course_id.eq.${selectedCourseId},course_id.is.null`),
-        supabase
-          .from("live_questions")
-          .select("id, session_id")
-          .in(
-            "session_id",
-            (await supabase
-              .from("live_sessions")
-              .select("id")
-              .eq("instructor_id", user.id)
-              .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
-            ).data?.map(s => s.id) || []
-          ),
       ]);
+
+      const sessionIds = (sessionsRes.data || []).map(s => s.id);
+      let questionsCount = 0;
+      if (sessionIds.length > 0) {
+        const { count } = await supabase
+          .from("live_questions")
+          .select("id", { count: "exact", head: true })
+          .in("session_id", sessionIds);
+        questionsCount = count || 0;
+      }
 
       const sessionsCount = sessionsRes.data?.length || 0;
       const questionsCount = questionsRes.data?.length || 0;
