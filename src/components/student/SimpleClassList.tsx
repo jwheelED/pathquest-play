@@ -153,7 +153,7 @@ export function SimpleClassList({ userId, onClassesLoaded }: SimpleClassListProp
             classData.push({
               enrollmentId: enrollment.id,
               instructorId: instructor.id,
-              instructorName: instructor.full_name || "Unknown Instructor",
+              instructorName: instructor.full_name || "Instructor",
               courseId: null,
               courseTitle: instructor.course_title || "Untitled Course",
               courseCode: instructor.instructor_code || "N/A",
