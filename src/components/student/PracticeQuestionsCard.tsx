@@ -124,11 +124,35 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   // ---- Rendering ----
 
   if (loading) {
-    return null; // Don't show anything while loading
+    return null;
   }
 
   if (questions.length === 0) {
-    return null; // Hide card entirely when no material-based questions exist
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Brain className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-foreground">Practice Questions</p>
+              <p className="text-sm text-muted-foreground">
+                Upload study materials to generate practice questions you can quiz yourself on
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById("study-materials-section")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Upload
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const progressPercent =
