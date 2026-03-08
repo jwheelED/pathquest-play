@@ -55,23 +55,20 @@ export function QuickMetricsGrid() {
       }
 
       const sessionsCount = sessionsRes.data?.length || 0;
-      const questionsCount = questionsRes.data?.length || 0;
 
       // Compute avg response rate from recent sessions
       let avgRate = 0;
       if (sessionsCount > 0) {
         const recentSessionIds = (sessionsRes.data || []).slice(0, 10).map(s => s.id);
         if (recentSessionIds.length > 0) {
-          const [participantsRes, responsesRes] = await Promise.all([
-            supabase
-              .from("live_participants")
-              .select("id", { count: "exact", head: true })
-              .in("session_id", recentSessionIds),
-            supabase
-              .from("live_responses")
-              .select("id", { count: "exact", head: true })
-              .in("session_id", recentSessionIds),
-          ]);
+          const { count: pCount } = await supabase
+            .from("live_participants")
+            .select("id", { count: "exact", head: true })
+            .in("session_id", recentSessionIds);
+          const { count: rCount } = await supabase
+            .from("live_responses")
+            .select("id", { count: "exact", head: true })
+            .in("session_id", recentSessionIds);
           const totalP = participantsRes.count || 0;
           const totalR = responsesRes.count || 0;
           avgRate = totalP > 0 ? Math.round((totalR / totalP) * 100) : 0;
