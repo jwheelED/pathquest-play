@@ -1,6 +1,6 @@
 
-## Plan: Rework Live Session Logic — Grading Accuracy & Timer Reliability
+## Plan: Instructor Dashboard Redesign
 
 **STATUS: COMPLETED**
 
-Fixed 4 bugs: (1) MCQ result display now shows Correct/Incorrect with green/red feedback instead of generic "Response Recorded", (2) Empty correctAnswer guard prevents all-answers-wrong bug by returning 422 error, (3) Removed dangerous first-char fallback in normalizeAnswer that misinterpreted words starting with A-D as answer letters, (4) Stabilized auto-question timer by using refs instead of state in useEffect dependencies to prevent interval teardown/recreation.
+Redesigned the instructor dashboard overview tab into a cohesive control center. Created 4 new components: SessionReadyModule (course name + join code + CTAs), QuickMetricsGrid (2x2 Edvana-specific metrics), CheckInPreview (live results preview with empty state), RecentSessionsTable (last 5 sessions in a scannable table). Updated LastSessionSummary with actionable insights based on session metrics. Improved sidebar styling with left-border accent and better font weights. Removed CourseCodeCard, InstructorQuickActions, and InstructorOverview from overview (absorbed into new modules).
