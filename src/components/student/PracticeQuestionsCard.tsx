@@ -83,35 +83,50 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
       return;
     }
 
-    const isCorrect =
-      answer.toLowerCase() === currentQuestion.correct_answer.toLowerCase();
+    let isCorrect: boolean;
+
+    if (currentQuestion.question_type === "multiple_choice") {
+      isCorrect = answer.toLowerCase() === currentQuestion.correct_answer.toLowerCase();
+    } else {
+      // For short answer, use AI grading instead of exact match
+      isCorrect = false; // default, will be updated by AI
+      setAiFeedbackLoading(true);
+      try {
+        const { data } = await supabase.functions.invoke("generate-detailed-explanation", {
+          body: {
+            problemText: currentQuestion.question_text,
+            correctAnswer: currentQuestion.correct_answer,
+            userAnswer: answer,
+            wasCorrect: false,
+          },
+        });
+        if (data?.explanation) {
+          // Check if the AI determined the answer was actually correct
+          // by looking at the effectiveWasCorrect logic on the server
+          const explanationLower = data.explanation.toLowerCase();
+          const looksCorrect = explanationLower.includes("you are correct") || 
+            explanationLower.includes("your answer is correct") ||
+            explanationLower.includes("well done") ||
+            explanationLower.includes("that's right") ||
+            explanationLower.includes("you got it");
+          
+          if (looksCorrect) {
+            isCorrect = true;
+          }
+          setAiFeedback(data.explanation);
+        }
+      } catch {
+        // Fallback to simple comparison
+        isCorrect = answer.toLowerCase().trim() === currentQuestion.correct_answer.toLowerCase().trim();
+      } finally {
+        setAiFeedbackLoading(false);
+      }
+    }
 
     setAnswerState(isCorrect ? "correct" : "incorrect");
     setShowExplanation(true);
     setSessionTotal((p) => p + 1);
     if (isCorrect) setSessionCorrect((p) => p + 1);
-
-    // For incorrect short answers, get AI feedback explaining why their answer is wrong
-    if (!isCorrect && currentQuestion.question_type !== "multiple_choice") {
-      setAiFeedbackLoading(true);
-      try {
-        const { data } = await supabase.functions.invoke("generate-detailed-explanation", {
-          body: {
-            questionText: currentQuestion.question_text,
-            correctAnswer: currentQuestion.correct_answer,
-            studentAnswer: answer,
-            wasCorrect: false,
-          },
-        });
-        if (data?.explanation) {
-          setAiFeedback(data.explanation);
-        }
-      } catch {
-        // non-blocking
-      } finally {
-        setAiFeedbackLoading(false);
-      }
-    }
 
     // Update stats in background
     try {
