@@ -551,11 +551,7 @@ export default function InstructorDashboard() {
       case "materials":
         return (
           <div className="space-y-6">
-            <div className="min-w-0">
-              <LectureMaterialsUpload />
-            </div>
-            
-            
+            <LectureMaterialsUpload />
             {professorType === "research" && (
               <Card className="headspace-card h-fit">
                 <CardHeader className="pb-3">
