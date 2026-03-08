@@ -4,13 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BottomNav } from "@/components/mobile/BottomNav";
 
-// New simplified components
+import { NextActionBanner } from "@/components/student/NextActionBanner";
 import { JoinClassHero } from "@/components/student/JoinClassHero";
 import { SimpleClassList } from "@/components/student/SimpleClassList";
 import { LectureCheckInHistory } from "@/components/student/LectureCheckInHistory";
-import { RecommendedNextSteps } from "@/components/student/RecommendedNextSteps";
 import { SimplifiedStudyMaterials } from "@/components/student/SimplifiedStudyMaterials";
-import { ConfidenceAnalytics } from "@/components/student/ConfidenceAnalytics";
 import { PracticeQuestionsCard } from "@/components/student/PracticeQuestionsCard";
 
 import { logger } from "@/lib/logger";
@@ -26,6 +24,7 @@ export default function StudentTraining() {
   const [hasClasses, setHasClasses] = useState(false);
   const [wrongAnswersCount, setWrongAnswersCount] = useState(0);
   const [materialsCount, setMaterialsCount] = useState(0);
+  const [hasLiveSession, setHasLiveSession] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const navigate = useNavigate();
 
@@ -41,6 +40,7 @@ export default function StudentTraining() {
       setUser(session.user);
       fetchUserProfile(session.user.id);
       fetchWrongAnswersCount(session.user.id);
+      fetchLiveSessionStatus(session.user.id);
     }
   };
 
@@ -50,10 +50,7 @@ export default function StudentTraining() {
       .select("full_name")
       .eq("id", userId)
       .single();
-    
-    if (data?.full_name) {
-      setUserName(data.full_name);
-    }
+    if (data?.full_name) setUserName(data.full_name);
   };
 
   const fetchWrongAnswersCount = async (userId: string) => {
@@ -65,10 +62,35 @@ export default function StudentTraining() {
         .eq("assignment_type", "lecture_checkin")
         .eq("completed", true)
         .or("grade.lt.70");
-
       setWrongAnswersCount(count || 0);
     } catch (error) {
       logger.error("Error fetching wrong answers count:", error);
+    }
+  };
+
+  const fetchLiveSessionStatus = async (userId: string) => {
+    try {
+      const { data: connections } = await supabase
+        .from("instructor_students")
+        .select("instructor_id, course_id")
+        .eq("student_id", userId);
+
+      if (!connections || connections.length === 0) return;
+
+      const instructorIds = [...new Set(connections.map(c => c.instructor_id))];
+      const now = new Date().toISOString();
+
+      const { data: liveSessions } = await supabase
+        .from("live_sessions")
+        .select("id")
+        .in("instructor_id", instructorIds)
+        .eq("is_active", true)
+        .gt("ends_at", now)
+        .limit(1);
+
+      setHasLiveSession((liveSessions?.length || 0) > 0);
+    } catch (error) {
+      logger.error("Error checking live sessions:", error);
     }
   };
 
@@ -81,9 +103,10 @@ export default function StudentTraining() {
   const handleClassJoined = () => {
     setRefreshKey(prev => prev + 1);
     setHasClasses(true);
+    fetchLiveSessionStatus(user!.id);
   };
 
-  const handleClassesLoaded = (classes: any[]) => {
+  const handleClassesLoaded = (classes: unknown[]) => {
     setHasClasses(classes.length > 0);
   };
 
@@ -107,67 +130,41 @@ export default function StudentTraining() {
       subtitle="Stay on track with your classes"
     >
       <div className="max-w-4xl mx-auto space-y-6 pb-20 md:pb-6">
-        
-        {/* Join Class Hero - Always visible and prominent */}
+        {/* 1. Next Action Banner */}
         <section className="animate-fade-in">
-          <JoinClassHero userId={user.id} onClassJoined={handleClassJoined} />
-        </section>
-
-        {/* My Classes - Clean grid of enrolled classes */}
-        <section key={refreshKey} className="animate-fade-in">
-          <SimpleClassList 
-            userId={user.id} 
-            onClassesLoaded={handleClassesLoaded}
+          <NextActionBanner
+            userId={user.id}
+            hasClasses={hasClasses}
+            wrongAnswersCount={wrongAnswersCount}
+            materialsCount={materialsCount}
+            hasLiveSession={hasLiveSession}
           />
         </section>
 
-        {/* Two-column layout for recommendations and wrong answers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recommended Next Steps */}
-          <section className="animate-fade-in">
-            <RecommendedNextSteps 
-              userId={user.id}
-              hasClasses={hasClasses}
-              wrongAnswersCount={wrongAnswersCount}
-              materialsCount={materialsCount}
-            />
-          </section>
-
-          {/* Questions to Review (Wrong Answers) */}
-          <section className="animate-fade-in">
-            <LectureCheckInHistory 
-              userId={user.id} 
-              limit={5}
-              showOnlyWrong={true}
-            />
-          </section>
-        </div>
-
-        {/* Recent Check-In History */}
-        <section className="animate-fade-in">
-          <LectureCheckInHistory 
-            userId={user.id} 
-            limit={10}
-            showOnlyWrong={false}
-          />
+        {/* 2. My Classes + Join a Class */}
+        <section className="animate-fade-in grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div key={refreshKey} className="lg:col-span-2">
+            <SimpleClassList userId={user.id} onClassesLoaded={handleClassesLoaded} />
+          </div>
+          <div>
+            <JoinClassHero userId={user.id} onClassJoined={handleClassJoined} />
+          </div>
         </section>
 
-        {/* Practice Questions */}
+        {/* 3. Questions to Review */}
+        <section id="review-section" className="animate-fade-in">
+          <LectureCheckInHistory userId={user.id} limit={5} showOnlyWrong={true} />
+        </section>
+
+        {/* 4. Recent Check-Ins + Study Materials */}
+        <section className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <LectureCheckInHistory userId={user.id} limit={5} showOnlyWrong={false} />
+          <SimplifiedStudyMaterials userId={user.id} onMaterialCountChange={setMaterialsCount} />
+        </section>
+
+        {/* 5. Practice Questions */}
         <section className="animate-fade-in">
           <PracticeQuestionsCard userId={user.id} />
-        </section>
-
-        {/* Study Materials - Simplified upload and library */}
-        <section className="animate-fade-in">
-          <SimplifiedStudyMaterials 
-            userId={user.id}
-            onMaterialCountChange={setMaterialsCount}
-          />
-        </section>
-
-        {/* Confidence Analytics - Kept but simplified view */}
-        <section className="animate-fade-in">
-          <ConfidenceAnalytics userId={user.id} />
         </section>
       </div>
 

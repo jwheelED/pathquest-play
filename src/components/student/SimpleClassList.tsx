@@ -201,15 +201,9 @@ export function SimpleClassList({ userId, onClassesLoaded }: SimpleClassListProp
 
   if (classes.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="p-8 text-center">
-          <BookOpen className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
-          <h3 className="font-medium text-foreground mb-1">No classes yet</h3>
-          <p className="text-sm text-muted-foreground">
-            Enter a class code above to join your first class
-          </p>
-        </CardContent>
-      </Card>
+      <div className="p-4 rounded-lg border border-dashed border-border text-center">
+        <p className="text-sm text-muted-foreground">No classes yet — enter a class code to get started</p>
+      </div>
     );
   }
 
