@@ -142,6 +142,7 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setShortAnswer("");
     setAnswerState("unanswered");
     setShowExplanation(false);
+    setAiFeedback(null);
     setSessionCorrect(0);
     setSessionTotal(0);
   };
