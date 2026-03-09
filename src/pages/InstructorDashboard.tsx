@@ -513,25 +513,15 @@ export default function InstructorDashboard() {
 
       case "students":
         return (
-          <div className="space-y-6">
-            <div className="min-w-0">
-              <StudentRankingCard
-                students={rankedStudents}
-                onStudentClick={handleStudentClick}
-                onRefresh={fetchStudents}
-              />
-            </div>
-            
-            <div className="min-w-0">
-              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
-            </div>
-            
-            {currentUser && (
-              <div className="min-w-0">
-                <AcademicIntegrityInsights instructorId={currentUser.id} />
-              </div>
-            )}
-          </div>
+          <StudentRosterPanel
+            students={students}
+            onStudentClick={handleStudentClick}
+            onRefresh={fetchStudents}
+            instructorId={currentUser?.id || ""}
+            selectedStudentDetail={selectedStudentDetail}
+            selectedStudentId={selectedStudentId}
+            loading={loading}
+          />
         );
 
       case "question-bank":
