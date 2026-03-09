@@ -15,9 +15,8 @@ import { QuickMetricsGrid } from "@/components/instructor/QuickMetricsGrid";
 import { CheckInPreview } from "@/components/instructor/CheckInPreview";
 import { RecentSessionsTable } from "@/components/instructor/RecentSessionsTable";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
-import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
-import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
+import { StudentRosterPanel } from "@/components/instructor/StudentRosterPanel";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
@@ -329,9 +328,6 @@ export default function InstructorDashboard() {
     setDialogOpen(true);
   };
 
-  const rankedStudents = [...students]
-    .sort((a, b) => (b.average_grade || 0) - (a.average_grade || 0))
-    .map((s, idx) => ({ ...s, rank: idx + 1 }));
 
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
 
@@ -492,6 +488,10 @@ export default function InstructorDashboard() {
             <div className="min-w-0">
               <PastLiveSessions />
             </div>
+
+            <div className="min-w-0">
+              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
+            </div>
           </div>
         );
 
@@ -514,25 +514,15 @@ export default function InstructorDashboard() {
 
       case "students":
         return (
-          <div className="space-y-6">
-            <div className="min-w-0">
-              <StudentRankingCard
-                students={rankedStudents}
-                onStudentClick={handleStudentClick}
-                onRefresh={fetchStudents}
-              />
-            </div>
-            
-            <div className="min-w-0">
-              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
-            </div>
-            
-            {currentUser && (
-              <div className="min-w-0">
-                <AcademicIntegrityInsights instructorId={currentUser.id} />
-              </div>
-            )}
-          </div>
+          <StudentRosterPanel
+            students={students}
+            onStudentClick={handleStudentClick}
+            onRefresh={fetchStudents}
+            instructorId={currentUser?.id || ""}
+            selectedStudentDetail={selectedStudentDetail}
+            selectedStudentId={selectedStudentId}
+            loading={loading}
+          />
         );
 
       case "question-bank":
