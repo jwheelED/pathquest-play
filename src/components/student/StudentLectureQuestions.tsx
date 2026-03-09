@@ -319,9 +319,9 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
   };
 
   const renderAssignmentResponses = (assignment: Assignment) => {
-    const questions = (assignment.content as Record<string, unknown>)?.questions as Record<string, unknown>[] || [];
+    const questions = assignment.content?.questions || [];
     const responses = assignment.quiz_responses || {};
-    const aiRecommendations = (responses as Record<string, unknown>)._ai_recommendations as Record<string, Record<string, unknown>> || {};
+    const aiRecommendations = (responses as any)._ai_recommendations || {};
 
     if (questions.length === 0) {
       return (
@@ -334,13 +334,13 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
 
     return (
       <div className="space-y-3">
-        {questions.map((q: Record<string, unknown>, idx: number) => {
-          const studentAnswer = (responses as Record<string, string>)[idx];
+        {questions.map((q: any, idx: number) => {
+          const studentAnswer = responses[idx];
           const aiRec = aiRecommendations[idx];
-          const correctAnswer = q.correctAnswer as string;
-          const isCorrect = studentAnswer === correctAnswer || (aiRec && (aiRec.grade as number) >= 70);
-          const grade = aiRec?.grade as number | undefined;
-          const feedback = aiRec?.feedback as string | undefined;
+          const correctAnswer = q.correctAnswer;
+          const isCorrect = studentAnswer === correctAnswer || (aiRec && aiRec.grade >= 70);
+          const grade = aiRec?.grade;
+          const feedback = aiRec?.feedback;
 
           return (
             <div key={idx} className="p-4 bg-muted/50 rounded-lg border">
