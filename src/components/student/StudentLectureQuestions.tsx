@@ -42,11 +42,11 @@ interface Assignment {
   title: string;
   assignment_type: string;
   mode: string;
-  content: Record<string, unknown>;
+  content: any;
   completed: boolean;
   created_at: string;
   grade?: number | null;
-  quiz_responses?: Record<string, unknown>;
+  quiz_responses?: any;
   answers_released?: boolean;
 }
 
