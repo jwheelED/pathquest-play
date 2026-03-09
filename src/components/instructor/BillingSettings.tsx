@@ -220,7 +220,7 @@ export function BillingSettings() {
         {/* Available Plans */}
         <div>
           <h3 className="font-medium mb-4">Available Plans</h3>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             {tiers.map((tier) => {
               const isCurrentTier = tier.name === currentTier;
               const isFreeTier = tier.name === 'free';
