@@ -30,14 +30,7 @@ import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLec
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
-import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
-import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
-import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
-import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
-import { BillingSettings } from "@/components/instructor/BillingSettings";
-import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
-import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
-import { KalturaSettings } from "@/components/instructor/KalturaSettings";
+import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
@@ -574,24 +567,12 @@ export default function InstructorDashboard() {
         );
 
       case "settings":
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl">
-              {currentUser && (
-                <>
-                  <BillingSettings />
-                  <QuestionFormatSettings instructorId={currentUser.id} professorType={instructorProfile?.professor_type} />
-                  <QuestionPreviewSettings />
-                  <QuestionDifficultySettings />
-                  <AdaptiveTutoringSettings />
-                  <AutoGradeSettings />
-                  <LMSIntegrationSettings />
-                  <KalturaSettings instructorId={currentUser.id} />
-                </>
-              )}
-            </div>
-          </div>
-        );
+        return currentUser ? (
+          <SettingsPanel
+            currentUserId={currentUser.id}
+            professorType={instructorProfile?.professor_type}
+          />
+        ) : null;
 
       default:
         return null;
