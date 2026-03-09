@@ -175,7 +175,7 @@ export function BillingSettings() {
       <CardContent className="space-y-6 overflow-hidden">
         {/* Current Plan Status */}
         <div className="rounded-lg border bg-muted/30 p-4">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-lg">
