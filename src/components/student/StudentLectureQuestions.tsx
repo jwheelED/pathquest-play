@@ -161,7 +161,7 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
       : progress.responses;
     let totalScore = 0;
     let questionCount = 0;
-    Object.values(responses).forEach((resp: Record<string, unknown>) => {
+    Object.values(responses).forEach((resp: any) => {
       if (resp.grade !== undefined) {
         totalScore += resp.grade as number;
         questionCount++;
