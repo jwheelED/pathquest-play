@@ -172,7 +172,7 @@ export function BillingSettings() {
           Manage your subscription plan and billing details
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 overflow-hidden">
         {/* Current Plan Status */}
         <div className="rounded-lg border bg-muted/30 p-4">
           <div className="flex items-start justify-between">
