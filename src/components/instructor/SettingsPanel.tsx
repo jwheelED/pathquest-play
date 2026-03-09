@@ -141,7 +141,7 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
         </div>
       )}
 
-      <div className="flex gap-8">
+      <div className="flex gap-8 overflow-hidden">
         {/* Desktop sidebar */}
         {!isMobile && (
           <nav className="w-56 flex-shrink-0">
@@ -156,7 +156,7 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
         )}
 
         {/* Content panel */}
-        <div className="flex-1 min-w-0 max-w-3xl">
+        <div className="flex-1 min-w-0 overflow-hidden">
           {renderContent()}
         </div>
       </div>
