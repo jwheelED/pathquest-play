@@ -345,7 +345,7 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
           return (
             <div key={idx} className="p-4 bg-muted/50 rounded-lg border">
               <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-xs font-medium text-muted-foreground">Q{idx + 1} • {(q.type as string) || 'multiple_choice'}</span>
+                <span className="text-xs font-medium text-muted-foreground">Q{idx + 1} • {q.type || 'multiple_choice'}</span>
                 {grade !== undefined ? (
                   <Badge variant={getGradeBadgeVariant(grade)} className="text-xs">{grade}%</Badge>
                 ) : correctAnswer ? (
