@@ -256,7 +256,7 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
                 <p className="text-sm text-muted-foreground">
                   {typeof pp.question_content === 'string'
                     ? JSON.parse(pp.question_content).question
-                    : (pp.question_content as Record<string, string>).question}
+                    : (pp.question_content as any).question}
                 </p>
               </div>
             );
