@@ -517,7 +517,7 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
               ) : (
                 <Accordion type="single" collapsible value={expandedAssignment || undefined} onValueChange={setExpandedAssignment}>
                   {completedAssignments.map(assignment => {
-                    const questionCount = ((assignment.content as Record<string, unknown>)?.questions as unknown[])?.length || 0;
+                    const questionCount = assignment.content?.questions?.length || 0;
                     return (
                       <AccordionItem key={assignment.id} value={assignment.id} className="border rounded-lg mb-3 px-4">
                         <AccordionTrigger className="hover:no-underline py-4">
