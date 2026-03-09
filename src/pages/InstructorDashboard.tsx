@@ -574,24 +574,12 @@ export default function InstructorDashboard() {
         );
 
       case "settings":
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl">
-              {currentUser && (
-                <>
-                  <BillingSettings />
-                  <QuestionFormatSettings instructorId={currentUser.id} professorType={instructorProfile?.professor_type} />
-                  <QuestionPreviewSettings />
-                  <QuestionDifficultySettings />
-                  <AdaptiveTutoringSettings />
-                  <AutoGradeSettings />
-                  <LMSIntegrationSettings />
-                  <KalturaSettings instructorId={currentUser.id} />
-                </>
-              )}
-            </div>
-          </div>
-        );
+        return currentUser ? (
+          <SettingsPanel
+            currentUserId={currentUser.id}
+            professorType={instructorProfile?.professor_type}
+          />
+        ) : null;
 
       default:
         return null;
