@@ -30,14 +30,7 @@ import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLec
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
-import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
-import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
-import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
-import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
-import { BillingSettings } from "@/components/instructor/BillingSettings";
-import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
-import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
-import { KalturaSettings } from "@/components/instructor/KalturaSettings";
+import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
