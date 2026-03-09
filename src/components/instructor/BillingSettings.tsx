@@ -245,7 +245,7 @@ export function BillingSettings() {
                           <Crown className="h-4 w-4 text-primary" />
                         )}
                       </h4>
-                      <p className="text-2xl font-bold mt-1">
+                      <p className="text-2xl font-bold mt-1 break-words">
                         {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
                         {!isFreeTier && tier.price_suffix && (
                           <span className="text-sm font-normal text-muted-foreground">
