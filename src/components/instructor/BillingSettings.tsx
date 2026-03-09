@@ -162,7 +162,7 @@ export function BillingSettings() {
   const currentTier = getCurrentTierName();
 
   return (
-    <Card className="col-span-full">
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
@@ -172,10 +172,10 @@ export function BillingSettings() {
           Manage your subscription plan and billing details
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 overflow-hidden">
         {/* Current Plan Status */}
         <div className="rounded-lg border bg-muted/30 p-4">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-lg">
@@ -220,7 +220,7 @@ export function BillingSettings() {
         {/* Available Plans */}
         <div>
           <h3 className="font-medium mb-4">Available Plans</h3>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {tiers.map((tier) => {
               const isCurrentTier = tier.name === currentTier;
               const isFreeTier = tier.name === 'free';
@@ -245,7 +245,7 @@ export function BillingSettings() {
                           <Crown className="h-4 w-4 text-primary" />
                         )}
                       </h4>
-                      <p className="text-2xl font-bold mt-1">
+                      <p className="text-2xl font-bold mt-1 break-words">
                         {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
                         {!isFreeTier && tier.price_suffix && (
                           <span className="text-sm font-normal text-muted-foreground">
