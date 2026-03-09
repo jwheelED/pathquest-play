@@ -328,9 +328,6 @@ export default function InstructorDashboard() {
     setDialogOpen(true);
   };
 
-  const rankedStudents = [...students]
-    .sort((a, b) => (b.average_grade || 0) - (a.average_grade || 0))
-    .map((s, idx) => ({ ...s, rank: idx + 1 }));
 
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
 
