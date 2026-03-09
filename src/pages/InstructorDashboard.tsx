@@ -491,6 +491,10 @@ export default function InstructorDashboard() {
             <div className="min-w-0">
               <PastLiveSessions />
             </div>
+
+            <div className="min-w-0">
+              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
+            </div>
           </div>
         );
 
