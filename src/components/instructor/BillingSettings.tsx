@@ -162,7 +162,7 @@ export function BillingSettings() {
   const currentTier = getCurrentTierName();
 
   return (
-    <Card className="col-span-full">
+    <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
