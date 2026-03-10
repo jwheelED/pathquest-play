@@ -309,10 +309,12 @@ export default function InstructorAuth() {
           }
         }
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An error occurred";
+      toast.error(message);
     } finally {
       setLoading(false);
+      setIsSigningUp(false);
     }
   };
 
