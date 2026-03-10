@@ -17,6 +17,7 @@ export default function InstructorAuth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
   const navigate = useNavigate();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
