@@ -1662,13 +1662,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("📝 Sending via handleQuestionSend...");
 
-      // Send the question using existing flow
+      // Send the question using existing flow — pass pre-generated MCQ data to avoid double AI generation
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
         extraction_method: "auto_interval",
         source: isManualTest ? "manual_test" : "auto_interval",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
 
       const totalTime = Date.now() - startTime;
