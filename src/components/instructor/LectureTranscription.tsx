@@ -940,6 +940,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         confidence: 1.0,
         extraction_method: "manual_button",
         source: "manual_button",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
 
       // Reset auto-question timer after manual send
