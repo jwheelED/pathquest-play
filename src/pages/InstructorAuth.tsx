@@ -232,9 +232,20 @@ export default function InstructorAuth() {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);
           } else if (data.session) {
-            // User is auto-confirmed, redirect to org onboarding
-            toast.success("Account created successfully!");
-            navigate("/instructor/org-onboarding");
+            // User is auto-confirmed - assign instructor role before navigating
+            const { data: roleAssigned } = await supabase
+              .rpc('assign_oauth_role', { 
+                p_user_id: data.user.id, 
+                p_role: 'instructor' 
+              });
+            
+            if (roleAssigned) {
+              toast.success("Account created successfully!");
+              navigate("/instructor/org-onboarding");
+            } else {
+              toast.error("Failed to set up instructor account. Please try again.");
+              await supabase.auth.signOut();
+            }
           } else {
             // Email confirmation required
             toast.success("Account created! Please check your email to confirm your account before signing in.");
