@@ -799,6 +799,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         confidence: 1.0, // Voice command = maximum confidence
         extraction_method: "voice_command",
         source: "voice_command",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
 
       // Reset auto-question timer after voice command
