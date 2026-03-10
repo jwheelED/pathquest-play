@@ -215,6 +215,7 @@ export default function InstructorAuth() {
 
         const validData = validationResult.data;
 
+        setIsSigningUp(true);
         const { data, error } = await supabase.auth.signUp({ 
           email: validData.email, 
           password: validData.password,
