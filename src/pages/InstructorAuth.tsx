@@ -169,7 +169,7 @@ export default function InstructorAuth() {
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode]);
+  }, [navigate, isRecoveryMode, isSigningUp]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
