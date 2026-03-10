@@ -17,6 +17,7 @@ export default function InstructorAuth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [isSigningUp, setIsSigningUp] = useState(false);
   const navigate = useNavigate();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -71,8 +72,8 @@ export default function InstructorAuth() {
         return; // Don't proceed with session checks
       }
 
-      // Skip session checks if we're in recovery mode
-      if (isRecoveryMode) {
+      // Skip session checks if we're in recovery mode or actively signing up
+      if (isRecoveryMode || isSigningUp) {
         return;
       }
 
@@ -168,7 +169,7 @@ export default function InstructorAuth() {
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode]);
+  }, [navigate, isRecoveryMode, isSigningUp]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
@@ -214,6 +215,7 @@ export default function InstructorAuth() {
 
         const validData = validationResult.data;
 
+        setIsSigningUp(true);
         const { data, error } = await supabase.auth.signUp({ 
           email: validData.email, 
           password: validData.password,
@@ -232,9 +234,20 @@ export default function InstructorAuth() {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);
           } else if (data.session) {
-            // User is auto-confirmed, redirect to org onboarding
-            toast.success("Account created successfully!");
-            navigate("/instructor/org-onboarding");
+            // User is auto-confirmed - assign instructor role before navigating
+            const { data: roleAssigned } = await supabase
+              .rpc('assign_oauth_role', { 
+                p_user_id: data.user.id, 
+                p_role: 'instructor' 
+              });
+            
+            if (roleAssigned) {
+              toast.success("Account created successfully!");
+              navigate("/instructor/org-onboarding");
+            } else {
+              toast.error("Failed to set up instructor account. Please try again.");
+              await supabase.auth.signOut();
+            }
           } else {
             // Email confirmation required
             toast.success("Account created! Please check your email to confirm your account before signing in.");
@@ -296,10 +309,12 @@ export default function InstructorAuth() {
           }
         }
       }
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "An error occurred";
+      toast.error(message);
     } finally {
       setLoading(false);
+      setIsSigningUp(false);
     }
   };
 
