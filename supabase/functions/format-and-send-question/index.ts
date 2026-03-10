@@ -10,6 +10,7 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 // Shuffle MCQ options so the correct answer isn't always A
+// Uses index tracking instead of indexOf to handle duplicate option text correctly
 const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {
   if (!mcq?.options || mcq.options.length !== 4 || !mcq.correctAnswer) return mcq;
 
@@ -17,22 +18,36 @@ const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAn
   const correctIdx = letters.indexOf(mcq.correctAnswer.trim().toUpperCase());
   if (correctIdx === -1) return mcq;
 
-  // Strip letter prefixes to get raw text
-  const rawOptions = mcq.options.map(opt => opt.replace(/^[A-D][\).\-\s]+\s*/i, '').trim());
-  const correctText = rawOptions[correctIdx];
+  // Strip letter prefixes and track which index is correct
+  const augmented = mcq.options.map((opt, i) => ({
+    text: opt.replace(/^[A-D][\).\-\s]+\s*/i, '').trim(),
+    wasCorrect: i === correctIdx,
+  }));
 
-  // Fisher-Yates shuffle
-  for (let i = rawOptions.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [rawOptions[i], rawOptions[j]] = [rawOptions[j], rawOptions[i]];
+  // Check for duplicate option text — skip shuffle if found
+  const uniqueTexts = new Set(augmented.map(o => o.text.toLowerCase()));
+  if (uniqueTexts.size < 4) {
+    console.warn('⚠️ Duplicate MCQ options detected — skipping shuffle to preserve correctAnswer mapping');
+    return mcq;
   }
 
-  // Find where the correct answer ended up
-  const newCorrectIdx = rawOptions.indexOf(correctText);
+  // Fisher-Yates shuffle
+  for (let i = augmented.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [augmented[i], augmented[j]] = [augmented[j], augmented[i]];
+  }
+
+  // Find where the correct answer ended up via tracked flag
+  const newCorrectIdx = augmented.findIndex(o => o.wasCorrect);
+  if (newCorrectIdx === -1) {
+    console.error('🚫 Shuffle tracking failed — returning unshuffled');
+    return mcq;
+  }
+
   const newCorrectLetter = letters[newCorrectIdx];
 
   // Re-prefix with letters
-  const newOptions = rawOptions.map((text, i) => `${letters[i]}. ${text}`);
+  const newOptions = augmented.map((o, i) => `${letters[i]}. ${o.text}`);
 
   console.log(`🔀 Shuffled MCQ: correct answer moved from ${mcq.correctAnswer} → ${newCorrectLetter}`);
 
