@@ -1228,6 +1228,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         confidence: data.confidence,
         extraction_method: 'manual_test',
         source: 'manual_test',
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
     } finally {
       setIsSendingQuestion(false);

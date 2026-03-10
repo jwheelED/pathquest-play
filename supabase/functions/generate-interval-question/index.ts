@@ -512,6 +512,7 @@ Generate ONE focused question that tests understanding of the most important con
       }
 
       // Shuffle MCQ options so correct answer isn't always A
+      // Uses index tracking to handle duplicate option text correctly
       let finalOptions = parsed.options;
       let finalCorrectAnswer = parsed.correct_answer;
       if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
@@ -519,16 +520,32 @@ Generate ONE focused question that tests understanding of the most important con
           const letters = ['A', 'B', 'C', 'D'];
           const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
           if (correctIdx !== -1) {
-            const rawOpts = finalOptions.map((o: string) => o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim());
-            const correctText = rawOpts[correctIdx];
-            for (let i = rawOpts.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [rawOpts[i], rawOpts[j]] = [rawOpts[j], rawOpts[i]];
+            // Strip prefixes and track correct index
+            const augmented = finalOptions.map((o: string, i: number) => ({
+              text: o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim(),
+              wasCorrect: i === correctIdx,
+            }));
+
+            // Check for duplicate option text — skip shuffle if found
+            const uniqueTexts = new Set(augmented.map((o: { text: string }) => o.text.toLowerCase()));
+            if (uniqueTexts.size < 4) {
+              console.warn('⚠️ Duplicate interval MCQ options — skipping shuffle');
+            } else {
+              // Fisher-Yates shuffle
+              for (let i = augmented.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [augmented[i], augmented[j]] = [augmented[j], augmented[i]];
+              }
+
+              const newIdx = augmented.findIndex((o: { wasCorrect: boolean }) => o.wasCorrect);
+              if (newIdx !== -1) {
+                finalCorrectAnswer = letters[newIdx];
+                finalOptions = augmented.map((o: { text: string }, i: number) => `${letters[i]}. ${o.text}`);
+                console.log(`🔀 Shuffled interval MCQ: correct answer → ${finalCorrectAnswer}`);
+              } else {
+                console.error('🚫 Shuffle tracking failed — keeping original order');
+              }
             }
-            const newIdx = rawOpts.indexOf(correctText);
-            finalCorrectAnswer = letters[newIdx];
-            finalOptions = rawOpts.map((t: string, i: number) => `${letters[i]}. ${t}`);
-            console.log(`🔀 Shuffled interval MCQ: correct answer → ${finalCorrectAnswer}`);
           }
         }
       }
