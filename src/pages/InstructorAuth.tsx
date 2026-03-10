@@ -72,8 +72,8 @@ export default function InstructorAuth() {
         return; // Don't proceed with session checks
       }
 
-      // Skip session checks if we're in recovery mode
-      if (isRecoveryMode) {
+      // Skip session checks if we're in recovery mode or actively signing up
+      if (isRecoveryMode || isSigningUp) {
         return;
       }
 
