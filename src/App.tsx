@@ -169,6 +169,8 @@ function App() {
               <StudentTraining />
             </ProtectedRoute>
           } />
+          <Route path="/corporate/events" element={<CorporateEvents />} />
+          <Route path="/corporate/enterprise" element={<CorporateEnterprise />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

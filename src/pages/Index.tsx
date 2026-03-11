@@ -837,7 +837,7 @@ const Index = () => {
                   size="lg"
                   variant="outline"
                   onClick={handlePilotConversation}
-                  className="rounded-full px-10 text-lg h-14 border-2 border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+                  className="rounded-full px-10 text-lg h-14 border-2 bg-white/20 text-white border-white/40 hover:bg-white/30 transition-all"
                 >
                   Start a Pilot Conversation
                 </Button>
