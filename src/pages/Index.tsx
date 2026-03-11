@@ -161,16 +161,16 @@ const Index = () => {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate("/join")}
+              onClick={handleBookDemo}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
             >
-              Join Session
+              Book a Demo
             </button>
             <button
-              onClick={() => navigate("/auth")}
+              onClick={handlePilotConversation}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
             >
-              Student Sign In
+              Book a Pilot
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -190,8 +190,8 @@ const Index = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" onClick={() => navigate("/instructor/auth")} className="rounded-full">
-              Instructor Sign In
+            <Button size="sm" onClick={() => navigate("/join")} className="rounded-full font-semibold">
+              Join Session
             </Button>
           </div>
         </div>
