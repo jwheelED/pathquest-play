@@ -170,10 +170,28 @@ const Index = () => {
               onClick={() => navigate("/auth")}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
             >
-              Login
+              Student Sign In
             </button>
-            <Button size="sm" onClick={handleBookDemo} className="rounded-full">
-              Book a Demo
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Corporate
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate("/corporate/events")}>
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Events
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/corporate/enterprise")}>
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Enterprise
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" onClick={() => navigate("/instructor/auth")} className="rounded-full">
+              Instructor Sign In
             </Button>
           </div>
         </div>
