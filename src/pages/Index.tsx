@@ -219,19 +219,19 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center animate-fade-in stagger-3">
               <Button
                 size="lg"
-                onClick={handleBookDemo}
+                onClick={() => navigate("/instructor/auth")}
                 className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-105 group"
               >
-                Book a Demo
+                Instructor Sign In
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => scrollToSection("how-it-works")}
+                onClick={() => navigate("/auth")}
                 className="rounded-full px-8 border-2 border-border text-foreground hover:bg-accent transition-all gap-2"
               >
-                See How It Works
+                Student Sign In
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
