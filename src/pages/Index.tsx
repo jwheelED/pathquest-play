@@ -24,7 +24,15 @@ import {
   Monitor,
   Wrench,
   Stethoscope,
+  ChevronDown,
+  CalendarDays,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
