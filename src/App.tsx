@@ -34,6 +34,8 @@ import SlidePresenter from "./pages/SlidePresenter";
 import InteractiveLecture from "./pages/InteractiveLecture";
 import InstructorLecturePreview from "./pages/InstructorLecturePreview";
 import StudentTraining from "./pages/StudentTraining";
+import CorporateEvents from "./pages/CorporateEvents";
+import CorporateEnterprise from "./pages/CorporateEnterprise";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -167,6 +169,8 @@ function App() {
               <StudentTraining />
             </ProtectedRoute>
           } />
+          <Route path="/corporate/events" element={<CorporateEvents />} />
+          <Route path="/corporate/enterprise" element={<CorporateEnterprise />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

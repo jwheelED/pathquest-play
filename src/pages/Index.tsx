@@ -24,7 +24,15 @@ import {
   Monitor,
   Wrench,
   Stethoscope,
+  ChevronDown,
+  CalendarDays,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
@@ -162,10 +170,28 @@ const Index = () => {
               onClick={() => navigate("/auth")}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
             >
-              Login
+              Student Sign In
             </button>
-            <Button size="sm" onClick={handleBookDemo} className="rounded-full">
-              Book a Demo
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Corporate
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate("/corporate/events")}>
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Events
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/corporate/enterprise")}>
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Enterprise
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" onClick={() => navigate("/instructor/auth")} className="rounded-full">
+              Instructor Sign In
             </Button>
           </div>
         </div>
@@ -193,19 +219,19 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center animate-fade-in stagger-3">
               <Button
                 size="lg"
-                onClick={handleBookDemo}
+                onClick={() => navigate("/instructor/auth")}
                 className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-105 group"
               >
-                Book a Demo
+                Instructor Sign In
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => scrollToSection("how-it-works")}
+                onClick={() => navigate("/auth")}
                 className="rounded-full px-8 border-2 border-border text-foreground hover:bg-accent transition-all gap-2"
               >
-                See How It Works
+                Student Sign In
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -811,7 +837,7 @@ const Index = () => {
                   size="lg"
                   variant="outline"
                   onClick={handlePilotConversation}
-                  className="rounded-full px-10 text-lg h-14 border-2 border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+                  className="rounded-full px-10 text-lg h-14 border-2 bg-white/20 text-white border-white/40 hover:bg-white/30 transition-all"
                 >
                   Start a Pilot Conversation
                 </Button>
