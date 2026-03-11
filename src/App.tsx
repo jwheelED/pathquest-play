@@ -34,6 +34,8 @@ import SlidePresenter from "./pages/SlidePresenter";
 import InteractiveLecture from "./pages/InteractiveLecture";
 import InstructorLecturePreview from "./pages/InstructorLecturePreview";
 import StudentTraining from "./pages/StudentTraining";
+import CorporateEvents from "./pages/CorporateEvents";
+import CorporateEnterprise from "./pages/CorporateEnterprise";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
