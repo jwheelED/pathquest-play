@@ -1131,7 +1131,7 @@ export const LectureCheckInResults = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            Check-In Results
+            Live Room Insight
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
