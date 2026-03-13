@@ -142,7 +142,7 @@ export function SavedSummariesTab() {
       if (selectedSummary?.id === id) setSelectedSummary(null);
       toast.success("Session insight deleted");
     } catch (error) {
-      toast.error("Failed to delete summary");
+      toast.error("Failed to delete session insight");
     }
   };
 
