@@ -86,7 +86,9 @@ const ExpandableResponseRow = ({
       onClick={() => isLong && setExpanded(!expanded)}
     >
       <div className="flex items-center gap-2 py-1.5 px-3">
-        {response.is_correct ? (
+        {isPoll ? (
+          <BarChart3 className="h-3.5 w-3.5 text-primary shrink-0" />
+        ) : response.is_correct ? (
           <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
         ) : (
           <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />

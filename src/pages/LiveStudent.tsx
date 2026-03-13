@@ -968,6 +968,21 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
+              {/* Poll Results - Just "Response Recorded" */}
+              {isPoll && (
+                <>
+                  <div className="relative">
+                    <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                  </div>
+                  <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                    Response Recorded 📊
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your response: <span className="font-semibold">{selectedAnswer}</span>
+                  </p>
+                </>
+              )}
+
               {/* MCQ Results - Correct/Incorrect feedback */}
               {isMCQ && (
                 <>
