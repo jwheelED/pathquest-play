@@ -61,6 +61,9 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
+import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
+import { PassiveQuestionCandidateCard } from "./PassiveQuestionCandidate";
+import { Switch } from "@/components/ui/switch";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -173,6 +176,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
   const pendingQuestionDataRef = useRef<any>(null);
 
+  // Passive question detection
+  const [passiveDetectionEnabled, setPassiveDetectionEnabled] = useState(true);
+
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -195,6 +202,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isDeepgramConnected, setIsDeepgramConnected] = useState(false);
   
   const { toast } = useToast();
+
+  // Passive question detection hook
+  const {
+    candidate: passiveCandidate,
+    checkUtterance: checkPassiveQuestion,
+    dismissCandidate: dismissPassiveCandidate,
+    resetDetection: resetPassiveDetection,
+  } = usePassiveQuestionDetection({
+    enabled: passiveDetectionEnabled && isRecording,
+    cooldownMs: 30000,
+    minWordCount: 8,
+    autoDismissMs: 15000,
+    lastQuestionSentTime: lastQuestionSentTimeRef.current,
+  });
+
 
   // Keep isSendingQuestion ref in sync with state
   useEffect(() => {
@@ -2286,6 +2308,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setTranscriptChunks((prev) => [...prev, cleanText]);
           setLastTranscript(cleanText);
           
+          // Passive question detection — check final utterances for ?
+          checkPassiveQuestion(cleanText);
+
+          
           // Accumulate clean text in transcript buffer
           if (transcriptBufferRef.current) {
             transcriptBufferRef.current += " " + cleanText;
@@ -3437,7 +3463,29 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </div>
                   
+                  {/* Passive question detection toggle */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                    <Switch
+                      id="passive-detection-toggle"
+                      checked={passiveDetectionEnabled}
+                      onCheckedChange={setPassiveDetectionEnabled}
+                      className="scale-75"
+                    />
+                    <Label
+                      htmlFor="passive-detection-toggle"
+                      className="text-xs font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Detect questions
+                    </Label>
+                    {passiveDetectionEnabled && (
+                      <Badge variant="outline" className="text-[10px]">
+                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                        Auto
+                      </Badge>
+                    )}
+                  </div>
                   
+
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">
                       Clear
@@ -3699,6 +3747,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         isSending={isSendingFromPreview}
         sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
+
+      {/* Passive Question Detection Candidate */}
+      {passiveCandidate && (
+        <PassiveQuestionCandidateCard
+          candidate={passiveCandidate}
+          onSend={(questionText) => {
+            dismissPassiveCandidate();
+            handleQuestionSend({
+              question_text: questionText,
+              suggested_type: 'multiple_choice',
+              source: 'passive_detection',
+            });
+          }}
+          onDismiss={dismissPassiveCandidate}
+        />
+      )}
     </>
   );
 };
+
