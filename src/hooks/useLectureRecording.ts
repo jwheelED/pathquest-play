@@ -7,6 +7,8 @@ import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
+import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
+
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
 import { sanitizeTranscript } from '@/lib/transcriptSanitizer';
