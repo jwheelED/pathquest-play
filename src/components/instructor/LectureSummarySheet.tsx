@@ -126,7 +126,7 @@ export const LectureSummarySheet = ({
       toast.success("Session insight saved!");
     } catch (error) {
       console.error("Error saving summary:", error);
-      toast.error("Failed to save summary");
+      toast.error("Failed to save session insight");
     } finally {
       setSaving(false);
     }
