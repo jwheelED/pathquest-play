@@ -121,8 +121,8 @@ export function CreateQuestionDialog({
   
   // Available types based on professor type
   const availableTypes = professorType === "humanities" 
-    ? ["multiple_choice", "short_answer"] 
-    : ["multiple_choice", "short_answer", "coding"];
+    ? ["multiple_choice", "short_answer", "poll"] 
+    : ["multiple_choice", "short_answer", "coding", "poll"];
   
   // Reset form when dialog opens/closes or editQuestion changes
   useEffect(() => {
