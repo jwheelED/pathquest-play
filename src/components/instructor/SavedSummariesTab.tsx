@@ -292,7 +292,7 @@ export function SavedSummariesTab() {
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="flex items-center gap-2">
                           <h4 className="font-medium text-sm truncate">
-                            {summary.title || "Untitled Summary"}
+                            {summary.title || "Untitled Session Insight"}
                           </h4>
                           {hasFollowUp && (
                             <Badge variant="outline" className="text-xs border-warning/50 text-warning shrink-0">
