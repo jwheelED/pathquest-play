@@ -140,7 +140,7 @@ export function SavedSummariesTab() {
       if (error) throw error;
       setSummaries((prev) => prev.filter((s) => s.id !== id));
       if (selectedSummary?.id === id) setSelectedSummary(null);
-      toast.success("Summary deleted");
+      toast.success("Session insight deleted");
     } catch (error) {
       toast.error("Failed to delete summary");
     }
