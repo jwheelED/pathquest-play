@@ -913,7 +913,7 @@ export const LectureCheckInResults = () => {
         const checkInDate = new Date(group.timestamp).toLocaleString();
         doc.setFontSize(14);
         doc.setTextColor(40, 40, 40);
-        doc.text(`Check-In: ${checkInDate}`, 20, yPosition);
+        doc.text(`Response: ${checkInDate}`, 20, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
         doc.text(`${group.assignments.length} student(s)`, 20, yPosition + 6);
