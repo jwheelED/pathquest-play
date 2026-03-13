@@ -316,7 +316,6 @@ serve(async (req) => {
     }
 
     // Build prompt based on format preference
-    // Poll uses the same MCQ format (4 options) but is ungraded
     let formatInstructions = "";
     if (format_preference === "coding") {
       formatInstructions = coding_question_style === "simple"
@@ -324,8 +323,13 @@ serve(async (req) => {
         : `Generate a complete coding problem with starter code and test cases.`;
     } else if (format_preference === "short_answer") {
       formatInstructions = `Generate an open-ended short answer question that tests understanding.`;
+    } else if (format_preference === "poll") {
+      formatInstructions = `Generate an ungraded poll question with 2 to 4 answer options. Use your judgment on option count:
+- Use exactly 2 options (e.g. "Yes / No", "True / False", "Agree / Disagree") when the question naturally fits a binary choice.
+- Use 3-4 options when the question benefits from more nuance or there are multiple valid perspectives.
+The poll is ungraded — there is no single correct answer. Options should capture different viewpoints or responses.`;
     } else {
-      // Both "multiple_choice" and "poll" generate MCQ-style options
+      // "multiple_choice" generates MCQ-style with 4 options
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
@@ -370,6 +374,10 @@ For multiple_choice, also include:
 - "options": ["A. ...", "B. ...", "C. ...", "D. ..."]
 - "correct_answer": "A" | "B" | "C" | "D"
 - "explanation": "why the correct answer is right"
+
+For poll, also include:
+- "options": an array of 2 to 4 options (e.g. ["Yes", "No"] or ["A. ...", "B. ...", "C. ..."])
+- Do NOT include "correct_answer" or "explanation" for polls
 
 For coding questions:
 - "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }
@@ -514,10 +522,17 @@ Generate ONE focused question that tests understanding of the most important con
       }
 
       // Shuffle MCQ options so correct answer isn't always A
-      // Uses index tracking to handle duplicate option text correctly
+      // Skip shuffle for polls (ungraded, no correct answer)
       let finalOptions = parsed.options;
       let finalCorrectAnswer = parsed.correct_answer;
-      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice" || format_preference === "poll") {
+      if (format_preference === "poll") {
+        // For polls, just clean up option prefixes if present
+        if (finalOptions && Array.isArray(finalOptions)) {
+          finalOptions = finalOptions.map((o: string) => o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim());
+          console.log(`📊 Poll options (${finalOptions.length}): ${finalOptions.join(' | ')}`);
+        }
+        finalCorrectAnswer = undefined;
+      } else if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
         if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
           const letters = ['A', 'B', 'C', 'D'];
           const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
