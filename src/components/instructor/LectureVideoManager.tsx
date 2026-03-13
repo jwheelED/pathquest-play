@@ -150,7 +150,7 @@ export const LectureVideoManager = () => {
       toast.success('Recording deleted successfully');
     } catch (error) {
       console.error('Error deleting lecture:', error);
-      toast.error('Failed to delete lecture');
+      toast.error('Failed to delete recording');
     } finally {
       setDeletingId(null);
     }

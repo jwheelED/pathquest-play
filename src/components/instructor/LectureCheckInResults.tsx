@@ -1015,7 +1015,7 @@ export const LectureCheckInResults = () => {
       const csvRows: string[] = [];
       
       // Add header row
-      csvRows.push('Check-In Date,Student Name,Question #,Question Text,Student Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
+      csvRows.push('Response Date,Participant Name,Question #,Question Text,Participant Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
       
       // Add data rows
       groupedResults.forEach((group) => {
