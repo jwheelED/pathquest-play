@@ -116,7 +116,7 @@ export const LectureVideoManager = () => {
         prev.map(l => l.id === lectureId ? { ...l, published: !currentValue } : l)
       );
 
-      toast.success(!currentValue ? 'Lecture visible to students' : 'Lecture hidden from students');
+      toast.success(!currentValue ? 'Session visible to participants' : 'Session hidden from participants');
     } catch (error) {
       console.error('Error toggling published:', error);
       toast.error('Failed to update visibility');
