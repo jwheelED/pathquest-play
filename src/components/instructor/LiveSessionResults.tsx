@@ -244,9 +244,9 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
+           <CardTitle className="text-lg flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
-            Live Session Responses
+            Live Room Insight
             <Badge variant="outline" className="ml-2">
               {questionGroups.length} question{questionGroups.length !== 1 ? "s" : ""}
             </Badge>
