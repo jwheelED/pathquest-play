@@ -344,7 +344,7 @@ export function VoiceQuestionPreviewDialog({
   };
 
   const getTypeLabel = () => {
-    return questionType === 'multiple_choice' ? 'Multiple Choice' : 'Short Answer';
+    return questionType === 'multiple_choice' ? 'Multiple Choice' : questionType === 'poll' ? 'Poll' : 'Short Answer';
   };
 
   return (
