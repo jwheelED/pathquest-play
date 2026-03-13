@@ -176,6 +176,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
   const pendingQuestionDataRef = useRef<any>(null);
 
+  // Passive question detection
+  const [passiveDetectionEnabled, setPassiveDetectionEnabled] = useState(true);
+
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
