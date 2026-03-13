@@ -135,7 +135,7 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             </div>
             <div>
               <p className="text-lg font-bold text-foreground">{session.participantCount}</p>
-              <p className="text-xs text-muted-foreground">Students participated</p>
+              <p className="text-xs text-muted-foreground">Participants</p>
             </div>
           </div>
         </div>
