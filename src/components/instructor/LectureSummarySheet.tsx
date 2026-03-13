@@ -229,7 +229,7 @@ export const LectureSummarySheet = ({
                 className="rounded-xl gap-2"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4 text-success" /> : <Save className="h-4 w-4" />}
-                {saved ? "Saved" : "Save Summary"}
+                {saved ? "Saved" : "Save Insight"}
               </Button>
               <Button size="sm" variant="outline" onClick={handleExport} className="rounded-xl gap-2">
                 <FileDown className="h-4 w-4" />
