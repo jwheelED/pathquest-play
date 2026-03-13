@@ -187,100 +187,6 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   }
 };
 
-const generatePollOptions = async (
-  questionText: string,
-  context: string,
-  courseContext?: { title: string; topics: string[] } | null,
-) => {
-  let courseInfo = "";
-  if (courseContext?.title) courseInfo += `\nCourse: ${courseContext.title}`;
-  if (courseContext?.topics?.length) courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
-
-  const prompt = `The speaker asked: "${questionText}"
-
-Context from session: "${context}"${courseInfo}
-
-Generate poll options for this question. This is an UNGRADED poll — there is no single correct answer.
-
-RULES:
-- Use exactly 2 options when the question naturally fits a binary choice (e.g. Yes/No, True/False, Agree/Disagree, Before/After).
-- Use 3 options when there are a few distinct perspectives or categories.
-- Use 4 options when the topic benefits from more nuance.
-- Options should be concise and clear.
-- Do NOT include letter prefixes (A., B., etc.) — just the option text.
-
-Return JSON:
-{
-  "question": "the poll question",
-  "options": ["Option 1", "Option 2"] or ["Option 1", "Option 2", "Option 3"] or ["Option 1", "Option 2", "Option 3", "Option 4"]
-}`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-  try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: "You are an educational AI that creates concise poll options for live session questions. Return ONLY valid JSON, no markdown.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`AI API error: ${response.status} - ${errorText}`);
-    }
-
-    const aiResponse = await response.json();
-    let content = aiResponse.choices[0].message.content;
-    content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-
-    try {
-      const parsed = JSON.parse(content);
-      // Strip any accidental letter prefixes
-      const cleanOptions = (parsed.options || []).map((o: string) =>
-        o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim()
-      );
-      return {
-        question: parsed.question || questionText,
-        options: cleanOptions.length >= 2 ? cleanOptions : ["Yes", "No"],
-      };
-    } catch {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        const cleanOptions = (parsed.options || []).map((o: string) =>
-          o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim()
-        );
-        return { question: parsed.question || questionText, options: cleanOptions.length >= 2 ? cleanOptions : ["Yes", "No"] };
-      }
-      // Fallback to Yes/No
-      return { question: questionText, options: ["Yes", "No"] };
-    }
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    console.error("Poll generation error:", error);
-    // Fallback to Yes/No on any error
-    return { question: questionText, options: ["Yes", "No"] };
-  }
-}
-
 const generateCodingQuestion = async (
   questionText: string,
   context: string,
@@ -608,11 +514,7 @@ serve(async (req) => {
 
     let finalType: string;
 
-    if (suggested_type === 'poll') {
-      // Poll type is always explicit - never override
-      finalType = 'poll';
-      console.log(`📊 Using explicit poll type`);
-    } else if (hasPreGeneratedOptions && suggested_type) {
+    if (hasPreGeneratedOptions && suggested_type) {
       // Preview dialog with edited options - respect user's explicit choice
       finalType = suggested_type;
       console.log(`📝 Using preview dialog type: ${finalType}`);
@@ -621,10 +523,6 @@ serve(async (req) => {
       // Don't override with instructor's default preference
       finalType = 'short_answer';
       console.log(`📝 Respecting explicit short_answer type from preview dialog`);
-    } else if (instructorPreference === "poll") {
-      // Instructor's default preference is poll
-      finalType = 'poll';
-      console.log(`📊 Using instructor poll preference`);
     } else if (instructorPreference === "coding") {
       // When instructor prefers coding, fetch their coding style and use it
       const { data: codingPref } = await supabase
@@ -780,30 +678,7 @@ serve(async (req) => {
     let formatStartTime = Date.now();
     console.log("⏱️ Starting question formatting...");
 
-    if (finalType === "poll") {
-      // Poll: MCQ-style options but no grading
-      console.log("📊 Creating poll question (ungraded)");
-      if (options && Array.isArray(options) && options.length >= 2) {
-        // Use pre-generated options from preview dialog
-        formattedQuestion = {
-          question: question_text,
-          type: "poll",
-          options: options,
-          gradingMode: "none",
-        };
-      } else {
-        // Generate poll-specific options via AI (2-4 options, ungraded)
-        console.log("🤖 Generating poll options with AI (2-4 options, ungraded)");
-        const poll = await generatePollOptions(question_text, context || "", course_context);
-        formattedQuestion = {
-          question: poll.question,
-          type: "poll",
-          options: poll.options,
-          gradingMode: "none",
-        };
-        console.log(`📊 Poll generated with ${poll.options.length} options: ${poll.options.join(' | ')}`);
-      }
-    } else if (finalType === "coding" || finalType === "coding_simple") {
+    if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
 
       if (isSimpleCoding) {

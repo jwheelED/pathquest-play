@@ -31,7 +31,7 @@ export const LiveClassroomStatus = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Total Participants</span>
+              <span className="text-sm font-medium">Total Students</span>
               <Badge variant="outline" className="gap-1">
                 <Users className="h-3 w-3" />
                 {totalStudents}
@@ -76,7 +76,7 @@ export const LiveClassroomStatus = ({
             </div>
             <Progress value={completionRate} className="h-2" />
             {completionRate === 100 && (
-              <p className="text-xs text-green-600 font-medium">✓ All participants have responded!</p>
+              <p className="text-xs text-green-600 font-medium">✓ All students have responded!</p>
             )}
           </div>
         )}

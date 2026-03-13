@@ -78,13 +78,13 @@ const generateTitle = (summaryData: LectureSummaryData): string => {
     return title.length > 60 ? `${topics[0]} — ${dateStr}` : title;
   }
   if (topics.length === 1) return `${topics[0]} — ${dateStr}`;
-  return `Session Insight — ${dateStr}`;
+  return `Lecture Summary — ${dateStr}`;
 };
 
 const getAccuracyLabel = (accuracy: number): { label: string; icon: typeof TrendingUp } => {
   if (accuracy >= 70) return { label: "Strong understanding", icon: TrendingUp };
   if (accuracy >= 50) return { label: "Mixed results — consider review", icon: AlertTriangle };
-  return { label: "Participants struggled — review recommended", icon: TrendingDown };
+  return { label: "Students struggled — review recommended", icon: TrendingDown };
 };
 
 export const LectureSummarySheet = ({
@@ -101,7 +101,7 @@ export const LectureSummarySheet = ({
   const [saved, setSaved] = useState(false);
   const { selectedCourseId } = useCourseContext();
 
-  const reportTitle = summaryData ? generateTitle(summaryData) : "Session Insight";
+  const reportTitle = summaryData ? generateTitle(summaryData) : "Teaching Summary";
 
   const handleSave = async () => {
     if (!summaryData) return;
@@ -123,10 +123,10 @@ export const LectureSummarySheet = ({
 
       if (error) throw error;
       setSaved(true);
-      toast.success("Session insight saved!");
+      toast.success("Lecture summary saved!");
     } catch (error) {
       console.error("Error saving summary:", error);
-      toast.error("Failed to save session insight");
+      toast.error("Failed to save summary");
     } finally {
       setSaving(false);
     }
@@ -144,7 +144,7 @@ export const LectureSummarySheet = ({
     y += 10;
     doc.setFontSize(10);
     doc.setTextColor(120);
-    doc.text(`${formatDuration(recordingDuration)} · ${questionsAsked} questions · ${studentCount} participants · ${format(new Date(), "MMM d, yyyy")}`, lm, y);
+    doc.text(`${formatDuration(recordingDuration)} · ${questionsAsked} questions · ${studentCount} students · ${format(new Date(), "MMM d, yyyy")}`, lm, y);
     y += 12;
     doc.setTextColor(0);
 
@@ -178,7 +178,7 @@ export const LectureSummarySheet = ({
 
     addSection("Topics Covered", summaryData.topicsIdentified);
     addSection("Key Concepts", summaryData.keyConceptsCovered, "✓");
-    addSection("Session Highlights", summaryData.lectureHighlights);
+    addSection("Lecture Highlights", summaryData.lectureHighlights);
     if (summaryData.engagementAnalysis) {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
@@ -195,7 +195,7 @@ export const LectureSummarySheet = ({
     addSection("Consider Reviewing", summaryData.conceptsToReview, "⚠");
 
     doc.save(`${reportTitle.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.pdf`);
-    toast.success("Session insight exported as PDF");
+    toast.success("Summary exported as PDF");
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -216,7 +216,7 @@ export const LectureSummarySheet = ({
           <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
             <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDuration(recordingDuration)}</span>
             <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{questionsAsked} questions</span>
-            <span className="flex items-center gap-1"><Users className="h-3 w-3" />{studentCount} participants</span>
+            <span className="flex items-center gap-1"><Users className="h-3 w-3" />{studentCount} students</span>
             <span>{format(new Date(), "MMM d, yyyy")}</span>
           </div>
           {summaryData && !isLoading && (
@@ -229,7 +229,7 @@ export const LectureSummarySheet = ({
                 className="rounded-xl gap-2"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4 text-success" /> : <Save className="h-4 w-4" />}
-                {saved ? "Saved" : "Save Insight"}
+                {saved ? "Saved" : "Save Summary"}
               </Button>
               <Button size="sm" variant="outline" onClick={handleExport} className="rounded-xl gap-2">
                 <FileDown className="h-4 w-4" />
@@ -243,9 +243,9 @@ export const LectureSummarySheet = ({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-lg font-medium">Analyzing your session...</p>
+              <p className="text-lg font-medium">Analyzing your lecture...</p>
               <p className="text-sm text-muted-foreground text-center">
-                Reviewing transcript and participant responses to generate insights.
+                Reviewing transcript and student responses to generate insights.
               </p>
             </div>
           ) : summaryData ? (
@@ -320,7 +320,7 @@ export const LectureSummarySheet = ({
                       <>
                         <Separator />
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Session Highlights</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Lecture Highlights</p>
                           <ul className="space-y-1.5">
                             {summaryData.lectureHighlights.map((highlight, i) => (
                               <li key={i} className="text-sm flex items-start gap-2">
@@ -396,15 +396,15 @@ export const LectureSummarySheet = ({
               )}
 
               <p className="text-xs text-center text-muted-foreground pb-4 pt-2">
-                Report based on {formatDuration(recordingDuration)} of session content
+                Report based on {formatDuration(recordingDuration)} of lecture content
               </p>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 space-y-4">
               <AlertTriangle className="h-12 w-12 text-muted-foreground" />
-              <p className="text-lg font-medium">No insight available</p>
+              <p className="text-lg font-medium">No summary available</p>
               <p className="text-sm text-muted-foreground text-center">
-                Record at least 10 minutes of session content to generate a session insight.
+                Record at least 10 minutes of lecture content to generate a teaching summary.
               </p>
             </div>
           )}

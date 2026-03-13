@@ -116,7 +116,7 @@ export const LectureVideoManager = () => {
         prev.map(l => l.id === lectureId ? { ...l, published: !currentValue } : l)
       );
 
-      toast.success(!currentValue ? 'Session visible to participants' : 'Session hidden from participants');
+      toast.success(!currentValue ? 'Lecture visible to students' : 'Lecture hidden from students');
     } catch (error) {
       console.error('Error toggling published:', error);
       toast.error('Failed to update visibility');
@@ -147,10 +147,10 @@ export const LectureVideoManager = () => {
       if (error) throw error;
 
       setLectures(prev => prev.filter(l => l.id !== lectureId));
-      toast.success('Recording deleted successfully');
+      toast.success('Lecture deleted successfully');
     } catch (error) {
       console.error('Error deleting lecture:', error);
-      toast.error('Failed to delete recording');
+      toast.error('Failed to delete lecture');
     } finally {
       setDeletingId(null);
     }
