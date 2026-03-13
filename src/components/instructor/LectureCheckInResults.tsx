@@ -337,11 +337,11 @@ export const LectureCheckInResults = () => {
 
       if (error) throw error;
       
-      toast.success("Check-in deleted successfully!");
+      toast.success("Response deleted successfully!");
       fetchResults();
     } catch (error) {
-      console.error("Error deleting check-in:", error);
-      toast.error("Failed to delete check-in");
+      console.error("Error deleting response:", error);
+      toast.error("Failed to delete response");
     }
   };
 
