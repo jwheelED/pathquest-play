@@ -105,7 +105,7 @@ export const QuestionAnalyticsChart = ({
           return normalizedAnswer === letter;
         }).length;
         
-        const isCorrect = letter === correctAnswerLetter;
+        const isCorrect = !isPoll && letter === correctAnswerLetter;
 
         return {
           option: letter,
