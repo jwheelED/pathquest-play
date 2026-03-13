@@ -101,7 +101,7 @@ export const LectureSummarySheet = ({
   const [saved, setSaved] = useState(false);
   const { selectedCourseId } = useCourseContext();
 
-  const reportTitle = summaryData ? generateTitle(summaryData) : "Teaching Summary";
+  const reportTitle = summaryData ? generateTitle(summaryData) : "Session Insight";
 
   const handleSave = async () => {
     if (!summaryData) return;
