@@ -34,8 +34,12 @@ export const QuestionAnalyticsChart = ({
   questionIndex,
   stats,
 }: QuestionAnalyticsChartProps) => {
-  const isMultipleChoice = question.type === "multiple_choice" && question.options;
-  const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
+  const isPoll = question.isPoll === true || 
+    question.correctAnswer === '' || 
+    question.correctAnswer === null || 
+    question.correctAnswer === undefined;
+  const isMultipleChoice = (question.type === "multiple_choice" || isPoll) && question.options;
+  const isAutoGradedShortAnswer = !isPoll && question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
   // DEDUPLICATION: Keep only the latest submission per student
   const uniqueStudents = new Map<string, Assignment>();
