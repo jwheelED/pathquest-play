@@ -1841,17 +1841,36 @@ export const LectureCheckInResults = () => {
                                 const total = deduplicatedAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
-                                const isCorrect = optionLetter === correctAnswerToUse;
+                                const isCorrectBar = !isPoll && optionLetter === correctAnswerToUse;
+
+                                // For polls, find the most popular option
+                                const allCounts = isPoll ? question.options?.map((_: string, oi: number) => {
+                                  const ol = String.fromCharCode(65 + oi);
+                                  return deduplicatedAssignments.filter((a) => {
+                                    if (!a.completed) return false;
+                                    const ac = a.content as any;
+                                    const aq = ac?.questions || [];
+                                    const si = aq.findIndex((q: any) => q.question === question.question);
+                                    const sa = si >= 0 ? (a.quiz_responses?.[si.toString()] || a.quiz_responses?.[si]) : null;
+                                    return sa === ol;
+                                  }).length;
+                                }) : [];
+                                const maxCount = isPoll ? Math.max(...allCounts, 0) : 0;
+                                const isMostPopular = isPoll && count > 0 && count === maxCount;
 
                                 return (
                                   <div key={optionLetter} className="flex items-center gap-2 text-xs">
-                                    <span className={`font-mono w-6 ${isCorrect ? "text-green-600 font-bold" : ""}`}>
+                                    <span className={`font-mono w-6 ${isCorrectBar ? "text-green-600 font-bold" : isMostPopular ? "text-primary font-bold" : ""}`}>
                                       {optionLetter}
-                                      {isCorrect ? " ✓" : ""}
+                                      {isCorrectBar ? " ✓" : ""}
                                     </span>
-                                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                                    <div className="flex-1 bg-muted rounded-full h-5 overflow-hidden">
                                       <div
-                                        className={`h-full ${isCorrect ? "bg-green-500" : "bg-primary"}`}
+                                        className={`h-full transition-all ${
+                                          isPoll 
+                                            ? (isMostPopular ? "bg-primary" : "bg-primary/60") 
+                                            : (isCorrectBar ? "bg-green-500" : "bg-primary")
+                                        }`}
                                         style={{ width: `${percentage}%` }}
                                       />
                                     </div>
