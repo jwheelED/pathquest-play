@@ -889,7 +889,7 @@ export const LectureCheckInResults = () => {
       // Header
       doc.setFontSize(20);
       doc.setTextColor(40, 40, 40);
-      doc.text("Lecture Check-In Report", pageWidth / 2, 20, { align: "center" });
+      doc.text("Live Room Insight Report", pageWidth / 2, 20, { align: "center" });
       
       doc.setFontSize(11);
       doc.setTextColor(100, 100, 100);
