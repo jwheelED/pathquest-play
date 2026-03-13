@@ -70,10 +70,12 @@ const ExpandableResponseRow = ({
   response,
   fullAnswer,
   isLong,
+  isPoll,
 }: {
   response: LiveResponse & { nickname?: string };
   fullAnswer: string;
   isLong: boolean;
+  isPoll: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -86,7 +88,9 @@ const ExpandableResponseRow = ({
       onClick={() => isLong && setExpanded(!expanded)}
     >
       <div className="flex items-center gap-2 py-1.5 px-3">
-        {response.is_correct ? (
+        {isPoll ? (
+          <BarChart3 className="h-3.5 w-3.5 text-primary shrink-0" />
+        ) : response.is_correct ? (
           <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
         ) : (
           <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
@@ -269,6 +273,8 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
       <CardContent className="space-y-2">
         <Accordion type="multiple" defaultValue={[questionGroups[0]?.question.id]}>
           {questionGroups.map((group) => {
+            const questionType = group.question.question_content?.type;
+            const groupIsPoll = questionType === 'poll';
             const correctPct =
               group.totalResponses > 0
                 ? Math.round((group.correctCount / group.totalResponses) * 100)
@@ -285,7 +291,7 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                 <AccordionTrigger className="hover:no-underline py-3">
                   <div className="flex items-center gap-3 text-left flex-1 mr-2">
                     <Badge variant="secondary" className="shrink-0">
-                      Q{group.question.question_number}
+                      {groupIsPoll ? '📊' : `Q${group.question.question_number}`}
                     </Badge>
                     <span className="text-sm truncate flex-1">
                       {typeof questionText === "string"
@@ -293,12 +299,18 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                         : "Question"}
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <Badge
-                        variant={correctPct >= 70 ? "default" : correctPct >= 40 ? "secondary" : "destructive"}
-                        className="text-xs"
-                      >
-                        {correctPct}% correct
-                      </Badge>
+                      {groupIsPoll ? (
+                        <Badge variant="outline" className="text-xs">
+                          Poll
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant={correctPct >= 70 ? "default" : correctPct >= 40 ? "secondary" : "destructive"}
+                          className="text-xs"
+                        >
+                          {correctPct}% correct
+                        </Badge>
+                      )}
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Users className="h-3 w-3" />
                         {group.totalResponses}
@@ -310,14 +322,23 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                   <div className="space-y-3 pt-2">
                     {/* Stats bar */}
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                        {group.correctCount} correct
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <XCircle className="h-3.5 w-3.5 text-red-500" />
-                        {group.totalResponses - group.correctCount} incorrect
-                      </span>
+                      {groupIsPoll ? (
+                        <span className="flex items-center gap-1">
+                          <BarChart3 className="h-3.5 w-3.5 text-primary" />
+                          {group.totalResponses} response{group.totalResponses !== 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                            {group.correctCount} correct
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <XCircle className="h-3.5 w-3.5 text-red-500" />
+                            {group.totalResponses - group.correctCount} incorrect
+                          </span>
+                        </>
+                      )}
                       {group.avgResponseTime && (
                         <span className="flex items-center gap-1">
                           <Clock className="h-3.5 w-3.5" />
@@ -326,8 +347,8 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                       )}
                     </div>
 
-                    {/* Progress bar */}
-                    <Progress value={correctPct} className="h-2" />
+                    {/* Progress bar - hide for polls */}
+                    {!groupIsPoll && <Progress value={correctPct} className="h-2" />}
 
                     {/* Question text */}
                     <div className="p-3 bg-muted/50 rounded-lg text-sm">
@@ -346,6 +367,7 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                               response={r}
                               fullAnswer={fullAnswer}
                               isLong={isLong}
+                              isPoll={groupIsPoll}
                             />
                           );
                         })}

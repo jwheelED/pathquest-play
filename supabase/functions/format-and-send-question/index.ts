@@ -514,7 +514,11 @@ serve(async (req) => {
 
     let finalType: string;
 
-    if (hasPreGeneratedOptions && suggested_type) {
+    if (suggested_type === 'poll') {
+      // Poll type is always explicit - never override
+      finalType = 'poll';
+      console.log(`📊 Using explicit poll type`);
+    } else if (hasPreGeneratedOptions && suggested_type) {
       // Preview dialog with edited options - respect user's explicit choice
       finalType = suggested_type;
       console.log(`📝 Using preview dialog type: ${finalType}`);
@@ -523,6 +527,10 @@ serve(async (req) => {
       // Don't override with instructor's default preference
       finalType = 'short_answer';
       console.log(`📝 Respecting explicit short_answer type from preview dialog`);
+    } else if (instructorPreference === "poll") {
+      // Instructor's default preference is poll
+      finalType = 'poll';
+      console.log(`📊 Using instructor poll preference`);
     } else if (instructorPreference === "coding") {
       // When instructor prefers coding, fetch their coding style and use it
       const { data: codingPref } = await supabase
@@ -678,7 +686,25 @@ serve(async (req) => {
     let formatStartTime = Date.now();
     console.log("⏱️ Starting question formatting...");
 
-    if (finalType === "coding" || finalType === "coding_simple") {
+    if (finalType === "poll") {
+      // Poll: simple question with options but no correct answer, not graded
+      console.log("📊 Creating poll question (ungraded)");
+      if (options && Array.isArray(options) && options.length >= 2) {
+        formattedQuestion = {
+          question: question_text,
+          type: "poll",
+          options: options,
+          gradingMode: "none",
+        };
+      } else {
+        // Free-text poll (no options)
+        formattedQuestion = {
+          question: question_text,
+          type: "poll",
+          gradingMode: "none",
+        };
+      }
+    } else if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
 
       if (isSimpleCoding) {

@@ -433,6 +433,60 @@ const LiveStudent = () => {
   const [gradePending, setGradePending] = useState<boolean>(false);
   const [isGrading, setIsGrading] = useState<boolean>(false); // Track grading in progress
 
+  // For poll questions (no grading, just record response)
+  const handlePollSubmit = async () => {
+    if (!selectedAnswer || !participantId || !currentQuestion) return;
+
+    setIsSubmitting(true);
+    const responseTimeMs = Date.now() - questionStartTime;
+
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: selectedAnswer,
+      responseTimeMs,
+    };
+
+    try {
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
+      );
+
+      answeredQuestionsRef.current.add(currentQuestion.id);
+      hasStartedAnsweringRef.current = false;
+
+      if (result.queued) {
+        setHasAnswered(true);
+        toast.info("Response saved! Will sync when back online.", { icon: "📡" });
+      } else if (result.success) {
+        setHasAnswered(true);
+        setQuestionsAnswered(prev => prev + 1);
+        toast.success("Response recorded! 📊");
+      } else if (result.error) {
+        throw result.error;
+      }
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : '';
+      if (errMsg.includes("already submitted")) {
+        toast.info("You already responded to this poll");
+        answeredQuestionsRef.current.add(currentQuestion.id);
+        setHasAnswered(true);
+      } else {
+        toast.error("Failed to submit response");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // For short answer questions (with AI grading)
   const handleSubmit = async () => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
@@ -674,6 +728,8 @@ const LiveStudent = () => {
   }
 
   const isMCQ = currentQuestion.question_content.type === "multiple_choice";
+  const isPoll = currentQuestion.question_content.type === "poll";
+  const hasPollOptions = isPoll && currentQuestion.question_content.options && currentQuestion.question_content.options.length >= 2;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
@@ -855,10 +911,78 @@ const LiveStudent = () => {
                     )}
                   </Button>
                 </>
+               )}
+
+              {/* Poll question - MCQ-like with options or free text, no grading */}
+              {isPoll && (
+                <>
+                  {hasPollOptions ? (
+                    <RadioGroup value={selectedAnswer} onValueChange={(val) => {
+                      setSelectedAnswer(val);
+                      hasStartedAnsweringRef.current = true;
+                    }}>
+                      <div className="space-y-3">
+                        {currentQuestion.question_content.options.map((option: string, index: number) => (
+                          <div key={index} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
+                            <RadioGroupItem value={option} id={`poll-option-${index}`} />
+                            <Label htmlFor={`poll-option-${index}`} className="flex-1 cursor-pointer text-base">
+                              <MathRenderer content={option} />
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </RadioGroup>
+                  ) : (
+                    <Textarea
+                      value={selectedAnswer}
+                      onChange={(e) => {
+                        setSelectedAnswer(e.target.value);
+                        hasStartedAnsweringRef.current = true;
+                      }}
+                      onFocus={() => setIsTyping(true)}
+                      onBlur={() => setIsTyping(false)}
+                      placeholder="Type your response..."
+                      className="min-h-[120px]"
+                    />
+                  )}
+                  <div className="text-xs text-muted-foreground text-center">
+                    📊 This is a poll — your response will not be graded
+                  </div>
+                  <Button 
+                    onClick={handlePollSubmit} 
+                    className="w-full" 
+                    size="lg"
+                    disabled={!selectedAnswer || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Response"
+                    )}
+                  </Button>
+                </>
               )}
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
+              {/* Poll Results - Just "Response Recorded" */}
+              {isPoll && (
+                <>
+                  <div className="relative">
+                    <CheckCircle2 className="h-16 w-16 text-primary mx-auto animate-in zoom-in-50 duration-300" />
+                  </div>
+                  <p className="text-2xl font-bold text-primary animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                    Response Recorded 📊
+                  </p>
+                  <p className="text-muted-foreground">
+                    Your response: <span className="font-semibold">{selectedAnswer}</span>
+                  </p>
+                </>
+              )}
+
               {/* MCQ Results - Correct/Incorrect feedback */}
               {isMCQ && (
                 <>
@@ -992,24 +1116,26 @@ const LiveStudent = () => {
                 </>
               )}
               
-              {/* AI Explanation Button */}
-              <Button
-                onClick={loadAiExplanation}
-                variant="outline"
-                className="w-full max-w-md mx-auto"
-                disabled={loadingExplanation}
-              >
-                {loadingExplanation ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating explanation...
-                  </>
-                ) : showExplanation ? (
-                  <>📚 Hide Explanation</>
-                ) : (
-                  <>✨ Why? Get AI Explanation</>
-                )}
-              </Button>
+              {/* AI Explanation Button - hide for polls */}
+              {!isPoll && (
+                <Button
+                  onClick={loadAiExplanation}
+                  variant="outline"
+                  className="w-full max-w-md mx-auto"
+                  disabled={loadingExplanation}
+                >
+                  {loadingExplanation ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating explanation...
+                    </>
+                  ) : showExplanation ? (
+                    <>📚 Hide Explanation</>
+                  ) : (
+                    <>✨ Why? Get AI Explanation</>
+                  )}
+                </Button>
+              )}
               
               {/* AI Explanation Display */}
               {showExplanation && explanation && (
