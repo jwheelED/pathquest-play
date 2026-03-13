@@ -12,7 +12,7 @@ interface QuestionFormatSettingsProps {
 }
 
 export const QuestionFormatSettings = ({ instructorId, professorType }: QuestionFormatSettingsProps) => {
-  const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding'>('multiple_choice');
+  const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding' | 'poll'>('multiple_choice');
   const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
