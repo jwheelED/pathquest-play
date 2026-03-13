@@ -34,7 +34,7 @@ interface CreateQuestionDialogProps {
   professorType: string | null;
 }
 
-type QuestionType = "multiple_choice" | "short_answer" | "coding";
+type QuestionType = "multiple_choice" | "short_answer" | "coding" | "poll";
 
 export function CreateQuestionDialog({
   open,
