@@ -687,9 +687,10 @@ serve(async (req) => {
     console.log("⏱️ Starting question formatting...");
 
     if (finalType === "poll") {
-      // Poll: simple question with options but no correct answer, not graded
+      // Poll: MCQ-style options but no grading
       console.log("📊 Creating poll question (ungraded)");
       if (options && Array.isArray(options) && options.length >= 2) {
+        // Use pre-generated options from preview dialog
         formattedQuestion = {
           question: question_text,
           type: "poll",
@@ -697,10 +698,13 @@ serve(async (req) => {
           gradingMode: "none",
         };
       } else {
-        // Free-text poll (no options)
+        // Generate MCQ-style options via AI, then strip grading info
+        console.log("🤖 Generating poll options with AI (MCQ-style, ungraded)");
+        const mcq = await generateMCQ(question_text, context || "", course_context);
         formattedQuestion = {
-          question: question_text,
+          question: mcq.question,
           type: "poll",
+          options: mcq.options,
           gradingMode: "none",
         };
       }

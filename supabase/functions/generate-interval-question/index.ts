@@ -38,7 +38,7 @@ function isGenericQuestion(text: string): boolean {
 function getFallbackResponse(formatPreference: string, confidence: number, reason: string) {
   // If MCQ is preferred, we can't generate a proper MCQ fallback without AI,
   // so return a failure instead of sending a wrong-format generic question.
-  if (formatPreference === "multiple_choice" || formatPreference === "coding") {
+  if (formatPreference === "multiple_choice" || formatPreference === "coding" || formatPreference === "poll") {
     return {
       success: false,
       error: "Could not generate a relevant question in the requested format",
@@ -316,6 +316,7 @@ serve(async (req) => {
     }
 
     // Build prompt based on format preference
+    // Poll uses the same MCQ format (4 options) but is ungraded
     let formatInstructions = "";
     if (format_preference === "coding") {
       formatInstructions = coding_question_style === "simple"
@@ -324,6 +325,7 @@ serve(async (req) => {
     } else if (format_preference === "short_answer") {
       formatInstructions = `Generate an open-ended short answer question that tests understanding.`;
     } else {
+      // Both "multiple_choice" and "poll" generate MCQ-style options
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
@@ -515,7 +517,7 @@ Generate ONE focused question that tests understanding of the most important con
       // Uses index tracking to handle duplicate option text correctly
       let finalOptions = parsed.options;
       let finalCorrectAnswer = parsed.correct_answer;
-      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
+      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice" || format_preference === "poll") {
         if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
           const letters = ['A', 'B', 'C', 'D'];
           const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
