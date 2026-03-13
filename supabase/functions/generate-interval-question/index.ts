@@ -316,7 +316,6 @@ serve(async (req) => {
     }
 
     // Build prompt based on format preference
-    // Poll uses the same MCQ format (4 options) but is ungraded
     let formatInstructions = "";
     if (format_preference === "coding") {
       formatInstructions = coding_question_style === "simple"
@@ -324,8 +323,13 @@ serve(async (req) => {
         : `Generate a complete coding problem with starter code and test cases.`;
     } else if (format_preference === "short_answer") {
       formatInstructions = `Generate an open-ended short answer question that tests understanding.`;
+    } else if (format_preference === "poll") {
+      formatInstructions = `Generate an ungraded poll question with 2 to 4 answer options. Use your judgment on option count:
+- Use exactly 2 options (e.g. "Yes / No", "True / False", "Agree / Disagree") when the question naturally fits a binary choice.
+- Use 3-4 options when the question benefits from more nuance or there are multiple valid perspectives.
+The poll is ungraded — there is no single correct answer. Options should capture different viewpoints or responses.`;
     } else {
-      // Both "multiple_choice" and "poll" generate MCQ-style options
+      // "multiple_choice" generates MCQ-style with 4 options
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
