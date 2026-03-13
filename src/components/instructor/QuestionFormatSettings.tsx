@@ -160,6 +160,18 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
               </div>
             </div>
           )}
+
+          <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
+            <RadioGroupItem value="poll" id="poll" />
+            <div className="space-y-1 leading-none flex-1">
+              <Label htmlFor="poll" className="font-semibold cursor-pointer">
+                Poll (Ungraded)
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Gather student opinions or check understanding. Responses are recorded but not graded.
+              </p>
+            </div>
+          </div>
         </RadioGroup>
 
         {/* Coding style sub-options - only show when coding is selected */}

@@ -394,6 +394,10 @@ export function SlideRecordingControls({
                   <span className="font-medium">Coding Challenge</span>
                   <span className="ml-auto text-xs text-muted-foreground">Code</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSendSlideQuestion('poll')}>
+                  <span className="font-medium">Poll (Ungraded)</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Poll</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             
