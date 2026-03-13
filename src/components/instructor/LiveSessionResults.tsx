@@ -53,7 +53,24 @@ const getRoomSignal = (correctPct: number, totalResponses: number): { label: str
 
 // Resolve a short answer like "A" or "B" to the full option text
 const resolveAnswerToFullText = (answer: string, questionContent: any): string => {
-  // ... keep existing code
+  const options: string[] = questionContent?.options || [];
+  if (!options.length) return answer;
+
+  const trimmed = answer.trim();
+  const letterMatch = trimmed.match(/^([A-Da-d])\.?\s*$/);
+  if (letterMatch) {
+    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
+    if (idx >= 0 && idx < options.length) {
+      return options[idx];
+    }
+  }
+
+  const prefixMatch = trimmed.match(/^([A-Da-d])[\.\)]\s+(.+)/);
+  if (prefixMatch) {
+    return trimmed;
+  }
+
+  return answer;
 };
 
 const ExpandableResponseRow = ({
