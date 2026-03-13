@@ -230,10 +230,10 @@ export const QuestionAnalyticsChart = ({
                   }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {answerDistribution.map((entry, index) => (
+                  {answerDistribution.map((entry: { isCorrect: boolean }, index: number) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.isCorrect ? "hsl(var(--success))" : "hsl(var(--primary))"}
+                      fill={isPoll ? "hsl(var(--primary))" : (entry.isCorrect ? "hsl(var(--success))" : "hsl(var(--primary))")}
                     />
                   ))}
                 </Bar>
