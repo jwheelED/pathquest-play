@@ -84,7 +84,7 @@ const generateTitle = (summaryData: LectureSummaryData): string => {
 const getAccuracyLabel = (accuracy: number): { label: string; icon: typeof TrendingUp } => {
   if (accuracy >= 70) return { label: "Strong understanding", icon: TrendingUp };
   if (accuracy >= 50) return { label: "Mixed results — consider review", icon: AlertTriangle };
-  return { label: "Students struggled — review recommended", icon: TrendingDown };
+  return { label: "Participants struggled — review recommended", icon: TrendingDown };
 };
 
 export const LectureSummarySheet = ({
