@@ -13,8 +13,8 @@ export function CheckInPreview({ activeSessionId, onNavigate }: CheckInPreviewPr
     return (
       <EmptyState
         icon={<BarChart3 className="w-7 h-7" />}
-        title="Live check-in results"
-        description="During a live session, check-in results appear here in real time. You'll see how students respond to each question as it happens."
+        title="Live Room Insight"
+        description="During a live session, room insights appear here in real time. You'll see how participants respond to each question as it happens."
         action={{
           label: "Start Live Session",
           onClick: () => onNavigate("live"),
