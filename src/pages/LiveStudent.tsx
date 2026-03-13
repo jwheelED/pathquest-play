@@ -433,6 +433,60 @@ const LiveStudent = () => {
   const [gradePending, setGradePending] = useState<boolean>(false);
   const [isGrading, setIsGrading] = useState<boolean>(false); // Track grading in progress
 
+  // For poll questions (no grading, just record response)
+  const handlePollSubmit = async () => {
+    if (!selectedAnswer || !participantId || !currentQuestion) return;
+
+    setIsSubmitting(true);
+    const responseTimeMs = Date.now() - questionStartTime;
+
+    const responseData = {
+      questionId: currentQuestion.id,
+      participantId,
+      answer: selectedAnswer,
+      responseTimeMs,
+    };
+
+    try {
+      const result = await submitWithOfflineSupport(
+        'submit-live-response',
+        async () => {
+          const { data, error } = await supabase.functions.invoke("submit-live-response", {
+            body: responseData,
+          });
+          if (error) throw error;
+          return data;
+        },
+        responseData
+      );
+
+      answeredQuestionsRef.current.add(currentQuestion.id);
+      hasStartedAnsweringRef.current = false;
+
+      if (result.queued) {
+        setHasAnswered(true);
+        toast.info("Response saved! Will sync when back online.", { icon: "📡" });
+      } else if (result.success) {
+        setHasAnswered(true);
+        setQuestionsAnswered(prev => prev + 1);
+        toast.success("Response recorded! 📊");
+      } else if (result.error) {
+        throw result.error;
+      }
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : '';
+      if (errMsg.includes("already submitted")) {
+        toast.info("You already responded to this poll");
+        answeredQuestionsRef.current.add(currentQuestion.id);
+        setHasAnswered(true);
+      } else {
+        toast.error("Failed to submit response");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // For short answer questions (with AI grading)
   const handleSubmit = async () => {
     if (!selectedAnswer || !participantId || !currentQuestion) return;
