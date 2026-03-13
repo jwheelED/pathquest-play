@@ -127,10 +127,10 @@ export const StudentRosterPanel = ({
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
-            Students
+            Participants
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            View enrollment, participation, and student activity for this course.
+            View enrollment, participation, and participant activity for this course.
           </p>
         </div>
         <Badge variant="secondary" className="self-start sm:self-auto text-sm px-3 py-1">
