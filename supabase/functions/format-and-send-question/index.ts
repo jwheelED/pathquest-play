@@ -792,15 +792,16 @@ serve(async (req) => {
           gradingMode: "none",
         };
       } else {
-        // Generate MCQ-style options via AI, then strip grading info
-        console.log("🤖 Generating poll options with AI (MCQ-style, ungraded)");
-        const mcq = await generateMCQ(question_text, context || "", course_context);
+        // Generate poll-specific options via AI (2-4 options, ungraded)
+        console.log("🤖 Generating poll options with AI (2-4 options, ungraded)");
+        const poll = await generatePollOptions(question_text, context || "", course_context);
         formattedQuestion = {
-          question: mcq.question,
+          question: poll.question,
           type: "poll",
-          options: mcq.options,
+          options: poll.options,
           gradingMode: "none",
         };
+        console.log(`📊 Poll generated with ${poll.options.length} options: ${poll.options.join(' | ')}`);
       }
     } else if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
