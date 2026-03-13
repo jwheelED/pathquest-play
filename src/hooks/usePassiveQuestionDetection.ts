@@ -64,6 +64,22 @@ const RHETORICAL_BLOCKLIST = [
   "can everyone hear me",
 ];
 
+// Greeting patterns that should never be treated as audience checks
+const GREETING_PATTERNS = [
+  /^how('?s| is) everyone/i,
+  /^how('?s| is) everybody/i,
+  /^how('?s| are) (you|y'all|ya'll|yall) (all )?(doing|today|this)/i,
+  /^how are (we|you) (doing|today|this)/i,
+  /^how('?s| is) it going/i,
+  /^what('?s| is) up/i,
+  /^how('?s| is) (your|the) (day|morning|afternoon|evening)/i,
+  /^(good )?(morning|afternoon|evening|hey|hello|hi|welcome)/i,
+  /^(is )?everyone (here|ready|good|doing)/i,
+  /^(are )?we (all )?(here|ready|good|set)/i,
+  /^can (you|everyone|everybody) hear me/i,
+  /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
+];
+
 /**
  * Extracts question segments from a transcript utterance.
  * Handles normal sentence punctuation and edge cases where text contains `?`
@@ -90,7 +106,13 @@ function isRhetorical(question: string): boolean {
     .trim()
     .toLowerCase();
 
-  // Substantive WH-questions should not be blocked
+  // Check greeting patterns FIRST — these override WH-question bypass
+  // e.g. "How's everyone doing today?" starts with "how" but is a greeting
+  for (const pattern of GREETING_PATTERNS) {
+    if (pattern.test(normalized)) return true;
+  }
+
+  // Substantive WH-questions should not be blocked (after greeting check)
   if (/^(what|how|why|when|where|who|which)\b/.test(normalized)) {
     return false;
   }
@@ -99,7 +121,6 @@ function isRhetorical(question: string): boolean {
   for (const phrase of RHETORICAL_BLOCKLIST) {
     if (normalized === phrase) return true;
     // Also check if the question is just filler + these phrases
-    // e.g., "so does that make sense" or "and right"
     const stripped = normalized
       .replace(/^(so|and|but|well|now|or|um|uh|like)\s+/i, '')
       .trim();

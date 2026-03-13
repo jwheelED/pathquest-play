@@ -62,8 +62,7 @@ import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySh
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
-import { PassiveQuestionCandidateCard } from "./PassiveQuestionCandidate";
-import { Switch } from "@/components/ui/switch";
+import { QuestionOnDeck } from "./QuestionOnDeck";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -176,9 +175,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
   const pendingQuestionDataRef = useRef<any>(null);
 
-  // Passive question detection
-  const [passiveDetectionEnabled, setPassiveDetectionEnabled] = useState(true);
-
+  // Passive question detection — always on when recording
+  const [onDeckHeld, setOnDeckHeld] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -210,10 +208,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
-    enabled: passiveDetectionEnabled,
+    enabled: true, // Always on
     cooldownMs: 8000,
     minWordCount: 5,
-    autoDismissMs: 20000,
+    autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
 
@@ -3233,9 +3231,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mic className="h-5 w-5" />
-            Live Lecture Capture
+            Live Copilot
           </CardTitle>
-          <CardDescription>Record your lecture and send questions to students in real-time</CardDescription>
+          <CardDescription>Edvana listens and autodrafts audience checks as you speak</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Error History Panel */}
@@ -3354,12 +3352,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-xl">
                 {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
-                Live Lecture Capture
+                Live Copilot
               </CardTitle>
               <CardDescription className="text-sm">
                 {isRecording
-                  ? "🎙️ Real-time streaming active • Say 'send question now' or click 'Send Question' to send your most recent question to students"
-                  : "Start recording with Deepgram real-time transcription - use voice commands or the 'Send Question' button to send questions"}
+                  ? "🎙️ Streaming — Edvana is autodrafting your next audience check"
+                  : "Start recording to enable always-on question detection"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -3463,27 +3461,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </div>
                   
-                  {/* Passive question detection toggle */}
-                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
-                    <Switch
-                      id="passive-detection-toggle"
-                      checked={passiveDetectionEnabled}
-                      onCheckedChange={setPassiveDetectionEnabled}
-                      className="scale-75"
-                    />
-                    <Label
-                      htmlFor="passive-detection-toggle"
-                      className="text-xs font-medium cursor-pointer whitespace-nowrap"
-                    >
-                      Detect questions
-                    </Label>
-                    {passiveDetectionEnabled && (
-                      <Badge variant="outline" className="text-[10px]">
-                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />
-                        Auto
-                      </Badge>
-                    )}
-                  </div>
+                  {/* Always-on detection — no toggle needed */}
                   
 
                   {transcriptChunks.length > 0 && (
@@ -3560,7 +3538,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     ) : (
                       <>
                         <Zap className="mr-2 h-4 w-4" />
-                        Send Question
+                        Send Now
                       </>
                     )}
                   </Button>
@@ -3603,7 +3581,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   {rateLimitSecondsLeft === 0 && (
                     <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
                       <p className="text-xs font-medium text-center">
-                        ✅ Ready • Click "Send Question" or say "send question now"
+                        ✅ Ready • Edvana is autodrafting
                       </p>
                     </div>
                   )}
@@ -3621,64 +3599,72 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 </div>
               )}
 
-              {transcriptChunks.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Transcript Chunks:</p>
-                    {/* Transcription Quality Rating */}
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground">Accuracy:</p>
-                      {["excellent", "good", "poor"].map((rating) => (
-                        <Button
-                          key={rating}
-                          variant={transcriptionRating === rating ? "default" : "outline"}
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const {
-                                data: { user },
-                              } = await supabase.auth.getUser();
-                              if (!user) return;
+              {(transcriptChunks.length > 0 || lastTranscript) && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-2">
+                    <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    Live Session Feed
+                    <Badge variant="secondary" className="text-[10px] ml-auto">
+                      {transcriptChunks.length} chunks
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 pt-2">
+                      {/* Transcription Quality Rating */}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">Accuracy:</p>
+                        {["excellent", "good", "poor"].map((rating) => (
+                          <Button
+                            key={rating}
+                            variant={transcriptionRating === rating ? "default" : "outline"}
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const {
+                                  data: { user },
+                                } = await supabase.auth.getUser();
+                                if (!user) return;
 
-                              const { error } = await supabase.from("ai_quality_ratings").insert({
-                                user_id: user.id,
-                                rating_type: "transcription",
-                                reference_id: sessionId,
-                                rating: rating,
-                              });
+                                const { error } = await supabase.from("ai_quality_ratings").insert({
+                                  user_id: user.id,
+                                  rating_type: "transcription",
+                                  reference_id: sessionId,
+                                  rating: rating,
+                                });
 
-                              if (error) throw error;
+                                if (error) throw error;
 
-                              setTranscriptionRating(rating);
-                              toast({
-                                title: "Thank you for your feedback!",
-                                description: "Your rating helps us improve transcription quality.",
-                              });
-                            } catch (error) {
-                              console.error("Error saving rating:", error);
-                              toast({
-                                title: "Failed to save rating",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          className="gap-1 h-7 text-xs"
-                        >
-                          <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
-                          {rating.charAt(0).toUpperCase() + rating.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {transcriptChunks.map((chunk, index) => (
-                      <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                                setTranscriptionRating(rating);
+                                toast({
+                                  title: "Thank you for your feedback!",
+                                  description: "Your rating helps us improve transcription quality.",
+                                });
+                              } catch (error) {
+                                console.error("Error saving rating:", error);
+                                toast({
+                                  title: "Failed to save rating",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="gap-1 h-7 text-xs"
+                          >
+                            <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
+                            {rating.charAt(0).toUpperCase() + rating.slice(1)}
+                          </Button>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {transcriptChunks.map((chunk, index) => (
+                          <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </CardContent>
           </Card>
@@ -3748,20 +3734,48 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
 
-      {/* Passive Question Detection Candidate */}
-      {passiveCandidate && (
-        <PassiveQuestionCandidateCard
-          candidate={passiveCandidate}
-          onSend={(questionText) => {
-            dismissPassiveCandidate();
-            handleQuestionSend({
-              question_text: questionText,
-              suggested_type: 'multiple_choice',
-              source: 'passive_detection',
-            });
-          }}
-          onDismiss={dismissPassiveCandidate}
-        />
+      {/* Question on Deck — persistent autodraft card */}
+      {isRecording && (
+        <div className="mt-4">
+          <QuestionOnDeck
+            candidate={passiveCandidate}
+            isListening={isRecording}
+            isSending={isSendingQuestion}
+            isHeld={onDeckHeld}
+            onToggleHold={() => setOnDeckHeld(h => !h)}
+            onSendNow={(questionText) => {
+              dismissPassiveCandidate();
+              // Open preview for review before sending
+              setPreviewQuestionData({
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+              });
+              pendingQuestionDataRef.current = {
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+                confidence: 1.0,
+                extraction_method: 'passive_detection',
+                source: 'passive_detection',
+              };
+              setIsPreviewOpen(true);
+            }}
+            onPreview={(questionText) => {
+              setPreviewQuestionData({
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+              });
+              pendingQuestionDataRef.current = {
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+                confidence: 1.0,
+                extraction_method: 'passive_detection',
+                source: 'passive_detection',
+              };
+              setIsPreviewOpen(true);
+            }}
+            onDismiss={dismissPassiveCandidate}
+          />
+        </div>
       )}
     </>
   );

@@ -42,25 +42,32 @@ interface LiveSessionResultsProps {
   sessionId: string;
 }
 
+// Interpret room signal from correctness percentage
+const getRoomSignal = (correctPct: number, totalResponses: number): { label: string; description: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } => {
+  if (totalResponses === 0) return { label: 'Waiting', description: 'No responses yet', variant: 'outline' };
+  if (correctPct >= 85) return { label: 'Move on', description: 'Room has this — ready to advance', variant: 'default' };
+  if (correctPct >= 60) return { label: 'Solid', description: 'Most of the room got this', variant: 'default' };
+  if (correctPct >= 40) return { label: 'Split room', description: 'Consider revisiting this concept', variant: 'secondary' };
+  return { label: 'Revisit', description: 'Room is struggling — pause and clarify', variant: 'destructive' };
+};
+
 // Resolve a short answer like "A" or "B" to the full option text
 const resolveAnswerToFullText = (answer: string, questionContent: any): string => {
   const options: string[] = questionContent?.options || [];
   if (!options.length) return answer;
 
   const trimmed = answer.trim();
-  // Check if answer is just a letter (A, B, C, D)
   const letterMatch = trimmed.match(/^([A-Da-d])\.?\s*$/);
   if (letterMatch) {
-    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1...
+    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
     if (idx >= 0 && idx < options.length) {
       return options[idx];
     }
   }
 
-  // Check if answer starts with a letter prefix but is already full text
   const prefixMatch = trimmed.match(/^([A-Da-d])[\.\)]\s+(.+)/);
   if (prefixMatch) {
-    return trimmed; // Already detailed
+    return trimmed;
   }
 
   return answer;
@@ -254,9 +261,9 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
+           <CardTitle className="text-lg flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-primary" />
-            Live Session Responses
+            Live Room Insight
             <Badge variant="outline" className="ml-2">
               {questionGroups.length} question{questionGroups.length !== 1 ? "s" : ""}
             </Badge>
@@ -280,6 +287,8 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                 : group.question.question_content?.question?.title ||
                   `Question #${group.question.question_number}`;
 
+            const roomSignal = getRoomSignal(correctPct, group.totalResponses);
+
             return (
               <AccordionItem key={group.question.id} value={group.question.id}>
                 <AccordionTrigger className="hover:no-underline py-3">
@@ -294,10 +303,10 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge
-                        variant={correctPct >= 70 ? "default" : correctPct >= 40 ? "secondary" : "destructive"}
+                        variant={roomSignal.variant}
                         className="text-xs"
                       >
-                        {correctPct}% correct
+                        {roomSignal.label}
                       </Badge>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Users className="h-3 w-3" />
@@ -308,26 +317,17 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-3 pt-2">
-                    {/* Stats bar */}
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                        {group.correctCount} correct
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <XCircle className="h-3.5 w-3.5 text-red-500" />
-                        {group.totalResponses - group.correctCount} incorrect
-                      </span>
-                      {group.avgResponseTime && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          {(group.avgResponseTime / 1000).toFixed(1)}s avg
-                        </span>
-                      )}
+                    {/* Room Signal interpretation */}
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <p className="text-sm font-medium text-foreground">{roomSignal.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {correctPct}% correct · {group.correctCount}/{group.totalResponses} responses
+                        {group.avgResponseTime && ` · ${(group.avgResponseTime / 1000).toFixed(1)}s avg`}
+                      </p>
                     </div>
 
                     {/* Progress bar */}
-                    <Progress value={correctPct} className="h-2" />
+                    <Progress value={correctPct} className="h-1.5" />
 
                     {/* Question text */}
                     <div className="p-3 bg-muted/50 rounded-lg text-sm">
