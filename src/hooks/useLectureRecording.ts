@@ -128,20 +128,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     },
   });
   
-  // Passive question detection hook
-  const {
-    candidate: passiveCandidate,
-    checkUtterance: checkPassiveQuestion,
-    dismissCandidate: dismissPassiveCandidate,
-    resetDetection: resetPassiveDetection,
-  } = usePassiveQuestionDetection({
-    enabled: passiveDetectionEnabled && isRecording,
-    cooldownMs: 30000,
-    minWordCount: 8,
-    autoDismissMs: 15000,
-    lastQuestionSentTime: lastQuestionSentTimeRef.current,
-  });
-  
+
   // Store slide context in a ref so it's always current
 
   const slideContextRef = useRef<string>('');
