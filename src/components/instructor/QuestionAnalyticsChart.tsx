@@ -202,7 +202,7 @@ export const QuestionAnalyticsChart = ({
         {/* Answer Distribution Chart (Multiple Choice) */}
         {isMultipleChoice && answerDistribution.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Answer Distribution</p>
+            <p className="text-xs text-muted-foreground font-medium">{isPoll ? 'Response Distribution' : 'Answer Distribution'}</p>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
               <BarChart data={answerDistribution}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
