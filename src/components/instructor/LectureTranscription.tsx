@@ -3725,6 +3725,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         isSending={isSendingFromPreview}
         sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
+
+      {/* Passive Question Detection Candidate */}
+      {passiveCandidate && (
+        <PassiveQuestionCandidateCard
+          candidate={passiveCandidate}
+          onSend={(questionText) => {
+            dismissPassiveCandidate();
+            handleQuestionSend({
+              question_text: questionText,
+              suggested_type: 'multiple_choice',
+              source: 'passive_detection',
+            });
+          }}
+          onDismiss={dismissPassiveCandidate}
+        />
+      )}
     </>
   );
 };
+
