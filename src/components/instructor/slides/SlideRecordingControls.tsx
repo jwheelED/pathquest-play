@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type SlideQuestionType = 'mcq' | 'short_answer' | 'coding';
+export type SlideQuestionType = 'mcq' | 'short_answer' | 'coding' | 'poll';
 export type ExtractionStage = 'idle' | 'capturing' | 'analyzing' | 'sending';
 
 interface SlideRecordingControlsProps {
