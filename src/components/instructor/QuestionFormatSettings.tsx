@@ -66,7 +66,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
 
       toast({
         title: "✅ Preference saved",
-        description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : 'Coding'}`,
+        description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : newFormat === 'poll' ? 'Poll' : 'Coding'}`,
       });
     } catch (error: any) {
       console.error('Error updating preference:', error);
