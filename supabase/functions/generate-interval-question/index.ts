@@ -316,6 +316,7 @@ serve(async (req) => {
     }
 
     // Build prompt based on format preference
+    // Poll uses the same MCQ format (4 options) but is ungraded
     let formatInstructions = "";
     if (format_preference === "coding") {
       formatInstructions = coding_question_style === "simple"
@@ -324,6 +325,7 @@ serve(async (req) => {
     } else if (format_preference === "short_answer") {
       formatInstructions = `Generate an open-ended short answer question that tests understanding.`;
     } else {
+      // Both "multiple_choice" and "poll" generate MCQ-style options
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
