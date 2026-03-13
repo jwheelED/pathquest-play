@@ -1174,9 +1174,9 @@ export const LectureCheckInResults = () => {
             <div className="rounded-full bg-muted p-4 mb-4">
               <ClipboardList className="h-8 w-8 text-muted-foreground" />
             </div>
-            <p className="text-lg font-medium text-muted-foreground mb-1">No check-ins yet</p>
+            <p className="text-lg font-medium text-muted-foreground mb-1">No responses yet</p>
             <p className="text-sm text-muted-foreground/70 max-w-sm">
-              Send a lecture check-in question to your students during a live session to see results here.
+              Send a question to your participants during a live session to see results here.
             </p>
           </div>
         </CardContent>
