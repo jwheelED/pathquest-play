@@ -271,7 +271,7 @@ export function SavedSummariesTab() {
 
         {/* Summary Cards */}
         {filteredSummaries.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No summaries match your search.</p>
+          <p className="text-sm text-muted-foreground text-center py-8">No session insights match your search.</p>
         ) : (
           <div className="space-y-3">
             {filteredSummaries.map((summary) => {
