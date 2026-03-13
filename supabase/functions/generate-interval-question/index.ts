@@ -38,7 +38,7 @@ function isGenericQuestion(text: string): boolean {
 function getFallbackResponse(formatPreference: string, confidence: number, reason: string) {
   // If MCQ is preferred, we can't generate a proper MCQ fallback without AI,
   // so return a failure instead of sending a wrong-format generic question.
-  if (formatPreference === "multiple_choice" || formatPreference === "coding") {
+  if (formatPreference === "multiple_choice" || formatPreference === "coding" || formatPreference === "poll") {
     return {
       success: false,
       error: "Could not generate a relevant question in the requested format",
