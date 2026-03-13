@@ -108,7 +108,7 @@ export function VoiceQuestionPreviewDialog({
     
     const optionsEmpty = !mcqOptions.some(opt => opt.trim() !== '');
     const shouldAutoGenerate = 
-      questionType === 'multiple_choice' && 
+      (questionType === 'multiple_choice' || questionType === 'poll') && 
       optionsEmpty && 
       questionText.trim() !== '' &&
       !isGeneratingOptions;
