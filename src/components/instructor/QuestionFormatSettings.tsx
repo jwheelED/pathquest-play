@@ -32,7 +32,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
       if (error) throw error;
       
       if (data?.question_format_preference) {
-        setFormat(data.question_format_preference as 'multiple_choice' | 'short_answer' | 'coding');
+        setFormat(data.question_format_preference as 'multiple_choice' | 'short_answer' | 'coding' | 'poll');
       }
       if (data?.coding_question_style) {
         setCodingStyle(data.coding_question_style as 'simple' | 'full');
