@@ -678,7 +678,25 @@ serve(async (req) => {
     let formatStartTime = Date.now();
     console.log("⏱️ Starting question formatting...");
 
-    if (finalType === "coding" || finalType === "coding_simple") {
+    if (finalType === "poll") {
+      // Poll: simple question with options but no correct answer, not graded
+      console.log("📊 Creating poll question (ungraded)");
+      if (options && Array.isArray(options) && options.length >= 2) {
+        formattedQuestion = {
+          question: question_text,
+          type: "poll",
+          options: options,
+          gradingMode: "none",
+        };
+      } else {
+        // Free-text poll (no options)
+        formattedQuestion = {
+          question: question_text,
+          type: "poll",
+          gradingMode: "none",
+        };
+      }
+    } else if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
 
       if (isSimpleCoding) {
