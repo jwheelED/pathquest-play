@@ -1367,6 +1367,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     isProcessing,
     isStreamingMode,
 
+    // Passive question detection
+    passiveCandidate,
+    passiveDetectionEnabled,
+    setPassiveDetectionEnabled,
+    dismissPassiveCandidate,
+
     // Actions
     startRecording,
     stopRecording,
@@ -1376,3 +1382,4 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     sendExtractedQuestion,
   };
 }
+
