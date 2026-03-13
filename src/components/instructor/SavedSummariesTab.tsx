@@ -231,7 +231,7 @@ export function SavedSummariesTab() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Summaries</h3>
+            <h3 className="text-lg font-semibold">Session Insights</h3>
             <Badge variant="secondary" className="text-xs">{summaries.length}</Badge>
           </div>
         </div>
