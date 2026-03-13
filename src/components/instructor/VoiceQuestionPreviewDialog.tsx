@@ -381,9 +381,9 @@ export function VoiceQuestionPreviewDialog({
               value={questionType}
               onValueChange={(value: 'short_answer' | 'multiple_choice' | 'poll') => {
                 setQuestionType(value);
-                // Auto-generate options when switching to MCQ and options are empty
-                if (value === 'multiple_choice' && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
-                  console.log('📋 Switching to MCQ - triggering option generation');
+                // Auto-generate options when switching to MCQ or Poll and options are empty
+                if ((value === 'multiple_choice' || value === 'poll') && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
+                  console.log(`📋 Switching to ${value} - triggering option generation`);
                   setTimeout(() => handleGenerateOptionsAuto(), 100);
                 }
                 // Auto-generate expected answer when switching to short answer and it's empty
