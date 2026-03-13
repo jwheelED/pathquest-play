@@ -200,6 +200,21 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const studentCountRef = useRef(studentCount);
   const autoQuestionIntervalRef = useRef(autoQuestionInterval);
   
+  // Passive question detection hook
+  const {
+    candidate: passiveCandidate,
+    checkUtterance: checkPassiveQuestion,
+    dismissCandidate: dismissPassiveCandidate,
+    resetDetection: resetPassiveDetection,
+  } = usePassiveQuestionDetection({
+    enabled: passiveDetectionEnabled && isRecording,
+    cooldownMs: 30000,
+    minWordCount: 8,
+    autoDismissMs: 15000,
+    lastQuestionSentTime: lastQuestionSentTimeRef.current,
+  });
+
+
   // Deepgram streaming refs for real-time transcription
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
   
