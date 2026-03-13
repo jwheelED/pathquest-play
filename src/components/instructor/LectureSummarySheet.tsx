@@ -243,9 +243,9 @@ export const LectureSummarySheet = ({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 space-y-4">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-lg font-medium">Analyzing your lecture...</p>
+              <p className="text-lg font-medium">Analyzing your session...</p>
               <p className="text-sm text-muted-foreground text-center">
-                Reviewing transcript and student responses to generate insights.
+                Reviewing transcript and participant responses to generate insights.
               </p>
             </div>
           ) : summaryData ? (
