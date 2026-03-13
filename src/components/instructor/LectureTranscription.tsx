@@ -3463,7 +3463,29 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </div>
                   
+                  {/* Passive question detection toggle */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+                    <Switch
+                      id="passive-detection-toggle"
+                      checked={passiveDetectionEnabled}
+                      onCheckedChange={setPassiveDetectionEnabled}
+                      className="scale-75"
+                    />
+                    <Label
+                      htmlFor="passive-detection-toggle"
+                      className="text-xs font-medium cursor-pointer whitespace-nowrap"
+                    >
+                      Detect questions
+                    </Label>
+                    {passiveDetectionEnabled && (
+                      <Badge variant="outline" className="text-[10px]">
+                        <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                        Auto
+                      </Badge>
+                    )}
+                  </div>
                   
+
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">
                       Clear
