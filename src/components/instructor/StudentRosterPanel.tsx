@@ -127,10 +127,10 @@ export const StudentRosterPanel = ({
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Users className="h-6 w-6 text-primary" />
-            Students
+            Participants
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            View enrollment, participation, and student activity for this course.
+            View enrollment, participation, and participant activity for this course.
           </p>
         </div>
         <Badge variant="secondary" className="self-start sm:self-auto text-sm px-3 py-1">
@@ -144,7 +144,7 @@ export const StudentRosterPanel = ({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search students…"
+            placeholder="Search participants…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 rounded-xl"
@@ -168,7 +168,7 @@ export const StudentRosterPanel = ({
             <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Students</SelectItem>
+            <SelectItem value="all">All Participants</SelectItem>
             <SelectItem value="has-grades">Has Grades</SelectItem>
             <SelectItem value="no-grades">No Grades</SelectItem>
           </SelectContent>
@@ -185,12 +185,12 @@ export const StudentRosterPanel = ({
           <ScrollArea className="h-[500px]">
             {loading ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm p-8">
-                Loading students…
+                Loading participants…
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm p-8 gap-2">
                 <Users className="h-8 w-8 opacity-40" />
-                {search ? "No students match your search." : "No students enrolled yet."}
+                {search ? "No participants match your search." : "No participants enrolled yet."}
               </div>
             ) : (
               <div className="divide-y divide-border">

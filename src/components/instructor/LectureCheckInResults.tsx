@@ -337,11 +337,11 @@ export const LectureCheckInResults = () => {
 
       if (error) throw error;
       
-      toast.success("Check-in deleted successfully!");
+      toast.success("Response deleted successfully!");
       fetchResults();
     } catch (error) {
-      console.error("Error deleting check-in:", error);
-      toast.error("Failed to delete check-in");
+      console.error("Error deleting response:", error);
+      toast.error("Failed to delete response");
     }
   };
 
@@ -360,11 +360,11 @@ export const LectureCheckInResults = () => {
 
       if (error) throw error;
       
-      toast.success("All check-ins deleted successfully!");
+      toast.success("All responses deleted successfully!");
       fetchResults();
     } catch (error) {
-      console.error("Error deleting all check-ins:", error);
-      toast.error("Failed to delete all check-ins");
+      console.error("Error deleting all responses:", error);
+      toast.error("Failed to delete all responses");
     }
   };
 
@@ -889,7 +889,7 @@ export const LectureCheckInResults = () => {
       // Header
       doc.setFontSize(20);
       doc.setTextColor(40, 40, 40);
-      doc.text("Lecture Check-In Report", pageWidth / 2, 20, { align: "center" });
+      doc.text("Live Room Insight Report", pageWidth / 2, 20, { align: "center" });
       
       doc.setFontSize(11);
       doc.setTextColor(100, 100, 100);
@@ -913,7 +913,7 @@ export const LectureCheckInResults = () => {
         const checkInDate = new Date(group.timestamp).toLocaleString();
         doc.setFontSize(14);
         doc.setTextColor(40, 40, 40);
-        doc.text(`Check-In: ${checkInDate}`, 20, yPosition);
+        doc.text(`Response: ${checkInDate}`, 20, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
         doc.text(`${group.assignments.length} student(s)`, 20, yPosition + 6);
@@ -1015,7 +1015,7 @@ export const LectureCheckInResults = () => {
       const csvRows: string[] = [];
       
       // Add header row
-      csvRows.push('Check-In Date,Student Name,Question #,Question Text,Student Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
+      csvRows.push('Response Date,Participant Name,Question #,Question Text,Participant Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
       
       // Add data rows
       groupedResults.forEach((group) => {
@@ -1131,7 +1131,7 @@ export const LectureCheckInResults = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            Check-In Results
+            Live Room Insight
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1166,7 +1166,7 @@ export const LectureCheckInResults = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            Check-In Results
+            Live Room Insight
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1174,9 +1174,9 @@ export const LectureCheckInResults = () => {
             <div className="rounded-full bg-muted p-4 mb-4">
               <ClipboardList className="h-8 w-8 text-muted-foreground" />
             </div>
-            <p className="text-lg font-medium text-muted-foreground mb-1">No check-ins yet</p>
+            <p className="text-lg font-medium text-muted-foreground mb-1">No responses yet</p>
             <p className="text-sm text-muted-foreground/70 max-w-sm">
-              Send a lecture check-in question to your students during a live session to see results here.
+              Send a question to your participants during a live session to see results here.
             </p>
           </div>
         </CardContent>
@@ -1207,7 +1207,7 @@ export const LectureCheckInResults = () => {
             <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <TrendingUp className="h-6 w-6 text-primary shrink-0" />
-                <span className="truncate">Check-In Results</span>
+                <span className="truncate">Live Room Insight</span>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
                 Auto-graded performance • Last synced: {formatLastUpdated()}
@@ -1242,9 +1242,9 @@ export const LectureCheckInResults = () => {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete All Check-Ins?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete All Responses?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete all lecture check-in results and student responses. This action cannot be undone.
+                    This will permanently delete all session response results and participant answers. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

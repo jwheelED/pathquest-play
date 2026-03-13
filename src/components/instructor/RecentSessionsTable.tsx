@@ -125,7 +125,7 @@ export function RecentSessionsTable({ onNavigate }: RecentSessionsTableProps) {
             <TableRow>
               <TableHead>Session</TableHead>
               <TableHead className="w-[120px]">Date</TableHead>
-              <TableHead className="w-[90px] text-center">Students</TableHead>
+              <TableHead className="w-[90px] text-center">Participants</TableHead>
               <TableHead className="w-[90px] text-center">Questions</TableHead>
             </TableRow>
           </TableHeader>

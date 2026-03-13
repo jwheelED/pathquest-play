@@ -114,7 +114,7 @@ export function QuickMetricsGrid() {
     <div className="grid grid-cols-2 gap-3">
       <MetricCard
         icon={<Users className="w-4 h-4" />}
-        label="Total Students"
+        label="Total Participants"
         value={metrics.totalStudents}
         size="sm"
         variant="primary"

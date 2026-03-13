@@ -140,15 +140,15 @@ export function SavedSummariesTab() {
       if (error) throw error;
       setSummaries((prev) => prev.filter((s) => s.id !== id));
       if (selectedSummary?.id === id) setSelectedSummary(null);
-      toast.success("Summary deleted");
+      toast.success("Session insight deleted");
     } catch (error) {
-      toast.error("Failed to delete summary");
+      toast.error("Failed to delete session insight");
     }
   };
 
   const handleExport = (summary: SavedSummary) => {
     const sd = summary.summary_data;
-    const title = summary.title || "Lecture Summary";
+    const title = summary.title || "Session Insight";
     const doc = new jsPDF();
     let y = 20;
     const lm = 15;
@@ -158,7 +158,7 @@ export function SavedSummariesTab() {
     doc.text(title, lm, y); y += 10;
     doc.setFontSize(10);
     doc.setTextColor(120);
-    doc.text(`${formatDuration(summary.duration_seconds)} · ${summary.questions_asked} questions · ${summary.student_count} students · ${format(new Date(summary.created_at), "MMM d, yyyy")}`, lm, y);
+    doc.text(`${formatDuration(summary.duration_seconds)} · ${summary.questions_asked} questions · ${summary.student_count} participants · ${format(new Date(summary.created_at), "MMM d, yyyy")}`, lm, y);
     y += 12;
     doc.setTextColor(0);
 
@@ -183,7 +183,7 @@ export function SavedSummariesTab() {
     }
     addSection("Topics Covered", sd.topicsIdentified || []);
     addSection("Key Concepts", sd.keyConceptsCovered || [], "✓");
-    addSection("Lecture Highlights", sd.lectureHighlights || []);
+    addSection("Session Highlights", sd.lectureHighlights || []);
     if (sd.engagementAnalysis) {
       doc.setFontSize(12); doc.setFont("helvetica", "bold");
       doc.text("Engagement Analysis", lm, y); y += 7;
@@ -196,7 +196,7 @@ export function SavedSummariesTab() {
     addSection("Consider Reviewing", sd.conceptsToReview || [], "⚠");
 
     doc.save(`${title.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.pdf`);
-    toast.success("Summary exported as PDF");
+    toast.success("Session insight exported as PDF");
   };
 
   if (loading) {
@@ -217,8 +217,8 @@ export function SavedSummariesTab() {
     return (
       <EmptyState
         icon={<Award className="w-7 h-7" />}
-        title="No saved summaries"
-        description="Lecture summaries are generated after 10+ minute live sessions. Save them from the post-lecture summary sheet."
+        title="No saved session insights"
+        description="Session insights are generated after 10+ minute live sessions. Save them from the post-session insight sheet."
       />
     );
   }
@@ -231,7 +231,7 @@ export function SavedSummariesTab() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Summaries</h3>
+            <h3 className="text-lg font-semibold">Session Insights</h3>
             <Badge variant="secondary" className="text-xs">{summaries.length}</Badge>
           </div>
         </div>
@@ -271,7 +271,7 @@ export function SavedSummariesTab() {
 
         {/* Summary Cards */}
         {filteredSummaries.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No summaries match your search.</p>
+          <p className="text-sm text-muted-foreground text-center py-8">No session insights match your search.</p>
         ) : (
           <div className="space-y-3">
             {filteredSummaries.map((summary) => {
@@ -292,7 +292,7 @@ export function SavedSummariesTab() {
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="flex items-center gap-2">
                           <h4 className="font-medium text-sm truncate">
-                            {summary.title || "Untitled Summary"}
+                            {summary.title || "Untitled Session Insight"}
                           </h4>
                           {hasFollowUp && (
                             <Badge variant="outline" className="text-xs border-warning/50 text-warning shrink-0">
@@ -359,7 +359,7 @@ export function SavedSummariesTab() {
             <div className="flex items-center justify-between gap-3">
               <DialogTitle className="flex items-center gap-2 text-base">
                 <Award className="h-5 w-5 text-primary" />
-                {selectedSummary?.title || "Lecture Summary"}
+                {selectedSummary?.title || "Session Insight"}
               </DialogTitle>
               {selectedSummary && (
                 <Button size="sm" variant="outline" onClick={() => handleExport(selectedSummary)} className="rounded-xl gap-2 shrink-0">
@@ -514,7 +514,7 @@ export function SavedSummariesTab() {
                 )}
 
                 <p className="text-xs text-center text-muted-foreground pt-2">
-                  Report from {formatDuration(selectedSummary.duration_seconds)} of lecture content
+                  Report from {formatDuration(selectedSummary.duration_seconds)} of session content
                 </p>
               </div>
             )}
