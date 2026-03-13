@@ -359,7 +359,7 @@ export function SavedSummariesTab() {
             <div className="flex items-center justify-between gap-3">
               <DialogTitle className="flex items-center gap-2 text-base">
                 <Award className="h-5 w-5 text-primary" />
-                {selectedSummary?.title || "Lecture Summary"}
+                {selectedSummary?.title || "Session Insight"}
               </DialogTitle>
               {selectedSummary && (
                 <Button size="sm" variant="outline" onClick={() => handleExport(selectedSummary)} className="rounded-xl gap-2 shrink-0">
