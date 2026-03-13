@@ -1750,6 +1750,25 @@ export const LectureCheckInResults = () => {
                                         </Badge>
                                       )}
                                     </>
+                                   ) : isPoll ? (
+                                    <>
+                                      <Badge
+                                        variant="secondary"
+                                        className="gap-1"
+                                      >
+                                        <BarChart3 className="h-3 w-3" />
+                                        Recorded
+                                      </Badge>
+                                      <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+                                        {studentAnswer || '(none)'}
+                                      </span>
+                                      {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                          <Clock className="h-3 w-3" />
+                                          {formatTime(assignment.response_time_seconds)}
+                                        </Badge>
+                                      )}
+                                    </>
                                    ) : (
                                     <>
                                       <Badge
