@@ -216,7 +216,7 @@ export const QuestionAnalyticsChart = ({
                         <div className="rounded-lg border bg-background p-2 shadow-sm">
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-semibold">
-                              Option {data.option} {data.isCorrect && "✓"}
+                              Option {data.option} {!isPoll && data.isCorrect && "✓"}
                             </span>
                             <span className="text-xs text-muted-foreground">{data.label}</span>
                             <span className="text-xs font-medium">
