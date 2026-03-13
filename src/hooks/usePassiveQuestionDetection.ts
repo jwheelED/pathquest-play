@@ -65,16 +65,22 @@ const RHETORICAL_BLOCKLIST = [
 ];
 
 /**
- * Extracts question sentences (ending in ?) from a transcript utterance.
- * Returns only the question portion.
+ * Extracts question segments from a transcript utterance.
+ * Handles normal sentence punctuation and edge cases where text contains `?`
+ * but doesn't strictly end with it.
  */
 function extractQuestions(text: string): string[] {
-  // Split on sentence boundaries — look for text ending in ?
-  // Handle multiple sentences in one utterance
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  return sentences
-    .map(s => s.trim())
-    .filter(s => s.endsWith('?'));
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (!normalized.includes('?') && !normalized.includes('？')) return [];
+
+  // Primary path: capture segments that end with question marks
+  const matches = normalized.match(/[^?？]*[?？]/g);
+  if (matches?.length) {
+    return matches.map(segment => segment.trim()).filter(Boolean);
+  }
+
+  // Fallback: if punctuation exists but pattern split fails, treat full text as candidate
+  return [normalized];
 }
 
 function isRhetorical(question: string): boolean {
