@@ -203,6 +203,21 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   
   const { toast } = useToast();
 
+  // Passive question detection hook
+  const {
+    candidate: passiveCandidate,
+    checkUtterance: checkPassiveQuestion,
+    dismissCandidate: dismissPassiveCandidate,
+    resetDetection: resetPassiveDetection,
+  } = usePassiveQuestionDetection({
+    enabled: passiveDetectionEnabled && isRecording,
+    cooldownMs: 30000,
+    minWordCount: 8,
+    autoDismissMs: 15000,
+    lastQuestionSentTime: lastQuestionSentTimeRef.current,
+  });
+
+
   // Keep isSendingQuestion ref in sync with state
   useEffect(() => {
     isSendingQuestionRef.current = isSendingQuestion;
