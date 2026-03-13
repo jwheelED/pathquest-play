@@ -581,7 +581,10 @@ export function VoiceQuestionPreviewDialog({
                 Sending...
               </>
             ) : (
-              'Send to Students'
+              <>
+                <Send className="h-4 w-4 mr-1" />
+                Send to Room
+              </>
             )}
           </Button>
         </DialogFooter>

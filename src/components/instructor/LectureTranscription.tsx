@@ -3600,64 +3600,72 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 </div>
               )}
 
-              {transcriptChunks.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Transcript Chunks:</p>
-                    {/* Transcription Quality Rating */}
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground">Accuracy:</p>
-                      {["excellent", "good", "poor"].map((rating) => (
-                        <Button
-                          key={rating}
-                          variant={transcriptionRating === rating ? "default" : "outline"}
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const {
-                                data: { user },
-                              } = await supabase.auth.getUser();
-                              if (!user) return;
+              {(transcriptChunks.length > 0 || lastTranscript) && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-2">
+                    <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    Live Session Feed
+                    <Badge variant="secondary" className="text-[10px] ml-auto">
+                      {transcriptChunks.length} chunks
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 pt-2">
+                      {/* Transcription Quality Rating */}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">Accuracy:</p>
+                        {["excellent", "good", "poor"].map((rating) => (
+                          <Button
+                            key={rating}
+                            variant={transcriptionRating === rating ? "default" : "outline"}
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const {
+                                  data: { user },
+                                } = await supabase.auth.getUser();
+                                if (!user) return;
 
-                              const { error } = await supabase.from("ai_quality_ratings").insert({
-                                user_id: user.id,
-                                rating_type: "transcription",
-                                reference_id: sessionId,
-                                rating: rating,
-                              });
+                                const { error } = await supabase.from("ai_quality_ratings").insert({
+                                  user_id: user.id,
+                                  rating_type: "transcription",
+                                  reference_id: sessionId,
+                                  rating: rating,
+                                });
 
-                              if (error) throw error;
+                                if (error) throw error;
 
-                              setTranscriptionRating(rating);
-                              toast({
-                                title: "Thank you for your feedback!",
-                                description: "Your rating helps us improve transcription quality.",
-                              });
-                            } catch (error) {
-                              console.error("Error saving rating:", error);
-                              toast({
-                                title: "Failed to save rating",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          className="gap-1 h-7 text-xs"
-                        >
-                          <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
-                          {rating.charAt(0).toUpperCase() + rating.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {transcriptChunks.map((chunk, index) => (
-                      <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                                setTranscriptionRating(rating);
+                                toast({
+                                  title: "Thank you for your feedback!",
+                                  description: "Your rating helps us improve transcription quality.",
+                                });
+                              } catch (error) {
+                                console.error("Error saving rating:", error);
+                                toast({
+                                  title: "Failed to save rating",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="gap-1 h-7 text-xs"
+                          >
+                            <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
+                            {rating.charAt(0).toUpperCase() + rating.slice(1)}
+                          </Button>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {transcriptChunks.map((chunk, index) => (
+                          <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </CardContent>
           </Card>
