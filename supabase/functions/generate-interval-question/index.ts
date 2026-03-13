@@ -522,10 +522,17 @@ Generate ONE focused question that tests understanding of the most important con
       }
 
       // Shuffle MCQ options so correct answer isn't always A
-      // Uses index tracking to handle duplicate option text correctly
+      // Skip shuffle for polls (ungraded, no correct answer)
       let finalOptions = parsed.options;
       let finalCorrectAnswer = parsed.correct_answer;
-      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice" || format_preference === "poll") {
+      if (format_preference === "poll") {
+        // For polls, just clean up option prefixes if present
+        if (finalOptions && Array.isArray(finalOptions)) {
+          finalOptions = finalOptions.map((o: string) => o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim());
+          console.log(`📊 Poll options (${finalOptions.length}): ${finalOptions.join(' | ')}`);
+        }
+        finalCorrectAnswer = undefined;
+      } else if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
         if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
           const letters = ['A', 'B', 'C', 'D'];
           const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
