@@ -246,6 +246,17 @@ export function CreateQuestionDialog({
           return false;
         }
         break;
+      case "poll":
+        if (!mcqQuestion.trim()) {
+          toast.error("Please enter the poll question text");
+          return false;
+        }
+        // At least 2 options required for poll
+        if (mcqOptions.filter(opt => opt.trim()).length < 2) {
+          toast.error("Please provide at least 2 poll options");
+          return false;
+        }
+        break;
     }
     
     return true;
