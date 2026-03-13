@@ -45,7 +45,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
   };
 
   const handleFormatChange = async (value: string) => {
-    const newFormat = value as 'multiple_choice' | 'short_answer' | 'coding';
+    const newFormat = value as 'multiple_choice' | 'short_answer' | 'coding' | 'poll';
     setFormat(newFormat);
 
     try {
