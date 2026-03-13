@@ -857,6 +857,59 @@ const LiveStudent = () => {
                     )}
                   </Button>
                 </>
+               )}
+
+              {/* Poll question - MCQ-like with options or free text, no grading */}
+              {isPoll && (
+                <>
+                  {hasPollOptions ? (
+                    <RadioGroup value={selectedAnswer} onValueChange={(val) => {
+                      setSelectedAnswer(val);
+                      hasStartedAnsweringRef.current = true;
+                    }}>
+                      <div className="space-y-3">
+                        {currentQuestion.question_content.options.map((option: string, index: number) => (
+                          <div key={index} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-accent transition-colors">
+                            <RadioGroupItem value={option} id={`poll-option-${index}`} />
+                            <Label htmlFor={`poll-option-${index}`} className="flex-1 cursor-pointer text-base">
+                              <MathRenderer content={option} />
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </RadioGroup>
+                  ) : (
+                    <Textarea
+                      value={selectedAnswer}
+                      onChange={(e) => {
+                        setSelectedAnswer(e.target.value);
+                        hasStartedAnsweringRef.current = true;
+                      }}
+                      onFocus={() => setIsTyping(true)}
+                      onBlur={() => setIsTyping(false)}
+                      placeholder="Type your response..."
+                      className="min-h-[120px]"
+                    />
+                  )}
+                  <div className="text-xs text-muted-foreground text-center">
+                    📊 This is a poll — your response will not be graded
+                  </div>
+                  <Button 
+                    onClick={handlePollSubmit} 
+                    className="w-full" 
+                    size="lg"
+                    disabled={!selectedAnswer || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Response"
+                    )}
+                  </Button>
+                </>
               )}
             </>
           ) : (
