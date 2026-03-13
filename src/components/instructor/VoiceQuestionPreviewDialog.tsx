@@ -314,11 +314,15 @@ export function VoiceQuestionPreviewDialog({
     
     // Include MCQ data if this is a multiple choice question
     if (questionType === 'multiple_choice') {
-      // Only include options if at least one is filled
       if (hasOptions) {
         questionData.options = mcqOptions;
         questionData.correct_answer = correctAnswer;
       }
+    }
+
+    // Include options for poll (no correct answer)
+    if (questionType === 'poll' && hasOptions) {
+      questionData.options = mcqOptions;
     }
 
     // Include expected answer for short answer questions
