@@ -2308,6 +2308,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           setTranscriptChunks((prev) => [...prev, cleanText]);
           setLastTranscript(cleanText);
           
+          // Passive question detection — check final utterances for ?
+          checkPassiveQuestion(cleanText);
+
+          
           // Accumulate clean text in transcript buffer
           if (transcriptBufferRef.current) {
             transcriptBufferRef.current += " " + cleanText;
