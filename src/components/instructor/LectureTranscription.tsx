@@ -176,9 +176,8 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
   const pendingQuestionDataRef = useRef<any>(null);
 
-  // Passive question detection
-  const [passiveDetectionEnabled, setPassiveDetectionEnabled] = useState(true);
-
+  // Passive question detection — always on when recording
+  const [onDeckHeld, setOnDeckHeld] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
