@@ -195,7 +195,7 @@ export const LectureSummarySheet = ({
     addSection("Consider Reviewing", summaryData.conceptsToReview, "⚠");
 
     doc.save(`${reportTitle.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.pdf`);
-    toast.success("Summary exported as PDF");
+    toast.success("Session insight exported as PDF");
   };
 
   const handleOpenChange = (isOpen: boolean) => {
