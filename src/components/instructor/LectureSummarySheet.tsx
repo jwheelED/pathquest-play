@@ -144,7 +144,7 @@ export const LectureSummarySheet = ({
     y += 10;
     doc.setFontSize(10);
     doc.setTextColor(120);
-    doc.text(`${formatDuration(recordingDuration)} · ${questionsAsked} questions · ${studentCount} students · ${format(new Date(), "MMM d, yyyy")}`, lm, y);
+    doc.text(`${formatDuration(recordingDuration)} · ${questionsAsked} questions · ${studentCount} participants · ${format(new Date(), "MMM d, yyyy")}`, lm, y);
     y += 12;
     doc.setTextColor(0);
 
