@@ -42,28 +42,18 @@ interface LiveSessionResultsProps {
   sessionId: string;
 }
 
+// Interpret room signal from correctness percentage
+const getRoomSignal = (correctPct: number, totalResponses: number): { label: string; description: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } => {
+  if (totalResponses === 0) return { label: 'Waiting', description: 'No responses yet', variant: 'outline' };
+  if (correctPct >= 85) return { label: 'Move on', description: 'Room has this — ready to advance', variant: 'default' };
+  if (correctPct >= 60) return { label: 'Solid', description: 'Most of the room got this', variant: 'default' };
+  if (correctPct >= 40) return { label: 'Split room', description: 'Consider revisiting this concept', variant: 'secondary' };
+  return { label: 'Revisit', description: 'Room is struggling — pause and clarify', variant: 'destructive' };
+};
+
 // Resolve a short answer like "A" or "B" to the full option text
 const resolveAnswerToFullText = (answer: string, questionContent: any): string => {
-  const options: string[] = questionContent?.options || [];
-  if (!options.length) return answer;
-
-  const trimmed = answer.trim();
-  // Check if answer is just a letter (A, B, C, D)
-  const letterMatch = trimmed.match(/^([A-Da-d])\.?\s*$/);
-  if (letterMatch) {
-    const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65; // A=0, B=1...
-    if (idx >= 0 && idx < options.length) {
-      return options[idx];
-    }
-  }
-
-  // Check if answer starts with a letter prefix but is already full text
-  const prefixMatch = trimmed.match(/^([A-Da-d])[\.\)]\s+(.+)/);
-  if (prefixMatch) {
-    return trimmed; // Already detailed
-  }
-
-  return answer;
+  // ... keep existing code
 };
 
 const ExpandableResponseRow = ({
