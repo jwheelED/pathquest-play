@@ -196,7 +196,7 @@ export function SavedSummariesTab() {
     addSection("Consider Reviewing", sd.conceptsToReview || [], "⚠");
 
     doc.save(`${title.replace(/[^a-zA-Z0-9 ]/g, "").trim()}.pdf`);
-    toast.success("Summary exported as PDF");
+    toast.success("Session insight exported as PDF");
   };
 
   if (loading) {
