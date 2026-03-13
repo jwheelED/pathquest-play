@@ -61,6 +61,9 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
+import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
+import { PassiveQuestionCandidateCard } from "./PassiveQuestionCandidate";
+import { Switch } from "@/components/ui/switch";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
