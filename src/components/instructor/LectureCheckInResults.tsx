@@ -1242,9 +1242,9 @@ export const LectureCheckInResults = () => {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete All Check-Ins?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete All Responses?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete all lecture check-in results and student responses. This action cannot be undone.
+                    This will permanently delete all session response results and participant answers. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

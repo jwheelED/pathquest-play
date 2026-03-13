@@ -178,7 +178,7 @@ export const LectureSummarySheet = ({
 
     addSection("Topics Covered", summaryData.topicsIdentified);
     addSection("Key Concepts", summaryData.keyConceptsCovered, "✓");
-    addSection("Lecture Highlights", summaryData.lectureHighlights);
+    addSection("Session Highlights", summaryData.lectureHighlights);
     if (summaryData.engagementAnalysis) {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");

@@ -183,7 +183,7 @@ export function SavedSummariesTab() {
     }
     addSection("Topics Covered", sd.topicsIdentified || []);
     addSection("Key Concepts", sd.keyConceptsCovered || [], "✓");
-    addSection("Lecture Highlights", sd.lectureHighlights || []);
+    addSection("Session Highlights", sd.lectureHighlights || []);
     if (sd.engagementAnalysis) {
       doc.setFontSize(12); doc.setFont("helvetica", "bold");
       doc.text("Engagement Analysis", lm, y); y += 7;

@@ -190,7 +190,7 @@ export const StudentRosterPanel = ({
             ) : filteredStudents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm p-8 gap-2">
                 <Users className="h-8 w-8 opacity-40" />
-                {search ? "No students match your search." : "No students enrolled yet."}
+                {search ? "No participants match your search." : "No participants enrolled yet."}
               </div>
             ) : (
               <div className="divide-y divide-border">

@@ -155,7 +155,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         <p className="text-xs text-muted-foreground mt-1">
           {metrics.completedCount} of {metrics.totalAssignmentStudents} participants
         </p>
-        <p className="text-xs text-primary mt-1.5 hover:underline">View full summary →</p>
+        <p className="text-xs text-primary mt-1.5 hover:underline">View full insight →</p>
       </div>
     </div>
   );
