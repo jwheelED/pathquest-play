@@ -86,9 +86,14 @@ function extractQuestions(text: string): string[] {
 function isRhetorical(question: string): boolean {
   // Strip trailing ? and normalize
   const normalized = question
-    .replace(/\?+$/, '')
+    .replace(/[?？]+$/, '')
     .trim()
     .toLowerCase();
+
+  // Substantive WH-questions should not be blocked
+  if (/^(what|how|why|when|where|who|which)\b/.test(normalized)) {
+    return false;
+  }
 
   // Direct match against blocklist
   for (const phrase of RHETORICAL_BLOCKLIST) {
