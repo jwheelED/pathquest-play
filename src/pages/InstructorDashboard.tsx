@@ -91,7 +91,7 @@ export default function InstructorDashboard() {
     const today = new Date().toDateString();
     if (lastReminderDate !== today) {
       setTimeout(() => {
-        toast.info("💡 Tip: You can upload lecture slides and materials in the Materials tab!", {
+        toast.info("💡 Tip: You can upload session slides and materials in the Materials tab!", {
           duration: 5000,
         });
         localStorage.setItem('lastCourseMaterialsReminder', today);
