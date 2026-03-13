@@ -360,11 +360,11 @@ export const LectureCheckInResults = () => {
 
       if (error) throw error;
       
-      toast.success("All check-ins deleted successfully!");
+      toast.success("All responses deleted successfully!");
       fetchResults();
     } catch (error) {
-      console.error("Error deleting all check-ins:", error);
-      toast.error("Failed to delete all check-ins");
+      console.error("Error deleting all responses:", error);
+      toast.error("Failed to delete all responses");
     }
   };
 
