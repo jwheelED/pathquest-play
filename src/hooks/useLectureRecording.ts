@@ -209,7 +209,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   } = usePassiveQuestionDetection({
     enabled: passiveDetectionEnabled && isRecording,
     cooldownMs: 30000,
-    minWordCount: 8,
+    minWordCount: 5,
     autoDismissMs: 15000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });

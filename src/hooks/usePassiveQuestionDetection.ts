@@ -12,6 +12,7 @@ interface UsePassiveQuestionDetectionOptions {
   autoDismissMs?: number;
   /** Timestamp of the last question sent (any method) — skip detection if recent */
   lastQuestionSentTime?: number;
+  debug?: boolean;
 }
 
 // Rhetorical / filler questions to ignore (normalized lowercase, no trailing ?)
@@ -105,9 +106,10 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const {
     enabled = true,
     cooldownMs = 30000,
-    minWordCount = 8,
+    minWordCount = 5,
     autoDismissMs = 15000,
     lastQuestionSentTime = 0,
+    debug = true,
   } = options;
 
   const lastDetectionTimeRef = useRef<number>(0);
@@ -134,19 +136,35 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
     const now = Date.now();
 
+    if (debug) console.log('🔍 [passive] checking utterance:', text.substring(0, 80));
+
     // Respect cooldown
-    if (now - lastDetectionTimeRef.current < cooldownMs) return;
+    if (now - lastDetectionTimeRef.current < cooldownMs) {
+      if (debug) console.log('🔍 [passive] skipped — cooldown active');
+      return;
+    }
 
     // Skip if a question was just sent recently (any method)
-    if (lastQuestionSentTime && now - lastQuestionSentTime < cooldownMs) return;
+    if (lastQuestionSentTime && now - lastQuestionSentTime < cooldownMs) {
+      if (debug) console.log('🔍 [passive] skipped — recent question sent');
+      return;
+    }
 
     const questions = extractQuestions(text);
+    if (debug) console.log('🔍 [passive] extracted questions:', questions);
     if (questions.length === 0) return;
 
     // Find the first substantive question
     for (const q of questions) {
-      if (wordCount(q) < minWordCount) continue;
-      if (isRhetorical(q)) continue;
+      const wc = wordCount(q);
+      if (wc < minWordCount) {
+        if (debug) console.log(`🔍 [passive] skipped "${q}" — too short (${wc} words < ${minWordCount})`);
+        continue;
+      }
+      if (isRhetorical(q)) {
+        if (debug) console.log(`🔍 [passive] skipped "${q}" — rhetorical`);
+        continue;
+      }
 
       // We have a candidate!
       console.log('🔍 Passive question detected:', q);
@@ -169,7 +187,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
       return; // Only surface one candidate per utterance
     }
-  }, [enabled, cooldownMs, minWordCount, autoDismissMs, lastQuestionSentTime, clearAutoDismiss]);
+  }, [enabled, cooldownMs, minWordCount, autoDismissMs, lastQuestionSentTime, clearAutoDismiss, debug]);
 
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
