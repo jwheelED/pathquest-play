@@ -211,9 +211,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: passiveDetectionEnabled && isRecording,
-    cooldownMs: 30000,
+    cooldownMs: 8000,
     minWordCount: 5,
-    autoDismissMs: 15000,
+    autoDismissMs: 20000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
 
