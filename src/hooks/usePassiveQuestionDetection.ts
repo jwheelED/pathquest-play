@@ -64,6 +64,22 @@ const RHETORICAL_BLOCKLIST = [
   "can everyone hear me",
 ];
 
+// Greeting patterns that should never be treated as audience checks
+const GREETING_PATTERNS = [
+  /^how('?s| is) everyone/i,
+  /^how('?s| is) everybody/i,
+  /^how('?s| are) (you|y'all|ya'll|yall) (all )?(doing|today|this)/i,
+  /^how are (we|you) (doing|today|this)/i,
+  /^how('?s| is) it going/i,
+  /^what('?s| is) up/i,
+  /^how('?s| is) (your|the) (day|morning|afternoon|evening)/i,
+  /^(good )?(morning|afternoon|evening|hey|hello|hi|welcome)/i,
+  /^(is )?everyone (here|ready|good|doing)/i,
+  /^(are )?we (all )?(here|ready|good|set)/i,
+  /^can (you|everyone|everybody) hear me/i,
+  /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
+];
+
 /**
  * Extracts question segments from a transcript utterance.
  * Handles normal sentence punctuation and edge cases where text contains `?`
