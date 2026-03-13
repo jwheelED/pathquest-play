@@ -958,7 +958,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
+          // Passive question detection — check final utterances for ?
+          checkPassiveQuestion(cleanText);
+          
           // Update React state less frequently to reduce re-renders (every 5 chunks)
+
           transcriptChunkCountRef.current++;
           setLastTranscript(cleanText);
           
