@@ -78,7 +78,7 @@ const generateTitle = (summaryData: LectureSummaryData): string => {
     return title.length > 60 ? `${topics[0]} — ${dateStr}` : title;
   }
   if (topics.length === 1) return `${topics[0]} — ${dateStr}`;
-  return `Lecture Summary — ${dateStr}`;
+  return `Session Insight — ${dateStr}`;
 };
 
 const getAccuracyLabel = (accuracy: number): { label: string; icon: typeof TrendingUp } => {
