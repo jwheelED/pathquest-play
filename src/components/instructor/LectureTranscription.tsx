@@ -3582,7 +3582,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   {rateLimitSecondsLeft === 0 && (
                     <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
                       <p className="text-xs font-medium text-center">
-                        ✅ Ready • Click "Send Question" or say "send question now"
+                        ✅ Ready • Edvana is autodrafting
                       </p>
                     </div>
                   )}
