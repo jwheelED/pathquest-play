@@ -148,7 +148,7 @@ export function SavedSummariesTab() {
 
   const handleExport = (summary: SavedSummary) => {
     const sd = summary.summary_data;
-    const title = summary.title || "Lecture Summary";
+    const title = summary.title || "Session Insight";
     const doc = new jsPDF();
     let y = 20;
     const lm = 15;
