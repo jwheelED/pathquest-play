@@ -379,7 +379,7 @@ export function VoiceQuestionPreviewDialog({
             <Label>Question Type</Label>
             <RadioGroup
               value={questionType}
-              onValueChange={(value: 'short_answer' | 'multiple_choice') => {
+              onValueChange={(value: 'short_answer' | 'multiple_choice' | 'poll') => {
                 setQuestionType(value);
                 // Auto-generate options when switching to MCQ and options are empty
                 if (value === 'multiple_choice' && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
@@ -406,6 +406,12 @@ export function VoiceQuestionPreviewDialog({
                 <Label htmlFor="multiple_choice" className="flex items-center gap-1 cursor-pointer">
                   <ListChecks className="h-4 w-4" />
                   Multiple Choice
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="poll" id="poll" />
+                <Label htmlFor="poll" className="flex items-center gap-1 cursor-pointer">
+                  📊 Poll
                 </Label>
               </div>
             </RadioGroup>
