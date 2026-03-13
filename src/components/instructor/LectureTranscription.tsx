@@ -3233,9 +3233,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mic className="h-5 w-5" />
-            Live Lecture Capture
+            Live Copilot
           </CardTitle>
-          <CardDescription>Record your lecture and send questions to students in real-time</CardDescription>
+          <CardDescription>Edvana listens and autodrafts audience checks as you speak</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Error History Panel */}
