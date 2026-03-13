@@ -147,8 +147,8 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             : session.questionCount === 0
             ? "No questions were sent. Try enabling auto-questions next time."
             : session.participantCount === 0
-            ? "No students joined. Verify your join code is shared before the next session."
-            : `${session.participantCount} student${session.participantCount !== 1 ? "s" : ""} responded to ${session.questionCount} question${session.questionCount !== 1 ? "s" : ""}.`}
+            ? "No participants joined. Verify your join code is shared before the next session."
+            : `${session.participantCount} participant${session.participantCount !== 1 ? "s" : ""} responded to ${session.questionCount} question${session.questionCount !== 1 ? "s" : ""}.`}
         </div>
 
         {onNavigate && (
