@@ -161,6 +161,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Question preview setting - when false, questions send immediately without preview
   const [questionPreviewEnabled, setQuestionPreviewEnabled] = useState(true);
   const questionPreviewEnabledRef = useRef(true);
+
+  // Passive question detection
+  const [passiveDetectionEnabled, setPassiveDetectionEnabled] = useState(true);
+
   
   // Update slide context ref when prop changes
   useEffect(() => {
