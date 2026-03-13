@@ -402,9 +402,9 @@ export const LectureSummarySheet = ({
           ) : (
             <div className="flex flex-col items-center justify-center py-16 space-y-4">
               <AlertTriangle className="h-12 w-12 text-muted-foreground" />
-              <p className="text-lg font-medium">No summary available</p>
+              <p className="text-lg font-medium">No insight available</p>
               <p className="text-sm text-muted-foreground text-center">
-                Record at least 10 minutes of lecture content to generate a teaching summary.
+                Record at least 10 minutes of session content to generate a session insight.
               </p>
             </div>
           )}

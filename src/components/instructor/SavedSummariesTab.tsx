@@ -514,7 +514,7 @@ export function SavedSummariesTab() {
                 )}
 
                 <p className="text-xs text-center text-muted-foreground pt-2">
-                  Report from {formatDuration(selectedSummary.duration_seconds)} of lecture content
+                  Report from {formatDuration(selectedSummary.duration_seconds)} of session content
                 </p>
               </div>
             )}
