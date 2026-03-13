@@ -1116,24 +1116,26 @@ const LiveStudent = () => {
                 </>
               )}
               
-              {/* AI Explanation Button */}
-              <Button
-                onClick={loadAiExplanation}
-                variant="outline"
-                className="w-full max-w-md mx-auto"
-                disabled={loadingExplanation}
-              >
-                {loadingExplanation ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating explanation...
-                  </>
-                ) : showExplanation ? (
-                  <>📚 Hide Explanation</>
-                ) : (
-                  <>✨ Why? Get AI Explanation</>
-                )}
-              </Button>
+              {/* AI Explanation Button - hide for polls */}
+              {!isPoll && (
+                <Button
+                  onClick={loadAiExplanation}
+                  variant="outline"
+                  className="w-full max-w-md mx-auto"
+                  disabled={loadingExplanation}
+                >
+                  {loadingExplanation ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating explanation...
+                    </>
+                  ) : showExplanation ? (
+                    <>📚 Hide Explanation</>
+                  ) : (
+                    <>✨ Why? Get AI Explanation</>
+                  )}
+                </Button>
+              )}
               
               {/* AI Explanation Display */}
               {showExplanation && explanation && (

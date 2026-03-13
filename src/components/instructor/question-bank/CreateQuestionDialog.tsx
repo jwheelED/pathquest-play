@@ -205,6 +205,13 @@ export function CreateQuestionDialog({
           language: codingLanguage,
           difficulty: difficulty,
         };
+      case "poll":
+        return {
+          type: "poll",
+          question: mcqQuestion,
+          options: mcqOptions.filter(opt => opt.trim()).map((opt, i) => `${["A", "B", "C", "D"][i]}. ${opt}`),
+          gradingMode: "none",
+        };
       default:
         return {};
     }
