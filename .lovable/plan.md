@@ -1,6 +1,14 @@
 
-## Plan: Question Bank Redesign
+## Plan: Passive Question Detection from Deepgram Punctuation
 
 **STATUS: COMPLETED**
 
-Redesigned the Question Bank tab into a two-column operational layout with Prep/Live Push mode tabs, top control bar with stats, right-side preview panel with inline results, natural slide sorting (ascending), and status lifecycle badges (Ready/Pushed). Removed standalone QuestionBankResults section and integrated results into the preview panel. Updated QuestionBankCard with mode-aware rendering (larger push buttons in Live mode, edit/delete hidden), and SourceMaterialCard with natural sort and auto-expand in Live mode.
+Implemented passive question detection that monitors `is_final` transcript utterances for question marks (`?`) from Deepgram's smart formatting. When the speaker naturally asks a substantive question (8+ words, not rhetorical), a floating candidate card appears for the instructor to send or dismiss. Auto-dismisses after 15 seconds with a 30-second cooldown between detections.
+
+### Files Created
+- `src/hooks/usePassiveQuestionDetection.ts` — Core detection hook with filtering, cooldown, and rhetorical blocklist
+- `src/components/instructor/PassiveQuestionCandidate.tsx` — Floating card UI with countdown progress bar
+
+### Files Edited
+- `src/components/instructor/LectureTranscription.tsx` — Wired hook into onTranscript callback, added "Detect questions" toggle, rendered candidate card
+- `src/hooks/useLectureRecording.ts` — Wired hook into Deepgram streaming callback, exposed passive detection state in return
