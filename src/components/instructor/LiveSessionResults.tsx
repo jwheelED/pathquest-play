@@ -70,10 +70,12 @@ const ExpandableResponseRow = ({
   response,
   fullAnswer,
   isLong,
+  isPoll,
 }: {
   response: LiveResponse & { nickname?: string };
   fullAnswer: string;
   isLong: boolean;
+  isPoll: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
 
