@@ -1420,7 +1420,16 @@ export const LectureCheckInResults = () => {
                         </div>
                         <div className="text-right space-y-2">
                           <div>
-                            {stats.hasAIGrades && stats.avgAIGrade !== null ? (
+                            {isPoll ? (
+                              <>
+                                <div className="text-2xl font-bold text-primary">
+                                  {stats.completed}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  response{stats.completed !== 1 ? 's' : ''} (Poll)
+                                </div>
+                              </>
+                            ) : stats.hasAIGrades && stats.avgAIGrade !== null ? (
                               <>
                                 <div className={`text-2xl font-bold ${stats.avgAIGrade >= 70 ? 'text-green-600' : stats.avgAIGrade >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                                   {stats.avgAIGrade}%
@@ -1451,7 +1460,7 @@ export const LectureCheckInResults = () => {
                               </div>
                             )}
                           </div>
-                          {question.options && (
+                          {question.options && !isPoll && (
                             <Button 
                               size="sm" 
                               variant="outline"
