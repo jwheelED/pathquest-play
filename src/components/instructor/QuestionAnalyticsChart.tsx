@@ -116,8 +116,10 @@ export const QuestionAnalyticsChart = ({
       })
     : [];
 
-  // Calculate performance data - use AI grades for short answers if available
-  const performanceData = stats.hasAIGrades
+  // For polls, show a simple response distribution instead of correct/incorrect pie chart
+  const performanceData = isPoll
+    ? [] // No performance pie chart for polls
+    : stats.hasAIGrades
     ? [
         {
           name: "Passing (≥70%)",
