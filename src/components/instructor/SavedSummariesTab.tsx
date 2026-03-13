@@ -158,7 +158,7 @@ export function SavedSummariesTab() {
     doc.text(title, lm, y); y += 10;
     doc.setFontSize(10);
     doc.setTextColor(120);
-    doc.text(`${formatDuration(summary.duration_seconds)} · ${summary.questions_asked} questions · ${summary.student_count} students · ${format(new Date(summary.created_at), "MMM d, yyyy")}`, lm, y);
+    doc.text(`${formatDuration(summary.duration_seconds)} · ${summary.questions_asked} questions · ${summary.student_count} participants · ${format(new Date(summary.created_at), "MMM d, yyyy")}`, lm, y);
     y += 12;
     doc.setTextColor(0);
 
