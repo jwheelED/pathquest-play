@@ -674,6 +674,8 @@ const LiveStudent = () => {
   }
 
   const isMCQ = currentQuestion.question_content.type === "multiple_choice";
+  const isPoll = currentQuestion.question_content.type === "poll";
+  const hasPollOptions = isPoll && currentQuestion.question_content.options && currentQuestion.question_content.options.length >= 2;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
