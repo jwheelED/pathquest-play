@@ -51,8 +51,8 @@ const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = 
   { value: "live", label: "Live Session", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
-  { value: "summaries", label: "Summaries", icon: Award },
-  { value: "students", label: "Students", icon: Users },
+  { value: "summaries", label: "Session Insights", icon: Award },
+  { value: "students", label: "Participants", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
   { value: "settings", label: "Settings", icon: Settings },
 ];
