@@ -62,7 +62,7 @@ import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySh
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
-import { PassiveQuestionCandidateCard } from "./PassiveQuestionCandidate";
+import { QuestionOnDeck } from "./QuestionOnDeck";
 import { Switch } from "@/components/ui/switch";
 
 interface LectureTranscriptionProps {
