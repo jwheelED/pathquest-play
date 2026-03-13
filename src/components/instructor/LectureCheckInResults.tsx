@@ -1530,7 +1530,7 @@ export const LectureCheckInResults = () => {
                           <div className="pt-3 flex items-center justify-between border-t">
                             <div className="flex items-center gap-2">
                               <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Visual Analytics</span>
+                              <span className="text-sm font-medium">Room Signal</span>
                               {showCharts[`${groupIdx}-${qIdx}`] && (
                                 <Badge variant="secondary" className="text-xs">Visible</Badge>
                               )}
