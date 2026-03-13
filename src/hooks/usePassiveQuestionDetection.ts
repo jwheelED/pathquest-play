@@ -106,9 +106,10 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const {
     enabled = true,
     cooldownMs = 30000,
-    minWordCount = 8,
+    minWordCount = 5,
     autoDismissMs = 15000,
     lastQuestionSentTime = 0,
+    debug = true,
   } = options;
 
   const lastDetectionTimeRef = useRef<number>(0);
