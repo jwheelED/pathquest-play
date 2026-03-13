@@ -517,7 +517,7 @@ Generate ONE focused question that tests understanding of the most important con
       // Uses index tracking to handle duplicate option text correctly
       let finalOptions = parsed.options;
       let finalCorrectAnswer = parsed.correct_answer;
-      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
+      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice" || format_preference === "poll") {
         if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
           const letters = ['A', 'B', 'C', 'D'];
           const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
