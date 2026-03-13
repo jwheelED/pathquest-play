@@ -187,6 +187,100 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   }
 };
 
+const generatePollOptions = async (
+  questionText: string,
+  context: string,
+  courseContext?: { title: string; topics: string[] } | null,
+) => {
+  let courseInfo = "";
+  if (courseContext?.title) courseInfo += `\nCourse: ${courseContext.title}`;
+  if (courseContext?.topics?.length) courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
+
+  const prompt = `The speaker asked: "${questionText}"
+
+Context from session: "${context}"${courseInfo}
+
+Generate poll options for this question. This is an UNGRADED poll — there is no single correct answer.
+
+RULES:
+- Use exactly 2 options when the question naturally fits a binary choice (e.g. Yes/No, True/False, Agree/Disagree, Before/After).
+- Use 3 options when there are a few distinct perspectives or categories.
+- Use 4 options when the topic benefits from more nuance.
+- Options should be concise and clear.
+- Do NOT include letter prefixes (A., B., etc.) — just the option text.
+
+Return JSON:
+{
+  "question": "the poll question",
+  "options": ["Option 1", "Option 2"] or ["Option 1", "Option 2", "Option 3"] or ["Option 1", "Option 2", "Option 3", "Option 4"]
+}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: "You are an educational AI that creates concise poll options for live session questions. Return ONLY valid JSON, no markdown.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" },
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI API error: ${response.status} - ${errorText}`);
+    }
+
+    const aiResponse = await response.json();
+    let content = aiResponse.choices[0].message.content;
+    content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+    try {
+      const parsed = JSON.parse(content);
+      // Strip any accidental letter prefixes
+      const cleanOptions = (parsed.options || []).map((o: string) =>
+        o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim()
+      );
+      return {
+        question: parsed.question || questionText,
+        options: cleanOptions.length >= 2 ? cleanOptions : ["Yes", "No"],
+      };
+    } catch {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        const cleanOptions = (parsed.options || []).map((o: string) =>
+          o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim()
+        );
+        return { question: parsed.question || questionText, options: cleanOptions.length >= 2 ? cleanOptions : ["Yes", "No"] };
+      }
+      // Fallback to Yes/No
+      return { question: questionText, options: ["Yes", "No"] };
+    }
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    console.error("Poll generation error:", error);
+    // Fallback to Yes/No on any error
+    return { question: questionText, options: ["Yes", "No"] };
+  }
+}
+
 const generateCodingQuestion = async (
   questionText: string,
   context: string,
