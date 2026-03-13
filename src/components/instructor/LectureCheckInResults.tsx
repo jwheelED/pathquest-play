@@ -1393,15 +1393,15 @@ export const LectureCheckInResults = () => {
                             <ul className="text-sm text-muted-foreground space-y-1">
                               {question.options.map((opt: string, oIdx: number) => {
                                 const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
-                                const isCorrect = letter === currentCorrectAnswer;
+                                const isCorrectOption = !isPoll && letter === currentCorrectAnswer;
                                 return (
                                   <li
                                     key={oIdx}
-                                    className={`flex items-start gap-1 ${isCorrect ? "font-medium text-green-600 dark:text-green-500" : ""}`}
+                                    className={`flex items-start gap-1 ${isCorrectOption ? "font-medium text-green-600 dark:text-green-500" : ""}`}
                                   >
                                     <span className="font-bold shrink-0">{letter}.</span>
                                     <span className="flex-1"><MathRenderer content={opt} /></span>
-                                    {isCorrect && <span className="shrink-0">✓</span>}
+                                    {isCorrectOption && <span className="shrink-0">✓</span>}
                                   </li>
                                 );
                               })}
