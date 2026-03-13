@@ -549,6 +549,41 @@ export function CreateQuestionDialog({
               </div>
             </div>
           )}
+
+          {questionType === "poll" && (
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+              <div className="text-xs text-muted-foreground bg-primary/5 p-2 rounded">
+                📊 Poll responses are recorded but not graded. Students won't see correct/incorrect feedback.
+              </div>
+              <div className="space-y-2">
+                <Label>Poll Question *</Label>
+                <Textarea
+                  placeholder="What do you think about...?"
+                  value={mcqQuestion}
+                  onChange={(e) => setMcqQuestion(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Options (at least 2)</Label>
+                {["A", "B", "C", "D"].map((letter, i) => (
+                  <div key={letter} className="flex items-center gap-2">
+                    <span className="w-6 text-sm font-medium">{letter}.</span>
+                    <Input
+                      placeholder={i < 2 ? `Option ${letter} *` : `Option ${letter} (optional)`}
+                      value={mcqOptions[i]}
+                      onChange={(e) => {
+                        const newOptions = [...mcqOptions];
+                        newOptions[i] = e.target.value;
+                        setMcqOptions(newOptions);
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Tags */}
           <div className="space-y-2">
