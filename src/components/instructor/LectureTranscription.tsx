@@ -783,36 +783,13 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("✅ Question extracted via voice command:", data.question_text);
 
-      // Check if preview is enabled - if so, show dialog instead of sending directly
-      if (questionPreviewEnabled) {
-        console.log("📋 Preview enabled - showing voice question preview");
-        setPreviewQuestionData({
-          question_text: data.question_text,
-          suggested_type: data.suggested_type || 'short_answer',
-          // Include pre-generated MCQ options if available
-          options: data.options,
-          correct_answer: data.correct_answer,
-          explanation: data.explanation,
-          expected_answer: data.expected_answer,
-        });
-        pendingQuestionDataRef.current = {
-          question_text: data.question_text,
-          suggested_type: data.suggested_type,
-          confidence: 1.0,
-          extraction_method: "voice_command",
-          source: "voice_command",
-          // Also store MCQ data in pending ref
-          options: data.options,
-          correct_answer: data.correct_answer,
-          explanation: data.explanation,
-          expected_answer: data.expected_answer,
-        };
-        setIsPreviewOpen(true);
-        // Don't set isSendingQuestion to false yet - preview will handle that
-        return;
-      }
+      // Voice commands now route through the On Deck card flow instead of auto-opening preview.
+      // The passive detection will surface the question on the On Deck card where
+      // the instructor can Preview / Send Now at their own pace.
+      console.log("📋 Voice command question routed to On Deck card (preview not auto-opened)");
+      setIsSendingQuestion(false);
 
-      // Preview disabled - send immediately
+      // Send immediately (bypasses preview) —
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
