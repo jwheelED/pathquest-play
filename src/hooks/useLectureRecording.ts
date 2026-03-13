@@ -207,7 +207,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
-    enabled: passiveDetectionEnabled && isRecording,
+    enabled: passiveDetectionEnabled,
     cooldownMs: 8000,
     minWordCount: 5,
     autoDismissMs: 20000,
