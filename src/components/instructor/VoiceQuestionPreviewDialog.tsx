@@ -108,7 +108,7 @@ export function VoiceQuestionPreviewDialog({
     
     const optionsEmpty = !mcqOptions.some(opt => opt.trim() !== '');
     const shouldAutoGenerate = 
-      questionType === 'multiple_choice' && 
+      (questionType === 'multiple_choice' || questionType === 'poll') && 
       optionsEmpty && 
       questionText.trim() !== '' &&
       !isGeneratingOptions;
@@ -314,11 +314,15 @@ export function VoiceQuestionPreviewDialog({
     
     // Include MCQ data if this is a multiple choice question
     if (questionType === 'multiple_choice') {
-      // Only include options if at least one is filled
       if (hasOptions) {
         questionData.options = mcqOptions;
         questionData.correct_answer = correctAnswer;
       }
+    }
+
+    // Include options for poll (no correct answer)
+    if (questionType === 'poll' && hasOptions) {
+      questionData.options = mcqOptions;
     }
 
     // Include expected answer for short answer questions
@@ -381,9 +385,9 @@ export function VoiceQuestionPreviewDialog({
               value={questionType}
               onValueChange={(value: 'short_answer' | 'multiple_choice' | 'poll') => {
                 setQuestionType(value);
-                // Auto-generate options when switching to MCQ and options are empty
-                if (value === 'multiple_choice' && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
-                  console.log('📋 Switching to MCQ - triggering option generation');
+                // Auto-generate options when switching to MCQ or Poll and options are empty
+                if ((value === 'multiple_choice' || value === 'poll') && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
+                  console.log(`📋 Switching to ${value} - triggering option generation`);
                   setTimeout(() => handleGenerateOptionsAuto(), 100);
                 }
                 // Auto-generate expected answer when switching to short answer and it's empty
@@ -496,11 +500,11 @@ export function VoiceQuestionPreviewDialog({
             </div>
           )}
 
-          {/* MCQ Options (only shown for multiple choice) */}
-          {questionType === 'multiple_choice' && (
+          {/* MCQ Options (shown for multiple choice AND poll) */}
+          {(questionType === 'multiple_choice' || questionType === 'poll') && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Answer Options</Label>
+                <Label>{questionType === 'poll' ? 'Poll Choices' : 'Answer Options'}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -522,52 +526,82 @@ export function VoiceQuestionPreviewDialog({
                   ) : (
                     <>
                       <Sparkles className="h-3 w-3" />
-                      Generate Options
+                      Generate {questionType === 'poll' ? 'Choices' : 'Options'}
                     </>
                   )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                {hasOptions 
-                  ? "Edit the generated options below. Select the correct answer."
-                  : "Click 'Generate Options' to create choices, or add them manually."}
+                {questionType === 'poll' 
+                  ? (hasOptions ? "Edit the poll choices below. Responses will not be graded." : "Click 'Generate Choices' to create poll options, or add them manually.")
+                  : (hasOptions ? "Edit the generated options below. Select the correct answer." : "Click 'Generate Options' to create choices, or add them manually.")}
               </p>
-              <RadioGroup
-                value={correctAnswer}
-                onValueChange={(value) => setCorrectAnswer(value as 'A' | 'B' | 'C' | 'D')}
-                className="space-y-3"
-              >
-                {['A', 'B', 'C', 'D'].map((letter, index) => (
-                  <div key={letter} className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-2 min-w-[80px]">
-                        <RadioGroupItem
-                          value={letter}
-                          id={`correct-${letter}`}
+              {questionType === 'multiple_choice' ? (
+                <RadioGroup
+                  value={correctAnswer}
+                  onValueChange={(value) => setCorrectAnswer(value as 'A' | 'B' | 'C' | 'D')}
+                  className="space-y-3"
+                >
+                  {['A', 'B', 'C', 'D'].map((letter, index) => (
+                    <div key={letter} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-[80px]">
+                          <RadioGroupItem
+                            value={letter}
+                            id={`correct-${letter}`}
+                          />
+                          <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
+                            {letter}
+                          </Label>
+                        </div>
+                        <Input
+                          value={mcqOptions[index]}
+                          onChange={(e) => handleOptionChange(index, e.target.value)}
+                          placeholder={`Option ${letter}`}
+                          className="flex-1"
                         />
-                        <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
-                          {letter}
-                        </Label>
                       </div>
-                      <Input
-                        value={mcqOptions[index]}
-                        onChange={(e) => handleOptionChange(index, e.target.value)}
-                        placeholder={`Option ${letter}`}
-                        className="flex-1"
-                      />
+                      {showMathPreview && mcqOptions[index] && (
+                        <div className="ml-[88px] p-2 rounded border bg-muted/30 text-sm">
+                          <MathRenderer content={mcqOptions[index]} />
+                        </div>
+                      )}
                     </div>
-                    {/* Math preview for this option */}
-                    {showMathPreview && mcqOptions[index] && (
-                      <div className="ml-[88px] p-2 rounded border bg-muted/30 text-sm">
-                        <MathRenderer content={mcqOptions[index]} />
+                  ))}
+                </RadioGroup>
+              ) : (
+                /* Poll: show options without correct answer selector */
+                <div className="space-y-3">
+                  {['A', 'B', 'C', 'D'].map((letter, index) => (
+                    <div key={letter} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label className="font-medium min-w-[24px]">{letter}.</Label>
+                        <Input
+                          value={mcqOptions[index]}
+                          onChange={(e) => handleOptionChange(index, e.target.value)}
+                          placeholder={`Choice ${letter}`}
+                          className="flex-1"
+                        />
                       </div>
-                    )}
-                  </div>
-                ))}
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                Select the radio button next to the correct answer.
-              </p>
+                      {showMathPreview && mcqOptions[index] && (
+                        <div className="ml-8 p-2 rounded border bg-muted/30 text-sm">
+                          <MathRenderer content={mcqOptions[index]} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {questionType === 'multiple_choice' && (
+                <p className="text-xs text-muted-foreground">
+                  Select the radio button next to the correct answer.
+                </p>
+              )}
+              {questionType === 'poll' && (
+                <p className="text-xs text-muted-foreground">
+                  📊 Poll responses are recorded but not graded.
+                </p>
+              )}
             </div>
           )}
         </div>
