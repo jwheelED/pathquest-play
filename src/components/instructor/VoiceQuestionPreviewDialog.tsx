@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye, Send } from 'lucide-react';
+import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MathRenderer } from '@/components/ui/math-renderer';
@@ -352,11 +352,11 @@ export function VoiceQuestionPreviewDialog({
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Review Audience Check
+            <Mic className="h-5 w-5 text-emerald-500" />
+            Voice Question Preview
           </DialogTitle>
           <DialogDescription>
-            Review and refine before sending to the room.
+            Review and edit the extracted question before sending to students.
           </DialogDescription>
         </DialogHeader>
 
@@ -581,10 +581,7 @@ export function VoiceQuestionPreviewDialog({
                 Sending...
               </>
             ) : (
-              <>
-                <Send className="h-4 w-4 mr-1" />
-                Send to Room
-              </>
+              'Send to Students'
             )}
           </Button>
         </DialogFooter>

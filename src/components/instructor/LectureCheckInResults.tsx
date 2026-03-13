@@ -1131,7 +1131,7 @@ export const LectureCheckInResults = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            Live Room Insight
+            Check-In Results
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1166,7 +1166,7 @@ export const LectureCheckInResults = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" />
-            Live Room Insight
+            Check-In Results
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1207,7 +1207,7 @@ export const LectureCheckInResults = () => {
             <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <TrendingUp className="h-6 w-6 text-primary shrink-0" />
-                <span className="truncate">Live Room Insight</span>
+                <span className="truncate">Check-In Results</span>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
                 Auto-graded performance • Last synced: {formatLastUpdated()}
@@ -1530,7 +1530,7 @@ export const LectureCheckInResults = () => {
                           <div className="pt-3 flex items-center justify-between border-t">
                             <div className="flex items-center gap-2">
                               <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Room Signal</span>
+                              <span className="text-sm font-medium">Visual Analytics</span>
                               {showCharts[`${groupIdx}-${qIdx}`] && (
                                 <Badge variant="secondary" className="text-xs">Visible</Badge>
                               )}
