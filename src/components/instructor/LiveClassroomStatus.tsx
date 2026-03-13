@@ -31,7 +31,7 @@ export const LiveClassroomStatus = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Total Students</span>
+              <span className="text-sm font-medium">Total Participants</span>
               <Badge variant="outline" className="gap-1">
                 <Users className="h-3 w-3" />
                 {totalStudents}
