@@ -63,7 +63,6 @@ import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuest
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
 import { QuestionOnDeck } from "./QuestionOnDeck";
-import { Switch } from "@/components/ui/switch";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
