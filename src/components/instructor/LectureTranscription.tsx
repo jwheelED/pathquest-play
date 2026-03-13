@@ -209,10 +209,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
-    enabled: passiveDetectionEnabled,
+    enabled: true, // Always on
     cooldownMs: 8000,
     minWordCount: 5,
-    autoDismissMs: 20000,
+    autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
 
