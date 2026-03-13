@@ -12,6 +12,7 @@ interface UsePassiveQuestionDetectionOptions {
   autoDismissMs?: number;
   /** Timestamp of the last question sent (any method) — skip detection if recent */
   lastQuestionSentTime?: number;
+  debug?: boolean;
 }
 
 // Rhetorical / filler questions to ignore (normalized lowercase, no trailing ?)
