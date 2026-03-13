@@ -168,7 +168,7 @@ export const StudentRosterPanel = ({
             <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Students</SelectItem>
+            <SelectItem value="all">All Participants</SelectItem>
             <SelectItem value="has-grades">Has Grades</SelectItem>
             <SelectItem value="no-grades">No Grades</SelectItem>
           </SelectContent>
