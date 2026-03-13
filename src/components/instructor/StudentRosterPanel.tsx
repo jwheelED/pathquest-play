@@ -185,7 +185,7 @@ export const StudentRosterPanel = ({
           <ScrollArea className="h-[500px]">
             {loading ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm p-8">
-                Loading students…
+                Loading participants…
               </div>
             ) : filteredStudents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm p-8 gap-2">
