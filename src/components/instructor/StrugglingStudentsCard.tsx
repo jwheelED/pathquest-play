@@ -35,7 +35,7 @@ export default function StrugglingStudentsCard({ students, onMessageStudent }: S
       </CardHeader>
       <CardContent className="space-y-3">
         {students.length === 0 ? (
-          <p className="text-muted-foreground text-sm">All students are doing well! 🎉</p>
+          <p className="text-muted-foreground text-sm">All participants are doing well! 🎉</p>
         ) : (
           students.map((student) => (
             <div key={student.id} className="flex items-start justify-between p-3 bg-accent/20 rounded-lg pixel-corners">

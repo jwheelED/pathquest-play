@@ -458,7 +458,7 @@ export default function InstructorDashboard() {
                     Slide Presenter
                   </CardTitle>
                   <CardDescription className="text-sm">
-                    Present slides with integrated live lecture tools
+                    Present slides with integrated live session tools
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">

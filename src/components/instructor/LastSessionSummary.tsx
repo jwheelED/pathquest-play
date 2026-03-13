@@ -156,7 +156,7 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             onClick={() => onNavigate("live")}
             className="flex items-center gap-1 text-xs text-primary hover:underline mt-3"
           >
-            View full summary <ArrowRight className="w-3 h-3" />
+            View full insight <ArrowRight className="w-3 h-3" />
           </button>
         )}
       </CardContent>

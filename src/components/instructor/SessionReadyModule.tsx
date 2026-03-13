@@ -87,7 +87,7 @@ export function SessionReadyModule({ activeSession, onStartLive, onPresentSlides
               {studentCount !== null && (
                 <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Users className="w-4 h-4" />
-                  {studentCount} student{studentCount !== 1 ? "s" : ""}
+                  {studentCount} participant{studentCount !== 1 ? "s" : ""}
                 </span>
               )}
             </div>

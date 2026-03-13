@@ -76,7 +76,7 @@ export const LiveClassroomStatus = ({
             </div>
             <Progress value={completionRate} className="h-2" />
             {completionRate === 100 && (
-              <p className="text-xs text-green-600 font-medium">✓ All students have responded!</p>
+              <p className="text-xs text-green-600 font-medium">✓ All participants have responded!</p>
             )}
           </div>
         )}

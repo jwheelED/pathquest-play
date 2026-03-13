@@ -29,7 +29,7 @@ export function CheckInPreview({ activeSessionId, onNavigate }: CheckInPreviewPr
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            Live Check-In Results
+            Live Room Insight
           </CardTitle>
           <Button
             variant="ghost"
