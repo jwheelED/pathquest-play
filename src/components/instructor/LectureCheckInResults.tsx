@@ -1680,7 +1680,10 @@ export const LectureCheckInResults = () => {
                               // coding_simple uses AI grade threshold >= 70 as correct
                               // short_answer with AI grade uses same logic
                               // MCQ uses exact match
-                              const isCorrect = isManualGradeShortAnswer 
+                              // Polls are never graded
+                              const isCorrect = isPoll
+                                ? null
+                                : isManualGradeShortAnswer 
                                 ? null 
                                 : (hasAIGrade && (question.type === 'short_answer' || isCodingSimple))
                                   ? studentAIGrade >= 70 
@@ -1692,6 +1695,7 @@ export const LectureCheckInResults = () => {
                               <div
                                 key={assignment.id}
                                 className={`flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50 ${
+                                  isPoll ? '' :
                                   !isCompleted ? '' :
                                   isCorrect === true ? 'bg-green-50/50 dark:bg-green-950/20' :
                                   isCorrect === false ? 'bg-red-50/50 dark:bg-red-950/20' : ''
