@@ -126,7 +126,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Active Today"
         value={metrics.totalStudents > 0 ? metrics.activeToday : "--"}
         variant="default"
-        description={`of ${metrics.totalStudents} students`}
+        description={`of ${metrics.totalStudents} participants`}
       />
 
       <div
