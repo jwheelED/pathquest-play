@@ -320,7 +320,7 @@ export const LectureSummarySheet = ({
                       <>
                         <Separator />
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Lecture Highlights</p>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Session Highlights</p>
                           <ul className="space-y-1.5">
                             {summaryData.lectureHighlights.map((highlight, i) => (
                               <li key={i} className="text-sm flex items-start gap-2">
