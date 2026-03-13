@@ -153,7 +153,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
           {metrics.avgCompletion}%
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          {metrics.completedCount} of {metrics.totalAssignmentStudents} students
+          {metrics.completedCount} of {metrics.totalAssignmentStudents} participants
         </p>
         <p className="text-xs text-primary mt-1.5 hover:underline">View full summary →</p>
       </div>
