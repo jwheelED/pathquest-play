@@ -375,6 +375,10 @@ For multiple_choice, also include:
 - "correct_answer": "A" | "B" | "C" | "D"
 - "explanation": "why the correct answer is right"
 
+For poll, also include:
+- "options": an array of 2 to 4 options (e.g. ["Yes", "No"] or ["A. ...", "B. ...", "C. ..."])
+- Do NOT include "correct_answer" or "explanation" for polls
+
 For coding questions:
 - "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }
 
