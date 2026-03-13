@@ -396,7 +396,7 @@ export const LectureSummarySheet = ({
               )}
 
               <p className="text-xs text-center text-muted-foreground pb-4 pt-2">
-                Report based on {formatDuration(recordingDuration)} of lecture content
+                Report based on {formatDuration(recordingDuration)} of session content
               </p>
             </div>
           ) : (
