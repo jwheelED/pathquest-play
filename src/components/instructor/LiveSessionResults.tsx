@@ -287,6 +287,8 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                 : group.question.question_content?.question?.title ||
                   `Question #${group.question.question_number}`;
 
+            const roomSignal = getRoomSignal(correctPct, group.totalResponses);
+
             return (
               <AccordionItem key={group.question.id} value={group.question.id}>
                 <AccordionTrigger className="hover:no-underline py-3">
@@ -301,10 +303,10 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge
-                        variant={correctPct >= 70 ? "default" : correctPct >= 40 ? "secondary" : "destructive"}
+                        variant={roomSignal.variant}
                         className="text-xs"
                       >
-                        {correctPct}% correct
+                        {roomSignal.label}
                       </Badge>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Users className="h-3 w-3" />
@@ -315,26 +317,17 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-3 pt-2">
-                    {/* Stats bar */}
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                        {group.correctCount} correct
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <XCircle className="h-3.5 w-3.5 text-red-500" />
-                        {group.totalResponses - group.correctCount} incorrect
-                      </span>
-                      {group.avgResponseTime && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          {(group.avgResponseTime / 1000).toFixed(1)}s avg
-                        </span>
-                      )}
+                    {/* Room Signal interpretation */}
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                      <p className="text-sm font-medium text-foreground">{roomSignal.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {correctPct}% correct · {group.correctCount}/{group.totalResponses} responses
+                        {group.avgResponseTime && ` · ${(group.avgResponseTime / 1000).toFixed(1)}s avg`}
+                      </p>
                     </div>
 
                     {/* Progress bar */}
-                    <Progress value={correctPct} className="h-2" />
+                    <Progress value={correctPct} className="h-1.5" />
 
                     {/* Question text */}
                     <div className="p-3 bg-muted/50 rounded-lg text-sm">
