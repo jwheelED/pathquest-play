@@ -3354,12 +3354,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-xl">
                 {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
-                Live Lecture Capture
+                Live Copilot
               </CardTitle>
               <CardDescription className="text-sm">
                 {isRecording
-                  ? "🎙️ Real-time streaming active • Say 'send question now' or click 'Send Question' to send your most recent question to students"
-                  : "Start recording with Deepgram real-time transcription - use voice commands or the 'Send Question' button to send questions"}
+                  ? "🎙️ Streaming — Edvana is autodrafting your next audience check"
+                  : "Start recording to enable always-on question detection"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
