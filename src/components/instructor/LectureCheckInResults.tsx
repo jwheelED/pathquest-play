@@ -1207,7 +1207,7 @@ export const LectureCheckInResults = () => {
             <div className="min-w-0 flex-1">
               <CardTitle className="flex items-center gap-2 text-xl">
                 <TrendingUp className="h-6 w-6 text-primary shrink-0" />
-                <span className="truncate">Check-In Results</span>
+                <span className="truncate">Live Room Insight</span>
               </CardTitle>
               <CardDescription className="mt-1 text-xs">
                 Auto-graded performance • Last synced: {formatLastUpdated()}
