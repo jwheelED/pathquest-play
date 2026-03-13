@@ -110,8 +110,8 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
     return (
       <EmptyState
         icon={<Users className="w-7 h-7" />}
-        title="No students yet"
-        description="Share your join code to get students into your class."
+        title="No participants yet"
+        description="Share your join code to get participants into your session."
         className={className}
       />
     );
