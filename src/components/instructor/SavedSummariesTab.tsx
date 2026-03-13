@@ -217,8 +217,8 @@ export function SavedSummariesTab() {
     return (
       <EmptyState
         icon={<Award className="w-7 h-7" />}
-        title="No saved summaries"
-        description="Lecture summaries are generated after 10+ minute live sessions. Save them from the post-lecture summary sheet."
+        title="No saved session insights"
+        description="Session insights are generated after 10+ minute live sessions. Save them from the post-session insight sheet."
       />
     );
   }
