@@ -216,7 +216,7 @@ export const LectureSummarySheet = ({
           <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
             <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDuration(recordingDuration)}</span>
             <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{questionsAsked} questions</span>
-            <span className="flex items-center gap-1"><Users className="h-3 w-3" />{studentCount} students</span>
+            <span className="flex items-center gap-1"><Users className="h-3 w-3" />{studentCount} participants</span>
             <span>{format(new Date(), "MMM d, yyyy")}</span>
           </div>
           {summaryData && !isLoading && (
