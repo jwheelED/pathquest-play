@@ -1362,9 +1362,14 @@ export const LectureCheckInResults = () => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
                   const isOverridden = !!question.overriddenAnswer;
+                  const isPoll = question.isPoll === true || 
+                    question.correctAnswer === '' || 
+                    question.correctAnswer === null || 
+                    question.correctAnswer === undefined;
 
                   return (
                     <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card border-l-4 ${
+                      isPoll ? 'border-l-primary' :
                       isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' :
                       stats.percentage === null ? 'border-l-blue-500' :
                       stats.percentage >= 80 ? 'border-l-green-500' :
