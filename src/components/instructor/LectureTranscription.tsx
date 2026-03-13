@@ -3539,7 +3539,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     ) : (
                       <>
                         <Zap className="mr-2 h-4 w-4" />
-                        Send Question
+                        Send Now
                       </>
                     )}
                   </Button>
