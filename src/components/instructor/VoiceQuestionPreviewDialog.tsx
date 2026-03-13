@@ -50,7 +50,7 @@ export function VoiceQuestionPreviewDialog({
 }: VoiceQuestionPreviewDialogProps) {
   const { toast } = useToast();
   const [questionText, setQuestionText] = useState('');
-  const [questionType, setQuestionType] = useState<'short_answer' | 'multiple_choice'>('short_answer');
+  const [questionType, setQuestionType] = useState<'short_answer' | 'multiple_choice' | 'poll'>('short_answer');
   const [mcqOptions, setMcqOptions] = useState(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
