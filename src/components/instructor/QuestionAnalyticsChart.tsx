@@ -196,7 +196,7 @@ export const QuestionAnalyticsChart = ({
 
   return (
     <div className="my-4 border rounded-lg p-4 bg-muted/20">
-      <p className="text-sm font-medium mb-3">📊 Visual Analytics</p>
+      <p className="text-sm font-medium mb-3">{isPoll ? '📊 Poll Results' : '📊 Visual Analytics'}</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Answer Distribution Chart (Multiple Choice) */}
