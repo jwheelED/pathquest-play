@@ -20,7 +20,7 @@ import { MathRenderer } from '@/components/ui/math-renderer';
 
 export interface ExtractedVoiceQuestion {
   question_text: string;
-  suggested_type: 'short_answer' | 'multiple_choice';
+  suggested_type: 'short_answer' | 'multiple_choice' | 'poll';
   // MCQ fields (pre-generated for editing)
   options?: string[];
   correct_answer?: 'A' | 'B' | 'C' | 'D';
