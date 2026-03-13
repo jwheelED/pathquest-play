@@ -29,9 +29,9 @@ export default function StrugglingStudentsCard({ students, onMessageStudent }: S
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-warning" />
-          Students Needing Help
+          Participants Needing Help
         </CardTitle>
-        <CardDescription>Students who may need additional support</CardDescription>
+        <CardDescription>Participants who may need additional support</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {students.length === 0 ? (
