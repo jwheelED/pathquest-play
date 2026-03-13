@@ -3727,20 +3727,48 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
 
-      {/* Passive Question Detection Candidate */}
-      {passiveCandidate && (
-        <PassiveQuestionCandidateCard
-          candidate={passiveCandidate}
-          onSend={(questionText) => {
-            dismissPassiveCandidate();
-            handleQuestionSend({
-              question_text: questionText,
-              suggested_type: 'multiple_choice',
-              source: 'passive_detection',
-            });
-          }}
-          onDismiss={dismissPassiveCandidate}
-        />
+      {/* Question on Deck — persistent autodraft card */}
+      {isRecording && (
+        <div className="mt-4">
+          <QuestionOnDeck
+            candidate={passiveCandidate}
+            isListening={isRecording}
+            isSending={isSendingQuestion}
+            isHeld={onDeckHeld}
+            onToggleHold={() => setOnDeckHeld(h => !h)}
+            onSendNow={(questionText) => {
+              dismissPassiveCandidate();
+              // Open preview for review before sending
+              setPreviewQuestionData({
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+              });
+              pendingQuestionDataRef.current = {
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+                confidence: 1.0,
+                extraction_method: 'passive_detection',
+                source: 'passive_detection',
+              };
+              setIsPreviewOpen(true);
+            }}
+            onPreview={(questionText) => {
+              setPreviewQuestionData({
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+              });
+              pendingQuestionDataRef.current = {
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+                confidence: 1.0,
+                extraction_method: 'passive_detection',
+                source: 'passive_detection',
+              };
+              setIsPreviewOpen(true);
+            }}
+            onDismiss={dismissPassiveCandidate}
+          />
+        </div>
       )}
     </>
   );
