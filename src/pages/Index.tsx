@@ -941,7 +941,7 @@ const Index = () => {
                 Book a Demo
               </button>
               <button
-                onClick={() => navigate("/instructor/auth")}
+                onClick={handleStartPilot}
                 className="landing-secondary-btn px-8 py-3 text-[15px]"
               >
                 Start a Pilot Conversation
