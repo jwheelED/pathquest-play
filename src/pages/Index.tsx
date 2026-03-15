@@ -923,7 +923,314 @@ const Index = () => {
             </div>
           </div>
         </section>
+        {/* ── Use Cases Detail ── */}
+        <section
+          id="use-cases-detail"
+          className="py-20"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-5xl mx-auto px-6">
+            <p
+              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4 text-center"
+              style={{ color: "hsl(var(--landing-accent))" }}
+            >
+              USE CASES
+            </p>
+            <h2
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-center"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              Where Edvana fits first
+            </h2>
+            <p
+              className="text-base md:text-lg leading-relaxed max-w-2xl mx-auto mb-14 text-center"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Edvana is especially valuable in live sessions where explanation,
+              interpretation, or complex material needs to land clearly in the
+              moment.
+            </p>
+            <div className="grid md:grid-cols-2 gap-5">
+              {[
+                {
+                  title: "Higher education",
+                  body: "For instructors teaching difficult, abstract, or explanation-heavy material.",
+                },
+                {
+                  title: "Clinical and health-professions education",
+                  body: "For nursing, medical, PA, and case-based learning environments.",
+                },
+                {
+                  title: "Training and certification",
+                  body: "For trainers who need live signal without heavy prep or clunky interaction tools.",
+                },
+                {
+                  title: "Workshops and cohort-based sessions",
+                  body: "For facilitators leading high-attention learning experiences.",
+                },
+              ].map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-xl p-7"
+                  style={{
+                    background: "hsl(var(--landing-surface))",
+                    border: "1px solid hsl(var(--landing-border))",
+                  }}
+                >
+                  <h3
+                    className="text-lg font-semibold mb-2"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-sm leading-relaxed"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Emotional Midpoint ── */}
+        <section
+          className="py-20"
+          style={{
+            background: "hsl(var(--landing-surface))",
+            borderTop: "1px solid hsl(var(--landing-border))",
+            borderBottom: "1px solid hsl(var(--landing-border))",
+          }}
+        >
+          <div className="max-w-2xl mx-auto px-6 text-center">
+            <h2
+              className="text-2xl md:text-3xl font-bold tracking-tight mb-5"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              When you speak, you should not have to do it blind.
+            </h2>
+            <p
+              className="text-base leading-relaxed"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Most live sessions are one-way by default. Edvana helps turn them
+              into responsive moments by making audience understanding visible
+              in real time.
+            </p>
+          </div>
+        </section>
+
+        {/* ── Vision ── */}
+        <section
+          className="py-20"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-2xl mx-auto px-6 text-center">
+            <p
+              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4"
+              style={{ color: "hsl(var(--landing-accent))" }}
+            >
+              VISION
+            </p>
+            <h2
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-5"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              A new layer for live understanding
+            </h2>
+            <p
+              className="text-base leading-relaxed"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Edvana exists to make understanding visible while communication is
+              still happening. When speakers can see the room in real time,
+              people can learn, align, and adapt faster together.
+            </p>
+          </div>
+        </section>
+
+        {/* ── Final CTA ── */}
+        <section
+          id="demo"
+          className="py-24"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-2xl mx-auto px-6 text-center">
+            <h2
+              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              See how Edvana changes a live session.
+            </h2>
+            <p
+              className="text-base leading-relaxed mb-10"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Book a short demo or start a pilot conversation to see how Edvana
+              supports real-time understanding in teaching, training, and
+              explanation-heavy live sessions.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+              <button
+                onClick={() => navigate("/instructor/auth")}
+                className="rounded-full px-8 py-3 text-[15px] font-semibold transition-all duration-200"
+                style={{
+                  background: "hsl(var(--landing-accent))",
+                  color: "#fff",
+                }}
+              >
+                Book a Demo
+              </button>
+              <button
+                onClick={() => navigate("/instructor/auth")}
+                className="rounded-full px-8 py-3 text-[15px] font-semibold transition-all duration-200 border"
+                style={{
+                  borderColor: "hsl(var(--landing-border))",
+                  color: "hsl(var(--landing-text))",
+                }}
+              >
+                Start a Pilot Conversation
+              </button>
+            </div>
+            <p
+              className="text-xs"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Short demo. Clear workflow. No bloated setup.
+            </p>
+          </div>
+        </section>
       </main>
+
+      {/* ── Footer ── */}
+      <footer
+        className="py-16"
+        style={{
+          background: "hsl(var(--landing-surface))",
+          borderTop: "1px solid hsl(var(--landing-border))",
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
+            {/* Product */}
+            <div>
+              <h4
+                className="text-sm font-semibold mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Product
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "Product", id: "product" },
+                  { label: "How It Works", id: "how-it-works" },
+                  { label: "Why Edvana", id: "why-edvana" },
+                  { label: "Use Cases", id: "use-cases-detail" },
+                  { label: "Results", id: "results" },
+                ].map((link) => (
+                  <li key={link.id}>
+                    <button
+                      onClick={() => scrollToSection(link.id)}
+                      className="text-sm transition-colors duration-150 hover:opacity-80"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Sessions */}
+            <div>
+              <h4
+                className="text-sm font-semibold mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Sessions
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "Book a Demo", action: () => navigate("/instructor/auth") },
+                  { label: "Start a Pilot", action: () => navigate("/instructor/auth") },
+                  { label: "Join Session", action: () => navigate("/join") },
+                  { label: "Login", action: () => navigate("/auth") },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <button
+                      onClick={link.action}
+                      className="text-sm transition-colors duration-150 hover:opacity-80"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h4
+                className="text-sm font-semibold mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Company
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "About", action: () => scrollToSection("hero") },
+                  { label: "Contact", action: () => navigate("/instructor/auth") },
+                  { label: "Privacy", action: () => navigate("/privacy") },
+                  { label: "Terms", action: () => navigate("/terms") },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <button
+                      onClick={link.action}
+                      className="text-sm transition-colors duration-150 hover:opacity-80"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Brand */}
+            <div>
+              <p
+                className="text-sm font-semibold mb-2"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Edvana is the copilot for live understanding.
+              </p>
+              <p
+                className="text-xs leading-relaxed"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Helping speakers see audience understanding in real time without
+                breaking flow.
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div
+            className="pt-6"
+            style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+          >
+            <p
+              className="text-xs"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              © 2026 Edvana. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
