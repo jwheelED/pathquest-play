@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
 const NAV_ITEMS = ["Product", "How It Works", "Use Cases", "Results", "Demo"];
@@ -72,9 +72,33 @@ const Index = () => {
     }
   };
 
+  const [corpDropdownOpen, setCorpDropdownOpen] = useState(false);
+  const corpDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (corpDropdownRef.current && !corpDropdownRef.current.contains(e.target as Node)) {
+        setCorpDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const handleBookDemo = () => {
     window.location.href =
       "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
+  };
+
+  const handleStartPilot = () => {
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
+  };
+
+  const handleContact = () => {
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Contact&body=";
   };
 
   return (
@@ -125,26 +149,63 @@ const Index = () => {
           {/* Right — Utility (desktop) */}
           <div className="hidden lg:flex items-center gap-5 shrink-0">
             <button
-              onClick={() => navigate("/instructor/auth")}
+              onClick={handleBookDemo}
               className="landing-util-link"
             >
-              Login
+              Book a Demo
             </button>
             <button
-              onClick={() => navigate("/join")}
+              onClick={handleStartPilot}
               className="landing-util-link"
             >
-              Join Session
+              Book a Pilot
             </button>
-            <button onClick={handleBookDemo} className="landing-cta">
-              Book a Demo
+            {/* Corporate dropdown */}
+            <div className="relative" ref={corpDropdownRef}>
+              <button
+                onClick={() => setCorpDropdownOpen(!corpDropdownOpen)}
+                className="landing-util-link flex items-center gap-1"
+              >
+                Corporate
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {corpDropdownOpen && (
+                <div
+                  className="absolute top-full right-0 mt-2 w-44 rounded-lg py-1 shadow-lg"
+                  style={{
+                    backgroundColor: "hsl(var(--landing-bg))",
+                    border: "1px solid hsl(var(--landing-border))",
+                  }}
+                >
+                  <button
+                    onClick={() => { navigate("/corporate/events"); setCorpDropdownOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    Events
+                  </button>
+                  <button
+                    onClick={() => { navigate("/corporate/enterprise"); setCorpDropdownOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    Enterprise
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => navigate("/join")}
+              className="landing-cta"
+            >
+              Join Session
             </button>
           </div>
 
           {/* Mobile — CTA + Hamburger */}
           <div className="flex lg:hidden items-center gap-3">
-            <button onClick={handleBookDemo} className="landing-cta text-xs px-4 py-2">
-              Book a Demo
+            <button onClick={() => navigate("/join")} className="landing-cta text-xs px-4 py-2">
+              Join Session
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -179,18 +240,11 @@ const Index = () => {
               </button>
             ))}
             <div className="pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
-              <button
-                onClick={() => navigate("/instructor/auth")}
-                className="landing-util-link text-left py-2"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => navigate("/join")}
-                className="landing-util-link text-left py-2"
-              >
-                Join Session
-              </button>
+              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">Book a Demo</button>
+              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">Book a Pilot</button>
+              <button onClick={() => { navigate("/corporate/events"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Events</button>
+              <button onClick={() => { navigate("/corporate/enterprise"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Enterprise</button>
+              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">Join Session</button>
             </div>
           </div>
         )}
@@ -227,14 +281,14 @@ const Index = () => {
 
               {/* CTAs */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-9">
-                <button onClick={handleBookDemo} className="landing-cta px-8 py-3 text-[15px]">
-                  Book a Demo
+                <button onClick={() => navigate("/instructor/auth")} className="landing-cta px-8 py-3 text-[15px]">
+                  Instructor Sign In
                 </button>
                 <button
-                  onClick={() => scrollToSection("how-it-works")}
+                  onClick={() => navigate("/auth")}
                   className="landing-secondary-btn px-8 py-3 text-[15px]"
                 >
-                  Watch It Work
+                  Student Sign In
                 </button>
               </div>
 
@@ -437,31 +491,8 @@ const Index = () => {
           </div>
         </section>
 
-        {/* ═══════════ CATEGORY-FRAMING STRIP ═══════════ */}
-        <section
-          className="py-20 md:py-24 px-6"
-          style={{
-            borderTop: "1px solid hsl(var(--landing-border))",
-            borderBottom: "1px solid hsl(var(--landing-border))",
-            backgroundColor: "hsl(var(--landing-surface))",
-          }}
-        >
-          <div className="max-w-2xl mx-auto text-center">
-            <h2
-              className="landing-heading text-2xl md:text-[28px] mb-5"
-            >
-              The missing feedback loop in live communication
-            </h2>
-            <p
-              className="landing-subheading text-[15px] md:text-base"
-            >
-              Most speakers ask questions and get silence, guesses, or delayed
-              answers. Edvana turns spoken questions into live room signal in
-              seconds, so understanding becomes visible while the moment is
-              still alive.
-            </p>
-          </div>
-        </section>
+
+
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section id="how-it-works" className="py-24 md:py-32 px-6">
@@ -882,43 +913,8 @@ const Index = () => {
           </div>
         </section>
 
-        {/* ── Emotional Midpoint ── */}
-        <section
-          className="py-24 md:py-28 px-6"
-          style={{
-            background: "hsl(var(--landing-surface))",
-            borderTop: "1px solid hsl(var(--landing-border))",
-            borderBottom: "1px solid hsl(var(--landing-border))",
-          }}
-        >
-          <div className="max-w-xl mx-auto text-center">
-            <h2
-              className="landing-heading text-2xl md:text-[28px] mb-5"
-            >
-              When you speak, you should not have to do it blind.
-            </h2>
-            <p className="landing-subheading text-[15px]">
-              Most live sessions are one-way by default. Edvana helps turn them
-              into responsive moments by making audience understanding visible
-              in real time.
-            </p>
-          </div>
-        </section>
 
-        {/* ── Vision ── */}
-        <section className="py-24 md:py-32 px-6">
-          <div className="max-w-xl mx-auto text-center">
-            <p className="landing-eyebrow mb-4">Vision</p>
-            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
-              A new layer for live understanding
-            </h2>
-            <p className="landing-subheading text-[15px]">
-              Edvana exists to make understanding visible while communication is
-              still happening. When speakers can see the room in real time,
-              people can learn, align, and adapt faster together.
-            </p>
-          </div>
-        </section>
+
 
         {/* ── Final CTA ── */}
         <section
@@ -945,7 +941,7 @@ const Index = () => {
                 Book a Demo
               </button>
               <button
-                onClick={() => navigate("/instructor/auth")}
+                onClick={handleStartPilot}
                 className="landing-secondary-btn px-8 py-3 text-[15px]"
               >
                 Start a Pilot Conversation
@@ -1011,7 +1007,7 @@ const Index = () => {
               <ul className="space-y-2.5">
                 {[
                   { label: "Book a Demo", action: handleBookDemo },
-                  { label: "Start a Pilot", action: () => navigate("/instructor/auth") },
+                  { label: "Start a Pilot", action: handleStartPilot },
                   { label: "Join Session", action: () => navigate("/join") },
                   { label: "Login", action: () => navigate("/auth") },
                 ].map((link) => (
@@ -1039,7 +1035,7 @@ const Index = () => {
               <ul className="space-y-2.5">
                 {[
                   { label: "About", action: () => scrollToSection("hero") },
-                  { label: "Contact", action: handleBookDemo },
+                  { label: "Contact", action: handleContact },
                   { label: "Privacy", action: () => navigate("/privacy") },
                   { label: "Terms", action: () => navigate("/terms") },
                 ].map((link) => (
