@@ -81,13 +81,13 @@ const Index = () => {
     <div className="landing-page min-h-screen">
       {/* ═══════════ HEADER ═══════════ */}
       <header
-        className="sticky top-0 z-50 border-b backdrop-blur-xl"
+        className="sticky top-0 z-50 backdrop-blur-xl"
         style={{
-          backgroundColor: "hsl(var(--landing-surface) / 0.82)",
-          borderColor: "hsl(var(--landing-border))",
+          backgroundColor: "hsl(var(--landing-bg) / 0.85)",
+          borderBottom: "1px solid hsl(var(--landing-border))",
         }}
       >
-        <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1120px] mx-auto px-6 h-[60px] flex items-center justify-between">
           {/* Left — Logo */}
           <div
             className="flex items-center gap-2 cursor-pointer shrink-0"
@@ -143,7 +143,7 @@ const Index = () => {
 
           {/* Mobile — CTA + Hamburger */}
           <div className="flex lg:hidden items-center gap-3">
-            <button onClick={handleBookDemo} className="landing-cta text-xs px-4 py-1.5">
+            <button onClick={handleBookDemo} className="landing-cta text-xs px-4 py-2">
               Book a Demo
             </button>
             <button
@@ -160,10 +160,10 @@ const Index = () => {
         {/* Mobile menu dropdown */}
         {mobileMenuOpen && (
           <div
-            className="lg:hidden border-t px-6 py-4 space-y-1"
+            className="lg:hidden px-6 py-4 space-y-1"
             style={{
               backgroundColor: "hsl(var(--landing-surface))",
-              borderColor: "hsl(var(--landing-border))",
+              borderTop: "1px solid hsl(var(--landing-border))",
             }}
           >
             {NAV_ITEMS.map((item) => (
@@ -173,12 +173,12 @@ const Index = () => {
                   scrollToSection(item.toLowerCase().replace(/\s+/g, "-"));
                   setMobileMenuOpen(false);
                 }}
-                className="block w-full text-left py-2 landing-nav-link"
+                className="block w-full text-left py-2.5 landing-nav-link"
               >
                 {item}
               </button>
             ))}
-            <div className="pt-3 border-t flex flex-col gap-2" style={{ borderColor: "hsl(var(--landing-border))" }}>
+            <div className="pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
               <button
                 onClick={() => navigate("/instructor/auth")}
                 className="landing-util-link text-left py-2"
@@ -198,21 +198,18 @@ const Index = () => {
 
       {/* ═══════════ HERO ═══════════ */}
       <main>
-        <section className="relative pt-24 pb-20 md:pt-32 md:pb-28 px-6">
-          <div className="max-w-[1200px] mx-auto">
+        <section id="hero" className="relative pt-28 pb-24 md:pt-36 md:pb-32 px-6">
+          <div className="max-w-[1120px] mx-auto">
             {/* Text block */}
             <div className="max-w-2xl mx-auto text-center">
               {/* Eyebrow */}
-              <p
-                className="text-xs font-semibold uppercase tracking-[0.2em] mb-5"
-                style={{ color: "hsl(var(--landing-accent))" }}
-              >
+              <p className="landing-eyebrow mb-5">
                 Live understanding, in real time
               </p>
 
               {/* Headline */}
               <h1
-                className="text-4xl md:text-[56px] lg:text-[64px] font-bold leading-[1.08] tracking-tight mb-5"
+                className="text-4xl md:text-[52px] lg:text-[60px] font-bold leading-[1.08] tracking-[-0.025em] mb-6"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
                 See understanding while you speak.
@@ -220,7 +217,7 @@ const Index = () => {
 
               {/* Subheadline */}
               <p
-                className="text-lg md:text-xl leading-relaxed mb-10 max-w-xl mx-auto"
+                className="text-lg md:text-xl leading-relaxed mb-11 max-w-lg mx-auto"
                 style={{ color: "hsl(var(--landing-muted))" }}
               >
                 Edvana helps speakers turn live questions into instant audience
@@ -229,31 +226,20 @@ const Index = () => {
               </p>
 
               {/* CTAs */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
-                <button onClick={handleBookDemo} className="landing-cta px-7 py-3 text-[15px]">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-9">
+                <button onClick={handleBookDemo} className="landing-cta px-8 py-3 text-[15px]">
                   Book a Demo
                 </button>
                 <button
                   onClick={() => scrollToSection("how-it-works")}
-                  className="rounded-full px-7 py-3 text-[15px] font-semibold transition-all duration-200 border"
-                  style={{
-                    color: "hsl(var(--landing-text))",
-                    borderColor: "hsl(var(--landing-border))",
-                    backgroundColor: "transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "hsl(var(--landing-border))";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }}
+                  className="landing-secondary-btn px-8 py-3 text-[15px]"
                 >
                   Watch It Work
                 </button>
               </div>
 
               {/* Proof points */}
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm" style={{ color: "hsl(var(--landing-muted))" }}>
+              <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]" style={{ color: "hsl(var(--landing-muted))" }}>
                 {["No prebuilt polls required", "Review before sending", "Built for real live sessions"].map((point) => (
                   <span key={point} className="flex items-center gap-2">
                     <span
@@ -267,19 +253,19 @@ const Index = () => {
             </div>
 
             {/* ── Hero Visual: Continuous product story ── */}
-            <div className="mt-16 md:mt-20 max-w-4xl mx-auto">
+            <div className="mt-18 md:mt-24 max-w-4xl mx-auto">
               <div
-                className="rounded-2xl border overflow-hidden"
+                className="rounded-2xl overflow-hidden"
                 style={{
-                  borderColor: "hsl(var(--landing-border))",
+                  border: "1px solid hsl(var(--landing-border))",
                   backgroundColor: "hsl(var(--landing-surface))",
-                  boxShadow: "0 24px 80px -12px hsl(220 20% 12% / 0.08), 0 0 0 1px hsl(220 10% 92% / 0.5)",
+                  boxShadow: "0 24px 80px -12px hsl(220 20% 12% / 0.08), 0 0 0 1px hsl(220 10% 92% / 0.4)",
                 }}
               >
                 {/* Flow steps bar */}
                 <div
-                  className="flex items-center gap-0 border-b text-xs font-medium"
-                  style={{ borderColor: "hsl(var(--landing-border))" }}
+                  className="flex items-center gap-0 text-[11px] font-medium"
+                  style={{ borderBottom: "1px solid hsl(var(--landing-border))" }}
                 >
                   {[
                     { num: "1", label: "Speaker is live" },
@@ -289,9 +275,9 @@ const Index = () => {
                   ].map((step, i) => (
                     <div
                       key={step.num}
-                      className="flex-1 flex items-center gap-2 px-4 py-3 border-r last:border-r-0"
+                      className="flex-1 flex items-center gap-2 px-4 py-3"
                       style={{
-                        borderColor: "hsl(var(--landing-border))",
+                        borderRight: i < 3 ? "1px solid hsl(var(--landing-border))" : "none",
                         color: i === 3 ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))",
                       }}
                     >
@@ -314,7 +300,7 @@ const Index = () => {
                   {/* Panel 1: Live transcript */}
                   <div className="p-6 flex flex-col justify-center">
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "hsl(0 72% 55%)" }} />
                       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--landing-muted))" }}>
                         Live
                       </span>
@@ -333,7 +319,7 @@ const Index = () => {
                           className="w-[3px] rounded-full"
                           style={{
                             height: `${h * 16}px`,
-                            backgroundColor: "hsl(var(--landing-accent) / 0.35)",
+                            backgroundColor: "hsl(var(--landing-accent) / 0.3)",
                           }}
                         />
                       ))}
@@ -344,7 +330,7 @@ const Index = () => {
                   <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
 
                   {/* Panel 2: Drafted check-in */}
-                  <div className="p-6 flex flex-col justify-center border-t md:border-t-0" style={{ borderColor: "hsl(var(--landing-border))" }}>
+                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
                     <div className="flex items-center justify-between mb-4">
                       <span
                         className="text-[11px] font-semibold uppercase tracking-wider"
@@ -373,9 +359,9 @@ const Index = () => {
                       ].map((opt) => (
                         <div
                           key={opt.label}
-                          className="flex items-center gap-2.5 p-2.5 rounded-lg text-[13px] border"
+                          className="flex items-center gap-2.5 p-2.5 rounded-lg text-[13px]"
                           style={{
-                            borderColor: opt.correct ? "hsl(var(--landing-accent) / 0.4)" : "hsl(var(--landing-border))",
+                            border: `1px solid ${opt.correct ? "hsl(var(--landing-accent) / 0.35)" : "hsl(var(--landing-border))"}`,
                             backgroundColor: opt.correct ? "hsl(var(--landing-accent) / 0.04)" : "transparent",
                             color: "hsl(var(--landing-text))",
                           }}
@@ -405,26 +391,25 @@ const Index = () => {
                   <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
 
                   {/* Panel 3: Response signal */}
-                  <div className="p-6 flex flex-col justify-center border-t md:border-t-0" style={{ borderColor: "hsl(var(--landing-border))" }}>
+                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
                     <span className="text-[11px] font-semibold uppercase tracking-wider mb-4" style={{ color: "hsl(var(--landing-muted))" }}>
                       Room Signal
                     </span>
-                    {/* Vertical bars */}
                     <div className="flex items-end gap-3 h-24 mb-4">
                       {[
-                        { pct: 31, color: "hsl(var(--landing-border))" },
-                        { pct: 58, color: "hsl(var(--landing-accent))" },
-                        { pct: 11, color: "hsl(var(--landing-border))" },
+                        { pct: 31, highlight: false },
+                        { pct: 58, highlight: true },
+                        { pct: 11, highlight: false },
                       ].map((bar, i) => (
                         <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-[11px] font-semibold" style={{ color: i === 1 ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))" }}>
+                          <span className="text-[11px] font-semibold" style={{ color: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))" }}>
                             {bar.pct}%
                           </span>
                           <div
                             className="w-full rounded-md"
                             style={{
                               height: `${bar.pct * 1.1}px`,
-                              backgroundColor: bar.color,
+                              backgroundColor: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
                               minHeight: "8px",
                             }}
                           />
@@ -434,7 +419,6 @@ const Index = () => {
                         </div>
                       ))}
                     </div>
-                    {/* Insight line */}
                     <div
                       className="rounded-lg p-3 text-[12px] leading-snug"
                       style={{
@@ -455,22 +439,21 @@ const Index = () => {
 
         {/* ═══════════ CATEGORY-FRAMING STRIP ═══════════ */}
         <section
-          className="border-y py-20 md:py-24 px-6"
+          className="py-20 md:py-24 px-6"
           style={{
-            borderColor: "hsl(var(--landing-border))",
+            borderTop: "1px solid hsl(var(--landing-border))",
+            borderBottom: "1px solid hsl(var(--landing-border))",
             backgroundColor: "hsl(var(--landing-surface))",
           }}
         >
           <div className="max-w-2xl mx-auto text-center">
             <h2
-              className="text-2xl md:text-3xl font-bold leading-snug tracking-tight mb-5"
-              style={{ color: "hsl(var(--landing-text))" }}
+              className="landing-heading text-2xl md:text-[28px] mb-5"
             >
               The missing feedback loop in live communication
             </h2>
             <p
-              className="text-[15px] md:text-base leading-relaxed"
-              style={{ color: "hsl(var(--landing-muted))" }}
+              className="landing-subheading text-[15px] md:text-base"
             >
               Most speakers ask questions and get silence, guesses, or delayed
               answers. Edvana turns spoken questions into live room signal in
@@ -481,26 +464,15 @@ const Index = () => {
         </section>
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
-        <section id="how-it-works" className="py-20 md:py-28 px-6">
-          <div className="max-w-[1200px] mx-auto">
+        <section id="how-it-works" className="py-24 md:py-32 px-6">
+          <div className="max-w-[1120px] mx-auto">
             {/* Header */}
-            <div className="max-w-2xl mx-auto text-center mb-14">
-              <p
-                className="text-xs font-semibold uppercase tracking-[0.2em] mb-4"
-                style={{ color: "hsl(var(--landing-accent))" }}
-              >
-                How It Works
-              </p>
-              <h2
-                className="text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">How It Works</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
                 Three steps. One continuous flow.
               </h2>
-              <p
-                className="text-base md:text-lg leading-relaxed"
-                style={{ color: "hsl(var(--landing-muted))" }}
-              >
+              <p className="landing-subheading text-base md:text-lg">
                 Edvana fits into the way people already teach, train, explain,
                 and present.
               </p>
@@ -530,13 +502,7 @@ const Index = () => {
               ].map((step) => (
                 <div
                   key={step.num}
-                  className="rounded-xl border p-7 flex flex-col"
-                  style={{
-                    borderColor: "hsl(var(--landing-border))",
-                    backgroundColor: "hsl(var(--landing-surface))",
-                    boxShadow:
-                      "0 2px 12px -4px hsl(220 20% 12% / 0.04)",
-                  }}
+                  className="landing-card flex flex-col"
                 >
                   {/* Step number */}
                   <span
@@ -549,7 +515,7 @@ const Index = () => {
                     {step.num}
                   </span>
                   <h3
-                    className="text-lg font-semibold mb-3"
+                    className="text-[17px] font-semibold mb-3"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
                     {step.title}
@@ -577,28 +543,19 @@ const Index = () => {
         {/* ═══════════ BUILT FOR THE LIVE MOMENT ═══════════ */}
         <section
           id="use-cases"
-          className="py-20 md:py-28 px-6 border-t"
-          style={{ borderColor: "hsl(var(--landing-border))" }}
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
-          <div className="max-w-[1200px] mx-auto">
+          <div className="max-w-[1120px] mx-auto">
             {/* Header */}
-            <div className="max-w-2xl mx-auto text-center mb-14">
-              <p
-                className="text-xs font-semibold uppercase tracking-[0.2em] mb-4"
-                style={{ color: "hsl(var(--landing-accent))" }}
-              >
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">
                 Why It Changes the Live Moment
               </p>
-              <h2
-                className="text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
                 Built for the live moment
               </h2>
-              <p
-                className="text-base md:text-lg leading-relaxed"
-                style={{ color: "hsl(var(--landing-muted))" }}
-              >
+              <p className="landing-subheading text-base md:text-lg">
                 Edvana is designed for what speakers actually need in real
                 sessions, not for static polling workflows.
               </p>
@@ -620,18 +577,9 @@ const Index = () => {
                   body: "See what the room understood while there is still time to respond, not after the moment has passed.",
                 },
               ].map((card) => (
-                <div
-                  key={card.title}
-                  className="rounded-xl border p-7"
-                  style={{
-                    borderColor: "hsl(var(--landing-border))",
-                    backgroundColor: "hsl(var(--landing-surface))",
-                    boxShadow:
-                      "0 2px 12px -4px hsl(220 20% 12% / 0.04)",
-                  }}
-                >
+                <div key={card.title} className="landing-card">
                   <h3
-                    className="text-lg font-semibold mb-3"
+                    className="text-[17px] font-semibold mb-3"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
                     {card.title}
@@ -651,22 +599,16 @@ const Index = () => {
         {/* ═══════════ WHY EDVANA IS DIFFERENT ═══════════ */}
         <section
           id="results"
-          className="py-20 md:py-28 px-6 border-t"
-          style={{ borderColor: "hsl(var(--landing-border))" }}
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
-          <div className="max-w-[1200px] mx-auto">
+          <div className="max-w-[1120px] mx-auto">
             {/* Header */}
-            <div className="max-w-2xl mx-auto text-center mb-14">
-              <p
-                className="text-xs font-semibold uppercase tracking-[0.2em] mb-4"
-                style={{ color: "hsl(var(--landing-accent))" }}
-              >
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">
                 Why Edvana Is Different
               </p>
-              <h2
-                className="text-2xl md:text-3xl font-bold leading-tight tracking-tight"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h2 className="landing-heading text-2xl md:text-3xl">
                 Polling collects responses.
                 <br />
                 Edvana helps you see understanding.
@@ -676,15 +618,9 @@ const Index = () => {
             {/* Comparison columns */}
             <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {/* Left — Traditional */}
-              <div
-                className="rounded-xl border p-7"
-                style={{
-                  borderColor: "hsl(var(--landing-border))",
-                  backgroundColor: "hsl(var(--landing-surface))",
-                }}
-              >
+              <div className="landing-card">
                 <h3
-                  className="text-sm font-semibold uppercase tracking-wider mb-5"
+                  className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-5"
                   style={{ color: "hsl(var(--landing-muted))" }}
                 >
                   Traditional polling tools
@@ -713,14 +649,14 @@ const Index = () => {
 
               {/* Right — Edvana */}
               <div
-                className="rounded-xl border p-7"
+                className="rounded-[0.875rem] p-7"
                 style={{
-                  borderColor: "hsl(var(--landing-accent) / 0.3)",
+                  border: "1px solid hsl(var(--landing-accent) / 0.25)",
                   backgroundColor: "hsl(var(--landing-accent) / 0.03)",
                 }}
               >
                 <h3
-                  className="text-sm font-semibold uppercase tracking-wider mb-5"
+                  className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-5"
                   style={{ color: "hsl(var(--landing-accent))" }}
                 >
                   Edvana
@@ -750,7 +686,7 @@ const Index = () => {
 
             {/* Footer line */}
             <p
-              className="text-center text-[13px] leading-relaxed mt-10 max-w-xl mx-auto"
+              className="text-center text-[13px] leading-relaxed mt-12 max-w-xl mx-auto"
               style={{ color: "hsl(var(--landing-muted))" }}
             >
               Polling tools help collect responses. Edvana helps speakers know
@@ -760,34 +696,28 @@ const Index = () => {
           </div>
         </section>
 
-        {/* ── Section: Built for Real Sessions ── */}
+        {/* ── Built for Real Sessions ── */}
         <section
-          className="py-20"
-          style={{
-            borderTop: "1px solid hsl(var(--landing-border))",
-          }}
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
-          <div className="max-w-5xl mx-auto px-6">
-            <p
-              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4 text-center"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
-              BUILT FOR REAL SESSIONS
-            </p>
-            <h2
-              className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-4"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
-              Built for control in real sessions
-            </h2>
-            <p
-              className="text-base md:text-lg leading-relaxed text-center max-w-2xl mx-auto mb-14"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
-              Edvana supports live use without taking control away from the speaker.
-            </p>
+          <div className="max-w-[1120px] mx-auto">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p
+                className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-4"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Built for Real Sessions
+              </p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Built for control in real sessions
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana supports live use without taking control away from the speaker.
+              </p>
+            </div>
 
-            <div className="grid md:grid-cols-2 gap-5">
+            <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {[
                 {
                   title: "Leader-controlled workflow",
@@ -806,14 +736,7 @@ const Index = () => {
                   body: "No heavy implementation, no complex rollout, no bloated adoption overhead.",
                 },
               ].map((card) => (
-                <div
-                  key={card.title}
-                  className="rounded-xl p-6"
-                  style={{
-                    backgroundColor: "hsl(var(--landing-surface))",
-                    border: "1px solid hsl(var(--landing-border))",
-                  }}
-                >
+                <div key={card.title} className="landing-card">
                   <h3
                     className="text-[15px] font-semibold mb-2"
                     style={{ color: "hsl(var(--landing-text))" }}
@@ -821,7 +744,7 @@ const Index = () => {
                     {card.title}
                   </h3>
                   <p
-                    className="text-sm leading-relaxed"
+                    className="text-[14px] leading-relaxed"
                     style={{ color: "hsl(var(--landing-muted))" }}
                   >
                     {card.body}
@@ -832,65 +755,44 @@ const Index = () => {
           </div>
         </section>
 
-        {/* ── Section: Results ── */}
+        {/* ── Results ── */}
         <section
-          className="py-20"
-          style={{
-            borderTop: "1px solid hsl(var(--landing-border))",
-          }}
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
-          <div className="max-w-5xl mx-auto px-6">
-            <p
-              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4 text-center"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
-              RESULTS
-            </p>
-            <h2
-              className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-4"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
-              Used in live sessions where understanding matters
-            </h2>
-            <p
-              className="text-base md:text-lg leading-relaxed text-center max-w-2xl mx-auto mb-14"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
-              Edvana is already being used in explanation-heavy environments where it helps leaders see more, respond faster, and stay in flow.
-            </p>
+          <div className="max-w-[1120px] mx-auto">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">Results</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Used in live sessions where understanding matters
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana is already being used in explanation-heavy environments where it helps leaders see more, respond faster, and stay in flow.
+              </p>
+            </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
               {[
                 {
                   eyebrow: "HIGHER EDUCATION",
                   title: "Intro to Writing",
-                  stats: "12 sessions \u00b7 78% average response rate",
+                  stats: "12 sessions · 78% average response rate",
                   quote: "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
                   footer: "Repeat use: 4 of 5 class sessions",
                 },
                 {
                   eyebrow: "STEM INSTRUCTION",
                   title: "Engineering Fundamentals",
-                  stats: "8 sessions \u00b7 85% average response rate",
+                  stats: "8 sessions · 85% average response rate",
                   quote: "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
                   footer: "Repeat use: Every session after week 2",
                 },
               ].map((card) => (
                 <div
                   key={card.title}
-                  className="rounded-xl p-7"
-                  style={{
-                    backgroundColor: "hsl(var(--landing-surface))",
-                    border: "1px solid hsl(var(--landing-border))",
-                    boxShadow: "0 2px 8px -2px hsl(220 25% 15% / 0.05)",
-                  }}
+                  className="landing-card"
                 >
-                  <p
-                    className="text-[11px] font-semibold tracking-[0.15em] uppercase mb-3"
-                    style={{ color: "hsl(var(--landing-accent))" }}
-                  >
-                    {card.eyebrow}
-                  </p>
+                  <p className="landing-eyebrow mb-3">{card.eyebrow}</p>
                   <h3
                     className="text-lg font-bold mb-1"
                     style={{ color: "hsl(var(--landing-text))" }}
@@ -898,13 +800,13 @@ const Index = () => {
                     {card.title}
                   </h3>
                   <p
-                    className="text-xs mb-5"
+                    className="text-[12px] mb-6"
                     style={{ color: "hsl(var(--landing-muted))" }}
                   >
                     {card.stats}
                   </p>
                   <blockquote
-                    className="text-sm leading-relaxed italic pl-4 mb-5"
+                    className="text-[14px] leading-relaxed italic pl-4 mb-6"
                     style={{
                       color: "hsl(var(--landing-text))",
                       borderLeft: "2px solid hsl(var(--landing-accent))",
@@ -913,7 +815,7 @@ const Index = () => {
                     {card.quote}
                   </blockquote>
                   <p
-                    className="text-xs"
+                    className="text-[12px]"
                     style={{ color: "hsl(var(--landing-muted))" }}
                   >
                     {card.footer}
@@ -923,34 +825,26 @@ const Index = () => {
             </div>
           </div>
         </section>
+
         {/* ── Use Cases Detail ── */}
         <section
           id="use-cases-detail"
-          className="py-20"
+          className="py-24 md:py-32 px-6"
           style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
-          <div className="max-w-5xl mx-auto px-6">
-            <p
-              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4 text-center"
-              style={{ color: "hsl(var(--landing-accent))" }}
-            >
-              USE CASES
-            </p>
-            <h2
-              className="text-3xl md:text-4xl font-bold tracking-tight mb-4 text-center"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
-              Where Edvana fits first
-            </h2>
-            <p
-              className="text-base md:text-lg leading-relaxed max-w-2xl mx-auto mb-14 text-center"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
-              Edvana is especially valuable in live sessions where explanation,
-              interpretation, or complex material needs to land clearly in the
-              moment.
-            </p>
-            <div className="grid md:grid-cols-2 gap-5">
+          <div className="max-w-[1120px] mx-auto">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">Use Cases</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Where Edvana fits first
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana is especially valuable in live sessions where explanation,
+                interpretation, or complex material needs to land clearly in the
+                moment.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {[
                 {
                   title: "Higher education",
@@ -969,22 +863,15 @@ const Index = () => {
                   body: "For facilitators leading high-attention learning experiences.",
                 },
               ].map((card) => (
-                <div
-                  key={card.title}
-                  className="rounded-xl p-7"
-                  style={{
-                    background: "hsl(var(--landing-surface))",
-                    border: "1px solid hsl(var(--landing-border))",
-                  }}
-                >
+                <div key={card.title} className="landing-card">
                   <h3
-                    className="text-lg font-semibold mb-2"
+                    className="text-[17px] font-semibold mb-2"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
                     {card.title}
                   </h3>
                   <p
-                    className="text-sm leading-relaxed"
+                    className="text-[14px] leading-relaxed"
                     style={{ color: "hsl(var(--landing-muted))" }}
                   >
                     {card.body}
@@ -997,24 +884,20 @@ const Index = () => {
 
         {/* ── Emotional Midpoint ── */}
         <section
-          className="py-20"
+          className="py-24 md:py-28 px-6"
           style={{
             background: "hsl(var(--landing-surface))",
             borderTop: "1px solid hsl(var(--landing-border))",
             borderBottom: "1px solid hsl(var(--landing-border))",
           }}
         >
-          <div className="max-w-2xl mx-auto px-6 text-center">
+          <div className="max-w-xl mx-auto text-center">
             <h2
-              className="text-2xl md:text-3xl font-bold tracking-tight mb-5"
-              style={{ color: "hsl(var(--landing-text))" }}
+              className="landing-heading text-2xl md:text-[28px] mb-5"
             >
               When you speak, you should not have to do it blind.
             </h2>
-            <p
-              className="text-base leading-relaxed"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
+            <p className="landing-subheading text-[15px]">
               Most live sessions are one-way by default. Edvana helps turn them
               into responsive moments by making audience understanding visible
               in real time.
@@ -1023,27 +906,13 @@ const Index = () => {
         </section>
 
         {/* ── Vision ── */}
-        <section
-          className="py-20"
-          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-        >
-          <div className="max-w-2xl mx-auto px-6 text-center">
-            <p
-              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4"
-              style={{ color: "hsl(var(--landing-accent))" }}
-            >
-              VISION
-            </p>
-            <h2
-              className="text-3xl md:text-4xl font-bold tracking-tight mb-5"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
+        <section className="py-24 md:py-32 px-6">
+          <div className="max-w-xl mx-auto text-center">
+            <p className="landing-eyebrow mb-4">Vision</p>
+            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
               A new layer for live understanding
             </h2>
-            <p
-              className="text-base leading-relaxed"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
+            <p className="landing-subheading text-[15px]">
               Edvana exists to make understanding visible while communication is
               still happening. When speakers can see the room in real time,
               people can learn, align, and adapt faster together.
@@ -1054,19 +923,15 @@ const Index = () => {
         {/* ── Final CTA ── */}
         <section
           id="demo"
-          className="py-24"
+          className="py-28 md:py-36 px-6"
           style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
-          <div className="max-w-2xl mx-auto px-6 text-center">
-            <h2
-              className="text-3xl md:text-4xl font-bold tracking-tight mb-4"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
+          <div className="max-w-xl mx-auto text-center">
+            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
               See how Edvana changes a live session.
             </h2>
             <p
-              className="text-base leading-relaxed mb-10"
-              style={{ color: "hsl(var(--landing-muted))" }}
+              className="landing-subheading text-base mb-11"
             >
               Book a short demo or start a pilot conversation to see how Edvana
               supports real-time understanding in teaching, training, and
@@ -1074,28 +939,20 @@ const Index = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
               <button
-                onClick={() => navigate("/instructor/auth")}
-                className="rounded-full px-8 py-3 text-[15px] font-semibold transition-all duration-200"
-                style={{
-                  background: "hsl(var(--landing-accent))",
-                  color: "#fff",
-                }}
+                onClick={handleBookDemo}
+                className="landing-cta px-8 py-3 text-[15px]"
               >
                 Book a Demo
               </button>
               <button
                 onClick={() => navigate("/instructor/auth")}
-                className="rounded-full px-8 py-3 text-[15px] font-semibold transition-all duration-200 border"
-                style={{
-                  borderColor: "hsl(var(--landing-border))",
-                  color: "hsl(var(--landing-text))",
-                }}
+                className="landing-secondary-btn px-8 py-3 text-[15px]"
               >
                 Start a Pilot Conversation
               </button>
             </div>
             <p
-              className="text-xs"
+              className="text-[12px]"
               style={{ color: "hsl(var(--landing-muted))" }}
             >
               Short demo. Clear workflow. No bloated setup.
@@ -1106,18 +963,18 @@ const Index = () => {
 
       {/* ── Footer ── */}
       <footer
-        className="py-16"
+        className="py-14 px-6"
         style={{
           background: "hsl(var(--landing-surface))",
           borderTop: "1px solid hsl(var(--landing-border))",
         }}
       >
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
+        <div className="max-w-[1120px] mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
             {/* Product */}
             <div>
               <h4
-                className="text-sm font-semibold mb-4"
+                className="text-[13px] font-semibold mb-4"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
                 Product
@@ -1126,14 +983,14 @@ const Index = () => {
                 {[
                   { label: "Product", id: "product" },
                   { label: "How It Works", id: "how-it-works" },
-                  { label: "Why Edvana", id: "why-edvana" },
+                  { label: "Why Edvana", id: "results" },
                   { label: "Use Cases", id: "use-cases-detail" },
                   { label: "Results", id: "results" },
                 ].map((link) => (
-                  <li key={link.id}>
+                  <li key={link.label}>
                     <button
                       onClick={() => scrollToSection(link.id)}
-                      className="text-sm transition-colors duration-150 hover:opacity-80"
+                      className="text-[13px] transition-colors duration-150 hover:opacity-80"
                       style={{ color: "hsl(var(--landing-muted))" }}
                     >
                       {link.label}
@@ -1146,14 +1003,14 @@ const Index = () => {
             {/* Sessions */}
             <div>
               <h4
-                className="text-sm font-semibold mb-4"
+                className="text-[13px] font-semibold mb-4"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
                 Sessions
               </h4>
               <ul className="space-y-2.5">
                 {[
-                  { label: "Book a Demo", action: () => navigate("/instructor/auth") },
+                  { label: "Book a Demo", action: handleBookDemo },
                   { label: "Start a Pilot", action: () => navigate("/instructor/auth") },
                   { label: "Join Session", action: () => navigate("/join") },
                   { label: "Login", action: () => navigate("/auth") },
@@ -1161,7 +1018,7 @@ const Index = () => {
                   <li key={link.label}>
                     <button
                       onClick={link.action}
-                      className="text-sm transition-colors duration-150 hover:opacity-80"
+                      className="text-[13px] transition-colors duration-150 hover:opacity-80"
                       style={{ color: "hsl(var(--landing-muted))" }}
                     >
                       {link.label}
@@ -1174,7 +1031,7 @@ const Index = () => {
             {/* Company */}
             <div>
               <h4
-                className="text-sm font-semibold mb-4"
+                className="text-[13px] font-semibold mb-4"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
                 Company
@@ -1182,14 +1039,14 @@ const Index = () => {
               <ul className="space-y-2.5">
                 {[
                   { label: "About", action: () => scrollToSection("hero") },
-                  { label: "Contact", action: () => navigate("/instructor/auth") },
+                  { label: "Contact", action: handleBookDemo },
                   { label: "Privacy", action: () => navigate("/privacy") },
                   { label: "Terms", action: () => navigate("/terms") },
                 ].map((link) => (
                   <li key={link.label}>
                     <button
                       onClick={link.action}
-                      className="text-sm transition-colors duration-150 hover:opacity-80"
+                      className="text-[13px] transition-colors duration-150 hover:opacity-80"
                       style={{ color: "hsl(var(--landing-muted))" }}
                     >
                       {link.label}
@@ -1202,13 +1059,13 @@ const Index = () => {
             {/* Brand */}
             <div>
               <p
-                className="text-sm font-semibold mb-2"
+                className="text-[13px] font-semibold mb-2"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
                 Edvana is the copilot for live understanding.
               </p>
               <p
-                className="text-xs leading-relaxed"
+                className="text-[12px] leading-relaxed"
                 style={{ color: "hsl(var(--landing-muted))" }}
               >
                 Helping speakers see audience understanding in real time without
@@ -1223,7 +1080,7 @@ const Index = () => {
             style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
           >
             <p
-              className="text-xs"
+              className="text-[11px]"
               style={{ color: "hsl(var(--landing-muted))" }}
             >
               © 2026 Edvana. All rights reserved.
