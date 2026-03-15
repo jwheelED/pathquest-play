@@ -637,6 +637,54 @@
   background: linear-gradient(180deg, hsl(199 85% 82%), hsl(199 80% 90%));
 }
 
-.dark .mastery-bg {
+  .dark .mastery-bg {
   background: linear-gradient(180deg, hsl(220 30% 6%), hsl(220 28% 10%));
+}
+
+/* ============================================
+   LANDING PAGE — Premium Design Tokens
+   Scoped under .landing-page to avoid dashboard leaks
+   ============================================ */
+
+.landing-page {
+  --landing-bg: 0 0% 99%;
+  --landing-text: 220 20% 12%;
+  --landing-muted: 220 10% 52%;
+  --landing-border: 220 10% 92%;
+  --landing-surface: 0 0% 100%;
+  --landing-accent: 160 45% 40%;
+  --landing-accent-hover: 160 45% 32%;
+
+  background-color: hsl(var(--landing-bg));
+  color: hsl(var(--landing-text));
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+.landing-page .landing-nav-link {
+  @apply text-[15px] font-medium transition-colors duration-200;
+  color: hsl(var(--landing-muted));
+}
+
+.landing-page .landing-nav-link:hover {
+  color: hsl(var(--landing-text));
+}
+
+.landing-page .landing-cta {
+  background-color: hsl(var(--landing-accent));
+  color: white;
+  @apply rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition-all duration-200;
+}
+
+.landing-page .landing-cta:hover {
+  background-color: hsl(var(--landing-accent-hover));
+  @apply shadow-md;
+}
+
+.landing-page .landing-util-link {
+  @apply text-sm font-medium transition-colors duration-200;
+  color: hsl(var(--landing-muted));
+}
+
+.landing-page .landing-util-link:hover {
+  color: hsl(var(--landing-text));
 }
