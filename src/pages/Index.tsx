@@ -72,9 +72,33 @@ const Index = () => {
     }
   };
 
+  const [corpDropdownOpen, setCorpDropdownOpen] = useState(false);
+  const corpDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (corpDropdownRef.current && !corpDropdownRef.current.contains(e.target as Node)) {
+        setCorpDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const handleBookDemo = () => {
     window.location.href =
       "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
+  };
+
+  const handleStartPilot = () => {
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
+  };
+
+  const handleContact = () => {
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Contact&body=";
   };
 
   return (
