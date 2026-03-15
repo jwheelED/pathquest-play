@@ -256,26 +256,26 @@ const Index = () => {
         style={{ backgroundColor: "hsl(var(--landing-bg))" }}
       >
         <div
-          className="max-w-md mx-auto rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center gap-3"
+          className="max-w-[440px] mx-auto rounded-2xl px-5 py-4"
           style={{
             border: "1px solid hsl(var(--landing-border))",
             backgroundColor: "hsl(var(--landing-surface))",
           }}
         >
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 mb-3">
             <span
-              className="w-2 h-2 rounded-full animate-pulse"
+              className="w-2 h-2 rounded-full animate-pulse shrink-0"
               style={{ backgroundColor: "hsl(var(--landing-accent))" }}
             />
             <span
-              className="text-[13px] font-medium whitespace-nowrap"
+              className="text-[13px] font-medium"
               style={{ color: "hsl(var(--landing-text))" }}
             >
               Joining as a participant?
             </span>
           </div>
           <form
-            className="flex flex-1 items-center gap-2 w-full sm:w-auto"
+            className="flex items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               const code = (e.currentTarget.elements.namedItem("joinCode") as HTMLInputElement)?.value?.trim();
@@ -287,9 +287,9 @@ const Index = () => {
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              placeholder="6-digit code"
+              placeholder="Enter 6-digit code"
               maxLength={6}
-              className="flex-1 h-9 rounded-lg border px-3 text-center font-mono text-sm tracking-widest bg-transparent focus:outline-none focus:ring-2"
+              className="min-w-0 flex-1 h-9 rounded-lg border px-3 text-center font-mono text-sm tracking-widest bg-transparent focus:outline-none focus:ring-2"
               style={{
                 borderColor: "hsl(var(--landing-border))",
                 color: "hsl(var(--landing-text))",
@@ -297,7 +297,7 @@ const Index = () => {
             />
             <button
               type="submit"
-              className="landing-cta h-9 px-4 text-[13px] shrink-0"
+              className="landing-cta h-9 px-5 text-[13px] shrink-0"
             >
               Join
             </button>
