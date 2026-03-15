@@ -149,26 +149,63 @@ const Index = () => {
           {/* Right — Utility (desktop) */}
           <div className="hidden lg:flex items-center gap-5 shrink-0">
             <button
-              onClick={() => navigate("/instructor/auth")}
+              onClick={handleBookDemo}
               className="landing-util-link"
             >
-              Login
+              Book a Demo
             </button>
             <button
-              onClick={() => navigate("/join")}
+              onClick={handleStartPilot}
               className="landing-util-link"
             >
-              Join Session
+              Book a Pilot
             </button>
-            <button onClick={handleBookDemo} className="landing-cta">
-              Book a Demo
+            {/* Corporate dropdown */}
+            <div className="relative" ref={corpDropdownRef}>
+              <button
+                onClick={() => setCorpDropdownOpen(!corpDropdownOpen)}
+                className="landing-util-link flex items-center gap-1"
+              >
+                Corporate
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {corpDropdownOpen && (
+                <div
+                  className="absolute top-full right-0 mt-2 w-44 rounded-lg py-1 shadow-lg"
+                  style={{
+                    backgroundColor: "hsl(var(--landing-bg))",
+                    border: "1px solid hsl(var(--landing-border))",
+                  }}
+                >
+                  <button
+                    onClick={() => { navigate("/corporate/events"); setCorpDropdownOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    Events
+                  </button>
+                  <button
+                    onClick={() => { navigate("/corporate/enterprise"); setCorpDropdownOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    Enterprise
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => navigate("/join")}
+              className="landing-cta"
+            >
+              Join Session
             </button>
           </div>
 
           {/* Mobile — CTA + Hamburger */}
           <div className="flex lg:hidden items-center gap-3">
-            <button onClick={handleBookDemo} className="landing-cta text-xs px-4 py-2">
-              Book a Demo
+            <button onClick={() => navigate("/join")} className="landing-cta text-xs px-4 py-2">
+              Join Session
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -203,18 +240,11 @@ const Index = () => {
               </button>
             ))}
             <div className="pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
-              <button
-                onClick={() => navigate("/instructor/auth")}
-                className="landing-util-link text-left py-2"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => navigate("/join")}
-                className="landing-util-link text-left py-2"
-              >
-                Join Session
-              </button>
+              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">Book a Demo</button>
+              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">Book a Pilot</button>
+              <button onClick={() => { navigate("/corporate/events"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Events</button>
+              <button onClick={() => { navigate("/corporate/enterprise"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Enterprise</button>
+              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">Join Session</button>
             </div>
           </div>
         )}
