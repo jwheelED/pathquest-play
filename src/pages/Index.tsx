@@ -452,6 +452,313 @@ const Index = () => {
             </div>
           </div>
         </section>
+
+        {/* ═══════════ CATEGORY-FRAMING STRIP ═══════════ */}
+        <section
+          className="border-y py-20 md:py-24 px-6"
+          style={{
+            borderColor: "hsl(var(--landing-border))",
+            backgroundColor: "hsl(var(--landing-surface))",
+          }}
+        >
+          <div className="max-w-2xl mx-auto text-center">
+            <h2
+              className="text-2xl md:text-3xl font-bold leading-snug tracking-tight mb-5"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              The missing feedback loop in live communication
+            </h2>
+            <p
+              className="text-[15px] md:text-base leading-relaxed"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Most speakers ask questions and get silence, guesses, or delayed
+              answers. Edvana turns spoken questions into live room signal in
+              seconds, so understanding becomes visible while the moment is
+              still alive.
+            </p>
+          </div>
+        </section>
+
+        {/* ═══════════ HOW IT WORKS ═══════════ */}
+        <section id="how-it-works" className="py-20 md:py-28 px-6">
+          <div className="max-w-[1200px] mx-auto">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto text-center mb-14">
+              <p
+                className="text-xs font-semibold uppercase tracking-[0.2em] mb-4"
+                style={{ color: "hsl(var(--landing-accent))" }}
+              >
+                How It Works
+              </p>
+              <h2
+                className="text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Three steps. One continuous flow.
+              </h2>
+              <p
+                className="text-base md:text-lg leading-relaxed"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Edvana fits into the way people already teach, train, explain,
+                and present.
+              </p>
+            </div>
+
+            {/* Steps grid */}
+            <div className="grid md:grid-cols-3 gap-5">
+              {[
+                {
+                  num: "1",
+                  title: "Speak naturally",
+                  body: "Teach, train, explain, or present the way you normally would. Edvana listens in real time without forcing you to stop and build activities from scratch.",
+                  micro: "Real-time session context, without interrupting flow",
+                },
+                {
+                  num: "2",
+                  title: "Preview and send a live check-in",
+                  body: "Edvana drafts a contextual audience check based on what you just said. You stay in control, review it, and send it when the moment is right.",
+                  micro: "You review before participants ever see it",
+                },
+                {
+                  num: "3",
+                  title: "See the room instantly",
+                  body: "Watch live response patterns appear while the session is still happening. Clarify, slow down, move on, or go deeper with actual signal from the room.",
+                  micro: "Act while the session is still alive",
+                },
+              ].map((step) => (
+                <div
+                  key={step.num}
+                  className="rounded-xl border p-7 flex flex-col"
+                  style={{
+                    borderColor: "hsl(var(--landing-border))",
+                    backgroundColor: "hsl(var(--landing-surface))",
+                    boxShadow:
+                      "0 2px 12px -4px hsl(220 20% 12% / 0.04)",
+                  }}
+                >
+                  {/* Step number */}
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-5"
+                    style={{
+                      backgroundColor: "hsl(var(--landing-accent) / 0.1)",
+                      color: "hsl(var(--landing-accent))",
+                    }}
+                  >
+                    {step.num}
+                  </span>
+                  <h3
+                    className="text-lg font-semibold mb-3"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p
+                    className="text-[14px] leading-relaxed mb-auto"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {step.body}
+                  </p>
+                  {/* Micro-line */}
+                  <div className="mt-6 flex items-center gap-2 text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
+                    <span
+                      className="w-1 h-1 rounded-full shrink-0"
+                      style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+                    />
+                    {step.micro}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════ BUILT FOR THE LIVE MOMENT ═══════════ */}
+        <section
+          id="use-cases"
+          className="py-20 md:py-28 px-6 border-t"
+          style={{ borderColor: "hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1200px] mx-auto">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto text-center mb-14">
+              <p
+                className="text-xs font-semibold uppercase tracking-[0.2em] mb-4"
+                style={{ color: "hsl(var(--landing-accent))" }}
+              >
+                Why It Changes the Live Moment
+              </p>
+              <h2
+                className="text-3xl md:text-4xl font-bold leading-tight tracking-tight mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Built for the live moment
+              </h2>
+              <p
+                className="text-base md:text-lg leading-relaxed"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Edvana is designed for what speakers actually need in real
+                sessions, not for static polling workflows.
+              </p>
+            </div>
+
+            {/* Feature cards */}
+            <div className="grid md:grid-cols-3 gap-5">
+              {[
+                {
+                  title: "No prebuilt polls",
+                  body: "Edvana works from what's actually being said, so you do not have to plan every check-in in advance.",
+                },
+                {
+                  title: "No broken flow",
+                  body: "Check understanding without pausing to open a separate workflow, build a form, or derail momentum.",
+                },
+                {
+                  title: "No delayed insight",
+                  body: "See what the room understood while there is still time to respond, not after the moment has passed.",
+                },
+              ].map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-xl border p-7"
+                  style={{
+                    borderColor: "hsl(var(--landing-border))",
+                    backgroundColor: "hsl(var(--landing-surface))",
+                    boxShadow:
+                      "0 2px 12px -4px hsl(220 20% 12% / 0.04)",
+                  }}
+                >
+                  <h3
+                    className="text-lg font-semibold mb-3"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-[14px] leading-relaxed"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════ WHY EDVANA IS DIFFERENT ═══════════ */}
+        <section
+          id="results"
+          className="py-20 md:py-28 px-6 border-t"
+          style={{ borderColor: "hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1200px] mx-auto">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto text-center mb-14">
+              <p
+                className="text-xs font-semibold uppercase tracking-[0.2em] mb-4"
+                style={{ color: "hsl(var(--landing-accent))" }}
+              >
+                Why Edvana Is Different
+              </p>
+              <h2
+                className="text-2xl md:text-3xl font-bold leading-tight tracking-tight"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Polling collects responses.
+                <br />
+                Edvana helps you see understanding.
+              </h2>
+            </div>
+
+            {/* Comparison columns */}
+            <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+              {/* Left — Traditional */}
+              <div
+                className="rounded-xl border p-7"
+                style={{
+                  borderColor: "hsl(var(--landing-border))",
+                  backgroundColor: "hsl(var(--landing-surface))",
+                }}
+              >
+                <h3
+                  className="text-sm font-semibold uppercase tracking-wider mb-5"
+                  style={{ color: "hsl(var(--landing-muted))" }}
+                >
+                  Traditional polling tools
+                </h3>
+                <ul className="space-y-3">
+                  {[
+                    "Require prebuilt questions before the session",
+                    "Interrupt flow to launch activities",
+                    "Often get used inconsistently or abandoned",
+                    "Focus on response collection more than live understanding",
+                  ].map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[14px] leading-relaxed"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full mt-[7px] shrink-0"
+                        style={{ backgroundColor: "hsl(var(--landing-border))" }}
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Right — Edvana */}
+              <div
+                className="rounded-xl border p-7"
+                style={{
+                  borderColor: "hsl(var(--landing-accent) / 0.3)",
+                  backgroundColor: "hsl(var(--landing-accent) / 0.03)",
+                }}
+              >
+                <h3
+                  className="text-sm font-semibold uppercase tracking-wider mb-5"
+                  style={{ color: "hsl(var(--landing-accent))" }}
+                >
+                  Edvana
+                </h3>
+                <ul className="space-y-3">
+                  {[
+                    "Supports in-the-moment checks with minimal prep",
+                    "Fits live teaching, training, and explanation flow",
+                    "Lets leaders act while the session is still happening",
+                    "Helps surface confusion before it becomes drift",
+                  ].map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[14px] leading-relaxed"
+                      style={{ color: "hsl(var(--landing-text))" }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full mt-[7px] shrink-0"
+                        style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer line */}
+            <p
+              className="text-center text-[13px] leading-relaxed mt-10 max-w-xl mx-auto"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Polling tools help collect responses. Edvana helps speakers know
+              what the room actually took away — while there is still time to
+              adjust.
+            </p>
+          </div>
+        </section>
       </main>
     </div>
   );
