@@ -812,6 +812,170 @@ const Index = () => {
           </div>
         </section>
 
+        {/* ── Section: Built for Real Sessions ── */}
+        <section
+          className="py-20"
+          style={{
+            borderTop: "1px solid hsl(var(--landing-border))",
+          }}
+        >
+          <div className="max-w-5xl mx-auto px-6">
+            <p
+              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4 text-center"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              BUILT FOR REAL SESSIONS
+            </p>
+            <h2
+              className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-4"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              Built for control in real sessions
+            </h2>
+            <p
+              className="text-base md:text-lg leading-relaxed text-center max-w-2xl mx-auto mb-14"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Edvana supports live use without taking control away from the speaker.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-5">
+              {[
+                {
+                  title: "Leader-controlled workflow",
+                  body: "Every check-in is reviewed before it is sent.",
+                },
+                {
+                  title: "Designed for sensitive environments",
+                  body: "Built for settings where discretion, privacy, and responsible data handling matter.",
+                },
+                {
+                  title: "Easy to pilot",
+                  body: "Start small, test in a controlled setting, and expand once the workflow fits.",
+                },
+                {
+                  title: "Low setup burden",
+                  body: "No heavy implementation, no complex rollout, no bloated adoption overhead.",
+                },
+              ].map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-xl p-6"
+                  style={{
+                    backgroundColor: "hsl(var(--landing-surface))",
+                    border: "1px solid hsl(var(--landing-border))",
+                  }}
+                >
+                  <h3
+                    className="text-[15px] font-semibold mb-2"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-sm leading-relaxed"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Section: Results ── */}
+        <section
+          className="py-20"
+          style={{
+            borderTop: "1px solid hsl(var(--landing-border))",
+          }}
+        >
+          <div className="max-w-5xl mx-auto px-6">
+            <p
+              className="text-xs font-semibold tracking-[0.2em] uppercase mb-4 text-center"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              RESULTS
+            </p>
+            <h2
+              className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-4"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              Used in live sessions where understanding matters
+            </h2>
+            <p
+              className="text-base md:text-lg leading-relaxed text-center max-w-2xl mx-auto mb-14"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Edvana is already being used in explanation-heavy environments where it helps leaders see more, respond faster, and stay in flow.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {[
+                {
+                  eyebrow: "HIGHER EDUCATION",
+                  title: "Intro to Writing",
+                  stats: "12 sessions · 78% average response rate",
+                  quote: "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
+                  footer: "Repeat use: 4 of 5 class sessions",
+                },
+                {
+                  eyebrow: "STEM INSTRUCTION",
+                  title: "Engineering Fundamentals",
+                  stats: "8 sessions · 85% average response rate",
+                  quote: "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
+                  footer: "Repeat use: Every session after week 2",
+                },
+              ].map((card) => (
+                <div
+                  key={card.title}
+                  className="rounded-xl p-7"
+                  style={{
+                    backgroundColor: "hsl(var(--landing-surface))",
+                    border: "1px solid hsl(var(--landing-border))",
+                    boxShadow: "0 2px 8px -2px hsl(220 25% 15% / 0.05)",
+                  }}
+                >
+                  <p
+                    className="text-[11px] font-semibold tracking-[0.15em] uppercase mb-3"
+                    style={{ color: "hsl(var(--landing-accent))" }}
+                  >
+                    {card.eyebrow}
+                  </p>
+                  <h3
+                    className="text-lg font-bold mb-1"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-xs mb-5"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.stats}
+                  </p>
+                  <blockquote
+                    className="text-sm leading-relaxed italic pl-4 mb-5"
+                    style={{
+                      color: "hsl(var(--landing-text))",
+                      borderLeft: "2px solid hsl(var(--landing-accent))",
+                    }}
+                  >
+                    {card.quote}
+                  </blockquote>
+                  <p
+                    className="text-xs"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.footer}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ═══════════ WHY EDVANA IS DIFFERENT ═══════════ */}
         <section
           id="results"
