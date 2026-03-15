@@ -94,11 +94,11 @@ const JoinLive = () => {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/")}
           className="gap-2 rounded-full hover:bg-accent"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
+          Back
         </Button>
         
         <Card className="w-full">

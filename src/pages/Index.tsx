@@ -250,9 +250,64 @@ const Index = () => {
         )}
       </header>
 
+      {/* ═══════════ JOIN SESSION BANNER ═══════════ */}
+      <div
+        className="px-6 pt-20 md:pt-24 pb-0"
+        style={{ backgroundColor: "hsl(var(--landing-bg))" }}
+      >
+        <div
+          className="max-w-md mx-auto rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center gap-3"
+          style={{
+            border: "1px solid hsl(var(--landing-border))",
+            backgroundColor: "hsl(var(--landing-surface))",
+          }}
+        >
+          <div className="flex items-center gap-2 shrink-0">
+            <span
+              className="w-2 h-2 rounded-full animate-pulse"
+              style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+            />
+            <span
+              className="text-[13px] font-medium whitespace-nowrap"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              Joining as a participant?
+            </span>
+          </div>
+          <form
+            className="flex flex-1 items-center gap-2 w-full sm:w-auto"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const code = (e.currentTarget.elements.namedItem("joinCode") as HTMLInputElement)?.value?.trim();
+              if (code) navigate(`/join?code=${code}`);
+            }}
+          >
+            <input
+              name="joinCode"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="6-digit code"
+              maxLength={6}
+              className="flex-1 h-9 rounded-lg border px-3 text-center font-mono text-sm tracking-widest bg-transparent focus:outline-none focus:ring-2"
+              style={{
+                borderColor: "hsl(var(--landing-border))",
+                color: "hsl(var(--landing-text))",
+              }}
+            />
+            <button
+              type="submit"
+              className="landing-cta h-9 px-4 text-[13px] shrink-0"
+            >
+              Join
+            </button>
+          </form>
+        </div>
+      </div>
+
       {/* ═══════════ HERO ═══════════ */}
       <main>
-        <section id="hero" className="relative pt-28 pb-24 md:pt-36 md:pb-32 px-6">
+        <section id="hero" className="relative pt-12 pb-24 md:pt-16 md:pb-32 px-6">
           <div className="max-w-[1120px] mx-auto">
             {/* Text block */}
             <div className="max-w-2xl mx-auto text-center">
