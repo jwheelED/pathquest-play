@@ -1,44 +1,44 @@
 
+## Plan: Live Copilot Redesign — Always-On Autodraft Command Center
 
-## Plan: Add Use Cases, Emotional Midpoint, Vision, Final CTA & Footer
+**STATUS: ROUND 1-3 COMPLETE**
 
-Insert five new blocks into `src/pages/Index.tsx` at line 925 (before `</main>`), plus a footer after `</main>`. No earlier sections touched.
+### What was implemented
 
-### Sections to Add
+#### Round 1: QuestionOnDeck + Live tab restructure + rebranding
+- Created `QuestionOnDeck.tsx` — persistent autodraft card with Listening/Draft states, Preview/Send Now/Hold/Edit actions
+- Rebranded "Live Lecture Capture" → **Live Copilot** throughout
+- Rebranded "Live Session" tab → **Live Copilot**
+- Removed "Detect questions" toggle — detection is now always on
+- Wrapped transcript chunks in collapsible **Live Session Feed**
+- Replaced floating `PassiveQuestionCandidateCard` toast with inline QuestionOnDeck card
 
-**1. Use Cases** (`id="use-cases-detail"`)
-- Eyebrow + headline + subheadline centered
-- 4 cards in `md:grid-cols-2` grid: Higher education, Clinical/health-professions, Training/certification, Workshops/cohort-based
-- Same card styling as "Built for Real Sessions" — border, `landing-surface` bg, title + body only
+#### Round 2: Results redesign (Room Insight + Room Signal + Next Move)
+- Renamed "Check-In Results" → **Live Room Insight** in LectureCheckInResults
+- Renamed "Live Session Responses" → **Live Room Insight** in LiveSessionResults
+- Renamed "Visual Analytics" → **Room Signal** in LectureCheckInResults
+- Added `getRoomSignal()` interpretation function (Move on / Solid / Split room / Revisit)
+- Each live question result now leads with natural language interpretation + "Recommended Next Move" badge
+- Correctness stats are secondary (smaller text in interpretation section)
 
-**2. Emotional Midpoint**
-- Full-width band, generous `py-20`, centered max-w-2xl
-- Bold headline: "When you speak, you should not have to do it blind."
-- Body paragraph below in muted text
-- Similar treatment to the existing category-framing strip (subtle border top/bottom, `landing-surface` bg)
+#### Round 3: Review modal + greeting fix
+- Renamed "Voice Question Preview" → **Review Audience Check** in VoiceQuestionPreviewDialog
+- Renamed "Send to Students" → **Send to Room**
+- Added greeting pattern detection (`GREETING_PATTERNS`) to `usePassiveQuestionDetection.ts`
+- "How's everyone doing today?" and similar greetings are now blocked before WH-question bypass
+- Auto-dismiss extended to 60s for persistent on-deck card
 
-**3. Vision**
-- Eyebrow "VISION" + headline + body, centered max-w-2xl
-- Clean section, no cards — just typography with generous whitespace
-- `py-20`, border-top separator
+### Files Created
+- `src/components/instructor/QuestionOnDeck.tsx` — Central autodraft card
 
-**4. Final CTA**
-- Centered block, `py-24`
-- Headline + subheadline
-- Two buttons: "Book a Demo" (emerald pill, same as hero) + "Start a Pilot Conversation" (outlined)
-- Small muted supporting line below
+### Files Edited
+- `src/pages/InstructorDashboard.tsx` — Tab rename
+- `src/components/instructor/LectureTranscription.tsx` — Rebrand, layout restructure, unified pipeline
+- `src/components/instructor/VoiceQuestionPreviewDialog.tsx` — Rename + Send to Room
+- `src/components/instructor/LiveSessionResults.tsx` — Room Insight + interpretation layer
+- `src/components/instructor/LectureCheckInResults.tsx` — Room Insight + Room Signal
+- `src/hooks/usePassiveQuestionDetection.ts` — Greeting patterns, always-on
+- `src/hooks/useLectureRecording.ts` — Always-on detection config
 
-**5. Footer**
-- `<footer>` after `</main>`, `landing-surface` bg with top border
-- 4-column grid (`md:grid-cols-4`):
-  - Product links, Sessions links, Company links, Brand statement
-- Links use muted color, hover to dark
-- Bottom bar: `© 2026 Edvana` left-aligned, minimal
-- Internal links use `scrollToSection` or `navigate`; external pages (`/privacy`, `/terms`) use router
-
-### File Change
-
-| File | Action |
-|---|---|
-| `src/pages/Index.tsx` | Insert ~200 lines at line 925 (before `</main>`) + footer after `</main>` |
-
+### Files No Longer Used
+- `src/components/instructor/PassiveQuestionCandidate.tsx` — Replaced by QuestionOnDeck (not deleted, no longer imported)
