@@ -491,31 +491,8 @@ const Index = () => {
           </div>
         </section>
 
-        {/* ═══════════ CATEGORY-FRAMING STRIP ═══════════ */}
-        <section
-          className="py-20 md:py-24 px-6"
-          style={{
-            borderTop: "1px solid hsl(var(--landing-border))",
-            borderBottom: "1px solid hsl(var(--landing-border))",
-            backgroundColor: "hsl(var(--landing-surface))",
-          }}
-        >
-          <div className="max-w-2xl mx-auto text-center">
-            <h2
-              className="landing-heading text-2xl md:text-[28px] mb-5"
-            >
-              The missing feedback loop in live communication
-            </h2>
-            <p
-              className="landing-subheading text-[15px] md:text-base"
-            >
-              Most speakers ask questions and get silence, guesses, or delayed
-              answers. Edvana turns spoken questions into live room signal in
-              seconds, so understanding becomes visible while the moment is
-              still alive.
-            </p>
-          </div>
-        </section>
+
+
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section id="how-it-works" className="py-24 md:py-32 px-6">
