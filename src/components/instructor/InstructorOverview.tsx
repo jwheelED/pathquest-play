@@ -110,8 +110,8 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
     return (
       <EmptyState
         icon={<Users className="w-7 h-7" />}
-        title="No participants yet"
-        description="Share your join code to get participants into your session."
+        title="No students yet"
+        description="Share your join code to get students into your class."
         className={className}
       />
     );
@@ -126,7 +126,7 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
         label="Active Today"
         value={metrics.totalStudents > 0 ? metrics.activeToday : "--"}
         variant="default"
-        description={`of ${metrics.totalStudents} participants`}
+        description={`of ${metrics.totalStudents} students`}
       />
 
       <div
@@ -153,9 +153,9 @@ export function InstructorOverview({ instructorId, className, onNavigate }: Inst
           {metrics.avgCompletion}%
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          {metrics.completedCount} of {metrics.totalAssignmentStudents} participants
+          {metrics.completedCount} of {metrics.totalAssignmentStudents} students
         </p>
-        <p className="text-xs text-primary mt-1.5 hover:underline">View full insight →</p>
+        <p className="text-xs text-primary mt-1.5 hover:underline">View full summary →</p>
       </div>
     </div>
   );

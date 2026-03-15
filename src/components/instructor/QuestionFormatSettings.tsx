@@ -8,12 +8,12 @@ import { Settings, Code, FileText } from "lucide-react";
 
 interface QuestionFormatSettingsProps {
   instructorId: string;
-  professorType?: "stem" | "humanities" | "medical" | null;
+  professorType?: 'stem' | 'humanities' | 'medical' | null;
 }
 
 export const QuestionFormatSettings = ({ instructorId, professorType }: QuestionFormatSettingsProps) => {
-  const [format, setFormat] = useState<"multiple_choice" | "short_answer" | "coding" | "poll">("multiple_choice");
-  const [codingStyle, setCodingStyle] = useState<"simple" | "full">("simple");
+  const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding'>('multiple_choice');
+  const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -24,52 +24,52 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
   const fetchPreference = async () => {
     try {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("question_format_preference, coding_question_style")
-        .eq("id", instructorId)
+        .from('profiles')
+        .select('question_format_preference, coding_question_style')
+        .eq('id', instructorId)
         .single();
 
       if (error) throw error;
-
+      
       if (data?.question_format_preference) {
-        setFormat(data.question_format_preference as "multiple_choice" | "short_answer" | "coding" | "poll");
+        setFormat(data.question_format_preference as 'multiple_choice' | 'short_answer' | 'coding');
       }
       if (data?.coding_question_style) {
-        setCodingStyle(data.coding_question_style as "simple" | "full");
+        setCodingStyle(data.coding_question_style as 'simple' | 'full');
       }
     } catch (error) {
-      console.error("Error fetching preference:", error);
+      console.error('Error fetching preference:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleFormatChange = async (value: string) => {
-    const newFormat = value as "multiple_choice" | "short_answer" | "coding" | "poll";
+    const newFormat = value as 'multiple_choice' | 'short_answer' | 'coding';
     setFormat(newFormat);
 
     try {
       const { error } = await supabase
-        .from("profiles")
+        .from('profiles')
         .update({ question_format_preference: newFormat })
-        .eq("id", instructorId);
+        .eq('id', instructorId);
 
       if (error) throw error;
 
       // Verify the update worked
       const { data: verifyData } = await supabase
-        .from("profiles")
-        .select("question_format_preference, coding_question_style")
-        .eq("id", instructorId)
+        .from('profiles')
+        .select('question_format_preference, coding_question_style')
+        .eq('id', instructorId)
         .single();
-      console.log("✅ Settings verified after save:", verifyData);
+      console.log('✅ Settings verified after save:', verifyData);
 
       toast({
         title: "✅ Preference saved",
-        description: `Question format updated to ${newFormat === "multiple_choice" ? "Multiple Choice" : newFormat === "short_answer" ? "Short Answer" : newFormat === "poll" ? "Poll" : "Coding"}`,
+        description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : 'Coding'}`,
       });
     } catch (error: any) {
-      console.error("Error updating preference:", error);
+      console.error('Error updating preference:', error);
       toast({
         title: "Failed to save preference",
         description: error.message,
@@ -79,26 +79,25 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
   };
 
   const handleCodingStyleChange = async (value: string) => {
-    const newStyle = value as "simple" | "full";
+    const newStyle = value as 'simple' | 'full';
     setCodingStyle(newStyle);
 
     try {
       const { error } = await supabase
-        .from("profiles")
+        .from('profiles')
         .update({ coding_question_style: newStyle })
-        .eq("id", instructorId);
+        .eq('id', instructorId);
 
       if (error) throw error;
 
       toast({
         title: "✅ Coding style saved",
-        description:
-          newStyle === "simple"
-            ? "Simple check-ins: 100% for core understanding"
-            : "Full problems: Component-based grading (0-100)",
+        description: newStyle === 'simple' 
+          ? "Simple check-ins: 100% for core understanding" 
+          : "Full problems: Component-based grading (0-100)",
       });
     } catch (error: any) {
-      console.error("Error updating coding style:", error);
+      console.error('Error updating coding style:', error);
       toast({
         title: "Failed to save coding style",
         description: error.message,
@@ -118,7 +117,9 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
           <Settings className="h-5 w-5" />
           Question Format Settings
         </CardTitle>
-        <CardDescription>Choose the default format for lecture check-in questions sent to students</CardDescription>
+        <CardDescription>
+          Choose the default format for lecture check-in questions sent to students
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <RadioGroup value={format} onValueChange={handleFormatChange} className="space-y-4">
@@ -146,7 +147,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
             </div>
           </div>
 
-          {professorType !== "humanities" && (
+          {professorType !== 'humanities' && (
             <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
               <RadioGroupItem value="coding" id="coding" />
               <div className="space-y-1 leading-none flex-1">
@@ -159,22 +160,10 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
               </div>
             </div>
           )}
-
-          <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
-            <RadioGroupItem value="poll" id="poll" />
-            <div className="space-y-1 leading-none flex-1">
-              <Label htmlFor="poll" className="font-semibold cursor-pointer">
-                Poll
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Gather student opinions or check understanding. Responses are recorded but not graded.
-              </p>
-            </div>
-          </div>
         </RadioGroup>
 
         {/* Coding style sub-options - only show when coding is selected */}
-        {format === "coding" && professorType !== "humanities" && (
+        {format === 'coding' && professorType !== 'humanities' && (
           <div className="mt-4 ml-6 p-4 border-l-2 border-primary/20 space-y-3">
             <Label className="text-sm font-medium flex items-center gap-2">
               <Code className="h-4 w-4" />
@@ -188,8 +177,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
                     Simple Check-Ins (Recommended)
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Quick conceptual prompts (e.g., "Write a for loop that...").{" "}
-                    <strong>100% if student shows core understanding.</strong>
+                    Quick conceptual prompts (e.g., "Write a for loop that..."). <strong>100% if student shows core understanding.</strong>
                   </p>
                 </div>
               </div>

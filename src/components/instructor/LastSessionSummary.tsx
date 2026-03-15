@@ -135,7 +135,7 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             </div>
             <div>
               <p className="text-lg font-bold text-foreground">{session.participantCount}</p>
-              <p className="text-xs text-muted-foreground">Participants</p>
+              <p className="text-xs text-muted-foreground">Students participated</p>
             </div>
           </div>
         </div>
@@ -147,8 +147,8 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             : session.questionCount === 0
             ? "No questions were sent. Try enabling auto-questions next time."
             : session.participantCount === 0
-            ? "No participants joined. Verify your join code is shared before the next session."
-            : `${session.participantCount} participant${session.participantCount !== 1 ? "s" : ""} responded to ${session.questionCount} question${session.questionCount !== 1 ? "s" : ""}.`}
+            ? "No students joined. Verify your join code is shared before the next session."
+            : `${session.participantCount} student${session.participantCount !== 1 ? "s" : ""} responded to ${session.questionCount} question${session.questionCount !== 1 ? "s" : ""}.`}
         </div>
 
         {onNavigate && (
@@ -156,7 +156,7 @@ export function LastSessionSummary({ onNavigate }: LastSessionSummaryProps) {
             onClick={() => onNavigate("live")}
             className="flex items-center gap-1 text-xs text-primary hover:underline mt-3"
           >
-            View full insight <ArrowRight className="w-3 h-3" />
+            View full summary <ArrowRight className="w-3 h-3" />
           </button>
         )}
       </CardContent>
