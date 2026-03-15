@@ -1,34 +1,44 @@
 
+## Plan: Live Copilot Redesign — Always-On Autodraft Command Center
 
-## Plan: Add Two Sections — "Built for Real Sessions" + "Results"
+**STATUS: ROUND 1-3 COMPLETE**
 
-Insert two new `<section>` blocks into `src/pages/Index.tsx` at line 761 (before the closing `</main>` tag). No other files or sections are touched.
+### What was implemented
 
-### Section 1: Built for Real Sessions
+#### Round 1: QuestionOnDeck + Live tab restructure + rebranding
+- Created `QuestionOnDeck.tsx` — persistent autodraft card with Listening/Draft states, Preview/Send Now/Hold/Edit actions
+- Rebranded "Live Lecture Capture" → **Live Copilot** throughout
+- Rebranded "Live Session" tab → **Live Copilot**
+- Removed "Detect questions" toggle — detection is now always on
+- Wrapped transcript chunks in collapsible **Live Session Feed**
+- Replaced floating `PassiveQuestionCandidateCard` toast with inline QuestionOnDeck card
 
-- Eyebrow / headline / subheadline centered, same styling pattern as existing sections
-- 4 cards in a `md:grid-cols-2` grid (2×2 feels calmer than 4-across):
-  - "Leader-controlled workflow"
-  - "Designed for sensitive environments"
-  - "Easy to pilot"
-  - "Low setup burden"
-- Each card: rounded-xl border, `landing-surface` bg, title + body only — no icons, no decorations
-- Section separated by a top border, generous py-20
+#### Round 2: Results redesign (Room Insight + Room Signal + Next Move)
+- Renamed "Check-In Results" → **Live Room Insight** in LectureCheckInResults
+- Renamed "Live Session Responses" → **Live Room Insight** in LiveSessionResults
+- Renamed "Visual Analytics" → **Room Signal** in LectureCheckInResults
+- Added `getRoomSignal()` interpretation function (Move on / Solid / Split room / Revisit)
+- Each live question result now leads with natural language interpretation + "Recommended Next Move" badge
+- Correctness stats are secondary (smaller text in interpretation section)
 
-### Section 2: Results
+#### Round 3: Review modal + greeting fix
+- Renamed "Voice Question Preview" → **Review Audience Check** in VoiceQuestionPreviewDialog
+- Renamed "Send to Students" → **Send to Room**
+- Added greeting pattern detection (`GREETING_PATTERNS`) to `usePassiveQuestionDetection.ts`
+- "How's everyone doing today?" and similar greetings are now blocked before WH-question bypass
+- Auto-dismiss extended to 60s for persistent on-deck card
 
-- Eyebrow / headline / subheadline centered
-- 2 proof cards in `md:grid-cols-2`, each card containing:
-  - Small uppercase eyebrow (e.g. "HIGHER EDUCATION")
-  - Title bold
-  - Stats line in muted text (e.g. "12 sessions · 78% average response rate")
-  - Blockquote-style quote with left emerald accent bar
-  - Footer note in small muted text
-- Cards use `landing-surface` bg with subtle shadow — polished but not dashboard-like
+### Files Created
+- `src/components/instructor/QuestionOnDeck.tsx` — Central autodraft card
 
-### File Change
+### Files Edited
+- `src/pages/InstructorDashboard.tsx` — Tab rename
+- `src/components/instructor/LectureTranscription.tsx` — Rebrand, layout restructure, unified pipeline
+- `src/components/instructor/VoiceQuestionPreviewDialog.tsx` — Rename + Send to Room
+- `src/components/instructor/LiveSessionResults.tsx` — Room Insight + interpretation layer
+- `src/components/instructor/LectureCheckInResults.tsx` — Room Insight + Room Signal
+- `src/hooks/usePassiveQuestionDetection.ts` — Greeting patterns, always-on
+- `src/hooks/useLectureRecording.ts` — Always-on detection config
 
-| File | Action | Where |
-|---|---|---|
-| `src/pages/Index.tsx` | Insert ~120 lines | Line 761, before `</main>` |
-
+### Files No Longer Used
+- `src/components/instructor/PassiveQuestionCandidate.tsx` — Replaced by QuestionOnDeck (not deleted, no longer imported)
