@@ -1007,7 +1007,7 @@ const Index = () => {
               <ul className="space-y-2.5">
                 {[
                   { label: "Book a Demo", action: handleBookDemo },
-                  { label: "Start a Pilot", action: () => navigate("/instructor/auth") },
+                  { label: "Start a Pilot", action: handleStartPilot },
                   { label: "Join Session", action: () => navigate("/join") },
                   { label: "Login", action: () => navigate("/auth") },
                 ].map((link) => (
