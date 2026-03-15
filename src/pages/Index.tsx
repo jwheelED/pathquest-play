@@ -281,14 +281,14 @@ const Index = () => {
 
               {/* CTAs */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-9">
-                <button onClick={handleBookDemo} className="landing-cta px-8 py-3 text-[15px]">
-                  Book a Demo
+                <button onClick={() => navigate("/instructor/auth")} className="landing-cta px-8 py-3 text-[15px]">
+                  Instructor Sign In
                 </button>
                 <button
-                  onClick={() => scrollToSection("how-it-works")}
+                  onClick={() => navigate("/auth")}
                   className="landing-secondary-btn px-8 py-3 text-[15px]"
                 >
-                  Watch It Work
+                  Student Sign In
                 </button>
               </div>
 
