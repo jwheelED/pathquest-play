@@ -913,43 +913,8 @@ const Index = () => {
           </div>
         </section>
 
-        {/* ── Emotional Midpoint ── */}
-        <section
-          className="py-24 md:py-28 px-6"
-          style={{
-            background: "hsl(var(--landing-surface))",
-            borderTop: "1px solid hsl(var(--landing-border))",
-            borderBottom: "1px solid hsl(var(--landing-border))",
-          }}
-        >
-          <div className="max-w-xl mx-auto text-center">
-            <h2
-              className="landing-heading text-2xl md:text-[28px] mb-5"
-            >
-              When you speak, you should not have to do it blind.
-            </h2>
-            <p className="landing-subheading text-[15px]">
-              Most live sessions are one-way by default. Edvana helps turn them
-              into responsive moments by making audience understanding visible
-              in real time.
-            </p>
-          </div>
-        </section>
 
-        {/* ── Vision ── */}
-        <section className="py-24 md:py-32 px-6">
-          <div className="max-w-xl mx-auto text-center">
-            <p className="landing-eyebrow mb-4">Vision</p>
-            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
-              A new layer for live understanding
-            </h2>
-            <p className="landing-subheading text-[15px]">
-              Edvana exists to make understanding visible while communication is
-              still happening. When speakers can see the room in real time,
-              people can learn, align, and adapt faster together.
-            </p>
-          </div>
-        </section>
+
 
         {/* ── Final CTA ── */}
         <section
