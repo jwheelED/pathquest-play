@@ -9,6 +9,10 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { trackSessionJoined } from "@/lib/posthogTracking";
+import { useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+import { Loader2, ArrowLeft } from "lucide-react";
+import { trackSessionJoined } from "@/lib/posthogTracking";
 
 const JoinLive = () => {
   const [sessionCode, setSessionCode] = useState("");
