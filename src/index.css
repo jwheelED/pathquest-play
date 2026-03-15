@@ -647,21 +647,37 @@
    ============================================ */
 
 .landing-page {
-  --landing-bg: 0 0% 99%;
-  --landing-text: 220 20% 12%;
-  --landing-muted: 220 10% 52%;
-  --landing-border: 220 10% 92%;
-  --landing-surface: 0 0% 100%;
-  --landing-accent: 160 45% 40%;
-  --landing-accent-hover: 160 45% 32%;
+  --landing-bg: 210 20% 99%;
+  --landing-text: 220 25% 10%;
+  --landing-muted: 220 10% 48%;
+  --landing-border: 220 12% 91%;
+  --landing-surface: 210 20% 98.5%;
+  --landing-accent: 162 42% 38%;
+  --landing-accent-hover: 162 42% 30%;
 
   background-color: hsl(var(--landing-bg));
   color: hsl(var(--landing-text));
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Consistent card styling */
+.landing-page .landing-card {
+  background: hsl(var(--landing-surface));
+  border: 1px solid hsl(var(--landing-border));
+  border-radius: 0.875rem;
+  padding: 1.75rem;
+  box-shadow: 0 1px 3px -1px hsl(220 20% 12% / 0.04);
+  transition: box-shadow 0.2s ease;
+}
+
+.landing-page .landing-card:hover {
+  box-shadow: 0 4px 16px -4px hsl(220 20% 12% / 0.07);
 }
 
 .landing-page .landing-nav-link {
-  @apply text-[15px] font-medium transition-colors duration-200;
+  @apply text-[14px] font-medium transition-colors duration-200;
   color: hsl(var(--landing-muted));
 }
 
@@ -672,12 +688,26 @@
 .landing-page .landing-cta {
   background-color: hsl(var(--landing-accent));
   color: white;
-  @apply rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition-all duration-200;
+  @apply rounded-full px-6 py-2.5 text-sm font-semibold transition-all duration-200;
+  box-shadow: 0 1px 3px hsl(162 42% 38% / 0.2);
 }
 
 .landing-page .landing-cta:hover {
   background-color: hsl(var(--landing-accent-hover));
-  @apply shadow-md;
+  box-shadow: 0 4px 12px hsl(162 42% 38% / 0.25);
+  transform: translateY(-1px);
+}
+
+.landing-page .landing-secondary-btn {
+  @apply rounded-full px-6 py-2.5 text-sm font-semibold transition-all duration-200 border;
+  border-color: hsl(var(--landing-border));
+  color: hsl(var(--landing-text));
+  background: transparent;
+}
+
+.landing-page .landing-secondary-btn:hover {
+  background: hsl(var(--landing-surface));
+  border-color: hsl(var(--landing-muted) / 0.3);
 }
 
 .landing-page .landing-util-link {
@@ -687,4 +717,27 @@
 
 .landing-page .landing-util-link:hover {
   color: hsl(var(--landing-text));
+}
+
+/* Section eyebrow */
+.landing-page .landing-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: hsl(var(--landing-accent));
+}
+
+/* Section heading */
+.landing-page .landing-heading {
+  color: hsl(var(--landing-text));
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* Section subheading */
+.landing-page .landing-subheading {
+  color: hsl(var(--landing-muted));
+  line-height: 1.7;
 }
