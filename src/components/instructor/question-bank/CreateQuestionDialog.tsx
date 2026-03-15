@@ -34,7 +34,7 @@ interface CreateQuestionDialogProps {
   professorType: string | null;
 }
 
-type QuestionType = "multiple_choice" | "short_answer" | "coding";
+type QuestionType = "multiple_choice" | "short_answer" | "coding" | "poll";
 
 export function CreateQuestionDialog({
   open,
@@ -121,8 +121,8 @@ export function CreateQuestionDialog({
   
   // Available types based on professor type
   const availableTypes = professorType === "humanities" 
-    ? ["multiple_choice", "short_answer"] 
-    : ["multiple_choice", "short_answer", "coding"];
+    ? ["multiple_choice", "short_answer", "poll"] 
+    : ["multiple_choice", "short_answer", "coding", "poll"];
   
   // Reset form when dialog opens/closes or editQuestion changes
   useEffect(() => {
@@ -205,6 +205,13 @@ export function CreateQuestionDialog({
           language: codingLanguage,
           difficulty: difficulty,
         };
+      case "poll":
+        return {
+          type: "poll",
+          question: mcqQuestion,
+          options: mcqOptions.filter(opt => opt.trim()).map((opt, i) => `${["A", "B", "C", "D"][i]}. ${opt}`),
+          gradingMode: "none",
+        };
       default:
         return {};
     }
@@ -236,6 +243,17 @@ export function CreateQuestionDialog({
       case "coding":
         if (!codingProblem.trim()) {
           toast.error("Please enter the problem description");
+          return false;
+        }
+        break;
+      case "poll":
+        if (!mcqQuestion.trim()) {
+          toast.error("Please enter the poll question text");
+          return false;
+        }
+        // At least 2 options required for poll
+        if (mcqOptions.filter(opt => opt.trim()).length < 2) {
+          toast.error("Please provide at least 2 poll options");
           return false;
         }
         break;
@@ -344,6 +362,10 @@ export function CreateQuestionDialog({
                   <Label htmlFor="type-coding" className="cursor-pointer">Coding</Label>
                 </div>
               )}
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="poll" id="type-poll" />
+                <Label htmlFor="type-poll" className="cursor-pointer">📊 Poll (Ungraded)</Label>
+              </div>
             </RadioGroup>
           </div>
           
@@ -524,6 +546,41 @@ export function CreateQuestionDialog({
                   rows={4}
                   className="font-mono text-sm"
                 />
+              </div>
+            </div>
+          )}
+
+          {questionType === "poll" && (
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
+              <div className="text-xs text-muted-foreground bg-primary/5 p-2 rounded">
+                📊 Poll responses are recorded but not graded. Students won't see correct/incorrect feedback.
+              </div>
+              <div className="space-y-2">
+                <Label>Poll Question *</Label>
+                <Textarea
+                  placeholder="What do you think about...?"
+                  value={mcqQuestion}
+                  onChange={(e) => setMcqQuestion(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Options (at least 2)</Label>
+                {["A", "B", "C", "D"].map((letter, i) => (
+                  <div key={letter} className="flex items-center gap-2">
+                    <span className="w-6 text-sm font-medium">{letter}.</span>
+                    <Input
+                      placeholder={i < 2 ? `Option ${letter} *` : `Option ${letter} (optional)`}
+                      value={mcqOptions[i]}
+                      onChange={(e) => {
+                        const newOptions = [...mcqOptions];
+                        newOptions[i] = e.target.value;
+                        setMcqOptions(newOptions);
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           )}

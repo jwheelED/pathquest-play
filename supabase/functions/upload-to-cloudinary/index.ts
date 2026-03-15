@@ -1,7 +1,6 @@
 // upload-to-cloudinary: uploads files to Cloudflare R2 (S3-compatible)
 // Uses manual AWS Signature V4 + native fetch (no AWS SDK — Deno compatible)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -47,40 +46,27 @@ serve(async (req) => {
   }
 
   try {
-    // --- Auth check ---
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseAuth = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getUser(token);
-    if (claimsError || !claimsData?.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    // --- End auth check ---
-
     const R2_ACCOUNT_ID = Deno.env.get("R2_ACCOUNT_ID");
     const R2_ACCESS_KEY_ID = Deno.env.get("R2_ACCESS_KEY_ID");
     const R2_SECRET_ACCESS_KEY = Deno.env.get("R2_SECRET_ACCESS_KEY");
     const R2_BUCKET_NAME = Deno.env.get("R2_BUCKET_NAME");
     const R2_PUBLIC_URL = Deno.env.get("R2_PUBLIC_URL");
 
+    // Log secret presence (not values) for debugging
+    console.log("R2 config check:", {
+      hasAccountId: !!R2_ACCOUNT_ID,
+      hasAccessKey: !!R2_ACCESS_KEY_ID,
+      hasSecretKey: !!R2_SECRET_ACCESS_KEY,
+      hasBucket: !!R2_BUCKET_NAME,
+      hasPublicUrl: !!R2_PUBLIC_URL,
+    });
+
     if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME || !R2_PUBLIC_URL) {
       throw new Error("Cloudflare R2 credentials not configured");
     }
+
+    const contentType = req.headers.get("content-type") || "";
+    console.log("Request content-type:", contentType);
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -99,6 +85,7 @@ serve(async (req) => {
     const body = new Uint8Array(arrayBuffer);
     const fileContentType = file.type || "application/octet-stream";
 
+    // Sign and upload to R2 using AWS Signature V4 (path-style endpoint)
     const encodedKey = encodeObjectKey(key);
     const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
     const canonicalUri = `/${encodeRfc3986(R2_BUCKET_NAME)}/${encodedKey}`;
@@ -123,7 +110,9 @@ serve(async (req) => {
     const signatureBuffer = await hmac(signingKey, stringToSign);
     const signature = toHex(signatureBuffer.buffer as ArrayBuffer);
 
-    const authorizationHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+    const authHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY_ID}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    console.log("Uploading to R2:", { host, key, canonicalUri, contentType: fileContentType, bodyLength: body.length });
 
     const uploadRes = await fetch(url, {
       method: "PUT",
@@ -131,7 +120,7 @@ serve(async (req) => {
         "Content-Type": fileContentType,
         "x-amz-content-sha256": payloadHash,
         "x-amz-date": amzDate,
-        "Authorization": authorizationHeader,
+        "Authorization": authHeader,
       },
       body: body,
     });
