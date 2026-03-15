@@ -648,7 +648,11 @@ const Index = () => {
           </div>
         </section>
 
-
+        {/* ── Section: Built for Real Sessions ── */}
+        <section
+          className="py-20"
+          style={{
+            borderTop: "1px solid hsl(var(--landing-border))",
           }}
         >
           <div className="max-w-5xl mx-auto px-6">
