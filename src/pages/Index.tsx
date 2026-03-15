@@ -1035,7 +1035,7 @@ const Index = () => {
               <ul className="space-y-2.5">
                 {[
                   { label: "About", action: () => scrollToSection("hero") },
-                  { label: "Contact", action: handleBookDemo },
+                  { label: "Contact", action: handleContact },
                   { label: "Privacy", action: () => navigate("/privacy") },
                   { label: "Terms", action: () => navigate("/terms") },
                 ].map((link) => (
