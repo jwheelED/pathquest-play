@@ -1,44 +1,43 @@
 
-## Plan: Live Copilot Redesign — Always-On Autodraft Command Center
 
-**STATUS: ROUND 1-3 COMPLETE**
+## Plan: Add Four Sections Below the Hero
 
-### What was implemented
+Add four new sections to `src/pages/Index.tsx` inside `<main>`, after the hero `</section>` (line 454). The header and hero remain untouched.
 
-#### Round 1: QuestionOnDeck + Live tab restructure + rebranding
-- Created `QuestionOnDeck.tsx` — persistent autodraft card with Listening/Draft states, Preview/Send Now/Hold/Edit actions
-- Rebranded "Live Lecture Capture" → **Live Copilot** throughout
-- Rebranded "Live Session" tab → **Live Copilot**
-- Removed "Detect questions" toggle — detection is now always on
-- Wrapped transcript chunks in collapsible **Live Session Feed**
-- Replaced floating `PassiveQuestionCandidateCard` toast with inline QuestionOnDeck card
+### Section 1: Category-Framing Strip (line ~454)
+- Full-width band with subtle top/bottom border, light surface background
+- Centered text block (max-w-2xl): headline "The missing feedback loop in live communication" + body paragraph
+- Generous vertical padding (py-20), restrained styling — no icons, no cards
 
-#### Round 2: Results redesign (Room Insight + Room Signal + Next Move)
-- Renamed "Check-In Results" → **Live Room Insight** in LectureCheckInResults
-- Renamed "Live Session Responses" → **Live Room Insight** in LiveSessionResults
-- Renamed "Visual Analytics" → **Room Signal** in LectureCheckInResults
-- Added `getRoomSignal()` interpretation function (Move on / Solid / Split room / Revisit)
-- Each live question result now leads with natural language interpretation + "Recommended Next Move" badge
-- Correctness stats are secondary (smaller text in interpretation section)
+### Section 2: How It Works (`id="how-it-works"`)
+- Eyebrow + headline + subheadline centered
+- Three step cards in a responsive grid (`md:grid-cols-3`), each card with:
+  - Step number pill (small emerald circle)
+  - Title (bold)
+  - Body paragraph
+  - Micro-line at bottom (small muted text with accent dot)
+- Cards use `landing-surface` bg, `landing-border` border, subtle shadow
+- Connected feel via a horizontal rule or subtle numbering
 
-#### Round 3: Review modal + greeting fix
-- Renamed "Voice Question Preview" → **Review Audience Check** in VoiceQuestionPreviewDialog
-- Renamed "Send to Students" → **Send to Room**
-- Added greeting pattern detection (`GREETING_PATTERNS`) to `usePassiveQuestionDetection.ts`
-- "How's everyone doing today?" and similar greetings are now blocked before WH-question bypass
-- Auto-dismiss extended to 60s for persistent on-deck card
+### Section 3: Built for the Live Moment (`id="use-cases"`)
+- Eyebrow "WHY IT CHANGES THE LIVE MOMENT" + headline + subheadline centered
+- Three feature cards in `md:grid-cols-3`:
+  - "No prebuilt polls" / "No broken flow" / "No delayed insight"
+  - Each card: title + body, clean border, surface bg
+  - Titles use landing-text, body uses landing-muted
 
-### Files Created
-- `src/components/instructor/QuestionOnDeck.tsx` — Central autodraft card
+### Section 4: Why Edvana is Different (`id="results"`)
+- Eyebrow + headline centered
+- Two-column comparison layout (`md:grid-cols-2`):
+  - Left: "Traditional polling tools" — muted styling, bullet list with subtle markers
+  - Right: "Edvana" — accent-highlighted card, bullet list with emerald markers
+  - Not a cheesy table — two distinct cards side by side with different visual weight
+- Footer line below in muted text, centered
 
-### Files Edited
-- `src/pages/InstructorDashboard.tsx` — Tab rename
-- `src/components/instructor/LectureTranscription.tsx` — Rebrand, layout restructure, unified pipeline
-- `src/components/instructor/VoiceQuestionPreviewDialog.tsx` — Rename + Send to Room
-- `src/components/instructor/LiveSessionResults.tsx` — Room Insight + interpretation layer
-- `src/components/instructor/LectureCheckInResults.tsx` — Room Insight + Room Signal
-- `src/hooks/usePassiveQuestionDetection.ts` — Greeting patterns, always-on
-- `src/hooks/useLectureRecording.ts` — Always-on detection config
+### File Changes
+| Action | File |
+|---|---|
+| **Edit** | `src/pages/Index.tsx` — insert 4 sections after line 454 inside `<main>` |
 
-### Files No Longer Used
-- `src/components/instructor/PassiveQuestionCandidate.tsx` — Replaced by QuestionOnDeck (not deleted, no longer imported)
+No new files. No changes to header, hero, or CSS.
+
