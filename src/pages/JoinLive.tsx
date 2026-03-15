@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,15 +9,13 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { trackSessionJoined } from "@/lib/posthogTracking";
-import { useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { trackSessionJoined } from "@/lib/posthogTracking";
 
 const JoinLive = () => {
-  const [sessionCode, setSessionCode] = useState("");
+  const [searchParams] = useSearchParams();
+  const prefillCode = searchParams.get("code") || "";
+  const [sessionCode, setSessionCode] = useState(prefillCode);
   const [nickname, setNickname] = useState("");
-  const [step, setStep] = useState<"code" | "nickname">("code");
+  const [step, setStep] = useState<"code" | "nickname">(prefillCode.length === 6 ? "nickname" : "code");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
