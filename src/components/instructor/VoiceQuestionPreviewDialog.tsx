@@ -382,11 +382,11 @@ export function VoiceQuestionPreviewDialog({
             <Label>Question Type</Label>
             <RadioGroup
               value={questionType}
-              onValueChange={(value: 'short_answer' | 'multiple_choice') => {
+              onValueChange={(value: 'short_answer' | 'multiple_choice' | 'poll') => {
                 setQuestionType(value);
-                // Auto-generate options when switching to MCQ and options are empty
-                if (value === 'multiple_choice' && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
-                  console.log('📋 Switching to MCQ - triggering option generation');
+                // Auto-generate options when switching to MCQ or Poll and options are empty
+                if ((value === 'multiple_choice' || value === 'poll') && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
+                  console.log('📋 Switching to MCQ/Poll - triggering option generation');
                   setTimeout(() => handleGenerateOptionsAuto(), 100);
                 }
                 // Auto-generate expected answer when switching to short answer and it's empty
@@ -395,7 +395,7 @@ export function VoiceQuestionPreviewDialog({
                   setTimeout(() => handleGenerateExpectedAnswerAuto(), 100);
                 }
               }}
-              className="flex gap-4"
+              className="flex flex-wrap gap-4"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="short_answer" id="short_answer" />
@@ -409,6 +409,13 @@ export function VoiceQuestionPreviewDialog({
                 <Label htmlFor="multiple_choice" className="flex items-center gap-1 cursor-pointer">
                   <ListChecks className="h-4 w-4" />
                   Multiple Choice
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="poll" id="poll" />
+                <Label htmlFor="poll" className="flex items-center gap-1 cursor-pointer">
+                  <BarChart3 className="h-4 w-4" />
+                  Poll (Ungraded)
                 </Label>
               </div>
             </RadioGroup>
