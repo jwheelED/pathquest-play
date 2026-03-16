@@ -339,15 +339,15 @@ export function VoiceQuestionPreviewDialog({
   };
 
   const getTypeIcon = () => {
-    return questionType === 'multiple_choice' ? (
-      <ListChecks className="h-5 w-5 text-primary" />
-    ) : (
-      <MessageSquare className="h-5 w-5 text-primary" />
-    );
+    if (questionType === 'multiple_choice') return <ListChecks className="h-5 w-5 text-primary" />;
+    if (questionType === 'poll') return <BarChart3 className="h-5 w-5 text-primary" />;
+    return <MessageSquare className="h-5 w-5 text-primary" />;
   };
 
   const getTypeLabel = () => {
-    return questionType === 'multiple_choice' ? 'Multiple Choice' : 'Short Answer';
+    if (questionType === 'multiple_choice') return 'Multiple Choice';
+    if (questionType === 'poll') return 'Poll (Ungraded)';
+    return 'Short Answer';
   };
 
   return (
