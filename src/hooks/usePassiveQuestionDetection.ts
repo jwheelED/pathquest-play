@@ -90,14 +90,26 @@ function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized.includes('?') && !normalized.includes('？')) return [];
 
-  // Primary path: capture segments that end with question marks
-  const matches = normalized.match(/[^?？]*[?？]/g);
-  if (matches?.length) {
-    return matches.map(segment => segment.trim()).filter(Boolean);
+  // Split on sentence-ending punctuation (period, exclamation, semicolon, colon)
+  // but NOT commas or question marks — so only the question sentence survives
+  const sentences = normalized.split(/[.!;:]\s+/);
+
+  const questions: string[] = [];
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (!trimmed) continue;
+    if (trimmed.includes('?') || trimmed.includes('？')) {
+      // Extract question-mark-terminated segments within this sentence
+      const matches = trimmed.match(/[^?？]*[?？]/g);
+      if (matches) {
+        questions.push(...matches.map(s => s.trim()).filter(Boolean));
+      } else {
+        questions.push(trimmed);
+      }
+    }
   }
 
-  // Fallback: if punctuation exists but pattern split fails, treat full text as candidate
-  return [normalized];
+  return questions;
 }
 
 function isRhetorical(question: string): boolean {

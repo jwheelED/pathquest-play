@@ -500,9 +500,17 @@ export function VoiceQuestionPreviewDialog({
             </div>
           )}
 
-          {/* MCQ Options (only shown for multiple choice) */}
-          {questionType === 'multiple_choice' && (
+          {/* MCQ Options (shown for multiple choice and poll) */}
+          {(questionType === 'multiple_choice' || questionType === 'poll') && (
             <div className="space-y-3">
+              {questionType === 'poll' && (
+                <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                  <BarChart3 className="h-5 w-5 text-blue-500 shrink-0" />
+                  <p className="text-sm text-blue-500">
+                    📊 Responses will be collected as a poll (no grading)
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <Label>Answer Options</Label>
                 <Button
@@ -533,45 +541,72 @@ export function VoiceQuestionPreviewDialog({
               </div>
               <p className="text-xs text-muted-foreground">
                 {hasOptions 
-                  ? "Edit the generated options below. Select the correct answer."
+                  ? questionType === 'poll' 
+                    ? "Edit the generated options below."
+                    : "Edit the generated options below. Select the correct answer."
                   : "Click 'Generate Options' to create choices, or add them manually."}
               </p>
-              <RadioGroup
-                value={correctAnswer}
-                onValueChange={(value) => setCorrectAnswer(value as 'A' | 'B' | 'C' | 'D')}
-                className="space-y-3"
-              >
-                {['A', 'B', 'C', 'D'].map((letter, index) => (
-                  <div key={letter} className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-2 min-w-[80px]">
-                        <RadioGroupItem
-                          value={letter}
-                          id={`correct-${letter}`}
+              {questionType === 'multiple_choice' ? (
+                <RadioGroup
+                  value={correctAnswer}
+                  onValueChange={(value) => setCorrectAnswer(value as 'A' | 'B' | 'C' | 'D')}
+                  className="space-y-3"
+                >
+                  {['A', 'B', 'C', 'D'].map((letter, index) => (
+                    <div key={letter} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-[80px]">
+                          <RadioGroupItem
+                            value={letter}
+                            id={`correct-${letter}`}
+                          />
+                          <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
+                            {letter}
+                          </Label>
+                        </div>
+                        <Input
+                          value={mcqOptions[index]}
+                          onChange={(e) => handleOptionChange(index, e.target.value)}
+                          placeholder={`Option ${letter}`}
+                          className="flex-1"
                         />
-                        <Label htmlFor={`correct-${letter}`} className="font-medium cursor-pointer">
-                          {letter}
-                        </Label>
                       </div>
-                      <Input
-                        value={mcqOptions[index]}
-                        onChange={(e) => handleOptionChange(index, e.target.value)}
-                        placeholder={`Option ${letter}`}
-                        className="flex-1"
-                      />
+                      {showMathPreview && mcqOptions[index] && (
+                        <div className="ml-[88px] p-2 rounded border bg-muted/30 text-sm">
+                          <MathRenderer content={mcqOptions[index]} />
+                        </div>
+                      )}
                     </div>
-                    {/* Math preview for this option */}
-                    {showMathPreview && mcqOptions[index] && (
-                      <div className="ml-[88px] p-2 rounded border bg-muted/30 text-sm">
-                        <MathRenderer content={mcqOptions[index]} />
+                  ))}
+                </RadioGroup>
+              ) : (
+                /* Poll mode: no correct answer selector, just option inputs */
+                <div className="space-y-3">
+                  {['A', 'B', 'C', 'D'].map((letter, index) => (
+                    <div key={letter} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium w-6 text-muted-foreground">{letter}:</span>
+                        <Input
+                          value={mcqOptions[index]}
+                          onChange={(e) => handleOptionChange(index, e.target.value)}
+                          placeholder={`Option ${letter}`}
+                          className="flex-1"
+                        />
                       </div>
-                    )}
-                  </div>
-                ))}
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                Select the radio button next to the correct answer.
-              </p>
+                      {showMathPreview && mcqOptions[index] && (
+                        <div className="ml-8 p-2 rounded border bg-muted/30 text-sm">
+                          <MathRenderer content={mcqOptions[index]} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {questionType === 'multiple_choice' && (
+                <p className="text-xs text-muted-foreground">
+                  Select the radio button next to the correct answer.
+                </p>
+              )}
             </div>
           )}
         </div>
