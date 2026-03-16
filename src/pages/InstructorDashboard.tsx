@@ -48,11 +48,11 @@ type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "q
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "live", label: "Live Session", icon: Radio },
+  { value: "live", label: "Live Copilot", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
-  { value: "summaries", label: "Session Insights", icon: Award },
-  { value: "students", label: "Participants", icon: Users },
+  { value: "summaries", label: "Summaries", icon: Award },
+  { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
   { value: "settings", label: "Settings", icon: Settings },
 ];
@@ -91,7 +91,7 @@ export default function InstructorDashboard() {
     const today = new Date().toDateString();
     if (lastReminderDate !== today) {
       setTimeout(() => {
-        toast.info("💡 Tip: You can upload session slides and materials in the Materials tab!", {
+        toast.info("💡 Tip: You can upload lecture slides and materials in the Materials tab!", {
           duration: 5000,
         });
         localStorage.setItem('lastCourseMaterialsReminder', today);
@@ -458,7 +458,7 @@ export default function InstructorDashboard() {
                     Slide Presenter
                   </CardTitle>
                   <CardDescription className="text-sm">
-                    Present slides with integrated live session tools
+                    Present slides with integrated live lecture tools
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-0">

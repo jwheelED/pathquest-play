@@ -7,6 +7,8 @@ import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
+import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
+
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
 import { sanitizeTranscript } from '@/lib/transcriptSanitizer';
@@ -126,7 +128,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     },
   });
   
+
   // Store slide context in a ref so it's always current
+
   const slideContextRef = useRef<string>('');
   
   // Store course context (topics, title) for AI question generation
@@ -159,6 +163,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Question preview setting - when false, questions send immediately without preview
   const [questionPreviewEnabled, setQuestionPreviewEnabled] = useState(true);
   const questionPreviewEnabledRef = useRef(true);
+
+  // Passive question detection
+  const [passiveDetectionEnabled, setPassiveDetectionEnabled] = useState(true);
+
   
   // Update slide context ref when prop changes
   useEffect(() => {
@@ -192,6 +200,21 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   const studentCountRef = useRef(studentCount);
   const autoQuestionIntervalRef = useRef(autoQuestionInterval);
   
+  // Passive question detection hook
+  const {
+    candidate: passiveCandidate,
+    checkUtterance: checkPassiveQuestion,
+    dismissCandidate: dismissPassiveCandidate,
+    resetDetection: resetPassiveDetection,
+  } = usePassiveQuestionDetection({
+    enabled: true, // Always on
+    cooldownMs: 8000,
+    minWordCount: 5,
+    autoDismissMs: 60000,
+    lastQuestionSentTime: lastQuestionSentTimeRef.current,
+  });
+
+
   // Deepgram streaming refs for real-time transcription
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
   
@@ -935,7 +958,11 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
+          // Passive question detection — check final utterances for ?
+          checkPassiveQuestion(cleanText);
+          
           // Update React state less frequently to reduce re-renders (every 5 chunks)
+
           transcriptChunkCountRef.current++;
           setLastTranscript(cleanText);
           
@@ -1340,6 +1367,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     isProcessing,
     isStreamingMode,
 
+    // Passive question detection
+    passiveCandidate,
+    passiveDetectionEnabled,
+    setPassiveDetectionEnabled,
+    dismissPassiveCandidate,
+
     // Actions
     startRecording,
     stopRecording,
@@ -1349,3 +1382,4 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     sendExtractedQuestion,
   };
 }
+

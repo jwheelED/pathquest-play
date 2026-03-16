@@ -1,89 +1,27 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  ArrowRight,
-  Users,
-  CheckCircle2,
-  Shield,
-  Mic,
-  Square,
-  Eye,
-  Zap,
-  BarChart3,
-  X,
-  Check,
-  Building2,
-  FlaskConical,
-  Clock,
-  MessageSquare,
-  GraduationCap,
-  HeartPulse,
-  Award,
-  Monitor,
-  Wrench,
-  Stethoscope,
-  ChevronDown,
-  CalendarDays,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+import { Menu, X, ChevronDown } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
-import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+
+const NAV_ITEMS = ["Product", "How It Works", "Use Cases", "Results", "Demo"];
 
 const Index = () => {
   const [session, setSession] = useState(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stayOnPage = searchParams.get("stay") === "true";
-
-  // Scroll animation refs
-  const step1Ref = useScrollAnimation(0.2);
-  const step2Ref = useScrollAnimation(0.2);
-  const step3Ref = useScrollAnimation(0.2);
-  const diffRef = useScrollAnimation(0.2);
-  const trustRef = useScrollAnimation(0.2);
-  const proofRef = useScrollAnimation(0.2);
-  const audienceRef = useScrollAnimation(0.2);
-
-  // Step 1 recording animation state
-  const [isRecording, setIsRecording] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
-  const recordingTriggered = useRef(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (step1Ref.isVisible && !recordingTriggered.current) {
-      recordingTriggered.current = true;
-      const t1 = setTimeout(() => setIsRecording(true), 1500);
-      const t2 = setTimeout(() => setShowTranscript(true), 2200);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
-    }
-  }, [step1Ref.isVisible]);
-
-  // Step 3 bar chart animation state
-  const [barsAnimated, setBarsAnimated] = useState(false);
-  const barsTriggered = useRef(false);
-
-  useEffect(() => {
-    if (step3Ref.isVisible && !barsTriggered.current) {
-      barsTriggered.current = true;
-      const t = setTimeout(() => setBarsAnimated(true), 400);
-      return () => clearTimeout(t);
-    }
-  }, [step3Ref.isVisible]);
-
-  useEffect(() => {
-    const checkSessionAndRedirect = async (session: any) => {
+    const checkSessionAndRedirect = async (session: unknown) => {
       if (session && !stayOnPage) {
+        const typedSession = session as { user: { id: string } };
+
         const { data: adminRole } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", session.user.id)
+          .eq("user_id", typedSession.user.id)
           .eq("role", "admin")
           .maybeSingle();
 
@@ -95,7 +33,7 @@ const Index = () => {
         const { data: instructorRole } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", session.user.id)
+          .eq("user_id", typedSession.user.id)
           .eq("role", "instructor")
           .maybeSingle();
 
@@ -115,7 +53,7 @@ const Index = () => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
         setTimeout(() => {
@@ -134,802 +72,1070 @@ const Index = () => {
     }
   };
 
+  const [corpDropdownOpen, setCorpDropdownOpen] = useState(false);
+  const corpDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (corpDropdownRef.current && !corpDropdownRef.current.contains(e.target as Node)) {
+        setCorpDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const handleBookDemo = () => {
-    window.location.href = "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
   };
 
-  const handlePilotConversation = () => {
-    window.location.href = "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to explore a controlled pilot of Edvana for my sessions.";
+  const handleStartPilot = () => {
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
+  };
+
+  const handleContact = () => {
+    window.location.href =
+      "mailto:nigel@edvana.dev?subject=Contact&body=";
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden relative">
-      {/* ═══════════════════════════ HEADER ═══════════════════════════ */}
-      <header className="relative z-10 border-b border-border bg-card/90 backdrop-blur-sm sticky top-0">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => scrollToSection("hero")}>
-            <img src={edvanaLogo} alt="Edvana" className="h-8 transition-transform hover:scale-105" />
+    <div className="landing-page min-h-screen">
+      {/* ═══════════ HEADER ═══════════ */}
+      <header
+        className="sticky top-0 z-50 backdrop-blur-xl"
+        style={{
+          backgroundColor: "hsl(var(--landing-bg) / 0.85)",
+          borderBottom: "1px solid hsl(var(--landing-border))",
+        }}
+      >
+        <div className="max-w-[1120px] mx-auto px-6 h-[60px] flex items-center justify-between">
+          {/* Left — Logo */}
+          <div
+            className="flex items-center gap-2 cursor-pointer shrink-0"
+            onClick={() => scrollToSection("hero")}
+          >
+            <img
+              src={edvanaLogo}
+              alt="Edvana"
+              className="h-7 transition-transform hover:scale-105"
+            />
           </div>
 
-          {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-            <button onClick={() => scrollToSection("how-it-works")} className="hover:text-foreground transition-colors">How It Works</button>
-            <button onClick={() => scrollToSection("differentiation")} className="hover:text-foreground transition-colors">Why Edvana</button>
-            <button onClick={() => scrollToSection("trust")} className="hover:text-foreground transition-colors">Trust</button>
-            <button onClick={() => scrollToSection("proof")} className="hover:text-foreground transition-colors">Results</button>
+          {/* Center — Nav (desktop) */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {NAV_ITEMS.map((item, i) => (
+              <span key={item} className="flex items-center">
+                {i > 0 && (
+                  <span
+                    className="mx-3 w-[3px] h-[3px] rounded-full"
+                    style={{ backgroundColor: "hsl(var(--landing-border))" }}
+                  />
+                )}
+                <button
+                  onClick={() =>
+                    scrollToSection(item.toLowerCase().replace(/\s+/g, "-"))
+                  }
+                  className="landing-nav-link"
+                >
+                  {item}
+                </button>
+              </span>
+            ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          {/* Right — Utility (desktop) */}
+          <div className="hidden lg:flex items-center gap-5 shrink-0">
             <button
               onClick={handleBookDemo}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
+              className="landing-util-link"
             >
               Book a Demo
             </button>
             <button
-              onClick={handlePilotConversation}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
+              onClick={handleStartPilot}
+              className="landing-util-link"
             >
               Book a Pilot
             </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  Corporate
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate("/corporate/events")}>
-                  <CalendarDays className="w-4 h-4 mr-2" />
-                  Events
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/corporate/enterprise")}>
-                  <Building2 className="w-4 h-4 mr-2" />
-                  Enterprise
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button size="sm" onClick={() => navigate("/join")} className="rounded-full font-semibold">
+            {/* Corporate dropdown */}
+            <div className="relative" ref={corpDropdownRef}>
+              <button
+                onClick={() => setCorpDropdownOpen(!corpDropdownOpen)}
+                className="landing-util-link flex items-center gap-1"
+              >
+                Corporate
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              {corpDropdownOpen && (
+                <div
+                  className="absolute top-full right-0 mt-2 w-44 rounded-lg py-1 shadow-lg"
+                  style={{
+                    backgroundColor: "hsl(var(--landing-bg))",
+                    border: "1px solid hsl(var(--landing-border))",
+                  }}
+                >
+                  <button
+                    onClick={() => { navigate("/corporate/events"); setCorpDropdownOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    Events
+                  </button>
+                  <button
+                    onClick={() => { navigate("/corporate/enterprise"); setCorpDropdownOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    Enterprise
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => navigate("/join")}
+              className="landing-cta"
+            >
               Join Session
-            </Button>
+            </button>
+          </div>
+
+          {/* Mobile — CTA + Hamburger */}
+          <div className="flex lg:hidden items-center gap-3">
+            <button onClick={() => navigate("/join")} className="landing-cta text-xs px-4 py-2">
+              Join Session
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: "hsl(var(--landing-text))" }}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {mobileMenuOpen && (
+          <div
+            className="lg:hidden px-6 py-4 space-y-1"
+            style={{
+              backgroundColor: "hsl(var(--landing-surface))",
+              borderTop: "1px solid hsl(var(--landing-border))",
+            }}
+          >
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item}
+                onClick={() => {
+                  scrollToSection(item.toLowerCase().replace(/\s+/g, "-"));
+                  setMobileMenuOpen(false);
+                }}
+                className="block w-full text-left py-2.5 landing-nav-link"
+              >
+                {item}
+              </button>
+            ))}
+            <div className="pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">Book a Demo</button>
+              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">Book a Pilot</button>
+              <button onClick={() => { navigate("/corporate/events"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Events</button>
+              <button onClick={() => { navigate("/corporate/enterprise"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Enterprise</button>
+              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">Join Session</button>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* ═══════════════════════════ HERO ═══════════════════════════ */}
-      <section id="hero" className="relative z-10 py-16 md:py-24 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center space-y-6">
-            {/* Headline */}
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground leading-[1.1] tracking-tight animate-fade-in">
-              Know Whether the Room Is
-              <span className="block mt-2 bg-gradient-to-r from-primary via-primary-glow to-secondary bg-clip-text text-transparent">
-                Actually With You
-              </span>
-            </h1>
-
-            {/* Subheadline */}
-            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed animate-fade-in stagger-2">
-              Edvana helps instructors, trainers, and facilitators check understanding{" "}
-              <span className="text-foreground font-medium">live</span> — without breaking the flow of teaching, training, or explanation.
-            </p>
-
-            {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center animate-fade-in stagger-3">
-              <Button
-                size="lg"
-                onClick={() => navigate("/instructor/auth")}
-                className="rounded-full px-8 gap-2 shadow-glow hover:shadow-xl transition-all duration-300 hover:scale-105 group"
-              >
-                Instructor Sign In
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => navigate("/auth")}
-                className="rounded-full px-8 border-2 border-border text-foreground hover:bg-accent transition-all gap-2"
-              >
-                Student Sign In
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* Trust row */}
-            <div className="flex flex-wrap items-center justify-center gap-6 pt-4 text-sm text-muted-foreground animate-fade-in stagger-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
-                No prebuilt polls required
-              </div>
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-primary" />
-                Review before sending
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
-                Built for real live sessions
-              </div>
-            </div>
+      {/* ═══════════ JOIN SESSION BANNER ═══════════ */}
+      <div
+        className="px-6 pt-20 md:pt-24 pb-0"
+        style={{ backgroundColor: "hsl(var(--landing-bg))" }}
+      >
+        <div
+          className="max-w-[440px] mx-auto rounded-2xl px-5 py-4"
+          style={{
+            border: "1px solid hsl(var(--landing-border))",
+            backgroundColor: "hsl(var(--landing-surface))",
+          }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span
+              className="w-2 h-2 rounded-full animate-pulse shrink-0"
+              style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+            />
+            <span
+              className="text-[13px] font-medium"
+              style={{ color: "hsl(var(--landing-text))" }}
+            >
+              Joining as a participant?
+            </span>
           </div>
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const code = (e.currentTarget.elements.namedItem("joinCode") as HTMLInputElement)?.value?.trim();
+              if (code) navigate(`/join?code=${code}`);
+            }}
+          >
+            <input
+              name="joinCode"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="Enter 6-digit code"
+              maxLength={6}
+              className="min-w-0 flex-1 h-9 rounded-lg border px-3 text-center font-mono text-sm tracking-widest bg-transparent focus:outline-none focus:ring-2"
+              style={{
+                borderColor: "hsl(var(--landing-border))",
+                color: "hsl(var(--landing-text))",
+              }}
+            />
+            <button
+              type="submit"
+              className="landing-cta h-9 px-5 text-[13px] shrink-0"
+            >
+              Join
+            </button>
+          </form>
+        </div>
+      </div>
 
-          {/* Hero Visual — 3-panel workflow */}
-          <div className="mt-14 grid md:grid-cols-3 gap-4 animate-fade-in stagger-4">
-            {/* Panel 1: Live session context */}
-            <div className="rounded-2xl border border-border bg-card shadow-card p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Live Session</span>
-              </div>
-              <p className="text-sm text-foreground font-medium leading-relaxed">
-                "The key difference between Type I and Type II errors is that one rejects a true hypothesis while the other fails to reject a false one…"
+      {/* ═══════════ HERO ═══════════ */}
+      <main>
+        <section id="hero" className="relative pt-12 pb-24 md:pt-16 md:pb-32 px-6">
+          <div className="max-w-[1120px] mx-auto">
+            {/* Text block */}
+            <div className="max-w-2xl mx-auto text-center">
+              {/* Eyebrow */}
+              <p className="landing-eyebrow mb-5">
+                Live understanding, in real time
               </p>
-              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <Mic className="w-3 h-3" />
-                12 min into session
-              </div>
-            </div>
 
-            {/* Panel 2: Check-in preview */}
-            <div className="rounded-2xl border-2 border-primary/30 bg-card shadow-card p-6">
-              <p className="text-xs font-medium text-primary uppercase tracking-wider mb-3">Drafted Check-In</p>
-              <p className="text-sm text-foreground font-semibold mb-3">A Type II error occurs when you…</p>
-              <div className="space-y-2">
-                {[
-                  { label: "A", text: "Reject a true null hypothesis", correct: false },
-                  { label: "B", text: "Fail to reject a false null hypothesis", correct: true },
-                  { label: "C", text: "Accept the alternative hypothesis", correct: false },
-                ].map((opt) => (
-                  <div
-                    key={opt.label}
-                    className={`flex items-center gap-2 p-2 rounded-lg text-xs ${
-                      opt.correct ? "border border-primary bg-primary/5 font-medium text-foreground" : "border border-border bg-muted/30 text-muted-foreground"
-                    }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                      opt.correct ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {opt.label}
-                    </span>
-                    {opt.text}
-                  </div>
+              {/* Headline */}
+              <h1
+                className="text-4xl md:text-[52px] lg:text-[60px] font-bold leading-[1.08] tracking-[-0.025em] mb-6"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                See understanding while you speak.
+              </h1>
+
+              {/* Subheadline */}
+              <p
+                className="text-lg md:text-xl leading-relaxed mb-11 max-w-lg mx-auto"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Edvana helps speakers turn live questions into instant audience
+                understanding checks, so they can adjust in real time without
+                breaking flow.
+              </p>
+
+              {/* CTAs */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-9">
+                <button onClick={() => navigate("/instructor/auth")} className="landing-cta px-8 py-3 text-[15px]">
+                  Instructor Sign In
+                </button>
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="landing-secondary-btn px-8 py-3 text-[15px]"
+                >
+                  Student Sign In
+                </button>
+              </div>
+
+              {/* Proof points */}
+              <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]" style={{ color: "hsl(var(--landing-muted))" }}>
+                {["No prebuilt polls required", "Review before sending", "Built for real live sessions"].map((point) => (
+                  <span key={point} className="flex items-center gap-2">
+                    <span
+                      className="w-1 h-1 rounded-full shrink-0"
+                      style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+                    />
+                    {point}
+                  </span>
                 ))}
               </div>
-              <Button size="sm" className="w-full mt-3 rounded-full text-xs" style={{ pointerEvents: "none" }}>
-                Send to Participants
-              </Button>
             </div>
 
-            {/* Panel 3: Response summary */}
-            <div className="rounded-2xl border border-border bg-card shadow-card p-6">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Response Summary</p>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">A — Reject true null</span>
-                    <span className="text-destructive font-medium">31%</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-destructive/70 rounded-full" style={{ width: "31%" }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-foreground font-medium">B — Fail to reject false null ✓</span>
-                    <span className="text-primary font-bold">58%</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: "58%" }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">C — Accept alternative</span>
-                    <span className="text-muted-foreground font-medium">11%</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-muted-foreground/40 rounded-full" style={{ width: "11%" }} />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  45 responded
-                </div>
-                <span className="font-semibold text-primary">58% correct</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════ AUDIENCE BAND ═══════════════════════════ */}
-      <section className="relative z-10 py-10 px-4 border-y border-border bg-muted/30">
-        <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">
-            Built for explanation-heavy live sessions like:
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {[
-              { icon: GraduationCap, label: "Higher ed teaching" },
-              { icon: Stethoscope, label: "Nursing & clinical education" },
-              { icon: Wrench, label: "Workforce training" },
-              { icon: Users, label: "Workshops & cohort learning" },
-              { icon: Monitor, label: "Zoom & hybrid sessions" },
-              { icon: FlaskConical, label: "Technical & case-based instruction" },
-            ].map((item, i) => (
+            {/* ── Hero Visual: Continuous product story ── */}
+            <div className="mt-18 md:mt-24 max-w-4xl mx-auto">
               <div
-                key={i}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border text-sm text-foreground font-medium"
+                className="rounded-2xl overflow-hidden"
+                style={{
+                  border: "1px solid hsl(var(--landing-border))",
+                  backgroundColor: "hsl(var(--landing-surface))",
+                  boxShadow: "0 24px 80px -12px hsl(220 20% 12% / 0.08), 0 0 0 1px hsl(220 10% 92% / 0.4)",
+                }}
               >
-                <item.icon className="w-4 h-4 text-primary" />
-                {item.label}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════ HOW IT WORKS ═══════════════════════════ */}
-      <section id="how-it-works" className="relative z-10 py-20 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
-              How It Works
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Check understanding during a live session in three simple steps
-            </p>
-          </div>
-
-          <div className="space-y-16">
-            {/* Step 1 — Just Teach */}
-            <div
-              ref={step1Ref.ref}
-              className={`grid lg:grid-cols-2 gap-10 items-center transition-all duration-1000 ${
-                step1Ref.isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
-              }`}
-            >
-              <div className="order-2 lg:order-1">
-                <div className="rounded-2xl border border-border bg-card shadow-card p-8 md:p-10">
-                  <div className="flex flex-col items-center gap-6">
-                    <button
-                      className={`flex items-center gap-3 px-6 py-3 rounded-full font-semibold text-primary-foreground text-sm transition-all duration-500 ${
-                        isRecording ? "bg-destructive shadow-lg scale-105" : "bg-primary shadow-glow"
-                      }`}
-                      style={{ pointerEvents: "none" }}
-                    >
-                      {isRecording ? (
-                        <>
-                          <Square className="w-4 h-4" fill="currentColor" />
-                          Stop Recording
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="w-4 h-4" />
-                          Start Recording
-                        </>
-                      )}
-                    </button>
-
+                {/* Flow steps bar */}
+                <div
+                  className="flex items-center gap-0 text-[11px] font-medium"
+                  style={{ borderBottom: "1px solid hsl(var(--landing-border))" }}
+                >
+                  {[
+                    { num: "1", label: "Speaker is live" },
+                    { num: "2", label: "Edvana drafts a check-in" },
+                    { num: "3", label: "Sent to audience" },
+                    { num: "4", label: "Signal appears" },
+                  ].map((step, i) => (
                     <div
-                      className={`w-full max-w-sm bg-muted/50 rounded-xl p-5 border border-border transition-all duration-700 ${
-                        showTranscript ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 max-h-0 overflow-hidden"
-                      }`}
-                      style={showTranscript ? { maxHeight: 200 } : { maxHeight: 0 }}
+                      key={step.num}
+                      className="flex-1 flex items-center gap-2 px-4 py-3"
+                      style={{
+                        borderRight: i < 3 ? "1px solid hsl(var(--landing-border))" : "none",
+                        color: i === 3 ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))",
+                      }}
                     >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Live Transcription</span>
-                      </div>
-                      <p className="text-base text-foreground font-medium leading-relaxed">
-                        "Today we'll cover the three main types of chemical bonds…"
-                      </p>
+                      <span
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                        style={{
+                          backgroundColor: i === 3 ? "hsl(var(--landing-accent) / 0.1)" : "hsl(var(--landing-border))",
+                          color: i === 3 ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))",
+                        }}
+                      >
+                        {step.num}
+                      </span>
+                      <span className="hidden sm:inline">{step.label}</span>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
-              <div className="order-1 lg:order-2 space-y-5">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center shadow-glow">
-                  <Mic className="w-7 h-7 text-primary-foreground" strokeWidth={1.5} />
-                </div>
-                <div className="text-sm font-semibold text-primary uppercase tracking-wider">Step 1</div>
-                <h3 className="text-3xl md:text-4xl font-bold text-foreground">Just Teach</h3>
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  Lead the session normally while Edvana helps you create live checks for understanding without interrupting flow.
-                </p>
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground pt-1">
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                  Real-time session context, without interrupting flow
-                </div>
-              </div>
-            </div>
 
-            {/* Step 2 — Preview and Send a Check-In */}
-            <div
-              ref={step2Ref.ref}
-              className={`grid lg:grid-cols-2 gap-10 items-center transition-all duration-1000 ${
-                step2Ref.isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-10"
-              }`}
-            >
-              <div className="space-y-5">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-secondary to-secondary-glow flex items-center justify-center shadow-glow-secondary">
-                  <Eye className="w-7 h-7 text-secondary-foreground" strokeWidth={1.5} />
-                </div>
-                <div className="text-sm font-semibold text-secondary uppercase tracking-wider">Step 2</div>
-                <h3 className="text-3xl md:text-4xl font-bold text-foreground">Preview & Send a Check-In</h3>
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  Edvana drafts a contextual check-in based on what was just explained. You stay in control and review before anything is sent.
-                </p>
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground pt-1">
-                  <CheckCircle2 className="w-4 h-4 text-secondary" />
-                  You review before participants see it
-                </div>
-              </div>
-              <div>
-                <div className="rounded-2xl border border-border bg-card shadow-card p-8">
-                  <div className="space-y-4">
-                    <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Preview Check-In</p>
-                    <p className="text-lg text-foreground font-semibold">What type of bond shares electrons between atoms?</p>
-                    <div className="space-y-3 pt-2">
-                      {[
-                        { label: "A", text: "Ionic bond", correct: false },
-                        { label: "B", text: "Covalent bond", correct: true },
-                        { label: "C", text: "Metallic bond", correct: false },
-                        { label: "D", text: "Hydrogen bond", correct: false },
-                      ].map((opt) => (
-                        <div
-                          key={opt.label}
-                          className={`flex items-center gap-3 p-3 rounded-lg border ${
-                            opt.correct ? "border-primary bg-primary/5" : "border-border bg-muted/30"
-                          }`}
-                        >
-                          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
-                            opt.correct ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                          }`}>
-                            {opt.label}
-                          </span>
-                          <span className="text-foreground font-medium">{opt.text}</span>
-                        </div>
+                {/* Product scene */}
+                <div className="grid md:grid-cols-[1fr_1px_1.1fr_1px_0.8fr] min-h-[280px]">
+                  {/* Panel 1: Live transcript */}
+                  <div className="p-6 flex flex-col justify-center">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "hsl(0 72% 55%)" }} />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--landing-muted))" }}>
+                        Live
+                      </span>
+                      <span className="text-[11px] ml-auto" style={{ color: "hsl(var(--landing-border))" }}>
+                        14:22
+                      </span>
+                    </div>
+                    <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-text))" }}>
+                      "The key difference between Type I and Type II errors is that one rejects a true hypothesis
+                      while the other fails to reject a false one…"
+                    </p>
+                    <div className="mt-4 flex items-center gap-3">
+                      {[0.6, 1, 0.7, 0.9, 0.5, 0.8, 1, 0.6].map((h, i) => (
+                        <span
+                          key={i}
+                          className="w-[3px] rounded-full"
+                          style={{
+                            height: `${h * 16}px`,
+                            backgroundColor: "hsl(var(--landing-accent) / 0.3)",
+                          }}
+                        />
                       ))}
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Step 3 — See Where the Room Is Confused */}
-            <div
-              ref={step3Ref.ref}
-              className={`grid lg:grid-cols-2 gap-10 items-center transition-all duration-1000 ${
-                step3Ref.isVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-10"
-              }`}
-            >
-              <div className="order-2 lg:order-1">
-                <div className="rounded-2xl border border-border bg-card shadow-card p-8">
-                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">Answer Distribution</p>
-                  <p className="text-base text-foreground font-semibold mb-6">What type of bond shares electrons?</p>
-                  
-                  <div className="flex items-end justify-center gap-3 h-52 mb-4">
-                    {[
-                      { label: "A", text: "Ionic", count: 5, pct: 23, correct: false, color: "bg-destructive" },
-                      { label: "B", text: "Covalent", count: 22, pct: 100, correct: true, color: "bg-primary" },
-                      { label: "C", text: "Metallic", count: 3, pct: 14, correct: false, color: "bg-secondary" },
-                      { label: "D", text: "Hydrogen", count: 2, pct: 9, correct: false, color: "bg-muted-foreground" },
-                    ].map((bar) => (
-                      <div key={bar.label} className="flex flex-col items-center gap-1 flex-1 h-full">
-                        <span className={`text-base font-extrabold transition-all duration-700 delay-500 ${
-                          barsAnimated ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-                        } text-foreground`}>
-                          {bar.count}
-                        </span>
-                        <div className="w-full flex-1 flex items-end">
+                  {/* Divider */}
+                  <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
+
+                  {/* Panel 2: Drafted check-in */}
+                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+                    <div className="flex items-center justify-between mb-4">
+                      <span
+                        className="text-[11px] font-semibold uppercase tracking-wider"
+                        style={{ color: "hsl(var(--landing-accent))" }}
+                      >
+                        Drafted check-in
+                      </span>
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                        style={{
+                          backgroundColor: "hsl(var(--landing-accent) / 0.08)",
+                          color: "hsl(var(--landing-accent))",
+                        }}
+                      >
+                        MCQ
+                      </span>
+                    </div>
+                    <p className="text-[14px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
+                      A Type II error occurs when you…
+                    </p>
+                    <div className="space-y-2">
+                      {[
+                        { label: "A", text: "Reject a true null hypothesis" },
+                        { label: "B", text: "Fail to reject a false null hypothesis", correct: true },
+                        { label: "C", text: "Accept the alternative hypothesis" },
+                      ].map((opt) => (
+                        <div
+                          key={opt.label}
+                          className="flex items-center gap-2.5 p-2.5 rounded-lg text-[13px]"
+                          style={{
+                            border: `1px solid ${opt.correct ? "hsl(var(--landing-accent) / 0.35)" : "hsl(var(--landing-border))"}`,
+                            backgroundColor: opt.correct ? "hsl(var(--landing-accent) / 0.04)" : "transparent",
+                            color: "hsl(var(--landing-text))",
+                          }}
+                        >
+                          <span
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                            style={{
+                              backgroundColor: opt.correct ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
+                              color: opt.correct ? "white" : "hsl(var(--landing-muted))",
+                            }}
+                          >
+                            {opt.label}
+                          </span>
+                          {opt.text}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      className="mt-4 w-full py-2 rounded-lg text-xs font-semibold text-white pointer-events-none"
+                      style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+                    >
+                      Send to Room →
+                    </button>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
+
+                  {/* Panel 3: Response signal */}
+                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider mb-4" style={{ color: "hsl(var(--landing-muted))" }}>
+                      Room Signal
+                    </span>
+                    <div className="flex items-end gap-3 h-24 mb-4">
+                      {[
+                        { pct: 31, highlight: false },
+                        { pct: 58, highlight: true },
+                        { pct: 11, highlight: false },
+                      ].map((bar, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <span className="text-[11px] font-semibold" style={{ color: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))" }}>
+                            {bar.pct}%
+                          </span>
                           <div
-                            className={`w-full rounded-t-md transition-all duration-1000 ease-out ${bar.color} ${
-                              bar.correct ? "shadow-lg shadow-primary/30" : ""
-                            }`}
-                            style={{ 
-                              height: barsAnimated ? `${bar.pct}%` : "0%",
-                              minHeight: barsAnimated ? "8px" : "0px"
+                            className="w-full rounded-md"
+                            style={{
+                              height: `${bar.pct * 1.1}px`,
+                              backgroundColor: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
+                              minHeight: "8px",
                             }}
                           />
+                          <span className="text-[10px]" style={{ color: "hsl(var(--landing-muted))" }}>
+                            {["A", "B", "C"][i]}
+                          </span>
                         </div>
-                        <div className={`w-full rounded-md py-1.5 text-center text-xs font-bold text-primary-foreground ${bar.color}`}>
-                          {bar.label}
-                        </div>
-                        <span className="text-xs text-muted-foreground font-medium truncate w-full text-center">
-                          {bar.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-4 border-t border-border flex items-center justify-between text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      <span>32 participants responded</span>
+                      ))}
                     </div>
-                    <span className="font-semibold text-primary">69% correct</span>
+                    <div
+                      className="rounded-lg p-3 text-[12px] leading-snug"
+                      style={{
+                        backgroundColor: "hsl(var(--landing-accent) / 0.05)",
+                        color: "hsl(var(--landing-text))",
+                      }}
+                    >
+                      <span className="font-semibold" style={{ color: "hsl(var(--landing-accent))" }}>58% correct</span>
+                      <span style={{ color: "hsl(var(--landing-muted))" }}> · 45 responded · </span>
+                      <span className="font-medium">Consider revisiting</span>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="order-1 lg:order-2 space-y-5">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-achievement to-achievement-glow flex items-center justify-center shadow-xl">
-                  <BarChart3 className="w-7 h-7 text-achievement-foreground" strokeWidth={1.5} />
-                </div>
-                <div className="text-sm font-semibold text-achievement uppercase tracking-wider">Step 3</div>
-                <h3 className="text-3xl md:text-4xl font-bold text-foreground">See Where the Room Is Confused</h3>
-                <p className="text-lg text-muted-foreground leading-relaxed">
-                  View live response patterns while the session is still happening, so you can clarify, reframe, or move on with confidence.
-                </p>
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground pt-1">
-                  <CheckCircle2 className="w-4 h-4 text-achievement" />
-                  Act while the session is still live
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ═══════════════════════════ DIFFERENTIATION ═══════════════════════════ */}
-      <section id="differentiation" ref={diffRef.ref} className="relative z-10 py-20 px-4 bg-muted/30">
-        <div
-          className={`max-w-5xl mx-auto transition-all duration-1000 ${
-            diffRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-          }`}
-        >
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">Why Edvana Is Different</h2>
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-8 mb-10">
-            {/* Traditional */}
-            <div className="bg-card rounded-xl shadow-card p-8 border border-border">
-              <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-muted-foreground" />
-                Traditional polling tools
-              </h3>
-              <ul className="space-y-4">
-                {[
-                  "Require prebuilt questions before the session",
-                  "Interrupt flow to launch activities",
-                  "Often get used inconsistently or abandoned",
-                  "Focus on response collection more than live understanding",
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 text-muted-foreground">
-                    <X className="w-4 h-4 text-destructive mt-1 shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
 
-            {/* Edvana */}
-            <div className="bg-card rounded-xl shadow-card p-8 border-2 border-primary/30">
-              <h3 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <img src={edvanaLogo} alt="" className="h-5" />
-                Edvana
-              </h3>
-              <ul className="space-y-4">
-                {[
-                  "Supports in-the-moment checks with minimal prep",
-                  "Fits live teaching and training flow",
-                  "Lets leaders act while the session is still happening",
-                  "Helps surface confusion before it becomes drift",
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3 text-foreground">
-                    <Check className="w-4 h-4 text-primary mt-1 shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
 
-          <p className="text-center text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Polling tools help collect responses.{" "}
-            <span className="text-foreground font-semibold">
-              Edvana helps leaders know what the room actually took away while there's still time to adjust.
-            </span>
-          </p>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════ TRUST ═══════════════════════════ */}
-      <section id="trust" ref={trustRef.ref} className="relative z-10 py-20 px-4">
-        <div
-          className={`max-w-4xl mx-auto transition-all duration-1000 ${
-            trustRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-          }`}
-        >
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
-              Built for Trust, Control, and Real-World Rollout
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-6">
-            {[
-              {
-                icon: Shield,
-                title: "Leader-controlled workflow",
-                desc: "Every check-in is reviewed before it is sent.",
-              },
-              {
-                icon: Building2,
-                title: "Built for privacy-sensitive environments",
-                desc: "Designed for settings where trust, discretion, and responsible data handling matter.",
-              },
-              {
-                icon: FlaskConical,
-                title: "Easy to pilot",
-                desc: "Start small with a controlled rollout before expanding.",
-              },
-              {
-                icon: Zap,
-                title: "Low setup burden",
-                desc: "No heavy setup or complex integration required.",
-              },
-            ].map((item, i) => (
-              <div key={i} className="bg-card rounded-xl border border-border shadow-card p-6 flex gap-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <item.icon className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════ PROOF ═══════════════════════════ */}
-      <section id="proof" ref={proofRef.ref} className="relative z-10 py-20 px-4 bg-muted/30">
-        <div
-          className={`max-w-6xl mx-auto transition-all duration-1000 ${
-            proofRef.isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
-          }`}
-        >
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
-              Used in Real Teaching and Training Environments
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                environment: "Higher Education",
-                context: "Intro to Writing",
-                sessions: 12,
-                responseRate: 78,
-                repeatUse: "4 of 5 class sessions",
-                role: "University Professor",
-                quote: "I demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.",
-              },
-              {
-                environment: "STEM Instruction",
-                context: "Engineering Fundamentals",
-                sessions: 8,
-                responseRate: 85,
-                repeatUse: "Every session after week 2",
-                role: "Instructor",
-                quote: "I stopped guessing and started knowing which concepts needed more time.",
-              },
-              {
-                environment: "Graduate Seminar",
-                context: "Computer Science Seminar",
-                sessions: 15,
-                responseRate: 72,
-                repeatUse: "3 of 4 class sessions",
-                role: "Graduate Engineering Student",
-                quote: "It was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!",
-              },
-            ].map((card, i) => (
-              <div key={i} className="bg-card rounded-xl border border-border shadow-card p-8 flex flex-col">
-                <div className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">{card.environment}</div>
-                <div className="flex items-center gap-2 mb-5">
-                  <Building2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">{card.context}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div className="bg-muted/50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-foreground">{card.sessions}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Sessions</div>
-                  </div>
-                  <div className="bg-muted/50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-primary">{card.responseRate}%</div>
-                    <div className="text-xs text-muted-foreground mt-1">Avg. Response</div>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground mb-5 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                  Repeat use: {card.repeatUse}
-                </div>
-                <div className="mt-auto pt-5 border-t border-border">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground mb-2" />
-                  <p className="text-sm text-foreground italic leading-relaxed">"{card.quote}"</p>
-                  <p className="text-xs text-muted-foreground mt-2 font-medium">— {card.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════ WHO IT IS FOR ═══════════════════════════ */}
-      <section
-        id="audience"
-        ref={audienceRef.ref}
-        className="relative z-10 py-20 px-4"
-      >
-        <div
-          className={`max-w-5xl mx-auto transition-all duration-1000 ${
-            audienceRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-          }`}
-        >
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground mb-4">
-              Who Edvana Is For
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-6">
-            {[
-              {
-                icon: GraduationCap,
-                title: "Higher education",
-                desc: "For instructors teaching difficult or explanation-heavy material.",
-              },
-              {
-                icon: HeartPulse,
-                title: "Clinical & health-professions education",
-                desc: "For nursing, medical, PA, and case-based learning environments.",
-              },
-              {
-                icon: Award,
-                title: "Training & certification",
-                desc: "For trainers who need live signal without heavy prep.",
-              },
-              {
-                icon: Users,
-                title: "Workshops & cohort-based sessions",
-                desc: "For facilitators leading high-attention learning experiences.",
-              },
-            ].map((item, i) => (
-              <div key={i} className="bg-card rounded-xl border border-border shadow-card p-8 flex gap-5">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <item.icon className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════ FINAL CTA ═══════════════════════════ */}
-      <section className="relative z-10 py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="relative rounded-[2.5rem] p-12 md:p-20 bg-gradient-to-br from-primary via-primary to-primary-glow text-primary-foreground text-center overflow-hidden">
-            <div className="relative z-10">
-              <h2 className="text-3xl md:text-5xl font-bold mb-6">See How Edvana Fits Your Live Sessions</h2>
-              <p className="text-primary-foreground/90 text-lg md:text-xl mb-8 max-w-2xl mx-auto">
-                Start with a short demo or controlled pilot to see how Edvana supports real-time understanding in teaching, training, and explanation-heavy sessions.
+        {/* ═══════════ HOW IT WORKS ═══════════ */}
+        <section id="how-it-works" className="py-24 md:py-32 px-6">
+          <div className="max-w-[1120px] mx-auto">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">How It Works</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Three steps. One continuous flow.
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana fits into the way people already teach, train, explain,
+                and present.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  size="lg"
-                  onClick={handleBookDemo}
-                  className="rounded-full px-10 text-lg h-14 shadow-xl hover:scale-105 transition-all duration-300 group bg-card text-primary hover:bg-accent border-none"
+            </div>
+
+            {/* Steps grid */}
+            <div className="grid md:grid-cols-3 gap-5">
+              {[
+                {
+                  num: "1",
+                  title: "Speak naturally",
+                  body: "Teach, train, explain, or present the way you normally would. Edvana listens in real time without forcing you to stop and build activities from scratch.",
+                  micro: "Real-time session context, without interrupting flow",
+                },
+                {
+                  num: "2",
+                  title: "Preview and send a live check-in",
+                  body: "Edvana drafts a contextual audience check based on what you just said. You stay in control, review it, and send it when the moment is right.",
+                  micro: "You review before participants ever see it",
+                },
+                {
+                  num: "3",
+                  title: "See the room instantly",
+                  body: "Watch live response patterns appear while the session is still happening. Clarify, slow down, move on, or go deeper with actual signal from the room.",
+                  micro: "Act while the session is still alive",
+                },
+              ].map((step) => (
+                <div
+                  key={step.num}
+                  className="landing-card flex flex-col"
                 >
-                  Book a Demo
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handlePilotConversation}
-                  className="rounded-full px-10 text-lg h-14 border-2 bg-white/20 text-white border-white/40 hover:bg-white/30 transition-all"
+                  {/* Step number */}
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-5"
+                    style={{
+                      backgroundColor: "hsl(var(--landing-accent) / 0.1)",
+                      color: "hsl(var(--landing-accent))",
+                    }}
+                  >
+                    {step.num}
+                  </span>
+                  <h3
+                    className="text-[17px] font-semibold mb-3"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p
+                    className="text-[14px] leading-relaxed mb-auto"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {step.body}
+                  </p>
+                  {/* Micro-line */}
+                  <div className="mt-6 flex items-center gap-2 text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
+                    <span
+                      className="w-1 h-1 rounded-full shrink-0"
+                      style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+                    />
+                    {step.micro}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════ BUILT FOR THE LIVE MOMENT ═══════════ */}
+        <section
+          id="use-cases"
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1120px] mx-auto">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">
+                Why It Changes the Live Moment
+              </p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Built for the live moment
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana is designed for what speakers actually need in real
+                sessions, not for static polling workflows.
+              </p>
+            </div>
+
+            {/* Feature cards */}
+            <div className="grid md:grid-cols-3 gap-5">
+              {[
+                {
+                  title: "No prebuilt polls",
+                  body: "Edvana works from what's actually being said, so you do not have to plan every check-in in advance.",
+                },
+                {
+                  title: "No broken flow",
+                  body: "Check understanding without pausing to open a separate workflow, build a form, or derail momentum.",
+                },
+                {
+                  title: "No delayed insight",
+                  body: "See what the room understood while there is still time to respond, not after the moment has passed.",
+                },
+              ].map((card) => (
+                <div key={card.title} className="landing-card">
+                  <h3
+                    className="text-[17px] font-semibold mb-3"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-[14px] leading-relaxed"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════ WHY EDVANA IS DIFFERENT ═══════════ */}
+        <section
+          id="results"
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1120px] mx-auto">
+            {/* Header */}
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">
+                Why Edvana Is Different
+              </p>
+              <h2 className="landing-heading text-2xl md:text-3xl">
+                Polling collects responses.
+                <br />
+                Edvana helps you see understanding.
+              </h2>
+            </div>
+
+            {/* Comparison columns */}
+            <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+              {/* Left — Traditional */}
+              <div className="landing-card">
+                <h3
+                  className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-5"
+                  style={{ color: "hsl(var(--landing-muted))" }}
                 >
-                  Start a Pilot Conversation
-                </Button>
+                  Traditional polling tools
+                </h3>
+                <ul className="space-y-3">
+                  {[
+                    "Require prebuilt questions before the session",
+                    "Interrupt flow to launch activities",
+                    "Often get used inconsistently or abandoned",
+                    "Focus on response collection more than live understanding",
+                  ].map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[14px] leading-relaxed"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full mt-[7px] shrink-0"
+                        style={{ backgroundColor: "hsl(var(--landing-border))" }}
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Right — Edvana */}
+              <div
+                className="rounded-[0.875rem] p-7"
+                style={{
+                  border: "1px solid hsl(var(--landing-accent) / 0.25)",
+                  backgroundColor: "hsl(var(--landing-accent) / 0.03)",
+                }}
+              >
+                <h3
+                  className="text-[11px] font-semibold uppercase tracking-[0.15em] mb-5"
+                  style={{ color: "hsl(var(--landing-accent))" }}
+                >
+                  Edvana
+                </h3>
+                <ul className="space-y-3">
+                  {[
+                    "Supports in-the-moment checks with minimal prep",
+                    "Fits live teaching, training, and explanation flow",
+                    "Lets leaders act while the session is still happening",
+                    "Helps surface confusion before it becomes drift",
+                  ].map((item) => (
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[14px] leading-relaxed"
+                      style={{ color: "hsl(var(--landing-text))" }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full mt-[7px] shrink-0"
+                        style={{ backgroundColor: "hsl(var(--landing-accent))" }}
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
+
+            {/* Footer line */}
+            <p
+              className="text-center text-[13px] leading-relaxed mt-12 max-w-xl mx-auto"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Polling tools help collect responses. Edvana helps speakers know
+              what the room actually took away — while there is still time to
+              adjust.
+            </p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ═══════════════════════════ FOOTER ═══════════════════════════ */}
-      <footer className="relative z-10 py-12 px-4 border-t border-border bg-muted/30">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-12 mb-8">
-            <div>
-              <h3 className="font-semibold text-foreground mb-4">Product</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <button onClick={() => scrollToSection("how-it-works")} className="hover:text-foreground hover:underline transition-colors">
-                    How It Works
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection("differentiation")} className="hover:text-foreground hover:underline transition-colors">
-                    Why Edvana
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection("audience")} className="hover:text-foreground hover:underline transition-colors">
-                    Who It's For
-                  </button>
-                </li>
-              </ul>
+        {/* ── Built for Real Sessions ── */}
+        <section
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1120px] mx-auto">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p
+                className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-4"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Built for Real Sessions
+              </p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Built for control in real sessions
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana supports live use without taking control away from the speaker.
+              </p>
             </div>
 
-            <div>
-              <h3 className="font-semibold text-foreground mb-4">Trust</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <button onClick={() => scrollToSection("trust")} className="hover:text-foreground hover:underline transition-colors">
-                    Trust & Control
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection("proof")} className="hover:text-foreground hover:underline transition-colors">
-                    Results
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-4">Login & Join Session</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <button onClick={() => navigate("/auth")} className="hover:text-foreground hover:underline transition-colors">
-                    Login
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => navigate("/join")} className="hover:text-foreground hover:underline transition-colors">
-                    Join Session
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => navigate("/admin/auth")} className="hover:text-foreground hover:underline transition-colors">
-                    Admin Portal
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <button onClick={() => navigate("/privacy")} className="hover:text-foreground hover:underline transition-colors">
-                    Privacy Policy
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => navigate("/terms")} className="hover:text-foreground hover:underline transition-colors">
-                    Terms of Service
-                  </button>
-                </li>
-              </ul>
+            <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+              {[
+                {
+                  title: "Leader-controlled workflow",
+                  body: "Every check-in is reviewed before it is sent.",
+                },
+                {
+                  title: "Designed for sensitive environments",
+                  body: "Built for settings where discretion, privacy, and responsible data handling matter.",
+                },
+                {
+                  title: "Easy to pilot",
+                  body: "Start small, test in a controlled setting, and expand once the workflow fits.",
+                },
+                {
+                  title: "Low setup burden",
+                  body: "No heavy implementation, no complex rollout, no bloated adoption overhead.",
+                },
+              ].map((card) => (
+                <div key={card.title} className="landing-card">
+                  <h3
+                    className="text-[15px] font-semibold mb-2"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-[14px] leading-relaxed"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.body}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
+        </section>
 
-          <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-            <img src={edvanaLogo} alt="Edvana" className="h-7" />
-            <p className="text-sm text-muted-foreground italic">Live understanding without breaking flow.</p>
-            <span className="text-sm text-muted-foreground">&copy; 2026 Edvana. All rights reserved.</span>
+        {/* ── Results ── */}
+        <section
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1120px] mx-auto">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">Results</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Used in live sessions where understanding matters
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana is already being used in explanation-heavy environments where it helps leaders see more, respond faster, and stay in flow.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              {[
+                {
+                  eyebrow: "HIGHER EDUCATION",
+                  title: "Intro to Writing",
+                  stats: "12 sessions · 78% average response rate",
+                  quote: "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
+                  footer: "Repeat use: 4 of 5 class sessions",
+                },
+                {
+                  eyebrow: "STEM INSTRUCTION",
+                  title: "Engineering Fundamentals",
+                  stats: "8 sessions · 85% average response rate",
+                  quote: "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
+                  footer: "Repeat use: Every session after week 2",
+                },
+              ].map((card) => (
+                <div
+                  key={card.title}
+                  className="landing-card"
+                >
+                  <p className="landing-eyebrow mb-3">{card.eyebrow}</p>
+                  <h3
+                    className="text-lg font-bold mb-1"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-[12px] mb-6"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.stats}
+                  </p>
+                  <blockquote
+                    className="text-[14px] leading-relaxed italic pl-4 mb-6"
+                    style={{
+                      color: "hsl(var(--landing-text))",
+                      borderLeft: "2px solid hsl(var(--landing-accent))",
+                    }}
+                  >
+                    {card.quote}
+                  </blockquote>
+                  <p
+                    className="text-[12px]"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.footer}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Use Cases Detail ── */}
+        <section
+          id="use-cases-detail"
+          className="py-24 md:py-32 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-[1120px] mx-auto">
+            <div className="max-w-2xl mx-auto text-center mb-16">
+              <p className="landing-eyebrow mb-4">Use Cases</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+                Where Edvana fits first
+              </h2>
+              <p className="landing-subheading text-base md:text-lg">
+                Edvana is especially valuable in live sessions where explanation,
+                interpretation, or complex material needs to land clearly in the
+                moment.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
+              {[
+                {
+                  title: "Higher education",
+                  body: "For instructors teaching difficult, abstract, or explanation-heavy material.",
+                },
+                {
+                  title: "Clinical and health-professions education",
+                  body: "For nursing, medical, PA, and case-based learning environments.",
+                },
+                {
+                  title: "Training and certification",
+                  body: "For trainers who need live signal without heavy prep or clunky interaction tools.",
+                },
+                {
+                  title: "Workshops and cohort-based sessions",
+                  body: "For facilitators leading high-attention learning experiences.",
+                },
+              ].map((card) => (
+                <div key={card.title} className="landing-card">
+                  <h3
+                    className="text-[17px] font-semibold mb-2"
+                    style={{ color: "hsl(var(--landing-text))" }}
+                  >
+                    {card.title}
+                  </h3>
+                  <p
+                    className="text-[14px] leading-relaxed"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
+                    {card.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+
+
+
+        {/* ── Final CTA ── */}
+        <section
+          id="demo"
+          className="py-28 md:py-36 px-6"
+          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+        >
+          <div className="max-w-xl mx-auto text-center">
+            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
+              See how Edvana changes a live session.
+            </h2>
+            <p
+              className="landing-subheading text-base mb-11"
+            >
+              Book a short demo or start a pilot conversation to see how Edvana
+              supports real-time understanding in teaching, training, and
+              explanation-heavy live sessions.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+              <button
+                onClick={handleBookDemo}
+                className="landing-cta px-8 py-3 text-[15px]"
+              >
+                Book a Demo
+              </button>
+              <button
+                onClick={handleStartPilot}
+                className="landing-secondary-btn px-8 py-3 text-[15px]"
+              >
+                Start a Pilot Conversation
+              </button>
+            </div>
+            <p
+              className="text-[12px]"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              Short demo. Clear workflow. No bloated setup.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer
+        className="py-14 px-6"
+        style={{
+          background: "hsl(var(--landing-surface))",
+          borderTop: "1px solid hsl(var(--landing-border))",
+        }}
+      >
+        <div className="max-w-[1120px] mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+            {/* Product */}
+            <div>
+              <h4
+                className="text-[13px] font-semibold mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Product
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "Product", id: "product" },
+                  { label: "How It Works", id: "how-it-works" },
+                  { label: "Why Edvana", id: "results" },
+                  { label: "Use Cases", id: "use-cases-detail" },
+                  { label: "Results", id: "results" },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <button
+                      onClick={() => scrollToSection(link.id)}
+                      className="text-[13px] transition-colors duration-150 hover:opacity-80"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Sessions */}
+            <div>
+              <h4
+                className="text-[13px] font-semibold mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Sessions
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "Book a Demo", action: handleBookDemo },
+                  { label: "Start a Pilot", action: handleStartPilot },
+                  { label: "Join Session", action: () => navigate("/join") },
+                  { label: "Login", action: () => navigate("/auth") },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <button
+                      onClick={link.action}
+                      className="text-[13px] transition-colors duration-150 hover:opacity-80"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h4
+                className="text-[13px] font-semibold mb-4"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Company
+              </h4>
+              <ul className="space-y-2.5">
+                {[
+                  { label: "About", action: () => scrollToSection("hero") },
+                  { label: "Contact", action: handleContact },
+                  { label: "Privacy", action: () => navigate("/privacy") },
+                  { label: "Terms", action: () => navigate("/terms") },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <button
+                      onClick={link.action}
+                      className="text-[13px] transition-colors duration-150 hover:opacity-80"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Brand */}
+            <div>
+              <p
+                className="text-[13px] font-semibold mb-2"
+                style={{ color: "hsl(var(--landing-text))" }}
+              >
+                Edvana is the copilot for live understanding.
+              </p>
+              <p
+                className="text-[12px] leading-relaxed"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Helping speakers see audience understanding in real time without
+                breaking flow.
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div
+            className="pt-6"
+            style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+          >
+            <p
+              className="text-[11px]"
+              style={{ color: "hsl(var(--landing-muted))" }}
+            >
+              © 2026 Edvana. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>

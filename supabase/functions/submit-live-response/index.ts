@@ -168,63 +168,6 @@ Deno.serve(async (req) => {
       console.log('📋 Using direct question format:', { correctAnswer, questionType, optionsCount: options.length });
     }
 
-    // === POLL TYPE: Skip grading entirely ===
-    if (questionType === 'poll') {
-      console.log('📊 Poll question — recording response without grading');
-
-      // Check if response already exists
-      const { data: existingResponse } = await supabase
-        .from('live_responses')
-        .select('id')
-        .eq('question_id', questionId)
-        .eq('participant_id', participantId)
-        .single();
-
-      if (existingResponse) {
-        return new Response(
-          JSON.stringify({ error: 'Response already submitted', existingId: existingResponse.id }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const { data: response, error: insertError } = await supabase
-        .from('live_responses')
-        .insert({
-          question_id: questionId,
-          participant_id: participantId,
-          answer: answer,
-          is_correct: false, // Not applicable for polls
-          confidence_level: confidenceLevel,
-          confidence_multiplier: 1,
-          points_earned: 0,
-          response_time_ms: responseTimeMs,
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Error inserting poll response:', insertError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to save response', details: insertError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          response: {
-            id: response.id,
-            isPoll: true,
-            isCorrect: null,
-            pointsEarned: 0,
-            confidenceMultiplier: 1,
-          },
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Diagnostic: warn if options are missing for MCQ
     if (questionType === 'multiple_choice' && (!options || options.length === 0)) {
       console.warn(`⚠️ No options array found for MCQ grading. Question ID: ${questionId}. This may cause grading issues.`);

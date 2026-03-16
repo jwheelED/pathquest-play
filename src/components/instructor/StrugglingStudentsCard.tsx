@@ -29,13 +29,13 @@ export default function StrugglingStudentsCard({ students, onMessageStudent }: S
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-warning" />
-          Participants Needing Help
+          Students Needing Help
         </CardTitle>
-        <CardDescription>Participants who may need additional support</CardDescription>
+        <CardDescription>Students who may need additional support</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {students.length === 0 ? (
-          <p className="text-muted-foreground text-sm">All participants are doing well! 🎉</p>
+          <p className="text-muted-foreground text-sm">All students are doing well! 🎉</p>
         ) : (
           students.map((student) => (
             <div key={student.id} className="flex items-start justify-between p-3 bg-accent/20 rounded-lg pixel-corners">

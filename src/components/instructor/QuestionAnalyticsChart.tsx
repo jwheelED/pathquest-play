@@ -34,12 +34,8 @@ export const QuestionAnalyticsChart = ({
   questionIndex,
   stats,
 }: QuestionAnalyticsChartProps) => {
-  const isPoll = question.isPoll === true || 
-    question.correctAnswer === '' || 
-    question.correctAnswer === null || 
-    question.correctAnswer === undefined;
-  const isMultipleChoice = (question.type === "multiple_choice" || isPoll) && question.options;
-  const isAutoGradedShortAnswer = !isPoll && question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
+  const isMultipleChoice = question.type === "multiple_choice" && question.options;
+  const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
   // DEDUPLICATION: Keep only the latest submission per student
   const uniqueStudents = new Map<string, Assignment>();
@@ -105,7 +101,7 @@ export const QuestionAnalyticsChart = ({
           return normalizedAnswer === letter;
         }).length;
         
-        const isCorrect = !isPoll && letter === correctAnswerLetter;
+        const isCorrect = letter === correctAnswerLetter;
 
         return {
           option: letter,
@@ -116,10 +112,8 @@ export const QuestionAnalyticsChart = ({
       })
     : [];
 
-  // For polls, show a simple response distribution instead of correct/incorrect pie chart
-  const performanceData = isPoll
-    ? [] // No performance pie chart for polls
-    : stats.hasAIGrades
+  // Calculate performance data - use AI grades for short answers if available
+  const performanceData = stats.hasAIGrades
     ? [
         {
           name: "Passing (≥70%)",
@@ -196,13 +190,13 @@ export const QuestionAnalyticsChart = ({
 
   return (
     <div className="my-4 border rounded-lg p-4 bg-muted/20">
-      <p className="text-sm font-medium mb-3">{isPoll ? '📊 Poll Results' : '📊 Visual Analytics'}</p>
+      <p className="text-sm font-medium mb-3">📊 Visual Analytics</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Answer Distribution Chart (Multiple Choice) */}
         {isMultipleChoice && answerDistribution.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">{isPoll ? 'Response Distribution' : 'Answer Distribution'}</p>
+            <p className="text-xs text-muted-foreground font-medium">Answer Distribution</p>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
               <BarChart data={answerDistribution}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
@@ -216,7 +210,7 @@ export const QuestionAnalyticsChart = ({
                         <div className="rounded-lg border bg-background p-2 shadow-sm">
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-semibold">
-                              Option {data.option} {!isPoll && data.isCorrect && "✓"}
+                              Option {data.option} {data.isCorrect && "✓"}
                             </span>
                             <span className="text-xs text-muted-foreground">{data.label}</span>
                             <span className="text-xs font-medium">
@@ -230,10 +224,10 @@ export const QuestionAnalyticsChart = ({
                   }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {answerDistribution.map((entry: { isCorrect: boolean }, index: number) => (
+                  {answerDistribution.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={isPoll ? "hsl(var(--primary))" : (entry.isCorrect ? "hsl(var(--success))" : "hsl(var(--primary))")}
+                      fill={entry.isCorrect ? "hsl(var(--success))" : "hsl(var(--primary))"}
                     />
                   ))}
                 </Bar>
