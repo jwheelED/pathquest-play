@@ -305,205 +305,202 @@ export default function AuthPage() {
   }, [navigate]);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12" style={{ background: 'hsl(210, 20%, 98%)' }}>
-      {/* Ambient glows */}
-      <div className="absolute top-[-15%] right-[25%] w-[450px] h-[450px] rounded-full opacity-[0.05] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 84%, 42%), transparent 70%)' }} />
-      <div className="absolute bottom-[-10%] left-[30%] w-[350px] h-[350px] rounded-full opacity-[0.035] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(199, 89%, 60%), transparent 70%)' }} />
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-primary/10 px-4">
+      <div className="w-full max-w-md p-8 bg-card shadow-glow border border-primary-glow rounded-xl">
+        {session ? (
+          <div>
+            <h2 className="text-2xl font-bold mb-6 text-center text-foreground">You are signed in</h2>
+            <p className="text-center text-sm mb-4 text-muted-foreground">{session.user.email}</p>
+            <button
+              onClick={() => navigateByRole(session.user.id)}
+              className="w-full bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow mb-3"
+            >
+              Go to Dashboard
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-full bg-destructive text-destructive-foreground p-2 rounded-lg hover:bg-destructive/90 transition"
+            >
+              Sign out &amp; switch account
+            </button>
+          </div>
+        ) : isRecoveryMode ? (
+          <>
+            <h2 className="text-2xl font-bold mb-6 text-center text-primary">
+              Set your new password
+            </h2>
 
-      <div className="relative z-10 w-full max-w-[400px]">
-        <div className="bg-card rounded-2xl border border-border/50 shadow-[0_1px_3px_0_hsl(220_25%_15%/0.04),0_8px_28px_-6px_hsl(220_25%_15%/0.06)] px-7 py-9 sm:px-9 sm:py-10">
-          {session ? (
-            <div className="space-y-5">
-              <h2 className="text-xl font-semibold tracking-tight text-center text-foreground">You are signed in</h2>
-              <p className="text-center text-[13px] text-muted-foreground">{session.user.email}</p>
-              <button
-                onClick={() => navigateByRole(session.user.id)}
-                className="w-full h-[42px] bg-primary text-primary-foreground rounded-[10px] hover:bg-primary/90 transition-all font-medium text-sm shadow-sm"
-              >
-                Go to Dashboard
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full h-[42px] bg-destructive text-destructive-foreground rounded-[10px] hover:bg-destructive/90 transition-all font-medium text-sm"
-              >
-                Sign out &amp; switch account
-              </button>
-            </div>
-          ) : isRecoveryMode ? (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                  Set your new password
-                </h2>
+            {error && (
+              <div role="alert" className="text-destructive mb-4 text-sm">
+                {error}
               </div>
+            )}
+            {success && (
+              <div role="status" className="text-primary mb-4 text-sm">
+                {success}
+              </div>
+            )}
 
-              {error && <div role="alert" className="text-destructive text-[13px] leading-snug">{error}</div>}
-              {success && <div role="status" className="text-primary text-[13px] leading-snug">{success}</div>}
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <input
+                id="new-password"
+                type="password"
+                placeholder="Enter your new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
+                className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
 
+            <button
+              onClick={handlePasswordUpdate}
+              className="w-full mt-4 bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow"
+            >
+              Update Password
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl font-bold mb-6 text-center text-primary">
+              {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Sign in to your account"}
+            </h2>
+
+            {error && (
+              <div role="alert" className="text-destructive mb-4 text-sm">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div role="status" className="text-primary mb-4 text-sm">
+                {success}
+              </div>
+            )}
+
+            {!isResetMode && isSignUp && (
               <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">New Password</Label>
+                <Label htmlFor="name">Full Name</Label>
                 <input
-                  id="new-password"
-                  type="password"
-                  placeholder="Enter your new password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
-                  className="w-full h-[42px] px-3.5 text-sm border border-border/60 bg-background text-foreground rounded-[10px] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                  id="name"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  aria-describedby={error ? "auth-error" : undefined}
+                  className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
+            )}
 
-              <button
-                onClick={handlePasswordUpdate}
-                className="w-full h-[42px] bg-primary text-primary-foreground rounded-[10px] hover:bg-primary/90 transition-all font-medium text-sm shadow-sm"
-              >
-                Update Password
-              </button>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
+                aria-describedby={error ? "auth-error" : undefined}
+                className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
             </div>
-          ) : (
-            <div className="space-y-5">
-              {/* Header */}
-              <div className="text-center pb-1">
-                <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                  {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Sign in to your account"}
-                </h2>
+            {!isResetMode && (
+              <div className="space-y-2 mt-4">
+                <Label htmlFor="password">Password</Label>
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  aria-describedby={error ? "auth-error" : undefined}
+                  className="w-full p-2 border border-input bg-background text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
               </div>
+            )}
 
-              {error && <div role="alert" className="text-destructive text-[13px] leading-snug">{error}</div>}
-              {success && <div role="status" className="text-primary text-[13px] leading-snug">{success}</div>}
+            <button
+              onClick={isResetMode ? handlePasswordReset : handleAuth}
+              className="w-full bg-primary text-primary-foreground p-2 rounded-lg hover:bg-primary/90 transition font-semibold shadow-glow"
+            >
+              {isResetMode ? "Send Reset Link" : isSignUp ? "Sign Up" : "Sign In"}
+            </button>
 
-              {/* Form fields */}
-              <div className="space-y-3.5">
-                {!isResetMode && isSignUp && (
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">Full Name</Label>
-                    <input
-                      id="name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      aria-describedby={error ? "auth-error" : undefined}
-                      className="w-full h-[42px] px-3.5 text-sm border border-border/60 bg-background text-foreground rounded-[10px] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">Email</Label>
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
-                    aria-describedby={error ? "auth-error" : undefined}
-                    className="w-full h-[42px] px-3.5 text-sm border border-border/60 bg-background text-foreground rounded-[10px] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
-                  />
-                </div>
-                {!isResetMode && (
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">Password</Label>
-                    <input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      aria-describedby={error ? "auth-error" : undefined}
-                      className="w-full h-[42px] px-3.5 text-sm border border-border/60 bg-background text-foreground rounded-[10px] placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Primary CTA */}
+            {!isResetMode && !isSignUp && (
               <button
-                onClick={isResetMode ? handlePasswordReset : handleAuth}
-                className="w-full h-[44px] bg-primary text-primary-foreground rounded-[10px] hover:bg-primary/90 transition-all font-semibold text-sm shadow-[0_1px_3px_0_hsl(160_84%_29%/0.25)]"
+                onClick={() => setIsResetMode(true)}
+                className="w-full text-sm text-primary hover:underline mt-2"
               >
-                {isResetMode ? "Send Reset Link" : isSignUp ? "Sign Up" : "Sign In"}
+                Forgot password?
               </button>
+            )}
 
-              {!isResetMode && !isSignUp && (
-                <button
-                  onClick={() => setIsResetMode(true)}
-                  className="w-full text-center text-[12px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                >
-                  Forgot password?
-                </button>
-              )}
-
-              {!isResetMode && (
-                <>
-                  <div className="relative my-1.5">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border/40" />
-                    </div>
-                    <div className="relative flex justify-center">
-                      <span className="bg-card px-3 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground/50">Or continue with</span>
-                    </div>
+            {!isResetMode && (
+              <>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-input" />
                   </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                  </div>
+                </div>
 
-                  <button
-                    onClick={async () => {
-                      const { error } = await supabase.auth.signInWithOAuth({
-                        provider: 'google',
-                        options: {
-                          redirectTo: `${window.location.origin}/auth`,
-                        }
-                      });
-                      if (error) {
-                        toast.error(error.message);
+                <button
+                  onClick={async () => {
+                    const { error } = await supabase.auth.signInWithOAuth({
+                      provider: 'google',
+                      options: {
+                        redirectTo: `${window.location.origin}/auth`,
                       }
-                    }}
-                    className="w-full h-[42px] flex items-center justify-center gap-2.5 bg-background border border-border/50 text-foreground rounded-[10px] hover:bg-muted/40 hover:border-border/70 transition-all text-sm font-medium"
-                  >
-                    <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    Continue with Google
-                  </button>
+                    });
+                    if (error) {
+                      toast.error(error.message);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-background border-2 border-input text-foreground p-2 rounded-lg hover:bg-accent/10 transition"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Continue with Google
+                </button>
 
-                  <p className="text-[13px] text-center text-muted-foreground/70 pt-1">
-                    {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-                    <button
-                      onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-primary/80 hover:text-primary hover:underline font-medium transition-colors"
-                    >
-                      {isSignUp ? "Sign In" : "Sign Up"}
-                    </button>
-                  </p>
-                </>
-              )}
-
-              {isResetMode && (
-                <p className="text-[13px] text-center pt-1">
+                <p className="mt-4 text-sm text-center text-foreground">
+                  {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
                   <button
-                    onClick={() => setIsResetMode(false)}
-                    className="text-muted-foreground/60 hover:text-foreground transition-colors"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="text-primary hover:underline font-semibold"
                   >
-                    ← Back to Sign In
+                    {isSignUp ? "Sign In" : "Sign Up"}
                   </button>
                 </p>
-              )}
-            </div>
-          )}
-        </div>
+              </>
+            )}
 
-        {/* Back link — outside card */}
-        {!isRecoveryMode && (
-          <p className="text-center mt-8">
-            <Link to="/" className="text-[12px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-              ← Back to Home
-            </Link>
-          </p>
+            {isResetMode && (
+              <p className="mt-4 text-sm text-center text-foreground">
+                <button
+                  onClick={() => setIsResetMode(false)}
+                  className="text-primary hover:underline font-semibold"
+                >
+                  ← Back to Sign In
+                </button>
+              </p>
+            )}
+            <p className="mt-4 text-sm text-center text-muted-foreground">
+              <Link to="/" className="text-primary hover:underline">
+                ← Back to Home
+              </Link>
+            </p>
+          </>
         )}
       </div>
     </main>

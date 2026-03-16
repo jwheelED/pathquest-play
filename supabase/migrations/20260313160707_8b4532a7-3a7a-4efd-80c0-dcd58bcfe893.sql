@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_question_format_preference_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_question_format_preference_check CHECK (question_format_preference IN ('multiple_choice', 'short_answer', 'coding', 'poll'));

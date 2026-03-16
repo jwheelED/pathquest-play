@@ -337,11 +337,11 @@ export const LectureCheckInResults = () => {
 
       if (error) throw error;
       
-      toast.success("Check-in deleted successfully!");
+      toast.success("Response deleted successfully!");
       fetchResults();
     } catch (error) {
-      console.error("Error deleting check-in:", error);
-      toast.error("Failed to delete check-in");
+      console.error("Error deleting response:", error);
+      toast.error("Failed to delete response");
     }
   };
 
@@ -360,11 +360,11 @@ export const LectureCheckInResults = () => {
 
       if (error) throw error;
       
-      toast.success("All check-ins deleted successfully!");
+      toast.success("All responses deleted successfully!");
       fetchResults();
     } catch (error) {
-      console.error("Error deleting all check-ins:", error);
-      toast.error("Failed to delete all check-ins");
+      console.error("Error deleting all responses:", error);
+      toast.error("Failed to delete all responses");
     }
   };
 
@@ -889,7 +889,7 @@ export const LectureCheckInResults = () => {
       // Header
       doc.setFontSize(20);
       doc.setTextColor(40, 40, 40);
-      doc.text("Lecture Check-In Report", pageWidth / 2, 20, { align: "center" });
+      doc.text("Live Room Insight Report", pageWidth / 2, 20, { align: "center" });
       
       doc.setFontSize(11);
       doc.setTextColor(100, 100, 100);
@@ -913,7 +913,7 @@ export const LectureCheckInResults = () => {
         const checkInDate = new Date(group.timestamp).toLocaleString();
         doc.setFontSize(14);
         doc.setTextColor(40, 40, 40);
-        doc.text(`Check-In: ${checkInDate}`, 20, yPosition);
+        doc.text(`Response: ${checkInDate}`, 20, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
         doc.text(`${group.assignments.length} student(s)`, 20, yPosition + 6);
@@ -1015,7 +1015,7 @@ export const LectureCheckInResults = () => {
       const csvRows: string[] = [];
       
       // Add header row
-      csvRows.push('Check-In Date,Student Name,Question #,Question Text,Student Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
+      csvRows.push('Response Date,Participant Name,Question #,Question Text,Participant Answer,Correct Answer,Is Correct,Grade,Response Time (seconds),Completed');
       
       // Add data rows
       groupedResults.forEach((group) => {
@@ -1174,9 +1174,9 @@ export const LectureCheckInResults = () => {
             <div className="rounded-full bg-muted p-4 mb-4">
               <ClipboardList className="h-8 w-8 text-muted-foreground" />
             </div>
-            <p className="text-lg font-medium text-muted-foreground mb-1">No check-ins yet</p>
+            <p className="text-lg font-medium text-muted-foreground mb-1">No responses yet</p>
             <p className="text-sm text-muted-foreground/70 max-w-sm">
-              Send a lecture check-in question to your students during a live session to see results here.
+              Send a question to your participants during a live session to see results here.
             </p>
           </div>
         </CardContent>
@@ -1242,9 +1242,9 @@ export const LectureCheckInResults = () => {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete All Check-Ins?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete All Responses?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete all lecture check-in results and student responses. This action cannot be undone.
+                    This will permanently delete all session response results and participant answers. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1362,9 +1362,14 @@ export const LectureCheckInResults = () => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
                   const isOverridden = !!question.overriddenAnswer;
+                  const isPoll = question.isPoll === true || 
+                    question.correctAnswer === '' || 
+                    question.correctAnswer === null || 
+                    question.correctAnswer === undefined;
 
                   return (
                     <div key={qIdx} className={`border rounded-lg p-5 space-y-4 shadow-sm bg-card border-l-4 ${
+                      isPoll ? 'border-l-primary' :
                       isOverridden ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20' :
                       stats.percentage === null ? 'border-l-blue-500' :
                       stats.percentage >= 80 ? 'border-l-green-500' :
@@ -1388,15 +1393,15 @@ export const LectureCheckInResults = () => {
                             <ul className="text-sm text-muted-foreground space-y-1">
                               {question.options.map((opt: string, oIdx: number) => {
                                 const letter = String.fromCharCode(65 + oIdx); // A, B, C, D...
-                                const isCorrect = letter === currentCorrectAnswer;
+                                const isCorrectOption = !isPoll && letter === currentCorrectAnswer;
                                 return (
                                   <li
                                     key={oIdx}
-                                    className={`flex items-start gap-1 ${isCorrect ? "font-medium text-green-600 dark:text-green-500" : ""}`}
+                                    className={`flex items-start gap-1 ${isCorrectOption ? "font-medium text-green-600 dark:text-green-500" : ""}`}
                                   >
                                     <span className="font-bold shrink-0">{letter}.</span>
                                     <span className="flex-1"><MathRenderer content={opt} /></span>
-                                    {isCorrect && <span className="shrink-0">✓</span>}
+                                    {isCorrectOption && <span className="shrink-0">✓</span>}
                                   </li>
                                 );
                               })}
@@ -1415,7 +1420,16 @@ export const LectureCheckInResults = () => {
                         </div>
                         <div className="text-right space-y-2">
                           <div>
-                            {stats.hasAIGrades && stats.avgAIGrade !== null ? (
+                            {isPoll ? (
+                              <>
+                                <div className="text-2xl font-bold text-primary">
+                                  {stats.completed}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  response{stats.completed !== 1 ? 's' : ''} (Poll)
+                                </div>
+                              </>
+                            ) : stats.hasAIGrades && stats.avgAIGrade !== null ? (
                               <>
                                 <div className={`text-2xl font-bold ${stats.avgAIGrade >= 70 ? 'text-green-600' : stats.avgAIGrade >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                                   {stats.avgAIGrade}%
@@ -1446,7 +1460,7 @@ export const LectureCheckInResults = () => {
                               </div>
                             )}
                           </div>
-                          {question.options && (
+                          {question.options && !isPoll && (
                             <Button 
                               size="sm" 
                               variant="outline"
@@ -1530,7 +1544,7 @@ export const LectureCheckInResults = () => {
                           <div className="pt-3 flex items-center justify-between border-t">
                             <div className="flex items-center gap-2">
                               <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Room Signal</span>
+                              <span className="text-sm font-medium">Visual Analytics</span>
                               {showCharts[`${groupIdx}-${qIdx}`] && (
                                 <Badge variant="secondary" className="text-xs">Visible</Badge>
                               )}
@@ -1666,7 +1680,10 @@ export const LectureCheckInResults = () => {
                               // coding_simple uses AI grade threshold >= 70 as correct
                               // short_answer with AI grade uses same logic
                               // MCQ uses exact match
-                              const isCorrect = isManualGradeShortAnswer 
+                              // Polls are never graded
+                              const isCorrect = isPoll
+                                ? null
+                                : isManualGradeShortAnswer 
                                 ? null 
                                 : (hasAIGrade && (question.type === 'short_answer' || isCodingSimple))
                                   ? studentAIGrade >= 70 
@@ -1678,6 +1695,7 @@ export const LectureCheckInResults = () => {
                               <div
                                 key={assignment.id}
                                 className={`flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50 ${
+                                  isPoll ? '' :
                                   !isCompleted ? '' :
                                   isCorrect === true ? 'bg-green-50/50 dark:bg-green-950/20' :
                                   isCorrect === false ? 'bg-red-50/50 dark:bg-red-950/20' : ''
@@ -1725,6 +1743,25 @@ export const LectureCheckInResults = () => {
                                         <Clock className="h-3 w-3" />
                                         {isCodingSimple ? "Grading..." : "Pending Review"}
                                       </Badge>
+                                      {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                          <Clock className="h-3 w-3" />
+                                          {formatTime(assignment.response_time_seconds)}
+                                        </Badge>
+                                      )}
+                                    </>
+                                   ) : isPoll ? (
+                                    <>
+                                      <Badge
+                                        variant="secondary"
+                                        className="gap-1"
+                                      >
+                                        <BarChart3 className="h-3 w-3" />
+                                        Recorded
+                                      </Badge>
+                                      <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
+                                        {studentAnswer || '(none)'}
+                                      </span>
                                       {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
                                         <Badge variant="outline" className="gap-1 text-xs">
                                           <Clock className="h-3 w-3" />
@@ -1804,17 +1841,36 @@ export const LectureCheckInResults = () => {
                                 const total = deduplicatedAssignments.filter((a) => a.completed).length;
                                 const percentage = total > 0 ? (count / total) * 100 : 0;
                                 const correctAnswerToUse = question.overriddenAnswer || question.correctAnswer;
-                                const isCorrect = optionLetter === correctAnswerToUse;
+                                const isCorrectBar = !isPoll && optionLetter === correctAnswerToUse;
+
+                                // For polls, find the most popular option
+                                const allCounts = isPoll ? question.options?.map((_: string, oi: number) => {
+                                  const ol = String.fromCharCode(65 + oi);
+                                  return deduplicatedAssignments.filter((a) => {
+                                    if (!a.completed) return false;
+                                    const ac = a.content as any;
+                                    const aq = ac?.questions || [];
+                                    const si = aq.findIndex((q: any) => q.question === question.question);
+                                    const sa = si >= 0 ? (a.quiz_responses?.[si.toString()] || a.quiz_responses?.[si]) : null;
+                                    return sa === ol;
+                                  }).length;
+                                }) : [];
+                                const maxCount = isPoll ? Math.max(...allCounts, 0) : 0;
+                                const isMostPopular = isPoll && count > 0 && count === maxCount;
 
                                 return (
                                   <div key={optionLetter} className="flex items-center gap-2 text-xs">
-                                    <span className={`font-mono w-6 ${isCorrect ? "text-green-600 font-bold" : ""}`}>
+                                    <span className={`font-mono w-6 ${isCorrectBar ? "text-green-600 font-bold" : isMostPopular ? "text-primary font-bold" : ""}`}>
                                       {optionLetter}
-                                      {isCorrect ? " ✓" : ""}
+                                      {isCorrectBar ? " ✓" : ""}
                                     </span>
-                                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                                    <div className="flex-1 bg-muted rounded-full h-5 overflow-hidden">
                                       <div
-                                        className={`h-full ${isCorrect ? "bg-green-500" : "bg-primary"}`}
+                                        className={`h-full transition-all ${
+                                          isPoll 
+                                            ? (isMostPopular ? "bg-primary" : "bg-primary/60") 
+                                            : (isCorrectBar ? "bg-green-500" : "bg-primary")
+                                        }`}
                                         style={{ width: `${percentage}%` }}
                                       />
                                     </div>

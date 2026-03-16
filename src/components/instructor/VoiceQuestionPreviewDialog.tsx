@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye, Send, BarChart3 } from 'lucide-react';
+import { Mic, MessageSquare, ListChecks, Loader2, Sparkles, RefreshCw, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MathRenderer } from '@/components/ui/math-renderer';
@@ -312,16 +312,17 @@ export function VoiceQuestionPreviewDialog({
       suggested_type: questionType,
     };
     
-    // Include MCQ data if this is a multiple choice or poll question
-    if (questionType === 'multiple_choice' || questionType === 'poll') {
-      // Only include options if at least one is filled
+    // Include MCQ data if this is a multiple choice question
+    if (questionType === 'multiple_choice') {
       if (hasOptions) {
         questionData.options = mcqOptions;
-        // Only set correct_answer for graded MCQ, not poll
-        if (questionType === 'multiple_choice') {
-          questionData.correct_answer = correctAnswer;
-        }
+        questionData.correct_answer = correctAnswer;
       }
+    }
+
+    // Include options for poll (no correct answer)
+    if (questionType === 'poll' && hasOptions) {
+      questionData.options = mcqOptions;
     }
 
     // Include expected answer for short answer questions
@@ -339,15 +340,15 @@ export function VoiceQuestionPreviewDialog({
   };
 
   const getTypeIcon = () => {
-    if (questionType === 'multiple_choice') return <ListChecks className="h-5 w-5 text-primary" />;
-    if (questionType === 'poll') return <BarChart3 className="h-5 w-5 text-primary" />;
-    return <MessageSquare className="h-5 w-5 text-primary" />;
+    return questionType === 'multiple_choice' ? (
+      <ListChecks className="h-5 w-5 text-primary" />
+    ) : (
+      <MessageSquare className="h-5 w-5 text-primary" />
+    );
   };
 
   const getTypeLabel = () => {
-    if (questionType === 'multiple_choice') return 'Multiple Choice';
-    if (questionType === 'poll') return 'Poll (Ungraded)';
-    return 'Short Answer';
+    return questionType === 'multiple_choice' ? 'Multiple Choice' : questionType === 'poll' ? 'Poll' : 'Short Answer';
   };
 
   return (
@@ -355,11 +356,11 @@ export function VoiceQuestionPreviewDialog({
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Review Audience Check
+            <Mic className="h-5 w-5 text-emerald-500" />
+            Voice Question Preview
           </DialogTitle>
           <DialogDescription>
-            Review and refine before sending to the room.
+            Review and edit the extracted question before sending to students.
           </DialogDescription>
         </DialogHeader>
 
@@ -386,7 +387,7 @@ export function VoiceQuestionPreviewDialog({
                 setQuestionType(value);
                 // Auto-generate options when switching to MCQ or Poll and options are empty
                 if ((value === 'multiple_choice' || value === 'poll') && !mcqOptions.some(opt => opt.trim() !== '') && questionText.trim() && !isGeneratingOptions) {
-                  console.log('📋 Switching to MCQ/Poll - triggering option generation');
+                  console.log(`📋 Switching to ${value} - triggering option generation`);
                   setTimeout(() => handleGenerateOptionsAuto(), 100);
                 }
                 // Auto-generate expected answer when switching to short answer and it's empty
@@ -395,7 +396,7 @@ export function VoiceQuestionPreviewDialog({
                   setTimeout(() => handleGenerateExpectedAnswerAuto(), 100);
                 }
               }}
-              className="flex flex-wrap gap-4"
+              className="flex gap-4"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="short_answer" id="short_answer" />
@@ -414,8 +415,7 @@ export function VoiceQuestionPreviewDialog({
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="poll" id="poll" />
                 <Label htmlFor="poll" className="flex items-center gap-1 cursor-pointer">
-                  <BarChart3 className="h-4 w-4" />
-                  Poll (Ungraded)
+                  📊 Poll
                 </Label>
               </div>
             </RadioGroup>
@@ -500,19 +500,11 @@ export function VoiceQuestionPreviewDialog({
             </div>
           )}
 
-          {/* MCQ Options (shown for multiple choice and poll) */}
+          {/* MCQ Options (shown for multiple choice AND poll) */}
           {(questionType === 'multiple_choice' || questionType === 'poll') && (
             <div className="space-y-3">
-              {questionType === 'poll' && (
-                <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <BarChart3 className="h-5 w-5 text-blue-500 shrink-0" />
-                  <p className="text-sm text-blue-500">
-                    📊 Responses will be collected as a poll (no grading)
-                  </p>
-                </div>
-              )}
               <div className="flex items-center justify-between">
-                <Label>Answer Options</Label>
+                <Label>{questionType === 'poll' ? 'Poll Choices' : 'Answer Options'}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -534,17 +526,15 @@ export function VoiceQuestionPreviewDialog({
                   ) : (
                     <>
                       <Sparkles className="h-3 w-3" />
-                      Generate Options
+                      Generate {questionType === 'poll' ? 'Choices' : 'Options'}
                     </>
                   )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                {hasOptions 
-                  ? questionType === 'poll' 
-                    ? "Edit the generated options below."
-                    : "Edit the generated options below. Select the correct answer."
-                  : "Click 'Generate Options' to create choices, or add them manually."}
+                {questionType === 'poll' 
+                  ? (hasOptions ? "Edit the poll choices below. Responses will not be graded." : "Click 'Generate Choices' to create poll options, or add them manually.")
+                  : (hasOptions ? "Edit the generated options below. Select the correct answer." : "Click 'Generate Options' to create choices, or add them manually.")}
               </p>
               {questionType === 'multiple_choice' ? (
                 <RadioGroup
@@ -580,16 +570,16 @@ export function VoiceQuestionPreviewDialog({
                   ))}
                 </RadioGroup>
               ) : (
-                /* Poll mode: no correct answer selector, just option inputs */
+                /* Poll: show options without correct answer selector */
                 <div className="space-y-3">
                   {['A', 'B', 'C', 'D'].map((letter, index) => (
                     <div key={letter} className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium w-6 text-muted-foreground">{letter}:</span>
+                        <Label className="font-medium min-w-[24px]">{letter}.</Label>
                         <Input
                           value={mcqOptions[index]}
                           onChange={(e) => handleOptionChange(index, e.target.value)}
-                          placeholder={`Option ${letter}`}
+                          placeholder={`Choice ${letter}`}
                           className="flex-1"
                         />
                       </div>
@@ -605,6 +595,11 @@ export function VoiceQuestionPreviewDialog({
               {questionType === 'multiple_choice' && (
                 <p className="text-xs text-muted-foreground">
                   Select the radio button next to the correct answer.
+                </p>
+              )}
+              {questionType === 'poll' && (
+                <p className="text-xs text-muted-foreground">
+                  📊 Poll responses are recorded but not graded.
                 </p>
               )}
             </div>
@@ -626,10 +621,7 @@ export function VoiceQuestionPreviewDialog({
                 Sending...
               </>
             ) : (
-              <>
-                <Send className="h-4 w-4 mr-1" />
-                Send to Room
-              </>
+              'Send to Students'
             )}
           </Button>
         </DialogFooter>

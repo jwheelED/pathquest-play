@@ -6,6 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
 };
 
+/**
+ * Background PPTX to PDF conversion for hybrid mode
+ * Converts PPTX files that were uploaded with "preserve animations" 
+ * to enable slide question extraction while keeping the original PPTX for presentation
+ * 
+ * Writes granular sub-stages to pdf_conversion_status for progress tracking:
+ * processing:downloading → processing:uploading_to_converter → processing:converting →
+ * processing:downloading_pdf → processing:uploading_pdf → completed
+ */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -15,32 +24,7 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // --- Auth check ---
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  const supabaseAuth = createClient(
-    supabaseUrl,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-
-  const token = authHeader.replace('Bearer ', '');
-  const { data: userData, error: userError } = await supabaseAuth.auth.getUser(token);
-  if (userError || !userData?.user) {
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  const authenticatedUserId = userData.user.id;
-  // --- End auth check ---
-
+  // Helper to update conversion stage
   const setStage = async (materialId: string, stage: string) => {
     console.log(`📍 Stage: ${stage}`);
     await supabase
@@ -59,18 +43,12 @@ serve(async (req) => {
       );
     }
 
-    // Verify instructorId matches authenticated user
-    if (instructorId !== authenticatedUserId) {
-      return new Response(
-        JSON.stringify({ error: 'Forbidden: instructorId does not match authenticated user' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     console.log(`🔄 Starting background PPTX conversion for material: ${materialId}`);
 
+    // Stage: downloading PPTX from storage
     await setStage(materialId, 'processing:downloading');
 
+    // Get CloudConvert API key
     const apiKey = Deno.env.get('CLOUDCONVERT_API_KEY');
     if (!apiKey) {
       console.error('Missing CloudConvert API key');
@@ -81,6 +59,7 @@ serve(async (req) => {
       );
     }
 
+    // Download the PPTX file from storage
     console.log('📥 Downloading PPTX from storage:', filePath);
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('lecture-materials')
@@ -95,6 +74,7 @@ serve(async (req) => {
       );
     }
 
+    // Convert blob to base64
     const arrayBuffer = await fileData.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
     let binary = '';
@@ -105,9 +85,11 @@ serve(async (req) => {
     }
     const fileBase64 = btoa(binary);
 
+    // Stage: uploading to CloudConvert
     await setStage(materialId, 'processing:uploading_to_converter');
     console.log('📤 Creating CloudConvert job...');
 
+    // Create CloudConvert job
     const jobResponse = await fetch('https://api.cloudconvert.com/v2/jobs', {
       method: 'POST',
       headers: {
@@ -145,7 +127,8 @@ serve(async (req) => {
     const jobId = jobData.data.id;
     console.log('✅ Job created:', jobId);
 
-    const importTask = jobData.data.tasks.find((t: Record<string, unknown>) => t.name === 'import-file');
+    // Get upload URL from import task
+    const importTask = jobData.data.tasks.find((t: any) => t.name === 'import-file');
     if (!importTask?.result?.form?.url) {
       console.error('Import task missing upload URL');
       await setStage(materialId, 'failed');
@@ -155,6 +138,7 @@ serve(async (req) => {
       );
     }
 
+    // Upload to CloudConvert
     console.log('📤 Uploading to CloudConvert...');
     const binaryData = Uint8Array.from(atob(fileBase64), c => c.charCodeAt(0));
     const blob = new Blob([binaryData], { 
@@ -184,9 +168,11 @@ serve(async (req) => {
       );
     }
 
+    // Stage: converting
     await setStage(materialId, 'processing:converting');
     console.log('⏳ Waiting for conversion...');
 
+    // Poll for completion
     let attempts = 0;
     const maxAttempts = 90;
     let completedJob = null;
@@ -226,9 +212,10 @@ serve(async (req) => {
       );
     }
 
+    // Stage: downloading PDF
     await setStage(materialId, 'processing:downloading_pdf');
 
-    const exportTask = completedJob.tasks.find((t: Record<string, unknown>) => t.name === 'export-file');
+    const exportTask = completedJob.tasks.find((t: any) => t.name === 'export-file');
     const pdfUrl = exportTask?.result?.files?.[0]?.url;
     
     if (!pdfUrl) {
@@ -253,6 +240,7 @@ serve(async (req) => {
     const pdfBuffer = await pdfResponse.arrayBuffer();
     console.log(`✅ PDF downloaded: ${pdfBuffer.byteLength} bytes`);
 
+    // Stage: uploading PDF to storage
     await setStage(materialId, 'processing:uploading_pdf');
 
     const pdfFileName = fileName.replace(/\.(pptx|ppt)$/i, '_fallback.pdf');
@@ -276,6 +264,7 @@ serve(async (req) => {
       );
     }
 
+    // Stage: completed
     const { error: updateError } = await supabase
       .from('lecture_materials')
       .update({ 

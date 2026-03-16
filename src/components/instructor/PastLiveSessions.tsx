@@ -177,7 +177,7 @@ export const PastLiveSessions = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        {session.participantCount} students
+                        {session.participantCount} participants
                       </span>
                       <span>{session.questionCount} questions</span>
                     </div>

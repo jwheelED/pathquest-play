@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type SlideQuestionType = 'mcq' | 'short_answer' | 'coding';
+export type SlideQuestionType = 'mcq' | 'short_answer' | 'coding' | 'poll';
 export type ExtractionStage = 'idle' | 'capturing' | 'analyzing' | 'sending';
 
 interface SlideRecordingControlsProps {
@@ -393,6 +393,10 @@ export function SlideRecordingControls({
                 <DropdownMenuItem onClick={() => onSendSlideQuestion('coding')}>
                   <span className="font-medium">Coding Challenge</span>
                   <span className="ml-auto text-xs text-muted-foreground">Code</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onSendSlideQuestion('poll')}>
+                  <span className="font-medium">Poll (Ungraded)</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Poll</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
