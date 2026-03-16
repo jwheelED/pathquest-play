@@ -312,12 +312,15 @@ export function VoiceQuestionPreviewDialog({
       suggested_type: questionType,
     };
     
-    // Include MCQ data if this is a multiple choice question
-    if (questionType === 'multiple_choice') {
+    // Include MCQ data if this is a multiple choice or poll question
+    if (questionType === 'multiple_choice' || questionType === 'poll') {
       // Only include options if at least one is filled
       if (hasOptions) {
         questionData.options = mcqOptions;
-        questionData.correct_answer = correctAnswer;
+        // Only set correct_answer for graded MCQ, not poll
+        if (questionType === 'multiple_choice') {
+          questionData.correct_answer = correctAnswer;
+        }
       }
     }
 
