@@ -319,20 +319,20 @@ export default function InstructorAuth() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden" style={{ background: 'hsl(210, 20%, 98%)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12" style={{ background: 'hsl(210, 20%, 98%)' }}>
       {/* Ambient glow */}
-      <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.07]" style={{ background: 'radial-gradient(circle, hsl(160, 84%, 42%), transparent 70%)' }} />
-      <div className="absolute bottom-[-10%] right-[20%] w-[400px] h-[400px] rounded-full opacity-[0.05]" style={{ background: 'radial-gradient(circle, hsl(199, 89%, 60%), transparent 70%)' }} />
+      <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.05] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 84%, 42%), transparent 70%)' }} />
+      <div className="absolute bottom-[-10%] right-[20%] w-[400px] h-[400px] rounded-full opacity-[0.035] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(199, 89%, 60%), transparent 70%)' }} />
 
-      <div className="relative z-10 w-full max-w-[420px] px-4">
+      <div className="relative z-10 w-full max-w-[400px]">
         {/* Card */}
-        <div className="bg-card rounded-2xl border border-border/60 shadow-[0_4px_24px_-4px_hsl(220_25%_15%/0.06)] p-8 sm:p-10 space-y-6">
+        <div className="bg-card rounded-2xl border border-border/50 shadow-[0_1px_3px_0_hsl(220_25%_15%/0.04),0_8px_28px_-6px_hsl(220_25%_15%/0.06)] px-7 py-9 sm:px-9 sm:py-10">
           {/* Header */}
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          <div className="text-center space-y-1.5 mb-7">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
               Instructor Portal
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-[13px] text-muted-foreground/70">
               {isRecoveryMode ? "Enter your new password" : isResetMode ? "Reset your password" : isSignUp ? "Create your instructor account" : "Sign in to manage your students"}
             </p>
           </div>
@@ -340,8 +340,8 @@ export default function InstructorAuth() {
           {/* Form */}
           {isRecoveryMode ? (
             <div className="space-y-5">
-              <div className="space-y-1.5">
-                <Label htmlFor="new-password" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">New Password</Label>
+              <div className="space-y-2">
+                <Label htmlFor="new-password" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">New Password</Label>
                 <Input
                   id="new-password"
                   type="password"
@@ -349,63 +349,68 @@ export default function InstructorAuth() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handlePasswordUpdate()}
-                  className="h-11 rounded-lg border-border/70 bg-background focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-colors"
+                  className="h-[42px] rounded-[10px] border-border/60 bg-background placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all"
                 />
               </div>
               <Button
                 onClick={handlePasswordUpdate}
                 disabled={loading}
-                className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm transition-all"
+                className="w-full h-[44px] rounded-[10px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-[0_1px_3px_0_hsl(160_84%_29%/0.25)] transition-all"
               >
                 {loading ? "Updating..." : "Update Password"}
               </Button>
             </div>
           ) : (
             <div className="space-y-5">
-              {!isResetMode && isSignUp && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="instructor-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Full Name</Label>
+              {/* Fields */}
+              <div className="space-y-3.5">
+                {!isResetMode && isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="instructor-name" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">Full Name</Label>
+                    <Input
+                      id="instructor-name"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className="h-[42px] rounded-[10px] border-border/60 bg-background placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all"
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="instructor-email" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">Email</Label>
                   <Input
-                    id="instructor-name"
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="h-11 rounded-lg border-border/70 bg-background focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-colors"
+                    id="instructor-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
+                    className="h-[42px] rounded-[10px] border-border/60 bg-background placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all"
                   />
                 </div>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="instructor-email" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Email</Label>
-                <Input
-                  id="instructor-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyPress={isResetMode ? (e) => e.key === 'Enter' && handlePasswordReset() : handleKeyPress}
-                  className="h-11 rounded-lg border-border/70 bg-background focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-colors"
-                />
+                {!isResetMode && (
+                  <div className="space-y-2">
+                    <Label htmlFor="instructor-password" className="text-[11px] font-semibold text-muted-foreground/80 uppercase tracking-[0.08em]">Password</Label>
+                    <Input
+                      id="instructor-password"
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className="h-[42px] rounded-[10px] border-border/60 bg-background placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40 transition-all"
+                    />
+                  </div>
+                )}
               </div>
-              {!isResetMode && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="instructor-password" className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Password</Label>
-                  <Input
-                    id="instructor-password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="h-11 rounded-lg border-border/70 bg-background focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-colors"
-                  />
-                </div>
-              )}
+
+              {/* Primary CTA */}
               <Button
                 onClick={isResetMode ? handlePasswordReset : handleAuth}
                 disabled={loading}
-                className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm transition-all"
+                className="w-full h-[44px] rounded-[10px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-[0_1px_3px_0_hsl(160_84%_29%/0.25)] transition-all"
               >
                 {loading ? "Loading..." : isResetMode ? "Send Reset Link" : isSignUp ? "Sign Up" : "Sign In"}
               </Button>
@@ -413,7 +418,7 @@ export default function InstructorAuth() {
               {!isResetMode && !isSignUp && (
                 <button
                   onClick={() => setIsResetMode(true)}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+                  className="w-full text-center text-[12px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                 >
                   Forgot password?
                 </button>
@@ -421,12 +426,12 @@ export default function InstructorAuth() {
 
               {!isResetMode && (
                 <>
-                  <div className="relative my-2">
+                  <div className="relative my-1.5">
                     <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border/50" />
+                      <span className="w-full border-t border-border/40" />
                     </div>
-                    <div className="relative flex justify-center text-[11px] uppercase tracking-widest">
-                      <span className="bg-card px-3 text-muted-foreground/70">Or continue with</span>
+                    <div className="relative flex justify-center">
+                      <span className="bg-card px-3 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground/50">Or continue with</span>
                     </div>
                   </div>
 
@@ -446,9 +451,9 @@ export default function InstructorAuth() {
                       }
                     }}
                     variant="outline"
-                    className="w-full h-11 rounded-lg border-border/70 bg-background hover:bg-muted/50 text-foreground font-medium flex items-center justify-center gap-2.5 transition-colors"
+                    className="w-full h-[42px] rounded-[10px] border-border/50 bg-background hover:bg-muted/40 hover:border-border/70 text-foreground text-sm font-medium flex items-center justify-center gap-2.5 transition-all"
                   >
-                    <svg className="w-4.5 h-4.5" viewBox="0 0 24 24">
+                    <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
@@ -459,7 +464,7 @@ export default function InstructorAuth() {
 
                   <button
                     onClick={() => setIsSignUp(!isSignUp)}
-                    className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+                    className="w-full text-center text-[13px] text-muted-foreground/70 hover:text-muted-foreground transition-colors pt-1"
                   >
                     {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
                   </button>
@@ -469,7 +474,7 @@ export default function InstructorAuth() {
               {isResetMode && (
                 <button
                   onClick={() => setIsResetMode(false)}
-                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+                  className="w-full text-center text-[13px] text-muted-foreground/60 hover:text-foreground transition-colors pt-1"
                 >
                   ← Back to Sign In
                 </button>
@@ -480,8 +485,8 @@ export default function InstructorAuth() {
 
         {/* Back link — outside card */}
         {!isRecoveryMode && (
-          <p className="text-center mt-6">
-            <Link to="/" className="text-xs text-muted-foreground/70 hover:text-foreground transition-colors">
+          <p className="text-center mt-8">
+            <Link to="/" className="text-[12px] text-muted-foreground/50 hover:text-muted-foreground transition-colors">
               ← Back to Home
             </Link>
           </p>
@@ -490,4 +495,3 @@ export default function InstructorAuth() {
     </div>
   );
 }
- 
