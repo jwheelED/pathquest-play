@@ -466,6 +466,89 @@ const CorporateEvents = () => {
         </div>
       </section>
 
+      {/* ══════════════════════════════════════
+          SECTION 6 — Built for Live Events
+         ══════════════════════════════════════ */}
+      <section
+        className="py-20"
+        style={{ backgroundColor: "hsl(var(--landing-surface))" }}
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="landing-eyebrow mb-3 text-center">BUILT FOR LIVE EVENTS</p>
+          <h2 className="landing-heading text-3xl md:text-4xl text-center mb-12">
+            What makes Edvana different for events.
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              {
+                title: "No prebuilt polls",
+                body: "Edvana drafts understanding checks from your speaker's live words. You do not have to build anything before the event starts.",
+              },
+              {
+                title: "Speaker stays in control",
+                body: "Every check-in is reviewed before it goes to the room. Nothing is sent automatically.",
+              },
+              {
+                title: "Participants join in seconds",
+                body: "No app download. No account required. Scan a QR code or enter a session code and you are in.",
+              },
+              {
+                title: "Pricing that matches how events work",
+                body: "You buy a block of time for your room size. No subscriptions. No annual commitments. No paying for features you will never use.",
+              },
+            ].map((card) => (
+              <div key={card.title} className="landing-card">
+                <h3
+                  className="font-semibold text-base mb-2"
+                  style={{ color: "hsl(var(--landing-text))" }}
+                >
+                  {card.title}
+                </h3>
+                <p className="landing-subheading text-sm leading-relaxed">
+                  {card.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          SECTION 7 — Final CTA
+         ══════════════════════════════════════ */}
+      <section className="py-24">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+            Ready to bring real-time understanding to your next event?
+          </h2>
+          <p className="landing-subheading text-base max-w-xl mx-auto mb-10">
+            Start with self-serve and be running in under two minutes, or tell us
+            about your event and we will help you find the right setup.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <a
+              href="mailto:nigel@edvana.dev?subject=Plan%20My%20Event&body=I%27d%20like%20to%20plan%20an%20event%20with%20Edvana."
+              className="landing-cta inline-block"
+            >
+              Plan Your Event
+            </a>
+            <a
+              href="mailto:nigel@edvana.dev?subject=Talk%20to%20the%20Team&body=I%27d%20like%20to%20discuss%20running%20an%20event%20with%20Edvana."
+              className="landing-secondary-btn inline-block"
+            >
+              Talk to the Team
+            </a>
+          </div>
+          <p
+            className="text-xs"
+            style={{ color: "hsl(var(--landing-muted))" }}
+          >
+            Launch pricing available for early event partners.
+          </p>
+        </div>
+      </section>
+
       {/* ── Footer ── */}
       <footer
         className="border-t py-8"
