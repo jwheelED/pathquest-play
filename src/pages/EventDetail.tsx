@@ -47,8 +47,8 @@ const EventDetail = () => {
 
   const fetchEvent = useCallback(async () => {
     if (!eventId) return;
-    const { data, error } = await supabase
-      .from("scheduled_events" as string)
+    const { data, error } = await (supabase as any)
+      .from("scheduled_events")
       .select("*")
       .eq("id", eventId)
       .single();
