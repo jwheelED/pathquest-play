@@ -36,6 +36,8 @@ import InstructorLecturePreview from "./pages/InstructorLecturePreview";
 import StudentTraining from "./pages/StudentTraining";
 import CorporateEvents from "./pages/CorporateEvents";
 import CorporateEnterprise from "./pages/CorporateEnterprise";
+import CreateEvent from "./pages/CreateEvent";
+import EventDetail from "./pages/EventDetail";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
