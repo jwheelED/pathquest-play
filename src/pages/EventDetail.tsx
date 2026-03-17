@@ -180,7 +180,7 @@ const EventDetail = () => {
           <h1 className="text-lg font-semibold text-foreground truncate">{event.event_name}</h1>
           <Badge variant={statusInfo.variant} className="ml-auto flex items-center gap-1.5">
             {displayStatus === "live" && (
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             )}
             {statusInfo.label}
           </Badge>
