@@ -119,8 +119,8 @@ const EventDetail = () => {
 
   const handleCancel = async () => {
     if (!event) return;
-    const { error } = await supabase
-      .from("scheduled_events" as string)
+    const { error } = await (supabase as any)
+      .from("scheduled_events")
       .update({ status: "cancelled" })
       .eq("id", event.id);
 
