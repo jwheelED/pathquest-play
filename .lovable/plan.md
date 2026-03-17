@@ -1,64 +1,44 @@
 
-Goal: fix the persistent “Failed to send a request to the Edge Function” error for file uploads.
+## Plan: Live Copilot Redesign — Always-On Autodraft Command Center
 
-What I found from logs and code
-1. The current runtime error is not a generic network issue; it is a hard crash in the Edge Function runtime:
-   - `[unenv] fs.readFile is not implemented yet!`
-   - Stack trace references `@smithy/shared-ini-file-loader` and `@smithy/node-config-provider`.
-2. That stack trace is specific to AWS SDK-for-Node dependency resolution, which means the deployed function is still executing an old AWS SDK-based bundle.
-3. The repository code for `supabase/functions/upload-to-cloudinary/index.ts` is now the manual AWS Signature V4 + fetch implementation (no `@aws-sdk/client-s3` imports), so code and deployed runtime are out of sync.
-4. A direct function call currently returns `502 Bad Gateway`, consistent with boot-time/runtime crash before normal request handling.
+**STATUS: ROUND 1-3 COMPLETE**
 
-Root cause
-- The deployed `upload-to-cloudinary` function version is stale (or deployment did not switch active version), so Supabase is still running the previous AWS SDK-based code path that is incompatible with Deno Edge runtime.
+### What was implemented
 
-Fix plan (implementation sequence)
-1. Confirm deployment mismatch before changing behavior
-   - Trigger one controlled request to `/upload-to-cloudinary`.
-   - Capture fresh logs timestamp to confirm crash still points to `@smithy/*`.
-   - This establishes a known baseline and avoids chasing secondary issues.
+#### Round 1: QuestionOnDeck + Live tab restructure + rebranding
+- Created `QuestionOnDeck.tsx` — persistent autodraft card with Listening/Draft states, Preview/Send Now/Hold/Edit actions
+- Rebranded "Live Lecture Capture" → **Live Copilot** throughout
+- Rebranded "Live Session" tab → **Live Copilot**
+- Removed "Detect questions" toggle — detection is now always on
+- Wrapped transcript chunks in collapsible **Live Session Feed**
+- Replaced floating `PassiveQuestionCandidateCard` toast with inline QuestionOnDeck card
 
-2. Stabilize function source for deployment
-   - Keep the fetch-based R2 uploader as the canonical implementation.
-   - Remove the unused `HmacSha256` import to reduce any unnecessary module load surface.
-   - Add structured error logs around:
-     - secret presence checks,
-     - signed request creation,
-     - R2 response status/body.
-   - Preserve CORS behavior and response schema so existing frontend calls remain unchanged.
+#### Round 2: Results redesign (Room Insight + Room Signal + Next Move)
+- Renamed "Check-In Results" → **Live Room Insight** in LectureCheckInResults
+- Renamed "Live Session Responses" → **Live Room Insight** in LiveSessionResults
+- Renamed "Visual Analytics" → **Room Signal** in LectureCheckInResults
+- Added `getRoomSignal()` interpretation function (Move on / Solid / Split room / Revisit)
+- Each live question result now leads with natural language interpretation + "Recommended Next Move" badge
+- Correctness stats are secondary (smaller text in interpretation section)
 
-3. Force function runtime refresh
-   - Explicitly deploy `upload-to-cloudinary` (do not rely on implicit auto-sync in this recovery case).
-   - If stale bundle persists, perform a hard reset:
-     - delete deployed function,
-     - redeploy from current source.
-   - Rationale: this clears stuck deployment/version state and guarantees the active artifact matches repo code.
+#### Round 3: Review modal + greeting fix
+- Renamed "Voice Question Preview" → **Review Audience Check** in VoiceQuestionPreviewDialog
+- Renamed "Send to Students" → **Send to Room**
+- Added greeting pattern detection (`GREETING_PATTERNS`) to `usePassiveQuestionDetection.ts`
+- "How's everyone doing today?" and similar greetings are now blocked before WH-question bypass
+- Auto-dismiss extended to 60s for persistent on-deck card
 
-4. Validate edge behavior outside UI
-   - Call function directly and verify:
-     - no boot-time `@smithy/*` errors,
-     - function returns expected JSON error for missing file instead of 502 crash,
-     - OPTIONS preflight responds with correct CORS headers.
+### Files Created
+- `src/components/instructor/QuestionOnDeck.tsx` — Central autodraft card
 
-5. Validate end-to-end from app UI
-   - Test upload path used by:
-     - `SimplifiedStudyMaterials.tsx`
-     - `StudyMaterialUpload.tsx`
-     - `QuickUploadSheet.tsx`
-   - Confirm network request reaches function and receives JSON response.
-   - Confirm DB insert and post-upload question generation still trigger.
+### Files Edited
+- `src/pages/InstructorDashboard.tsx` — Tab rename
+- `src/components/instructor/LectureTranscription.tsx` — Rebrand, layout restructure, unified pipeline
+- `src/components/instructor/VoiceQuestionPreviewDialog.tsx` — Rename + Send to Room
+- `src/components/instructor/LiveSessionResults.tsx` — Room Insight + interpretation layer
+- `src/components/instructor/LectureCheckInResults.tsx` — Room Insight + Room Signal
+- `src/hooks/usePassiveQuestionDetection.ts` — Greeting patterns, always-on
+- `src/hooks/useLectureRecording.ts` — Always-on detection config
 
-6. Add guardrails for faster future diagnosis
-   - Improve frontend toast for function invocation failures to show actionable detail (edge error message/status).
-   - Keep function name unchanged (`upload-to-cloudinary`) to avoid refactoring multiple callers, but annotate in code that it now targets R2 to prevent confusion.
-
-Technical notes
-- No database schema changes are required.
-- No additional secrets are required beyond the R2 secrets already added.
-- Expected successful outcome: boot errors disappear, 502 is replaced by normal function responses, and uploads work again.
-
-Acceptance criteria
-1. Edge logs for `upload-to-cloudinary` show no `fs.readFile` / `@smithy/*` runtime errors.
-2. Direct function call no longer returns 502 due to crash.
-3. At least one real file upload from the UI succeeds and returns a valid public R2 URL.
-4. Existing upload entry points continue working without client API contract changes.
+### Files No Longer Used
+- `src/components/instructor/PassiveQuestionCandidate.tsx` — Replaced by QuestionOnDeck (not deleted, no longer imported)

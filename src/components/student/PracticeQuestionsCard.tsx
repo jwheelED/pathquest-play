@@ -29,7 +29,57 @@ interface PracticeQuestionsCardProps {
   userId: string;
 }
 
+interface GradeComponents {
+  conceptual_understanding: number;
+  accuracy: number;
+  completeness: number;
+  application: number;
+}
+
 type AnswerState = "unanswered" | "correct" | "incorrect";
+
+function GradeDisplay({ grade }: { grade: number }) {
+  const getGradeInfo = (g: number) => {
+    if (g >= 85) return { label: "Great answer!", color: "text-green-600", bg: "bg-green-50 dark:bg-green-500/10", border: "border-green-200 dark:border-green-500/20" };
+    if (g >= 70) return { label: "Good answer", color: "text-green-600", bg: "bg-green-50 dark:bg-green-500/10", border: "border-green-200 dark:border-green-500/20" };
+    if (g >= 50) return { label: "Partially correct", color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-amber-200 dark:border-amber-500/20" };
+    return { label: "Needs improvement", color: "text-red-600", bg: "bg-red-50 dark:bg-red-500/10", border: "border-red-200 dark:border-red-500/20" };
+  };
+  const info = getGradeInfo(grade);
+  return (
+    <p className={cn("font-semibold flex items-center gap-1.5", info.color)}>
+      {grade >= 70 ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+      {info.label} ({grade}/100)
+    </p>
+  );
+}
+
+function ComponentScores({ components }: { components: GradeComponents }) {
+  const items = [
+    { label: "Conceptual", value: components.conceptual_understanding },
+    { label: "Accuracy", value: components.accuracy },
+    { label: "Completeness", value: components.completeness },
+    { label: "Application", value: components.application },
+  ];
+  return (
+    <div className="grid grid-cols-4 gap-2 mt-2">
+      {items.map((item) => (
+        <div key={item.label} className="text-center">
+          <div className="w-full bg-muted rounded-full h-1.5 mb-1">
+            <div
+              className={cn(
+                "h-1.5 rounded-full transition-all",
+                item.value >= 20 ? "bg-green-500" : item.value >= 12 ? "bg-amber-500" : "bg-red-500"
+              )}
+              style={{ width: `${(item.value / 25) * 100}%` }}
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -41,6 +91,10 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   const [sessionCorrect, setSessionCorrect] = useState(0);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [aiFeedbackLoading, setAiFeedbackLoading] = useState(false);
+  const [aiGrade, setAiGrade] = useState<number | null>(null);
+  const [aiComponents, setAiComponents] = useState<GradeComponents | null>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -81,8 +135,45 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
       return;
     }
 
-    const isCorrect =
-      answer.toLowerCase() === currentQuestion.correct_answer.toLowerCase();
+    let isCorrect: boolean;
+
+    if (currentQuestion.question_type === "multiple_choice") {
+      isCorrect = answer.toLowerCase() === currentQuestion.correct_answer.toLowerCase();
+    } else {
+      // Use auto-grade-short-answer for proper partial grading
+      isCorrect = false;
+      setAiFeedbackLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("auto-grade-short-answer", {
+          body: {
+            studentAnswer: answer,
+            expectedAnswer: currentQuestion.correct_answer,
+            question: currentQuestion.question_text,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data && typeof data.grade === "number") {
+          const grade = Math.round(data.grade);
+          setAiGrade(grade);
+          isCorrect = grade >= 70;
+
+          if (data.feedback) {
+            setAiFeedback(data.feedback);
+          }
+          if (data.components) {
+            setAiComponents(data.components);
+          }
+        }
+      } catch (err) {
+        console.error("Auto-grade error:", err);
+        // Fallback: simple comparison
+        isCorrect = answer.toLowerCase().trim() === currentQuestion.correct_answer.toLowerCase().trim();
+      } finally {
+        setAiFeedbackLoading(false);
+      }
+    }
 
     setAnswerState(isCorrect ? "correct" : "incorrect");
     setShowExplanation(true);
@@ -108,6 +199,9 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setShortAnswer("");
     setAnswerState("unanswered");
     setShowExplanation(false);
+    setAiFeedback(null);
+    setAiGrade(null);
+    setAiComponents(null);
     setCurrentIndex((prev) => (prev + 1) % questions.length);
   };
 
@@ -117,6 +211,9 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
     setShortAnswer("");
     setAnswerState("unanswered");
     setShowExplanation(false);
+    setAiFeedback(null);
+    setAiGrade(null);
+    setAiComponents(null);
     setSessionCorrect(0);
     setSessionTotal(0);
   };
@@ -124,15 +221,41 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
   // ---- Rendering ----
 
   if (loading) {
-    return null; // Don't show anything while loading
+    return null;
   }
 
   if (questions.length === 0) {
-    return null; // Hide card entirely when no material-based questions exist
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Brain className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-foreground">Practice Questions</p>
+              <p className="text-sm text-muted-foreground">
+                Upload study materials to generate practice questions you can quiz yourself on
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => document.getElementById("study-materials-section")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Upload
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const progressPercent =
     sessionTotal > 0 ? Math.round((sessionCorrect / sessionTotal) * 100) : 0;
+
+  const isShortAnswer = currentQuestion?.question_type !== "multiple_choice";
 
   return (
     <Card>
@@ -258,35 +381,68 @@ export function PracticeQuestionsCard({ userId }: PracticeQuestionsCardProps) {
           </div>
         )}
 
-        {/* Explanation */}
+        {/* Explanation / Grading feedback */}
         {showExplanation && (
           <div
             className={cn(
-              "rounded-lg p-4 text-sm space-y-1",
-              answerState === "correct"
+              "rounded-lg p-4 text-sm space-y-3",
+              isShortAnswer && aiGrade !== null
+                ? aiGrade >= 70
+                  ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20"
+                  : aiGrade >= 50
+                  ? "bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20"
+                  : "bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20"
+                : answerState === "correct"
                 ? "bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20"
                 : "bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20"
             )}
           >
-            <p className="font-semibold flex items-center gap-1.5">
-              {answerState === "correct" ? (
+            {/* Short answer: show grade-based feedback */}
+            {isShortAnswer ? (
+              aiFeedbackLoading ? (
+                <p className="text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Grading your answer...
+                </p>
+              ) : aiGrade !== null ? (
                 <>
-                  <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  Correct!
+                  <GradeDisplay grade={aiGrade} />
+                  {aiComponents && <ComponentScores components={aiComponents} />}
+                  {aiFeedback && (
+                    <p className="text-muted-foreground whitespace-pre-line mt-2">{aiFeedback}</p>
+                  )}
                 </>
               ) : (
                 <>
-                  <XCircle className="w-4 h-4 text-red-500" />
-                  Not quite — the answer is:{" "}
-                  <span className="text-foreground">
-                    {currentQuestion!.correct_answer}
-                  </span>
+                  <p className="font-semibold flex items-center gap-1.5">
+                    {answerState === "correct" ? (
+                      <><CheckCircle2 className="w-4 h-4 text-green-600" /> Correct!</>
+                    ) : (
+                      <><XCircle className="w-4 h-4 text-red-500" /> Incorrect</>
+                    )}
+                  </p>
+                  <p className="text-muted-foreground">{currentQuestion!.explanation}</p>
                 </>
-              )}
-            </p>
-            <p className="text-muted-foreground">
-              {currentQuestion!.explanation}
-            </p>
+              )
+            ) : (
+              /* Multiple choice: binary correct/incorrect */
+              <>
+                <p className="font-semibold flex items-center gap-1.5">
+                  {answerState === "correct" ? (
+                    <><CheckCircle2 className="w-4 h-4 text-green-600" /> Correct!</>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 text-red-500" />
+                      Not quite — the answer is:{" "}
+                      <span className="text-foreground">
+                        {currentQuestion!.correct_answer}
+                      </span>
+                    </>
+                  )}
+                </p>
+                <p className="text-muted-foreground">{currentQuestion!.explanation}</p>
+              </>
+            )}
           </div>
         )}
 

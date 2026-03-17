@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -45,6 +45,56 @@ export function CreateQuestionDialog({
 }: CreateQuestionDialogProps) {
   const { selectedCourseId } = useCourseContext();
   const [saving, setSaving] = useState(false);
+  const [generatingMcq, setGeneratingMcq] = useState(false);
+  const [generatingExpected, setGeneratingExpected] = useState(false);
+
+  const handleAiGenerateMcqOptions = async () => {
+    if (!mcqQuestion.trim()) {
+      toast.error("Enter a question first");
+      return;
+    }
+    setGeneratingMcq(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-mcq-options", {
+        body: { question_text: mcqQuestion },
+      });
+      if (error) throw error;
+      if (data?.options?.length === 4) {
+        setMcqOptions(data.options.map((o: string) => o.replace(/^[A-D][\).\s]+/, "")));
+        setMcqCorrectAnswer(data.correct_answer || "A");
+        if (data.explanation) setMcqExplanation(data.explanation);
+        toast.success("AI options generated — review & adjust as needed");
+      }
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error("Failed to generate options");
+    } finally {
+      setGeneratingMcq(false);
+    }
+  };
+
+  const handleAiGenerateExpectedAnswer = async () => {
+    if (!shortQuestion.trim()) {
+      toast.error("Enter a question first");
+      return;
+    }
+    setGeneratingExpected(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-expected-answer", {
+        body: { question_text: shortQuestion },
+      });
+      if (error) throw error;
+      if (data?.expected_answer) {
+        setShortExpectedAnswer(data.expected_answer);
+        toast.success("AI answer generated — review & adjust as needed");
+      }
+    } catch (e: unknown) {
+      console.error(e);
+      toast.error("Failed to generate expected answer");
+    } finally {
+      setGeneratingExpected(false);
+    }
+  };
   
   // Common fields
   const [title, setTitle] = useState("");
@@ -323,6 +373,21 @@ export function CreateQuestionDialog({
                   onChange={(e) => setMcqQuestion(e.target.value)}
                   rows={3}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={generatingMcq || !mcqQuestion.trim()}
+                  onClick={handleAiGenerateMcqOptions}
+                >
+                  {generatingMcq ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  {generatingMcq ? "Generating..." : "AI Suggest Options"}
+                </Button>
               </div>
               
               <div className="space-y-2">
@@ -382,7 +447,23 @@ export function CreateQuestionDialog({
               </div>
               
               <div className="space-y-2">
-                <Label>Expected Answer (optional)</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Expected Answer (optional)</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={generatingExpected || !shortQuestion.trim()}
+                    onClick={handleAiGenerateExpectedAnswer}
+                  >
+                    {generatingExpected ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    {generatingExpected ? "Generating..." : "AI Generate"}
+                  </Button>
+                </div>
                 <Textarea
                   placeholder="Model answer for grading reference..."
                   value={shortExpectedAnswer}

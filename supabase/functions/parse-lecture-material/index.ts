@@ -204,14 +204,24 @@ serve(async (req) => {
       const bytes = new Uint8Array(await fileData.arrayBuffer());
       text = extractTextFromPdf(bytes);
       console.log(`📄 PDF extracted: ${text.length} chars`);
-    } else if (fileType === "pptx" || fileType === "ppt") {
+    } else if (fileType === "pptx") {
       const bytes = new Uint8Array(await fileData.arrayBuffer());
       text = await extractTextFromPptx(bytes);
       console.log(`📊 PPTX extracted: ${text.length} chars`);
-    } else if (fileType === "docx" || fileType === "doc") {
+    } else if (fileType === "ppt") {
+      // Old .ppt format is OLE2 binary, not ZIP — use raw text extraction like PDF
+      const bytes = new Uint8Array(await fileData.arrayBuffer());
+      text = extractTextFromPdf(bytes);
+      console.log(`📊 PPT (legacy) extracted: ${text.length} chars`);
+    } else if (fileType === "docx") {
       const bytes = new Uint8Array(await fileData.arrayBuffer());
       text = await extractTextFromDocx(bytes);
       console.log(`📝 DOCX extracted: ${text.length} chars`);
+    } else if (fileType === "doc") {
+      // Old .doc format is OLE2 binary, not ZIP — use raw text extraction
+      const bytes = new Uint8Array(await fileData.arrayBuffer());
+      text = extractTextFromPdf(bytes);
+      console.log(`📝 DOC (legacy) extracted: ${text.length} chars`);
     } else if (["txt", "md", "markdown", "csv", "text"].includes(fileType)) {
       text = (await fileData.text()).slice(0, MAX_OUTPUT_CHARS);
       console.log(`📝 Text file read: ${text.length} chars`);
