@@ -114,7 +114,19 @@ Generate a JSON summary with:
     const aiResponse = await response.json();
     let content = aiResponse.choices[0].message.content;
     content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    const summary = JSON.parse(content);
+    
+    let summary;
+    try {
+      summary = JSON.parse(content);
+    } catch (parseError) {
+      console.error("JSON parse failed for summary, attempting extraction:", content.substring(0, 200));
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        summary = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("Failed to parse AI summary response");
+      }
+    }
 
     console.log("✅ Summary generated:", summary.topicsIdentified?.slice(0, 3));
 
