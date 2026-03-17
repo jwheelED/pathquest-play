@@ -1,44 +1,52 @@
 
-## Plan: Live Copilot Redesign — Always-On Autodraft Command Center
 
-**STATUS: ROUND 1-3 COMPLETE**
+## Plan: Events Marketing Page
 
-### What was implemented
+**Scope**: Replace `src/pages/CorporateEvents.tsx` entirely — from a speaker dashboard into a marketing/pricing page. No other files change. The route `/corporate/events` is already wired.
 
-#### Round 1: QuestionOnDeck + Live tab restructure + rebranding
-- Created `QuestionOnDeck.tsx` — persistent autodraft card with Listening/Draft states, Preview/Send Now/Hold/Edit actions
-- Rebranded "Live Lecture Capture" → **Live Copilot** throughout
-- Rebranded "Live Session" tab → **Live Copilot**
-- Removed "Detect questions" toggle — detection is now always on
-- Wrapped transcript chunks in collapsible **Live Session Feed**
-- Replaced floating `PassiveQuestionCandidateCard` toast with inline QuestionOnDeck card
+### Design System
+Use the existing `.landing-page` scoped class and its utility classes (`.landing-card`, `.landing-cta`, `.landing-eyebrow`, `.landing-heading`, `.landing-subheading`, `.landing-secondary-btn`) from `src/index.css` to match the homepage aesthetic exactly.
 
-#### Round 2: Results redesign (Room Insight + Room Signal + Next Move)
-- Renamed "Check-In Results" → **Live Room Insight** in LectureCheckInResults
-- Renamed "Live Session Responses" → **Live Room Insight** in LiveSessionResults
-- Renamed "Visual Analytics" → **Room Signal** in LectureCheckInResults
-- Added `getRoomSignal()` interpretation function (Move on / Solid / Split room / Revisit)
-- Each live question result now leads with natural language interpretation + "Recommended Next Move" badge
-- Correctness stats are secondary (smaller text in interpretation section)
+### Page Structure (single file: `src/pages/CorporateEvents.tsx`)
 
-#### Round 3: Review modal + greeting fix
-- Renamed "Voice Question Preview" → **Review Audience Check** in VoiceQuestionPreviewDialog
-- Renamed "Send to Students" → **Send to Room**
-- Added greeting pattern detection (`GREETING_PATTERNS`) to `usePassiveQuestionDetection.ts`
-- "How's everyone doing today?" and similar greetings are now blocked before WH-question bypass
-- Auto-dismiss extended to 60s for persistent on-deck card
+**Header**: Edvana logo + "Back to Home" ghost button. Same pattern as `CorporateEnterprise.tsx` but wrapped in `.landing-page`.
 
-### Files Created
-- `src/components/instructor/QuestionOnDeck.tsx` — Central autodraft card
+**Section 1 — Hero**
+- Eyebrow: `EDVANA FOR EVENTS`
+- Headline + subheadline (copy as specified)
+- Three proof points in a horizontal row with subtle emerald check icons
+- No CTA button in the hero (pricing below handles conversion)
 
-### Files Edited
-- `src/pages/InstructorDashboard.tsx` — Tab rename
-- `src/components/instructor/LectureTranscription.tsx` — Rebrand, layout restructure, unified pipeline
-- `src/components/instructor/VoiceQuestionPreviewDialog.tsx` — Rename + Send to Room
-- `src/components/instructor/LiveSessionResults.tsx` — Room Insight + interpretation layer
-- `src/components/instructor/LectureCheckInResults.tsx` — Room Insight + Room Signal
-- `src/hooks/usePassiveQuestionDetection.ts` — Greeting patterns, always-on
-- `src/hooks/useLectureRecording.ts` — Always-on detection config
+**Section 2 — How It Works**
+- Eyebrow: `HOW IT WORKS`
+- Headline + subheadline
+- Three numbered step cards using `.landing-card` with step number, title, and description
 
-### Files No Longer Used
-- `src/components/instructor/PassiveQuestionCandidate.tsx` — Replaced by QuestionOnDeck (not deleted, no longer imported)
+**Section 3 — Two Ways to Run an Event**
+- Eyebrow: `TWO WAYS TO RUN AN EVENT`
+- Headline: "Self-serve or fully supported. You choose."
+- Two side-by-side `.landing-card` cards, each with body text and a tag/badge at the bottom
+
+**Section 4 — Pricing**
+- Eyebrow: `PRICING`
+- Headline + subheadline
+- Tab toggle (Self-Serve / Premium) using local `useState` — styled as two pill buttons, not Radix Tabs, to stay within `.landing-page` design
+- **Self-Serve tab**: label, pricing matrix table (4 rows × 3 columns), overflow note, "Plan Your Event" CTA
+- **Premium tab**: label, pricing matrix table (3 rows × 2 columns), custom quote note, "Request a Quote" CTA
+- Matrix: clean table with emerald hover highlight on cells, clear row/column headers
+- Both CTAs use `.landing-cta` style
+
+**Section 5 — Enterprise Callout**
+- Eyebrow: `ENTERPRISE`
+- Headline + body + "Contact Sales" CTA
+- Full-width card with subtle emerald border accent
+
+**Footer**: Simple copyright + Privacy/Terms links (same as `MarketingLanding.tsx`)
+
+### Technical Details
+- All pricing data is hardcoded as const arrays at the top of the file
+- Tab state managed with `useState<'self-serve' | 'premium'>('self-serve')`
+- No new components, no new CSS, no new routes — just rewriting the single page file
+- Responsive: single column on mobile, side-by-side cards on `md:`, pricing matrix scrolls horizontally on small screens
+- All CTAs use `mailto:nigel@edvana.dev` with appropriate subject lines, matching the existing lead-gen pattern
+
