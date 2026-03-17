@@ -99,8 +99,8 @@ const CreateEvent = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("scheduled_events" as string)
+      const { data, error } = await (supabase as any)
+        .from("scheduled_events")
         .insert({
           organizer_id: user.id,
           event_name: eventName.trim(),

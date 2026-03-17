@@ -270,7 +270,7 @@ const EventDetail = () => {
             {(displayStatus === "live" || event.status === "live") && (
               <>
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
                   <p className="font-medium text-foreground">Session Live</p>
                 </div>
                 <Badge variant="outline" className="text-sm">In Progress</Badge>
