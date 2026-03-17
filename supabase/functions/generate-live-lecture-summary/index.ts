@@ -60,6 +60,10 @@ Generate a JSON summary with:
   "lectureHighlights": ["key moment 1", "key moment 2"]
 }`;
 
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -75,7 +79,10 @@ Generate a JSON summary with:
         temperature: 0.5,
         response_format: { type: "json_object" },
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error("AI API error:", response.status);

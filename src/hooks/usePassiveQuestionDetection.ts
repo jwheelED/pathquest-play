@@ -150,9 +150,9 @@ function wordCount(text: string): number {
 export function usePassiveQuestionDetection(options: UsePassiveQuestionDetectionOptions = {}) {
   const {
     enabled = true,
-    cooldownMs = 30000,
+    cooldownMs = 15000,
     minWordCount = 5,
-    autoDismissMs = 15000,
+    autoDismissMs = 30000,
     lastQuestionSentTime = 0,
     debug = true,
   } = options;
