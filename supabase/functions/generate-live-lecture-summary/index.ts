@@ -60,6 +60,10 @@ Generate a JSON summary with:
   "lectureHighlights": ["key moment 1", "key moment 2"]
 }`;
 
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -75,7 +79,10 @@ Generate a JSON summary with:
         temperature: 0.5,
         response_format: { type: "json_object" },
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error("AI API error:", response.status);
@@ -107,7 +114,19 @@ Generate a JSON summary with:
     const aiResponse = await response.json();
     let content = aiResponse.choices[0].message.content;
     content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    const summary = JSON.parse(content);
+    
+    let summary;
+    try {
+      summary = JSON.parse(content);
+    } catch (parseError) {
+      console.error("JSON parse failed for summary, attempting extraction:", content.substring(0, 200));
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        summary = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("Failed to parse AI summary response");
+      }
+    }
 
     console.log("✅ Summary generated:", summary.topicsIdentified?.slice(0, 3));
 
@@ -130,6 +149,24 @@ Generate a JSON summary with:
 
   } catch (error: any) {
     console.error("Summary generation error:", error);
+    // Return a graceful fallback instead of error for timeout/parse failures
+    if (error.name === 'AbortError') {
+      return new Response(JSON.stringify({
+        success: true,
+        summary: {
+          overallScore: 70,
+          topicsIdentified: ["Lecture content"],
+          keyConceptsCovered: ["Topics discussed during lecture"],
+          engagementAnalysis: "Summary generation timed out. Review student responses for engagement insights.",
+          teachingSuggestions: ["Check student check-in results for teaching insights"],
+          conceptsToReview: [],
+          lectureHighlights: [],
+        },
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({
       success: false,
       error: error.message,

@@ -266,21 +266,31 @@ const LiveStudent = () => {
   };
 
   // Extract just the letter from MCQ answer for reliable server-side comparison
+  // NOTE: Removed dangerous first-char fallback that misinterpreted words like "Bones" as "B"
   const extractMCQLetter = (answer: string): string => {
+    const trimmed = answer.trim();
     // If already just a letter, return it
-    if (/^[A-Da-d]$/.test(answer.trim())) {
-      return answer.trim().toUpperCase();
+    if (/^[A-Da-d]$/.test(trimmed)) {
+      return trimmed.toUpperCase();
     }
-    // Extract letter from "B) 206 bones", "B. Answer", etc.
-    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
+    // Extract letter from explicit prefix formats: "B) 206 bones", "B. Answer", "B - text"
+    const letterMatch = trimmed.match(/^([A-Da-d])[\).\-\s]/);
     if (letterMatch) {
       return letterMatch[1].toUpperCase();
     }
-    // Fallback: return first character if A-D
-    if (/^[A-Da-d]/i.test(answer.trim())) {
-      return answer.trim().charAt(0).toUpperCase();
+    // Match against current question options to find the letter
+    if (currentQuestion?.question_content?.options) {
+      const options = currentQuestion.question_content.options as string[];
+      const letters = ['A', 'B', 'C', 'D'];
+      for (let i = 0; i < options.length && i < 4; i++) {
+        const optText = options[i].replace(/^[A-Da-d][\).\-\s]+\s*/i, '').trim();
+        if (trimmed.toLowerCase() === options[i].toLowerCase() || 
+            trimmed.toLowerCase() === optText.toLowerCase()) {
+          return letters[i];
+        }
+      }
     }
-    return answer; // Return original if no pattern matches
+    return trimmed; // Return original if no pattern matches
   };
 
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {

@@ -150,16 +150,20 @@ function wordCount(text: string): number {
 export function usePassiveQuestionDetection(options: UsePassiveQuestionDetectionOptions = {}) {
   const {
     enabled = true,
-    cooldownMs = 30000,
+    cooldownMs = 15000,
     minWordCount = 5,
-    autoDismissMs = 15000,
+    autoDismissMs = 30000,
     lastQuestionSentTime = 0,
     debug = true,
   } = options;
 
   const lastDetectionTimeRef = useRef<number>(0);
+  const lastQuestionSentTimeRef = useRef<number>(lastQuestionSentTime);
   const [candidate, setCandidate] = useState<PassiveQuestionCandidate | null>(null);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep ref in sync with prop to avoid stale closures
+  lastQuestionSentTimeRef.current = lastQuestionSentTime;
 
   const clearAutoDismiss = useCallback(() => {
     if (autoDismissTimerRef.current) {
@@ -189,8 +193,9 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       return;
     }
 
-    // Skip if a question was just sent recently (any method)
-    if (lastQuestionSentTime && now - lastQuestionSentTime < cooldownMs) {
+    // Skip if a question was just sent recently (any method) — use ref for fresh value
+    const recentSentTime = lastQuestionSentTimeRef.current;
+    if (recentSentTime && now - recentSentTime < cooldownMs) {
       if (debug) console.log('🔍 [passive] skipped — recent question sent');
       return;
     }
@@ -232,7 +237,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
       return; // Only surface one candidate per utterance
     }
-  }, [enabled, cooldownMs, minWordCount, autoDismissMs, lastQuestionSentTime, clearAutoDismiss, debug]);
+  }, [enabled, cooldownMs, minWordCount, autoDismissMs, clearAutoDismiss, debug]);
 
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
