@@ -2800,6 +2800,77 @@ export type Database = {
           },
         ]
       }
+      scheduled_events: {
+        Row: {
+          capacity_tier: string
+          created_at: string | null
+          duration: string
+          event_date: string
+          event_name: string
+          expected_attendance: number
+          id: string
+          join_method: string
+          org_id: string | null
+          organizer_id: string
+          price_cents: number
+          require_name: boolean
+          session_code: string | null
+          show_live_results: boolean
+          start_time: string
+          status: string
+          tier: string
+          updated_at: string | null
+        }
+        Insert: {
+          capacity_tier: string
+          created_at?: string | null
+          duration: string
+          event_date: string
+          event_name: string
+          expected_attendance: number
+          id?: string
+          join_method?: string
+          org_id?: string | null
+          organizer_id: string
+          price_cents: number
+          require_name?: boolean
+          session_code?: string | null
+          show_live_results?: boolean
+          start_time: string
+          status?: string
+          tier: string
+          updated_at?: string | null
+        }
+        Update: {
+          capacity_tier?: string
+          created_at?: string | null
+          duration?: string
+          event_date?: string
+          event_name?: string
+          expected_attendance?: number
+          id?: string
+          join_method?: string
+          org_id?: string | null
+          organizer_id?: string
+          price_cents?: number
+          require_name?: boolean
+          session_code?: string | null
+          show_live_results?: boolean
+          start_time?: string
+          status?: string
+          tier?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seat_allocations: {
         Row: {
           allocated_at: string
