@@ -930,6 +930,26 @@ serve(async (req) => {
       status: "analyzing", duration_seconds: durationSeconds || null,
     }).eq("id", lectureVideoId);
 
+    // Fire-and-forget: detect speaker questions from the transcript
+    if (transcript.segments && transcript.segments.length > 0) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      // Convert segments to the expected format (start_ms)
+      const segmentsWithMs = transcript.segments.map((s: { text: string; start: number; duration: number }) => ({
+        text: s.text,
+        start_ms: Math.round(s.start * 1000),
+        duration_ms: Math.round(s.duration * 1000),
+      }));
+      fetch(`${supabaseUrl}/functions/v1/detect-speaker-questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ lecture_video_id: lectureVideoId, transcript_segments: segmentsWithMs }),
+      }).catch((err: Error) => console.error("[transcribe-video] detect-speaker-questions call failed:", err));
+    }
+
     return new Response(JSON.stringify({ success: true, hasTranscript: true, durationSeconds }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {

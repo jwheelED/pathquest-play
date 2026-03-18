@@ -28,6 +28,7 @@ import { PastLiveSessions } from "@/components/instructor/PastLiveSessions";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
+import { StudentLectureQuestions } from "@/components/instructor/StudentLectureQuestions";
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
@@ -509,6 +510,12 @@ export default function InstructorDashboard() {
             <div className="min-w-0">
               <PreRecordedLectureGrades />
             </div>
+
+            {currentUser && (
+              <div className="min-w-0">
+                <StudentLectureQuestions instructorId={currentUser.id} />
+              </div>
+            )}
           </div>
         );
 

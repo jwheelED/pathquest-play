@@ -6,12 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { 
-  Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2, 
+import {
+  Play, Pause, Volume2, VolumeX, RotateCcw, Lock, CheckCircle2,
   XCircle, ChevronRight, Brain, Sparkles, Shield, Target, TrendingUp, Flame,
   RefreshCw, Rewind, BookOpen, Maximize2, Minimize2, Eye, MessageCircle, History, Flag,
-  Gauge
+  Gauge, HelpCircle
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -264,6 +271,12 @@ export const InteractiveLecturePlayer = ({
   // Question report state
   const [showReportDialog, setShowReportDialog] = useState(false);
 
+  // Ask instructor state
+  const [showAskModal, setShowAskModal] = useState(false);
+  const [askQuestionText, setAskQuestionText] = useState('');
+  const [askSubmitting, setAskSubmitting] = useState(false);
+  const [lectureInstructorId, setLectureInstructorId] = useState<string | null>(null);
+
   // Sort and filter pause points by timestamp (safety: clamp to video duration)
   const sortedPausePoints = [...pausePoints]
     .filter(p => duration === 0 || p.pause_timestamp <= duration)
@@ -316,10 +329,14 @@ export const InteractiveLecturePlayer = ({
     const loadTranscript = async () => {
       const { data: lecture } = await supabase
         .from('lecture_videos')
-        .select('transcript')
+        .select('transcript, instructor_id')
         .eq('id', lectureId)
         .single();
-      
+
+      if (lecture?.instructor_id) {
+        setLectureInstructorId(lecture.instructor_id);
+      }
+
       if (lecture?.transcript) {
         // Extract text from transcript object (handle various formats)
         const transcript = lecture.transcript;
@@ -507,6 +524,30 @@ export const InteractiveLecturePlayer = ({
     if (!videoRef.current) return;
     videoRef.current.playbackRate = speed;
     setPlaybackSpeed(speed);
+  };
+
+  const handleAskQuestionSubmit = async () => {
+    if (!askQuestionText.trim()) return;
+    setAskSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setAskSubmitting(false); return; }
+
+    const { error } = await supabase.from('student_lecture_questions').insert({
+      lecture_video_id: lectureId,
+      student_id: user.id,
+      instructor_id: lectureInstructorId,
+      question_text: askQuestionText.trim(),
+      video_timestamp_seconds: Math.floor(currentTime),
+    });
+
+    if (error) {
+      toast.error('Failed to send question');
+    } else {
+      toast.success('Question sent to your instructor');
+      setShowAskModal(false);
+      setAskQuestionText('');
+    }
+    setAskSubmitting(false);
   };
 
   const handleFullscreenToggle = async () => {
@@ -1464,6 +1505,18 @@ export const InteractiveLecturePlayer = ({
             </div>
 
             <div className="flex items-center gap-3">
+              {!isPreview && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAskModal(true)}
+                  className="text-white hover:bg-white/20 px-2 h-8"
+                  title="Ask your instructor a question"
+                >
+                  <HelpCircle className="h-4 w-4 mr-1" />
+                  Ask
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -1618,6 +1671,40 @@ export const InteractiveLecturePlayer = ({
           questionText={currentQuestion.question_content.question}
         />
       )}
+
+      {/* Ask Instructor Dialog */}
+      <Dialog open={showAskModal} onOpenChange={setShowAskModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5" />
+              Ask Your Instructor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Your question will be sent to your instructor along with the current video timestamp ({Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')}).
+            </p>
+            <Textarea
+              placeholder="What's your question about this part of the lecture?"
+              value={askQuestionText}
+              onChange={(e) => setAskQuestionText(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAskModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAskQuestionSubmit}
+              disabled={askSubmitting || !askQuestionText.trim()}
+            >
+              Send Question
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
