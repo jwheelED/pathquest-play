@@ -68,7 +68,7 @@ export function StudentLectureQuestions({ instructorId }: { instructorId: string
     if (error) {
       console.error('[StudentLectureQuestions] fetch error:', error);
     } else if (data) {
-      const mapped: StudentQuestion[] = data.map((row: Record<string, unknown>) => ({
+      const mapped: StudentQuestion[] = (data as any[]).map((row: Record<string, any>) => ({
         id: row.id as string,
         lecture_video_id: row.lecture_video_id as string,
         student_id: row.student_id as string,
