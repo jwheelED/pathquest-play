@@ -48,8 +48,8 @@ export function StudentLectureQuestions({ instructorId }: { instructorId: string
 
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('student_lecture_questions')
+    const { data, error } = await (supabase
+      .from('student_lecture_questions' as any) as any)
       .select(`
         id,
         lecture_video_id,
