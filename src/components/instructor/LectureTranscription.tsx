@@ -3754,6 +3754,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               setIsPreviewOpen(true);
             }}
             onDismiss={dismissPassiveCandidate}
+            onRemoveFromHistory={removePassiveFromHistory}
           />
         </div>
       )}
