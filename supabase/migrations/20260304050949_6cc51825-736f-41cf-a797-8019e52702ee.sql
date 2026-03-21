@@ -1,0 +1,1 @@
+ALTER TABLE public.slide_preset_questions ADD COLUMN question_name text;

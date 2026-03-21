@@ -4,9 +4,8 @@ import posthog from 'posthog-js'
 import * as Sentry from "@sentry/react";
 import './index.css'
 import App from './App.tsx'
-import { PostHogProvider } from 'posthog-js/react'
 
-// 1. Initialize PostHog FIRST (required for Sentry integration)
+// 1. Initialize PostHog (global instance — no React provider needed)
 posthog.init('phc_vRUtKXaLgYpSzc9H4jOmN2fsc72gn39wsRDx0IZspxq', {
   api_host: 'https://us.i.posthog.com',
   session_recording: {
@@ -33,14 +32,8 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
 });
 
-// NOTE: No manual window.onerror / onunhandledrejection needed —
-// Sentry captures unhandled errors automatically, and
-// posthog.sentryIntegration() forwards them to PostHog as $exception events.
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <PostHogProvider client={posthog}>
-      <App />
-    </PostHogProvider>
+    <App />
   </StrictMode>
 )

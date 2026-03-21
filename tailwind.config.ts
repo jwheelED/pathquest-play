@@ -18,6 +18,10 @@ export default {
         display: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Landing page text tokens (WCAG AA compliant)
+        "text-main": "hsl(220 25% 15%)",
+        "text-muted-landing": "hsl(215 16% 37%)",
+        "text-subtle": "hsl(215 14% 46%)",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -198,6 +202,7 @@ export default {
         "xl": "var(--shadow-xl)",
         "glow": "var(--shadow-glow)",
         "glow-secondary": "var(--shadow-glow-secondary)",
+        "card": "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
       },
     },
   },

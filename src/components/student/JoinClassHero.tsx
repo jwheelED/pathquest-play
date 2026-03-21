@@ -106,42 +106,29 @@ export function JoinClassHero({ userId, onClassJoined }: JoinClassHeroProps) {
   };
 
   return (
-    <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
-      <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row items-center gap-6">
-          <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-            <GraduationCap className="w-8 h-8 text-primary" />
-          </div>
-          
-          <div className="flex-1 text-center md:text-left">
-            <h2 className="text-xl font-bold text-foreground mb-1">
-              Join a New Class
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Enter the class code from your instructor to get started
-            </p>
-          </div>
-
-          <form onSubmit={handleJoinClass} className="flex gap-2 w-full md:w-auto">
-            <Input
-              value={classCode}
-              onChange={(e) => setClassCode(e.target.value.toUpperCase())}
-              placeholder="CLASS CODE"
-              className="w-full md:w-40 text-center font-mono uppercase tracking-wider bg-background"
-              maxLength={8}
-              disabled={joining}
-            />
-            <Button type="submit" disabled={!classCode.trim() || joining}>
-              {joining ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  Join <ArrowRight className="w-4 h-4 ml-1" />
-                </>
-              )}
-            </Button>
-          </form>
-        </div>
+    <Card className="border-border">
+      <CardContent className="p-4">
+        <form onSubmit={handleJoinClass} className="flex items-center gap-3">
+          <GraduationCap className="w-5 h-5 text-primary flex-shrink-0" />
+          <span className="text-sm font-medium text-foreground whitespace-nowrap">Join a class</span>
+          <Input
+            value={classCode}
+            onChange={(e) => setClassCode(e.target.value.toUpperCase())}
+            placeholder="CLASS CODE"
+            className="flex-1 text-center font-mono uppercase tracking-wider bg-background"
+            maxLength={8}
+            disabled={joining}
+          />
+          <Button type="submit" size="sm" disabled={!classCode.trim() || joining}>
+            {joining ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <>
+                Join <ArrowRight className="w-4 h-4 ml-1" />
+              </>
+            )}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );

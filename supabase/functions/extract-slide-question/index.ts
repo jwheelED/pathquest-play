@@ -81,6 +81,20 @@ serve(async (req) => {
 
 ${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
 
+MATH FORMATTING - CRITICAL:
+Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
+Write all math as plain readable text using Unicode:
+- Fractions: a/b, cos x / sin x (never \\frac)
+- Integrals: ∫(a to b) f(x) dx
+- Square roots: √x, √(x+1)
+- Exponents: x², x³, e^(x²)
+- Greek letters: π, θ, α, β
+- Derivatives: d/dx, d²/dx², f'(x), dy/dx
+- Limits: lim(h→0), lim(x→∞)
+- Summation: Σ(n=1 to ∞) 1/n²
+- Apply to the question AND all answer options
+- Reproduce the EXACT notation from the slide using Unicode — do not simplify or rewrite expressions
+
 **GRAPH & CHART ANALYSIS:**
 If the slide contains graphs, charts, diagrams, or data visualizations:
 - Identify the type (bar chart, line graph, pie chart, scatter plot, flowchart, diagram, table, etc.)
@@ -97,7 +111,7 @@ If there's an existing question on the slide, extract it. If not, CREATE a quest
 Return in this exact JSON format:
 {
   "found": true,
-  "question": "The question text (extracted or generated based on slide content)",
+  "question": "The question text (plain readable Unicode math, no LaTeX)",
   "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
   "correctAnswer": "The letter of the correct answer (A, B, C, or D)",
   "explanation": "Brief explanation of why this is the correct answer",
@@ -117,24 +131,32 @@ Return ONLY valid JSON, no other text.`;
 
 ${difficultyInstructions[difficulty as keyof typeof difficultyInstructions]}
 
+MATH FORMATTING - CRITICAL:
+Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
+Write all math as plain readable text using Unicode:
+- Fractions: a/b, cos x / sin x (never \\frac)
+- Integrals: ∫(a to b) f(x) dx
+- Square roots: √x, √(x+1)
+- Exponents: x², x³, e^(x²)
+- Greek letters: π, θ, α, β
+- Derivatives: d/dx, d²/dx², f'(x), dy/dx
+- Apply to the question AND the expected answer
+- Reproduce the EXACT notation from the slide using Unicode
+
 **GRAPH & CHART ANALYSIS:**
 If the slide contains graphs, charts, diagrams, or data visualizations:
 - Identify the type (bar chart, line graph, pie chart, scatter plot, flowchart, diagram, table, etc.)
 - Extract key data points, values, trends, comparisons, or relationships shown
 - Read axis labels, legends, data labels, and any numerical values (approximate values are acceptable)
-- Generate questions that require interpreting or explaining the visual data such as:
-  * "What trend does the graph show and what might explain it?"
-  * "Describe the relationship between X and Y based on the data."
-  * "What is the approximate value of X according to the chart?"
-  * "Explain what the diagram illustrates about the process."
+- Generate questions that require interpreting or explaining the visual data
 
 If there's an existing question on the slide, extract it. If not, CREATE a question based on the slide content.
 
 Return in this exact JSON format:
 {
   "found": true,
-  "question": "The question text (extracted or generated based on slide content)",
-  "expectedAnswer": "The expected answer based on slide content (for graph questions, accept reasonable approximations)",
+  "question": "The question text (plain readable Unicode math, no LaTeX)",
+  "expectedAnswer": "The expected answer (for graph questions, accept reasonable approximations)",
   "explanation": "Additional context or explanation",
   "difficulty": "${difficulty}"
 }

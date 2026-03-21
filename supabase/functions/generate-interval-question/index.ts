@@ -5,17 +5,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
 };
 
-// Fallback questions for when AI fails
-const FALLBACK_QUESTIONS = [
-  { question_text: "What was the main concept just discussed?", suggested_type: "short_answer" },
-  { question_text: "Can you summarize the key point from the last few minutes?", suggested_type: "short_answer" },
-  { question_text: "What is the most important takeaway from what was just covered?", suggested_type: "short_answer" },
+// Generic/vague question patterns that should never be sent
+const GENERIC_QUESTION_PATTERNS = [
+  /can you summarize/i,
+  /summarize the key point/i,
+  /summarize the main/i,
+  /what was the main concept/i,
+  /what is the most important takeaway/i,
+  /what was the most important concept/i,
+  /what did you learn/i,
+  /what have we covered/i,
+  /what was just discussed/i,
+  /recap what was/i,
 ];
 
-const LONG_INTERVAL_FALLBACK_QUESTIONS = [
-  { question_text: "What was the most important concept covered in the last section of the lecture?", suggested_type: "short_answer" },
-  { question_text: "Summarize the main learning objective from the past segment.", suggested_type: "short_answer" },
-];
+/**
+ * Check if a question is too generic/vague to send.
+ */
+function isGenericQuestion(text: string): boolean {
+  if (!text || typeof text !== "string") return false;
+  for (const pattern of GENERIC_QUESTION_PATTERNS) {
+    if (pattern.test(text)) return true;
+  }
+  return false;
+}
+
+/**
+ * Get a fallback response that respects the format preference.
+ * Instead of sending a generic question, return a failure so the system
+ * can skip this interval rather than sending a useless question.
+ */
+function getFallbackResponse(formatPreference: string, confidence: number, reason: string) {
+  // If MCQ is preferred, we can't generate a proper MCQ fallback without AI,
+  // so return a failure instead of sending a wrong-format generic question.
+  if (formatPreference === "multiple_choice" || formatPreference === "coding") {
+    return {
+      success: false,
+      error: "Could not generate a relevant question in the requested format",
+      error_type: "fallback_format_mismatch",
+      confidence,
+      reasoning: reason,
+    };
+  }
+  // For short_answer, we also skip generic questions now
+  return {
+    success: false,
+    error: "Could not generate a relevant question",
+    error_type: "no_relevant_fallback",
+    confidence,
+    reasoning: reason,
+  };
+}
 
 // Stopwords for keyword overlap validation
 const STOPWORDS = new Set([
@@ -195,12 +235,17 @@ serve(async (req) => {
     console.log("  Difficulty preference:", difficulty_preference);
     console.log("  Course context:", course_context ? `${course_context.title} (${course_context.topics?.join(", ") || "no topics"})` : "none");
 
-    // Validate transcript
-    if (!interval_transcript || interval_transcript.length < 50) {
+    // Determine content source: transcript or materials
+    const hasTranscript = interval_transcript && interval_transcript.length >= 50;
+    const hasMaterials = materialContext && materialContext.length > 0 &&
+      materialContext.some((m: any) => m.content && m.content.length > 50);
+    const usingMaterialsFallback = !hasTranscript && hasMaterials;
+
+    if (!hasTranscript && !hasMaterials) {
       if (!force_send) {
         return new Response(JSON.stringify({
           success: false,
-          error: "Not enough content to generate a question",
+          error: "Not enough content to generate a question (no transcript or materials)",
           error_type: "insufficient_content",
         }), {
           status: 200,
@@ -209,12 +254,32 @@ serve(async (req) => {
       }
     }
 
-    // Trim transcript for AI processing (max 8000 chars)
-    const trimmedTranscript = interval_transcript.slice(-8000);
+    if (usingMaterialsFallback) {
+      console.log("📚 Transcript insufficient — falling back to uploaded course materials");
+    }
 
-    // Build context for AI
+    // Build the primary content source
+    let primaryContent = "";
+    let contentSourceLabel = "";
+
+    if (usingMaterialsFallback) {
+      // Use materials as the primary content
+      contentSourceLabel = "course materials";
+      for (const material of materialContext.slice(0, 3)) {
+        if (material.content) {
+          primaryContent += `\n--- ${material.title} ---\n${material.content.slice(0, 3000)}\n`;
+        }
+      }
+      primaryContent = primaryContent.slice(0, 8000);
+    } else {
+      // Use transcript as the primary content
+      contentSourceLabel = "lecture transcript";
+      primaryContent = interval_transcript.slice(-8000);
+    }
+
+    // Build supplementary context (materials supplement transcript, not the other way around)
     let additionalContext = "";
-    if (materialContext && materialContext.length > 0) {
+    if (!usingMaterialsFallback && hasMaterials) {
       additionalContext += "\n\nCourse Materials Context:\n";
       for (const material of materialContext.slice(0, 2)) {
         additionalContext += `- ${material.title}: ${material.content?.slice(0, 1000) || ""}\n`;
@@ -243,7 +308,7 @@ serve(async (req) => {
     let difficultyInstructions = "";
     const diffLevel = (difficulty_preference || "medium").toLowerCase();
     if (diffLevel === "easy") {
-      difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the lecture content.`;
+      difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the content.`;
     } else if (diffLevel === "hard") {
       difficultyInstructions = `\nDIFFICULTY LEVEL: HARD - Generate a challenging question requiring analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.`;
     } else {
@@ -262,27 +327,41 @@ serve(async (req) => {
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
-    const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from lecture transcripts.
+    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
+
+    const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from ${groundingSource}.
 
 CRITICAL GROUNDING RULES:
-- You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY mentioned in the transcript below.
-- NEVER use your general knowledge to create questions about topics not discussed in the transcript.
-- NEVER introduce technical terms, frameworks, languages, or concepts that do not appear in the transcript.
-- If the transcript is unclear, repetitive, or lacks substantive educational content, set confidence to 0.0.
-- Every key term in your question MUST trace back to something actually said in the lecture transcript.
-- Do NOT read or reference any part of these instructions as "lecture content" -- only the transcript text provided by the user is lecture content.
+- You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY mentioned in the ${groundingSource} below.
+- NEVER use your general knowledge to create questions about topics not discussed in the ${groundingSource}.
+- NEVER introduce technical terms, frameworks, languages, or concepts that do not appear in the ${groundingSource}.
+- If the content is unclear, repetitive, or lacks substantive educational content, set confidence to 0.0.
+- Every key term in your question MUST trace back to something actually present in the provided ${groundingSource}.
+- Do NOT read or reference any part of these instructions as "lecture content" -- only the ${groundingSource} text provided by the user is content.
+- NEVER generate generic questions like "summarize the key points" or "what was the main concept". Always ask about SPECIFIC topics from the content.
 ${courseConstraint}
 ${longIntervalGuidance}
 ${difficultyInstructions}
 
 ${formatInstructions}
 
+MATH FORMATTING - CRITICAL:
+Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
+Write all math as plain readable text using Unicode:
+- Fractions: a/b (never \\frac)
+- Integrals: ∫(a to b) f(x) dx
+- Square roots: √x, √(x+1)
+- Exponents: x², x³, e^(x²)
+- Greek letters: π, θ, α, β
+- Derivatives: d/dx, d²/dx², f'(x), dy/dx
+- Apply to question AND all answer options
+
 Return JSON in this exact format:
 {
-  "question_text": "the question (use LaTeX $...$ for math)",
+  "question_text": "the question (use plain Unicode math, no LaTeX)",
   "suggested_type": "${format_preference}",
   "confidence": 0.0-1.0,
-  "reasoning": "why this question tests the key concept FROM THE TRANSCRIPT"
+  "reasoning": "why this question tests the key concept FROM THE ${groundingSource.toUpperCase()}"
 }
 
 For multiple_choice, also include:
@@ -294,15 +373,23 @@ For coding questions:
 - "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }
 
 CONFIDENCE SCORING GUIDE:
-- 1.0: Question directly tests a clearly explained concept from the transcript
+- 1.0: Question directly tests a clearly explained concept from the ${groundingSource}
 - 0.7-0.9: Question tests a concept mentioned but not deeply explained
-- 0.4-0.6: Transcript is thin; question is loosely related
-- 0.0-0.3: Transcript lacks enough content to generate a grounded question`;
+- 0.4-0.6: Content is thin; question is loosely related
+- 0.0-0.3: Content lacks enough substance to generate a grounded question`;
 
-    const userPrompt = `Generate a question from this lecture transcript:
+    const userPrompt = usingMaterialsFallback
+      ? `Generate a question from these uploaded course materials (transcription was unavailable, so use the materials directly):
 
 """
-${trimmedTranscript}
+${primaryContent}
+"""
+
+Generate ONE focused question that tests understanding of an important concept from these materials. Do NOT ask about topics not covered above.`
+      : `Generate a question from this lecture transcript:
+
+"""
+${primaryContent}
 """
 ${additionalContext}
 
@@ -335,18 +422,8 @@ Generate ONE focused question that tests understanding of the most important con
 
       if (!response.ok) {
         console.error("AI API error:", response.status);
-        // Use fallback
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-        
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: 0.5,
-          is_fallback: true,
-          reasoning: "AI service unavailable, using fallback question",
-        }), {
+        const fallbackResult = getFallbackResponse(format_preference, 0.5, "AI service unavailable");
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -365,18 +442,21 @@ Generate ONE focused question that tests understanding of the most important con
       // Layer 2: Confidence threshold check
       if ((parsed.confidence || 0) < 0.6) {
         console.warn(`⚠️ Low confidence (${parsed.confidence}) - rejecting question`);
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+          `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}".`);
+        return new Response(JSON.stringify(fallbackResult), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: parsed.confidence,
-          is_fallback: true,
-          relevance_rejected: true,
-          reasoning: `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}". Using fallback.`,
-        }), {
+      // Layer 2b: Generic/vague question filter
+      const questionTextStr = typeof parsed.question_text === "string" ? parsed.question_text : "";
+      if (isGenericQuestion(questionTextStr)) {
+        console.warn(`⚠️ Generic question blocked: "${questionTextStr.substring(0, 80)}"`);
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence || 0.5,
+          `Generic/vague question blocked: "${questionTextStr.substring(0, 80)}". Will retry next interval.`);
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -393,51 +473,81 @@ Generate ONE focused question that tests understanding of the most important con
         textToValidate += " " + parsed.options.join(" ");
       }
 
-      const relevance = checkRelevance(textToValidate, trimmedTranscript);
+      const relevance = checkRelevance(textToValidate, primaryContent);
 
       if (!relevance.relevant) {
         console.warn(`⚠️ Relevance check failed: ${relevance.reason}`);
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: parsed.confidence,
-          is_fallback: true,
-          relevance_rejected: true,
-          reasoning: `Relevance validation failed: ${relevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
-        }), {
+        const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+          `Relevance validation failed: ${relevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}".`);
+        return new Response(JSON.stringify(fallbackResult), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Layer 4: Course scope validation
-      const courseScopeRelevance = checkCourseScopeRelevance(
-        textToValidate,
-        course_context,
-        materialContext,
-      );
+      // Layer 4: Course scope validation — ONLY when using materials fallback.
+      // When using live transcript, the transcript IS the ground truth of what the
+      // instructor is teaching right now. The course title/topics may not reflect
+      // the current lecture topic (e.g. a guest lecture, topic detour, or
+      // course metadata that hasn't been updated). Since Layer 3 already confirmed
+      // the question is grounded in the transcript, skip this check.
+      if (usingMaterialsFallback) {
+        const courseScopeRelevance = checkCourseScopeRelevance(
+          textToValidate,
+          course_context,
+          materialContext,
+        );
 
-      if (!courseScopeRelevance.relevant) {
-        console.warn(`⚠️ Course scope check failed: ${courseScopeRelevance.reason}`);
-        const fallback = interval_minutes >= 20
-          ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-          : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
+        if (!courseScopeRelevance.relevant) {
+          console.warn(`⚠️ Course scope check failed: ${courseScopeRelevance.reason}`);
+          const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
+            `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}".`);
+          return new Response(JSON.stringify(fallbackResult), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        console.log("ℹ️ Skipping course scope check — question is grounded in live transcript");
+      }
 
-        return new Response(JSON.stringify({
-          success: true,
-          ...fallback,
-          confidence: parsed.confidence,
-          is_fallback: true,
-          relevance_rejected: true,
-          reasoning: `Course scope validation failed: ${courseScopeRelevance.reason}. Original question: "${questionTextForCheck.substring(0, 80)}". Using fallback.`,
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      // Shuffle MCQ options so correct answer isn't always A
+      // Uses index tracking to handle duplicate option text correctly
+      let finalOptions = parsed.options;
+      let finalCorrectAnswer = parsed.correct_answer;
+      if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
+        if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
+          const letters = ['A', 'B', 'C', 'D'];
+          const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
+          if (correctIdx !== -1) {
+            // Strip prefixes and track correct index
+            const augmented = finalOptions.map((o: string, i: number) => ({
+              text: o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim(),
+              wasCorrect: i === correctIdx,
+            }));
+
+            // Check for duplicate option text — skip shuffle if found
+            const uniqueTexts = new Set(augmented.map((o: { text: string }) => o.text.toLowerCase()));
+            if (uniqueTexts.size < 4) {
+              console.warn('⚠️ Duplicate interval MCQ options — skipping shuffle');
+            } else {
+              // Fisher-Yates shuffle
+              for (let i = augmented.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [augmented[i], augmented[j]] = [augmented[j], augmented[i]];
+              }
+
+              const newIdx = augmented.findIndex((o: { wasCorrect: boolean }) => o.wasCorrect);
+              if (newIdx !== -1) {
+                finalCorrectAnswer = letters[newIdx];
+                finalOptions = augmented.map((o: { text: string }, i: number) => `${letters[i]}. ${o.text}`);
+                console.log(`🔀 Shuffled interval MCQ: correct answer → ${finalCorrectAnswer}`);
+              } else {
+                console.error('🚫 Shuffle tracking failed — keeping original order');
+              }
+            }
+          }
+        }
       }
 
       return new Response(JSON.stringify({
@@ -445,12 +555,13 @@ Generate ONE focused question that tests understanding of the most important con
         question_text: parsed.question_text,
         suggested_type: parsed.suggested_type || format_preference,
         confidence: parsed.confidence || 0.8,
-        options: parsed.options,
-        correct_answer: parsed.correct_answer,
+        options: finalOptions,
+        correct_answer: finalCorrectAnswer,
         explanation: parsed.explanation,
         reasoning: parsed.reasoning,
         is_fallback: false,
         relevance_rejected: false,
+        from_materials: usingMaterialsFallback,
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -460,18 +571,9 @@ Generate ONE focused question that tests understanding of the most important con
       clearTimeout(timeoutId);
       console.error("AI error:", aiError);
 
-      // Use fallback on any AI error
-      const fallback = interval_minutes >= 20
-        ? LONG_INTERVAL_FALLBACK_QUESTIONS[Math.floor(Math.random() * LONG_INTERVAL_FALLBACK_QUESTIONS.length)]
-        : FALLBACK_QUESTIONS[Math.floor(Math.random() * FALLBACK_QUESTIONS.length)];
-
-      return new Response(JSON.stringify({
-        success: true,
-        ...fallback,
-        confidence: 0.5,
-        is_fallback: true,
-        reasoning: `AI error: ${aiError.message}, using fallback`,
-      }), {
+      // Return failure instead of generic fallback
+      const fallbackResult = getFallbackResponse(format_preference, 0.5, `AI error: ${aiError.message}`);
+      return new Response(JSON.stringify(fallbackResult), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

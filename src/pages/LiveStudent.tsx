@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, AlertCircle, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -58,6 +58,11 @@ const LiveStudent = () => {
   const [confidenceMultiplier, setConfidenceMultiplier] = useState<number>(1);
   const [pointsEarned, setPointsEarned] = useState<number>(0);
   
+  // Session XP tracker
+  const [sessionTotalXP, setSessionTotalXP] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [showXPPulse, setShowXPPulse] = useState(false);
+
   // AI Explanation state
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanation, setExplanation] = useState<string>("");
@@ -261,21 +266,31 @@ const LiveStudent = () => {
   };
 
   // Extract just the letter from MCQ answer for reliable server-side comparison
+  // NOTE: Removed dangerous first-char fallback that misinterpreted words like "Bones" as "B"
   const extractMCQLetter = (answer: string): string => {
+    const trimmed = answer.trim();
     // If already just a letter, return it
-    if (/^[A-Da-d]$/.test(answer.trim())) {
-      return answer.trim().toUpperCase();
+    if (/^[A-Da-d]$/.test(trimmed)) {
+      return trimmed.toUpperCase();
     }
-    // Extract letter from "B) 206 bones", "B. Answer", etc.
-    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
+    // Extract letter from explicit prefix formats: "B) 206 bones", "B. Answer", "B - text"
+    const letterMatch = trimmed.match(/^([A-Da-d])[\).\-\s]/);
     if (letterMatch) {
       return letterMatch[1].toUpperCase();
     }
-    // Fallback: return first character if A-D
-    if (/^[A-Da-d]/i.test(answer.trim())) {
-      return answer.trim().charAt(0).toUpperCase();
+    // Match against current question options to find the letter
+    if (currentQuestion?.question_content?.options) {
+      const options = currentQuestion.question_content.options as string[];
+      const letters = ['A', 'B', 'C', 'D'];
+      for (let i = 0; i < options.length && i < 4; i++) {
+        const optText = options[i].replace(/^[A-Da-d][\).\-\s]+\s*/i, '').trim();
+        if (trimmed.toLowerCase() === options[i].toLowerCase() || 
+            trimmed.toLowerCase() === optText.toLowerCase()) {
+          return letters[i];
+        }
+      }
     }
-    return answer; // Return original if no pattern matches
+    return trimmed; // Return original if no pattern matches
   };
 
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {
@@ -324,9 +339,18 @@ const LiveStudent = () => {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        // Edge function returns { success, response: { isCorrect, pointsEarned, ... } }
+        const responseData = result.data.response || result.data;
         setHasAnswered(true);
-        setIsCorrect(result.data.isCorrect);
-        setPointsEarned(result.data.pointsEarned || 0);
+        setIsCorrect(responseData.isCorrect);
+        setPointsEarned(responseData.pointsEarned || 0);
+        const earned = responseData.pointsEarned || 0;
+        setSessionTotalXP(prev => prev + earned);
+        setQuestionsAnswered(prev => prev + 1);
+        if (earned !== 0) {
+          setShowXPPulse(true);
+          setTimeout(() => setShowXPPulse(false), 1500);
+        }
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -335,10 +359,10 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        if (result.data.isCorrect) {
-          toast.success(`Correct! +${result.data.pointsEarned} XP 🎉`);
+        if (responseData.isCorrect) {
+          toast.success(`Correct! +${responseData.pointsEarned} XP 🎉`);
         } else {
-          const penalty = result.data.pointsEarned < 0 ? ` ${result.data.pointsEarned} XP` : '';
+          const penalty = responseData.pointsEarned < 0 ? ` ${responseData.pointsEarned} XP` : '';
           toast.error(`Incorrect${penalty}`);
         }
       } else if (result.error) {
@@ -346,7 +370,24 @@ const LiveStudent = () => {
       }
     } catch (error: any) {
       console.error("Error submitting answer:", error);
-      if (error.message?.includes("Already answered")) {
+      
+      // Handle 409 "already submitted" from edge function
+      let errorBody: string | null = null;
+      try {
+        // FunctionsHttpError stores the Response in error.context
+        if (error?.context?.json) {
+          const body = await error.context.json();
+          errorBody = body?.error || '';
+        }
+      } catch { /* ignore parse errors */ }
+      
+      const isAlreadySubmitted = 
+        error.message?.includes("Already answered") || 
+        error.message?.includes("already submitted") ||
+        errorBody?.includes("already submitted") ||
+        errorBody?.includes("Already answered");
+      
+      if (isAlreadySubmitted) {
         toast.info("You already answered this question");
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
@@ -450,14 +491,16 @@ const LiveStudent = () => {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        // Edge function returns { success, response: { isCorrect, pointsEarned, ... } }
+        const responseData = result.data.response || result.data;
         toast.dismiss(gradingToastId);
         setIsGrading(false);
         setHasAnswered(true);
-        setIsCorrect(result.data.isCorrect);
-        setAiGrade(result.data.aiGrade || null);
-        setAiFeedback(result.data.aiFeedback || null);
-        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setGradePending(result.data.gradePending || false);
+        setIsCorrect(responseData.isCorrect);
+        setAiGrade(responseData.aiGrade || null);
+        setAiFeedback(responseData.aiFeedback || null);
+        setAiGradeComponents(responseData.gradeBreakdown?.components || null);
+        setGradePending(responseData.gradePending || false);
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -467,13 +510,13 @@ const LiveStudent = () => {
         );
         
         // Show appropriate feedback based on grading mode
-        if (result.data.gradePending) {
+        if (responseData.gradePending) {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
-        } else if (result.data.aiGrade !== null) {
-          const gradeText = `${result.data.aiGrade}%`;
-          if (result.data.aiGrade >= 70) {
+        } else if (responseData.aiGrade !== null) {
+          const gradeText = `${responseData.aiGrade}%`;
+          if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
-          } else if (result.data.aiGrade >= 50) {
+          } else if (responseData.aiGrade >= 50) {
             toast.info(`Score: ${gradeText} - Good effort!`);
           } else {
             toast.error(`Score: ${gradeText} - Keep practicing!`);
@@ -553,15 +596,24 @@ const LiveStudent = () => {
           icon: "📡",
         });
       } else if (result.success && result.data) {
+        // Edge function returns { success, response: { isCorrect, pointsEarned, ... } }
+        const responseData = result.data.response || result.data;
         toast.dismiss(gradingToastId);
         setIsGrading(false);
         setHasAnswered(true);
-        setIsCorrect(result.data.isCorrect);
-        setAiGrade(result.data.aiGrade || null);
-        setAiFeedback(result.data.aiFeedback || null);
-        setAiGradeComponents(result.data.gradeBreakdown?.components || null);
-        setUnderstandsConcept(result.data.gradeBreakdown?.understandsConcept ?? null);
-        setPointsEarned(result.data.pointsEarned || 0);
+        setIsCorrect(responseData.isCorrect);
+        setAiGrade(responseData.aiGrade || null);
+        setAiFeedback(responseData.aiFeedback || null);
+        setAiGradeComponents(responseData.gradeBreakdown?.components || null);
+        setUnderstandsConcept(responseData.gradeBreakdown?.understandsConcept ?? null);
+        setPointsEarned(responseData.pointsEarned || 0);
+        const earned = responseData.pointsEarned || 0;
+        setSessionTotalXP(prev => prev + earned);
+        setQuestionsAnswered(prev => prev + 1);
+        if (earned !== 0) {
+          setShowXPPulse(true);
+          setTimeout(() => setShowXPPulse(false), 1500);
+        }
         setShowAccountPrompt(true);
         
         // Track question answered in PostHog
@@ -570,11 +622,11 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
-        if (result.data.aiGrade !== null) {
-          const gradeText = `${result.data.aiGrade}%`;
-          if (result.data.aiGrade >= 70) {
+        if (responseData.aiGrade !== null) {
+          const gradeText = `${responseData.aiGrade}%`;
+          if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
-          } else if (result.data.aiGrade >= 50) {
+          } else if (responseData.aiGrade >= 50) {
             toast.info(`Score: ${gradeText} - Good effort!`);
           } else {
             toast.error(`Score: ${gradeText} - Keep practicing!`);
@@ -634,7 +686,23 @@ const LiveStudent = () => {
   const isMCQ = currentQuestion.question_content.type === "multiple_choice";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+      {/* Session XP Tracker - Fixed top right */}
+      {questionsAnswered > 0 && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg transition-all duration-300 ${showXPPulse ? 'scale-110 ring-2 ring-primary/50' : 'scale-100'}`}>
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-5 h-5 text-primary fill-primary" />
+            <span className="text-lg font-bold text-foreground">
+              {sessionTotalXP > 0 ? '+' : ''}{sessionTotalXP}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">XP</span>
+          </div>
+          <div className="w-px h-5 bg-border" />
+          <span className="text-xs text-muted-foreground">
+            {questionsAnswered} Q{questionsAnswered !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
       <div className="w-full max-w-2xl space-y-4">
         {showAccountPrompt && (
           <Card className="bg-gradient-to-r from-primary/20 to-secondary/20 border-2 border-primary">
@@ -801,18 +869,54 @@ const LiveStudent = () => {
             </>
           ) : (
             <div className="text-center space-y-6 py-8">
-              {/* MCQ Results - Poll-style neutral feedback */}
+              {/* MCQ Results - Correct/Incorrect feedback */}
               {isMCQ && (
                 <>
-                  <div className="relative">
-                    <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
-                    Response Recorded ✓
-                  </p>
-                  <p className="text-muted-foreground">
-                    Your answer: <span className="font-semibold">{selectedAnswer}</span>
-                  </p>
+                  {isCorrect === true ? (
+                    <>
+                      <div className="relative">
+                        <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Correct! 🎉
+                      </p>
+                      <p className="text-muted-foreground">
+                        Your answer: <span className="font-semibold text-green-600 dark:text-green-400">{selectedAnswer}</span>
+                      </p>
+                    </>
+                  ) : isCorrect === false ? (
+                    <>
+                      <div className="relative">
+                        <XCircle className="h-16 w-16 text-red-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Incorrect
+                      </p>
+                      <p className="text-muted-foreground">
+                        Your answer: <span className="font-semibold text-red-600 dark:text-red-400">{selectedAnswer}</span>
+                      </p>
+                      {currentQuestion?.question_content?.correctAnswer && (
+                        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3 max-w-md mx-auto">
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            <span className="font-medium">Correct answer:</span>{" "}
+                            {currentQuestion.question_content.correctAnswer}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <CheckCircle2 className="h-16 w-16 text-blue-500 mx-auto animate-in zoom-in-50 duration-300" />
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                        Response Recorded ✓
+                      </p>
+                      <p className="text-muted-foreground">
+                        Your answer: <span className="font-semibold">{selectedAnswer}</span>
+                      </p>
+                    </>
+                  )}
                   {pointsEarned !== 0 && (
                     <AnimatedXPDisplay 
                       points={pointsEarned}

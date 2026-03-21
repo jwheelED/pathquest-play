@@ -5,8 +5,95 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+// Generic/vague question patterns that should never be sent
+const GENERIC_QUESTION_PATTERNS = [
+  /can you summarize/i,
+  /summarize the key point/i,
+  /summarize the main/i,
+  /what was the main concept/i,
+  /what is the most important takeaway/i,
+  /what was the most important concept/i,
+  /what did you learn/i,
+  /what have we covered/i,
+  /what was just discussed/i,
+  /recap what was/i,
+];
+
+function isGenericQuestion(text: string): boolean {
+  if (!text || typeof text !== "string") return false;
+  for (const pattern of GENERIC_QUESTION_PATTERNS) {
+    if (pattern.test(text)) return true;
+  }
+  return false;
+}
+
+// Stopwords for keyword overlap validation
+const STOPWORDS = new Set([
+  "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+  "have", "has", "had", "do", "does", "did", "will", "would", "could",
+  "should", "may", "might", "shall", "can", "need", "dare", "ought",
+  "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
+  "as", "into", "through", "during", "before", "after", "above", "below",
+  "between", "out", "off", "over", "under", "again", "further", "then",
+  "once", "here", "there", "when", "where", "why", "how", "all", "each",
+  "every", "both", "few", "more", "most", "other", "some", "such", "no",
+  "nor", "not", "only", "own", "same", "so", "than", "too", "very",
+  "just", "because", "but", "and", "or", "if", "while", "about", "up",
+  "this", "that", "these", "those", "what", "which", "who", "whom",
+  "its", "his", "her", "their", "our", "your", "my", "it", "he", "she",
+  "they", "we", "you", "me", "him", "them", "us", "following", "described",
+  "using", "based", "according", "within", "also", "well", "much",
+  "many", "any", "still", "already", "even", "given", "however",
+  "question", "answer", "option", "correct", "incorrect", "true", "false",
+  "primary", "purpose", "component", "necessary", "valid", "type", "data",
+]);
+
+function checkRelevance(
+  questionText: string,
+  transcript: string,
+): { relevant: boolean; reason?: string } {
+  const textToCheck = typeof questionText === "string"
+    ? questionText
+    : "";
+
+  const questionWords = textToCheck
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w: string) => w.length > 3 && !STOPWORDS.has(w));
+
+  const uniqueTerms = [...new Set(questionWords)];
+
+  if (uniqueTerms.length < 3) {
+    return { relevant: true };
+  }
+
+  const transcriptLower = transcript.toLowerCase();
+
+  let matches = 0;
+  for (const term of uniqueTerms) {
+    if (transcriptLower.includes(term)) {
+      matches++;
+    }
+  }
+
+  const ratio = matches / uniqueTerms.length;
+
+  console.log(`🔍 Relevance check: ${matches}/${uniqueTerms.length} terms found (${(ratio * 100).toFixed(0)}%)`);
+  console.log(`   Missing: [${uniqueTerms.filter((t: string) => !transcriptLower.includes(t)).join(", ")}]`);
+
+  if (ratio < 0.3) {
+    return {
+      relevant: false,
+      reason: `Only ${matches}/${uniqueTerms.length} key terms found in transcript (${(ratio * 100).toFixed(0)}% overlap). Missing: ${uniqueTerms.filter((t: string) => !transcriptLower.includes(t)).join(", ")}`,
+    };
+  }
+
+  return { relevant: true };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -134,11 +221,26 @@ Use clinical vignettes for MCQs where appropriate.`
 
     const systemPrompt = `You are an expert educational content analyzer. Your task is to analyze a lecture transcript and generate ${targetQuestionCount} pause point questions at optimal learning moments.
 
+CRITICAL GROUNDING RULES:
+- You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY stated in the transcript below.
+- NEVER use your general knowledge to create questions about topics not discussed in the transcript.
+- NEVER introduce technical terms, frameworks, or concepts that do not appear in the transcript.
+- Every key term in your question MUST trace back to something actually said in the transcript.
+- Do NOT reference any part of these instructions as "lecture content" — only the transcript provided by the user is content.
+- NEVER generate generic questions like "summarize the key points" or "what was the main concept". Always ask about SPECIFIC topics from the transcript.
+
+CONFIDENCE SCORING GUIDE:
+- 1.0: Question directly tests a concept clearly explained in the transcript
+- 0.7-0.9: Question tests a concept mentioned but not deeply explained
+- 0.4-0.6: Content is thin; question is loosely related
+- 0.0-0.3: Question relies on outside knowledge not in the transcript
+
 For each pause point, you must determine:
 1. The optimal timestamp (in seconds) where the video should pause
 2. A cognitive load score (1-10) indicating concept density at that point
 3. A question that tests understanding of the material just covered
 4. The question type (multiple_choice or short_answer)
+5. A confidence score (0.0-1.0) indicating how grounded the question is in the transcript
 ${medicalContext}
 
 QUESTION QUALITY GUIDELINES:
@@ -241,6 +343,13 @@ Generate exactly ${targetQuestionCount} pause point questions. For each question
                             description:
                               "Explanation of the correct answer",
                           },
+                          confidence: {
+                            type: "number",
+                            description:
+                              "How grounded is this question in the transcript? 1.0 = directly from transcript, 0.0 = invented from general knowledge",
+                            minimum: 0.0,
+                            maximum: 1.0,
+                          },
                         },
                         required: [
                           "pause_timestamp",
@@ -250,6 +359,7 @@ Generate exactly ${targetQuestionCount} pause point questions. For each question
                           "question",
                           "correct_answer",
                           "explanation",
+                          "confidence",
                         ],
                       },
                     },
@@ -320,7 +430,41 @@ Generate exactly ${targetQuestionCount} pause point questions. For each question
       );
     }
 
-    const pausePoints = analysisResult.pause_points || [];
+    const rawPausePoints = analysisResult.pause_points || [];
+
+    // Post-generation validation: filter out ungrounded questions
+    const filteredPausePoints = rawPausePoints.filter(
+      (point: { question: string; confidence?: number; options?: string[] }) => {
+        const confidence = point.confidence ?? 1.0;
+
+        if (confidence < 0.6) {
+          console.warn(`⚠️ Skipping question (low confidence ${confidence.toFixed(2)}): "${point.question}"`);
+          return false;
+        }
+
+        if (isGenericQuestion(point.question)) {
+          console.warn(`⚠️ Skipping question (generic): "${point.question}"`);
+          return false;
+        }
+
+        const combinedText = point.question + " " + (point.options?.join(" ") || "");
+        const relevanceResult = checkRelevance(combinedText, truncatedTranscript);
+        if (!relevanceResult.relevant) {
+          console.warn(`⚠️ Skipping question (not grounded): "${point.question}" — ${relevanceResult.reason}`);
+          return false;
+        }
+
+        return true;
+      }
+    );
+
+    // Fail-safe: if all questions were filtered, fall back to unfiltered set
+    const pausePoints = filteredPausePoints.length > 0 ? filteredPausePoints : rawPausePoints;
+    if (filteredPausePoints.length === 0 && rawPausePoints.length > 0) {
+      console.warn("⚠️ All questions failed validation — using unfiltered set as fallback");
+    } else {
+      console.log(`✅ ${filteredPausePoints.length}/${rawPausePoints.length} questions passed grounding validation`);
+    }
 
     if (pausePoints.length === 0) {
       console.error("AI generated no pause points");

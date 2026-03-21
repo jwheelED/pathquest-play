@@ -305,17 +305,19 @@ export function SimplifiedStudyMaterials({ userId, onMaterialCountChange }: Simp
           {/* Materials List */}
           {loading ? (
             <div className="space-y-2">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="animate-pulse h-16 bg-muted rounded-lg" />
+              {[1, 2].map(i => (
+                <div key={i} className="animate-pulse h-14 bg-muted rounded-lg" />
               ))}
             </div>
           ) : materials.length === 0 ? (
-            <div className="text-center py-8">
-              <BookOpen className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
-              <p className="text-muted-foreground">No materials yet</p>
-              <p className="text-sm text-muted-foreground">
-                Upload notes or PDFs to generate practice questions
-              </p>
+            <div className="flex items-center gap-3 p-4 rounded-lg border border-dashed border-border">
+              <Upload className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground">Upload notes or PDFs to generate practice questions</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowUpload(true)}>
+                Upload
+              </Button>
             </div>
           ) : (
             <div className="space-y-2">

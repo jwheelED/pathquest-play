@@ -46,7 +46,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text } = await req.json();
+    const { question_text, source_transcript } = await req.json();
 
     if (!question_text || question_text.trim() === '') {
       return new Response(
@@ -77,7 +77,7 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `Generate the expected/ideal answer for this question:\n\n${question_text}`
+            content: `${source_transcript ? `Lecture context (use this to ground your answer):\n"${source_transcript.slice(-800)}"\n\n` : ''}Generate the expected/ideal answer for this question:\n\n${question_text}\n\nBase your answer on the lecture context above, not general knowledge.`
           }
         ],
         tools: [

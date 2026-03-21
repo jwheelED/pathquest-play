@@ -60,6 +60,25 @@ export const LectureVideoManager = () => {
 
   useEffect(() => {
     fetchLectures();
+
+    // Subscribe to realtime changes on lecture_videos for auto-refresh
+    const channel = supabase
+      .channel('lecture-video-manager')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'lecture_videos' },
+        (payload) => {
+          const record = payload.new as Record<string, unknown> | undefined;
+          if (record?.status === 'ready') {
+            fetchLectures();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchLectures = async () => {

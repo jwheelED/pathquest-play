@@ -54,85 +54,113 @@ function buildInnertubeParams(videoId: string): string {
 }
 
 /**
+ * Helper: sleep for ms
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Primary method: YouTube Innertube get_transcript endpoint.
  * This is the same internal API YouTube's own frontend uses.
+ * Includes retry with backoff for 429 rate limits.
  */
 async function fetchTranscriptViaInnertube(
   videoId: string
 ): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
-  try {
-    console.log(`[Innertube] Attempting transcript for ${videoId}`);
-    
-    // First, fetch the video page to get the INNERTUBE_API_KEY
-    const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const pageResp = await fetch(pageUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
-      },
-    });
-
-    if (!pageResp.ok) {
-      console.error(`[Innertube] Page fetch failed: ${pageResp.status}`);
-      return null;
-    }
-
-    const html = await pageResp.text();
-    
-    // Extract INNERTUBE_API_KEY
-    const apiKeyMatch = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
-    const apiKey = apiKeyMatch?.[1] || "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"; // fallback to well-known key
-    
-    console.log(`[Innertube] Got API key: ${apiKey.substring(0, 10)}...`);
-
-    // Try to extract captions directly from the page first (faster)
-    const captionsResult = await extractCaptionsFromPage(html, videoId);
-    if (captionsResult) {
-      console.log(`[Innertube] Got captions from page: ${captionsResult.text.length} chars, ${captionsResult.segments.length} segments`);
-      return captionsResult;
-    }
-
-    // If page extraction failed, try the get_transcript endpoint
-    const params = buildInnertubeParams(videoId);
-    
-    const transcriptResp = await fetch(
-      `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}`,
-      {
-        method: "POST",
+  const maxRetries = 2;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delayMs = attempt * 2000; // 2s, 4s
+        console.log(`[Innertube] Retry ${attempt}/${maxRetries} after ${delayMs}ms`);
+        await sleep(delayMs);
+      }
+      
+      console.log(`[Innertube] Attempting transcript for ${videoId} (attempt ${attempt + 1})`);
+      
+      // Fetch the video page to get the INNERTUBE_API_KEY
+      const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
+      const pageResp = await fetch(pageUrl, {
         headers: {
-          "Content-Type": "application/json",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
         },
-        body: JSON.stringify({
-          context: {
-            client: {
-              clientName: "WEB",
-              clientVersion: "2.20240313.05.00",
-              hl: "en",
-              gl: "US",
-            },
-          },
-          params,
-        }),
-      }
-    );
+      });
 
-    if (!transcriptResp.ok) {
-      console.error(`[Innertube] get_transcript failed: ${transcriptResp.status}`);
-      const errBody = await transcriptResp.text();
-      console.error(`[Innertube] Response: ${errBody.substring(0, 500)}`);
+      if (pageResp.status === 429) {
+        console.warn(`[Innertube] Rate limited (429), attempt ${attempt + 1}`);
+        await pageResp.text(); // consume body
+        if (attempt < maxRetries) continue;
+        return null;
+      }
+
+      if (!pageResp.ok) {
+        console.error(`[Innertube] Page fetch failed: ${pageResp.status}`);
+        await pageResp.text();
+        return null;
+      }
+
+      const html = await pageResp.text();
+      
+      // Extract INNERTUBE_API_KEY
+      const apiKeyMatch = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
+      const apiKey = apiKeyMatch?.[1] || "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+      
+      console.log(`[Innertube] Got API key: ${apiKey.substring(0, 10)}...`);
+
+      // Try to extract captions directly from the page first (faster)
+      const captionsResult = await extractCaptionsFromPage(html, videoId);
+      if (captionsResult) {
+        console.log(`[Innertube] Got captions from page: ${captionsResult.text.length} chars, ${captionsResult.segments.length} segments`);
+        return captionsResult;
+      }
+
+      // If page extraction failed, try the get_transcript endpoint
+      const params = buildInnertubeParams(videoId);
+      
+      const transcriptResp = await fetch(
+        `https://www.youtube.com/youtubei/v1/get_transcript?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+          },
+          body: JSON.stringify({
+            context: {
+              client: {
+                clientName: "WEB",
+                clientVersion: "2.20240313.05.00",
+                hl: "en",
+                gl: "US",
+              },
+            },
+            params,
+          }),
+        }
+      );
+
+      if (!transcriptResp.ok) {
+        console.error(`[Innertube] get_transcript failed: ${transcriptResp.status}`);
+        const errBody = await transcriptResp.text();
+        console.error(`[Innertube] Response: ${errBody.substring(0, 500)}`);
+        return null;
+      }
+
+      const data = await transcriptResp.json();
+      return parseInnertubeTranscript(data);
+    } catch (error) {
+      console.error("[Innertube] Error:", error);
+      if (attempt < maxRetries) continue;
       return null;
     }
-
-    const data = await transcriptResp.json();
-    return parseInnertubeTranscript(data);
-  } catch (error) {
-    console.error("[Innertube] Error:", error);
-    return null;
   }
+  return null;
 }
 
 /**
@@ -191,7 +219,7 @@ async function extractCaptionsFromPage(
     }
   }
 
-  return await fetchCaptionTracksData(captions);
+  return await fetchCaptionTracksData(captions!);
 }
 
 /**
@@ -327,12 +355,204 @@ function parseInnertubeTranscript(
 }
 
 /**
+ * Direct timedtext scraping — no page fetch or API key needed.
+ * Tries multiple language/kind combos for maximum coverage.
+ */
+async function fetchTranscriptViaDirect(
+  videoId: string
+): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
+  // Try: manual English, auto English, manual any common languages
+  const attempts = [
+    { lang: "en", kind: "" },
+    { lang: "en", kind: "asr" },
+    { lang: "en-US", kind: "" },
+    { lang: "en-US", kind: "asr" },
+  ];
+
+  for (const { lang, kind } of attempts) {
+    try {
+      const kindParam = kind ? `&kind=${kind}` : "";
+      const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}${kindParam}&fmt=json3`;
+      console.log(`[DirectTimedtext] Trying: lang=${lang}, kind=${kind || "manual"}`);
+
+      const resp = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+        },
+      });
+
+      if (!resp.ok) {
+        console.log(`[DirectTimedtext] HTTP ${resp.status} for lang=${lang}, kind=${kind}`);
+        await resp.text();
+        continue;
+      }
+
+      const text = await resp.text();
+      if (!text || text.length < 20) {
+        console.log(`[DirectTimedtext] Empty response for lang=${lang}, kind=${kind} (${text.length} chars)`);
+        continue;
+      }
+
+      try {
+        const json = JSON.parse(text);
+        const result = parseTimedTextJson(json);
+        if (result && result.text.length > 50) {
+          console.log(`[DirectTimedtext] Success: ${result.text.length} chars, ${result.segments.length} segments (lang=${lang}, kind=${kind})`);
+          return result;
+        }
+      } catch {
+        // Try XML parse
+        const result = parseXmlCaptions(text);
+        if (result && result.text.length > 50) {
+          console.log(`[DirectTimedtext] Success (XML): ${result.text.length} chars`);
+          return result;
+        }
+      }
+    } catch (error) {
+      console.error(`[DirectTimedtext] Error for lang=${lang}:`, error);
+    }
+  }
+
+  // Also try the list endpoint to discover available languages
+  try {
+    const listUrl = `https://www.youtube.com/api/timedtext?type=list&v=${videoId}`;
+    const listResp = await fetch(listUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+      },
+    });
+    if (listResp.ok) {
+      const listXml = await listResp.text();
+      // Extract first language from <track> elements
+      const trackMatch = listXml.match(/lang_code="([^"]+)"/);
+      if (trackMatch) {
+        const discoveredLang = trackMatch[1];
+        console.log(`[DirectTimedtext] Discovered language: ${discoveredLang}`);
+        const url = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${discoveredLang}&fmt=json3`;
+        const resp = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Cookie": "CONSENT=PENDING+987; SOCS=CAESEwgDEgk2NDcxMjgzNTQaAmVuIAEaBgiA_LyaBg",
+          },
+        });
+        if (resp.ok) {
+          const text = await resp.text();
+          if (text && text.length > 20) {
+            try {
+              const result = parseTimedTextJson(JSON.parse(text));
+              if (result && result.text.length > 50) {
+                console.log(`[DirectTimedtext] Success with discovered lang=${discoveredLang}: ${result.text.length} chars`);
+                return result;
+              }
+            } catch {
+              // ignore
+            }
+          }
+        } else {
+          await resp.text();
+        }
+      }
+    } else {
+      await listResp.text();
+    }
+  } catch (error) {
+    console.error("[DirectTimedtext] List discovery error:", error);
+  }
+
+  console.log("[DirectTimedtext] All direct attempts failed");
+  return null;
+}
+
+/**
+ * Primary method: Supadata.ai API — reliable third-party transcript service.
+ * Handles both manual and auto-generated captions.
+ */
+async function fetchTranscriptViaSupadata(
+  videoId: string
+): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
+  const apiKey = Deno.env.get("SUPADATA_API_KEY");
+  if (!apiKey) {
+    console.log("[Supadata] API key not configured, skipping");
+    return null;
+  }
+
+  try {
+    const url = `https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&lang=en`;
+    console.log(`[Supadata] Fetching transcript for ${videoId}`);
+
+    const resp = await fetch(url, {
+      headers: {
+        "x-api-key": apiKey,
+      },
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`[Supadata] API error ${resp.status}: ${errText.substring(0, 300)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const content = data.content;
+
+    if (!content || !Array.isArray(content) || content.length === 0) {
+      console.log("[Supadata] No content in response");
+      return null;
+    }
+
+    const segments: Array<{ text: string; start: number; duration: number }> = [];
+    const textParts: string[] = [];
+
+    for (const item of content) {
+      const text = (item.text || "").trim();
+      if (!text) continue;
+      segments.push({
+        text,
+        start: (item.offset || 0) / 1000,
+        duration: (item.duration || 0) / 1000,
+      });
+      textParts.push(text);
+    }
+
+    if (textParts.length === 0) {
+      console.log("[Supadata] Parsed 0 segments from response");
+      return null;
+    }
+
+    console.log(`[Supadata] Success: ${textParts.join(" ").length} chars, ${segments.length} segments`);
+    return { text: textParts.join(" "), segments };
+  } catch (error) {
+    console.error("[Supadata] Error:", error);
+    return null;
+  }
+}
+
+/**
  * Orchestrate all YouTube transcript methods with fallbacks.
  */
 async function fetchYouTubeTranscript(
   videoId: string
 ): Promise<{ text: string; segments: Array<{ text: string; start: number; duration: number }> } | null> {
-  // Method 1: Innertube API (most reliable)
+  // Method 1: Supadata API (most reliable, uses third-party service)
+  try {
+    const result = await fetchTranscriptViaSupadata(videoId);
+    if (result) return result;
+  } catch (error) {
+    console.error("[YouTube] Supadata method failed:", error);
+  }
+
+  // Method 2: Direct timedtext (fastest scraping, no page fetch needed)
+  try {
+    const result = await fetchTranscriptViaDirect(videoId);
+    if (result) return result;
+  } catch (error) {
+    console.error("[YouTube] Direct timedtext method failed:", error);
+  }
+
+  // Method 3: Innertube API (page fetch + transcript endpoint, with retry)
   try {
     const result = await fetchTranscriptViaInnertube(videoId);
     if (result) return result;
@@ -340,7 +560,7 @@ async function fetchYouTubeTranscript(
     console.error("[YouTube] Innertube method failed:", error);
   }
 
-  // Method 2: YouTube Data API timedtext
+  // Method 4: YouTube Data API timedtext
   const apiKey = Deno.env.get("YOUTUBE_API_KEY");
   if (apiKey) {
     try {
@@ -709,6 +929,26 @@ serve(async (req) => {
       transcript: { text: transcript.text, segments: transcript.segments },
       status: "analyzing", duration_seconds: durationSeconds || null,
     }).eq("id", lectureVideoId);
+
+    // Fire-and-forget: detect speaker questions from the transcript
+    if (transcript.segments && transcript.segments.length > 0) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+      // Convert segments to the expected format (start_ms)
+      const segmentsWithMs = transcript.segments.map((s: { text: string; start: number; duration: number }) => ({
+        text: s.text,
+        start_ms: Math.round(s.start * 1000),
+        duration_ms: Math.round(s.duration * 1000),
+      }));
+      fetch(`${supabaseUrl}/functions/v1/detect-speaker-questions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ lecture_video_id: lectureVideoId, transcript_segments: segmentsWithMs }),
+      }).catch((err: Error) => console.error("[transcribe-video] detect-speaker-questions call failed:", err));
+    }
 
     return new Response(JSON.stringify({ success: true, hasTranscript: true, durationSeconds }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });

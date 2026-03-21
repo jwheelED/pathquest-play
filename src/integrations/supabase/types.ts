@@ -914,6 +914,8 @@ export type Database = {
           org_id: string | null
           question_content: Json
           question_type: string
+          source_material_id: string | null
+          source_material_title: string | null
           tags: string[] | null
           times_used: number | null
           title: string
@@ -929,6 +931,8 @@ export type Database = {
           org_id?: string | null
           question_content?: Json
           question_type: string
+          source_material_id?: string | null
+          source_material_title?: string | null
           tags?: string[] | null
           times_used?: number | null
           title: string
@@ -944,6 +948,8 @@ export type Database = {
           org_id?: string | null
           question_content?: Json
           question_type?: string
+          source_material_id?: string | null
+          source_material_title?: string | null
           tags?: string[] | null
           times_used?: number | null
           title?: string
@@ -969,6 +975,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instructor_question_bank_source_material_id_fkey"
+            columns: ["source_material_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_materials"
             referencedColumns: ["id"]
           },
         ]
@@ -1317,6 +1330,73 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lecture_summaries: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          duration_seconds: number
+          id: string
+          instructor_id: string
+          org_id: string | null
+          questions_asked: number
+          session_id: string | null
+          student_count: number
+          summary_data: Json
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          questions_asked?: number
+          session_id?: string | null
+          student_count?: number
+          summary_data?: Json
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          questions_asked?: number
+          session_id?: string | null
+          student_count?: number
+          summary_data?: Json
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lecture_summaries_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_summaries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lecture_summaries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -2409,6 +2489,8 @@ export type Database = {
           id: string
           instructor_code: string | null
           interval_question_model: string
+          kaltura_partner_id: string | null
+          kaltura_uiconf_id: string | null
           last_auto_question_at: string | null
           lecture_preferences: Json | null
           medical_specialty: string | null
@@ -2450,6 +2532,8 @@ export type Database = {
           id: string
           instructor_code?: string | null
           interval_question_model?: string
+          kaltura_partner_id?: string | null
+          kaltura_uiconf_id?: string | null
           last_auto_question_at?: string | null
           lecture_preferences?: Json | null
           medical_specialty?: string | null
@@ -2491,6 +2575,8 @@ export type Database = {
           id?: string
           instructor_code?: string | null
           interval_question_model?: string
+          kaltura_partner_id?: string | null
+          kaltura_uiconf_id?: string | null
           last_auto_question_at?: string | null
           lecture_preferences?: Json | null
           medical_specialty?: string | null
@@ -2714,6 +2800,77 @@ export type Database = {
           },
         ]
       }
+      scheduled_events: {
+        Row: {
+          capacity_tier: string
+          created_at: string | null
+          duration: string
+          event_date: string
+          event_name: string
+          expected_attendance: number
+          id: string
+          join_method: string
+          org_id: string | null
+          organizer_id: string
+          price_cents: number
+          require_name: boolean
+          session_code: string | null
+          show_live_results: boolean
+          start_time: string
+          status: string
+          tier: string
+          updated_at: string | null
+        }
+        Insert: {
+          capacity_tier: string
+          created_at?: string | null
+          duration: string
+          event_date: string
+          event_name: string
+          expected_attendance: number
+          id?: string
+          join_method?: string
+          org_id?: string | null
+          organizer_id: string
+          price_cents: number
+          require_name?: boolean
+          session_code?: string | null
+          show_live_results?: boolean
+          start_time: string
+          status?: string
+          tier: string
+          updated_at?: string | null
+        }
+        Update: {
+          capacity_tier?: string
+          created_at?: string | null
+          duration?: string
+          event_date?: string
+          event_name?: string
+          expected_attendance?: number
+          id?: string
+          join_method?: string
+          org_id?: string | null
+          organizer_id?: string
+          price_cents?: number
+          require_name?: boolean
+          session_code?: string | null
+          show_live_results?: boolean
+          start_time?: string
+          status?: string
+          tier?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seat_allocations: {
         Row: {
           allocated_at: string
@@ -2810,6 +2967,79 @@ export type Database = {
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slide_preset_questions: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          generation_source: string
+          id: string
+          instructor_id: string
+          is_enabled: boolean
+          material_id: string
+          order_index: number
+          org_id: string | null
+          question_content: Json
+          question_name: string | null
+          question_type: string
+          slide_number: number
+          updated_at: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          generation_source?: string
+          id?: string
+          instructor_id: string
+          is_enabled?: boolean
+          material_id: string
+          order_index?: number
+          org_id?: string | null
+          question_content?: Json
+          question_name?: string | null
+          question_type?: string
+          slide_number: number
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          generation_source?: string
+          id?: string
+          instructor_id?: string
+          is_enabled?: boolean
+          material_id?: string
+          order_index?: number
+          org_id?: string | null
+          question_content?: Json
+          question_name?: string | null
+          question_type?: string
+          slide_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slide_preset_questions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slide_preset_questions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slide_preset_questions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]

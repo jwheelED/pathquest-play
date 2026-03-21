@@ -61,6 +61,8 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
+import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
+import { QuestionOnDeck } from "./QuestionOnDeck";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -173,6 +175,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isSendingFromPreview, setIsSendingFromPreview] = useState(false);
   const pendingQuestionDataRef = useRef<any>(null);
 
+  // Passive question detection — always on when recording
+  const [onDeckHeld, setOnDeckHeld] = useState(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -195,6 +200,23 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   const [isDeepgramConnected, setIsDeepgramConnected] = useState(false);
   
   const { toast } = useToast();
+
+  // Passive question detection hook
+  const {
+    candidate: passiveCandidate,
+    candidateHistory: passiveCandidateHistory,
+    checkUtterance: checkPassiveQuestion,
+    dismissCandidate: dismissPassiveCandidate,
+    removeFromHistory: removePassiveFromHistory,
+    resetDetection: resetPassiveDetection,
+  } = usePassiveQuestionDetection({
+    enabled: true, // Always on
+    cooldownMs: 8000,
+    minWordCount: 5,
+    autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
+    lastQuestionSentTime: lastQuestionSentTimeRef.current,
+  });
+
 
   // Keep isSendingQuestion ref in sync with state
   useEffect(() => {
@@ -763,42 +785,22 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("✅ Question extracted via voice command:", data.question_text);
 
-      // Check if preview is enabled - if so, show dialog instead of sending directly
-      if (questionPreviewEnabled) {
-        console.log("📋 Preview enabled - showing voice question preview");
-        setPreviewQuestionData({
-          question_text: data.question_text,
-          suggested_type: data.suggested_type || 'short_answer',
-          // Include pre-generated MCQ options if available
-          options: data.options,
-          correct_answer: data.correct_answer,
-          explanation: data.explanation,
-          expected_answer: data.expected_answer,
-        });
-        pendingQuestionDataRef.current = {
-          question_text: data.question_text,
-          suggested_type: data.suggested_type,
-          confidence: 1.0,
-          extraction_method: "voice_command",
-          source: "voice_command",
-          // Also store MCQ data in pending ref
-          options: data.options,
-          correct_answer: data.correct_answer,
-          explanation: data.explanation,
-          expected_answer: data.expected_answer,
-        };
-        setIsPreviewOpen(true);
-        // Don't set isSendingQuestion to false yet - preview will handle that
-        return;
-      }
+      // Voice commands now route through the On Deck card flow instead of auto-opening preview.
+      // The passive detection will surface the question on the On Deck card where
+      // the instructor can Preview / Send Now at their own pace.
+      console.log("📋 Voice command question routed to On Deck card (preview not auto-opened)");
+      setIsSendingQuestion(false);
 
-      // Preview disabled - send immediately
+      // Send immediately (bypasses preview) —
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: 1.0, // Voice command = maximum confidence
         extraction_method: "voice_command",
         source: "voice_command",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
 
       // Reset auto-question timer after voice command
@@ -937,6 +939,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         confidence: 1.0,
         extraction_method: "manual_button",
         source: "manual_button",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
 
       // Reset auto-question timer after manual send
@@ -1656,13 +1661,16 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
 
       console.log("📝 Sending via handleQuestionSend...");
 
-      // Send the question using existing flow
+      // Send the question using existing flow — pass pre-generated MCQ data to avoid double AI generation
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
         extraction_method: "auto_interval",
         source: isManualTest ? "manual_test" : "auto_interval",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
       });
 
       const totalTime = Date.now() - startTime;
@@ -2002,12 +2010,17 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   }, [isRecording]);
 
   // Auto-question timer logic with comprehensive logging
+  // Refs to read inside the stable timer interval (avoids stale closures & effect re-runs)
+  const lastAutoQuestionTimeRef = useRef(lastAutoQuestionTime);
+  useEffect(() => { lastAutoQuestionTimeRef.current = lastAutoQuestionTime; }, [lastAutoQuestionTime]);
+
+  const retryAttemptsRef = useRef(retryAttempts);
+  useEffect(() => { retryAttemptsRef.current = retryAttempts; }, [retryAttempts]);
+
   useEffect(() => {
     console.log("🔍 Auto-question timer effect triggered:", {
       isRecording,
       autoQuestionEnabled,
-      isSendingQuestion,
-      lastAutoQuestionTime,
       autoQuestionInterval,
     });
 
@@ -2021,48 +2034,34 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       return;
     }
 
-    // NOTE: isSendingQuestion check moved inside the interval callback via ref
-    // to avoid tearing down and recreating the timer interval
-
-    const intervalMs = autoQuestionInterval * 60 * 1000; // Convert minutes to ms
+    const intervalMs = autoQuestionInterval * 60 * 1000;
 
     // Initialize timer on first recording start
-    if (lastAutoQuestionTime === 0) {
+    if (lastAutoQuestionTimeRef.current === 0) {
       const now = Date.now();
       setLastAutoQuestionTime(now);
-      intervalStartTimeRef.current = now; // Track actual start time
+      lastAutoQuestionTimeRef.current = now;
+      intervalStartTimeRef.current = now;
       setAutoQuestionCount(0);
       console.log(`🟢 Auto-questions initialized: every ${autoQuestionInterval} minutes (${intervalMs}ms)`);
       console.log("🕐 First question will trigger at:", new Date(now + intervalMs).toLocaleTimeString());
     }
 
-    // Check if interval has elapsed
+    // Stable interval — reads from refs, not state
     const checkInterval = setInterval(() => {
-      if (isPreviewOpen) {
-        console.log("⏸️ Skipping check: preview dialog is open");
-        return;
-      }
-      if (isSendingQuestionRef.current) {
-        console.log("⏸️ Skipping check: already sending a question");
-        return;
-      }
-      if (isGeneratingAutoQuestionRef.current) {
-        console.log("⏸️ Skipping check: generation in progress");
-        return;
-      }
-      if (isProcessing) {
-        console.log("⏸️ Skipping check: audio processing");
-        return;
-      }
+      if (isPreviewOpen) return;
+      if (isSendingQuestionRef.current) return;
+      if (isGeneratingAutoQuestionRef.current) return;
+      if (isProcessing) return;
 
       const now = Date.now();
-      const elapsed = now - lastAutoQuestionTime;
+      const elapsed = now - lastAutoQuestionTimeRef.current;
       const timeLeft = intervalMs - elapsed;
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
 
       setNextAutoQuestionIn(secondsLeft);
 
-      // Broadcast countdown tick to presenter popup (BroadcastChannel)
+      // Broadcast countdown tick to presenter popup
       broadcast('countdown_tick', {
         nextAutoQuestionIn: secondsLeft,
         autoQuestionEnabled,
@@ -2086,14 +2085,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         });
       }
 
-      // Log countdown at key intervals
       if (secondsLeft === 60 || secondsLeft === 30 || secondsLeft === 10) {
         console.log(`⏰ Auto-question in ${secondsLeft} seconds`);
       }
 
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
-        // Set lock IMMEDIATELY before any async work
         isGeneratingAutoQuestionRef.current = true;
 
         console.log("🚀 AUTO-QUESTION INTERVAL REACHED");
@@ -2102,29 +2099,26 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           intervalMs: `${(intervalMs / 1000).toFixed(0)}s`,
           transcriptLength: intervalTranscriptRef.current.length,
           transcriptWords: intervalTranscriptRef.current.split(/\s+/).length,
-          lastAutoQuestionTime: new Date(lastAutoQuestionTime).toLocaleTimeString(),
-          intervalStartTime: new Date(intervalStartTimeRef.current).toLocaleTimeString(),
+          lastAutoQuestionTime: new Date(lastAutoQuestionTimeRef.current).toLocaleTimeString(),
           now: new Date(now).toLocaleTimeString(),
-          autoQuestionEnabled,
-          isSendingQuestion,
         });
 
-        // Call async function with enhanced error handling and retry logic
         handleAutoQuestionGeneration()
           .then((success) => {
             if (success) {
-              // Question sent successfully - reset timer
               const newTime = Date.now();
               setLastAutoQuestionTime(newTime);
+              lastAutoQuestionTimeRef.current = newTime;
               intervalStartTimeRef.current = newTime;
               setRetryAttempts(0);
+              retryAttemptsRef.current = 0;
               setLastAutoQuestionError(null);
               console.log("✅ Timer reset after successful send");
               console.log("🕐 Next question at:", new Date(newTime + intervalMs).toLocaleTimeString());
             } else {
-              // Quality check failed - reset timer with 30-second delay
               const retryTime = Date.now() - (intervalMs - 30000);
               setLastAutoQuestionTime(retryTime);
+              lastAutoQuestionTimeRef.current = retryTime;
               console.log("⏭️ Quality check failed, will retry in 30 seconds");
             }
           })
@@ -2134,25 +2128,28 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             setLastAutoQuestionError(errorMsg);
             setLastAutoQuestionErrorTime(new Date());
 
-            // Retry logic: wait 5 seconds then try again
-            if (retryAttempts < 1) {
+            if (retryAttemptsRef.current < 1) {
               console.log("🔄 Will retry in 5 seconds...");
               setRetryAttempts((prev) => prev + 1);
+              retryAttemptsRef.current += 1;
               setTimeout(() => {
                 console.log("🔄 Retrying auto-question generation...");
-                const retryTime = Date.now() - (intervalMs - 5000); // Retry in 5s
+                const retryTime = Date.now() - (intervalMs - 5000);
                 setLastAutoQuestionTime(retryTime);
+                lastAutoQuestionTimeRef.current = retryTime;
                 isGeneratingAutoQuestionRef.current = false;
               }, 5000);
             } else {
               console.log("❌ Max retries reached, resetting timer");
               setRetryAttempts(0);
-              const retryTime = Date.now() - (intervalMs - 60000); // Retry in 1 minute
+              retryAttemptsRef.current = 0;
+              const retryTime = Date.now() - (intervalMs - 60000);
               setLastAutoQuestionTime(retryTime);
+              lastAutoQuestionTimeRef.current = retryTime;
             }
           })
           .finally(() => {
-            if (retryAttempts >= 1) {
+            if (retryAttemptsRef.current >= 1) {
               // Don't unlock if we're about to retry
               return;
             }
@@ -2165,7 +2162,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
       console.log("🧹 Cleaning up auto-question timer");
       clearInterval(checkInterval);
     };
-  }, [isRecording, autoQuestionEnabled, lastAutoQuestionTime, autoQuestionInterval, retryAttempts]);
+  }, [isRecording, autoQuestionEnabled, autoQuestionInterval]);
 
   // Initialize timer when auto-questions are toggled on during recording
   useEffect(() => {
@@ -2287,6 +2284,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
           
           setTranscriptChunks((prev) => [...prev, cleanText]);
           setLastTranscript(cleanText);
+          
+          // Passive question detection — check final utterances for ?
+          checkPassiveQuestion(cleanText);
+
           
           // Accumulate clean text in transcript buffer
           if (transcriptBufferRef.current) {
@@ -3209,9 +3210,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mic className="h-5 w-5" />
-            Live Lecture Capture
+            Live Copilot
           </CardTitle>
-          <CardDescription>Record your lecture and send questions to students in real-time</CardDescription>
+          <CardDescription>Edvana listens and autodrafts audience checks as you speak</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Error History Panel */}
@@ -3330,12 +3331,12 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-xl">
                 {isRecording ? <Radio className="h-4 w-4 text-red-500 animate-pulse" /> : <Mic className="h-4 w-4" />}
-                Live Lecture Capture
+                Live Copilot
               </CardTitle>
               <CardDescription className="text-sm">
                 {isRecording
-                  ? "🎙️ Real-time streaming active • Say 'send question now' or click 'Send Question' to send your most recent question to students"
-                  : "Start recording with Deepgram real-time transcription - use voice commands or the 'Send Question' button to send questions"}
+                  ? "🎙️ Streaming — Edvana is autodrafting your next audience check"
+                  : "Start recording to enable always-on question detection"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -3439,7 +3440,9 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     )}
                   </div>
                   
+                  {/* Always-on detection — no toggle needed */}
                   
+
                   {transcriptChunks.length > 0 && (
                     <Button onClick={clearTranscript} variant="outline" size="sm">
                       Clear
@@ -3514,7 +3517,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                     ) : (
                       <>
                         <Zap className="mr-2 h-4 w-4" />
-                        Send Question
+                        Send Now
                       </>
                     )}
                   </Button>
@@ -3557,7 +3560,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                   {rateLimitSecondsLeft === 0 && (
                     <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 space-y-1">
                       <p className="text-xs font-medium text-center">
-                        ✅ Ready • Click "Send Question" or say "send question now"
+                        ✅ Ready • Edvana is autodrafting
                       </p>
                     </div>
                   )}
@@ -3575,64 +3578,72 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
                 </div>
               )}
 
-              {transcriptChunks.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Transcript Chunks:</p>
-                    {/* Transcription Quality Rating */}
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground">Accuracy:</p>
-                      {["excellent", "good", "poor"].map((rating) => (
-                        <Button
-                          key={rating}
-                          variant={transcriptionRating === rating ? "default" : "outline"}
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const {
-                                data: { user },
-                              } = await supabase.auth.getUser();
-                              if (!user) return;
+              {(transcriptChunks.length > 0 || lastTranscript) && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full py-2">
+                    <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    Live Session Feed
+                    <Badge variant="secondary" className="text-[10px] ml-auto">
+                      {transcriptChunks.length} chunks
+                    </Badge>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 pt-2">
+                      {/* Transcription Quality Rating */}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">Accuracy:</p>
+                        {["excellent", "good", "poor"].map((rating) => (
+                          <Button
+                            key={rating}
+                            variant={transcriptionRating === rating ? "default" : "outline"}
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const {
+                                  data: { user },
+                                } = await supabase.auth.getUser();
+                                if (!user) return;
 
-                              const { error } = await supabase.from("ai_quality_ratings").insert({
-                                user_id: user.id,
-                                rating_type: "transcription",
-                                reference_id: sessionId,
-                                rating: rating,
-                              });
+                                const { error } = await supabase.from("ai_quality_ratings").insert({
+                                  user_id: user.id,
+                                  rating_type: "transcription",
+                                  reference_id: sessionId,
+                                  rating: rating,
+                                });
 
-                              if (error) throw error;
+                                if (error) throw error;
 
-                              setTranscriptionRating(rating);
-                              toast({
-                                title: "Thank you for your feedback!",
-                                description: "Your rating helps us improve transcription quality.",
-                              });
-                            } catch (error) {
-                              console.error("Error saving rating:", error);
-                              toast({
-                                title: "Failed to save rating",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          className="gap-1 h-7 text-xs"
-                        >
-                          <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
-                          {rating.charAt(0).toUpperCase() + rating.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {transcriptChunks.map((chunk, index) => (
-                      <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                                setTranscriptionRating(rating);
+                                toast({
+                                  title: "Thank you for your feedback!",
+                                  description: "Your rating helps us improve transcription quality.",
+                                });
+                              } catch (error) {
+                                console.error("Error saving rating:", error);
+                                toast({
+                                  title: "Failed to save rating",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="gap-1 h-7 text-xs"
+                          >
+                            <Star className={`h-3 w-3 ${transcriptionRating === rating ? "fill-current" : ""}`} />
+                            {rating.charAt(0).toUpperCase() + rating.slice(1)}
+                          </Button>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {transcriptChunks.map((chunk, index) => (
+                          <div key={index} className="border rounded-lg p-2.5 bg-muted/30">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Chunk {index + 1}</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{chunk}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </CardContent>
           </Card>
@@ -3701,6 +3712,53 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         isSending={isSendingFromPreview}
         sourceTranscript={transcriptBufferRef.current.slice(-500)}
       />
+
+      {/* Question on Deck — persistent autodraft card */}
+      {isRecording && (
+        <div className="mt-4">
+          <QuestionOnDeck
+            candidate={passiveCandidate}
+            candidateHistory={passiveCandidateHistory}
+            isListening={isRecording}
+            isSending={isSendingQuestion}
+            isHeld={onDeckHeld}
+            onToggleHold={() => setOnDeckHeld(h => !h)}
+            onSendNow={(questionText) => {
+              dismissPassiveCandidate();
+              // Open preview for review before sending
+              setPreviewQuestionData({
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+              });
+              pendingQuestionDataRef.current = {
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+                confidence: 1.0,
+                extraction_method: 'passive_detection',
+                source: 'passive_detection',
+              };
+              setIsPreviewOpen(true);
+            }}
+            onPreview={(questionText) => {
+              setPreviewQuestionData({
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+              });
+              pendingQuestionDataRef.current = {
+                question_text: questionText,
+                suggested_type: 'multiple_choice',
+                confidence: 1.0,
+                extraction_method: 'passive_detection',
+                source: 'passive_detection',
+              };
+              setIsPreviewOpen(true);
+            }}
+            onDismiss={dismissPassiveCandidate}
+            onRemoveFromHistory={removePassiveFromHistory}
+          />
+        </div>
+      )}
     </>
   );
 };
+

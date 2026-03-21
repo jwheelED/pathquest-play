@@ -4,10 +4,59 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+// Shuffle MCQ options so the correct answer isn't always A
+// Uses index tracking instead of indexOf to handle duplicate option text correctly
+const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {
+  if (!mcq?.options || mcq.options.length !== 4 || !mcq.correctAnswer) return mcq;
+
+  const letters = ['A', 'B', 'C', 'D'];
+  const correctIdx = letters.indexOf(mcq.correctAnswer.trim().toUpperCase());
+  if (correctIdx === -1) return mcq;
+
+  // Strip letter prefixes and track which index is correct
+  const augmented = mcq.options.map((opt, i) => ({
+    text: opt.replace(/^[A-D][\).\-\s]+\s*/i, '').trim(),
+    wasCorrect: i === correctIdx,
+  }));
+
+  // Check for duplicate option text — skip shuffle if found
+  const uniqueTexts = new Set(augmented.map(o => o.text.toLowerCase()));
+  if (uniqueTexts.size < 4) {
+    console.warn('⚠️ Duplicate MCQ options detected — skipping shuffle to preserve correctAnswer mapping');
+    return mcq;
+  }
+
+  // Fisher-Yates shuffle
+  for (let i = augmented.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [augmented[i], augmented[j]] = [augmented[j], augmented[i]];
+  }
+
+  // Find where the correct answer ended up via tracked flag
+  const newCorrectIdx = augmented.findIndex(o => o.wasCorrect);
+  if (newCorrectIdx === -1) {
+    console.error('🚫 Shuffle tracking failed — returning unshuffled');
+    return mcq;
+  }
+
+  const newCorrectLetter = letters[newCorrectIdx];
+
+  // Re-prefix with letters
+  const newOptions = augmented.map((o, i) => `${letters[i]}. ${o.text}`);
+
+  console.log(`🔀 Shuffled MCQ: correct answer moved from ${mcq.correctAnswer} → ${newCorrectLetter}`);
+
+  return {
+    ...mcq,
+    options: newOptions,
+    correctAnswer: newCorrectLetter,
+  };
+};
 
 const generateMCQ = async (
   questionText: string,
@@ -23,40 +72,21 @@ const generateMCQ = async (
     courseInfo += `\nRelevant topics: ${courseContext.topics.join(", ")}`;
   }
 
-  // Detect if this is a math question (contains LaTeX)
-  const isMathQuestion = questionText.includes("$") || questionText.includes("\\");
+  const mathGuidance = `
 
-  const mathGuidance = isMathQuestion
-    ? `
-
-🧮 MATHEMATICS QUESTION DETECTED - SPECIAL INSTRUCTIONS:
-
-This question contains mathematical expressions in LaTeX notation. Generate a high-quality math MCQ.
-
-DISTRACTOR GENERATION FOR MATH QUESTIONS:
-1. **Common Calculation Errors**: Include answers from typical mistakes (wrong sign, forgot constant, etc.)
-2. **Partial Solutions**: Show answers from incomplete work (stopped midway, forgot a step)
-3. **Conceptual Misunderstandings**: Include answers from common misconceptions about the concept
-4. **Order of Operations Errors**: Show what happens if operations done in wrong order
-
-EXAMPLE - For calculus derivative question like: "What is $\\lim_{h \\to 0} \\frac{(x+h)^2 - x^2}{h}$?"
-
-GOOD DISTRACTORS (realistic errors):
-- $x$ (forgot the coefficient 2)
-- $2$ (treated x as constant)
-- $x^2$ (didn't simplify the limit)
-- $2x + h$ (didn't take limit as h→0)
-
-BAD DISTRACTORS (nonsensical):
-- $5x^3$ (unrelated to the problem)
-- $\\sin(x)$ (wrong function entirely)
-
-FORMATTING RULES:
-- ALL math expressions in options MUST use LaTeX: $...$ or $$...$$
-- Keep notation consistent with the question
-- Use \\frac{}{} for fractions, \\lim_{} for limits, ^ for exponents
-- Greek letters: \\theta, \\pi, \\alpha, etc.`
-    : "";
+MATH FORMATTING - CRITICAL:
+Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
+Write all math as plain readable text using Unicode:
+- Fractions: a/b, cos x / sin x (never \\frac)
+- Integrals: ∫(a to b) f(x) dx
+- Square roots: √x, √(x+1)
+- Exponents: x², x³, e^(x²)
+- Greek letters: π, θ, α, β
+- Derivatives: d/dx, d²/dx², f'(x), dy/dx
+- Limits: lim(h→0), lim(x→∞)
+- Summation: Σ(n=1 to ∞) 1/n²
+- Multiplication: · or juxtapose
+- Apply to question AND all answer options`;
 
   const prompt = `The professor asked: "${questionText}"
 
@@ -69,17 +99,18 @@ GROUNDING RULES:
 
 Generate a multiple choice question with 4 options:
 - One correct answer
-- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""}${isMathQuestion ? " and typical calculation errors" : ""}
+- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""} and typical calculation errors
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
-- Keep it concise and clear${isMathQuestion ? "\n- Use LaTeX notation ($...$) for ALL mathematical expressions in options" : ""}
+- Keep it concise and clear
+- Use plain Unicode math notation (no LaTeX)
 ${courseContext?.topics?.length ? `- Consider these key topics when creating distractors: ${courseContext.topics.join(", ")}` : ""}
 
-${isMathQuestion ? "CRITICAL FOR MATH: Each distractor should represent a specific type of error a student might make." : ""}
+Each distractor should represent a specific type of error a student might make.
 
 Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
-  "question": "the question text (preserve LaTeX formatting)",
+  "question": "the question text (use plain Unicode math, no LaTeX)",
   "options": ["A. first option text", "B. second option text", "C. third option text", "D. fourth option text"],
   "correctAnswer": "A" | "B" | "C" | "D",
   "explanation": "Why this is correct and explain what mistakes lead to each wrong answer"
@@ -135,13 +166,15 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
       .trim();
 
     try {
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return shuffleMCQOptions(parsed);
     } catch (parseError) {
       console.error("JSON parse failed, content:", content);
       // Fallback: try to extract JSON from text
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        return shuffleMCQOptions(parsed);
       }
       throw new Error("Failed to parse AI response as JSON");
     }
@@ -731,14 +764,22 @@ serve(async (req) => {
       } else if (options && Array.isArray(options) && options.length === 4 && correct_answer) {
         // Use pre-generated options from preview dialog (allows instructor editing)
         console.log("📝 Using pre-generated MCQ options from preview dialog");
+        // Normalize options to have letter prefixes so student UI grades correctly
+        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        const normalizedOptions = options.map((opt: string, i: number) => {
+          const trimmed = opt.trim();
+          // Already has a letter prefix like "A. text" or "A) text"
+          if (/^[A-D][\).\-\s]/i.test(trimmed)) return trimmed;
+          return `${MCQ_LETTERS[i]}. ${trimmed}`;
+        });
         formattedQuestion = {
           question: question_text,
           type: "multiple_choice",
-          options: options,
+          options: normalizedOptions,
           correctAnswer: correct_answer,
           explanation: explanation || "",
           source: "preview_edited",
-          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
+          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade",
         };
       } else {
         // Fallback: generate with AI

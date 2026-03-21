@@ -3,18 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library } from "lucide-react";
+import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library, Settings, Award } from "lucide-react";
 import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
-import { CourseCodeCard } from "@/components/instructor/CourseCodeCard";
+import { SessionReadyModule } from "@/components/instructor/SessionReadyModule";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { InstructorOverview } from "@/components/instructor/InstructorOverview";
+import { LastSessionSummary } from "@/components/instructor/LastSessionSummary";
+import { QuickMetricsGrid } from "@/components/instructor/QuickMetricsGrid";
+import { CheckInPreview } from "@/components/instructor/CheckInPreview";
+import { RecentSessionsTable } from "@/components/instructor/RecentSessionsTable";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
-import StudentRankingCard from "@/components/instructor/StudentRankingCard";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
-import { AcademicIntegrityInsights } from "@/components/instructor/AcademicIntegrityInsights";
+import { StudentRosterPanel } from "@/components/instructor/StudentRosterPanel";
 import { LectureTranscription } from "@/components/instructor/LectureTranscription";
 import { LectureCheckInResults } from "@/components/instructor/LectureCheckInResults";
 import { AnswerReleaseCard } from "@/components/instructor/AnswerReleaseCard";
@@ -26,15 +28,12 @@ import { PastLiveSessions } from "@/components/instructor/PastLiveSessions";
 import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
 import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
+import { StudentLectureQuestions } from "@/components/instructor/StudentLectureQuestions";
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
-import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
-import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
-import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
-import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
-import { BillingSettings } from "@/components/instructor/BillingSettings";
-import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
+import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
 
 interface Student {
   id: string;
@@ -46,13 +45,14 @@ interface Student {
   average_grade?: number;
 }
 
-type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "settings";
+type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "summaries" | "settings";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "live", label: "Live Lecture", icon: Radio },
+  { value: "live", label: "Live Copilot", icon: Radio },
   { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
+  { value: "summaries", label: "Summaries", icon: Award },
   { value: "students", label: "Students", icon: Users },
   { value: "materials", label: "Materials", icon: FileText },
   { value: "settings", label: "Settings", icon: Settings },
@@ -329,9 +329,6 @@ export default function InstructorDashboard() {
     setDialogOpen(true);
   };
 
-  const rankedStudents = [...students]
-    .sort((a, b) => (b.average_grade || 0) - (a.average_grade || 0))
-    .map((s, idx) => ({ ...s, rank: idx + 1 }));
 
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
 
@@ -433,16 +430,20 @@ export default function InstructorDashboard() {
         return (
           <div className="space-y-6">
             <PendingOrgInvites />
-            
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <CourseCodeCard />
-
-              {currentUser && (
-                <div className="xl:col-span-2">
-                  <InstructorOverview instructorId={currentUser.id} />
-                </div>
-              )}
+            <SessionReadyModule
+              activeSession={activeSession}
+              onStartLive={() => setActiveTab("live")}
+              onPresentSlides={() => navigate("/instructor/slides")}
+            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              <QuickMetricsGrid />
             </div>
+            <CheckInPreview
+              activeSessionId={activeSession?.id}
+              onNavigate={(tab) => setActiveTab(tab as TabValue)}
+            />
+            <RecentSessionsTable onNavigate={(tab) => setActiveTab(tab as TabValue)} />
           </div>
         );
 
@@ -488,6 +489,10 @@ export default function InstructorDashboard() {
             <div className="min-w-0">
               <PastLiveSessions />
             </div>
+
+            <div className="min-w-0">
+              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
+            </div>
           </div>
         );
 
@@ -505,43 +510,38 @@ export default function InstructorDashboard() {
             <div className="min-w-0">
               <PreRecordedLectureGrades />
             </div>
-          </div>
-        );
 
-      case "students":
-        return (
-          <div className="space-y-6">
-            <div className="min-w-0">
-              <StudentRankingCard
-                students={rankedStudents}
-                onStudentClick={handleStudentClick}
-                onRefresh={fetchStudents}
-              />
-            </div>
-            
-            <div className="min-w-0">
-              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
-            </div>
-            
             {currentUser && (
               <div className="min-w-0">
-                <AcademicIntegrityInsights instructorId={currentUser.id} />
+                <StudentLectureQuestions instructorId={currentUser.id} />
               </div>
             )}
           </div>
         );
 
+      case "students":
+        return (
+          <StudentRosterPanel
+            students={students}
+            onStudentClick={handleStudentClick}
+            onRefresh={fetchStudents}
+            instructorId={currentUser?.id || ""}
+            selectedStudentDetail={selectedStudentDetail}
+            selectedStudentId={selectedStudentId}
+            loading={loading}
+          />
+        );
+
       case "question-bank":
         return <QuestionBankTab professorType={professorType} />;
+
+      case "summaries":
+        return <SavedSummariesTab />;
 
       case "materials":
         return (
           <div className="space-y-6">
-            <div className="min-w-0">
-              <LectureMaterialsUpload />
-            </div>
-            
-            
+            <LectureMaterialsUpload />
             {professorType === "research" && (
               <Card className="headspace-card h-fit">
                 <CardHeader className="pb-3">
@@ -564,22 +564,12 @@ export default function InstructorDashboard() {
         );
 
       case "settings":
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 max-w-4xl">
-              {currentUser && (
-                <>
-                  <BillingSettings />
-                  <QuestionFormatSettings instructorId={currentUser.id} professorType={instructorProfile?.professor_type} />
-                  <QuestionPreviewSettings />
-                  <QuestionDifficultySettings />
-                  <AdaptiveTutoringSettings />
-                  <AutoGradeSettings />
-                </>
-              )}
-            </div>
-          </div>
-        );
+        return currentUser ? (
+          <SettingsPanel
+            currentUserId={currentUser.id}
+            professorType={instructorProfile?.professor_type}
+          />
+        ) : null;
 
       default:
         return null;
@@ -606,7 +596,7 @@ export default function InstructorDashboard() {
     >
       <div className="flex min-h-[calc(100vh-12rem)]">
         {/* Sidebar Navigation - Desktop Only */}
-        <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
+        <aside className="hidden lg:flex w-56 flex-col border-r border-border/60 pr-6 mr-6 shrink-0">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -616,13 +606,13 @@ export default function InstructorDashboard() {
                   key={item.value}
                   onClick={() => setActiveTab(item.value)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left",
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all text-left",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-primary/10 text-primary font-semibold border-l-3 border-primary"
+                      : "text-muted-foreground font-medium hover:text-foreground hover:bg-muted/50"
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
                   {item.label}
                 </button>
               );

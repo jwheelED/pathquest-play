@@ -1,4 +1,4 @@
-import { Copy, Settings, Archive } from "lucide-react";
+import { Copy, Settings, Archive, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,6 +18,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useState } from "react";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { toast } from "sonner";
@@ -25,14 +31,17 @@ import { toast } from "sonner";
 export function CourseCodeCard() {
   const { selectedCourse, archiveCourse } = useCourseContext();
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   if (!selectedCourse) {
     return null;
   }
 
-  const handleCopy = () => {
+  const handleCopyCode = () => {
     navigator.clipboard.writeText(selectedCourse.course_code);
-    toast.success("Course code copied to clipboard!");
+    setCodeCopied(true);
+    toast.success("Join code copied to clipboard ✓");
+    setTimeout(() => setCodeCopied(false), 2000);
   };
 
   const handleArchive = async () => {
@@ -45,33 +54,42 @@ export function CourseCodeCard() {
       <Card className="headspace-card h-fit">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Course Code</CardTitle>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleCopy}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Code
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => setArchiveDialogOpen(true)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Archive className="mr-2 h-4 w-4" />
-                  Archive Course
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CardTitle className="text-lg">Student Join Code</CardTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleCopyCode}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy Join Code
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => setArchiveDialogOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Archive className="mr-2 h-4 w-4" />
+                        Archive Course
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Course settings</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground truncate">
               {selectedCourse.title}
             </p>
             <code className="text-2xl font-bold text-primary bg-primary/5 px-4 py-3 rounded-xl text-center block break-all">
@@ -81,14 +99,14 @@ export function CourseCodeCard() {
           <Button
             variant="outline"
             size="sm"
-            className="w-full rounded-xl"
-            onClick={handleCopy}
+            className="w-full rounded-xl border border-border hover:bg-accent"
+            onClick={handleCopyCode}
           >
-            <Copy className="w-4 h-4 mr-2" />
-            Copy Code
+            {codeCopied ? <Check className="w-4 h-4 mr-1 text-success" /> : <Copy className="w-4 h-4 mr-1" />}
+            {codeCopied ? "Copied!" : "Copy Join Code"}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Share this code with your students to join this course
+            Students enter this code in Edvana to join your class.
           </p>
         </CardContent>
       </Card>

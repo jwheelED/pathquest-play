@@ -1769,7 +1769,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                             
                             <div className="space-y-2">
                               {q.options?.map((opt: string, i: number) => {
-                                const optionLetter = opt.trim().charAt(0).toUpperCase();
+                                // Use index-based letter so plain-text options (no "A. " prefix) grade correctly
+                                const MCQ_LETTERS = ['A', 'B', 'C', 'D'];
+                                const optionLetter = MCQ_LETTERS[i] ?? opt.trim().charAt(0).toUpperCase();
                                 const normalizedSelected = selectedAnswer?.trim().toUpperCase();
                                 const isSelected = normalizedSelected === optionLetter;
                                 

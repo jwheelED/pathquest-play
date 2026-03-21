@@ -65,13 +65,8 @@ const normalizeAnswer = (answer: string, questionType: string, options?: string[
     }
   }
   
-  // 4. Fallback: first character if it's A-D (handles "B206" or "Banswer")
-  if (/^[A-Da-d]/i.test(trimmed)) {
-    console.log(`⚠️ Using first char fallback for "${trimmed}" → "${trimmed.charAt(0).toUpperCase()}"`);
-    return trimmed.charAt(0).toUpperCase();
-  }
-  
-  // 5. No match found - return original (will likely be marked incorrect)
+  // 4. No match found - return original (will likely be marked incorrect)
+  // NOTE: Removed dangerous first-char fallback that misinterpreted words like "Bones" as "B"
   console.warn(`❌ Could not normalize answer: "${trimmed}" - returning as-is`);
   return trimmed;
 };
@@ -176,6 +171,18 @@ Deno.serve(async (req) => {
     // Diagnostic: warn if options are missing for MCQ
     if (questionType === 'multiple_choice' && (!options || options.length === 0)) {
       console.warn(`⚠️ No options array found for MCQ grading. Question ID: ${questionId}. This may cause grading issues.`);
+    }
+
+    // Guard: reject MCQ grading if correctAnswer is empty (prevents all-wrong bug)
+    if (questionType === 'multiple_choice' && (!correctAnswer || correctAnswer.trim() === '')) {
+      console.error(`🚫 Empty correctAnswer for MCQ question ${questionId} — cannot grade`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Question has no correct answer configured. Please notify your instructor.',
+          code: 'MISSING_CORRECT_ANSWER'
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Normalize both answers for comparison (pass options for text matching)
