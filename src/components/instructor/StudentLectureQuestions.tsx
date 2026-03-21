@@ -109,8 +109,8 @@ export function StudentLectureQuestions({ instructorId }: { instructorId: string
   const handleReply = async (questionId: string) => {
     if (!replyText.trim()) return;
     setSubmitting(true);
-    const { error } = await supabase
-      .from('student_lecture_questions')
+    const { error } = await (supabase
+      .from('student_lecture_questions' as any) as any)
       .update({
         instructor_reply: replyText.trim(),
         replied_at: new Date().toISOString(),
