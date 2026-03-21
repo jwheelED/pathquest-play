@@ -3,6 +3,7 @@ import { useRef, useCallback, useState } from 'react';
 export interface PassiveQuestionCandidate {
   text: string;
   detectedAt: number;
+  id: string;
 }
 
 interface UsePassiveQuestionDetectionOptions {
@@ -106,17 +107,10 @@ const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
 
-/**
- * Extracts question segments from a transcript utterance.
- * Handles normal sentence punctuation and edge cases where text contains `?`
- * but doesn't strictly end with it.
- */
 function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized.includes('?') && !normalized.includes('？')) return [];
 
-  // Split on sentence-ending punctuation (period, exclamation, semicolon, colon)
-  // but NOT commas or question marks — so only the question sentence survives
   const sentences = normalized.split(/[.!;:]\s+/);
 
   const questions: string[] = [];
@@ -124,7 +118,6 @@ function extractQuestions(text: string): string[] {
     const trimmed = sentence.trim();
     if (!trimmed) continue;
     if (trimmed.includes('?') || trimmed.includes('？')) {
-      // Extract question-mark-terminated segments within this sentence
       const matches = trimmed.match(/[^?？]*[?？]/g);
       if (matches) {
         questions.push(...matches.map(s => s.trim()).filter(Boolean));
@@ -138,30 +131,23 @@ function extractQuestions(text: string): string[] {
 }
 
 function isRhetorical(question: string): boolean {
-  // Strip trailing ? and normalize
   const normalized = question
     .replace(/[?？]+$/, '')
     .trim()
     .toLowerCase();
 
-  // Check greeting patterns FIRST — these override WH-question bypass
-  // e.g. "How's everyone doing today?" starts with "how" but is a greeting
   for (const pattern of GREETING_PATTERNS) {
     if (pattern.test(normalized)) return true;
   }
 
-  // Check blocklist BEFORE WH bypass so rhetorical WH-questions are caught
-  // e.g. "What do you think?" or "How about that?" must not pass through
   for (const phrase of RHETORICAL_BLOCKLIST) {
     if (normalized === phrase) return true;
-    // Also check if the question is just filler + these phrases
     const stripped = normalized
       .replace(/^(so|and|but|well|now|or|um|uh|like)\s+/i, '')
       .trim();
     if (stripped === phrase) return true;
   }
 
-  // Substantive WH-questions should not be blocked (after greeting and blocklist checks)
   if (/^(what|how|why|when|where|who|which)\b/.test(normalized)) {
     return false;
   }
@@ -172,6 +158,8 @@ function isRhetorical(question: string): boolean {
 function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
+
+let candidateIdCounter = 0;
 
 export function usePassiveQuestionDetection(options: UsePassiveQuestionDetectionOptions = {}) {
   const {
@@ -186,6 +174,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const lastDetectionTimeRef = useRef<number>(0);
   const lastQuestionSentTimeRef = useRef<number>(lastQuestionSentTime);
   const [candidate, setCandidate] = useState<PassiveQuestionCandidate | null>(null);
+  const [candidateHistory, setCandidateHistory] = useState<PassiveQuestionCandidate[]>([]);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep ref in sync with prop to avoid stale closures
@@ -203,9 +192,10 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     setCandidate(null);
   }, [clearAutoDismiss]);
 
-  /**
-   * Process a final transcript utterance. Call this for every `is_final` chunk.
-   */
+  const removeFromHistory = useCallback((id: string) => {
+    setCandidateHistory(prev => prev.filter(c => c.id !== id));
+  }, []);
+
   const checkUtterance = useCallback((text: string) => {
     if (!enabled || !text) return;
 
@@ -213,13 +203,11 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
     if (debug) console.log('🔍 [passive] checking utterance:', text.substring(0, 80));
 
-    // Respect cooldown
     if (now - lastDetectionTimeRef.current < cooldownMs) {
       if (debug) console.log('🔍 [passive] skipped — cooldown active');
       return;
     }
 
-    // Skip if a question was just sent recently (any method) — use ref for fresh value
     const recentSentTime = lastQuestionSentTimeRef.current;
     if (recentSentTime && now - recentSentTime < cooldownMs) {
       if (debug) console.log('🔍 [passive] skipped — recent question sent');
@@ -230,7 +218,6 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     if (debug) console.log('🔍 [passive] extracted questions:', questions);
     if (questions.length === 0) return;
 
-    // Find the first substantive question
     for (const q of questions) {
       const wc = wordCount(q);
       if (wc < minWordCount) {
@@ -242,26 +229,37 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         continue;
       }
 
-      // We have a candidate!
       console.log('🔍 Passive question detected:', q);
       lastDetectionTimeRef.current = now;
 
-      // Clear any existing auto-dismiss
       clearAutoDismiss();
 
-      const newCandidate: PassiveQuestionCandidate = { text: q, detectedAt: now };
-      setCandidate(newCandidate);
+      const newCandidate: PassiveQuestionCandidate = {
+        text: q,
+        detectedAt: now,
+        id: `pq-${++candidateIdCounter}`,
+      };
 
-      // Auto-dismiss after timeout
+      // Move current candidate to history before replacing
+      setCandidate(current => {
+        if (current) {
+          setCandidateHistory(prev => [current, ...prev]);
+        }
+        return newCandidate;
+      });
+
       autoDismissTimerRef.current = setTimeout(() => {
         setCandidate(current => {
-          // Only dismiss if it's the same candidate
-          if (current?.detectedAt === now) return null;
+          if (current?.detectedAt === now) {
+            // Move to history instead of discarding
+            setCandidateHistory(prev => [current, ...prev]);
+            return null;
+          }
           return current;
         });
       }, autoDismissMs);
 
-      return; // Only surface one candidate per utterance
+      return;
     }
   }, [enabled, cooldownMs, minWordCount, autoDismissMs, clearAutoDismiss, debug]);
 
@@ -269,12 +267,15 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     lastDetectionTimeRef.current = 0;
     clearAutoDismiss();
     setCandidate(null);
+    setCandidateHistory([]);
   }, [clearAutoDismiss]);
 
   return {
     candidate,
+    candidateHistory,
     checkUtterance,
     dismissCandidate,
+    removeFromHistory,
     resetDetection,
   };
 }

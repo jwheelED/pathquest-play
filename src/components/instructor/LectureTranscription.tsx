@@ -204,8 +204,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    candidateHistory: passiveCandidateHistory,
     checkUtterance: checkPassiveQuestion,
     dismissCandidate: dismissPassiveCandidate,
+    removeFromHistory: removePassiveFromHistory,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
@@ -3716,6 +3718,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         <div className="mt-4">
           <QuestionOnDeck
             candidate={passiveCandidate}
+            candidateHistory={passiveCandidateHistory}
             isListening={isRecording}
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
@@ -3751,6 +3754,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               setIsPreviewOpen(true);
             }}
             onDismiss={dismissPassiveCandidate}
+            onRemoveFromHistory={removePassiveFromHistory}
           />
         </div>
       )}
