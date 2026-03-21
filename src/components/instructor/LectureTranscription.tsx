@@ -3718,6 +3718,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         <div className="mt-4">
           <QuestionOnDeck
             candidate={passiveCandidate}
+            candidateHistory={passiveCandidateHistory}
             isListening={isRecording}
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
