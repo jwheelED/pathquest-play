@@ -204,8 +204,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    candidateHistory: passiveCandidateHistory,
     checkUtterance: checkPassiveQuestion,
     dismissCandidate: dismissPassiveCandidate,
+    removeFromHistory: removePassiveFromHistory,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
