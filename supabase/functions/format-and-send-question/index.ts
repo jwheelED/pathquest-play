@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -764,14 +764,22 @@ serve(async (req) => {
       } else if (options && Array.isArray(options) && options.length === 4 && correct_answer) {
         // Use pre-generated options from preview dialog (allows instructor editing)
         console.log("📝 Using pre-generated MCQ options from preview dialog");
+        // Normalize options to have letter prefixes so student UI grades correctly
+        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        const normalizedOptions = options.map((opt: string, i: number) => {
+          const trimmed = opt.trim();
+          // Already has a letter prefix like "A. text" or "A) text"
+          if (/^[A-D][\).\-\s]/i.test(trimmed)) return trimmed;
+          return `${MCQ_LETTERS[i]}. ${trimmed}`;
+        });
         formattedQuestion = {
           question: question_text,
           type: "multiple_choice",
-          options: options,
+          options: normalizedOptions,
           correctAnswer: correct_answer,
           explanation: explanation || "",
           source: "preview_edited",
-          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
+          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade",
         };
       } else {
         // Fallback: generate with AI

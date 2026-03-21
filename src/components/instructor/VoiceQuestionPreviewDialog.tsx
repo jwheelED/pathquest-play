@@ -156,6 +156,7 @@ export function VoiceQuestionPreviewDialog({
       const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -191,6 +192,7 @@ export function VoiceQuestionPreviewDialog({
       const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -223,10 +225,11 @@ export function VoiceQuestionPreviewDialog({
     setIsGeneratingOptions(true);
     try {
       console.log('🔄 Auto-generating MCQ options for:', questionText.substring(0, 50));
-      
+
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -277,6 +280,7 @@ export function VoiceQuestionPreviewDialog({
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 

@@ -62,6 +62,31 @@ const RHETORICAL_BLOCKLIST = [
   "can everyone see",
   "can you hear me",
   "can everyone hear me",
+  // Rhetorical WH-questions (checked before the WH bypass)
+  'what do you think',
+  'what do you guys think',
+  'what do you all think',
+  'what do you say',
+  'what say you',
+  'how about that',
+  'how does that sound',
+  'how about',
+  'how so',
+  'where were we',
+  'where was i',
+  'who knows',
+  'who can tell me',
+  'who would have thought',
+  'what just happened',
+  'what about that',
+  'what about it',
+  'what would you do',
+  'what would you say',
+  'how are we doing',
+  'how are you doing',
+  'how is everyone doing',
+  'how is everybody doing',
+  'how are we looking',
 ];
 
 // Greeting patterns that should never be treated as audience checks
@@ -125,12 +150,8 @@ function isRhetorical(question: string): boolean {
     if (pattern.test(normalized)) return true;
   }
 
-  // Substantive WH-questions should not be blocked (after greeting check)
-  if (/^(what|how|why|when|where|who|which)\b/.test(normalized)) {
-    return false;
-  }
-
-  // Direct match against blocklist
+  // Check blocklist BEFORE WH bypass so rhetorical WH-questions are caught
+  // e.g. "What do you think?" or "How about that?" must not pass through
   for (const phrase of RHETORICAL_BLOCKLIST) {
     if (normalized === phrase) return true;
     // Also check if the question is just filler + these phrases
@@ -138,6 +159,11 @@ function isRhetorical(question: string): boolean {
       .replace(/^(so|and|but|well|now|or|um|uh|like)\s+/i, '')
       .trim();
     if (stripped === phrase) return true;
+  }
+
+  // Substantive WH-questions should not be blocked (after greeting and blocklist checks)
+  if (/^(what|how|why|when|where|who|which)\b/.test(normalized)) {
+    return false;
   }
 
   return false;

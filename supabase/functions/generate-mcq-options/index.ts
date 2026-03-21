@@ -46,7 +46,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text } = await req.json();
+    const { question_text, source_transcript } = await req.json();
 
     if (!question_text || question_text.trim() === '') {
       return new Response(
@@ -77,7 +77,7 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `Generate 4 multiple choice options for this question:\n\n${question_text}`
+            content: `${source_transcript ? `Lecture context (use this to ground the options):\n"${source_transcript.slice(-800)}"\n\n` : ''}Generate 4 multiple choice options for this question:\n\n${question_text}\n\nIMPORTANT: Format each option as "A. text", "B. text", "C. text", "D. text". Base all options on the lecture context above, not general knowledge.`
           }
         ],
         tools: [
