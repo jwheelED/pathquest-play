@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Monitor, Presentation, Users, ExternalLink } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { toast } from "sonner";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
@@ -40,46 +38,46 @@ export function LiveSessionStrip({ activeSession, participantCount }: LiveSessio
   const isLive = !!activeSession?.is_active;
 
   return (
-    <div className="command-card p-4 lg:p-5">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className="command-card px-4 py-3 lg:px-5 lg:py-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
         {/* Left: Session info */}
         <div className="flex-1 min-w-0">
           {/* Eyebrow + Status */}
-          <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-charcoal-subtle">
               Current Session
             </span>
             {isLive && (
-              <span className="live-badge inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              <span className="live-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1 h-1 bg-emerald-500 rounded-full" />
                 LIVE
               </span>
             )}
           </div>
 
-          {/* Title */}
-          <h2 className="text-lg font-semibold text-charcoal truncate mb-2">
-            {sessionTitle}
-          </h2>
-
-          {/* Metadata row */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-charcoal-subtle text-xs">Join code</span>
-              <code className="font-semibold text-charcoal bg-slate-50 px-2 py-0.5 rounded text-sm tracking-widest border border-slate-100">
-                {joinCode}
-              </code>
-            </div>
-            <div className="flex items-center gap-1.5 text-charcoal-muted">
-              <Users className="w-3.5 h-3.5 text-charcoal-subtle" />
-              <span>{participantCount} participant{participantCount !== 1 ? "s" : ""} joined</span>
+          {/* Title + metadata inline */}
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h2 className="text-base font-semibold text-charcoal truncate">
+              {sessionTitle}
+            </h2>
+            <div className="flex items-center gap-3 text-xs text-charcoal-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="text-charcoal-subtle">Code:</span>
+                <code className="font-semibold text-charcoal bg-slate-50 px-1.5 py-0.5 rounded text-xs tracking-wider border border-slate-100">
+                  {joinCode}
+                </code>
+              </span>
+              <span className="flex items-center gap-1">
+                <Users className="w-3 h-3 text-charcoal-subtle" />
+                {participantCount} joined
+              </span>
             </div>
           </div>
 
           {/* Support line */}
-          <p className="text-xs text-charcoal-subtle mt-2 flex items-center gap-1.5">
-            <ExternalLink className="w-3 h-3" />
-            Students can join at <span className="font-medium text-charcoal-muted">edvana.dev/join</span>
+          <p className="text-[11px] text-charcoal-subtle mt-1 flex items-center gap-1">
+            <ExternalLink className="w-2.5 h-2.5" />
+            Students join at <span className="font-medium">edvana.dev/join</span>
           </p>
         </div>
 
@@ -90,16 +88,16 @@ export function LiveSessionStrip({ activeSession, participantCount }: LiveSessio
             size="sm"
             onClick={handleCopyCode}
             className={cn(
-              "rounded-full h-9 px-4 gap-2 text-sm font-medium",
+              "rounded-full h-8 px-3 gap-1.5 text-xs font-medium",
               "border-slate-200 text-charcoal hover:bg-slate-50 hover:border-slate-300"
             )}
           >
             {codeCopied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <Check className="w-3 h-3 text-emerald-600" />
             ) : (
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className="w-3 h-3" />
             )}
-            Copy Join Code
+            Copy Code
           </Button>
 
           <Button
@@ -107,12 +105,12 @@ export function LiveSessionStrip({ activeSession, participantCount }: LiveSessio
             size="sm"
             onClick={() => navigate("/instructor/presenter")}
             className={cn(
-              "rounded-full h-9 px-4 gap-2 text-sm font-medium",
+              "rounded-full h-8 px-3 gap-1.5 text-xs font-medium",
               "border-slate-200 text-charcoal hover:bg-slate-50 hover:border-slate-300"
             )}
           >
-            <Monitor className="w-3.5 h-3.5" />
-            Presenter View
+            <Monitor className="w-3 h-3" />
+            <span className="hidden sm:inline">Presenter</span>
           </Button>
 
           <Button
@@ -120,12 +118,12 @@ export function LiveSessionStrip({ activeSession, participantCount }: LiveSessio
             size="sm"
             onClick={() => navigate("/instructor/slides")}
             className={cn(
-              "rounded-full h-9 px-4 gap-2 text-sm font-medium",
+              "rounded-full h-8 px-3 gap-1.5 text-xs font-medium",
               "border-slate-200 text-charcoal hover:bg-slate-50 hover:border-slate-300"
             )}
           >
-            <Presentation className="w-3.5 h-3.5" />
-            Present Slides
+            <Presentation className="w-3 h-3" />
+            <span className="hidden sm:inline">Slides</span>
           </Button>
         </div>
       </div>

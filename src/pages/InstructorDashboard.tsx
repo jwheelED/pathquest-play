@@ -40,6 +40,10 @@ import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
 import { LiveSessionStrip } from "@/components/instructor/LiveSessionStrip";
 import { LiveCopilotHero } from "@/components/instructor/LiveCopilotHero";
 import { HowItWorksSection } from "@/components/instructor/HowItWorksSection";
+import { SessionReadiness } from "@/components/instructor/SessionReadiness";
+import { LastLiveSignal } from "@/components/instructor/LastLiveSignal";
+import { LiveToolsSection } from "@/components/instructor/LiveToolsSection";
+import { LiveResponsesEmpty } from "@/components/instructor/LiveResponsesEmpty";
 
 interface Student {
   id: string;
@@ -80,6 +84,8 @@ export default function InstructorDashboard() {
   const [isListening, setIsListening] = useState(false);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
+  const [micConnected, setMicConnected] = useState(true);
+  const [hasCheckIns, setHasCheckIns] = useState(false);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
@@ -541,27 +547,44 @@ export default function InstructorDashboard() {
               />
             </section>
 
-            {/* ===== HOW IT WORKS: Educational section ===== */}
+            {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
             {!isListening && (
               <section>
                 <HowItWorksSection />
               </section>
             )}
 
-            {/* ===== LIVE RESULTS: Show when session active ===== */}
-            {activeSession?.id && (
-              <section className="space-y-6">
+            {/* ===== SESSION READINESS: Pre-flight indicators ===== */}
+            <section>
+              <SessionReadiness
+                isLive={!!activeSession?.is_active}
+                micConnected={micConnected}
+                participantCount={participantCount}
+                autoQuestionEnabled={autoQuestionEnabled}
+              />
+            </section>
+
+            {/* ===== LAST LIVE SIGNAL + TOOLS: Side by side on desktop ===== */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
+              <div className="command-card p-5">
+                <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              </div>
+            </section>
+
+            {/* ===== LIVE RESPONSES: Show results or empty state ===== */}
+            {activeSession?.id && hasCheckIns ? (
+              <section>
                 <LiveSessionResults sessionId={activeSession.id} />
+              </section>
+            ) : (
+              <section>
+                <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
               </section>
             )}
 
-            {/* ===== CHECK-IN RESULTS: Recent check-ins ===== */}
-            <section>
-              <LectureCheckInResults />
-            </section>
-
-            {/* ===== PAST SESSIONS: Lower priority ===== */}
-            <section className="pt-4 border-t border-slate-100">
+            {/* ===== PAST SESSIONS: Lower priority (border separator) ===== */}
+            <section className="pt-6 border-t border-slate-100">
               <PastLiveSessions />
             </section>
           </div>

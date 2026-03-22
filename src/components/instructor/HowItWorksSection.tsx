@@ -61,17 +61,19 @@ const colorClasses = {
 
 export function HowItWorksSection() {
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Section header */}
       <div>
-        <span className="section-eyebrow opacity-70">How It Works In Session</span>
-        <h2 className="text-lg font-semibold text-charcoal mt-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-charcoal-subtle/70">
+          How It Works In Session
+        </span>
+        <h2 className="text-base font-semibold text-charcoal mt-1.5">
           From speaking to room signal in four steps
         </h2>
       </div>
 
       {/* Steps grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {steps.map((step) => {
           const Icon = step.icon;
           const colors = colorClasses[step.color as keyof typeof colorClasses];
@@ -79,19 +81,19 @@ export function HowItWorksSection() {
           return (
             <div
               key={step.number}
-              className="signal-card p-5 relative"
+              className="signal-card p-4 relative"
             >
               {/* Step number + icon */}
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-2.5 mb-2.5">
                 <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center border",
+                  "w-7 h-7 rounded-lg flex items-center justify-center border",
                   colors.bg,
                   colors.border
                 )}>
-                  <Icon className={cn("w-4 h-4", colors.icon)} />
+                  <Icon className={cn("w-3.5 h-3.5", colors.icon)} />
                 </div>
                 <span className={cn(
-                  "text-xs font-semibold uppercase tracking-wide",
+                  "text-[10px] font-semibold uppercase tracking-wide",
                   colors.number
                 )}>
                   Step {step.number}
@@ -99,7 +101,7 @@ export function HowItWorksSection() {
               </div>
 
               {/* Title */}
-              <h3 className="text-sm font-semibold text-charcoal mb-1.5">
+              <h3 className="text-sm font-semibold text-charcoal mb-1">
                 {step.title}
               </h3>
 
@@ -107,11 +109,6 @@ export function HowItWorksSection() {
               <p className="text-xs text-charcoal-muted leading-relaxed">
                 {step.description}
               </p>
-
-              {/* Connector line (hidden on mobile and last item) */}
-              {step.number < 4 && (
-                <div className="hidden lg:block absolute top-1/2 -right-2 w-4 h-px bg-slate-200" />
-              )}
             </div>
           );
         })}

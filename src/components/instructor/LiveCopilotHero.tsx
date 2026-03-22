@@ -21,10 +21,18 @@ export function LiveCopilotHero({
   return (
     <div className="command-hero p-6 lg:p-8">
       {/* Eyebrow */}
-      <span className="section-eyebrow">Live Copilot</span>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="section-eyebrow">Live Copilot</span>
+        {isListening && (
+          <span className="live-badge inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+            LISTENING
+          </span>
+        )}
+      </div>
 
       {/* Headline */}
-      <h1 className="text-2xl lg:text-[1.75rem] font-semibold text-charcoal tracking-tight mt-2 mb-3">
+      <h1 className="text-2xl lg:text-[1.75rem] font-semibold text-charcoal tracking-tight mb-3">
         {isListening 
           ? "Listening to your lecture..." 
           : "Ready to listen for your next live question"
@@ -40,13 +48,13 @@ export function LiveCopilotHero({
       </p>
 
       {/* Actions row */}
-      <div className="flex flex-wrap items-center gap-4 mb-5">
+      <div className="flex flex-wrap items-center gap-4 mb-4">
         {/* Primary CTA */}
         {isListening ? (
           <Button
             onClick={onStopListening}
             className={cn(
-              "rounded-full px-6 h-12 gap-2.5 font-medium text-base",
+              "rounded-full px-7 h-12 gap-2.5 font-medium text-base",
               "bg-rose-600 hover:bg-rose-700 text-white shadow-sm",
               "transition-all duration-200 hover:shadow-md"
             )}
@@ -61,7 +69,7 @@ export function LiveCopilotHero({
           <Button
             onClick={onStartListening}
             className={cn(
-              "rounded-full px-6 h-12 gap-2.5 font-medium text-base",
+              "rounded-full px-7 h-12 gap-2.5 font-medium text-base",
               "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm",
               "transition-all duration-200 hover:shadow-md"
             )}
@@ -72,7 +80,7 @@ export function LiveCopilotHero({
         )}
 
         {/* Auto-question toggle */}
-        <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-full border border-slate-100">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-full border border-slate-100">
           <Sparkles className="w-4 h-4 text-charcoal-subtle" />
           <span className="text-sm font-medium text-charcoal">Auto-question mode</span>
           <Switch
@@ -92,14 +100,14 @@ export function LiveCopilotHero({
       {isListening && (
         <div className="mt-6 pt-5 border-t border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              {[...Array(4)].map((_, i) => (
+            <div className="flex items-center gap-1">
+              {[...Array(5)].map((_, i) => (
                 <div
                   key={i}
-                  className="w-1 bg-emerald-500 rounded-full animate-pulse"
+                  className="w-1 bg-emerald-500 rounded-full"
                   style={{
-                    height: `${12 + Math.random() * 12}px`,
-                    animationDelay: `${i * 0.15}s`,
+                    height: `${10 + Math.sin(i * 0.8) * 8 + 6}px`,
+                    animation: `pulse 1s ease-in-out ${i * 0.1}s infinite`,
                   }}
                 />
               ))}
