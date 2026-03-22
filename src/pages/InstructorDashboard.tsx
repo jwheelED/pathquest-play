@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library, Settings, Award } from "lucide-react";
 import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
-import { SessionReadyModule } from "@/components/instructor/SessionReadyModule";
+import { CommandStripHero } from "@/components/instructor/CommandStripHero";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { LastSessionSummary } from "@/components/instructor/LastSessionSummary";
-import { QuickMetricsGrid } from "@/components/instructor/QuickMetricsGrid";
+import { LiveStatusSection } from "@/components/instructor/LiveStatusSection";
+import { LastSessionCard } from "@/components/instructor/LastSessionCard";
+import { LiveUnderstandingHealth } from "@/components/instructor/LiveUnderstandingHealth";
 import { CheckInPreview } from "@/components/instructor/CheckInPreview";
 import { RecentSessionsTable } from "@/components/instructor/RecentSessionsTable";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
@@ -428,22 +429,33 @@ export default function InstructorDashboard() {
     switch (activeTab) {
       case "overview":
         return (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <PendingOrgInvites />
-            <SessionReadyModule
+            
+            {/* Command Strip Hero */}
+            <CommandStripHero
               activeSession={activeSession}
               onStartLive={() => setActiveTab("live")}
               onPresentSlides={() => navigate("/instructor/slides")}
             />
+            
+            {/* Live Status + Last Session Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-              <QuickMetricsGrid />
+              <LiveStatusSection 
+                onStartLive={() => setActiveTab("live")}
+                onViewSummary={() => setActiveTab("summaries")}
+              />
+              <LastSessionCard onNavigate={(tab) => setActiveTab(tab as TabValue)} />
             </div>
+            
+            {/* Live Understanding Health */}
+            <LiveUnderstandingHealth />
+            
+            {/* Check-in Preview (shows when session active) */}
             <CheckInPreview
               activeSessionId={activeSession?.id}
               onNavigate={(tab) => setActiveTab(tab as TabValue)}
             />
-            <RecentSessionsTable onNavigate={(tab) => setActiveTab(tab as TabValue)} />
           </div>
         );
 
