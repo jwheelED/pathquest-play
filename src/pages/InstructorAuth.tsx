@@ -319,14 +319,14 @@ export default function InstructorAuth() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12" style={{ background: 'hsl(210, 20%, 98%)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12 mastery-bg">
       {/* Ambient glow */}
-      <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.05] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 84%, 42%), transparent 70%)' }} />
-      <div className="absolute bottom-[-10%] right-[20%] w-[400px] h-[400px] rounded-full opacity-[0.035] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(199, 89%, 60%), transparent 70%)' }} />
+      <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
+      <div className="absolute bottom-[-10%] right-[20%] w-[400px] h-[400px] rounded-full opacity-[0.03] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 45%, 55%), transparent 70%)' }} />
 
       <div className="relative z-10 w-full max-w-[400px]">
         {/* Card */}
-        <div className="bg-card rounded-2xl border border-border/50 shadow-[0_1px_3px_0_hsl(220_25%_15%/0.04),0_8px_28px_-6px_hsl(220_25%_15%/0.06)] px-7 py-9 sm:px-9 sm:py-10">
+        <div className="command-card px-7 py-9 sm:px-9 sm:py-10">
           {/* Header */}
           <div className="text-center space-y-1.5 mb-7">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
