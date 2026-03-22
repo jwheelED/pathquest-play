@@ -135,7 +135,7 @@ export function LiveUnderstandingHealth() {
       {/* Section header */}
       <div>
         <span className="section-eyebrow">Live Understanding Health</span>
-        <h2 className="section-headline mt-1">
+        <h2 className="section-headline mt-1.5">
           Your recent room signal at a glance
         </h2>
       </div>
@@ -144,57 +144,57 @@ export function LiveUnderstandingHealth() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Card 1: Latest response rate */}
         <div className="signal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-4 h-4 text-charcoal-subtle" />
-            <span className="text-xs font-medium text-charcoal-muted">Latest response rate</span>
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Users className="w-3.5 h-3.5 text-charcoal-subtle" />
+            <span className="text-[11px] font-medium text-charcoal-muted uppercase tracking-wide">Response rate</span>
           </div>
           <p className="text-2xl font-semibold text-charcoal mb-1">
             {metrics?.latestResponseRate ?? 0}%
           </p>
-          <p className="text-xs text-charcoal-subtle">
-            From your most recent live check-in
+          <p className="text-[11px] text-charcoal-subtle leading-relaxed">
+            From your most recent check-in
           </p>
         </div>
         
         {/* Card 2: Participation trend */}
         <div className="signal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-charcoal-subtle" />
-            <span className="text-xs font-medium text-charcoal-muted">Participation trend</span>
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <TrendingUp className="w-3.5 h-3.5 text-charcoal-subtle" />
+            <span className="text-[11px] font-medium text-charcoal-muted uppercase tracking-wide">Participation</span>
           </div>
           <p className="text-2xl font-semibold text-charcoal mb-1">
             {getTrendLabel(metrics?.participationTrend ?? "steady")}
           </p>
-          <p className="text-xs text-charcoal-subtle">
-            Compared with your previous session
+          <p className="text-[11px] text-charcoal-subtle leading-relaxed">
+            Compared with previous session
           </p>
         </div>
         
         {/* Card 3: Understanding signal */}
         <div className="signal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Brain className="w-4 h-4 text-charcoal-subtle" />
-            <span className="text-xs font-medium text-charcoal-muted">Recent understanding signal</span>
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Brain className="w-3.5 h-3.5 text-charcoal-subtle" />
+            <span className="text-[11px] font-medium text-charcoal-muted uppercase tracking-wide">Understanding</span>
           </div>
-          <p className={`text-lg font-semibold mb-1 ${getSignalColor(metrics?.understandingSignal ?? "moderate")}`}>
+          <p className={`text-base font-semibold mb-1 leading-tight ${getSignalColor(metrics?.understandingSignal ?? "moderate")}`}>
             {getSignalLabel(metrics?.understandingSignal ?? "moderate")}
           </p>
-          <p className="text-xs text-charcoal-subtle">
-            Based on your latest session responses
+          <p className="text-[11px] text-charcoal-subtle leading-relaxed">
+            Based on latest session responses
           </p>
         </div>
         
         {/* Card 4: Session consistency */}
         <div className="signal-card p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-charcoal-subtle" />
-            <span className="text-xs font-medium text-charcoal-muted">Session consistency</span>
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Calendar className="w-3.5 h-3.5 text-charcoal-subtle" />
+            <span className="text-[11px] font-medium text-charcoal-muted uppercase tracking-wide">Consistency</span>
           </div>
           <p className="text-2xl font-semibold text-charcoal mb-1">
-            {metrics?.sessionsRun ?? 0} sessions
+            {metrics?.sessionsRun ?? 0}
           </p>
-          <p className="text-xs text-charcoal-subtle">
-            Live usage across recent teaching sessions
+          <p className="text-[11px] text-charcoal-subtle leading-relaxed">
+            Sessions run recently
           </p>
         </div>
       </div>

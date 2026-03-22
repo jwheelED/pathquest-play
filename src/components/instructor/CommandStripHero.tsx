@@ -54,7 +54,7 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides }
     <div className="command-hero overflow-hidden">
       <div className="p-6 lg:p-8">
         {/* Eyebrow */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-3">
           <span className="section-eyebrow">Current Session</span>
           {isLive && (
             <span className="live-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -65,31 +65,30 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides }
         </div>
 
         {/* Title */}
-        <h1 className="text-2xl lg:text-3xl font-semibold text-charcoal tracking-tight mb-3">
+        <h1 className="text-2xl lg:text-[1.75rem] font-semibold text-charcoal tracking-tight mb-4">
           {selectedCourse.title}
         </h1>
 
         {/* Supporting metadata */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-charcoal-muted mb-5">
-          <div className="flex items-center gap-2">
-            <span className="text-charcoal-subtle">Join code:</span>
-            <code className="font-semibold text-charcoal bg-slate-50 px-2 py-0.5 rounded text-base tracking-wider border border-slate-100">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-charcoal-muted mb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-charcoal-subtle text-xs uppercase tracking-wide font-medium">Join code</span>
+            <code className="font-semibold text-charcoal bg-slate-50 px-2.5 py-1 rounded-lg text-base tracking-widest border border-slate-100">
               {selectedCourse.course_code}
             </code>
             <button
               onClick={handleCopy}
-              className="inline-flex items-center gap-1 text-xs text-charcoal-muted hover:text-charcoal transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-charcoal-muted hover:text-charcoal transition-colors p-1 -m-1 rounded"
             >
               {codeCopied ? (
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <Check className="w-4 h-4 text-emerald-600" />
               ) : (
-                <Copy className="w-3.5 h-3.5" />
+                <Copy className="w-4 h-4" />
               )}
-              <span className="sr-only md:not-sr-only">{codeCopied ? "Copied" : "Copy"}</span>
             </button>
           </div>
           {studentCount !== null && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 text-charcoal-muted">
               <Users className="w-4 h-4 text-charcoal-subtle" />
               <span>{studentCount} participant{studentCount !== 1 ? "s" : ""}</span>
             </div>
@@ -97,7 +96,7 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides }
         </div>
 
         {/* Support line */}
-        <p className="text-sm text-charcoal-subtle mb-6 max-w-xl">
+        <p className="text-sm text-charcoal-subtle mb-6 max-w-xl leading-relaxed">
           {isLive 
             ? "Your session is live. Students can join and respond to check-ins in real time."
             : "Your session is ready. Start live understanding when you are."
@@ -109,7 +108,7 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides }
           <Button 
             onClick={onStartLive} 
             className={cn(
-              "rounded-full px-6 h-11 gap-2 font-medium shadow-sm",
+              "rounded-full px-6 h-11 gap-2.5 font-medium shadow-sm",
               "bg-emerald-600 hover:bg-emerald-700 text-white",
               "transition-all duration-200 hover:shadow-md"
             )}
