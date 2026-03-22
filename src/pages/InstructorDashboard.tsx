@@ -13,8 +13,10 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { LiveStatusSection } from "@/components/instructor/LiveStatusSection";
 import { LastSessionCard } from "@/components/instructor/LastSessionCard";
 import { LiveUnderstandingHealth } from "@/components/instructor/LiveUnderstandingHealth";
+import { RecentUnderstandingPatterns } from "@/components/instructor/RecentUnderstandingPatterns";
+import { RecentSessionsList } from "@/components/instructor/RecentSessionsList";
+import { AccountSnapshot } from "@/components/instructor/AccountSnapshot";
 import { CheckInPreview } from "@/components/instructor/CheckInPreview";
-import { RecentSessionsTable } from "@/components/instructor/RecentSessionsTable";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { StudentRosterPanel } from "@/components/instructor/StudentRosterPanel";
@@ -429,33 +431,59 @@ export default function InstructorDashboard() {
     switch (activeTab) {
       case "overview":
         return (
-          <div className="space-y-8">
+          <div className="space-y-10">
+            {/* Pending Invites - Top priority notification */}
             <PendingOrgInvites />
             
-            {/* Command Strip Hero */}
-            <CommandStripHero
-              activeSession={activeSession}
-              onStartLive={() => setActiveTab("live")}
-              onPresentSlides={() => navigate("/instructor/slides")}
-            />
+            {/* ===== PRIMARY SECTION: Command Strip Hero ===== */}
+            <section>
+              <CommandStripHero
+                activeSession={activeSession}
+                onStartLive={() => setActiveTab("live")}
+                onPresentSlides={() => navigate("/instructor/slides")}
+              />
+            </section>
             
-            {/* Live Status + Last Session Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* ===== SECONDARY SECTION: Live Status + Last Session ===== */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <LiveStatusSection 
                 onStartLive={() => setActiveTab("live")}
                 onViewSummary={() => setActiveTab("summaries")}
               />
               <LastSessionCard onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-            </div>
+            </section>
             
-            {/* Live Understanding Health */}
-            <LiveUnderstandingHealth />
+            {/* ===== TERTIARY SECTION: Live Understanding Health ===== */}
+            <section>
+              <LiveUnderstandingHealth />
+            </section>
             
-            {/* Check-in Preview (shows when session active) */}
+            {/* ===== TERTIARY SECTION: Recent Understanding Patterns ===== */}
+            <section>
+              <RecentUnderstandingPatterns 
+                onViewPatterns={() => setActiveTab("live")}
+              />
+            </section>
+            
+            {/* Check-in Preview (only shows when session active) */}
             <CheckInPreview
               activeSessionId={activeSession?.id}
               onNavigate={(tab) => setActiveTab(tab as TabValue)}
             />
+            
+            {/* ===== LOWER PRIORITY: Recent Sessions ===== */}
+            <section className="pt-2">
+              <RecentSessionsList onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+            </section>
+            
+            {/* ===== LOWEST PRIORITY: Account Snapshot + Quick Actions ===== */}
+            <section className="border-t border-slate-100 pt-8 mt-4">
+              <AccountSnapshot 
+                onNavigate={(tab) => setActiveTab(tab as TabValue)}
+                onStartLive={() => setActiveTab("live")}
+                onPresentSlides={() => navigate("/instructor/slides")}
+              />
+            </section>
           </div>
         );
 
