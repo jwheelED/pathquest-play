@@ -37,6 +37,9 @@ import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
+import { LiveSessionStrip } from "@/components/instructor/LiveSessionStrip";
+import { LiveCopilotHero } from "@/components/instructor/LiveCopilotHero";
+import { HowItWorksSection } from "@/components/instructor/HowItWorksSection";
 
 interface Student {
   id: string;
@@ -74,6 +77,9 @@ export default function InstructorDashboard() {
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
+  const [isListening, setIsListening] = useState(false);
+  const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
@@ -82,6 +88,32 @@ export default function InstructorDashboard() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Fetch participant count when active session changes
+  useEffect(() => {
+    if (!activeSession?.id) {
+      setParticipantCount(0);
+      return;
+    }
+
+    const fetchParticipantCount = async () => {
+      const { count, error } = await supabase
+        .from("live_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", activeSession.id);
+      
+      if (!error) {
+        setParticipantCount(count || 0);
+      }
+    };
+
+    fetchParticipantCount();
+    
+    // Poll every 5 seconds
+    const interval = setInterval(fetchParticipantCount, 5000);
+    
+    return () => clearInterval(interval);
+  }, [activeSession?.id]);
   
   // Refetch students when course changes
   useEffect(() => {
@@ -489,50 +521,49 @@ export default function InstructorDashboard() {
 
       case "live":
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* LiveSessionControls is rendered outside switch to persist - shown here */}
-              <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent h-fit">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Presentation className="h-5 w-5 text-primary" />
-                    Slide Presenter
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                    Present slides with integrated live lecture tools
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button 
-                    onClick={() => navigate('/instructor/slides')}
-                    className="w-full rounded-xl"
-                  >
-                    Open Slide Presenter
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+          <div className="space-y-8">
+            {/* ===== SESSION STRIP: Compact session info ===== */}
+            <section>
+              <LiveSessionStrip 
+                activeSession={activeSession}
+                participantCount={participantCount}
+              />
+            </section>
 
-            {/* LectureTranscription is now rendered outside tabs to persist recording */}
-            
-            {/* Live session responses - only shown when a live session is active */}
-            {activeSession?.id && (
-              <div className="min-w-0">
-                <LiveSessionResults sessionId={activeSession.id} />
-              </div>
+            {/* ===== LIVE COPILOT HERO: Main action center ===== */}
+            <section>
+              <LiveCopilotHero
+                isListening={isListening}
+                autoQuestionEnabled={autoQuestionEnabled}
+                onStartListening={() => setIsListening(true)}
+                onStopListening={() => setIsListening(false)}
+                onToggleAutoQuestion={setAutoQuestionEnabled}
+              />
+            </section>
+
+            {/* ===== HOW IT WORKS: Educational section ===== */}
+            {!isListening && (
+              <section>
+                <HowItWorksSection />
+              </section>
             )}
 
-            <div className="min-w-0">
+            {/* ===== LIVE RESULTS: Show when session active ===== */}
+            {activeSession?.id && (
+              <section className="space-y-6">
+                <LiveSessionResults sessionId={activeSession.id} />
+              </section>
+            )}
+
+            {/* ===== CHECK-IN RESULTS: Recent check-ins ===== */}
+            <section>
               <LectureCheckInResults />
-            </div>
+            </section>
 
-            <div className="min-w-0">
+            {/* ===== PAST SESSIONS: Lower priority ===== */}
+            <section className="pt-4 border-t border-slate-100">
               <PastLiveSessions />
-            </div>
-
-            <div className="min-w-0">
-              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
-            </div>
+            </section>
           </div>
         );
 
@@ -662,21 +693,19 @@ export default function InstructorDashboard() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-          {/* Always mount LiveSessionControls to persist session state across tabs */}
+          {/* LiveSessionControls - Hidden but persists session state */}
           {currentUser && (
-            <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <LiveSessionControls 
-                  onSessionChange={setLiveSessionId} 
-                  activeSession={activeSession}
-                  setActiveSession={setActiveSession}
-                />
-              </div>
+            <div className="hidden">
+              <LiveSessionControls 
+                onSessionChange={setLiveSessionId} 
+                activeSession={activeSession}
+                setActiveSession={setActiveSession}
+              />
             </div>
           )}
           
-          {/* Always mount LectureTranscription to persist recording across tabs */}
-          <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
+          {/* LectureTranscription - Hidden but persists recording state */}
+          <div className="hidden">
             <LectureTranscription onQuestionGenerated={() => {}} />
           </div>
           
