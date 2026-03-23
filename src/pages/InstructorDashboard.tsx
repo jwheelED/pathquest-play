@@ -96,6 +96,8 @@ export default function InstructorDashboard() {
   const onSendQuestionRef = useRef<((text: string) => void) | null>(null);
   const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
   const onDismissQuestionRef = useRef<(() => void) | null>(null);
+  const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
@@ -551,8 +553,8 @@ export default function InstructorDashboard() {
               <LiveCopilotHero
                 isListening={isListening}
                 autoQuestionEnabled={autoQuestionEnabled}
-                onStartListening={() => setIsListening(true)}
-                onStopListening={() => setIsListening(false)}
+                onStartListening={() => onStartRecordingRef.current?.()}
+                onStopListening={() => onStopRecordingRef.current?.()}
                 onToggleAutoQuestion={setAutoQuestionEnabled}
                 participantCount={participantCount}
                 transcriptChunks={transcriptChunks}
@@ -747,7 +749,7 @@ export default function InstructorDashboard() {
           
           {/* LectureTranscription - Hidden but persists recording state & exposes callbacks */}
           <div className="hidden">
-            <LectureTranscription 
+            <LectureTranscription
               onQuestionGenerated={() => {}}
               onRecordingChange={setIsListening}
               onTranscriptChange={(chunks, current) => {
@@ -759,6 +761,8 @@ export default function InstructorDashboard() {
               onSendQuestionRef={onSendQuestionRef}
               onPreviewQuestionRef={onPreviewQuestionRef}
               onDismissQuestionRef={onDismissQuestionRef}
+              onStartRecordingRef={onStartRecordingRef}
+              onStopRecordingRef={onStopRecordingRef}
             />
           </div>
           

@@ -75,6 +75,8 @@ interface LectureTranscriptionProps {
   onSendQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
   onDismissQuestionRef?: React.MutableRefObject<(() => void) | null>;
+  onStartRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  onStopRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
 
 // Constants for memory and resource management
@@ -100,6 +102,8 @@ export const LectureTranscription = ({
   onSendQuestionRef,
   onPreviewQuestionRef,
   onDismissQuestionRef,
+  onStartRecordingRef,
+  onStopRecordingRef,
 }: LectureTranscriptionProps) => {
   // Helper function to safely extract displayable text from question_text (string or object)
   const getQuestionPreview = (questionText: any, maxLength: number = 60): string => {
@@ -301,6 +305,19 @@ export const LectureTranscription = ({
       onDismissQuestionRef.current = dismissPassiveCandidate;
     }
   }, [dismissPassiveCandidate, onSendQuestionRef, onPreviewQuestionRef, onDismissQuestionRef]);
+
+  // Register start/stop recording refs so parent can trigger the mic.
+  // startRecording/stopRecording are plain functions (not useCallback) so we
+  // intentionally omit them from deps — the ref is just a stable pointer for
+  // the parent to call into, and we re-assign on every render harmlessly.
+  useEffect(() => {
+    if (onStartRecordingRef) {
+      onStartRecordingRef.current = startRecording;
+    }
+    if (onStopRecordingRef) {
+      onStopRecordingRef.current = stopRecording;
+    }
+  }); // no dep array — always keep ref current
   // ===== END EXTERNAL STATE SYNC =====
 
   // Presenter broadcast channel (for popup presenter view)
