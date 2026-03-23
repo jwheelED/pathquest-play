@@ -732,7 +732,7 @@ export default function InstructorDashboard() {
             <LectureTranscription onQuestionGenerated={() => {}} />
           </div>
           
-          {activeTab !== "live" && renderTabContent()}
+          {renderTabContent()}
         </main>
       </div>
 
