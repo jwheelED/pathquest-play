@@ -729,12 +729,12 @@ export default function InstructorDashboard() {
             </div>
           )}
           
+          {renderTabContent()}
+
           {/* LectureTranscription - Always mounted to persist recording, visible only on live tab */}
-          <div className={activeTab !== "live" ? "hidden" : ""}>
+          <div className={activeTab !== "live" ? "hidden" : "mt-8"}>
             <LectureTranscription onQuestionGenerated={() => {}} />
           </div>
-          
-          {renderTabContent()}
         </main>
       </div>
 
