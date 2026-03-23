@@ -7,7 +7,6 @@ import {
   Sparkles,
   Send,
   Eye,
-  X,
   Pause,
   Play,
   Pencil,
@@ -17,6 +16,7 @@ import {
   BarChart2,
   RefreshCw,
   ChevronRight,
+  ChevronLeft,
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -492,8 +492,11 @@ export function LiveCopilotHero({
   const [editText, setEditText] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [questionHistory, setQuestionHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
+  // Timer
   useEffect(() => {
     if (!isListening) {
       setElapsedSeconds(0);
@@ -503,15 +506,43 @@ export function LiveCopilotHero({
     return () => clearInterval(interval);
   }, [isListening]);
 
+  // Auto-scroll transcript
   useEffect(() => {
     if (transcriptEndRef.current && isListening) {
       transcriptEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [transcriptChunks, currentTranscript, isListening]);
 
+  // Accumulate question candidates into local history
+  useEffect(() => {
+    if (!questionCandidate?.text) return;
+    setQuestionHistory((prev) => {
+      if (prev.includes(questionCandidate.text)) return prev;
+      const next = [...prev, questionCandidate.text];
+      setHistoryIndex(next.length - 1);
+      return next;
+    });
+  }, [questionCandidate]);
+
+  // Reset history when listening stops
+  useEffect(() => {
+    if (!isListening) {
+      setQuestionHistory([]);
+      setHistoryIndex(-1);
+    }
+  }, [isListening]);
+
+  const displayedQuestion =
+    historyIndex >= 0 && questionHistory.length > 0
+      ? questionHistory[historyIndex]
+      : null;
+  const hasQuestion = displayedQuestion !== null;
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < questionHistory.length - 1;
+
   const handleStartEdit = () => {
-    if (questionCandidate) {
-      setEditText(questionCandidate.text);
+    if (displayedQuestion) {
+      setEditText(displayedQuestion);
       setIsEditingQuestion(true);
     }
   };
@@ -519,16 +550,33 @@ export function LiveCopilotHero({
   const handleSaveEdit = () => {
     setIsEditingQuestion(false);
     if (editText.trim() && onSendQuestion) {
+      // Replace current history entry with edited text
+      setQuestionHistory((prev) =>
+        prev.map((q, i) => (i === historyIndex ? editText.trim() : q))
+      );
       onSendQuestion(editText.trim());
     }
   };
 
-  const handleModalSend = (text: string, type: QuestionType) => {
+  const handleSendCurrent = () => {
+    if (!displayedQuestion || !onSendQuestion) return;
+    onSendQuestion(displayedQuestion);
+    // Remove sent item from history
+    setQuestionHistory((prev) => {
+      const next = prev.filter((_, i) => i !== historyIndex);
+      setHistoryIndex(Math.max(0, Math.min(historyIndex, next.length - 1)));
+      return next;
+    });
+    if (historyIndex === questionHistory.length - 1) {
+      onDismissQuestion?.();
+    }
+  };
+
+  const handleModalSend = (text: string, _type: QuestionType) => {
     setIsModalOpen(false);
     onSendQuestion?.(text);
   };
 
-  const hasQuestion = !!questionCandidate;
   const isSent = !!sentQuestion;
   const lastChunk =
     currentTranscript || transcriptChunks[transcriptChunks.length - 1] || null;
@@ -589,7 +637,7 @@ export function LiveCopilotHero({
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSend={handleModalSend}
-        initialText={questionCandidate?.text ?? ""}
+        initialText={displayedQuestion ?? ""}
         transcriptSource={lastChunk ?? undefined}
       />
 
@@ -639,7 +687,11 @@ export function LiveCopilotHero({
                   </span>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-medium text-neutral-600">
                     Next question:{" "}
-                    {hasQuestion ? "ready" : "listening"}
+                    {hasQuestion
+                      ? questionHistory.length > 1
+                        ? `${questionHistory.length} queued`
+                        : "ready"
+                      : "listening"}
                   </span>
                 </div>
               )}
@@ -829,35 +881,38 @@ export function LiveCopilotHero({
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
                       MCQ
                     </span>
+                    {questionHistory.length > 1 && (
+                      <span className="text-[10px] text-neutral-400 tabular-nums">
+                        {historyIndex + 1} of {questionHistory.length}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-[#1a1a1a] leading-relaxed font-medium">
-                    &ldquo;{questionCandidate.text}&rdquo;
+                    &ldquo;{displayedQuestion}&rdquo;
                   </p>
                 </div>
               </div>
 
               {/* Primary + secondary actions */}
               <div className="flex items-center gap-2 flex-wrap">
-                {onSendQuestion && (
-                  <Button
-                    size="sm"
-                    onClick={() => onSendQuestion(questionCandidate.text)}
-                    className="rounded-full h-9 px-5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
-                    disabled={isSendingQuestion}
-                  >
-                    {isSendingQuestion ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        Send Now
-                      </>
-                    )}
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  onClick={handleSendCurrent}
+                  className="rounded-full h-9 px-5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
+                  disabled={isSendingQuestion}
+                >
+                  {isSendingQuestion ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      Send Now
+                    </>
+                  )}
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -869,7 +924,7 @@ export function LiveCopilotHero({
                   Preview
                 </Button>
 
-                {/* Tertiary */}
+                {/* Tertiary: hold, edit, back/forward nav */}
                 <div className="flex items-center gap-1 ml-auto">
                   {onToggleQuestionHold && (
                     <Button
@@ -896,17 +951,29 @@ export function LiveCopilotHero({
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
-                  {onDismissQuestion && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={onDismissQuestion}
-                      className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-rose-500"
-                      disabled={isSendingQuestion}
-                      title="Dismiss"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
+                  {questionHistory.length > 1 && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setHistoryIndex((i) => i - 1)}
+                        disabled={!canGoBack}
+                        className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700 disabled:opacity-30"
+                        title="Previous question"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setHistoryIndex((i) => i + 1)}
+                        disabled={!canGoForward}
+                        className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700 disabled:opacity-30"
+                        title="Next question"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
