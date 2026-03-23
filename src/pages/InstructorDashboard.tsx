@@ -536,16 +536,7 @@ export default function InstructorDashboard() {
               />
             </section>
 
-            {/* ===== LIVE COPILOT HERO: Main action center ===== */}
-            <section>
-              <LiveCopilotHero
-                isListening={isListening}
-                autoQuestionEnabled={autoQuestionEnabled}
-                onStartListening={() => setIsListening(true)}
-                onStopListening={() => setIsListening(false)}
-                onToggleAutoQuestion={setAutoQuestionEnabled}
-              />
-            </section>
+            {/* LectureTranscription with QuestionOnDeck is rendered above via persistent mount */}
 
             {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
             {!isListening && (
@@ -727,8 +718,8 @@ export default function InstructorDashboard() {
             </div>
           )}
           
-          {/* LectureTranscription - Hidden but persists recording state */}
-          <div className="hidden">
+          {/* LectureTranscription - Always mounted to persist recording, visible only on live tab */}
+          <div className={activeTab !== "live" ? "hidden" : ""}>
             <LectureTranscription onQuestionGenerated={() => {}} />
           </div>
           
