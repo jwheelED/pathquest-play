@@ -2,12 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Radio } from "lucide-react";
 import { trackSessionJoined } from "@/lib/posthogTracking";
 
 const JoinLive = () => {
@@ -91,32 +90,41 @@ const JoinLive = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
-      <div className="w-full max-w-md space-y-4">
+    <div className="min-h-screen flex flex-col items-center justify-center mastery-bg p-4">
+      {/* Ambient glow */}
+      <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
+      
+      <div className="w-full max-w-md space-y-4 relative z-10">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate("/")}
-          className="gap-2 rounded-full hover:bg-accent"
+          className="gap-2 rounded-full text-charcoal-muted hover:text-charcoal hover:bg-slate-100"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
         
-        <Card className="w-full">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-bold">Join Live Session</CardTitle>
-            <CardDescription>
+        <div className="command-card p-6 sm:p-8">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <Radio className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h1 className="text-xl font-semibold text-charcoal mb-1">Join Live Session</h1>
+            <p className="text-sm text-charcoal-muted">
               {step === "code" 
-                ? "Your instructor will display a 6-digit code when they start a live Q&A session" 
-                : "Choose your nickname"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+                ? "Enter the 6-digit code from your instructor" 
+                : "Choose a nickname to identify yourself"}
+            </p>
+          </div>
+          
           {step === "code" ? (
             <form onSubmit={handleCodeSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="code">Session Code</Label>
+                <Label htmlFor="code" className="text-xs font-medium text-charcoal-muted uppercase tracking-wide">
+                  Session Code
+                </Label>
                 <Input
                   id="code"
                   type="text"
@@ -129,17 +137,16 @@ const JoinLive = () => {
                     setSessionCode(value);
                   }}
                   maxLength={6}
-                  className="text-center text-2xl tracking-widest font-mono"
+                  className="text-center text-2xl tracking-[0.5em] font-mono h-14 border-slate-200 focus:border-emerald-300 focus:ring-emerald-200"
                   autoFocus
                 />
-                <p className="text-xs text-muted-foreground text-center">
-                  Live session codes are 6 digits (numbers only)
+                <p className="text-xs text-charcoal-subtle text-center">
+                  Live session codes are 6 digits
                 </p>
               </div>
               <Button 
                 type="submit" 
-                className="w-full" 
-                size="lg"
+                className="w-full h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium" 
                 disabled={sessionCode.length !== 6 || isLoading}
               >
                 {isLoading ? (
@@ -155,21 +162,23 @@ const JoinLive = () => {
           ) : (
             <form onSubmit={handleNicknameSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="nickname">Your Nickname</Label>
+                <Label htmlFor="nickname" className="text-xs font-medium text-charcoal-muted uppercase tracking-wide">
+                  Your Nickname
+                </Label>
                 <Input
                   id="nickname"
                   placeholder="Enter your name"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   maxLength={30}
+                  className="h-11 border-slate-200 focus:border-emerald-300 focus:ring-emerald-200"
                   autoFocus
                 />
               </div>
               <div className="space-y-2">
                 <Button 
                   type="submit" 
-                  className="w-full" 
-                  size="lg"
+                  className="w-full h-11 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                   disabled={!nickname.trim() || isLoading}
                 >
                   {isLoading ? (
@@ -184,7 +193,7 @@ const JoinLive = () => {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="w-full"
+                  className="w-full h-10 rounded-full text-charcoal-muted hover:text-charcoal hover:bg-slate-50"
                   onClick={() => setStep("code")}
                   disabled={isLoading}
                 >
@@ -193,8 +202,7 @@ const JoinLive = () => {
               </div>
             </form>
           )}
-        </CardContent>
-      </Card>
+        </div>
       </div>
     </div>
   );

@@ -243,9 +243,9 @@
     transform: translateY(-1px);
   }
 
-  /* Headspace background */
+  /* Headspace background - Premium neutral */
   .headspace-bg {
-    background: linear-gradient(180deg, hsl(199 85% 82%), hsl(199 80% 90%));
+    background: hsl(40 20% 97%);
   }
 
   .dark .headspace-bg {
