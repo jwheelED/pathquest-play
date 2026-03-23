@@ -536,16 +536,7 @@ export default function InstructorDashboard() {
               />
             </section>
 
-            {/* ===== LIVE COPILOT HERO: Main action center ===== */}
-            <section>
-              <LiveCopilotHero
-                isListening={isListening}
-                autoQuestionEnabled={autoQuestionEnabled}
-                onStartListening={() => setIsListening(true)}
-                onStopListening={() => setIsListening(false)}
-                onToggleAutoQuestion={setAutoQuestionEnabled}
-              />
-            </section>
+            {/* LectureTranscription with QuestionOnDeck is rendered above via persistent mount */}
 
             {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
             {!isListening && (
