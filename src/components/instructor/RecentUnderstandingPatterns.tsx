@@ -56,13 +56,11 @@ export function RecentUnderstandingPatterns({ onViewPatterns }: RecentUnderstand
       const sessionIds = sessionsData.map(s => s.id);
 
       // Get questions and their response rates
-      const { data: questionsData } = await supabase
-        .from("live_questions")
+      const { data: questionsData } = await (supabase.from("live_questions") as any)
         .select("id, question_text, session_id")
         .in("session_id", sessionIds);
 
-      const { data: responsesData } = await supabase
-        .from("live_responses")
+      const { data: responsesData } = await (supabase.from("live_responses") as any)
         .select("question_id, is_correct, session_id")
         .in("session_id", sessionIds);
 

@@ -57,16 +57,13 @@ export function LastSessionCard({ onNavigate }: LastSessionCardProps) {
       const s = sessions[0];
 
       const [participantsRes, questionsRes, responsesRes] = await Promise.all([
-        supabase
-          .from("live_participants")
+        (supabase.from("live_participants") as any)
           .select("session_id")
           .eq("session_id", s.id),
-        supabase
-          .from("live_questions")
+        (supabase.from("live_questions") as any)
           .select("session_id")
           .eq("session_id", s.id),
-        supabase
-          .from("live_responses")
+        (supabase.from("live_responses") as any)
           .select("is_correct")
           .eq("session_id", s.id),
       ]);

@@ -566,6 +566,11 @@ export default function InstructorDashboard() {
               />
             </section>
 
+            {/* ===== QUESTION ON DECK + TRANSCRIPT CHUNKS ===== */}
+            <section>
+              <LectureTranscription onQuestionGenerated={() => {}} />
+            </section>
+
             {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
             {!isListening && (
               <section>
@@ -772,6 +777,8 @@ export default function InstructorDashboard() {
           </div>
           
           {renderTabContent()}
+
+          {/* LectureTranscription is now rendered inline within the live tab */}
         </main>
       </div>
 
