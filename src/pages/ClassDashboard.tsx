@@ -559,9 +559,10 @@ export default function ClassDashboard() {
             
             {activeTab === "assigned" && user && (
               <div className="space-y-6 animate-fade-in">
-                <AssignedContent 
-                  userId={user.id} 
+                <AssignedContent
+                  userId={user.id}
                   instructorId={instructorId}
+                  courseId={courseId ?? undefined}
                 />
               </div>
             )}

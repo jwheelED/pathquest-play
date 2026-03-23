@@ -506,20 +506,38 @@ serve(async (req) => {
       return "manual_grade";
     };
 
+    // Normalize suggested_type aliases so downstream logic is consistent.
+    // The ReviewModal sends 'mcq' and 'poll'; the edge function uses 'multiple_choice'.
+    const normalizeSuggestedType = (t: string | undefined | null): string | undefined => {
+      if (!t) return undefined;
+      if (t === 'mcq') return 'multiple_choice';
+      return t;
+    };
+    const normalizedSuggestedType = normalizeSuggestedType(suggested_type);
+
     // Determine final question type with smart priority:
     // 1. If pre-generated options provided (from preview dialog editing), respect the suggested_type
     // 2. If instructor prefers coding, use their coding style preference (simple vs full)
     // 3. Otherwise, use instructor's preference from settings
     // This ensures preview dialog overrides work, voice commands respect settings, and coding style is handled
-    const hasPreGeneratedOptions = options && Array.isArray(options) && options.length === 4 && correct_answer;
+    //
+    // For MCQ: require options with a correct_answer.
+    // For poll: require options (no correct_answer needed).
+    const hasMCQOptions = options && Array.isArray(options) && options.length >= 2 && correct_answer;
+    const hasPollOptions = options && Array.isArray(options) && options.length >= 2;
+    const hasPreGeneratedOptions = normalizedSuggestedType === 'poll' ? hasPollOptions : hasMCQOptions;
 
     let finalType: string;
 
-    if (hasPreGeneratedOptions && suggested_type) {
+    if (hasPreGeneratedOptions && normalizedSuggestedType) {
       // Preview dialog with edited options - respect user's explicit choice
-      finalType = suggested_type;
+      finalType = normalizedSuggestedType;
       console.log(`📝 Using preview dialog type: ${finalType}`);
-    } else if (suggested_type === 'short_answer' && (expected_answer || !hasPreGeneratedOptions)) {
+    } else if (normalizedSuggestedType === 'poll' && hasPollOptions) {
+      // Poll with pre-generated options but no correct_answer (polls are ungraded)
+      finalType = 'poll';
+      console.log(`📝 Using poll type from preview dialog`);
+    } else if (normalizedSuggestedType === 'short_answer' && (expected_answer || !hasPreGeneratedOptions)) {
       // Instructor explicitly chose short answer in preview dialog - respect it
       // Don't override with instructor's default preference
       finalType = 'short_answer';

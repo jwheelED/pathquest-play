@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(grep -r lecture_pause_points /c/Users/johna/Downloads/EdvanaClaude --include=*.sql --include=*.ts)",
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(find /c/Users/johna/Downloads/EdvanaClaude/src/components/instructor -type f -name *.tsx -o -name *.ts)",
+      "Bash(bun run:*)"
+    ]
+  }
+}
