@@ -395,10 +395,22 @@ frontend:
         agent: "testing"
         comment: "TypeScript compilation passed with no errors (exit code 0). All student dashboard UI updates (ClassDashboard.tsx, JoinLive.tsx) are correctly typed and there are no type errors in the codebase."
 
+  - task: "Live Copilot Hero Enhancements - Transcription & Question On Deck"
+    implemented: true
+    working: true
+    file: "src/components/instructor/LiveCopilotHero.tsx, src/components/instructor/LectureTranscription.tsx, src/pages/InstructorDashboard.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "CODE REVIEW COMPLETE. All Live Copilot Hero enhancements correctly implemented: ✅ LiveCopilotHero.tsx (lines 9-43) accepts new props: transcriptChunks, currentTranscript, questionCandidate, isSendingQuestion, onSendQuestion, onPreviewQuestion, onDismissQuestion, isQuestionHeld, onToggleQuestionHold. ✅ When listening, shows 'Actively listening' indicator with audio bars (lines 157-171), transcript panel with recent chunks and cursor (lines 174-196), Question On Deck card with detected questions (lines 198-334). ✅ Question On Deck has Edit, Preview, Send, Hold, Dismiss actions (lines 234-296). ✅ LectureTranscription.tsx (lines 70-78) added callback props: onRecordingChange, onTranscriptChange, onQuestionCandidateChange, onSendingChange, and ref callbacks (lines 75-77). ✅ External state sync implemented (lines 245-263) for recording, transcript, candidate, and sending states. ✅ External control refs registered (lines 265-303). ✅ InstructorDashboard.tsx Live tab (lines 551-566) passes all new props to LiveCopilotHero. ✅ LectureTranscription (lines 758-772) hidden but exposes state via callbacks. ✅ Other sections conditionally hidden when listening (lines 569-616). ✅ TypeScript compilation passes with no errors (exit code 0)."
+
 metadata:
   created_by: "main_agent"
-  version: "1.5"
-  test_sequence: 6
+  version: "1.6"
+  test_sequence: 7
   run_ui: false
 
 test_plan:
@@ -420,3 +432,5 @@ agent_communication:
     message: "CODE REVIEW COMPLETED for Live Copilot page - New Session Components. ALL REQUIREMENTS VERIFIED: ✅ All 4 new components created and correctly implemented (SessionReadiness.tsx, LastLiveSignal.tsx, LiveToolsSection.tsx, LiveResponsesEmpty.tsx). ✅ SessionReadiness has 4 compact pre-flight indicator cards with proper status colors and icons. ✅ LastLiveSignal has 'LAST LIVE SIGNAL' eyebrow, 'Your most recent room insight' headline, insight text with supporting stats, empty state, and Supabase integration. ✅ LiveToolsSection has 4 secondary tools buttons (Open Presenter View, Present Slides, Open Question Bank, Review Session Summary) all using rounded-full outline styling. ✅ LiveResponsesEmpty has 'LIVE RESPONSES' eyebrow, 'No check-ins sent yet' headline, centered icon with description. ✅ LiveSessionStrip updated with more compact layout. ✅ LiveCopilotHero updated with LISTENING badge. ✅ HowItWorksSection updated with tighter spacing. ✅ InstructorDashboard.tsx correctly integrates all components in Live tab with proper layout (lines 528-591). ✅ TypeScript compilation passes with no errors (exit code 0). ✅ All CSS classes properly defined in index.css. All code implementation is correct and complete."
   - agent: "testing"
     message: "CODE REVIEW COMPLETED for Student Dashboard Premium Design Updates. ALL REQUIREMENTS VERIFIED: ✅ ClassDashboard.tsx implements mastery-bg background, premium header with emerald icon, signal cards for stats (Completed, Avg Score, To Review, Lectures), command-card styling for course info/action banners/quick links, emerald-600 buttons and accents, charcoal text palette throughout. ✅ JoinLive.tsx implements mastery-bg background, command-card styling, Radio icon in emerald colors, emerald primary buttons, clean input styling with proper focus states. ✅ Index.css headspace-bg class updated to use neutral background hsl(40 20% 97%) matching the premium design system. ✅ TypeScript compilation passes with no errors (exit code 0). All code implementation is correct and complete."
+  - agent: "testing"
+    message: "CODE REVIEW COMPLETED for Live Copilot Hero Enhancements. ALL REQUIREMENTS VERIFIED: ✅ LiveCopilotHero.tsx accepts all new props (transcriptChunks, currentTranscript, questionCandidate, isSendingQuestion, callbacks for send/preview/dismiss, isQuestionHeld, onToggleQuestionHold). ✅ When listening, displays 'Actively listening' indicator with animated audio bars, transcript panel showing recent chunks with cursor animation, and Question On Deck card with detected questions. ✅ Question On Deck card has all required actions: Edit (with textarea), Preview, Send Now, Hold/Resume toggle, and Dismiss. ✅ LectureTranscription.tsx implements all callback props (onRecordingChange, onTranscriptChange, onQuestionCandidateChange, onSendingChange) and ref callbacks (onSendQuestionRef, onPreviewQuestionRef, onDismissQuestionRef) for external state sync. ✅ InstructorDashboard.tsx Live tab correctly passes all props to LiveCopilotHero and integrates LectureTranscription (hidden) with state callbacks. ✅ Other sections (HowItWorksSection, SessionReadiness, LastLiveSignal, LiveToolsSection, LiveResponsesEmpty, PastLiveSessions) conditionally hidden when listening for focused experience. ✅ TypeScript compilation passes with no errors (exit code 0). All code implementation is correct and complete."

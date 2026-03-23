@@ -86,6 +86,16 @@ export default function InstructorDashboard() {
   const [participantCount, setParticipantCount] = useState(0);
   const [micConnected, setMicConnected] = useState(true);
   const [hasCheckIns, setHasCheckIns] = useState(false);
+  // Transcription state from LectureTranscription
+  const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
+  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [questionCandidate, setQuestionCandidate] = useState<any>(null);
+  const [isSendingQuestion, setIsSendingQuestion] = useState(false);
+  const [isQuestionHeld, setIsQuestionHeld] = useState(false);
+  // Refs for callbacks
+  const onSendQuestionRef = useRef<((text: string) => void) | null>(null);
+  const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
+  const onDismissQuestionRef = useRef<(() => void) | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
@@ -544,6 +554,15 @@ export default function InstructorDashboard() {
                 onStartListening={() => setIsListening(true)}
                 onStopListening={() => setIsListening(false)}
                 onToggleAutoQuestion={setAutoQuestionEnabled}
+                transcriptChunks={transcriptChunks}
+                currentTranscript={currentTranscript}
+                questionCandidate={questionCandidate}
+                isSendingQuestion={isSendingQuestion}
+                onSendQuestion={(text) => onSendQuestionRef.current?.(text)}
+                onPreviewQuestion={(text) => onPreviewQuestionRef.current?.(text)}
+                onDismissQuestion={() => onDismissQuestionRef.current?.()}
+                isQuestionHeld={isQuestionHeld}
+                onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
               />
             </section>
 
@@ -555,38 +574,46 @@ export default function InstructorDashboard() {
             )}
 
             {/* ===== SESSION READINESS: Pre-flight indicators ===== */}
-            <section>
-              <SessionReadiness
-                isLive={!!activeSession?.is_active}
-                micConnected={micConnected}
-                participantCount={participantCount}
-                autoQuestionEnabled={autoQuestionEnabled}
-              />
-            </section>
-
-            {/* ===== LAST LIVE SIGNAL + TOOLS: Side by side on desktop ===== */}
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
-              <div className="command-card p-5">
-                <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-              </div>
-            </section>
-
-            {/* ===== LIVE RESPONSES: Show results or empty state ===== */}
-            {activeSession?.id && hasCheckIns ? (
+            {!isListening && (
               <section>
-                <LiveSessionResults sessionId={activeSession.id} />
-              </section>
-            ) : (
-              <section>
-                <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
+                <SessionReadiness
+                  isLive={!!activeSession?.is_active}
+                  micConnected={micConnected}
+                  participantCount={participantCount}
+                  autoQuestionEnabled={autoQuestionEnabled}
+                />
               </section>
             )}
 
+            {/* ===== LAST LIVE SIGNAL + TOOLS: Side by side on desktop ===== */}
+            {!isListening && (
+              <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
+                <div className="command-card p-5">
+                  <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+                </div>
+              </section>
+            )}
+
+            {/* ===== LIVE RESPONSES: Show results or empty state ===== */}
+            {!isListening && (
+              activeSession?.id && hasCheckIns ? (
+                <section>
+                  <LiveSessionResults sessionId={activeSession.id} />
+                </section>
+              ) : (
+                <section>
+                  <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
+                </section>
+              )
+            )}
+
             {/* ===== PAST SESSIONS: Lower priority (border separator) ===== */}
-            <section className="pt-6 border-t border-slate-100">
-              <PastLiveSessions />
-            </section>
+            {!isListening && (
+              <section className="pt-6 border-t border-slate-100">
+                <PastLiveSessions />
+              </section>
+            )}
           </div>
         );
 
@@ -727,9 +754,21 @@ export default function InstructorDashboard() {
             </div>
           )}
           
-          {/* LectureTranscription - Hidden but persists recording state */}
+          {/* LectureTranscription - Hidden but persists recording state & exposes callbacks */}
           <div className="hidden">
-            <LectureTranscription onQuestionGenerated={() => {}} />
+            <LectureTranscription 
+              onQuestionGenerated={() => {}}
+              onRecordingChange={setIsListening}
+              onTranscriptChange={(chunks, current) => {
+                setTranscriptChunks(chunks);
+                setCurrentTranscript(current);
+              }}
+              onQuestionCandidateChange={setQuestionCandidate}
+              onSendingChange={setIsSendingQuestion}
+              onSendQuestionRef={onSendQuestionRef}
+              onPreviewQuestionRef={onPreviewQuestionRef}
+              onDismissQuestionRef={onDismissQuestionRef}
+            />
           </div>
           
           {renderTabContent()}
