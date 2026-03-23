@@ -537,10 +537,10 @@ export default function InstructorDashboard() {
 
       case "live":
         return (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* ===== SESSION STRIP: Compact session info ===== */}
             <section>
-              <LiveSessionStrip 
+              <LiveSessionStrip
                 activeSession={activeSession}
                 participantCount={participantCount}
               />
@@ -554,6 +554,7 @@ export default function InstructorDashboard() {
                 onStartListening={() => setIsListening(true)}
                 onStopListening={() => setIsListening(false)}
                 onToggleAutoQuestion={setAutoQuestionEnabled}
+                participantCount={participantCount}
                 transcriptChunks={transcriptChunks}
                 currentTranscript={currentTranscript}
                 questionCandidate={questionCandidate}
@@ -563,12 +564,8 @@ export default function InstructorDashboard() {
                 onDismissQuestion={() => onDismissQuestionRef.current?.()}
                 isQuestionHeld={isQuestionHeld}
                 onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
+                onViewLiveResponses={() => setActiveTab("live")}
               />
-            </section>
-
-            {/* ===== QUESTION ON DECK + TRANSCRIPT CHUNKS ===== */}
-            <section>
-              <LectureTranscription onQuestionGenerated={() => {}} />
             </section>
 
             {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
@@ -590,33 +587,22 @@ export default function InstructorDashboard() {
               </section>
             )}
 
-            {/* ===== LAST LIVE SIGNAL + TOOLS: Side by side on desktop ===== */}
+            {/* ===== LOWER PRIORITY: Live Responses + Tools ===== */}
             {!isListening && (
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
-                <div className="command-card p-5">
-                  <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-                </div>
+                {activeSession?.id && hasCheckIns ? (
+                  <LiveSessionResults sessionId={activeSession.id} />
+                ) : (
+                  <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
+                )}
+                <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
               </section>
             )}
 
-            {/* ===== LIVE RESPONSES: Show results or empty state ===== */}
+            {/* ===== LAST LIVE SIGNAL: Below primary surface ===== */}
             {!isListening && (
-              activeSession?.id && hasCheckIns ? (
-                <section>
-                  <LiveSessionResults sessionId={activeSession.id} />
-                </section>
-              ) : (
-                <section>
-                  <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
-                </section>
-              )
-            )}
-
-            {/* ===== PAST SESSIONS: Lower priority (border separator) ===== */}
-            {!isListening && (
-              <section className="pt-6 border-t border-slate-100">
-                <PastLiveSessions />
+              <section>
+                <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
               </section>
             )}
           </div>

@@ -1,10 +1,62 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Mic, MicOff, Sparkles, Send, Eye, X, Pause, Play, Pencil, Check, Loader2 } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Sparkles,
+  Send,
+  Eye,
+  X,
+  Pause,
+  Play,
+  Pencil,
+  Check,
+  Loader2,
+  Monitor,
+  BarChart2,
+  RefreshCw,
+  ChevronRight,
+  ArrowRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import type { PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
+import { useNavigate } from "react-router-dom";
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+type QuestionType = "mcq" | "short_answer" | "poll";
+
+interface SentQuestionStats {
+  responded: number;
+  total: number;
+  correctPercent: number;
+  mostWrong?: string;
+  responseSpeed?: "fast" | "moderate" | "slow";
+}
+
+interface SentQuestion {
+  text: string;
+  type: QuestionType;
+  stats?: SentQuestionStats;
+}
+
+interface MCQOption {
+  label: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 interface LiveCopilotHeroProps {
   isListening: boolean;
@@ -12,10 +64,9 @@ interface LiveCopilotHeroProps {
   onStartListening: () => void;
   onStopListening: () => void;
   onToggleAutoQuestion: (enabled: boolean) => void;
-  // Transcription props
+  participantCount?: number;
   transcriptChunks?: string[];
   currentTranscript?: string;
-  // Question on deck props
   questionCandidate?: PassiveQuestionCandidate | null;
   isSendingQuestion?: boolean;
   onSendQuestion?: (text: string) => void;
@@ -23,7 +74,398 @@ interface LiveCopilotHeroProps {
   onDismissQuestion?: () => void;
   isQuestionHeld?: boolean;
   onToggleQuestionHold?: () => void;
+  sentQuestion?: SentQuestion | null;
+  onViewLiveResponses?: () => void;
+  onSendFollowUp?: () => void;
 }
+
+// ─── Default MCQ options ─────────────────────────────────────────────────────
+
+const DEFAULT_MCQ: MCQOption[] = [
+  { label: "A", text: "154", isCorrect: false },
+  { label: "B", text: "206", isCorrect: true },
+  { label: "C", text: "270", isCorrect: false },
+  { label: "D", text: "300", isCorrect: false },
+];
+
+const DEFAULT_POLL: MCQOption[] = [
+  { label: "A", text: "Very excited", isCorrect: false },
+  { label: "B", text: "Somewhat", isCorrect: false },
+  { label: "C", text: "Neutral", isCorrect: false },
+  { label: "D", text: "Not really", isCorrect: false },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatTimer(s: number) {
+  const m = Math.floor(s / 60).toString().padStart(2, "0");
+  const sec = (s % 60).toString().padStart(2, "0");
+  return `${m}:${sec}`;
+}
+
+const FLOW_STEPS = ["Listening", "Drafting", "Review", "Send", "Room Signal"] as const;
+
+function getActiveStep(
+  hasQuestion: boolean,
+  isModalOpen: boolean,
+  isSent: boolean
+): number {
+  if (isSent) return 3; // "Send" step lit, Room Signal next
+  if (isModalOpen) return 2; // "Review"
+  if (hasQuestion) return 1; // "Drafting" done, Review is next
+  return 0; // "Listening"
+}
+
+// ─── Review Modal ─────────────────────────────────────────────────────────────
+
+function ReviewModal({
+  open,
+  onClose,
+  onSend,
+  initialText,
+  transcriptSource,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSend: (text: string, type: QuestionType) => void;
+  initialText: string;
+  transcriptSource?: string;
+}) {
+  const [qType, setQType] = useState<QuestionType>("mcq");
+  const [questionText, setQuestionText] = useState(initialText);
+  const [mcqOptions, setMcqOptions] = useState<MCQOption[]>(DEFAULT_MCQ);
+  const [shortAnswer, setShortAnswer] = useState(
+    "There are 206 bones in the adult human body."
+  );
+  const [pollOptions, setPollOptions] = useState<MCQOption[]>(DEFAULT_POLL);
+
+  const typeLabels: Record<QuestionType, string> = {
+    mcq: "Multiple Choice",
+    short_answer: "Short Answer",
+    poll: "Poll",
+  };
+
+  const questionLabel: Record<QuestionType, string> = {
+    mcq: "Multiple Choice Question",
+    short_answer: "Short Answer Question",
+    poll: "Poll Question",
+  };
+
+  const setCorrect = (idx: number) => {
+    setMcqOptions((prev) =>
+      prev.map((o, i) => ({ ...o, isCorrect: i === idx }))
+    );
+  };
+
+  const updateMcqText = (idx: number, text: string) => {
+    setMcqOptions((prev) =>
+      prev.map((o, i) => (i === idx ? { ...o, text } : o))
+    );
+  };
+
+  const updatePollText = (idx: number, text: string) => {
+    setPollOptions((prev) =>
+      prev.map((o, i) => (i === idx ? { ...o, text } : o))
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border border-neutral-200 shadow-xl bg-white">
+        {/* Modal header */}
+        <div className="px-6 pt-6 pb-4 border-b border-neutral-100">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-[#1a1a1a]">
+              Review Audience Check
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500 mt-0.5">
+              Refine before sending to the room.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+          {/* Source */}
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 block mb-1.5">
+              From lecture transcript
+            </span>
+            <div className="px-3.5 py-2.5 bg-neutral-50 border border-neutral-100 rounded-xl">
+              <p className="text-xs text-neutral-600 italic leading-relaxed">
+                &ldquo;{transcriptSource || initialText}&rdquo;
+              </p>
+            </div>
+          </div>
+
+          {/* Type selector */}
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 block mb-2">
+              Question Type
+            </span>
+            <div className="flex gap-1.5">
+              {(["short_answer", "mcq", "poll"] as QuestionType[]).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setQType(t)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                    qType === t
+                      ? "bg-[#1a1a1a] text-white border-transparent"
+                      : "bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
+                  )}
+                >
+                  {typeLabels[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Question text */}
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 block mb-1.5">
+              {questionLabel[qType]}
+            </span>
+            <Textarea
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              className="min-h-[72px] text-sm border-neutral-200 rounded-xl resize-none"
+            />
+          </div>
+
+          {/* Type-specific section */}
+          {qType === "mcq" && (
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+                  Answer Options
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mb-3">
+                Edit the generated options below and select the correct answer.
+              </p>
+              <div className="space-y-2">
+                {mcqOptions.map((opt, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all",
+                      opt.isCorrect
+                        ? "border-emerald-300 bg-emerald-50/60"
+                        : "border-neutral-200 bg-white"
+                    )}
+                  >
+                    <button
+                      onClick={() => setCorrect(i)}
+                      className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                        opt.isCorrect
+                          ? "border-emerald-500 bg-emerald-500"
+                          : "border-neutral-300"
+                      )}
+                    >
+                      {opt.isCorrect && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                      )}
+                    </button>
+                    <span className="text-xs font-semibold text-neutral-400 w-4 shrink-0">
+                      {opt.label}.
+                    </span>
+                    <Input
+                      value={opt.text}
+                      onChange={(e) => updateMcqText(i, e.target.value)}
+                      className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-[#1a1a1a] flex-1"
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-7 px-2 text-xs text-neutral-400 hover:text-neutral-600 gap-1.5"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Regenerate options
+              </Button>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Responses will be graded against the selected correct answer.
+              </p>
+            </div>
+          )}
+
+          {qType === "short_answer" && (
+            <div>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 block mb-1.5">
+                Expected Answer{" "}
+                <span className="normal-case text-neutral-300 font-normal">
+                  (for grading reference)
+                </span>
+              </span>
+              <Textarea
+                value={shortAnswer}
+                onChange={(e) => setShortAnswer(e.target.value)}
+                className="min-h-[56px] text-sm border-neutral-200 rounded-xl resize-none"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-7 px-2 text-xs text-neutral-400 hover:text-neutral-600 gap-1.5"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Regenerate expected answer
+              </Button>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                This will be used as a reference when grading student responses.
+              </p>
+            </div>
+          )}
+
+          {qType === "poll" && (
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
+                  Poll Choices
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mb-3">
+                Edit the poll choices below. Poll responses are recorded but not
+                graded.
+              </p>
+              <div className="space-y-2">
+                {pollOptions.map((opt, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-neutral-200 bg-white"
+                  >
+                    <span className="text-xs font-semibold text-neutral-400 w-4 shrink-0">
+                      {opt.label}.
+                    </span>
+                    <Input
+                      value={opt.text}
+                      onChange={(e) => updatePollText(i, e.target.value)}
+                      className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-[#1a1a1a] flex-1"
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2 h-7 px-2 text-xs text-neutral-400 hover:text-neutral-600 gap-1.5"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Regenerate choices
+              </Button>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                Poll responses are recorded but not graded.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Modal footer */}
+        <div className="px-6 py-4 border-t border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="rounded-full h-8 px-4 text-xs text-neutral-500 hover:text-neutral-700"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => onSend(questionText, qType)}
+            className="rounded-full h-8 px-5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+          >
+            <Send className="w-3 h-3" />
+            Send to Room
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Live Flow Strip ──────────────────────────────────────────────────────────
+
+function LiveFlowStrip({
+  activeStep,
+}: {
+  activeStep: number;
+}) {
+  return (
+    <div className="px-4 py-3 bg-white border border-neutral-100 rounded-xl">
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400 block mb-2">
+        Live Flow
+      </span>
+      <div className="flex items-center gap-0.5 overflow-x-auto pb-0.5">
+        {FLOW_STEPS.map((step, i) => {
+          const isActive = i === activeStep;
+          const isDone = i < activeStep;
+          return (
+            <div key={step} className="flex items-center gap-0.5 min-w-0">
+              <span
+                className={cn(
+                  "text-[10px] font-medium whitespace-nowrap px-2 py-0.5 rounded-full transition-all",
+                  isActive
+                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                    : isDone
+                    ? "text-neutral-400 line-through"
+                    : "text-neutral-300"
+                )}
+              >
+                {step}
+              </span>
+              {i < FLOW_STEPS.length - 1 && (
+                <ChevronRight className="w-2.5 h-2.5 text-neutral-200 shrink-0" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Transcript Confidence Strip ─────────────────────────────────────────────
+
+function TranscriptStrip({
+  lastChunk,
+  hasLive,
+  chunkCount,
+}: {
+  lastChunk: string | null;
+  hasLive: boolean;
+  chunkCount: number;
+}) {
+  return (
+    <div className="px-4 py-3 bg-white border border-neutral-100 rounded-xl">
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400 block mb-1.5">
+        Last chunk heard
+      </span>
+      {lastChunk ? (
+        <>
+          <p className="text-xs text-neutral-600 leading-relaxed">
+            &ldquo;{lastChunk}&rdquo;
+            {hasLive && (
+              <span className="inline-block w-[2px] h-3 bg-emerald-500 ml-0.5 animate-pulse align-middle rounded-sm" />
+            )}
+          </p>
+          <p className="text-[10px] text-neutral-300 mt-1">
+            captured just now · {chunkCount} chunk{chunkCount !== 1 ? "s" : ""}{" "}
+            processed
+          </p>
+        </>
+      ) : (
+        <p className="text-xs text-neutral-400 italic">
+          Speak naturally — your words will appear here...
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function LiveCopilotHero({
   isListening,
@@ -31,6 +473,7 @@ export function LiveCopilotHero({
   onStartListening,
   onStopListening,
   onToggleAutoQuestion,
+  participantCount = 0,
   transcriptChunks = [],
   currentTranscript = "",
   questionCandidate = null,
@@ -40,12 +483,26 @@ export function LiveCopilotHero({
   onDismissQuestion,
   isQuestionHeld = false,
   onToggleQuestionHold,
+  sentQuestion = null,
+  onViewLiveResponses,
+  onSendFollowUp,
 }: LiveCopilotHeroProps) {
+  const navigate = useNavigate();
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const [editText, setEditText] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll transcript
+  useEffect(() => {
+    if (!isListening) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, [isListening]);
+
   useEffect(() => {
     if (transcriptEndRef.current && isListening) {
       transcriptEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -66,59 +523,34 @@ export function LiveCopilotHero({
     }
   };
 
+  const handleModalSend = (text: string, type: QuestionType) => {
+    setIsModalOpen(false);
+    onSendQuestion?.(text);
+  };
+
   const hasQuestion = !!questionCandidate;
+  const isSent = !!sentQuestion;
+  const lastChunk =
+    currentTranscript || transcriptChunks[transcriptChunks.length - 1] || null;
+  const activeStep = getActiveStep(hasQuestion, isModalOpen, isSent);
 
-  return (
-    <div className="command-hero overflow-hidden">
-      {/* Top accent bar when listening */}
-      {isListening && (
-        <div className="h-1 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-500 animate-pulse" />
-      )}
-
-      <div className="p-6 lg:p-8">
-        {/* Eyebrow */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="section-eyebrow">Live Copilot</span>
-          {isListening && (
-            <span className="live-badge inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-              LISTENING
-            </span>
-          )}
-        </div>
-
-        {/* Headline */}
-        <h1 className="text-2xl lg:text-[1.75rem] font-semibold text-charcoal tracking-tight mb-3">
-          {isListening 
-            ? "Listening to your lecture..." 
-            : "Ready to listen for your next live question"
-          }
-        </h1>
-
-        {/* Body */}
-        <p className="text-sm text-charcoal-muted leading-relaxed mb-6 max-w-xl">
-          {isListening
-            ? "Edvana is analyzing your lecture in real time. Questions will appear when the copilot detects a teachable moment."
-            : "Edvana listens while you teach and prepares send-ready understanding checks in real time, so you can respond to the room without breaking flow."
-          }
-        </p>
-
-        {/* Actions row */}
-        <div className="flex flex-wrap items-center gap-4 mb-4">
-          {/* Primary CTA */}
-          {isListening ? (
-            <Button
-              onClick={onStopListening}
-              className={cn(
-                "rounded-full px-7 h-12 gap-2.5 font-medium text-base",
-                "bg-rose-600 hover:bg-rose-700 text-white shadow-sm",
-                "transition-all duration-200 hover:shadow-md"
-              )}
-            >
-              <MicOff className="w-5 h-5" />
-              Stop Listening
-            </Button>
-          ) : (
+  // ── IDLE STATE ────────────────────────────────────────────────────────────
+  if (!isListening) {
+    return (
+      <div className="command-hero overflow-hidden">
+        <div className="p-6 lg:p-8">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="section-eyebrow">Live Copilot</span>
+          </div>
+          <h1 className="text-2xl lg:text-[1.75rem] font-semibold text-charcoal tracking-tight mb-3">
+            Ready to listen for your next live question
+          </h1>
+          <p className="text-sm text-charcoal-muted leading-relaxed mb-6 max-w-xl">
+            Edvana listens while you teach and prepares send-ready understanding
+            checks in real time, so you can respond to the room without breaking
+            flow.
+          </p>
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             <Button
               onClick={onStartListening}
               className={cn(
@@ -130,211 +562,457 @@ export function LiveCopilotHero({
               <Mic className="w-5 h-5" />
               Start Listening
             </Button>
-          )}
-
-          {/* Auto-question toggle */}
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-full border border-slate-100">
-            <Sparkles className="w-4 h-4 text-charcoal-subtle" />
-            <span className="text-sm font-medium text-charcoal">Auto-question mode</span>
-            <Switch
-              checked={autoQuestionEnabled}
-              onCheckedChange={onToggleAutoQuestion}
-              className="data-[state=checked]:bg-emerald-600"
-            />
-          </div>
-        </div>
-
-        {/* Supporting micro-line */}
-        <p className="text-xs text-charcoal-subtle mb-6">
-          You review every check-in before anything is sent.
-        </p>
-
-        {/* ===== LISTENING STATE: Transcription + Question On Deck ===== */}
-        {isListening && (
-          <div className="space-y-5 pt-5 border-t border-slate-100">
-            {/* Live Transcription Panel */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  {[...Array(4)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-0.5 bg-emerald-500 rounded-full animate-pulse"
-                      style={{
-                        height: `${8 + Math.sin(i * 1.2) * 6}px`,
-                        animationDelay: `${i * 0.1}s`,
-                      }}
-                    />
-                  ))}
-                </div>
-                <span className="text-xs font-medium text-emerald-700">Actively listening</span>
-              </div>
-              
-              {/* Transcript chunks */}
-              <div className="bg-slate-50/70 rounded-xl border border-slate-100 p-4 max-h-32 overflow-y-auto">
-                {transcriptChunks.length === 0 && !currentTranscript ? (
-                  <p className="text-sm text-charcoal-subtle italic">
-                    Speak naturally — your words will appear here...
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {transcriptChunks.slice(-5).map((chunk, idx) => (
-                      <p key={idx} className="text-sm text-charcoal-muted leading-relaxed">
-                        {chunk}
-                      </p>
-                    ))}
-                    {currentTranscript && (
-                      <p className="text-sm text-charcoal leading-relaxed">
-                        {currentTranscript}
-                        <span className="inline-block w-1.5 h-4 bg-emerald-500 ml-0.5 animate-pulse" />
-                      </p>
-                    )}
-                    <div ref={transcriptEndRef} />
-                  </div>
-                )}
-              </div>
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 rounded-full border border-slate-100">
+              <Sparkles className="w-4 h-4 text-charcoal-subtle" />
+              <span className="text-sm font-medium text-charcoal">
+                Auto-question mode
+              </span>
+              <Switch
+                checked={autoQuestionEnabled}
+                onCheckedChange={onToggleAutoQuestion}
+                className="data-[state=checked]:bg-emerald-600"
+              />
             </div>
+          </div>
+          <p className="text-xs text-charcoal-subtle">
+            You review every check-in before anything is sent.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-            {/* Question On Deck */}
-            <div className={cn(
-              "rounded-xl border p-4 transition-all duration-300",
-              hasQuestion
-                ? "bg-emerald-50/50 border-emerald-200"
-                : "bg-slate-50/50 border-slate-100"
-            )}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={cn(
-                  "w-7 h-7 rounded-lg flex items-center justify-center",
-                  hasQuestion ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-charcoal-subtle"
-                )}>
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-charcoal">Question on Deck</h3>
-                  <p className="text-xs text-charcoal-subtle">
-                    {hasQuestion ? "Ready to send" : "Listening for your next question..."}
-                  </p>
-                </div>
-                {hasQuestion && isQuestionHeld && (
-                  <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                    Held
-                  </span>
-                )}
+  // ── ACTIVE LISTENING STATE ────────────────────────────────────────────────
+  return (
+    <>
+      <ReviewModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSend={handleModalSend}
+        initialText={questionCandidate?.text ?? ""}
+        transcriptSource={lastChunk ?? undefined}
+      />
+
+      <div className="space-y-3">
+        {/* ── Control Bar ──────────────────────────────────────────────────── */}
+        <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
+          <div
+            className={cn(
+              "h-0.5 bg-gradient-to-r",
+              isSent
+                ? "from-teal-500 via-emerald-400 to-emerald-500"
+                : "from-emerald-500 via-emerald-400 to-teal-400"
+            )}
+          />
+          <div className="px-5 py-4 flex flex-col lg:flex-row lg:items-center gap-4">
+            {/* Left */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="text-sm font-semibold text-[#1a1a1a]">
+                  {isSent
+                    ? "Audience check is live"
+                    : "Live Copilot is listening"}
+                </span>
               </div>
-
-              {hasQuestion && !isEditingQuestion ? (
-                <div className="space-y-3">
-                  <div className="p-3 bg-white rounded-lg border border-slate-200">
-                    <p className="text-sm text-charcoal leading-relaxed">
-                      "{questionCandidate.text}"
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {onPreviewQuestion && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onPreviewQuestion(questionCandidate.text)}
-                        className="rounded-full h-8 px-3 text-xs gap-1.5 border-slate-200"
-                        disabled={isSendingQuestion}
-                      >
-                        <Eye className="w-3 h-3" />
-                        Preview
-                      </Button>
+              <p className="text-xs text-neutral-500 ml-3.5">
+                {isSent
+                  ? "Waiting for room responses while Edvana keeps listening."
+                  : `Transcription active · Detection running · ${participantCount} participants connected`}
+              </p>
+              {!isSent && (
+                <div className="flex flex-wrap gap-1.5 mt-2.5 ml-3.5">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-medium text-emerald-700">
+                    <Mic className="w-2.5 h-2.5" />
+                    Mic active
+                  </span>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-medium",
+                      autoQuestionEnabled
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        : "bg-neutral-100 border-neutral-200 text-neutral-500"
                     )}
-                    {onSendQuestion && (
-                      <Button
-                        size="sm"
-                        onClick={() => onSendQuestion(questionCandidate.text)}
-                        className="rounded-full h-8 px-4 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 flex-1"
-                        disabled={isSendingQuestion}
-                      >
-                        {isSendingQuestion ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-3 h-3" />
-                            Send Now
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    {onToggleQuestionHold && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={onToggleQuestionHold}
-                        className="rounded-full h-8 w-8 p-0 text-charcoal-muted hover:text-charcoal"
-                      >
-                        {isQuestionHeld ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleStartEdit}
-                      className="rounded-full h-8 w-8 p-0 text-charcoal-muted hover:text-charcoal"
-                      disabled={isSendingQuestion}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    {onDismissQuestion && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={onDismissQuestion}
-                        className="rounded-full h-8 w-8 p-0 text-charcoal-muted hover:text-charcoal"
-                        disabled={isSendingQuestion}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ) : isEditingQuestion ? (
-                <div className="space-y-3">
-                  <Textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    className="min-h-[60px] text-sm border-slate-200"
-                    placeholder="Edit the question..."
-                    autoFocus
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveEdit}
-                      className="rounded-full h-8 px-4 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
-                      disabled={!editText.trim()}
-                    >
-                      <Check className="w-3 h-3" />
-                      Send Edited
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setIsEditingQuestion(false)}
-                      className="rounded-full h-8 px-3 text-xs"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-3">
-                  <p className="text-xs text-charcoal-subtle">
-                    Edvana is listening and will autodraft your next audience check...
-                  </p>
+                  >
+                    <Sparkles className="w-2.5 h-2.5" />
+                    Auto-question {autoQuestionEnabled ? "enabled" : "off"}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-medium text-neutral-600">
+                    Next question:{" "}
+                    {hasQuestion ? "ready" : "listening"}
+                  </span>
                 </div>
               )}
             </div>
+
+            {/* Right */}
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+              <span className="font-mono text-sm font-medium text-neutral-400 tabular-nums min-w-[3rem] text-right">
+                {formatTimer(elapsedSeconds)}
+              </span>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-50 rounded-full border border-neutral-200">
+                <Sparkles className="w-3 h-3 text-neutral-400" />
+                <span className="text-[11px] font-medium text-neutral-600 hidden sm:inline">
+                  Auto-question
+                </span>
+                <Switch
+                  checked={autoQuestionEnabled}
+                  onCheckedChange={onToggleAutoQuestion}
+                  className="data-[state=checked]:bg-emerald-600 scale-[0.85]"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/instructor/presenter")}
+                className="rounded-full h-8 px-3 gap-1.5 text-xs font-medium border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+              >
+                <Monitor className="w-3 h-3" />
+                <span className="hidden sm:inline">Presenter</span>
+              </Button>
+              <Button
+                onClick={onStopListening}
+                size="sm"
+                className="rounded-full h-8 px-4 gap-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+              >
+                <MicOff className="w-3.5 h-3.5" />
+                Stop Listening
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Main Card ────────────────────────────────────────────────────── */}
+
+        {/* SENT STATE */}
+        {isSent && sentQuestion && (
+          <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="h-0.5 bg-gradient-to-r from-teal-500 to-emerald-400" />
+            <div className="px-6 pt-5 pb-5">
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <h2 className="text-base font-semibold text-[#1a1a1a]">
+                    Current Live Check
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Collecting responses from your room
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-200 text-[10px] font-semibold text-teal-700">
+                  <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse" />
+                  LIVE
+                </span>
+              </div>
+              <div className="h-px bg-neutral-100 my-4" />
+              <p className="text-sm text-[#1a1a1a] leading-relaxed mb-5">
+                &ldquo;{sentQuestion.text}&rdquo;
+              </p>
+
+              {/* Response stats */}
+              {sentQuestion.stats && (
+                <div className="mb-4">
+                  <span className="text-[9px] font-semibold uppercase tracking-widest text-neutral-400 block mb-2">
+                    Room Signal
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      {
+                        label: "Responded",
+                        value: `${sentQuestion.stats.responded} / ${sentQuestion.stats.total}`,
+                      },
+                      {
+                        label: "Correct so far",
+                        value: `${sentQuestion.stats.correctPercent}%`,
+                        highlight: true,
+                      },
+                      ...(sentQuestion.stats.mostWrong
+                        ? [
+                            {
+                              label: "Most wrong",
+                              value: sentQuestion.stats.mostWrong,
+                            },
+                          ]
+                        : []),
+                      ...(sentQuestion.stats.responseSpeed
+                        ? [
+                            {
+                              label: "Speed",
+                              value: sentQuestion.stats.responseSpeed,
+                            },
+                          ]
+                        : []),
+                    ].map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="px-3 py-2 bg-neutral-50 border border-neutral-100 rounded-xl"
+                      >
+                        <p className="text-[10px] text-neutral-400 mb-0.5">
+                          {stat.label}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-sm font-semibold",
+                            stat.highlight
+                              ? "text-emerald-600"
+                              : "text-[#1a1a1a]"
+                          )}
+                        >
+                          {stat.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onViewLiveResponses}
+                  className="rounded-full h-8 px-3 gap-1.5 text-xs border-neutral-200 text-neutral-600"
+                >
+                  <BarChart2 className="w-3 h-3" />
+                  View Live Responses
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onSendFollowUp}
+                  className="rounded-full h-8 px-3 gap-1.5 text-xs text-neutral-500 hover:text-neutral-700"
+                >
+                  <ArrowRight className="w-3 h-3" />
+                  Send Follow-Up
+                </Button>
+              </div>
+            </div>
+            <div className="px-6 py-3 border-t border-neutral-100 bg-neutral-50/60 rounded-b-2xl">
+              <p className="text-[11px] text-neutral-400">
+                Edvana is still listening for your next teachable moment.
+              </p>
+            </div>
           </div>
         )}
+
+        {/* DRAFT-READY STATE */}
+        {!isSent && hasQuestion && !isEditingQuestion && (
+          <div className="bg-white border border-emerald-200 rounded-2xl shadow-sm overflow-hidden ring-1 ring-emerald-100">
+            <div className="h-0.5 bg-gradient-to-r from-emerald-500 to-teal-400" />
+            <div className="px-6 pt-5 pb-5">
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <h2 className="text-base font-semibold text-[#1a1a1a]">
+                    Question on Deck
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Ready to send
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isQuestionHeld && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-semibold text-amber-700">
+                      Held
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-semibold">
+                    <span className="w-1.5 h-1.5 bg-white/70 rounded-full" />
+                    READY
+                  </span>
+                </div>
+              </div>
+              <div className="h-px bg-neutral-100 my-4" />
+
+              {/* Type pill + question */}
+              <div className="flex items-start gap-3 mb-5">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
+                      MCQ
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#1a1a1a] leading-relaxed font-medium">
+                    &ldquo;{questionCandidate.text}&rdquo;
+                  </p>
+                </div>
+              </div>
+
+              {/* Primary + secondary actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {onSendQuestion && (
+                  <Button
+                    size="sm"
+                    onClick={() => onSendQuestion(questionCandidate.text)}
+                    className="rounded-full h-9 px-5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
+                    disabled={isSendingQuestion}
+                  >
+                    {isSendingQuestion ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        Send Now
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsModalOpen(true)}
+                  className="rounded-full h-9 px-4 text-xs font-medium border-neutral-200 text-neutral-700 gap-1.5"
+                  disabled={isSendingQuestion}
+                >
+                  <Eye className="w-3 h-3" />
+                  Preview
+                </Button>
+
+                {/* Tertiary */}
+                <div className="flex items-center gap-1 ml-auto">
+                  {onToggleQuestionHold && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onToggleQuestionHold}
+                      className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700"
+                      title={isQuestionHeld ? "Resume" : "Hold"}
+                    >
+                      {isQuestionHeld ? (
+                        <Play className="w-3.5 h-3.5" />
+                      ) : (
+                        <Pause className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleStartEdit}
+                    className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700"
+                    disabled={isSendingQuestion}
+                    title="Edit"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  {onDismissQuestion && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={onDismissQuestion}
+                      className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-rose-500"
+                      disabled={isSendingQuestion}
+                      title="Dismiss"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-2.5 border-t border-emerald-100 bg-emerald-50/40 rounded-b-2xl">
+              <p className="text-[11px] text-neutral-400">
+                Drafted from your live speech. Review before sending if needed.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* EDITING STATE */}
+        {!isSent && isEditingQuestion && (
+          <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 pt-5 pb-5">
+              <h2 className="text-base font-semibold text-[#1a1a1a] mb-1">
+                Question on Deck
+              </h2>
+              <p className="text-xs text-neutral-500 mb-4">Editing</p>
+              <div className="h-px bg-neutral-100 mb-4" />
+              <Textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                className="min-h-[60px] text-sm border-neutral-200 rounded-xl resize-none"
+                placeholder="Edit the question..."
+                autoFocus
+              />
+              <div className="flex items-center gap-2 mt-3">
+                <Button
+                  size="sm"
+                  onClick={handleSaveEdit}
+                  className="rounded-full h-8 px-4 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={!editText.trim()}
+                >
+                  <Check className="w-3 h-3" />
+                  Send Edited
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditingQuestion(false)}
+                  className="rounded-full h-8 px-3 text-xs text-neutral-500"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PASSIVE LISTENING STATE (no question) */}
+        {!isSent && !hasQuestion && !isEditingQuestion && (
+          <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-6 pt-6 pb-5">
+              <div className="flex items-start justify-between mb-1">
+                <div>
+                  <h2 className="text-base font-semibold text-[#1a1a1a]">
+                    Question on Deck
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Listening for your next live question...
+                  </p>
+                </div>
+              </div>
+              <div className="h-px bg-neutral-100 my-4" />
+              <p className="text-sm text-neutral-600 leading-relaxed max-w-md">
+                Edvana is actively listening and will prepare a send-ready
+                audience check when a clear question moment is detected.
+              </p>
+              {/* Pulse */}
+              <div className="flex justify-center my-8">
+                <div className="relative flex items-center justify-center">
+                  <div
+                    className="absolute w-28 h-28 rounded-full border border-emerald-100/60 animate-ping"
+                    style={{ animationDuration: "2.8s" }}
+                  />
+                  <div
+                    className="absolute w-20 h-20 rounded-full border border-emerald-200/50 animate-ping"
+                    style={{ animationDuration: "2s" }}
+                  />
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                    <div className="w-4 h-4 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-3 border-t border-neutral-100 bg-neutral-50/60 rounded-b-2xl">
+              <p className="text-[11px] text-neutral-400">
+                Nothing is sent automatically. You stay in control.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Supporting strips ─────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <TranscriptStrip
+            lastChunk={lastChunk}
+            hasLive={!!currentTranscript}
+            chunkCount={transcriptChunks.length}
+          />
+          <LiveFlowStrip activeStep={activeStep} />
+        </div>
+        <div ref={transcriptEndRef} />
       </div>
-    </div>
+    </>
   );
 }
