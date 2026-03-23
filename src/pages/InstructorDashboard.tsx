@@ -547,7 +547,10 @@ export default function InstructorDashboard() {
               />
             </section>
 
-            {/* QuestionOnDeck + Transcript rendered via persistent LectureTranscription mount above */}
+            {/* ===== QUESTION ON DECK + TRANSCRIPT CHUNKS ===== */}
+            <section>
+              <LectureTranscription onQuestionGenerated={() => {}} />
+            </section>
 
             {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
             {!isListening && (
