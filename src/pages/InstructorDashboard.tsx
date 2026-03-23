@@ -547,7 +547,10 @@ export default function InstructorDashboard() {
               />
             </section>
 
-            {/* QuestionOnDeck + Transcript rendered via persistent LectureTranscription mount above */}
+            {/* ===== QUESTION ON DECK + TRANSCRIPT CHUNKS ===== */}
+            <section>
+              <LectureTranscription onQuestionGenerated={() => {}} />
+            </section>
 
             {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
             {!isListening && (
@@ -731,10 +734,7 @@ export default function InstructorDashboard() {
           
           {renderTabContent()}
 
-          {/* LectureTranscription - Always mounted to persist recording, visible only on live tab */}
-          <div className={activeTab !== "live" ? "hidden" : "mt-8"}>
-            <LectureTranscription onQuestionGenerated={() => {}} />
-          </div>
+          {/* LectureTranscription is now rendered inline within the live tab */}
         </main>
       </div>
 
