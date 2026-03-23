@@ -73,11 +73,11 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert educator creating multiple choice questions. Generate 4 answer options for the given question, with exactly one correct answer. Make distractors plausible but clearly incorrect to someone who understands the material.`
+            content: `You are an expert educator creating multiple choice questions. Generate 4 answer options for the given question, with exactly one correct answer. Always include the factually correct answer using your world knowledge, even if it was not mentioned in the lecture. Make distractors plausible but clearly incorrect to someone who understands the material.`
           },
           {
             role: 'user',
-            content: `${source_transcript ? `Lecture context (use this to ground the options):\n"${source_transcript.slice(-800)}"\n\n` : ''}Generate 4 multiple choice options for this question:\n\n${question_text}\n\nIMPORTANT: Format each option as "A. text", "B. text", "C. text", "D. text". Base all options on the lecture context above, not general knowledge.`
+            content: `${source_transcript ? `Lecture context (use for relevant distractors):\n"${source_transcript.slice(-800)}"\n\n` : ''}Generate 4 multiple choice options for this question:\n\n${question_text}\n\nIMPORTANT: Format each option as "A. text", "B. text", "C. text", "D. text". Always include the factually correct answer as one option (use world knowledge if needed). Never generate options like "was not mentioned in the lecture".`
           }
         ],
         tools: [

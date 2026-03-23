@@ -350,7 +350,7 @@ export function VoiceQuestionPreviewDialog({
 
   const getTypeLabel = () => {
     if (questionType === 'multiple_choice') return 'Multiple Choice';
-    if (questionType === 'poll') return 'Poll (Ungraded)';
+    if (questionType === 'poll') return 'Poll';
     return 'Short Answer';
   };
 
@@ -419,7 +419,7 @@ export function VoiceQuestionPreviewDialog({
                 <RadioGroupItem value="poll" id="poll" />
                 <Label htmlFor="poll" className="flex items-center gap-1 cursor-pointer">
                   <BarChart3 className="h-4 w-4" />
-                  Poll (Ungraded)
+                  Poll
                 </Label>
               </div>
             </RadioGroup>

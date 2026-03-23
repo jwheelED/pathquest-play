@@ -763,6 +763,7 @@ export default function InstructorDashboard() {
               onDismissQuestionRef={onDismissQuestionRef}
               onStartRecordingRef={onStartRecordingRef}
               onStopRecordingRef={onStopRecordingRef}
+              suppressInternalDialogs={true}
             />
           </div>
           

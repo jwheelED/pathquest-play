@@ -77,6 +77,8 @@ interface LectureTranscriptionProps {
   onDismissQuestionRef?: React.MutableRefObject<(() => void) | null>;
   onStartRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   onStopRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  /** When true, suppresses the VoiceQuestionPreviewDialog and auto-sends when triggered */
+  suppressInternalDialogs?: boolean;
 }
 
 // Constants for memory and resource management
@@ -104,6 +106,7 @@ export const LectureTranscription = ({
   onDismissQuestionRef,
   onStartRecordingRef,
   onStopRecordingRef,
+  suppressInternalDialogs = false,
 }: LectureTranscriptionProps) => {
   // Helper function to safely extract displayable text from question_text (string or object)
   const getQuestionPreview = (questionText: any, maxLength: number = 60): string => {
@@ -318,6 +321,14 @@ export const LectureTranscription = ({
       onStopRecordingRef.current = stopRecording;
     }
   }); // no dep array — always keep ref current
+
+  // When suppressInternalDialogs is true, auto-confirm the send instead of showing the dialog
+  useEffect(() => {
+    if (suppressInternalDialogs && isPreviewOpen && pendingQuestionDataRef.current) {
+      const data = pendingQuestionDataRef.current as import("./VoiceQuestionPreviewDialog").ExtractedVoiceQuestion;
+      handleConfirmPreviewSend(data);
+    }
+  }, [isPreviewOpen, suppressInternalDialogs]);
   // ===== END EXTERNAL STATE SYNC =====
 
   // Presenter broadcast channel (for popup presenter view)
@@ -3794,7 +3805,7 @@ export const LectureTranscription = ({
 
       {/* Voice/Manual Question Preview Dialog */}
       <VoiceQuestionPreviewDialog
-        open={isPreviewOpen}
+        open={isPreviewOpen && !suppressInternalDialogs}
         onOpenChange={(open) => {
           setIsPreviewOpen(open);
           if (!open) {

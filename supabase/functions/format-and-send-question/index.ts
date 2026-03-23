@@ -92,14 +92,15 @@ Write all math as plain readable text using Unicode:
 
 Context from lecture: "${context}"${courseInfo}${mathGuidance}
 
-GROUNDING RULES:
-- All options and distractors MUST relate to the lecture content provided above, NOT general knowledge.
-- Do NOT introduce concepts, terms, or topics that were not mentioned in the lecture context.
-- Every option should be plausible based on what was actually taught.
+ANSWER RULES:
+- Always include the factually correct answer as one of the options, even if it was not explicitly mentioned in the lecture transcript.
+- Use your world knowledge to determine the correct answer for factual questions.
+- Use the lecture context to craft relevant, plausible distractors when available.
+- Never generate an option like "was not mentioned in the lecture" or similar non-answers.
 
 Generate a multiple choice question with 4 options:
-- One correct answer
-- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""} and typical calculation errors
+- One correct answer (factually accurate, based on world knowledge if needed)
+- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""} and typical errors
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
 - Keep it concise and clear
@@ -133,7 +134,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
           {
             role: "system",
             content:
-              "You are an educational AI that creates high-quality multiple choice questions grounded strictly in the provided lecture content. You MUST NOT use general knowledge or introduce topics not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
+              "You are an educational AI that creates high-quality multiple choice questions. Always include the factually correct answer as one option, using your world knowledge when necessary. Use lecture context to inform distractors. Return ONLY valid JSON, no markdown formatting.",
           },
           { role: "user", content: prompt },
         ],
@@ -794,13 +795,38 @@ serve(async (req) => {
           gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
         };
       }
+    } else if (finalType === "poll") {
+      // Poll format - collect responses without grading
+      if (options && Array.isArray(options) && options.length >= 2) {
+        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        const normalizedOptions = options.map((opt: string, i: number) => {
+          const trimmed = opt.trim();
+          if (/^[A-D][\).\-\s]/i.test(trimmed)) return trimmed;
+          return `${MCQ_LETTERS[i]}. ${trimmed}`;
+        });
+        formattedQuestion = {
+          question: question_text,
+          type: "poll",
+          options: normalizedOptions,
+          gradingMode: "ungraded",
+        };
+      } else {
+        // Generate poll options with AI
+        const mcq = await generateMCQ(question_text, context || "", course_context);
+        formattedQuestion = {
+          question: mcq.question,
+          type: "poll",
+          options: mcq.options,
+          gradingMode: "ungraded",
+        };
+      }
     } else {
       // Short answer format - use AI grading if auto-grade enabled AND expected answer available
       formattedQuestion = {
         question: question_text,
         type: "short_answer",
         expectedAnswer: expected_answer || "",
-        gradingMode: autoGradePrefs.short_answer && expected_answer ? "auto_grade" : "manual_grade", // FIXED: Check auto-grade pref
+        gradingMode: autoGradePrefs.short_answer && expected_answer ? "auto_grade" : "manual_grade",
       };
     }
 
