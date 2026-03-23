@@ -532,7 +532,7 @@ export const InteractiveLecturePlayer = ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setAskSubmitting(false); return; }
 
-    const { error } = await supabase.from('student_lecture_questions').insert({
+    const { error } = await (supabase.from('student_lecture_questions' as any) as any).insert({
       lecture_video_id: lectureId,
       student_id: user.id,
       instructor_id: lectureInstructorId,

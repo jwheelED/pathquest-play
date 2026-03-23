@@ -61,11 +61,20 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
-import { usePassiveQuestionDetection } from "@/hooks/usePassiveQuestionDetection";
+import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
 import { QuestionOnDeck } from "./QuestionOnDeck";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
+  // Callbacks for external state sync
+  onRecordingChange?: (isRecording: boolean) => void;
+  onTranscriptChange?: (chunks: string[], current: string) => void;
+  onQuestionCandidateChange?: (candidate: PassiveQuestionCandidate | null) => void;
+  onSendingChange?: (isSending: boolean) => void;
+  // Refs for external control
+  onSendQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
+  onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
+  onDismissQuestionRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 // Constants for memory and resource management
@@ -82,7 +91,16 @@ const CIRCUIT_BREAKER_BACKOFF = [30000, 60000, 120000, 300000]; // 30s, 60s, 120
 const QUOTA_CIRCUIT_BREAKER_THRESHOLD = 3; // Trigger after 3 consecutive quota errors
 const QUOTA_PAUSE_DURATION = 5 * 60 * 1000; // 5 minutes pause
 
-export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscriptionProps) => {
+export const LectureTranscription = ({ 
+  onQuestionGenerated,
+  onRecordingChange,
+  onTranscriptChange,
+  onQuestionCandidateChange,
+  onSendingChange,
+  onSendQuestionRef,
+  onPreviewQuestionRef,
+  onDismissQuestionRef,
+}: LectureTranscriptionProps) => {
   // Helper function to safely extract displayable text from question_text (string or object)
   const getQuestionPreview = (questionText: any, maxLength: number = 60): string => {
     if (typeof questionText === "string") {
@@ -204,8 +222,10 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    candidateHistory: passiveCandidateHistory,
     checkUtterance: checkPassiveQuestion,
     dismissCandidate: dismissPassiveCandidate,
+    removeFromHistory: removePassiveFromHistory,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
@@ -220,6 +240,68 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
   useEffect(() => {
     isSendingQuestionRef.current = isSendingQuestion;
   }, [isSendingQuestion]);
+
+  // ===== EXTERNAL STATE SYNC CALLBACKS =====
+  // Sync recording state to parent
+  useEffect(() => {
+    onRecordingChange?.(isRecording);
+  }, [isRecording, onRecordingChange]);
+
+  // Sync transcript to parent
+  useEffect(() => {
+    onTranscriptChange?.(transcriptChunks, lastTranscript);
+  }, [transcriptChunks, lastTranscript, onTranscriptChange]);
+
+  // Sync passive candidate to parent
+  useEffect(() => {
+    onQuestionCandidateChange?.(passiveCandidate);
+  }, [passiveCandidate, onQuestionCandidateChange]);
+
+  // Sync sending state to parent
+  useEffect(() => {
+    onSendingChange?.(isSendingQuestion);
+  }, [isSendingQuestion, onSendingChange]);
+
+  // Register external control refs
+  useEffect(() => {
+    if (onSendQuestionRef) {
+      onSendQuestionRef.current = (questionText: string) => {
+        dismissPassiveCandidate();
+        setPreviewQuestionData({
+          question_text: questionText,
+          suggested_type: 'multiple_choice',
+        });
+        pendingQuestionDataRef.current = {
+          question_text: questionText,
+          suggested_type: 'multiple_choice',
+          confidence: 1.0,
+          extraction_method: 'passive_detection',
+          source: 'passive_detection',
+        };
+        setIsPreviewOpen(true);
+      };
+    }
+    if (onPreviewQuestionRef) {
+      onPreviewQuestionRef.current = (questionText: string) => {
+        setPreviewQuestionData({
+          question_text: questionText,
+          suggested_type: 'multiple_choice',
+        });
+        pendingQuestionDataRef.current = {
+          question_text: questionText,
+          suggested_type: 'multiple_choice',
+          confidence: 1.0,
+          extraction_method: 'passive_detection',
+          source: 'passive_detection',
+        };
+        setIsPreviewOpen(true);
+      };
+    }
+    if (onDismissQuestionRef) {
+      onDismissQuestionRef.current = dismissPassiveCandidate;
+    }
+  }, [dismissPassiveCandidate, onSendQuestionRef, onPreviewQuestionRef, onDismissQuestionRef]);
+  // ===== END EXTERNAL STATE SYNC =====
 
   // Presenter broadcast channel (for popup presenter view)
   const { broadcast } = usePresenterBroadcast();
@@ -3716,6 +3798,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
         <div className="mt-4">
           <QuestionOnDeck
             candidate={passiveCandidate}
+            candidateHistory={passiveCandidateHistory}
             isListening={isRecording}
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
@@ -3751,6 +3834,7 @@ export const LectureTranscription = ({ onQuestionGenerated }: LectureTranscripti
               setIsPreviewOpen(true);
             }}
             onDismiss={dismissPassiveCandidate}
+            onRemoveFromHistory={removePassiveFromHistory}
           />
         </div>
       )}

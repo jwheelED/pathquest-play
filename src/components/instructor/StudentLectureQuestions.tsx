@@ -48,8 +48,8 @@ export function StudentLectureQuestions({ instructorId }: { instructorId: string
 
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('student_lecture_questions')
+    const { data, error } = await (supabase
+      .from('student_lecture_questions' as any) as any)
       .select(`
         id,
         lecture_video_id,
@@ -68,7 +68,7 @@ export function StudentLectureQuestions({ instructorId }: { instructorId: string
     if (error) {
       console.error('[StudentLectureQuestions] fetch error:', error);
     } else if (data) {
-      const mapped: StudentQuestion[] = data.map((row: Record<string, unknown>) => ({
+      const mapped: StudentQuestion[] = (data as any[]).map((row: Record<string, any>) => ({
         id: row.id as string,
         lecture_video_id: row.lecture_video_id as string,
         student_id: row.student_id as string,
@@ -109,8 +109,8 @@ export function StudentLectureQuestions({ instructorId }: { instructorId: string
   const handleReply = async (questionId: string) => {
     if (!replyText.trim()) return;
     setSubmitting(true);
-    const { error } = await supabase
-      .from('student_lecture_questions')
+    const { error } = await (supabase
+      .from('student_lecture_questions' as any) as any)
       .update({
         instructor_reply: replyText.trim(),
         replied_at: new Date().toISOString(),

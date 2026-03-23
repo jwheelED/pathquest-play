@@ -14,46 +14,113 @@ import {
   Radio,
   X,
   Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PassiveQuestionCandidate } from '@/hooks/usePassiveQuestionDetection';
 
 interface QuestionOnDeckProps {
-  /** Current autodrafted candidate from passive detection or auto-interval */
   candidate: PassiveQuestionCandidate | null;
-  /** Whether the system is actively recording/listening */
+  candidateHistory: PassiveQuestionCandidate[];
   isListening: boolean;
-  /** Whether a question is currently being sent */
   isSending: boolean;
-  /** Called when user clicks Send Now */
   onSendNow: (questionText: string) => void;
-  /** Called when user clicks Preview (opens Review Audience Check modal) */
   onPreview: (questionText: string) => void;
-  /** Called to dismiss/clear the current candidate */
   onDismiss: () => void;
-  /** Whether hold is active (prevents auto-update of the draft) */
+  onRemoveFromHistory: (id: string) => void;
   isHeld: boolean;
-  /** Toggle hold state */
   onToggleHold: () => void;
-  /** Suggested question type */
   suggestedType?: 'multiple_choice' | 'short_answer';
+}
+
+function timeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  return `${Math.floor(diff / 60)}m ago`;
+}
+
+function HistoryItem({
+  item,
+  onSend,
+  onPreview,
+  onRemove,
+  isSending,
+}: {
+  item: PassiveQuestionCandidate;
+  onSend: (text: string) => void;
+  onPreview: (text: string) => void;
+  onRemove: (id: string) => void;
+  isSending: boolean;
+}) {
+  return (
+    <div className="p-3 rounded-lg bg-muted/40 border border-border/50 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-foreground leading-relaxed flex-1 line-clamp-2">
+          "{item.text}"
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onRemove(item.id)}
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground shrink-0"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <Clock className="h-2.5 w-2.5" />
+          {timeAgo(item.detectedAt)}
+        </span>
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onPreview(item.text)}
+            className="h-6 text-[10px] px-2"
+            disabled={isSending}
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Preview
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => onSend(item.text)}
+            className="h-6 text-[10px] px-2"
+            disabled={isSending}
+          >
+            <Send className="h-3 w-3 mr-1" />
+            Send
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function QuestionOnDeck({
   candidate,
+  candidateHistory,
   isListening,
   isSending,
   onSendNow,
   onPreview,
   onDismiss,
+  onRemoveFromHistory,
   isHeld,
   onToggleHold,
   suggestedType = 'multiple_choice',
 }: QuestionOnDeckProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [showAllHistory, setShowAllHistory] = useState(false);
 
   const hasCandidate = !!candidate;
+  const hasHistory = candidateHistory.length > 0;
+  const visibleHistory = showAllHistory ? candidateHistory : candidateHistory.slice(0, 3);
+  const hiddenCount = candidateHistory.length - 3;
 
   const handleStartEdit = () => {
     if (candidate) {
@@ -64,7 +131,6 @@ export function QuestionOnDeck({
 
   const handleSaveEdit = () => {
     setIsEditing(false);
-    // Send with edited text
     if (editText.trim()) {
       onSendNow(editText.trim());
     }
@@ -125,6 +191,11 @@ export function QuestionOnDeck({
           </div>
 
           <div className="flex items-center gap-2">
+            {hasHistory && (
+              <Badge variant="outline" className="text-[10px] font-medium">
+                {candidateHistory.length} saved
+              </Badge>
+            )}
             {hasCandidate && (
               <Badge
                 variant="outline"
@@ -134,10 +205,7 @@ export function QuestionOnDeck({
               </Badge>
             )}
             {isHeld && (
-              <Badge
-                variant="secondary"
-                className="text-[10px] font-medium"
-              >
+              <Badge variant="secondary" className="text-[10px] font-medium">
                 <Pause className="h-2.5 w-2.5 mr-0.5" />
                 Held
               </Badge>
@@ -151,17 +219,15 @@ export function QuestionOnDeck({
           </div>
         </div>
 
-        {/* Question Content */}
+        {/* Current candidate */}
         {hasCandidate && !isEditing ? (
           <div className="space-y-4">
-            {/* Question text */}
             <div className="p-4 rounded-xl bg-background border border-border/60">
               <p className="text-sm text-foreground leading-relaxed">
                 "{candidate.text}"
               </p>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -200,11 +266,7 @@ export function QuestionOnDeck({
                 className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
                 title={isHeld ? 'Release hold' : 'Hold this draft'}
               >
-                {isHeld ? (
-                  <Play className="h-3.5 w-3.5" />
-                ) : (
-                  <Pause className="h-3.5 w-3.5" />
-                )}
+                {isHeld ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
               </Button>
 
               <Button
@@ -281,6 +343,49 @@ export function QuestionOnDeck({
                 ? 'Edvana is listening and will autodraft your next audience check...'
                 : 'Start recording to enable always-on question detection'}
             </p>
+          </div>
+        )}
+
+        {/* Question History */}
+        {hasHistory && (
+          <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                Previous detections
+              </span>
+            </div>
+            <div className="space-y-2">
+              {visibleHistory.map((item) => (
+                <HistoryItem
+                  key={item.id}
+                  item={item}
+                  onSend={onSendNow}
+                  onPreview={onPreview}
+                  onRemove={onRemoveFromHistory}
+                  isSending={isSending}
+                />
+              ))}
+            </div>
+            {hiddenCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllHistory(v => !v)}
+                className="w-full h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+              >
+                {showAllHistory ? (
+                  <>
+                    <ChevronUp className="h-3 w-3" />
+                    Show less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" />
+                    Show {hiddenCount} more
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
