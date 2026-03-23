@@ -731,10 +731,7 @@ export default function InstructorDashboard() {
           
           {renderTabContent()}
 
-          {/* LectureTranscription - Always mounted to persist recording, visible only on live tab */}
-          <div className={activeTab !== "live" ? "hidden" : "mt-8"}>
-            <LectureTranscription onQuestionGenerated={() => {}} />
-          </div>
+          {/* LectureTranscription is now rendered inline within the live tab */}
         </main>
       </div>
 
