@@ -50,9 +50,9 @@ export function LiveUnderstandingHealth() {
         const latestSessionId = sessionIds[0];
         
         const [participantsRes, questionsRes, responsesRes] = await Promise.all([
-          supabase.from("live_participants").select("id", { count: "exact", head: true }).eq("session_id", latestSessionId),
-          supabase.from("live_questions").select("id", { count: "exact", head: true }).eq("session_id", latestSessionId),
-          supabase.from("live_responses").select("is_correct").in("session_id", sessionIds.slice(0, 3)),
+          (supabase.from("live_participants") as any).select("id", { count: "exact", head: true }).eq("session_id", latestSessionId),
+          (supabase.from("live_questions") as any).select("id", { count: "exact", head: true }).eq("session_id", latestSessionId),
+          (supabase.from("live_responses") as any).select("is_correct").in("session_id", sessionIds.slice(0, 3)),
         ]);
 
         const totalParticipants = participantsRes.count || 0;

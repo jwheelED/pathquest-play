@@ -56,9 +56,9 @@ export function RecentSessionsList({ onNavigate }: RecentSessionsListProps) {
       const sessionIds = sessionsData.map(s => s.id);
 
       const [participantsRes, questionsRes, responsesRes] = await Promise.all([
-        supabase.from("live_participants").select("session_id").in("session_id", sessionIds),
-        supabase.from("live_questions").select("session_id, id").in("session_id", sessionIds),
-        supabase.from("live_responses").select("session_id, is_correct").in("session_id", sessionIds),
+        (supabase.from("live_participants") as any).select("session_id").in("session_id", sessionIds),
+        (supabase.from("live_questions") as any).select("session_id, id").in("session_id", sessionIds),
+        (supabase.from("live_responses") as any).select("session_id, is_correct").in("session_id", sessionIds),
       ]);
 
       const pMap = new Map<string, number>();
