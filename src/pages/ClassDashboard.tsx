@@ -2,14 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, FileText, Trophy, CheckCircle2, Target, PlayCircle, TrendingUp, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, FileText, Trophy, CheckCircle2, Target, PlayCircle, TrendingUp, Users, ChevronRight } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
-import { FloatingDecorations } from "@/components/student/FloatingDecorations";
 import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
 import { StudentLectureQuestions } from "@/components/student/StudentLectureQuestions";
-import { MetricCard } from "@/components/dashboard/MetricCard";
 import { cn } from "@/lib/utils";
 
 interface User {
@@ -234,8 +232,11 @@ export default function ClassDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
+      <div className="min-h-screen mastery-bg flex items-center justify-center">
+        <div className="flex items-center gap-3 text-charcoal-muted">
+          <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Loading...</span>
+        </div>
       </div>
     );
   }
@@ -245,9 +246,7 @@ export default function ClassDashboard() {
   }
 
   return (
-    <div className="min-h-screen headspace-bg relative pb-20 md:pb-0">
-      <FloatingDecorations variant="minimal" />
-      
+    <div className="min-h-screen mastery-bg relative pb-20 md:pb-0">
       <MobileHeader
         userName={userName || user.email || "Student"}
         userEmail={user.email || ""}
@@ -257,8 +256,8 @@ export default function ClassDashboard() {
       />
 
       {/* Desktop Header */}
-      <header className="hidden md:block bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <header className="hidden md:block bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
@@ -268,31 +267,36 @@ export default function ClassDashboard() {
                   e.stopPropagation();
                   navigate("/dashboard");
                 }}
-                className="gap-2 rounded-full hover:bg-accent pointer-events-auto relative z-10"
+                className="gap-2 rounded-full text-charcoal-muted hover:text-charcoal hover:bg-slate-100"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
+                Back
               </Button>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-primary-foreground" />
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-emerald-600" />
                 </div>
-                <h1 className="text-xl font-bold text-foreground">
-                  {courseInfo?.courseTitle || "Class Dashboard"}
-                </h1>
+                <div>
+                  <h1 className="text-base font-semibold text-charcoal">
+                    {courseInfo?.courseTitle || "Class Dashboard"}
+                  </h1>
+                  {courseInfo?.instructorName && (
+                    <p className="text-xs text-charcoal-subtle">{courseInfo.instructorName}</p>
+                  )}
+                </div>
               </div>
             </div>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs text-charcoal-muted">
               {user?.email || "User"}
             </span>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 relative">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 relative">
         {/* Mobile Tab Navigation */}
         <div className="lg:hidden mb-4">
-          <div className="flex gap-1 p-1 bg-muted/50 rounded-xl overflow-x-auto">
+          <div className="flex gap-1 p-1 bg-white rounded-xl border border-slate-100 overflow-x-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.value;
@@ -303,8 +307,8 @@ export default function ClassDashboard() {
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-1 justify-center",
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-charcoal-muted hover:text-charcoal hover:bg-slate-50"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -317,8 +321,8 @@ export default function ClassDashboard() {
 
         <div className="flex min-h-[calc(100vh-12rem)]">
           {/* Sidebar Navigation - Desktop Only */}
-          <aside className="hidden lg:flex w-56 flex-col border-r border-border/50 pr-6 mr-6 shrink-0">
-            <nav className="flex flex-col gap-1 sticky top-24">
+          <aside className="hidden lg:flex w-52 flex-col pr-6 mr-6 shrink-0">
+            <nav className="flex flex-col gap-1 sticky top-20">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.value;
@@ -327,13 +331,13 @@ export default function ClassDashboard() {
                     key={item.value}
                     onClick={() => setActiveTab(item.value)}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-left",
+                      "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-left",
                       isActive
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "text-charcoal-muted hover:text-charcoal hover:bg-white"
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-4 w-4" />
                     {item.label}
                   </button>
                 );
@@ -345,103 +349,137 @@ export default function ClassDashboard() {
           <main className="flex-1 min-w-0">
             {activeTab === "overview" && (
               <div className="space-y-6 animate-fade-in">
-                {/* Course Header Row */}
+                {/* Course Info Strip */}
                 {courseInfo && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      <span>{courseInfo.instructorName}</span>
-                    </div>
-                    {courseInfo.courseSchedule && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        <span>{courseInfo.courseSchedule}</span>
+                  <div className="command-card px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2 text-charcoal-muted">
+                        <Users className="h-4 w-4 text-charcoal-subtle" />
+                        <span>{courseInfo.instructorName}</span>
                       </div>
-                    )}
+                      {courseInfo.courseSchedule && (
+                        <div className="flex items-center gap-2 text-charcoal-muted">
+                          <Calendar className="h-4 w-4 text-charcoal-subtle" />
+                          <span>{courseInfo.courseSchedule}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {/* Quick Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard
-                    icon={<CheckCircle2 className="h-4 w-4" />}
-                    label="Completed"
-                    value={classStats.itemsCompleted}
-                    description="Assignments & lectures"
-                    size="sm"
-                    variant="success"
-                  />
-                  <MetricCard
-                    icon={<TrendingUp className="h-4 w-4" />}
-                    label="Avg Score"
-                    value={classStats.averageScore !== null ? `${classStats.averageScore}%` : "—"}
-                    description={
-                      classStats.averageScore !== null
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="signal-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">Completed</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-charcoal">{classStats.itemsCompleted}</p>
+                    <p className="text-xs text-charcoal-subtle mt-0.5">Assignments & lectures</p>
+                  </div>
+                  
+                  <div className="signal-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-sky-600" />
+                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">Avg Score</span>
+                    </div>
+                    <p className={cn(
+                      "text-2xl font-semibold",
+                      classStats.averageScore !== null && classStats.averageScore >= 70 
+                        ? "text-emerald-600" 
+                        : classStats.averageScore !== null && classStats.averageScore >= 40
+                          ? "text-amber-600"
+                          : "text-charcoal"
+                    )}>
+                      {classStats.averageScore !== null ? `${classStats.averageScore}%` : "—"}
+                    </p>
+                    <p className="text-xs text-charcoal-subtle mt-0.5">
+                      {classStats.averageScore !== null
                         ? classStats.averageScore >= 70
                           ? "Strong performance"
                           : classStats.averageScore >= 40
                             ? "Room to improve"
                             : "Needs review"
-                        : "No grades yet"
-                    }
-                    size="sm"
-                    variant={
-                      classStats.averageScore !== null
-                        ? classStats.averageScore >= 70
-                          ? "success"
-                          : "warning"
-                        : "default"
-                    }
-                  />
-                  <MetricCard
-                    icon={<Target className="h-4 w-4" />}
-                    label="To Review"
-                    value={classStats.itemsToReview}
-                    description="Items below 70%"
-                    size="sm"
-                    variant={classStats.itemsToReview > 0 ? "warning" : "default"}
-                  />
-                  <MetricCard
-                    icon={<Video className="h-4 w-4" />}
-                    label="Lectures"
-                    value={classStats.lecturesTotal > 0 ? `${classStats.lecturesCompleted}/${classStats.lecturesTotal}` : "—"}
-                    description={classStats.lecturesTotal > 0 ? "Pre-recorded progress" : "None available"}
-                    size="sm"
-                    variant="primary"
-                  />
+                        : "No grades yet"}
+                    </p>
+                  </div>
+                  
+                  <div className="signal-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-amber-600" />
+                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">To Review</span>
+                    </div>
+                    <p className={cn(
+                      "text-2xl font-semibold",
+                      classStats.itemsToReview > 0 ? "text-amber-600" : "text-charcoal"
+                    )}>
+                      {classStats.itemsToReview}
+                    </p>
+                    <p className="text-xs text-charcoal-subtle mt-0.5">Items below 70%</p>
+                  </div>
+                  
+                  <div className="signal-card p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Video className="h-4 w-4 text-violet-600" />
+                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">Lectures</span>
+                    </div>
+                    <p className="text-2xl font-semibold text-charcoal">
+                      {classStats.lecturesTotal > 0 ? `${classStats.lecturesCompleted}/${classStats.lecturesTotal}` : "—"}
+                    </p>
+                    <p className="text-xs text-charcoal-subtle mt-0.5">
+                      {classStats.lecturesTotal > 0 ? "Pre-recorded progress" : "None available"}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Next Action Banner */}
                 {classStats.nextIncompleteLecture ? (
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
-                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <PlayCircle className="w-5 h-5 text-primary" />
+                  <div className="command-card p-4 border-l-4 border-l-emerald-500">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
+                        <PlayCircle className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-charcoal">Continue watching</p>
+                        <p className="text-sm text-charcoal-muted truncate">{classStats.nextIncompleteLecture}</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        onClick={() => setActiveTab("lectures")} 
+                        className="flex-shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-4"
+                      >
+                        Continue
+                      </Button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">Continue watching</p>
-                      <p className="text-sm text-muted-foreground truncate">{classStats.nextIncompleteLecture}</p>
-                    </div>
-                    <Button size="sm" onClick={() => setActiveTab("lectures")} className="flex-shrink-0">
-                      Go
-                    </Button>
                   </div>
                 ) : classStats.itemsToReview > 0 ? (
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                      <Target className="w-5 h-5 text-amber-600" />
+                  <div className="command-card p-4 border-l-4 border-l-amber-500">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                        <Target className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-charcoal">
+                          Review {classStats.itemsToReview} missed item{classStats.itemsToReview > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-sm text-charcoal-muted">Check feedback to improve your understanding</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => setActiveTab("results")} 
+                        className="flex-shrink-0 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50 px-4"
+                      >
+                        Review
+                      </Button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">Review {classStats.itemsToReview} missed item{classStats.itemsToReview > 1 ? "s" : ""}</p>
-                      <p className="text-sm text-muted-foreground">Check feedback to improve your understanding</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => setActiveTab("results")} className="flex-shrink-0 border-amber-500/30 text-amber-700 hover:bg-amber-500/10">
-                      Review
-                    </Button>
                   </div>
                 ) : classStats.itemsCompleted > 0 ? (
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                    <p className="text-sm text-muted-foreground">You're all caught up — keep it going!</p>
+                  <div className="command-card p-3 bg-emerald-50/50 border-emerald-100">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                      <p className="text-sm text-emerald-700 font-medium">You're all caught up — keep it going!</p>
+                    </div>
                   </div>
                 ) : null}
 
@@ -449,45 +487,66 @@ export default function ClassDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <button
                     onClick={() => setActiveTab("assigned")}
-                    className="flex items-center gap-3 p-4 rounded-xl border border-border/50 bg-card hover:bg-accent/50 transition-colors text-left"
+                    className="command-card p-4 hover:border-slate-200 transition-colors text-left group"
                   >
-                    <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Assigned Content</p>
-                      <p className="text-xs text-muted-foreground">Quizzes & assignments</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center">
+                          <FileText className="h-4 w-4 text-sky-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-charcoal">Assigned Content</p>
+                          <p className="text-xs text-charcoal-subtle">Quizzes & assignments</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-charcoal-subtle opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </button>
                   <button
                     onClick={() => setActiveTab("lectures")}
-                    className="flex items-center gap-3 p-4 rounded-xl border border-border/50 bg-card hover:bg-accent/50 transition-colors text-left"
+                    className="command-card p-4 hover:border-slate-200 transition-colors text-left group"
                   >
-                    <Video className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Pre-Recorded Lectures</p>
-                      <p className="text-xs text-muted-foreground">Watch & answer questions</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center">
+                          <Video className="h-4 w-4 text-violet-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-charcoal">Pre-Recorded Lectures</p>
+                          <p className="text-xs text-charcoal-subtle">Watch & answer questions</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-charcoal-subtle opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </button>
                   <button
                     onClick={() => setActiveTab("results")}
-                    className="flex items-center gap-3 p-4 rounded-xl border border-border/50 bg-card hover:bg-accent/50 transition-colors text-left"
+                    className="command-card p-4 hover:border-slate-200 transition-colors text-left group"
                   >
-                    <Trophy className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">View Results</p>
-                      <p className="text-xs text-muted-foreground">Grades & feedback</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center">
+                          <Trophy className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-charcoal">View Results</p>
+                          <p className="text-xs text-charcoal-subtle">Grades & feedback</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-charcoal-subtle opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                   </button>
                 </div>
 
                 {/* Topic Tags */}
                 {courseInfo?.courseTopics && courseInfo.courseTopics.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Topics Covered</h3>
+                  <div className="pt-4 border-t border-slate-100">
+                    <h3 className="text-[10px] font-semibold text-charcoal-subtle mb-3 uppercase tracking-widest">Topics Covered</h3>
                     <div className="flex flex-wrap gap-2">
                       {courseInfo.courseTopics.map((topic, idx) => (
                         <span
                           key={idx}
-                          className="px-3 py-1.5 bg-secondary/15 text-secondary rounded-full text-xs font-medium"
+                          className="px-3 py-1.5 bg-slate-50 text-charcoal-muted border border-slate-100 rounded-full text-xs font-medium"
                         >
                           {topic}
                         </span>
