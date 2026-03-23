@@ -727,8 +727,8 @@ export default function InstructorDashboard() {
             </div>
           )}
           
-          {/* LectureTranscription - Hidden but persists recording state */}
-          <div className="hidden">
+          {/* LectureTranscription - Visible on live tab, hidden otherwise to persist recording state */}
+          <div className={activeTab === "live" ? "" : "hidden"}>
             <LectureTranscription onQuestionGenerated={() => {}} />
           </div>
           
