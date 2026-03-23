@@ -93,7 +93,7 @@ export default function InstructorDashboard() {
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
   const [isQuestionHeld, setIsQuestionHeld] = useState(false);
   // Refs for callbacks
-  const onSendQuestionRef = useRef<((text: string) => void) | null>(null);
+  const onSendQuestionRef = useRef<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>(null);
   const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
   const onDismissQuestionRef = useRef<(() => void) | null>(null);
   const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
@@ -561,7 +561,7 @@ export default function InstructorDashboard() {
                 currentTranscript={currentTranscript}
                 questionCandidate={questionCandidate}
                 isSendingQuestion={isSendingQuestion}
-                onSendQuestion={(text) => onSendQuestionRef.current?.(text)}
+                onSendQuestion={(text, type, options, correctAnswer, expectedAnswer) => onSendQuestionRef.current?.(text, type, options, correctAnswer, expectedAnswer)}
                 onPreviewQuestion={(text) => onPreviewQuestionRef.current?.(text)}
                 onDismissQuestion={() => onDismissQuestionRef.current?.()}
                 isQuestionHeld={isQuestionHeld}

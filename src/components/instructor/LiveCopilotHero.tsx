@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -69,7 +70,7 @@ interface LiveCopilotHeroProps {
   currentTranscript?: string;
   questionCandidate?: PassiveQuestionCandidate | null;
   isSendingQuestion?: boolean;
-  onSendQuestion?: (text: string) => void;
+  onSendQuestion?: (text: string, type?: QuestionType, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void;
   onPreviewQuestion?: (text: string) => void;
   onDismissQuestion?: () => void;
   isQuestionHeld?: boolean;
@@ -127,17 +128,16 @@ function ReviewModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSend: (text: string, type: QuestionType) => void;
+  onSend: (text: string, type: QuestionType, options: string[], correctAnswer: string, expectedAnswer: string) => void;
   initialText: string;
   transcriptSource?: string;
 }) {
   const [qType, setQType] = useState<QuestionType>("mcq");
   const [questionText, setQuestionText] = useState(initialText);
   const [mcqOptions, setMcqOptions] = useState<MCQOption[]>(DEFAULT_MCQ);
-  const [shortAnswer, setShortAnswer] = useState(
-    "There are 206 bones in the adult human body."
-  );
+  const [shortAnswer, setShortAnswer] = useState("");
   const [pollOptions, setPollOptions] = useState<MCQOption[]>(DEFAULT_POLL);
+  const [isLoading, setIsLoading] = useState(false);
 
   const typeLabels: Record<QuestionType, string> = {
     mcq: "Multiple Choice",
@@ -150,6 +150,79 @@ function ReviewModal({
     short_answer: "Short Answer Question",
     poll: "Poll Question",
   };
+
+  const fetchMcqOptions = async (text: string, transcript: string | undefined) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-mcq-options", {
+        body: { question_text: text, source_transcript: transcript ?? "" },
+      });
+      if (!error && data?.options && Array.isArray(data.options)) {
+        const labels = ["A", "B", "C", "D"];
+        const correctLetter: string = data.correct_answer ?? "A";
+        const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
+          const stripped = opt.replace(/^[A-D]\.\s*/i, "");
+          return { label: labels[i] ?? String.fromCharCode(65 + i), text: stripped, isCorrect: labels[i] === correctLetter };
+        });
+        return parsed;
+      }
+    } catch (_e) {
+      // fall through to defaults
+    } finally {
+      setIsLoading(false);
+    }
+    return null;
+  };
+
+  const fetchExpectedAnswer = async (text: string, transcript: string | undefined) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-expected-answer", {
+        body: { question_text: text, source_transcript: transcript ?? "" },
+      });
+      if (!error && data?.expected_answer) {
+        return data.expected_answer as string;
+      }
+    } catch (_e) {
+      // fall through
+    } finally {
+      setIsLoading(false);
+    }
+    return null;
+  };
+
+  // Reset state when modal opens and trigger fetch
+  useEffect(() => {
+    if (!open) return;
+    setQuestionText(initialText);
+    setMcqOptions(DEFAULT_MCQ);
+    setShortAnswer("");
+    setPollOptions(DEFAULT_POLL);
+    setQType("mcq");
+
+    // Trigger fetch for default type (mcq)
+    fetchMcqOptions(initialText, transcriptSource).then((opts) => {
+      if (opts) setMcqOptions(opts);
+    });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch when type changes
+  useEffect(() => {
+    if (!open) return;
+    if (qType === "mcq") {
+      fetchMcqOptions(questionText, transcriptSource).then((opts) => {
+        if (opts) setMcqOptions(opts);
+      });
+    } else if (qType === "poll") {
+      fetchMcqOptions(questionText, transcriptSource).then((opts) => {
+        if (opts) setPollOptions(opts.map((o) => ({ ...o, isCorrect: false })));
+      });
+    } else if (qType === "short_answer") {
+      fetchExpectedAnswer(questionText, transcriptSource).then((ans) => {
+        if (ans) setShortAnswer(ans);
+      });
+    }
+  }, [qType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setCorrect = (idx: number) => {
     setMcqOptions((prev) =>
@@ -167,6 +240,38 @@ function ReviewModal({
     setPollOptions((prev) =>
       prev.map((o, i) => (i === idx ? { ...o, text } : o))
     );
+  };
+
+  const handleRegenerateMcq = () => {
+    fetchMcqOptions(questionText, transcriptSource).then((opts) => {
+      if (opts) setMcqOptions(opts);
+    });
+  };
+
+  const handleRegeneratePoll = () => {
+    fetchMcqOptions(questionText, transcriptSource).then((opts) => {
+      if (opts) setPollOptions(opts.map((o) => ({ ...o, isCorrect: false })));
+    });
+  };
+
+  const handleRegenerateShortAnswer = () => {
+    fetchExpectedAnswer(questionText, transcriptSource).then((ans) => {
+      if (ans) setShortAnswer(ans);
+    });
+  };
+
+  const handleSend = () => {
+    if (qType === "mcq") {
+      const correctOpt = mcqOptions.find((o) => o.isCorrect);
+      const correctAnswer = correctOpt ? correctOpt.label : "";
+      const options = mcqOptions.map((o) => `${o.label}. ${o.text}`);
+      onSend(questionText, qType, options, correctAnswer, "");
+    } else if (qType === "poll") {
+      const options = pollOptions.map((o) => `${o.label}. ${o.text}`);
+      onSend(questionText, qType, options, "", "");
+    } else {
+      onSend(questionText, qType, [], "", shortAnswer);
+    }
   };
 
   return (
@@ -192,7 +297,9 @@ function ReviewModal({
             </span>
             <div className="px-3.5 py-2.5 bg-neutral-50 border border-neutral-100 rounded-xl">
               <p className="text-xs text-neutral-600 italic leading-relaxed">
-                &ldquo;{transcriptSource || initialText}&rdquo;
+                {transcriptSource
+                  ? `\u201c${transcriptSource}\u201d`
+                  : "No transcript context captured yet."}
               </p>
             </div>
           </div>
@@ -243,47 +350,55 @@ function ReviewModal({
               <p className="text-xs text-neutral-400 mb-3">
                 Edit the generated options below and select the correct answer.
               </p>
-              <div className="space-y-2">
-                {mcqOptions.map((opt, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all",
-                      opt.isCorrect
-                        ? "border-emerald-300 bg-emerald-50/60"
-                        : "border-neutral-200 bg-white"
-                    )}
-                  >
-                    <button
-                      onClick={() => setCorrect(i)}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {mcqOptions.map((opt, i) => (
+                    <div
+                      key={i}
                       className={cn(
-                        "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                        "flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all",
                         opt.isCorrect
-                          ? "border-emerald-500 bg-emerald-500"
-                          : "border-neutral-300"
+                          ? "border-emerald-300 bg-emerald-50/60"
+                          : "border-neutral-200 bg-white"
                       )}
                     >
-                      {opt.isCorrect && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                      )}
-                    </button>
-                    <span className="text-xs font-semibold text-neutral-400 w-4 shrink-0">
-                      {opt.label}.
-                    </span>
-                    <Input
-                      value={opt.text}
-                      onChange={(e) => updateMcqText(i, e.target.value)}
-                      className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-[#1a1a1a] flex-1"
-                    />
-                  </div>
-                ))}
-              </div>
+                      <button
+                        onClick={() => setCorrect(i)}
+                        className={cn(
+                          "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+                          opt.isCorrect
+                            ? "border-emerald-500 bg-emerald-500"
+                            : "border-neutral-300"
+                        )}
+                      >
+                        {opt.isCorrect && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
+                      </button>
+                      <span className="text-xs font-semibold text-neutral-400 w-4 shrink-0">
+                        {opt.label}.
+                      </span>
+                      <Input
+                        value={opt.text}
+                        onChange={(e) => updateMcqText(i, e.target.value)}
+                        className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-[#1a1a1a] flex-1"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={isLoading}
+                onClick={handleRegenerateMcq}
                 className="mt-2 h-7 px-2 text-xs text-neutral-400 hover:text-neutral-600 gap-1.5"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
                 Regenerate options
               </Button>
               <p className="text-[11px] text-neutral-400 mt-1">
@@ -300,17 +415,25 @@ function ReviewModal({
                   (for grading reference)
                 </span>
               </span>
-              <Textarea
-                value={shortAnswer}
-                onChange={(e) => setShortAnswer(e.target.value)}
-                className="min-h-[56px] text-sm border-neutral-200 rounded-xl resize-none"
-              />
+              {isLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+                </div>
+              ) : (
+                <Textarea
+                  value={shortAnswer}
+                  onChange={(e) => setShortAnswer(e.target.value)}
+                  className="min-h-[56px] text-sm border-neutral-200 rounded-xl resize-none"
+                />
+              )}
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={isLoading}
+                onClick={handleRegenerateShortAnswer}
                 className="mt-2 h-7 px-2 text-xs text-neutral-400 hover:text-neutral-600 gap-1.5"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
                 Regenerate expected answer
               </Button>
               <p className="text-[11px] text-neutral-400 mt-1">
@@ -330,29 +453,37 @@ function ReviewModal({
                 Edit the poll choices below. Poll responses are recorded but not
                 graded.
               </p>
-              <div className="space-y-2">
-                {pollOptions.map((opt, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-neutral-200 bg-white"
-                  >
-                    <span className="text-xs font-semibold text-neutral-400 w-4 shrink-0">
-                      {opt.label}.
-                    </span>
-                    <Input
-                      value={opt.text}
-                      onChange={(e) => updatePollText(i, e.target.value)}
-                      className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-[#1a1a1a] flex-1"
-                    />
-                  </div>
-                ))}
-              </div>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pollOptions.map((opt, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-neutral-200 bg-white"
+                    >
+                      <span className="text-xs font-semibold text-neutral-400 w-4 shrink-0">
+                        {opt.label}.
+                      </span>
+                      <Input
+                        value={opt.text}
+                        onChange={(e) => updatePollText(i, e.target.value)}
+                        className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 text-[#1a1a1a] flex-1"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={isLoading}
+                onClick={handleRegeneratePoll}
                 className="mt-2 h-7 px-2 text-xs text-neutral-400 hover:text-neutral-600 gap-1.5"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
                 Regenerate choices
               </Button>
               <p className="text-[11px] text-neutral-400 mt-1">
@@ -374,7 +505,7 @@ function ReviewModal({
           </Button>
           <Button
             size="sm"
-            onClick={() => onSend(questionText, qType)}
+            onClick={handleSend}
             className="rounded-full h-8 px-5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
           >
             <Send className="w-3 h-3" />
@@ -572,9 +703,9 @@ export function LiveCopilotHero({
     }
   };
 
-  const handleModalSend = (text: string, _type: QuestionType) => {
+  const handleModalSend = (text: string, type: QuestionType, options: string[], correctAnswer: string, expectedAnswer: string) => {
     setIsModalOpen(false);
-    onSendQuestion?.(text);
+    onSendQuestion?.(text, type, options, correctAnswer, expectedAnswer);
   };
 
   const isSent = !!sentQuestion;

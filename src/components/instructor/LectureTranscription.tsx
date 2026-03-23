@@ -72,7 +72,7 @@ interface LectureTranscriptionProps {
   onQuestionCandidateChange?: (candidate: PassiveQuestionCandidate | null) => void;
   onSendingChange?: (isSending: boolean) => void;
   // Refs for external control
-  onSendQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
+  onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
   onDismissQuestionRef?: React.MutableRefObject<(() => void) | null>;
   onStartRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
@@ -272,15 +272,18 @@ export const LectureTranscription = ({
   // Register external control refs
   useEffect(() => {
     if (onSendQuestionRef) {
-      onSendQuestionRef.current = (questionText: string) => {
+      onSendQuestionRef.current = (questionText: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => {
         dismissPassiveCandidate();
-        setPreviewQuestionData({
+        const qData = {
           question_text: questionText,
-          suggested_type: 'multiple_choice',
-        });
+          suggested_type: (type as any) || 'multiple_choice',
+          options: options?.length ? options : undefined,
+          correct_answer: correctAnswer || undefined,
+          expected_answer: expectedAnswer || undefined,
+        };
+        setPreviewQuestionData({ question_text: questionText, suggested_type: qData.suggested_type });
         pendingQuestionDataRef.current = {
-          question_text: questionText,
-          suggested_type: 'multiple_choice',
+          ...qData,
           confidence: 1.0,
           extraction_method: 'passive_detection',
           source: 'passive_detection',
