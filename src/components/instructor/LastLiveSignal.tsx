@@ -53,14 +53,14 @@ export function LastLiveSignal({ onViewSummary }: LastLiveSignalProps) {
 
       const session = sessions[0];
 
-      const responsesRes = await (supabase
+      const responsesRes: { data: { is_correct: boolean }[] | null } = await (supabase as any)
         .from("live_responses")
         .select("is_correct")
-        .eq("session_id", session.id) as any);
-      const questionsRes = await (supabase
+        .eq("session_id", session.id);
+      const questionsRes: { data: { id: string }[] | null } = await (supabase as any)
         .from("live_questions")
         .select("id")
-        .eq("session_id", session.id) as any);
+        .eq("session_id", session.id);
 
       const responses = responsesRes.data || [];
       const correctCount = responses.filter(r => r.is_correct).length;
