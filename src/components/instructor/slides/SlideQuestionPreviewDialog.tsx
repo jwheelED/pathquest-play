@@ -64,8 +64,8 @@ export function SlideQuestionPreviewDialog({
   onConfirmSend,
   isSending = false,
 }: SlideQuestionPreviewDialogProps) {
-  // Poll mode is always enabled - no grading for slide presenter
-  const isPollMode = true;
+  // Poll mode disabled by default so MCQs are graded and correct answers are marked
+  const isPollMode = false;
   // Editable state for MCQ
   const [mcqQuestion, setMcqQuestion] = useState('');
   const [mcqOptions, setMcqOptions] = useState<string[]>(['', '', '', '']);
