@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Monitor, Presentation, Users, ExternalLink } from "lucide-react";
+import { Copy, Check, Users, ExternalLink } from "lucide-react";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";

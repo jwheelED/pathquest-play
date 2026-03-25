@@ -7,7 +7,6 @@ interface LiveToolsSectionProps {
 }
 
 export function LiveToolsSection({ onNavigate }: LiveToolsSectionProps) {
-  const navigate = useNavigate();
 
   const tools = [
     {
