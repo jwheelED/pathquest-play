@@ -100,31 +100,6 @@ export function LiveSessionStrip({ activeSession, participantCount }: LiveSessio
             Copy Code
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/instructor/presenter")}
-            className={cn(
-              "rounded-full h-8 px-3 gap-1.5 text-xs font-medium",
-              "border-slate-200 text-charcoal hover:bg-slate-50 hover:border-slate-300"
-            )}
-          >
-            <Monitor className="w-3 h-3" />
-            <span className="hidden sm:inline">Presenter</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/instructor/slides")}
-            className={cn(
-              "rounded-full h-8 px-3 gap-1.5 text-xs font-medium",
-              "border-slate-200 text-charcoal hover:bg-slate-50 hover:border-slate-300"
-            )}
-          >
-            <Presentation className="w-3 h-3" />
-            <span className="hidden sm:inline">Slides</span>
-          </Button>
         </div>
       </div>
     </div>

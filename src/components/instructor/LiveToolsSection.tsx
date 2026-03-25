@@ -12,16 +12,6 @@ export function LiveToolsSection({ onNavigate }: LiveToolsSectionProps) {
 
   const tools = [
     {
-      label: "Presenter View",
-      icon: Monitor,
-      onClick: () => navigate("/instructor/presenter"),
-    },
-    {
-      label: "Present Slides",
-      icon: Presentation,
-      onClick: () => navigate("/instructor/slides"),
-    },
-    {
       label: "Open Question Bank",
       icon: Library,
       onClick: () => onNavigate("question-bank"),

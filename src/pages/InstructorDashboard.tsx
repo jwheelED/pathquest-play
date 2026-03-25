@@ -542,11 +542,14 @@ export default function InstructorDashboard() {
       case "live":
         return (
           <div className="space-y-6">
-            {/* ===== SESSION STRIP: Compact session info ===== */}
+            {/* ===== SESSION CONTROLS: Start/manage live session ===== */}
             <section>
-              <LiveSessionStrip
+              <CommandStripHero
                 activeSession={activeSession}
-                participantCount={participantCount}
+                onStartLive={() => {}}
+                onPresentSlides={() => navigate("/instructor/slides")}
+                onSessionChange={setLiveSessionId}
+                setActiveSession={setActiveSession}
               />
             </section>
 
