@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Monitor, Presentation, Library, FileText } from "lucide-react";
+import { Library, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
 
 interface LiveToolsSectionProps {
   onNavigate: (tab: string) => void;
