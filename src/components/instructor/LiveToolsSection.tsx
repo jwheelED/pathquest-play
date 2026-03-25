@@ -1,26 +1,14 @@
 import { Button } from "@/components/ui/button";
-import { Monitor, Presentation, Library, FileText } from "lucide-react";
+import { Library, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
 
 interface LiveToolsSectionProps {
   onNavigate: (tab: string) => void;
 }
 
 export function LiveToolsSection({ onNavigate }: LiveToolsSectionProps) {
-  const navigate = useNavigate();
 
   const tools = [
-    {
-      label: "Presenter View",
-      icon: Monitor,
-      onClick: () => navigate("/instructor/presenter"),
-    },
-    {
-      label: "Present Slides",
-      icon: Presentation,
-      onClick: () => navigate("/instructor/slides"),
-    },
     {
       label: "Open Question Bank",
       icon: Library,
