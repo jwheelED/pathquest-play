@@ -491,6 +491,8 @@ export default function InstructorDashboard() {
                 activeSession={activeSession}
                 onStartLive={() => setActiveTab("live")}
                 onPresentSlides={() => navigate("/instructor/slides")}
+                onSessionChange={setLiveSessionId}
+                setActiveSession={setActiveSession}
               />
             </section>
             
