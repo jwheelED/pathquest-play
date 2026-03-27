@@ -1077,113 +1077,217 @@ export function LiveCopilotHero({
               </div>
               <div className="h-px bg-neutral-100 my-4" />
 
-              {/* Type pill + question */}
-              <div className="flex items-start gap-3 mb-5">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
-                      MCQ
-                    </span>
-                    {questionHistory.length > 1 && (
-                      <span className="text-[10px] text-neutral-400 tabular-nums">
-                        {historyIndex + 1} of {questionHistory.length}
+              <div className="flex gap-5">
+                {/* Left: question text + actions */}
+                <div className="flex-1 min-w-0">
+                  {/* Type pill + question */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
+                        {effectiveFormat === 'mcq' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
                       </span>
-                    )}
+                      {questionHistory.length > 1 && (
+                        <span className="text-[10px] text-neutral-400 tabular-nums">
+                          {historyIndex + 1} of {questionHistory.length}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#1a1a1a] leading-relaxed font-medium">
+                      &ldquo;{displayedQuestion}&rdquo;
+                    </p>
                   </div>
-                  <p className="text-sm text-[#1a1a1a] leading-relaxed font-medium">
-                    &ldquo;{displayedQuestion}&rdquo;
-                  </p>
-                </div>
-              </div>
 
-              {/* Primary + secondary actions */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  size="sm"
-                  onClick={handleSendCurrent}
-                  className="rounded-full h-9 px-5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
-                  disabled={isSendingQuestion}
-                >
-                  {isSendingQuestion ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      Send Now
-                    </>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsModalOpen(true)}
-                  className="rounded-full h-9 px-4 text-xs font-medium border-neutral-200 text-neutral-700 gap-1.5"
-                  disabled={isSendingQuestion}
-                >
-                  <Eye className="w-3 h-3" />
-                  Preview
-                </Button>
-
-                {/* Tertiary: hold, edit, back/forward nav */}
-                <div className="flex items-center gap-1 ml-auto">
-                  {onToggleQuestionHold && (
+                  {/* Primary + secondary actions */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       size="sm"
-                      variant="ghost"
-                      onClick={onToggleQuestionHold}
-                      className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700"
-                      title={isQuestionHeld ? "Resume" : "Hold"}
+                      onClick={handleSendCurrent}
+                      className="rounded-full h-9 px-5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
+                      disabled={isSendingQuestion || isGeneratingPreview}
                     >
-                      {isQuestionHeld ? (
-                        <Play className="w-3.5 h-3.5" />
+                      {isSendingQuestion ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Sending...
+                        </>
+                      ) : isGeneratingPreview ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Preparing...
+                        </>
                       ) : (
-                        <Pause className="w-3.5 h-3.5" />
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          Send Now
+                        </>
                       )}
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleStartEdit}
-                    className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700"
-                    disabled={isSendingQuestion}
-                    title="Edit"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                  {questionHistory.length > 1 && (
-                    <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsModalOpen(true)}
+                      className="rounded-full h-9 px-4 text-xs font-medium border-neutral-200 text-neutral-700 gap-1.5"
+                      disabled={isSendingQuestion}
+                    >
+                      <Eye className="w-3 h-3" />
+                      Full Preview
+                    </Button>
+
+                    {/* Tertiary: hold, edit, back/forward nav */}
+                    <div className="flex items-center gap-1 ml-auto">
+                      {onToggleQuestionHold && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={onToggleQuestionHold}
+                          className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700"
+                          title={isQuestionHeld ? "Resume" : "Hold"}
+                        >
+                          {isQuestionHeld ? (
+                            <Play className="w-3.5 h-3.5" />
+                          ) : (
+                            <Pause className="w-3.5 h-3.5" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setHistoryIndex((i) => i - 1)}
-                        disabled={!canGoBack}
-                        className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700 disabled:opacity-30"
-                        title="Previous question"
+                        onClick={handleStartEdit}
+                        className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700"
+                        disabled={isSendingQuestion}
+                        title="Edit"
                       >
-                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setHistoryIndex((i) => i + 1)}
-                        disabled={!canGoForward}
-                        className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700 disabled:opacity-30"
-                        title="Next question"
-                      >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </Button>
-                    </>
-                  )}
+                      {questionHistory.length > 1 && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setHistoryIndex((i) => i - 1)}
+                            disabled={!canGoBack}
+                            className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700 disabled:opacity-30"
+                            title="Previous question"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setHistoryIndex((i) => i + 1)}
+                            disabled={!canGoForward}
+                            className="rounded-full h-8 w-8 p-0 text-neutral-400 hover:text-neutral-700 disabled:opacity-30"
+                            title="Next question"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Inline auto-generated preview panel */}
+                <div className="w-56 shrink-0 border border-neutral-200 rounded-xl bg-neutral-50/50 overflow-hidden flex flex-col">
+                  <div className="px-3 py-2 bg-neutral-100/60 border-b border-neutral-200 flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                      {effectiveFormat === 'mcq' ? 'Answer Options' : effectiveFormat === 'poll' ? 'Poll Choices' : 'Expected Answer'}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        generatedForRef.current = null;
+                        if (displayedQuestion) {
+                          setIsGeneratingPreview(true);
+                          setPreviewOptions([]);
+                          setPreviewExpectedAnswer("");
+                          const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
+                          if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
+                            supabase.functions.invoke('generate-mcq-options', {
+                              body: { question_text: displayedQuestion, source_transcript: lastChunk },
+                            }).then(({ data, error }) => {
+                              if (!error && data?.options && Array.isArray(data.options)) {
+                                const labels = ['A', 'B', 'C', 'D'];
+                                const correctLetter: string = data.correct_answer ?? 'A';
+                                const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
+                                  const stripped = opt.replace(/^[A-D]\.\s*/i, '');
+                                  return {
+                                    label: labels[i] ?? String.fromCharCode(65 + i),
+                                    text: stripped,
+                                    isCorrect: effectiveFormat === 'mcq' ? labels[i] === correctLetter : false,
+                                  };
+                                });
+                                setPreviewOptions(parsed);
+                              }
+                              setIsGeneratingPreview(false);
+                            }).catch(() => setIsGeneratingPreview(false));
+                          } else {
+                            supabase.functions.invoke('generate-expected-answer', {
+                              body: { question_text: displayedQuestion, source_transcript: lastChunk },
+                            }).then(({ data, error }) => {
+                              if (!error && data?.expected_answer) {
+                                setPreviewExpectedAnswer(data.expected_answer as string);
+                              }
+                              setIsGeneratingPreview(false);
+                            }).catch(() => setIsGeneratingPreview(false));
+                          }
+                        }
+                      }}
+                      disabled={isGeneratingPreview}
+                      className="h-5 w-5 p-0 text-neutral-400 hover:text-neutral-600"
+                      title="Regenerate"
+                    >
+                      <RefreshCw className={cn('w-3 h-3', isGeneratingPreview && 'animate-spin')} />
+                    </Button>
+                  </div>
+                  <div className="px-3 py-2.5 flex-1 overflow-y-auto">
+                    {isGeneratingPreview ? (
+                      <div className="space-y-2 pt-1">
+                        {[...Array((effectiveFormat === 'mcq' || effectiveFormat === 'poll') ? 4 : 2)].map((_, i) => (
+                          <div key={i} className="h-6 rounded-md bg-neutral-200/50 animate-pulse" />
+                        ))}
+                      </div>
+                    ) : (effectiveFormat === 'mcq' || effectiveFormat === 'poll') ? (
+                      <div className="space-y-1.5">
+                        {(previewOptions.length > 0 ? previewOptions : DEFAULT_MCQ).map((opt) => (
+                          <div
+                            key={opt.label}
+                            className={cn(
+                              "flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-colors",
+                              effectiveFormat === 'mcq' && opt.isCorrect
+                                ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                                : "bg-white border border-neutral-200 text-neutral-700"
+                            )}
+                          >
+                            <span className="font-semibold text-neutral-400 w-3 shrink-0">{opt.label}</span>
+                            <span className="flex-1 min-w-0 truncate">{opt.text}</span>
+                            {effectiveFormat === 'mcq' && opt.isCorrect && (
+                              <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                            )}
+                          </div>
+                        ))}
+                        {effectiveFormat === 'mcq' && (
+                          <p className="text-[9px] text-neutral-400 mt-1">
+                            ✓ = correct answer
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-[11px] text-neutral-600 leading-relaxed">
+                          {previewExpectedAnswer || "Generating expected answer..."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
             <div className="px-6 py-2.5 border-t border-emerald-100 bg-emerald-50/40 rounded-b-2xl">
               <p className="text-[11px] text-neutral-400">
-                Drafted from your live speech. Review before sending if needed.
+                Drafted from your live speech. Preview auto-generated based on your format settings.
               </p>
             </div>
           </div>
