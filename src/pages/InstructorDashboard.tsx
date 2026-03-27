@@ -572,6 +572,7 @@ export default function InstructorDashboard() {
                 isQuestionHeld={isQuestionHeld}
                 onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
                 onViewLiveResponses={() => setActiveTab("live")}
+                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | undefined}
               />
             </section>
 
