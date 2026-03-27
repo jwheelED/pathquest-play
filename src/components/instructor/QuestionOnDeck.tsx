@@ -9,7 +9,6 @@ import {
   Pause,
   Play,
   Pencil,
-  Eye,
   Loader2,
   Radio,
   X,
@@ -17,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  ListChecks,
+  MessageSquare,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PassiveQuestionCandidate } from '@/hooks/usePassiveQuestionDetection';
@@ -32,7 +34,70 @@ interface QuestionOnDeckProps {
   onRemoveFromHistory: (id: string) => void;
   isHeld: boolean;
   onToggleHold: () => void;
-  suggestedType?: 'multiple_choice' | 'short_answer';
+  suggestedType?: 'multiple_choice' | 'short_answer' | 'poll';
+  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
+}
+
+function QuestionInlinePreview({
+  questionText,
+  formatType,
+}: {
+  questionText: string;
+  formatType: 'multiple_choice' | 'short_answer' | 'poll';
+}) {
+  const isChoice = formatType === 'multiple_choice' || formatType === 'poll';
+  const isPoll = formatType === 'poll';
+
+  return (
+    <div className="flex flex-col h-full border border-border/60 rounded-xl bg-background overflow-hidden">
+      {/* Preview header */}
+      <div className="px-3 py-2 bg-muted/40 border-b border-border/50 flex items-center gap-1.5 shrink-0">
+        {isChoice ? (
+          isPoll ? (
+            <BarChart3 className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <ListChecks className="h-3 w-3 text-muted-foreground" />
+          )
+        ) : (
+          <MessageSquare className="h-3 w-3 text-muted-foreground" />
+        )}
+        <span className="text-[10px] text-muted-foreground font-medium">
+          Student preview · {isPoll ? 'Poll' : isChoice ? 'MCQ' : 'Short Answer'}
+        </span>
+      </div>
+
+      {/* Question text */}
+      <div className="px-3 pt-3 pb-2 shrink-0">
+        <p className="text-xs font-medium text-foreground leading-relaxed line-clamp-3">
+          {questionText}
+        </p>
+      </div>
+
+      {/* Format-specific preview */}
+      <div className="px-3 pb-3 flex-1 overflow-hidden">
+        {isChoice ? (
+          <div className="space-y-1.5">
+            {['A', 'B', 'C', 'D'].map((letter) => (
+              <div
+                key={letter}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/50 bg-muted/20"
+              >
+                <span className="text-[10px] font-semibold text-muted-foreground w-4 shrink-0">{letter}</span>
+                <div className="h-1.5 rounded-full bg-muted-foreground/20 flex-1" />
+              </div>
+            ))}
+            {!isPoll && (
+              <p className="text-[9px] text-muted-foreground pt-0.5">Options auto-generated on send</p>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border/50 bg-muted/20 h-14 flex items-center px-3">
+            <span className="text-[10px] text-muted-foreground italic">Student types answer here...</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function timeAgo(ts: number): string {
@@ -112,7 +177,11 @@ export function QuestionOnDeck({
   isHeld,
   onToggleHold,
   suggestedType = 'multiple_choice',
+  formatPreference,
 }: QuestionOnDeckProps) {
+  // Effective preview format: use formatPreference (instructor setting) as default,
+  // fall back to suggestedType (auto-detected)
+  const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -221,75 +290,75 @@ export function QuestionOnDeck({
 
         {/* Current candidate */}
         {hasCandidate && !isEditing ? (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-background border border-border/60">
-              <p className="text-sm text-foreground leading-relaxed">
-                "{candidate.text}"
-              </p>
+          <div className="flex gap-4">
+            {/* Left: question text + action buttons */}
+            <div className="flex-1 space-y-3 min-w-0">
+              <div className="p-4 rounded-xl bg-background border border-border/60">
+                <p className="text-sm text-foreground leading-relaxed">
+                  "{candidate.text}"
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => onSendNow(candidate.text)}
+                  className="gap-1.5 text-xs h-9 rounded-lg flex-1 bg-primary hover:bg-primary/90"
+                  disabled={isSending}
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      Send Now
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onToggleHold}
+                  className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                  title={isHeld ? 'Release hold' : 'Hold this draft'}
+                >
+                  {isHeld ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleStartEdit}
+                  className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                  title="Edit draft"
+                  disabled={isSending}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onDismiss}
+                  className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                  title="Dismiss"
+                  disabled={isSending}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => onPreview(candidate.text)}
-                variant="outline"
-                className="gap-1.5 text-xs h-9 rounded-lg flex-1"
-                disabled={isSending}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                Preview
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={() => onSendNow(candidate.text)}
-                className="gap-1.5 text-xs h-9 rounded-lg flex-[2] bg-primary hover:bg-primary/90"
-                disabled={isSending}
-              >
-                {isSending ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5" />
-                    Send Now
-                  </>
-                )}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onToggleHold}
-                className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                title={isHeld ? 'Release hold' : 'Hold this draft'}
-              >
-                {isHeld ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleStartEdit}
-                className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                title="Edit draft"
-                disabled={isSending}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onDismiss}
-                className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                title="Dismiss"
-                disabled={isSending}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+            {/* Right: inline student preview */}
+            <div className="w-44 shrink-0">
+              <QuestionInlinePreview
+                questionText={candidate.text}
+                formatType={effectiveFormat}
+              />
             </div>
           </div>
         ) : isEditing ? (
