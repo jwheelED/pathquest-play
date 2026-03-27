@@ -248,7 +248,7 @@ export default function InstructorDashboard() {
     
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name, question_format_preference")
       .eq("id", session.user.id)
       .single();
     
