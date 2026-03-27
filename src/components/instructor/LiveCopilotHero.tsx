@@ -677,6 +677,14 @@ export function LiveCopilotHero({
     }
   }, [isListening]);
 
+  const displayedQuestion =
+    historyIndex >= 0 && questionHistory.length > 0
+      ? questionHistory[historyIndex]
+      : null;
+  const hasQuestion = displayedQuestion !== null;
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < questionHistory.length - 1;
+
   // Auto-generate preview when displayedQuestion changes
   useEffect(() => {
     if (!displayedQuestion || generatedForRef.current === displayedQuestion) return;
