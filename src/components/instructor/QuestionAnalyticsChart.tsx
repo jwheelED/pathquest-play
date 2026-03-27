@@ -1,5 +1,15 @@
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Legend } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+} from "recharts";
+import { Check } from "lucide-react";
 
 interface Assignment {
   id: string;
@@ -28,6 +38,9 @@ interface QuestionAnalyticsChartProps {
   stats: QuestionStats;
 }
 
+const EMERALD = "#10b981";
+const SLATE_LIGHT = "#e2e8f0";
+
 export const QuestionAnalyticsChart = ({
   question,
   assignments,
@@ -35,7 +48,8 @@ export const QuestionAnalyticsChart = ({
   stats,
 }: QuestionAnalyticsChartProps) => {
   const isMultipleChoice = question.type === "multiple_choice" && question.options;
-  const isAutoGradedShortAnswer = question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
+  const isAutoGradedShortAnswer =
+    question.type === "short_answer" && (stats.hasAIGrades || !stats.isManualGradeShortAnswer);
 
   // DEDUPLICATION: Keep only the latest submission per student
   const uniqueStudents = new Map<string, Assignment>();
@@ -47,49 +61,36 @@ export const QuestionAnalyticsChart = ({
   });
   const deduplicatedAssignments = Array.from(uniqueStudents.values());
 
-  // Calculate answer distribution for multiple choice using deduplicated data
   const correctAnswerRaw = question.overriddenAnswer || question.correctAnswer;
-  
-  // Normalize correct answer: extract leading letter if it's "A. something" or just "A"
   const correctAnswerLetter = (() => {
-    if (!correctAnswerRaw) return '';
+    if (!correctAnswerRaw) return "";
     const raw = String(correctAnswerRaw).trim();
-    // If it's a single letter (A-D), use it directly
     if (/^[A-Da-d]$/.test(raw)) return raw.toUpperCase();
-    // If it starts with a letter prefix like "A. " or "A) ", extract the letter
     const prefixMatch = raw.match(/^([A-Da-d])[.):\s]/);
     if (prefixMatch) return prefixMatch[1].toUpperCase();
-    // If it matches the full text of an option, find the corresponding letter
     if (question.options) {
       const idx = question.options.findIndex((opt: string) => {
-        const optClean = opt.replace(/^[A-Da-d][.):\s]+/, '').trim();
+        const optClean = opt.replace(/^[A-Da-d][.):\s]+/, "").trim();
         return optClean === raw || opt === raw;
       });
       if (idx >= 0) return String.fromCharCode(65 + idx);
     }
     return raw.toUpperCase();
   })();
-  
+
   const answerDistribution = isMultipleChoice
     ? question.options?.map((opt: string, idx: number) => {
         const letter = String.fromCharCode(65 + idx);
-        
         const count = deduplicatedAssignments.filter((a) => {
           if (!a.completed) return false;
-          
-          // Find the question index within THIS student's assignment
           const content = (a as any).content;
           const assignmentQuestions = content?.questions || [];
           const studentQuestionIdx = assignmentQuestions.findIndex(
             (q: any) => q.question === question.question
           );
-          
           if (studentQuestionIdx < 0) return false;
-          
           const studentAnswer = a.quiz_responses?.[studentQuestionIdx.toString()];
           if (!studentAnswer) return false;
-          
-          // Normalize student answer: extract leading letter
           const normalizedAnswer = (() => {
             const ans = String(studentAnswer).trim();
             if (/^[A-Da-d]$/.test(ans)) return ans.toUpperCase();
@@ -97,126 +98,114 @@ export const QuestionAnalyticsChart = ({
             if (match) return match[1].toUpperCase();
             return ans.toUpperCase();
           })();
-          
           return normalizedAnswer === letter;
         }).length;
-        
-        const isCorrect = letter === correctAnswerLetter;
-
         return {
           option: letter,
-          count: count,
-          label: opt.length > 25 ? opt.substring(0, 25) + "..." : opt,
-          isCorrect: isCorrect,
+          count,
+          label: opt.length > 25 ? opt.substring(0, 25) + "…" : opt,
+          isCorrect: letter === correctAnswerLetter,
         };
       })
     : [];
 
-  // Calculate performance data - use AI grades for short answers if available
-  const performanceData = stats.hasAIGrades
-    ? [
-        {
-          name: "Passing (≥70%)",
-          value: stats.correct,
-          fill: "hsl(var(--success))",
-        },
-        {
-          name: "Needs Work (<70%)",
-          value: stats.completed - stats.correct,
-          fill: "hsl(var(--destructive))",
-        },
-        {
-          name: "Not Answered",
-          value: stats.total - stats.completed,
-          fill: "hsl(var(--warning))",
-        },
-      ].filter((d) => d.value > 0)
-    : [
-        {
-          name: "Correct",
-          value: stats.correct,
-          fill: "hsl(var(--success))",
-        },
-        {
-          name: "Incorrect",
-          value: stats.completed - stats.correct,
-          fill: "hsl(var(--destructive))",
-        },
-        {
-          name: "Not Answered",
-          value: stats.total - stats.completed,
-          fill: "hsl(var(--warning))",
-        },
-      ].filter((d) => d.value > 0);
-
-  // Calculate grade distribution for auto-graded short answers (using deduplicated data)
+  // Grade distribution for auto-graded short answers
   const gradeDistribution = isAutoGradedShortAnswer
     ? [
         {
-          range: "90-100 (Excellent)",
-          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 90).length,
-          fill: "hsl(var(--success))",
+          range: "90–100",
+          count: deduplicatedAssignments.filter(
+            (a) => a.completed && a.grade != null && a.grade >= 90
+          ).length,
+          color: EMERALD,
         },
         {
-          range: "70-89 (Good)",
-          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 70 && a.grade < 90)
-            .length,
-          fill: "hsl(var(--primary))",
+          range: "70–89",
+          count: deduplicatedAssignments.filter(
+            (a) => a.completed && a.grade != null && a.grade >= 70 && a.grade < 90
+          ).length,
+          color: "#34d399",
         },
         {
-          range: "50-69 (Pass)",
-          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade >= 50 && a.grade < 70)
-            .length,
-          fill: "hsl(var(--warning))",
+          range: "50–69",
+          count: deduplicatedAssignments.filter(
+            (a) => a.completed && a.grade != null && a.grade >= 50 && a.grade < 70
+          ).length,
+          color: "#fbbf24",
         },
         {
-          range: "0-49 (Needs Work)",
-          count: deduplicatedAssignments.filter((a) => a.completed && a.grade && a.grade < 50).length,
-          fill: "hsl(var(--destructive))",
+          range: "0–49",
+          count: deduplicatedAssignments.filter(
+            (a) => a.completed && a.grade != null && a.grade < 50
+          ).length,
+          color: "#fca5a5",
         },
       ].filter((d) => d.count > 0)
     : [];
 
-  const chartConfig = {
-    count: {
-      label: "Students",
-      color: "hsl(var(--primary))",
-    },
-    value: {
-      label: "Count",
-      color: "hsl(var(--primary))",
-    },
-  };
+  // Two-segment donut: correct vs everything else
+  const notCorrect = stats.total - stats.correct;
+  const donutData = [
+    { name: "Correct", value: stats.correct, color: EMERALD },
+    { name: "Not Answered", value: notCorrect, color: SLATE_LIGHT },
+  ].filter((d) => d.value > 0);
+
+  // Y-axis max for bar chart — ceiling whole number
+  const barMax = answerDistribution.length > 0
+    ? Math.max(...answerDistribution.map((d: { count: number }) => d.count), 1)
+    : 1;
 
   return (
-    <div className="my-4 border rounded-lg p-4 bg-muted/20">
-      <p className="text-sm font-medium mb-3">📊 Visual Analytics</p>
+    <div className="my-4 border border-border/50 rounded-xl p-5 bg-white shadow-sm space-y-6">
+      <p className="text-sm font-semibold text-foreground">Visual Analytics</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Answer Distribution Chart (Multiple Choice) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Answer Distribution Bar Chart */}
         {isMultipleChoice && answerDistribution.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Answer Distribution</p>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <BarChart data={answerDistribution}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis dataKey="option" />
-                <YAxis />
-                <ChartTooltip
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Answer Distribution
+            </p>
+            <div className="w-full overflow-hidden">
+              <BarChart
+                width={260}
+                height={200}
+                data={answerDistribution}
+                margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+              >
+                <CartesianGrid
+                  vertical={false}
+                  stroke="#f1f5f9"
+                  strokeWidth={1}
+                />
+                <XAxis
+                  dataKey="option"
+                  tick={{ fontSize: 12, fill: "#64748b" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11, fill: "#94a3b8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={[0, Math.ceil(barMax)]}
+                  ticks={Array.from({ length: Math.ceil(barMax) + 1 }, (_, i) => i)}
+                />
+                <Tooltip
+                  cursor={{ fill: "#f8fafc" }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
-                      const data = payload[0].payload;
+                      const d = payload[0].payload;
                       return (
-                        <div className="rounded-lg border bg-background p-2 shadow-sm">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-semibold">
-                              Option {data.option} {data.isCorrect && "✓"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{data.label}</span>
-                            <span className="text-xs font-medium">
-                              {data.count} student{data.count !== 1 ? "s" : ""}
-                            </span>
-                          </div>
+                        <div className="rounded-lg border border-border/50 bg-white px-3 py-2 shadow-md text-xs space-y-0.5">
+                          <p className="font-semibold text-foreground">
+                            Option {d.option}{d.isCorrect ? " ✓" : ""}
+                          </p>
+                          <p className="text-muted-foreground">{d.label}</p>
+                          <p className="font-medium">
+                            {d.count} student{d.count !== 1 ? "s" : ""}
+                          </p>
                         </div>
                       );
                     }
@@ -224,80 +213,112 @@ export const QuestionAnalyticsChart = ({
                   }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {answerDistribution.map((entry, index) => (
+                  {answerDistribution.map((entry: { isCorrect: boolean }, index: number) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.isCorrect ? "hsl(var(--success))" : "hsl(var(--primary))"}
+                      fill={entry.isCorrect ? EMERALD : SLATE_LIGHT}
                     />
                   ))}
                 </Bar>
               </BarChart>
-            </ChartContainer>
+            </div>
           </div>
         )}
 
-        {/* Grade Distribution Chart (Auto-Graded Short Answer) */}
+        {/* Grade Distribution (short answer) */}
         {isAutoGradedShortAnswer && gradeDistribution.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Grade Distribution</p>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <BarChart data={gradeDistribution} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="range" width={120} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {gradeDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ChartContainer>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Grade Distribution
+            </p>
+            <div className="space-y-2 pt-1">
+              {gradeDistribution.map((d) => {
+                const total = deduplicatedAssignments.filter((a) => a.completed).length;
+                const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
+                return (
+                  <div key={d.range} className="flex items-center gap-2 text-xs">
+                    <span className="w-14 text-muted-foreground shrink-0">{d.range}</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: d.color }}
+                      />
+                    </div>
+                    <span className="w-8 text-right text-muted-foreground">{d.count}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {/* Performance Overview Pie Chart */}
-        {performanceData.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Performance Overview</p>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <PieChart>
-                <Pie
-                  data={performanceData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  dataKey="value"
-                  label={({ name, value }) => `${name}: ${value}`}
-                >
-                  {performanceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <ChartTooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0];
-                      const percentage = stats.total > 0 
-                        ? ((data.value as number / stats.total) * 100).toFixed(1)
-                        : "0";
-                      return (
-                        <div className="rounded-lg border bg-background p-2 shadow-sm">
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-semibold">{data.name}</span>
-                            <span className="text-xs font-medium">
-                              {data.value} student{data.value !== 1 ? "s" : ""} ({percentage}%)
-                            </span>
+        {/* Performance Overview — two-segment donut */}
+        {donutData.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Performance Overview
+            </p>
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <PieChart width={160} height={160}>
+                  <Pie
+                    data={donutData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={48}
+                    outerRadius={72}
+                    dataKey="value"
+                    startAngle={90}
+                    endAngle={-270}
+                    strokeWidth={2}
+                    stroke="#fff"
+                  >
+                    {donutData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0];
+                        const pct = stats.total > 0
+                          ? ((Number(d.value) / stats.total) * 100).toFixed(0)
+                          : "0";
+                        return (
+                          <div className="rounded-lg border border-border/50 bg-white px-3 py-2 shadow-md text-xs space-y-0.5">
+                            <p className="font-semibold text-foreground">{d.name}</p>
+                            <p className="text-muted-foreground">
+                              {d.value} student{Number(d.value) !== 1 ? "s" : ""} ({pct}%)
+                            </p>
                           </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </PieChart>
-            </ChartContainer>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </PieChart>
+                {/* Center label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-lg font-bold text-foreground leading-none">
+                    {stats.correct}/{stats.total}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">correct</span>
+                </div>
+              </div>
+              {/* Legend */}
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: EMERALD }} />
+                  <span className="text-foreground font-medium">Correct</span>
+                  <span className="text-muted-foreground">({stats.correct})</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: SLATE_LIGHT }} />
+                  <span className="text-foreground font-medium">Not Answered</span>
+                  <span className="text-muted-foreground">({stats.total - stats.correct})</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
