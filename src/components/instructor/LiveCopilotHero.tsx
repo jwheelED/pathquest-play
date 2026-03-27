@@ -618,6 +618,7 @@ export function LiveCopilotHero({
   sentQuestion = null,
   onViewLiveResponses,
   onSendFollowUp,
+  formatPreference,
 }: LiveCopilotHeroProps) {
   const navigate = useNavigate();
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
