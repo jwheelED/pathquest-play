@@ -62,7 +62,7 @@ import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySh
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
-import { QuestionOnDeck } from "./QuestionOnDeck";
+import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -3842,21 +3842,39 @@ export const LectureTranscription = ({
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
             formatPreference={questionFormatPreference}
-            onSendNow={(questionText) => {
+            onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
-              // Open preview for review before sending
-              setPreviewQuestionData({
-                question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
-              });
-              pendingQuestionDataRef.current = {
-                question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
-                confidence: 1.0,
-                extraction_method: 'passive_detection',
-                source: 'passive_detection',
-              };
-              setIsPreviewOpen(true);
+              if (data) {
+                // Pre-generated data from inline preview — bypass modal
+                pendingQuestionDataRef.current = {
+                  question_text: questionText,
+                  suggested_type: data.type,
+                  confidence: 1.0,
+                  extraction_method: 'passive_detection',
+                  source: 'passive_detection',
+                };
+                handleConfirmPreviewSend({
+                  question_text: questionText,
+                  suggested_type: data.type,
+                  options: data.options,
+                  correct_answer: data.correctAnswer,
+                  expected_answer: data.expectedAnswer,
+                });
+              } else {
+                // No pre-generated data — fall back to modal
+                setPreviewQuestionData({
+                  question_text: questionText,
+                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                });
+                pendingQuestionDataRef.current = {
+                  question_text: questionText,
+                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  confidence: 1.0,
+                  extraction_method: 'passive_detection',
+                  source: 'passive_detection',
+                };
+                setIsPreviewOpen(true);
+              }
             }}
             onPreview={(questionText) => {
               setPreviewQuestionData({
