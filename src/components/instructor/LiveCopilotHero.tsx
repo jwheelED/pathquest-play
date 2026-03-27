@@ -629,6 +629,15 @@ export function LiveCopilotHero({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
+  // Auto-generated preview state
+  const [previewOptions, setPreviewOptions] = useState<MCQOption[]>([]);
+  const [previewExpectedAnswer, setPreviewExpectedAnswer] = useState("");
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const generatedForRef = useRef<string | null>(null);
+
+  // Determine effective format from preference
+  const effectiveFormat: QuestionType = formatPreference === 'short_answer' ? 'short_answer' : formatPreference === 'poll' ? 'poll' : 'mcq';
+
   // Timer
   useEffect(() => {
     if (!isListening) {
