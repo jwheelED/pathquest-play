@@ -671,16 +671,52 @@ export function LiveCopilotHero({
     if (!isListening) {
       setQuestionHistory([]);
       setHistoryIndex(-1);
+      generatedForRef.current = null;
+      setPreviewOptions([]);
+      setPreviewExpectedAnswer("");
     }
   }, [isListening]);
 
-  const displayedQuestion =
-    historyIndex >= 0 && questionHistory.length > 0
-      ? questionHistory[historyIndex]
-      : null;
-  const hasQuestion = displayedQuestion !== null;
-  const canGoBack = historyIndex > 0;
-  const canGoForward = historyIndex < questionHistory.length - 1;
+  // Auto-generate preview when displayedQuestion changes
+  useEffect(() => {
+    if (!displayedQuestion || generatedForRef.current === displayedQuestion) return;
+    generatedForRef.current = displayedQuestion;
+    setIsGeneratingPreview(true);
+    setPreviewOptions([]);
+    setPreviewExpectedAnswer("");
+
+    const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
+
+    if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
+      supabase.functions.invoke('generate-mcq-options', {
+        body: { question_text: displayedQuestion, source_transcript: lastChunk },
+      }).then(({ data, error }) => {
+        if (!error && data?.options && Array.isArray(data.options)) {
+          const labels = ['A', 'B', 'C', 'D'];
+          const correctLetter: string = data.correct_answer ?? 'A';
+          const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
+            const stripped = opt.replace(/^[A-D]\.\s*/i, '');
+            return {
+              label: labels[i] ?? String.fromCharCode(65 + i),
+              text: stripped,
+              isCorrect: effectiveFormat === 'mcq' ? labels[i] === correctLetter : false,
+            };
+          });
+          setPreviewOptions(parsed);
+        }
+        setIsGeneratingPreview(false);
+      }).catch(() => setIsGeneratingPreview(false));
+    } else {
+      supabase.functions.invoke('generate-expected-answer', {
+        body: { question_text: displayedQuestion, source_transcript: lastChunk },
+      }).then(({ data, error }) => {
+        if (!error && data?.expected_answer) {
+          setPreviewExpectedAnswer(data.expected_answer as string);
+        }
+        setIsGeneratingPreview(false);
+      }).catch(() => setIsGeneratingPreview(false));
+    }
+  }, [displayedQuestion, effectiveFormat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStartEdit = () => {
     if (displayedQuestion) {
@@ -692,17 +728,34 @@ export function LiveCopilotHero({
   const handleSaveEdit = () => {
     setIsEditingQuestion(false);
     if (editText.trim() && onSendQuestion) {
-      // Replace current history entry with edited text
       setQuestionHistory((prev) =>
         prev.map((q, i) => (i === historyIndex ? editText.trim() : q))
       );
-      onSendQuestion(editText.trim());
+      // Send with preview data
+      sendWithPreviewData(editText.trim());
+    }
+  };
+
+  const sendWithPreviewData = (questionText: string) => {
+    if (!onSendQuestion) return;
+    if (effectiveFormat === 'mcq' && previewOptions.length > 0) {
+      const correctOpt = previewOptions.find(o => o.isCorrect);
+      const correctAnswer = correctOpt ? correctOpt.label : '';
+      const options = previewOptions.map(o => `${o.label}. ${o.text}`);
+      onSendQuestion(questionText, 'mcq', options, correctAnswer, '');
+    } else if (effectiveFormat === 'poll' && previewOptions.length > 0) {
+      const options = previewOptions.map(o => `${o.label}. ${o.text}`);
+      onSendQuestion(questionText, 'poll', options, '', '');
+    } else if (effectiveFormat === 'short_answer') {
+      onSendQuestion(questionText, 'short_answer', [], '', previewExpectedAnswer);
+    } else {
+      onSendQuestion(questionText);
     }
   };
 
   const handleSendCurrent = () => {
-    if (!displayedQuestion || !onSendQuestion) return;
-    onSendQuestion(displayedQuestion);
+    if (!displayedQuestion) return;
+    sendWithPreviewData(displayedQuestion);
     // Remove sent item from history
     setQuestionHistory((prev) => {
       const next = prev.filter((_, i) => i !== historyIndex);
