@@ -596,15 +596,15 @@ export default function InstructorDashboard() {
 
             {/* ===== LOWER PRIORITY: Live Responses + Tools ===== */}
             {!isListening && (
-              <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {activeSession?.id && hasCheckIns ? (
-                  <LiveSessionResults sessionId={activeSession.id} />
-                ) : (
-                  <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
-                )}
+              <section>
                 <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
               </section>
             )}
+
+            {/* ===== CHECK-IN RESULTS: Always visible at bottom ===== */}
+            <section>
+              <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
+            </section>
 
             {/* ===== LAST LIVE SIGNAL: Below primary surface ===== */}
             {!isListening && (
