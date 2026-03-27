@@ -142,16 +142,6 @@ function HistoryItem({
         <div className="flex gap-1.5">
           <Button
             size="sm"
-            variant="outline"
-            onClick={() => onPreview(item.text)}
-            className="h-6 text-[10px] px-2"
-            disabled={isSending}
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            Preview
-          </Button>
-          <Button
-            size="sm"
             onClick={() => onSend(item.text)}
             className="h-6 text-[10px] px-2"
             disabled={isSending}
