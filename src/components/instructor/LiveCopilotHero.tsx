@@ -78,6 +78,7 @@ interface LiveCopilotHeroProps {
   sentQuestion?: SentQuestion | null;
   onViewLiveResponses?: () => void;
   onSendFollowUp?: () => void;
+  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
 }
 
 // ─── Default MCQ options ─────────────────────────────────────────────────────
