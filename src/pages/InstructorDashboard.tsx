@@ -92,12 +92,14 @@ export default function InstructorDashboard() {
   const [questionCandidate, setQuestionCandidate] = useState<any>(null);
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
   const [isQuestionHeld, setIsQuestionHeld] = useState(false);
+  const [autoQuestionState, setAutoQuestionState] = useState({ intervalMinutes: 15, nextQuestionIn: 0, isSending: false });
   // Refs for callbacks
   const onSendQuestionRef = useRef<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>(null);
   const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
   const onDismissQuestionRef = useRef<(() => void) | null>(null);
   const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const onAutoQuestionIntervalChangeRef = useRef<((minutes: number) => void) | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
