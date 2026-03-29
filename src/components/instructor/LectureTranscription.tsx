@@ -330,6 +330,22 @@ export const LectureTranscription = ({
     if (onStopRecordingRef) {
       onStopRecordingRef.current = stopRecording;
     }
+    if (onAutoQuestionIntervalChangeRef) {
+      onAutoQuestionIntervalChangeRef.current = async (minutes: number) => {
+        setAutoQuestionInterval(minutes);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from("profiles")
+            .update({ auto_question_interval: minutes })
+            .eq("id", user.id);
+        }
+        if (isRecording) {
+          setLastAutoQuestionTime(Date.now());
+        }
+        sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
+      };
+    }
   }); // no dep array — always keep ref current
 
   // When suppressInternalDialogs is true, auto-confirm the send instead of showing the dialog
