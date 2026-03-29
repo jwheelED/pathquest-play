@@ -71,6 +71,8 @@ interface LectureTranscriptionProps {
   onTranscriptChange?: (chunks: string[], current: string) => void;
   onQuestionCandidateChange?: (candidate: PassiveQuestionCandidate | null) => void;
   onSendingChange?: (isSending: boolean) => void;
+  onAutoQuestionStateChange?: (state: { intervalMinutes: number; nextQuestionIn: number; isSending: boolean }) => void;
+  onAutoQuestionIntervalChangeRef?: React.MutableRefObject<((minutes: number) => void) | null>;
   // Refs for external control
   onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
@@ -101,6 +103,8 @@ export const LectureTranscription = ({
   onTranscriptChange,
   onQuestionCandidateChange,
   onSendingChange,
+  onAutoQuestionStateChange,
+  onAutoQuestionIntervalChangeRef,
   onSendQuestionRef,
   onPreviewQuestionRef,
   onDismissQuestionRef,
@@ -325,6 +329,22 @@ export const LectureTranscription = ({
     }
     if (onStopRecordingRef) {
       onStopRecordingRef.current = stopRecording;
+    }
+    if (onAutoQuestionIntervalChangeRef) {
+      onAutoQuestionIntervalChangeRef.current = async (minutes: number) => {
+        setAutoQuestionInterval(minutes);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from("profiles")
+            .update({ auto_question_interval: minutes })
+            .eq("id", user.id);
+        }
+        if (isRecording) {
+          setLastAutoQuestionTime(Date.now());
+        }
+        sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
+      };
     }
   }); // no dep array — always keep ref current
 
@@ -2178,6 +2198,7 @@ export const LectureTranscription = ({
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
 
       setNextAutoQuestionIn(secondsLeft);
+      onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: secondsLeft, isSending: isSendingQuestionRef.current });
 
       // Broadcast countdown tick to presenter popup
       broadcast('countdown_tick', {
