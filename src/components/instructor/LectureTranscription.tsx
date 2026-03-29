@@ -2182,6 +2182,7 @@ export const LectureTranscription = ({
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
 
       setNextAutoQuestionIn(secondsLeft);
+      onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: secondsLeft, isSending: isSendingQuestionRef.current });
 
       // Broadcast countdown tick to presenter popup
       broadcast('countdown_tick', {
