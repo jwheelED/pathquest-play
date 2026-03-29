@@ -575,6 +575,9 @@ export default function InstructorDashboard() {
                 onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
                 onViewLiveResponses={() => setActiveTab("live")}
                 formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | undefined}
+                intervalMinutes={autoQuestionState.intervalMinutes}
+                nextQuestionIn={autoQuestionState.nextQuestionIn}
+                onIntervalChange={(minutes) => onAutoQuestionIntervalChangeRef.current?.(minutes)}
               />
             </section>
 
