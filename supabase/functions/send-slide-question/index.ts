@@ -165,7 +165,6 @@ serve(async (req) => {
       .select("id, session_code")
       .eq("instructor_id", user.id)
       .eq("is_active", true)
-      .gt("ends_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .single();

@@ -62,7 +62,7 @@ import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySh
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
-import { QuestionOnDeck } from "./QuestionOnDeck";
+import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -71,6 +71,8 @@ interface LectureTranscriptionProps {
   onTranscriptChange?: (chunks: string[], current: string) => void;
   onQuestionCandidateChange?: (candidate: PassiveQuestionCandidate | null) => void;
   onSendingChange?: (isSending: boolean) => void;
+  onAutoQuestionStateChange?: (state: { intervalMinutes: number; nextQuestionIn: number; isSending: boolean }) => void;
+  onAutoQuestionIntervalChangeRef?: React.MutableRefObject<((minutes: number) => void) | null>;
   // Refs for external control
   onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
@@ -101,6 +103,8 @@ export const LectureTranscription = ({
   onTranscriptChange,
   onQuestionCandidateChange,
   onSendingChange,
+  onAutoQuestionStateChange,
+  onAutoQuestionIntervalChangeRef,
   onSendQuestionRef,
   onPreviewQuestionRef,
   onDismissQuestionRef,
@@ -193,6 +197,9 @@ export const LectureTranscription = ({
   const [lastRecordingDuration, setLastRecordingDuration] = useState(0);
   const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
 
+  // Instructor format preference (loaded from profile)
+  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll'>('multiple_choice');
+
   // Question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewQuestionData, setPreviewQuestionData] = useState<ExtractedVoiceQuestion | null>(null);
@@ -236,7 +243,7 @@ export const LectureTranscription = ({
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
-    cooldownMs: 8000,
+    cooldownMs: 1500,
     minWordCount: 5,
     autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
@@ -295,11 +302,11 @@ export const LectureTranscription = ({
       onPreviewQuestionRef.current = (questionText: string) => {
         setPreviewQuestionData({
           question_text: questionText,
-          suggested_type: 'multiple_choice',
+          suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
         });
         pendingQuestionDataRef.current = {
           question_text: questionText,
-          suggested_type: 'multiple_choice',
+          suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
           confidence: 1.0,
           extraction_method: 'passive_detection',
           source: 'passive_detection',
@@ -310,7 +317,7 @@ export const LectureTranscription = ({
     if (onDismissQuestionRef) {
       onDismissQuestionRef.current = dismissPassiveCandidate;
     }
-  }, [dismissPassiveCandidate, onSendQuestionRef, onPreviewQuestionRef, onDismissQuestionRef]);
+  }, [dismissPassiveCandidate, onSendQuestionRef, onPreviewQuestionRef, onDismissQuestionRef, questionFormatPreference]);
 
   // Register start/stop recording refs so parent can trigger the mic.
   // startRecording/stopRecording are plain functions (not useCallback) so we
@@ -322,6 +329,22 @@ export const LectureTranscription = ({
     }
     if (onStopRecordingRef) {
       onStopRecordingRef.current = stopRecording;
+    }
+    if (onAutoQuestionIntervalChangeRef) {
+      onAutoQuestionIntervalChangeRef.current = async (minutes: number) => {
+        setAutoQuestionInterval(minutes);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from("profiles")
+            .update({ auto_question_interval: minutes })
+            .eq("id", user.id);
+        }
+        if (isRecording) {
+          setLastAutoQuestionTime(Date.now());
+        }
+        sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
+      };
     }
   }); // no dep array — always keep ref current
 
@@ -489,7 +512,7 @@ export const LectureTranscription = ({
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from("profiles")
-          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference")
           .eq("id", user.id)
           .single();
 
@@ -505,6 +528,10 @@ export const LectureTranscription = ({
           setStrictModeEnabled(profile.auto_question_strict_mode !== false);
           // Question preview setting - default to true
           setQuestionPreviewEnabled(profile.question_preview_enabled !== false);
+          // Format preference for question on deck preview
+          if (profile.question_format_preference) {
+            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+          }
         }
 
         // Fetch today's question count
@@ -2171,6 +2198,7 @@ export const LectureTranscription = ({
       const secondsLeft = Math.max(0, Math.ceil(timeLeft / 1000));
 
       setNextAutoQuestionIn(secondsLeft);
+      onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: secondsLeft, isSending: isSendingQuestionRef.current });
 
       // Broadcast countdown tick to presenter popup
       broadcast('countdown_tick', {
@@ -3834,30 +3862,49 @@ export const LectureTranscription = ({
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
-            onSendNow={(questionText) => {
+            formatPreference={questionFormatPreference}
+            onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
-              // Open preview for review before sending
-              setPreviewQuestionData({
-                question_text: questionText,
-                suggested_type: 'multiple_choice',
-              });
-              pendingQuestionDataRef.current = {
-                question_text: questionText,
-                suggested_type: 'multiple_choice',
-                confidence: 1.0,
-                extraction_method: 'passive_detection',
-                source: 'passive_detection',
-              };
-              setIsPreviewOpen(true);
+              if (data) {
+                // Pre-generated data from inline preview — bypass modal
+                pendingQuestionDataRef.current = {
+                  question_text: questionText,
+                  suggested_type: data.type,
+                  confidence: 1.0,
+                  extraction_method: 'passive_detection',
+                  source: 'passive_detection',
+                };
+                handleConfirmPreviewSend({
+                  question_text: questionText,
+                  suggested_type: data.type,
+                  options: data.options,
+                  correct_answer: data.correctAnswer,
+                  expected_answer: data.expectedAnswer,
+                });
+              } else {
+                // No pre-generated data — fall back to modal
+                setPreviewQuestionData({
+                  question_text: questionText,
+                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                });
+                pendingQuestionDataRef.current = {
+                  question_text: questionText,
+                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  confidence: 1.0,
+                  extraction_method: 'passive_detection',
+                  source: 'passive_detection',
+                };
+                setIsPreviewOpen(true);
+              }
             }}
             onPreview={(questionText) => {
               setPreviewQuestionData({
                 question_text: questionText,
-                suggested_type: 'multiple_choice',
+                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
               });
               pendingQuestionDataRef.current = {
                 question_text: questionText,
-                suggested_type: 'multiple_choice',
+                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
                 confidence: 1.0,
                 extraction_method: 'passive_detection',
                 source: 'passive_detection',

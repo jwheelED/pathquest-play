@@ -92,12 +92,14 @@ export default function InstructorDashboard() {
   const [questionCandidate, setQuestionCandidate] = useState<any>(null);
   const [isSendingQuestion, setIsSendingQuestion] = useState(false);
   const [isQuestionHeld, setIsQuestionHeld] = useState(false);
+  const [autoQuestionState, setAutoQuestionState] = useState({ intervalMinutes: 15, nextQuestionIn: 0, isSending: false });
   // Refs for callbacks
   const onSendQuestionRef = useRef<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>(null);
   const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
   const onDismissQuestionRef = useRef<(() => void) | null>(null);
   const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const onAutoQuestionIntervalChangeRef = useRef<((minutes: number) => void) | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
@@ -248,7 +250,7 @@ export default function InstructorDashboard() {
     
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name, question_format_preference")
       .eq("id", session.user.id)
       .single();
     
@@ -491,6 +493,8 @@ export default function InstructorDashboard() {
                 activeSession={activeSession}
                 onStartLive={() => setActiveTab("live")}
                 onPresentSlides={() => navigate("/instructor/slides")}
+                onSessionChange={setLiveSessionId}
+                setActiveSession={setActiveSession}
               />
             </section>
             
@@ -540,11 +544,14 @@ export default function InstructorDashboard() {
       case "live":
         return (
           <div className="space-y-6">
-            {/* ===== SESSION STRIP: Compact session info ===== */}
+            {/* ===== SESSION CONTROLS: Start/manage live session ===== */}
             <section>
-              <LiveSessionStrip
+              <CommandStripHero
                 activeSession={activeSession}
-                participantCount={participantCount}
+                onStartLive={() => {}}
+                onPresentSlides={() => navigate("/instructor/slides")}
+                onSessionChange={setLiveSessionId}
+                setActiveSession={setActiveSession}
               />
             </section>
 
@@ -567,6 +574,10 @@ export default function InstructorDashboard() {
                 isQuestionHeld={isQuestionHeld}
                 onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
                 onViewLiveResponses={() => setActiveTab("live")}
+                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | undefined}
+                intervalMinutes={autoQuestionState.intervalMinutes}
+                nextQuestionIn={autoQuestionState.nextQuestionIn}
+                onIntervalChange={(minutes) => onAutoQuestionIntervalChangeRef.current?.(minutes)}
               />
             </section>
 
@@ -591,15 +602,15 @@ export default function InstructorDashboard() {
 
             {/* ===== LOWER PRIORITY: Live Responses + Tools ===== */}
             {!isListening && (
-              <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {activeSession?.id && hasCheckIns ? (
-                  <LiveSessionResults sessionId={activeSession.id} />
-                ) : (
-                  <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
-                )}
+              <section>
                 <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
               </section>
             )}
+
+            {/* ===== CHECK-IN RESULTS: Always visible at bottom ===== */}
+            <section>
+              <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
+            </section>
 
             {/* ===== LAST LIVE SIGNAL: Below primary surface ===== */}
             {!isListening && (
@@ -758,6 +769,8 @@ export default function InstructorDashboard() {
               }}
               onQuestionCandidateChange={setQuestionCandidate}
               onSendingChange={setIsSendingQuestion}
+              onAutoQuestionStateChange={setAutoQuestionState}
+              onAutoQuestionIntervalChangeRef={onAutoQuestionIntervalChangeRef}
               onSendQuestionRef={onSendQuestionRef}
               onPreviewQuestionRef={onPreviewQuestionRef}
               onDismissQuestionRef={onDismissQuestionRef}

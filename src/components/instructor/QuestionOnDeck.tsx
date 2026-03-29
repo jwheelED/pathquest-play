@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   Sparkles,
   Send,
   Pause,
   Play,
   Pencil,
-  Eye,
   Loader2,
   Radio,
   X,
@@ -17,22 +17,35 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  ListChecks,
+  MessageSquare,
+  BarChart3,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import type { PassiveQuestionCandidate } from '@/hooks/usePassiveQuestionDetection';
+
+export interface OnDeckSendData {
+  options?: string[];
+  correctAnswer?: 'A' | 'B' | 'C' | 'D';
+  expectedAnswer?: string;
+  type: 'multiple_choice' | 'short_answer' | 'poll';
+}
 
 interface QuestionOnDeckProps {
   candidate: PassiveQuestionCandidate | null;
   candidateHistory: PassiveQuestionCandidate[];
   isListening: boolean;
   isSending: boolean;
-  onSendNow: (questionText: string) => void;
+  onSendNow: (questionText: string, data?: OnDeckSendData) => void;
   onPreview: (questionText: string) => void;
   onDismiss: () => void;
   onRemoveFromHistory: (id: string) => void;
   isHeld: boolean;
   onToggleHold: () => void;
-  suggestedType?: 'multiple_choice' | 'short_answer';
+  suggestedType?: 'multiple_choice' | 'short_answer' | 'poll';
+  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
 }
 
 function timeAgo(ts: number): string {
@@ -44,13 +57,11 @@ function timeAgo(ts: number): string {
 function HistoryItem({
   item,
   onSend,
-  onPreview,
   onRemove,
   isSending,
 }: {
   item: PassiveQuestionCandidate;
   onSend: (text: string) => void;
-  onPreview: (text: string) => void;
   onRemove: (id: string) => void;
   isSending: boolean;
 }) {
@@ -74,32 +85,141 @@ function HistoryItem({
           <Clock className="h-2.5 w-2.5" />
           {timeAgo(item.detectedAt)}
         </span>
-        <div className="flex gap-1.5">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onPreview(item.text)}
-            className="h-6 text-[10px] px-2"
-            disabled={isSending}
-          >
-            <Eye className="h-3 w-3 mr-1" />
-            Preview
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => onSend(item.text)}
-            className="h-6 text-[10px] px-2"
-            disabled={isSending}
-          >
-            <Send className="h-3 w-3 mr-1" />
-            Send
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          onClick={() => onSend(item.text)}
+          className="h-6 text-[10px] px-2"
+          disabled={isSending}
+        >
+          <Send className="h-3 w-3 mr-1" />
+          Send
+        </Button>
       </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Inline editable preview panel
+// ---------------------------------------------------------------------------
+function PreviewPanel({
+  questionText,
+  formatType,
+  options,
+  correctAnswer,
+  expectedAnswer,
+  isGenerating,
+  onOptionsChange,
+  onCorrectAnswerChange,
+  onExpectedAnswerChange,
+  onRegenerate,
+}: {
+  questionText: string;
+  formatType: 'multiple_choice' | 'short_answer' | 'poll';
+  options: string[];
+  correctAnswer: 'A' | 'B' | 'C' | 'D';
+  expectedAnswer: string;
+  isGenerating: boolean;
+  onOptionsChange: (opts: string[]) => void;
+  onCorrectAnswerChange: (ans: 'A' | 'B' | 'C' | 'D') => void;
+  onExpectedAnswerChange: (ans: string) => void;
+  onRegenerate: () => void;
+}) {
+  const isChoice = formatType === 'multiple_choice' || formatType === 'poll';
+  const isPoll = formatType === 'poll';
+  const letters = ['A', 'B', 'C', 'D'] as const;
+
+  return (
+    <div className="flex flex-col border border-border/60 rounded-xl bg-background overflow-hidden h-full">
+      {/* Header */}
+      <div className="px-3 py-2 bg-muted/40 border-b border-border/50 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-1.5">
+          {isChoice ? (
+            isPoll ? <BarChart3 className="h-3 w-3 text-muted-foreground" /> : <ListChecks className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <MessageSquare className="h-3 w-3 text-muted-foreground" />
+          )}
+          <span className="text-[10px] text-muted-foreground font-medium">
+            {isPoll ? 'Poll' : isChoice ? 'MCQ options' : 'Expected answer'}
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRegenerate}
+          disabled={isGenerating}
+          className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+          title="Regenerate"
+        >
+          <RefreshCw className={cn('h-3 w-3', isGenerating && 'animate-spin')} />
+        </Button>
+      </div>
+
+      {/* Body */}
+      <div className="px-3 py-2.5 flex-1 overflow-y-auto space-y-2">
+        {isGenerating ? (
+          <div className="space-y-2 pt-1">
+            {[...Array(isChoice ? 4 : 2)].map((_, i) => (
+              <div key={i} className="h-7 rounded-md bg-muted/50 animate-pulse" />
+            ))}
+          </div>
+        ) : isChoice ? (
+          /* MCQ / Poll options */
+          <div className="space-y-1.5">
+            {letters.map((letter, idx) => (
+              <div key={letter} className="flex items-center gap-1.5">
+                {!isPoll && (
+                  <button
+                    type="button"
+                    onClick={() => onCorrectAnswerChange(letter)}
+                    className={cn(
+                      'h-4 w-4 rounded-full border-2 shrink-0 transition-colors',
+                      correctAnswer === letter
+                        ? 'border-emerald-500 bg-emerald-500'
+                        : 'border-muted-foreground/40 hover:border-emerald-400'
+                    )}
+                    title={`Mark ${letter} as correct`}
+                  />
+                )}
+                <span className="text-[10px] font-semibold text-muted-foreground w-3 shrink-0">{letter}</span>
+                <Input
+                  value={options[idx] ?? ''}
+                  onChange={(e) => {
+                    const next = [...options];
+                    next[idx] = e.target.value;
+                    onOptionsChange(next);
+                  }}
+                  className="h-6 text-[11px] px-2 py-0 flex-1 min-w-0"
+                  placeholder={`Option ${letter}`}
+                />
+              </div>
+            ))}
+            {!isPoll && (
+              <p className="text-[9px] text-muted-foreground pt-0.5">
+                ● = correct answer
+              </p>
+            )}
+          </div>
+        ) : (
+          /* Short answer / coding expected answer */
+          <div className="space-y-1">
+            <p className="text-[9px] text-muted-foreground">Expected answer (grading reference)</p>
+            <Textarea
+              value={expectedAnswer}
+              onChange={(e) => onExpectedAnswerChange(e.target.value)}
+              className="text-[11px] min-h-[70px] resize-none"
+              placeholder="Expected answer..."
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export function QuestionOnDeck({
   candidate,
   candidateHistory,
@@ -112,15 +232,75 @@ export function QuestionOnDeck({
   isHeld,
   onToggleHold,
   suggestedType = 'multiple_choice',
+  formatPreference,
 }: QuestionOnDeckProps) {
+  const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
+
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const [showAllHistory, setShowAllHistory] = useState(false);
+
+  // Generated preview state
+  const [mcqOptions, setMcqOptions] = useState(['', '', '', '']);
+  const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [expectedAnswer, setExpectedAnswer] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Track which candidate text we last generated for to avoid duplicate calls
+  const generatedForRef = useRef<string | null>(null);
 
   const hasCandidate = !!candidate;
   const hasHistory = candidateHistory.length > 0;
   const visibleHistory = showAllHistory ? candidateHistory : candidateHistory.slice(0, 3);
   const hiddenCount = candidateHistory.length - 3;
+
+  // Auto-generate when a new candidate appears
+  useEffect(() => {
+    if (!candidate || generatedForRef.current === candidate.text) return;
+    generatedForRef.current = candidate.text;
+    generatePreview(candidate.text, effectiveFormat);
+  }, [candidate?.text, effectiveFormat]);
+
+  // Reset generated state when candidate is cleared
+  useEffect(() => {
+    if (!candidate) {
+      generatedForRef.current = null;
+      setMcqOptions(['', '', '', '']);
+      setCorrectAnswer('A');
+      setExpectedAnswer('');
+    }
+  }, [candidate]);
+
+  const generatePreview = async (questionText: string, format: typeof effectiveFormat) => {
+    setIsGenerating(true);
+    setMcqOptions(['', '', '', '']);
+    setExpectedAnswer('');
+
+    try {
+      if (format === 'multiple_choice' || format === 'poll') {
+        const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
+          body: { question_text: questionText },
+        });
+        if (!error && data?.options?.length === 4) {
+          setMcqOptions(data.options);
+          if (data.correct_answer && format === 'multiple_choice') {
+            setCorrectAnswer(data.correct_answer);
+          }
+        }
+      } else {
+        const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
+          body: { question_text: questionText },
+        });
+        if (!error && data?.expected_answer) {
+          setExpectedAnswer(data.expected_answer);
+        }
+      }
+    } catch {
+      // Silent — user can still edit manually
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleStartEdit = () => {
     if (candidate) {
@@ -132,13 +312,29 @@ export function QuestionOnDeck({
   const handleSaveEdit = () => {
     setIsEditing(false);
     if (editText.trim()) {
-      onSendNow(editText.trim());
+      fireSend(editText.trim());
     }
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditText('');
+  };
+
+  // Build send data from current preview state and fire
+  const fireSend = (questionText: string) => {
+    const isChoice = effectiveFormat === 'multiple_choice' || effectiveFormat === 'poll';
+    const hasOptions = mcqOptions.some(o => o.trim());
+
+    const data: OnDeckSendData = {
+      type: effectiveFormat,
+      ...(isChoice && hasOptions
+        ? { options: mcqOptions, correctAnswer: effectiveFormat === 'multiple_choice' ? correctAnswer : undefined }
+        : {}),
+      ...(!isChoice && expectedAnswer.trim() ? { expectedAnswer } : {}),
+    };
+
+    onSendNow(questionText, data);
   };
 
   return (
@@ -169,17 +365,13 @@ export function QuestionOnDeck({
             <div
               className={cn(
                 'h-8 w-8 rounded-lg flex items-center justify-center transition-colors',
-                hasCandidate
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-muted text-muted-foreground'
+                hasCandidate ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
               )}
             >
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">
-                Question on Deck
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground">Question on Deck</h3>
               <p className="text-xs text-muted-foreground">
                 {hasCandidate
                   ? 'Ready to send'
@@ -197,11 +389,8 @@ export function QuestionOnDeck({
               </Badge>
             )}
             {hasCandidate && (
-              <Badge
-                variant="outline"
-                className="text-[10px] font-medium border-primary/30 text-primary"
-              >
-                {suggestedType === 'multiple_choice' ? 'MCQ' : 'Short Answer'}
+              <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary">
+                {effectiveFormat === 'multiple_choice' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
               </Badge>
             )}
             {isHeld && (
@@ -221,75 +410,91 @@ export function QuestionOnDeck({
 
         {/* Current candidate */}
         {hasCandidate && !isEditing ? (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-background border border-border/60">
-              <p className="text-sm text-foreground leading-relaxed">
-                "{candidate.text}"
-              </p>
+          <div className="flex gap-4">
+            {/* Left: question text + action buttons */}
+            <div className="flex-1 space-y-3 min-w-0">
+              <div className="p-4 rounded-xl bg-background border border-border/60">
+                <p className="text-sm text-foreground leading-relaxed">
+                  "{candidate.text}"
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => fireSend(candidate.text)}
+                  className="gap-1.5 text-xs h-9 rounded-lg flex-1 bg-primary hover:bg-primary/90"
+                  disabled={isSending || isGenerating}
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : isGenerating ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      Send Now
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onToggleHold}
+                  className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                  title={isHeld ? 'Release hold' : 'Hold this draft'}
+                >
+                  {isHeld ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleStartEdit}
+                  className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                  title="Edit question text"
+                  disabled={isSending}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={onDismiss}
+                  className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                  title="Dismiss"
+                  disabled={isSending}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => onPreview(candidate.text)}
-                variant="outline"
-                className="gap-1.5 text-xs h-9 rounded-lg flex-1"
-                disabled={isSending}
-              >
-                <Eye className="h-3.5 w-3.5" />
-                Preview
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={() => onSendNow(candidate.text)}
-                className="gap-1.5 text-xs h-9 rounded-lg flex-[2] bg-primary hover:bg-primary/90"
-                disabled={isSending}
-              >
-                {isSending ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5" />
-                    Send Now
-                  </>
-                )}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onToggleHold}
-                className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                title={isHeld ? 'Release hold' : 'Hold this draft'}
-              >
-                {isHeld ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleStartEdit}
-                className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                title="Edit draft"
-                disabled={isSending}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={onDismiss}
-                className="gap-1 text-xs h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground"
-                title="Dismiss"
-                disabled={isSending}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
+            {/* Right: live editable preview */}
+            <div className="w-52 shrink-0">
+              <PreviewPanel
+                questionText={candidate.text}
+                formatType={effectiveFormat}
+                options={mcqOptions}
+                correctAnswer={correctAnswer}
+                expectedAnswer={expectedAnswer}
+                isGenerating={isGenerating}
+                onOptionsChange={setMcqOptions}
+                onCorrectAnswerChange={setCorrectAnswer}
+                onExpectedAnswerChange={setExpectedAnswer}
+                onRegenerate={() => {
+                  generatedForRef.current = null;
+                  generatePreview(candidate.text, effectiveFormat);
+                }}
+              />
             </div>
           </div>
         ) : isEditing ? (
@@ -311,12 +516,7 @@ export function QuestionOnDeck({
                 <Check className="h-3.5 w-3.5" />
                 Send Edited
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleCancelEdit}
-                className="text-xs h-8"
-              >
+              <Button size="sm" variant="ghost" onClick={handleCancelEdit} className="text-xs h-8">
                 Cancel
               </Button>
             </div>
@@ -327,9 +527,7 @@ export function QuestionOnDeck({
             <div
               className={cn(
                 'mx-auto mb-3 h-12 w-12 rounded-2xl flex items-center justify-center transition-all',
-                isListening
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-muted text-muted-foreground'
+                isListening ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
               )}
             >
               {isListening ? (
@@ -349,18 +547,13 @@ export function QuestionOnDeck({
         {/* Question History */}
         {hasHistory && (
           <div className="mt-4 pt-4 border-t border-border/50 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Previous detections
-              </span>
-            </div>
+            <span className="text-xs font-medium text-muted-foreground">Previous detections</span>
             <div className="space-y-2">
               {visibleHistory.map((item) => (
                 <HistoryItem
                   key={item.id}
                   item={item}
-                  onSend={onSendNow}
-                  onPreview={onPreview}
+                  onSend={(text) => onSendNow(text)}
                   onRemove={onRemoveFromHistory}
                   isSending={isSending}
                 />
@@ -374,15 +567,9 @@ export function QuestionOnDeck({
                 className="w-full h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
               >
                 {showAllHistory ? (
-                  <>
-                    <ChevronUp className="h-3 w-3" />
-                    Show less
-                  </>
+                  <><ChevronUp className="h-3 w-3" />Show less</>
                 ) : (
-                  <>
-                    <ChevronDown className="h-3 w-3" />
-                    Show {hiddenCount} more
-                  </>
+                  <><ChevronDown className="h-3 w-3" />Show {hiddenCount} more</>
                 )}
               </Button>
             )}
