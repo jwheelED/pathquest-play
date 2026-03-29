@@ -103,6 +103,8 @@ export const LectureTranscription = ({
   onTranscriptChange,
   onQuestionCandidateChange,
   onSendingChange,
+  onAutoQuestionStateChange,
+  onAutoQuestionIntervalChangeRef,
   onSendQuestionRef,
   onPreviewQuestionRef,
   onDismissQuestionRef,
