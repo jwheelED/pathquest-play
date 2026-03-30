@@ -126,17 +126,29 @@ export class DeepgramStreamingClient {
           console.log("🔗 Fly.io proxy mode: persistent connection, no proactive reconnect needed");
           
           // For Fly.io proxy, set up long session health monitoring
-          // Detect if no transcripts received for 60s (possible stale connection)
+          // Auto-reconnect if no transcripts received for 90s (stale connection)
           this.longSessionHealthInterval = window.setInterval(() => {
             const timeSinceLastTranscript = Date.now() - this.lastTranscriptTime;
             const connectionAge = Date.now() - this.connectionStartTime;
             
             // Only check after at least 30 seconds of connection
-            if (connectionAge > 30000 && timeSinceLastTranscript > 60000) {
-              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s - connection may be stale`);
-              // Don't auto-reconnect, just log warning - user might be paused
+            if (connectionAge > 30000 && timeSinceLastTranscript > 90000) {
+              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s - connection is stale, auto-reconnecting`);
+              // Reset reconnect attempts since this is a health-triggered reconnect, not a failure
+              this.reconnectAttempts = 0;
+              this.proactiveReconnect();
+            } else if (connectionAge > 30000 && timeSinceLastTranscript > 45000) {
+              // Early warning — try sending a keepalive ping
+              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s — sending keepalive`);
+              try {
+                if (this.ws?.readyState === WebSocket.OPEN) {
+                  this.ws.send(JSON.stringify({ type: "KeepAlive" }));
+                }
+              } catch (e) {
+                console.error("❌ Keepalive send failed:", e);
+              }
             }
-          }, 30000); // Check every 30 seconds
+          }, 15000); // Check every 15 seconds for faster detection
         }
       };
 
