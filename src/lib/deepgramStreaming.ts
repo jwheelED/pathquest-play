@@ -36,7 +36,7 @@ export class DeepgramStreamingClient {
   private stream: MediaStream | null = null;
   private isConnecting: boolean = false;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 3;
+  private maxReconnectAttempts: number = 10; // Increased for long sessions (30-60+ min)
   private reconnectDelay: number = 2000;
   private audioChunksQueue: Blob[] = [];
   private isDeepgramReady: boolean = false;
