@@ -2183,6 +2183,10 @@ export const LectureTranscription = ({
       lastAutoQuestionTimeRef.current = now;
       intervalStartTimeRef.current = now;
       setAutoQuestionCount(0);
+      // Set the countdown immediately so UI doesn't flash "Now"
+      const initialSeconds = Math.ceil(intervalMs / 1000);
+      setNextAutoQuestionIn(initialSeconds);
+      onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: initialSeconds, isSending: false });
       console.log(`🟢 Auto-questions initialized: every ${autoQuestionInterval} minutes (${intervalMs}ms)`);
       console.log("🕐 First question will trigger at:", new Date(now + intervalMs).toLocaleTimeString());
     }
