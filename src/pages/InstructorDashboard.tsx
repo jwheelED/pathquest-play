@@ -100,6 +100,7 @@ export default function InstructorDashboard() {
   const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onAutoQuestionIntervalChangeRef = useRef<((minutes: number) => void) | null>(null);
+  const onAutoQuestionToggleRef = useRef<((enabled: boolean) => Promise<void>) | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
