@@ -2051,8 +2051,10 @@ export const LectureTranscription = ({
   };
 
   // Toggle auto-question enabled state with mid-recording mode switching
-  const handleToggleAutoQuestion = async () => {
-    const newState = !autoQuestionEnabled;
+  const handleToggleAutoQuestion = async (enabled?: boolean) => {
+    const newState = typeof enabled === "boolean" ? enabled : !autoQuestionEnabled;
+    if (newState === autoQuestionEnabled) return;
+
     console.log(`🔄 Toggling auto-questions: ${autoQuestionEnabled} → ${newState}`);
 
     try {
@@ -2066,12 +2068,33 @@ export const LectureTranscription = ({
       if (error) throw error;
 
       setAutoQuestionEnabled(newState);
+      onAutoQuestionEnabledChange?.(newState);
 
       // Reset timer when enabling
       if (newState) {
-        setLastAutoQuestionTime(0);
         setRetryAttempts(0);
         setLastAutoQuestionError(null);
+
+        if (isRecording) {
+          const now = Date.now();
+          const intervalMs = autoQuestionInterval * 60 * 1000;
+          const initialSeconds = Math.ceil(intervalMs / 1000);
+
+          setLastAutoQuestionTime(now);
+          lastAutoQuestionTimeRef.current = now;
+          intervalStartTimeRef.current = now;
+          setNextAutoQuestionIn(initialSeconds);
+          onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: initialSeconds, isSending: false });
+        } else {
+          setLastAutoQuestionTime(0);
+          lastAutoQuestionTimeRef.current = 0;
+          setNextAutoQuestionIn(0);
+        }
+      } else {
+        setLastAutoQuestionTime(0);
+        lastAutoQuestionTimeRef.current = 0;
+        setNextAutoQuestionIn(0);
+        onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: 0, isSending: false });
       }
 
       // Handle mid-recording mode switch
@@ -2079,7 +2102,7 @@ export const LectureTranscription = ({
         if (newState) {
           // Switching ON: Initialize timer, chunks already running
           console.log("🔄 Mid-recording: Enabling auto-questions");
-          
+
           // Ensure we have a microphone stream
           if (!streamRef.current) {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -2091,11 +2114,7 @@ export const LectureTranscription = ({
             });
             streamRef.current = stream;
           }
-          
-          const now = Date.now();
-          setLastAutoQuestionTime(now);
-          intervalStartTimeRef.current = now;
-          
+
           toast({
             title: "✅ Auto-Questions Enabled",
             description: `Questions will be generated every ${autoQuestionInterval} minutes`,
@@ -2103,7 +2122,7 @@ export const LectureTranscription = ({
         } else {
           // Switching OFF: Just notify user, chunks keep running
           console.log("🔄 Mid-recording: Auto-questions disabled, chunks continue for transcription");
-          
+
           toast({
             title: "⏸️ Auto-Questions Disabled",
             description: "Transcription continues, no questions generated",
