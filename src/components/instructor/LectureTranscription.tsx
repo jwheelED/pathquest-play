@@ -2316,6 +2316,10 @@ export const LectureTranscription = ({
       setLastAutoQuestionTime(now);
       intervalStartTimeRef.current = now;
       setAutoQuestionCount(0);
+      const intervalMs = autoQuestionInterval * 60 * 1000;
+      const initialSeconds = Math.ceil(intervalMs / 1000);
+      setNextAutoQuestionIn(initialSeconds);
+      onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: initialSeconds, isSending: false });
       console.log("⏰ Auto-question timer started mid-recording, first question in", autoQuestionInterval, "minutes");
     }
   }, [autoQuestionEnabled, isRecording, lastAutoQuestionTime, autoQuestionInterval]);
