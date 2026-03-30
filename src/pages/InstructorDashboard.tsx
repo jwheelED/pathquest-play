@@ -563,7 +563,7 @@ export default function InstructorDashboard() {
                 autoQuestionEnabled={autoQuestionEnabled}
                 onStartListening={() => onStartRecordingRef.current?.()}
                 onStopListening={() => onStopRecordingRef.current?.()}
-                onToggleAutoQuestion={setAutoQuestionEnabled}
+                onToggleAutoQuestion={(enabled) => onAutoQuestionToggleRef.current?.(enabled)}
                 participantCount={participantCount}
                 transcriptChunks={transcriptChunks}
                 currentTranscript={currentTranscript}
