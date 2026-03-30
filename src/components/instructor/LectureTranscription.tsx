@@ -348,16 +348,18 @@ export const LectureTranscription = ({
         }
         if (isRecording) {
           const now = Date.now();
+          const initialSeconds = Math.ceil((minutes * 60 * 1000) / 1000);
           setLastAutoQuestionTime(now);
           lastAutoQuestionTimeRef.current = now;
+          intervalStartTimeRef.current = now;
+          setNextAutoQuestionIn(initialSeconds);
+          onAutoQuestionStateChange?.({ intervalMinutes: minutes, nextQuestionIn: initialSeconds, isSending: isSendingQuestionRef.current });
         }
         sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
       };
     }
     if (onAutoQuestionToggleRef) {
-      onAutoQuestionToggleRef.current = async (enabled: boolean) => {
-        await handleToggleAutoQuestion(enabled);
-      };
+      onAutoQuestionToggleRef.current = handleToggleAutoQuestion;
     }
   }); // no dep array — always keep refs current
 
