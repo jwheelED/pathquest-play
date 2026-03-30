@@ -73,6 +73,7 @@ interface LectureTranscriptionProps {
   onSendingChange?: (isSending: boolean) => void;
   onAutoQuestionStateChange?: (state: { intervalMinutes: number; nextQuestionIn: number; isSending: boolean }) => void;
   onAutoQuestionIntervalChangeRef?: React.MutableRefObject<((minutes: number) => void) | null>;
+  onAutoQuestionToggleRef?: React.MutableRefObject<((enabled: boolean) => Promise<void>) | null>;
   // Refs for external control
   onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
@@ -82,21 +83,7 @@ interface LectureTranscriptionProps {
   /** When true, suppresses the VoiceQuestionPreviewDialog and auto-sends when triggered */
   suppressInternalDialogs?: boolean;
 }
-
-// Constants for memory and resource management
-const MAX_BUFFER_SIZE = 50000; // 50K characters max
-const KEEP_RECENT_SIZE = 40000; // Keep 40K most recent
-const RESTART_INTERVAL = 0; // Disabled - was causing auto-question timer resets
-const TOKEN_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes
-const MAX_RECORDING_CYCLES = 50; // Force restart after 50 cycles (~8.5 min)
-const MAX_CONSECUTIVE_FAILURES = 5; // Increased from 3 to 5
-const RECORDING_CHUNK_DURATION = 8000; // 8 seconds for better sentence completion
-const MIN_CHUNK_LENGTH = 30; // Minimum characters to analyze
-const CIRCUIT_BREAKER_BACKOFF = [30000, 60000, 120000, 300000]; // 30s, 60s, 120s, 300s
-// Quota-specific circuit breaker
-const QUOTA_CIRCUIT_BREAKER_THRESHOLD = 3; // Trigger after 3 consecutive quota errors
-const QUOTA_PAUSE_DURATION = 5 * 60 * 1000; // 5 minutes pause
-
+...
 export const LectureTranscription = ({ 
   onQuestionGenerated,
   onRecordingChange,
@@ -105,6 +92,7 @@ export const LectureTranscription = ({
   onSendingChange,
   onAutoQuestionStateChange,
   onAutoQuestionIntervalChangeRef,
+  onAutoQuestionToggleRef,
   onSendQuestionRef,
   onPreviewQuestionRef,
   onDismissQuestionRef,
