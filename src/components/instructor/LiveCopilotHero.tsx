@@ -896,7 +896,7 @@ export function LiveCopilotHero({
                     Next Question
                   </p>
                   <p className="text-2xl font-bold text-neutral-800 tabular-nums">
-                    {formatTimeLeft(nextQuestionIn)}
+                    {formatTimeLeft(nextQuestionIn, "Starting…")}
                   </p>
                   <Progress value={progressPercent} className="h-1.5 mt-2 bg-neutral-200 [&>div]:bg-emerald-500" />
                 </div>
