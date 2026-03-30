@@ -347,12 +347,19 @@ export const LectureTranscription = ({
             .eq("id", user.id);
         }
         if (isRecording) {
-          setLastAutoQuestionTime(Date.now());
+          const now = Date.now();
+          setLastAutoQuestionTime(now);
+          lastAutoQuestionTimeRef.current = now;
         }
         sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
       };
     }
-  }); // no dep array — always keep ref current
+    if (onAutoQuestionToggleRef) {
+      onAutoQuestionToggleRef.current = async (enabled: boolean) => {
+        await handleToggleAutoQuestion(enabled);
+      };
+    }
+  }); // no dep array — always keep refs current
 
   // When suppressInternalDialogs is true, auto-confirm the send instead of showing the dialog
   useEffect(() => {
