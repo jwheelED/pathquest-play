@@ -118,8 +118,8 @@ function formatTimer(s: number) {
   return `${m}:${sec}`;
 }
 
-function formatTimeLeft(seconds: number) {
-  if (seconds <= 0) return "Now";
+function formatTimeLeft(seconds: number, fallback = "Now") {
+  if (seconds <= 0) return fallback;
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   if (mins > 0) return `${mins}m ${secs}s`;
