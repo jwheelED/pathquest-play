@@ -536,7 +536,9 @@ export const LectureTranscription = ({
         }
 
         if (profile) {
-          setAutoQuestionEnabled(profile.auto_question_enabled || false);
+          const enabled = profile.auto_question_enabled || false;
+          setAutoQuestionEnabled(enabled);
+          onAutoQuestionEnabledChange?.(enabled);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
           // Default to true if not explicitly set to false
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);

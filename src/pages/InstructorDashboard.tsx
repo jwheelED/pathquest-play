@@ -772,6 +772,8 @@ export default function InstructorDashboard() {
               onSendingChange={setIsSendingQuestion}
               onAutoQuestionStateChange={setAutoQuestionState}
               onAutoQuestionIntervalChangeRef={onAutoQuestionIntervalChangeRef}
+              onAutoQuestionToggleRef={onAutoQuestionToggleRef}
+              onAutoQuestionEnabledChange={setAutoQuestionEnabled}
               onSendQuestionRef={onSendQuestionRef}
               onPreviewQuestionRef={onPreviewQuestionRef}
               onDismissQuestionRef={onDismissQuestionRef}
