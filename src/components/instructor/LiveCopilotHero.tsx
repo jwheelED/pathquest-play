@@ -605,12 +605,6 @@ export function LiveCopilotHero({
     return () => clearInterval(interval);
   }, [isListening]);
 
-  // Auto-scroll transcript
-  useEffect(() => {
-    if (transcriptEndRef.current && isListening) {
-      transcriptEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [transcriptChunks, currentTranscript, isListening]);
 
   // Accumulate question candidates into local history
   useEffect(() => {

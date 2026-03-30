@@ -333,6 +333,8 @@ export const LectureTranscription = ({
     if (onAutoQuestionIntervalChangeRef) {
       onAutoQuestionIntervalChangeRef.current = async (minutes: number) => {
         setAutoQuestionInterval(minutes);
+        // Immediately update the UI — don't wait for the 1-second timer tick
+        onAutoQuestionStateChange?.({ intervalMinutes: minutes, nextQuestionIn: nextAutoQuestionIn, isSending: isSendingQuestionRef.current });
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await supabase
