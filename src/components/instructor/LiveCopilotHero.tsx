@@ -852,7 +852,7 @@ export function LiveCopilotHero({
                 { label: "Transcription", value: "Active", active: true },
                 { label: "Detection", value: hasQuestion ? "Question found" : "Listening", active: hasQuestion, amber: !hasQuestion },
                 { label: "Students", value: `${participantCount} connected`, active: participantCount > 0 },
-                { label: "Next Question", value: autoQuestionEnabled ? formatTimeLeft(nextQuestionIn) : "Manual", active: autoQuestionEnabled, amber: autoQuestionEnabled && !hasQuestion },
+                { label: "Next Question", value: autoQuestionEnabled ? formatTimeLeft(nextQuestionIn, isListening ? "Starting…" : "—") : "Manual", active: autoQuestionEnabled, amber: autoQuestionEnabled && !hasQuestion },
               ].map((status) => (
                 <div key={status.label} className="bg-white border border-neutral-200 rounded-xl px-3.5 py-3 shadow-sm">
                   <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wide mb-1">
