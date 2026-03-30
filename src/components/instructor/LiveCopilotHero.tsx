@@ -118,8 +118,8 @@ function formatTimer(s: number) {
   return `${m}:${sec}`;
 }
 
-function formatTimeLeft(seconds: number) {
-  if (seconds <= 0) return "Now";
+function formatTimeLeft(seconds: number, fallback = "Now") {
+  if (seconds <= 0) return fallback;
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   if (mins > 0) return `${mins}m ${secs}s`;
@@ -852,7 +852,7 @@ export function LiveCopilotHero({
                 { label: "Transcription", value: "Active", active: true },
                 { label: "Detection", value: hasQuestion ? "Question found" : "Listening", active: hasQuestion, amber: !hasQuestion },
                 { label: "Students", value: `${participantCount} connected`, active: participantCount > 0 },
-                { label: "Next Question", value: autoQuestionEnabled ? formatTimeLeft(nextQuestionIn) : "Manual", active: autoQuestionEnabled, amber: autoQuestionEnabled && !hasQuestion },
+                { label: "Next Question", value: autoQuestionEnabled ? formatTimeLeft(nextQuestionIn, isListening ? "Starting…" : "—") : "Manual", active: autoQuestionEnabled, amber: autoQuestionEnabled && !hasQuestion },
               ].map((status) => (
                 <div key={status.label} className="bg-white border border-neutral-200 rounded-xl px-3.5 py-3 shadow-sm">
                   <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wide mb-1">
@@ -896,7 +896,7 @@ export function LiveCopilotHero({
                     Next Question
                   </p>
                   <p className="text-2xl font-bold text-neutral-800 tabular-nums">
-                    {formatTimeLeft(nextQuestionIn)}
+                    {formatTimeLeft(nextQuestionIn, "Starting…")}
                   </p>
                   <Progress value={progressPercent} className="h-1.5 mt-2 bg-neutral-200 [&>div]:bg-emerald-500" />
                 </div>

@@ -2314,6 +2314,7 @@ export const LectureTranscription = ({
     if (autoQuestionEnabled && isRecording && lastAutoQuestionTime === 0) {
       const now = Date.now();
       setLastAutoQuestionTime(now);
+      lastAutoQuestionTimeRef.current = now;
       intervalStartTimeRef.current = now;
       setAutoQuestionCount(0);
       const intervalMs = autoQuestionInterval * 60 * 1000;
