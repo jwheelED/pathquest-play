@@ -100,6 +100,7 @@ export default function InstructorDashboard() {
   const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onAutoQuestionIntervalChangeRef = useRef<((minutes: number) => void) | null>(null);
+  const onAutoQuestionToggleRef = useRef<((enabled: boolean) => Promise<void>) | null>(null);
   const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
@@ -562,7 +563,7 @@ export default function InstructorDashboard() {
                 autoQuestionEnabled={autoQuestionEnabled}
                 onStartListening={() => onStartRecordingRef.current?.()}
                 onStopListening={() => onStopRecordingRef.current?.()}
-                onToggleAutoQuestion={setAutoQuestionEnabled}
+                onToggleAutoQuestion={(enabled) => onAutoQuestionToggleRef.current?.(enabled)}
                 participantCount={participantCount}
                 transcriptChunks={transcriptChunks}
                 currentTranscript={currentTranscript}
@@ -771,6 +772,8 @@ export default function InstructorDashboard() {
               onSendingChange={setIsSendingQuestion}
               onAutoQuestionStateChange={setAutoQuestionState}
               onAutoQuestionIntervalChangeRef={onAutoQuestionIntervalChangeRef}
+              onAutoQuestionToggleRef={onAutoQuestionToggleRef}
+              onAutoQuestionEnabledChange={setAutoQuestionEnabled}
               onSendQuestionRef={onSendQuestionRef}
               onPreviewQuestionRef={onPreviewQuestionRef}
               onDismissQuestionRef={onDismissQuestionRef}

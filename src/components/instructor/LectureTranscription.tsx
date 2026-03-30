@@ -73,6 +73,8 @@ interface LectureTranscriptionProps {
   onSendingChange?: (isSending: boolean) => void;
   onAutoQuestionStateChange?: (state: { intervalMinutes: number; nextQuestionIn: number; isSending: boolean }) => void;
   onAutoQuestionIntervalChangeRef?: React.MutableRefObject<((minutes: number) => void) | null>;
+  onAutoQuestionToggleRef?: React.MutableRefObject<((enabled: boolean) => Promise<void>) | null>;
+  onAutoQuestionEnabledChange?: (enabled: boolean) => void;
   // Refs for external control
   onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
@@ -105,6 +107,8 @@ export const LectureTranscription = ({
   onSendingChange,
   onAutoQuestionStateChange,
   onAutoQuestionIntervalChangeRef,
+  onAutoQuestionToggleRef,
+  onAutoQuestionEnabledChange,
   onSendQuestionRef,
   onPreviewQuestionRef,
   onDismissQuestionRef,
@@ -343,12 +347,21 @@ export const LectureTranscription = ({
             .eq("id", user.id);
         }
         if (isRecording) {
-          setLastAutoQuestionTime(Date.now());
+          const now = Date.now();
+          const initialSeconds = Math.ceil((minutes * 60 * 1000) / 1000);
+          setLastAutoQuestionTime(now);
+          lastAutoQuestionTimeRef.current = now;
+          intervalStartTimeRef.current = now;
+          setNextAutoQuestionIn(initialSeconds);
+          onAutoQuestionStateChange?.({ intervalMinutes: minutes, nextQuestionIn: initialSeconds, isSending: isSendingQuestionRef.current });
         }
         sonnerToast.success(`Interval changed to ${minutes} minute${minutes > 1 ? 's' : ''}`);
       };
     }
-  }); // no dep array — always keep ref current
+    if (onAutoQuestionToggleRef) {
+      onAutoQuestionToggleRef.current = handleToggleAutoQuestion;
+    }
+  }); // no dep array — always keep refs current
 
   // When suppressInternalDialogs is true, auto-confirm the send instead of showing the dialog
   useEffect(() => {
@@ -523,7 +536,9 @@ export const LectureTranscription = ({
         }
 
         if (profile) {
-          setAutoQuestionEnabled(profile.auto_question_enabled || false);
+          const enabled = profile.auto_question_enabled || false;
+          setAutoQuestionEnabled(enabled);
+          onAutoQuestionEnabledChange?.(enabled);
           setAutoQuestionInterval(profile.auto_question_interval || 15);
           // Default to true if not explicitly set to false
           setAutoQuestionForceSend(profile.auto_question_force_send !== false);
@@ -2038,8 +2053,10 @@ export const LectureTranscription = ({
   };
 
   // Toggle auto-question enabled state with mid-recording mode switching
-  const handleToggleAutoQuestion = async () => {
-    const newState = !autoQuestionEnabled;
+  const handleToggleAutoQuestion = async (enabled?: boolean) => {
+    const newState = typeof enabled === "boolean" ? enabled : !autoQuestionEnabled;
+    if (newState === autoQuestionEnabled) return;
+
     console.log(`🔄 Toggling auto-questions: ${autoQuestionEnabled} → ${newState}`);
 
     try {
@@ -2053,12 +2070,33 @@ export const LectureTranscription = ({
       if (error) throw error;
 
       setAutoQuestionEnabled(newState);
+      onAutoQuestionEnabledChange?.(newState);
 
       // Reset timer when enabling
       if (newState) {
-        setLastAutoQuestionTime(0);
         setRetryAttempts(0);
         setLastAutoQuestionError(null);
+
+        if (isRecording) {
+          const now = Date.now();
+          const intervalMs = autoQuestionInterval * 60 * 1000;
+          const initialSeconds = Math.ceil(intervalMs / 1000);
+
+          setLastAutoQuestionTime(now);
+          lastAutoQuestionTimeRef.current = now;
+          intervalStartTimeRef.current = now;
+          setNextAutoQuestionIn(initialSeconds);
+          onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: initialSeconds, isSending: false });
+        } else {
+          setLastAutoQuestionTime(0);
+          lastAutoQuestionTimeRef.current = 0;
+          setNextAutoQuestionIn(0);
+        }
+      } else {
+        setLastAutoQuestionTime(0);
+        lastAutoQuestionTimeRef.current = 0;
+        setNextAutoQuestionIn(0);
+        onAutoQuestionStateChange?.({ intervalMinutes: autoQuestionInterval, nextQuestionIn: 0, isSending: false });
       }
 
       // Handle mid-recording mode switch
@@ -2066,7 +2104,7 @@ export const LectureTranscription = ({
         if (newState) {
           // Switching ON: Initialize timer, chunks already running
           console.log("🔄 Mid-recording: Enabling auto-questions");
-          
+
           // Ensure we have a microphone stream
           if (!streamRef.current) {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -2078,11 +2116,7 @@ export const LectureTranscription = ({
             });
             streamRef.current = stream;
           }
-          
-          const now = Date.now();
-          setLastAutoQuestionTime(now);
-          intervalStartTimeRef.current = now;
-          
+
           toast({
             title: "✅ Auto-Questions Enabled",
             description: `Questions will be generated every ${autoQuestionInterval} minutes`,
@@ -2090,7 +2124,7 @@ export const LectureTranscription = ({
         } else {
           // Switching OFF: Just notify user, chunks keep running
           console.log("🔄 Mid-recording: Auto-questions disabled, chunks continue for transcription");
-          
+
           toast({
             title: "⏸️ Auto-Questions Disabled",
             description: "Transcription continues, no questions generated",
