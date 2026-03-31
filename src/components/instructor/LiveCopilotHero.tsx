@@ -946,7 +946,7 @@ export function LiveCopilotHero({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
                 </span>
-                <span className="text-sm font-semibold text-neutral-800">Recording</span>
+                <span className="text-sm font-semibold text-neutral-800">Live Co-pilot is Listening</span>
               </div>
 
               {/* Timer pill */}
