@@ -619,6 +619,11 @@ export default function InstructorDashboard() {
                 <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
               </section>
             )}
+
+            {/* ===== PAST LIVE SESSIONS: Session history with student answers ===== */}
+            <section>
+              <PastLiveSessions />
+            </section>
           </div>
         );
 
