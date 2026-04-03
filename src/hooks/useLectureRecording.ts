@@ -8,6 +8,7 @@ import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
+import { useQuestionTriggerCapture } from '@/hooks/useQuestionTriggerCapture';
 
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
