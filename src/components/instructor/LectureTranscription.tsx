@@ -254,6 +254,27 @@ export const LectureTranscription = ({
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
 
+  // Trigger-based question capture — buffers multi-chunk questions
+  const {
+    feedChunk: feedTriggerChunk,
+    isCapturing: isTriggerCapturing,
+    resetCapture: resetTriggerCapture,
+    setOnCaptureComplete: setTriggerCaptureComplete,
+  } = useQuestionTriggerCapture({
+    cooldownMs: 15000,
+    silenceGapMs: 1500,
+    maxWords: 200,
+    maxDurationMs: 15000,
+  });
+
+  // Route trigger-captured questions into the passive candidate pipeline
+  useEffect(() => {
+    setTriggerCaptureComplete((candidate) => {
+      console.log('🎯 Trigger capture emitted question:', candidate.text);
+      checkPassiveQuestion(candidate.text);
+    });
+  }, [setTriggerCaptureComplete, checkPassiveQuestion]);
+
 
   // Keep isSendingQuestion ref in sync with state
   useEffect(() => {
