@@ -2491,8 +2491,13 @@ export const LectureTranscription = ({
           setTranscriptChunks((prev) => [...prev, cleanText]);
           setLastTranscript(cleanText);
           
-          // Passive question detection — check final utterances for ?
-          checkPassiveQuestion(cleanText);
+          // Trigger-based question capture — try buffered capture first
+          const capturing = feedTriggerChunk(cleanText, Date.now());
+          
+          // Passive question detection — only if trigger capture is NOT active
+          if (!capturing) {
+            checkPassiveQuestion(cleanText);
+          }
 
           
           // Accumulate clean text in transcript buffer
