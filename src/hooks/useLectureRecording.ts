@@ -215,6 +215,28 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
 
+  // Trigger-based question capture — buffers multi-chunk questions
+  const {
+    feedChunk: feedTriggerChunk,
+    isCapturing: isTriggerCapturing,
+    resetCapture: resetTriggerCapture,
+    setOnCaptureComplete: setTriggerCaptureComplete,
+  } = useQuestionTriggerCapture({
+    cooldownMs: 15000,
+    silenceGapMs: 1500,
+    maxWords: 200,
+    maxDurationMs: 15000,
+  });
+
+  // Route trigger-captured questions into the same passive candidate pipeline
+  useEffect(() => {
+    setTriggerCaptureComplete((candidate) => {
+      console.log('🎯 Trigger capture emitted question:', candidate.text);
+      // Directly set as passive candidate by checking the utterance
+      checkPassiveQuestion(candidate.text);
+    });
+  }, [setTriggerCaptureComplete, checkPassiveQuestion]);
+
 
   // Deepgram streaming refs for real-time transcription
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
