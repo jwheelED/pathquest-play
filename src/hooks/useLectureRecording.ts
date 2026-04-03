@@ -981,8 +981,13 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
-          // Passive question detection — check final utterances for ?
-          checkPassiveQuestion(cleanText);
+          // Trigger-based question capture — try buffered capture first
+          const capturing = feedTriggerChunk(cleanText, Date.now());
+          
+          // Passive question detection — only if trigger capture is NOT active
+          if (!capturing) {
+            checkPassiveQuestion(cleanText);
+          }
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 
