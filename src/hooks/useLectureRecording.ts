@@ -8,6 +8,7 @@ import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
+import { useQuestionTriggerCapture } from '@/hooks/useQuestionTriggerCapture';
 
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
@@ -213,6 +214,28 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     autoDismissMs: 60000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
+
+  // Trigger-based question capture — buffers multi-chunk questions
+  const {
+    feedChunk: feedTriggerChunk,
+    isCapturing: isTriggerCapturing,
+    resetCapture: resetTriggerCapture,
+    setOnCaptureComplete: setTriggerCaptureComplete,
+  } = useQuestionTriggerCapture({
+    cooldownMs: 15000,
+    silenceGapMs: 1500,
+    maxWords: 200,
+    maxDurationMs: 15000,
+  });
+
+  // Route trigger-captured questions into the same passive candidate pipeline
+  useEffect(() => {
+    setTriggerCaptureComplete((candidate) => {
+      console.log('🎯 Trigger capture emitted question:', candidate.text);
+      // Directly set as passive candidate by checking the utterance
+      checkPassiveQuestion(candidate.text);
+    });
+  }, [setTriggerCaptureComplete, checkPassiveQuestion]);
 
 
   // Deepgram streaming refs for real-time transcription
@@ -958,8 +981,13 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
-          // Passive question detection — check final utterances for ?
-          checkPassiveQuestion(cleanText);
+          // Trigger-based question capture — try buffered capture first
+          const capturing = feedTriggerChunk(cleanText, Date.now());
+          
+          // Passive question detection — only if trigger capture is NOT active
+          if (!capturing) {
+            checkPassiveQuestion(cleanText);
+          }
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 

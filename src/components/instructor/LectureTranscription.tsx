@@ -62,6 +62,7 @@ import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySh
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
+import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
 import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
 
 interface LectureTranscriptionProps {
@@ -252,6 +253,27 @@ export const LectureTranscription = ({
     autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
+
+  // Trigger-based question capture — buffers multi-chunk questions
+  const {
+    feedChunk: feedTriggerChunk,
+    isCapturing: isTriggerCapturing,
+    resetCapture: resetTriggerCapture,
+    setOnCaptureComplete: setTriggerCaptureComplete,
+  } = useQuestionTriggerCapture({
+    cooldownMs: 15000,
+    silenceGapMs: 1500,
+    maxWords: 200,
+    maxDurationMs: 15000,
+  });
+
+  // Route trigger-captured questions into the passive candidate pipeline
+  useEffect(() => {
+    setTriggerCaptureComplete((candidate) => {
+      console.log('🎯 Trigger capture emitted question:', candidate.text);
+      checkPassiveQuestion(candidate.text);
+    });
+  }, [setTriggerCaptureComplete, checkPassiveQuestion]);
 
 
   // Keep isSendingQuestion ref in sync with state
@@ -2469,8 +2491,13 @@ export const LectureTranscription = ({
           setTranscriptChunks((prev) => [...prev, cleanText]);
           setLastTranscript(cleanText);
           
-          // Passive question detection — check final utterances for ?
-          checkPassiveQuestion(cleanText);
+          // Trigger-based question capture — try buffered capture first
+          const capturing = feedTriggerChunk(cleanText, Date.now());
+          
+          // Passive question detection — only if trigger capture is NOT active
+          if (!capturing) {
+            checkPassiveQuestion(cleanText);
+          }
 
           
           // Accumulate clean text in transcript buffer
