@@ -185,8 +185,9 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     const question = postProcess(state.buffer);
     if (debug) console.log('🎯 [trigger-capture] finished:', question);
 
-    // Reset state
+    // Reset state + clear context window
     captureRef.current = { isCapturing: false, buffer: [], triggerTime: 0, lastChunkTime: 0 };
+    recentChunksRef.current = [];
     setIsCapturing(false);
     clearTimeout_();
 
