@@ -51,6 +51,14 @@ interface UseQuestionTriggerCaptureOptions {
   debug?: boolean;
 }
 
+interface RecentChunk {
+  text: string;
+  timestamp: number;
+}
+
+const MAX_WINDOW_CHUNKS = 5;
+const MAX_WINDOW_CHARS = 500;
+
 interface CaptureState {
   isCapturing: boolean;
   buffer: string[];
@@ -148,6 +156,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
   });
   const lastTriggerTimeRef = useRef<number>(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentChunksRef = useRef<RecentChunk[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
 
   // Callback when a full question is captured
@@ -176,8 +185,9 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     const question = postProcess(state.buffer);
     if (debug) console.log('🎯 [trigger-capture] finished:', question);
 
-    // Reset state
+    // Reset state + clear context window
     captureRef.current = { isCapturing: false, buffer: [], triggerTime: 0, lastChunkTime: 0 };
+    recentChunksRef.current = [];
     setIsCapturing(false);
     clearTimeout_();
 
@@ -248,47 +258,73 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       return true; // still capturing
     }
 
-    // Not capturing — check if this chunk starts a trigger
+    // Not capturing — update sliding context window then scan
     if (now - lastTriggerTimeRef.current < cooldownMs) {
+      // Still maintain the window even during cooldown
+      recentChunksRef.current.push({ text, timestamp: now });
+      if (recentChunksRef.current.length > MAX_WINDOW_CHUNKS) {
+        recentChunksRef.current.shift();
+      }
+      // Cap total chars
+      while (recentChunksRef.current.reduce((s, c) => s + c.text.length, 0) > MAX_WINDOW_CHARS && recentChunksRef.current.length > 1) {
+        recentChunksRef.current.shift();
+      }
       return false;
     }
 
-    const normalized = text.trim().toLowerCase();
+    // Push new chunk into sliding window
+    recentChunksRef.current.push({ text, timestamp: now });
+    if (recentChunksRef.current.length > MAX_WINDOW_CHUNKS) {
+      recentChunksRef.current.shift();
+    }
+    while (recentChunksRef.current.reduce((s, c) => s + c.text.length, 0) > MAX_WINDOW_CHARS && recentChunksRef.current.length > 1) {
+      recentChunksRef.current.shift();
+    }
 
-    // Strip leading filler before checking trigger
-    const stripped = normalized.replace(FILLER_PREFIXES, '').trim();
+    // Concatenate window and scan for triggers
+    const combinedWindow = recentChunksRef.current.map(c => c.text).join(' ').trim().toLowerCase();
+    const strippedWindow = combinedWindow.replace(FILLER_PREFIXES, '').trim();
 
     for (const pattern of TRIGGER_PATTERNS) {
-      if (pattern.test(stripped)) {
-        if (debug) console.log(`🎯 [trigger-capture] TRIGGER detected: "${text.substring(0, 80)}"`);
+      const match = strippedWindow.match(pattern);
+      if (match && match.index !== undefined) {
+        // Extract from trigger word onward in the ORIGINAL (non-lowercased) combined text
+        const originalCombined = recentChunksRef.current.map(c => c.text).join(' ').trim();
+        // Find approximate position in original text (case-insensitive search)
+        const triggerWord = match[0];
+        const origLower = originalCombined.toLowerCase();
+        // Search for the trigger starting from roughly the same position
+        const triggerIdx = origLower.indexOf(triggerWord.toLowerCase(), Math.max(0, match.index - 5));
+        
+        if (triggerIdx === -1) continue;
 
-        // Check if the chunk itself already contains a sentence-ending boundary
-        // (single-chunk question)
-        const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
+        const captureText = originalCombined.substring(triggerIdx).trim();
+        if (debug) console.log(`🎯 [trigger-capture] TRIGGER detected via window: "${captureText.substring(0, 80)}"`);
+
+        const hasSentenceEnd = /[.!?]\s*$/.test(captureText);
 
         lastTriggerTimeRef.current = now;
         captureRef.current = {
           isCapturing: true,
-          buffer: [text],
+          buffer: [captureText],
           triggerTime: now,
           lastChunkTime: now,
         };
         setIsCapturing(true);
+        recentChunksRef.current = []; // Clear window on trigger
 
         if (hasSentenceEnd) {
-          // Complete question in one chunk
           if (debug) console.log('🎯 [trigger-capture] single-chunk question, finishing immediately');
           finishCapture();
           return false;
         }
 
-        // Set safety timeout
         timeoutRef.current = setTimeout(() => {
           if (debug) console.log('🎯 [trigger-capture] safety timeout, finishing');
           finishCapture();
         }, maxDurationMs);
 
-        return true; // capturing started
+        return true;
       }
     }
 
@@ -297,6 +333,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
   const resetCapture = useCallback(() => {
     captureRef.current = { isCapturing: false, buffer: [], triggerTime: 0, lastChunkTime: 0 };
+    recentChunksRef.current = [];
     setIsCapturing(false);
     clearTimeout_();
     lastTriggerTimeRef.current = 0;
