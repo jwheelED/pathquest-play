@@ -333,6 +333,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
   const resetCapture = useCallback(() => {
     captureRef.current = { isCapturing: false, buffer: [], triggerTime: 0, lastChunkTime: 0 };
+    recentChunksRef.current = [];
     setIsCapturing(false);
     clearTimeout_();
     lastTriggerTimeRef.current = 0;
