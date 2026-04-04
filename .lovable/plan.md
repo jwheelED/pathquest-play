@@ -1,63 +1,48 @@
 
 
-# Trigger-Based Question Capture for Live Copilot
+# Add Transcript Context Window to Question Trigger Capture
 
 ## Problem
-Currently, passive question detection works on individual transcript chunks — it checks each chunk for a `?` and extracts the question from that single chunk. This means multi-chunk questions get truncated (only the tail end is captured), and the detected text depends on however Deepgram happened to split the utterance.
 
-## Solution: Question Trigger + Buffer Capture Mode
+The trigger capture hook only examines each individual chunk in isolation. When Deepgram splits a question across chunks — e.g., chunk 1: "so the wave will be", chunk 2: "increasing and what property of", chunk 3: "the wave is increasing" — the trigger word "what" may land in a chunk that doesn't start with it (it's mid-chunk), or the interrogative phrase spans a chunk boundary. The result is truncated or nonsensical detections like "the wave will be increasing?"
 
-When the transcript stream detects a question trigger phrase (e.g., "what is", "why does", "how many"), it enters a **capture mode** that buffers all subsequent chunks until a speech boundary (pause or sentence-ending punctuation) is reached. The full buffered text is then minimally post-processed and emitted as the detected question.
+## Solution: Sliding Context Window
 
-## Technical Design
+Add a small ring buffer of recent chunks (last 5 chunks, capped at ~500 chars) to `useQuestionTriggerCapture`. On each new chunk, concatenate the window and scan the **combined text** for trigger patterns — not just the latest chunk. When a trigger is found mid-window, start the capture buffer from the trigger word forward, discarding the pre-trigger context.
 
-### New hook: `useQuestionTriggerCapture.ts`
+## Changes
 
-**Trigger detection:**
-- Regex set matching interrogative starts: `what is/are/was/were/do/does/did/would/could/should/about`, `why is/are/do/does/did/would`, `how many/much/do/does/did/is/are/would/could/can`, `when is/are/do/does/did/would`, `where is/are/do/does/did`, `who is/are/was/were/does/did/would/can`, `which one/of/is`
-- Only triggers on **final** (non-interim) Deepgram results
-- 15-second cooldown between triggers (same as current passive detection)
+### `src/hooks/useQuestionTriggerCapture.ts`
 
-**Capture mode:**
-- Once triggered, a `captureBuffer` ref accumulates every subsequent transcript chunk
-- Capture ends when any of these conditions are met:
-  - A sentence-ending punctuation (`.`, `!`, `?`) is detected in a chunk
-  - A silence gap > 1.5 seconds between chunks (tracked via timestamps)
-  - Buffer exceeds 200 words (safety cap)
-  - 15 seconds elapsed since trigger (timeout safety)
+1. **Add a `recentChunks` ring buffer** to `CaptureState` — stores the last 5 raw chunks with timestamps
+2. **On each `feedChunk` call (when not already capturing)**:
+   - Push the new chunk into the ring buffer (evict oldest if > 5)
+   - Concatenate all chunks in the window into a single string
+   - Scan the concatenated string for trigger patterns
+   - If a trigger is found, extract everything from the trigger word onward as the initial capture buffer content
+3. **When capturing completes**, clear the ring buffer to avoid re-triggering on stale context
+4. **Passive detection (`checkUtterance`)** — no changes needed; it already receives the same chunks independently
 
-**Minimal post-processing (no paraphrasing):**
-1. Merge all buffered chunks into a single string
-2. Remove duplicate words at chunk boundaries (e.g., "the mitochondria the mitochondria" → "the mitochondria")
-3. Strip leading filler: "so", "um", "uh", "like", "well", "okay so"
-4. Restore sentence-ending `?` if missing
-5. Trim whitespace
+### `src/hooks/useLectureRecording.ts` and `src/components/instructor/LectureTranscription.tsx`
 
-**Output:**
-- Emits a `PassiveQuestionCandidate` (same interface as current detection) so it plugs directly into the existing Question On Deck card and auto-preview flow
-- Priority over chunk-based detection: if trigger capture is active, suppress regular `checkUtterance` to avoid duplicates
+No changes — the integration point (`feedTriggerChunk(cleanText, Date.now())`) remains identical.
 
-### Integration points
+## Example
 
-**`useLectureRecording.ts` and `LectureTranscription.tsx`:**
-- Before calling `checkPassiveQuestion(cleanText)`, first call `feedChunk(cleanText, timestamp)` on the trigger capture hook
-- If trigger capture is actively buffering, skip `checkPassiveQuestion`
-- When trigger capture emits a completed question, route it through the same candidate setter
+```text
+Chunk 1: "so the wave will be"          → window: ["so the wave will be"]
+Chunk 2: "increasing and what property" → window: ["so the wave will be", "increasing and what property"]
+  → combined: "so the wave will be increasing and what property"
+  → trigger match: "what property" at position 39
+  → capture starts with: "what property"
+Chunk 3: "of the wave is increasing"    → appended to capture buffer
+  → sentence end detected → finishCapture
+  → output: "What property of the wave is increasing?"
+```
 
-**`LiveCopilotHero.tsx`:**
-- No changes needed — it already renders whatever `questionCandidate` is passed in
+## Constraints
 
-### Files to create/modify
-
-| File | Action |
-|------|--------|
-| `src/hooks/useQuestionTriggerCapture.ts` | **Create** — new hook with trigger detection, buffer capture, and post-processing |
-| `src/hooks/useLectureRecording.ts` | **Modify** — integrate trigger capture before passive detection |
-| `src/components/instructor/LectureTranscription.tsx` | **Modify** — same integration for the transcription component |
-
-### Edge cases handled
-- Rhetorical questions: same blocklist filtering applied after capture completes
-- Greeting patterns: same regex filtering
-- Overlapping triggers: new trigger resets the buffer (latest wins)
-- No question mark in speech: appended automatically since we know it started with an interrogative
+- Window capped at 5 chunks / 500 chars to avoid memory growth
+- Ring buffer is reset on capture completion and on `resetCapture()`
+- No changes to post-processing logic or rhetorical filtering
 
