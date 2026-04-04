@@ -51,6 +51,14 @@ interface UseQuestionTriggerCaptureOptions {
   debug?: boolean;
 }
 
+interface RecentChunk {
+  text: string;
+  timestamp: number;
+}
+
+const MAX_WINDOW_CHUNKS = 5;
+const MAX_WINDOW_CHARS = 500;
+
 interface CaptureState {
   isCapturing: boolean;
   buffer: string[];
