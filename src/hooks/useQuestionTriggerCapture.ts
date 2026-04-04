@@ -156,6 +156,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
   });
   const lastTriggerTimeRef = useRef<number>(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recentChunksRef = useRef<RecentChunk[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
 
   // Callback when a full question is captured
