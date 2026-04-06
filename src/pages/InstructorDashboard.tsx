@@ -610,7 +610,7 @@ export default function InstructorDashboard() {
 
             {/* ===== CHECK-IN RESULTS: Always visible at bottom ===== */}
             <section>
-              <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} />
+              <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} activeSessionId={activeSession?.id} />
             </section>
 
             {/* ===== LAST LIVE SIGNAL: Below primary surface ===== */}
