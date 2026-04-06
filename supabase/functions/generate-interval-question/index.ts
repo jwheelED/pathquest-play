@@ -310,7 +310,23 @@ serve(async (req) => {
     if (diffLevel === "easy") {
       difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the content.`;
     } else if (diffLevel === "hard") {
-      difficultyInstructions = `\nDIFFICULTY LEVEL: HARD - Generate a challenging question requiring analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.`;
+      difficultyInstructions = `
+DIFFICULTY LEVEL: HARD
+
+Question Stem Requirements:
+- Ask students to APPLY, ANALYZE, or EVALUATE — never just recall a definition.
+- Prefer "What would happen if...", "Why does X lead to Y rather than Z?", "Compare X and Y in the context of...", or "Which of these scenarios demonstrates [concept]?"
+- Require connecting TWO or more concepts from the ${groundingSource}.
+- Avoid questions answerable by someone who only memorized a glossary.
+- Frame questions around cause-effect reasoning, edge cases, predicting outcomes, or identifying exceptions.
+
+MCQ Distractor Requirements (when format is multiple_choice):
+- Each distractor must represent a SPECIFIC misconception or common student error.
+- Distractors should be plausible to someone who partially understands the material.
+- Match the length, detail, and grammatical structure of the correct answer.
+- NEVER use "All of the above", "None of the above", or vague fillers like "Not specified in lecture".
+- At least one distractor should be a "near-miss" — correct logic but wrong conclusion, or right concept applied to the wrong context.
+- At least one distractor should reflect a common confusion between similar terms or concepts from the ${groundingSource}.`;
     } else {
       difficultyInstructions = `\nDIFFICULTY LEVEL: MEDIUM - Generate a moderate question requiring understanding and application of concepts. Students should need to think about the content, not just recall it.`;
     }
@@ -412,7 +428,7 @@ Generate ONE focused question that tests understanding of the most important con
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
+          temperature: diffLevel === "hard" ? 0.5 : 0.7,
           response_format: { type: "json_object" },
         }),
         signal: controller.signal,
