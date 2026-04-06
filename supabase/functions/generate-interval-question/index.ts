@@ -428,7 +428,7 @@ Generate ONE focused question that tests understanding of the most important con
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: 0.7,
+          temperature: diffLevel === "hard" ? 0.5 : 0.7,
           response_format: { type: "json_object" },
         }),
         signal: controller.signal,
