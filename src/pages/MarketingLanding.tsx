@@ -127,6 +127,20 @@ const MarketingLanding = () => {
         </div>
       </section>
 
+      {/* Booth Flyer Download */}
+      <section className="py-12 px-4 bg-muted/30">
+        <div className="container mx-auto max-w-4xl text-center space-y-4">
+          <h3 className="text-xl font-semibold text-foreground">Event Materials</h3>
+          <p className="text-muted-foreground">Grab our leave-behind flyer for your reference.</p>
+          <a href="/edvana-booth-flyer.pdf" download="edvana-booth-flyer.pdf">
+            <Button variant="outline" size="lg" className="gap-2">
+              <Download className="w-4 h-4" />
+              Download Booth Flyer (PDF)
+            </Button>
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-6 px-4 border-t border-border">
         <div className="container mx-auto flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
