@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, Brain, BarChart3 } from "lucide-react";
+import { Mic, Brain, BarChart3, Download } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
 const MarketingLanding = () => {
