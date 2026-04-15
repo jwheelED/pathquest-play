@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, Brain, BarChart3, Download } from "lucide-react";
+import { Mic, Brain, BarChart3, FileText } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
 const MarketingLanding = () => {
@@ -127,17 +127,15 @@ const MarketingLanding = () => {
         </div>
       </section>
 
-      {/* Booth Flyer Download */}
+      {/* Booth Flyer */}
       <section className="py-12 px-4 bg-muted/30">
         <div className="container mx-auto max-w-4xl text-center space-y-4">
           <h3 className="text-xl font-semibold text-foreground">Event Materials</h3>
-          <p className="text-muted-foreground">Grab our leave-behind flyer for your reference.</p>
-          <a href="/edvana-booth-flyer.pdf" download="edvana-booth-flyer.pdf">
-            <Button variant="outline" size="lg" className="gap-2">
-              <Download className="w-4 h-4" />
-              Download Booth Flyer (PDF)
-            </Button>
-          </a>
+          <p className="text-muted-foreground">View our booth flyer for your reference.</p>
+          <Button variant="outline" size="lg" className="gap-2" onClick={() => navigate("/flyer")}>
+            <FileText className="w-4 h-4" />
+            View Booth Flyer
+          </Button>
         </div>
       </section>
 

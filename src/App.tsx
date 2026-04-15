@@ -13,6 +13,7 @@ import Index from "./pages/Index";
 import MarketingLanding from "./pages/MarketingLanding";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import BoothFlyer from "./pages/BoothFlyer";
 
 import ClassDashboard from "./pages/ClassDashboard";
 import Auth from "./pages/Auth";
@@ -88,6 +89,7 @@ function App() {
             <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/learn-more" element={<MarketingLanding />} />
+          <Route path="/flyer" element={<BoothFlyer />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={
