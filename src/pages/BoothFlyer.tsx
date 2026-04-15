@@ -7,7 +7,7 @@ const BoothFlyer = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] py-8 px-4">
+    <div className="min-h-screen bg-[#ededed] py-8 px-4">
       <div className="max-w-[8.5in] mx-auto space-y-10">
         {/* Back button */}
         <Button
