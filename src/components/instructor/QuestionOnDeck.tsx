@@ -234,6 +234,7 @@ export function QuestionOnDeck({
   onToggleHold,
   suggestedType = 'multiple_choice',
   formatPreference,
+  transcriptContext,
 }: QuestionOnDeckProps) {
   const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
 
