@@ -73,11 +73,11 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert educator. Generate a concise, ideal answer for the given question. This answer will be used as a grading reference for student responses. Keep it clear, accurate, and comprehensive but not overly long.`
+            content: `You are an expert educator. Generate a concise, ideal answer for the given question. This answer will be used as a grading reference for student responses. The answer must be SPECIFIC and FACTUALLY CORRECT — never vague. If the lecture context explicitly states or strongly implies the answer, quote or paraphrase it directly. Only use general world knowledge as a fallback if the lecture does not cover it.`
           },
           {
             role: 'user',
-            content: `${source_transcript ? `Lecture context (use this to ground your answer):\n"${source_transcript.slice(-800)}"\n\n` : ''}Generate the expected/ideal answer for this question:\n\n${question_text}\n\nBase your answer on the lecture context above, not general knowledge.`
+            content: `${source_transcript ? `Lecture context (PRIMARY grounding source — use this directly when it addresses the question):\n"${source_transcript.slice(-6000)}"\n\n` : ''}Generate the expected/ideal answer for this question:\n\n${question_text}\n\nThe expected answer should be clear, specific, and factually correct so it can serve as a reliable grading reference. If the lecture explicitly states the answer, use that wording.`
           }
         ],
         tools: [

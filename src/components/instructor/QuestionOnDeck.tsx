@@ -46,6 +46,7 @@ interface QuestionOnDeckProps {
   onToggleHold: () => void;
   suggestedType?: 'multiple_choice' | 'short_answer' | 'poll';
   formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
+  transcriptContext?: string;
 }
 
 function timeAgo(ts: number): string {
@@ -233,6 +234,7 @@ export function QuestionOnDeck({
   onToggleHold,
   suggestedType = 'multiple_choice',
   formatPreference,
+  transcriptContext,
 }: QuestionOnDeckProps) {
   const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
 
@@ -279,7 +281,7 @@ export function QuestionOnDeck({
     try {
       if (format === 'multiple_choice' || format === 'poll') {
         const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
-          body: { question_text: questionText },
+          body: { question_text: questionText, source_transcript: transcriptContext },
         });
         if (!error && data?.options?.length === 4) {
           setMcqOptions(data.options);
@@ -289,7 +291,7 @@ export function QuestionOnDeck({
         }
       } else {
         const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
-          body: { question_text: questionText },
+          body: { question_text: questionText, source_transcript: transcriptContext },
         });
         if (!error && data?.expected_answer) {
           setExpectedAnswer(data.expected_answer);
