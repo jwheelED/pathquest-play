@@ -379,15 +379,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     isFinalizingRef.current = true;
 
     try {
-      const sliceText = getSliceAroundTrigger(pending.triggerTs, now);
+      const slice = getSliceAroundTrigger(pending.triggerTs, now);
       const elapsedSinceTrigger = now - pending.triggerTs;
       const lookbackUsed = Math.min(lookbackMs, pending.triggerTs - (bufferRef.current[0]?.timestamp ?? pending.triggerTs));
 
       if (debug) {
-        console.log(`🎯 [slice] lookback≈${lookbackUsed}ms lookahead≈${elapsedSinceTrigger}ms text="${sliceText.substring(0, 120)}"`);
+        console.log(`🎯 [slice-split] question="${slice.question.substring(0, 100)}" context="${slice.context.substring(0, 100)}" (${lookbackUsed}ms lookback)`);
       }
 
-      if (!sliceText) {
+      if (!slice.question) {
         if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
         pendingTriggerRef.current = null;
         extensionsUsedRef.current = 0;
@@ -396,7 +396,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
-      const question = postProcess(sliceText);
+      const question = postProcess(slice.question);
 
       // ===== Semantic completion gate =====
       if (enableCompletionGate) {
@@ -451,16 +451,24 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
+      // Light cleanup of priorContext: strip leading filler, cap at ~1500 chars
+      let priorContext = (slice.context || '').trim();
+      priorContext = priorContext.replace(FILLER_PREFIXES, '').trim();
+      if (priorContext.length > 1500) {
+        priorContext = priorContext.slice(-1500).trim();
+      }
+
       const candidate: PassiveQuestionCandidate = {
         text: question,
         detectedAt: Date.now(),
         id: `tq-${++triggerIdCounter}`,
+        priorContext: priorContext || undefined,
       };
 
       // Set post-success cooldown ONLY now (after pass)
       lastSuccessTimeRef.current = Date.now();
 
-      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed):`, question);
+      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed) priorCtx=${priorContext.length}chars:`, question);
       onCaptureCompleteRef.current?.(candidate);
     } finally {
       isFinalizingRef.current = false;
