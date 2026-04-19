@@ -261,17 +261,20 @@ export const LectureTranscription = ({
     resetCapture: resetTriggerCapture,
     setOnCaptureComplete: setTriggerCaptureComplete,
   } = useQuestionTriggerCapture({
-    cooldownMs: 15000,
+    cooldownMs: 12000,
     silenceGapMs: 2500,
+    minSilenceMs: 1200,
   });
 
   // Route trigger-captured questions into the passive candidate pipeline
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
+      // Reset passive detection cooldown so its stale state doesn't block follow-ups
+      resetPassiveDetection?.();
       checkPassiveQuestion(candidate.text);
     });
-  }, [setTriggerCaptureComplete, checkPassiveQuestion]);
+  }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 
 
   // Keep isSendingQuestion ref in sync with state
