@@ -350,53 +350,41 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       return;
     }
 
-    const sliceText = getSliceAroundTrigger(pending.triggerTs, now);
-    const elapsedSinceTrigger = now - pending.triggerTs;
-    const lookbackUsed = Math.min(lookbackMs, pending.triggerTs - (bufferRef.current[0]?.timestamp ?? pending.triggerTs));
-
-    if (debug) {
-      console.log(`🎯 [slice] lookback≈${lookbackUsed}ms lookahead≈${elapsedSinceTrigger}ms text="${sliceText.substring(0, 120)}"`);
-    }
-
-    if (!sliceText) {
-      if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
-      pendingTriggerRef.current = null;
-      extensionsUsedRef.current = 0;
-      clearCompletionTimer();
-      setIsCapturing(false);
+    // Concurrency guard — prevent timer + sentence-end races
+    if (isFinalizingRef.current) {
+      if (debug) console.log('🔒 [finalize-lock] already finalizing, skip');
       return;
     }
 
-    const question = postProcess(sliceText);
+    // Min-silence check — defer if Deepgram is still emitting chunks
+    const silenceElapsed = now - (lastChunkTimeRef.current || pending.armedAt);
+    if (!isForced && silenceElapsed < minSilenceMs && extensionsUsedRef.current < maxExtensions) {
+      const waitMs = Math.max(300, minSilenceMs - silenceElapsed);
+      extensionsUsedRef.current += 1;
+      if (debug) {
+        console.log(`🤫 [silence-wait] lastChunk=${silenceElapsed}ms ago, deferring finalize +${waitMs}ms (ext ${extensionsUsedRef.current}/${maxExtensions})`);
+      }
+      clearCompletionTimer();
+      const isFinalExtension = extensionsUsedRef.current >= maxExtensions;
+      completionTimerRef.current = setTimeout(() => {
+        finalizeCapture(Date.now(), isFinalExtension);
+      }, waitMs);
+      return;
+    }
 
-    // ===== Semantic completion gate =====
-    if (enableCompletionGate) {
-      const verdict = evaluateCompleteness(question, {
-        minWords: minCompleteWords,
-        elapsedMs: elapsedSinceTrigger,
-        softCompleteMs,
-      });
+    isFinalizingRef.current = true;
 
-      if (verdict.status === 'hold' && !isForced && extensionsUsedRef.current < maxExtensions) {
-        extensionsUsedRef.current += 1;
-        if (debug) {
-          console.log(`🚦 [gate-hold] reason="${verdict.reason}" extension=${extensionsUsedRef.current}/${maxExtensions}`);
-        }
-        // Extend timer; do NOT reset pending
-        clearCompletionTimer();
-        const isFinalExtension = extensionsUsedRef.current >= maxExtensions;
-        completionTimerRef.current = setTimeout(() => {
-          if (debug) console.log(`🚦 [gate-extend] timer fired (+${extensionMs}ms)`);
-          finalizeCapture(Date.now(), isFinalExtension);
-        }, extensionMs);
-        return;
+    try {
+      const sliceText = getSliceAroundTrigger(pending.triggerTs, now);
+      const elapsedSinceTrigger = now - pending.triggerTs;
+      const lookbackUsed = Math.min(lookbackMs, pending.triggerTs - (bufferRef.current[0]?.timestamp ?? pending.triggerTs));
+
+      if (debug) {
+        console.log(`🎯 [slice] lookback≈${lookbackUsed}ms lookahead≈${elapsedSinceTrigger}ms text="${sliceText.substring(0, 120)}"`);
       }
 
-      if (verdict.status === 'reject' || (verdict.status === 'hold' && (isForced || extensionsUsedRef.current >= maxExtensions))) {
-        if (debug) {
-          const tag = verdict.status === 'reject' ? 'gate-reject' : 'gate-reject (max-ext)';
-          console.log(`🚦 [${tag}] reason="${verdict.reason}"`);
-        }
+      if (!sliceText) {
+        if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
         pendingTriggerRef.current = null;
         extensionsUsedRef.current = 0;
         clearCompletionTimer();
@@ -404,33 +392,75 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
-      if (debug) console.log(`🚦 [gate-pass] ${verdict.reason}`);
+      const question = postProcess(sliceText);
+
+      // ===== Semantic completion gate =====
+      if (enableCompletionGate) {
+        const verdict = evaluateCompleteness(question, {
+          minWords: minCompleteWords,
+          elapsedMs: elapsedSinceTrigger,
+          softCompleteMs,
+        });
+
+        if (verdict.status === 'hold' && !isForced && extensionsUsedRef.current < maxExtensions) {
+          extensionsUsedRef.current += 1;
+          if (debug) {
+            console.log(`🚦 [gate-hold] reason="${verdict.reason}" extension=${extensionsUsedRef.current}/${maxExtensions}`);
+          }
+          clearCompletionTimer();
+          const isFinalExtension = extensionsUsedRef.current >= maxExtensions;
+          completionTimerRef.current = setTimeout(() => {
+            if (debug) console.log(`🚦 [gate-extend] timer fired (+${extensionMs}ms)`);
+            finalizeCapture(Date.now(), isFinalExtension);
+          }, extensionMs);
+          return;
+        }
+
+        if (verdict.status === 'reject' || (verdict.status === 'hold' && (isForced || extensionsUsedRef.current >= maxExtensions))) {
+          if (debug) {
+            const tag = verdict.status === 'reject' ? 'gate-reject' : 'gate-reject (max-ext)';
+            console.log(`🚦 [${tag}] reason="${verdict.reason}" — cooldown NOT set, retry allowed`);
+          }
+          pendingTriggerRef.current = null;
+          extensionsUsedRef.current = 0;
+          clearCompletionTimer();
+          setIsCapturing(false);
+          return;
+        }
+
+        if (debug) console.log(`🚦 [gate-pass] ${verdict.reason}`);
+      }
+
+      // Reset pending state — passing the gate
+      pendingTriggerRef.current = null;
+      extensionsUsedRef.current = 0;
+      clearCompletionTimer();
+      setIsCapturing(false);
+
+      if (isRhetoricalOrGreeting(question)) {
+        if (debug) console.log('🎯 [trigger-capture] blocked — rhetorical/greeting (no cooldown)');
+        return;
+      }
+
+      if (wordCount(question) < 5) {
+        if (debug) console.log('🎯 [trigger-capture] blocked — too short (no cooldown)');
+        return;
+      }
+
+      const candidate: PassiveQuestionCandidate = {
+        text: question,
+        detectedAt: Date.now(),
+        id: `tq-${++triggerIdCounter}`,
+      };
+
+      // Set post-success cooldown ONLY now (after pass)
+      lastSuccessTimeRef.current = Date.now();
+
+      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed):`, question);
+      onCaptureCompleteRef.current?.(candidate);
+    } finally {
+      isFinalizingRef.current = false;
     }
-
-    // Reset pending state — passing the gate
-    pendingTriggerRef.current = null;
-    extensionsUsedRef.current = 0;
-    clearCompletionTimer();
-    setIsCapturing(false);
-
-    if (isRhetoricalOrGreeting(question)) {
-      if (debug) console.log('🎯 [trigger-capture] blocked — rhetorical/greeting');
-      return;
-    }
-
-    if (wordCount(question) < 5) {
-      if (debug) console.log('🎯 [trigger-capture] blocked — too short');
-      return;
-    }
-
-    const candidate: PassiveQuestionCandidate = {
-      text: question,
-      detectedAt: Date.now(),
-      id: `tq-${++triggerIdCounter}`,
-    };
-
-    if (debug) console.log('🎯 [trigger-capture] FINAL:', question);
-    onCaptureCompleteRef.current?.(candidate);
   }, [
     getSliceAroundTrigger,
     clearCompletionTimer,
