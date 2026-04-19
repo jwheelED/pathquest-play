@@ -522,6 +522,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
   const resetCapture = useCallback(() => {
     bufferRef.current = [];
     pendingTriggerRef.current = null;
+    extensionsUsedRef.current = 0;
     clearCompletionTimer();
     setIsCapturing(false);
     lastTriggerTimeRef.current = 0;
