@@ -482,8 +482,9 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
   const feedChunk = useCallback((text: string, timestamp?: number): boolean => {
     const now = timestamp ?? Date.now();
 
-    // Always push into rolling buffer + trim
+    // Always push into rolling buffer + trim, and record arrival time
     bufferRef.current.push({ text, timestamp: now });
+    lastChunkTimeRef.current = now;
     trimBuffer(now);
 
     if (debug) {
@@ -492,13 +493,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       console.log(`🎯 [buffer] chunks=${bufferRef.current.length} chars=${totalChars} oldestAge=${oldestAge}ms`);
     }
 
-    // If a trigger is already armed, check for sentence-end finalization
+    // If a trigger is already armed — HARD lock against re-arming on same utterance
     if (pendingTriggerRef.current) {
       const pending = pendingTriggerRef.current;
       const heldFor = now - pending.armedAt;
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
 
-      if (hasSentenceEnd && heldFor >= minHoldMs) {
+      if (hasSentenceEnd && heldFor >= minHoldMs && !isFinalizingRef.current) {
         if (debug) console.log(`🎯 [trigger-capture] sentence-end after ${heldFor}ms hold, finalizing`);
         finalizeCapture(now);
         return false;
@@ -508,8 +509,12 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       return true;
     }
 
-    // Cooldown check
-    if (now - lastTriggerTimeRef.current < cooldownMs) {
+    // Post-success cooldown lock (only set when a candidate actually passed)
+    const sinceSuccess = now - lastSuccessTimeRef.current;
+    if (lastSuccessTimeRef.current > 0 && sinceSuccess < cooldownMs) {
+      if (debug) {
+        console.log(`🚦 [cooldown-block] remaining=${cooldownMs - sinceSuccess}ms`);
+      }
       return false;
     }
 
@@ -522,7 +527,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       if (match && match.index !== undefined) {
         const triggerWord = match[0];
 
-        // Arm the trigger — do NOT slice yet
+        // Arm the trigger — do NOT set cooldown yet (only on successful pass)
         lastTriggerTimeRef.current = now;
         pendingTriggerRef.current = {
           triggerTs: now,
@@ -550,6 +555,14 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
     return false;
   }, [
+    cooldownMs,
+    minHoldMs,
+    completionTimeoutMs,
+    trimBuffer,
+    finalizeCapture,
+    clearCompletionTimer,
+    debug,
+  ]);
     cooldownMs,
     minHoldMs,
     completionTimeoutMs,
