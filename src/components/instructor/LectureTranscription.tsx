@@ -1346,9 +1346,19 @@ export const LectureTranscription = ({
       // Show progress indicator immediately
       setBatchProgress("📝 Extracting and formatting question...");
 
-      // Provide richer context for better question formatting
-      const fullContext = transcriptBufferRef.current.slice(-1500);
-      
+      // Provide richer context for better question formatting.
+      // Prefer the focused priorContext captured by the trigger pipeline
+      // (the teaching prose immediately before the question — used to resolve pronouns).
+      const priorContextFromTrigger = pendingPriorContextRef.current ?? '';
+      const transcriptTail = transcriptBufferRef.current.slice(-2000);
+      const fullContext = priorContextFromTrigger || transcriptTail;
+
+      if (priorContextFromTrigger) {
+        console.log(`📤 [send] using priorContext from trigger (${priorContextFromTrigger.length} chars)`);
+      } else {
+        console.log(`📤 [send] using transcript tail (${transcriptTail.length} chars, fallback)`);
+      }
+
       // Get the recent transcript for display (for voice-sent questions)
       const isVoiceSent = detectionData.source === "voice_command" || detectionData.source === "manual_button";
       const sourceTranscript = isVoiceSent ? transcriptBufferRef.current.slice(-500) : null;
@@ -1361,6 +1371,7 @@ export const LectureTranscription = ({
             question_text: detectionData.question_text,
             suggested_type: detectionData.suggested_type,
             context: fullContext,
+            prior_context: priorContextFromTrigger || undefined,
             confidence: detectionData.confidence,
             expected_answer: detectionData.expected_answer || "", // Pass expected answer for short answer grading
             source: detectionData.source || "manual_button",
@@ -1376,6 +1387,9 @@ export const LectureTranscription = ({
           },
         });
       });
+
+      // Clear the stashed prior context — single-use per send attempt
+      pendingPriorContextRef.current = null;
 
       const totalTime = Date.now() - sendStartTime;
       console.log(`⏱️ Total send time: ${totalTime}ms`);
