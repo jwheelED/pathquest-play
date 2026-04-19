@@ -170,6 +170,7 @@ interface UseQuestionTriggerCaptureOptions {
   maxExtensions?: number;
   minCompleteWords?: number;
   softCompleteMs?: number;
+  minSilenceMs?: number;
   debug?: boolean;
 }
 
