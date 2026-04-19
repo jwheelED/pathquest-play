@@ -60,7 +60,26 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Build a labelled, role-explicit context block. Prior context (focused, recent teaching prose
+    // captured at trigger time) is given highest priority for pronoun resolution; the broader
+    // source_transcript tail is included as background lecture history.
+    const broadContext = (source_transcript || '').slice(-6000).trim();
+    const focusedContext = (prior_context || '').trim();
+    const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
+
+    const teachingContextBlock = hasAnyContext
+      ? [
+          focusedContext
+            ? `[MOST RECENT TEACHING — IMMEDIATELY BEFORE THE QUESTION]\n"${focusedContext}"`
+            : '',
+          broadContext
+            ? `[EARLIER LECTURE HISTORY]\n"${broadContext}"`
+            : '',
+        ].filter(Boolean).join('\n\n')
+      : '';
+
     console.log('Generating MCQ options for question:', question_text.substring(0, 100));
+    console.log(`Context received — broad=${broadContext.length} chars, focused=${focusedContext.length} chars`);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -73,11 +92,26 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert educator creating multiple choice questions. Generate 4 answer options for the given question, with exactly one correct answer. Use the provided lecture context as the PRIMARY source for the correct answer — if the lecture explicitly states the answer, use that. Only fall back to general world knowledge if the lecture context does not address the question. Make distractors plausible but clearly incorrect to someone who understood the lecture.`
+            content: `You are an expert educator creating multiple choice questions grounded in a live lecture transcript.
+
+CRITICAL: Instructor questions are often SHORT and contain pronouns ("it", "this", "they", "that", "these", "those") that refer back to topics discussed earlier in the lecture. You MUST resolve these pronouns using the TEACHING CONTEXT before generating options.
+
+EXAMPLE — pronoun resolution:
+  Teaching context: "the mitochondria converts glucose into energy"
+  Instructor's question: "what does it produce?"
+  → Resolved: "What does the mitochondria produce?"
+  → Correct answer must reference ATP / energy, NOT a generic "output of the process".
+
+RULES:
+1. Read the TEACHING CONTEXT carefully — it is the PRIMARY source for the correct answer.
+2. Resolve every pronoun in the INSTRUCTOR'S QUESTION using the TEACHING CONTEXT.
+3. The correct answer MUST be a specific, factual answer drawn from the lecture (e.g. "ATP", "the powerhouse of the cell"), not a vague restatement of the question.
+4. Distractors must be plausible but clearly wrong to a student who understood the lecture. They must be SPECIFIC and on-topic — never generic phrases like "the output of the process" or "the end result".
+5. If after reading all the context the question still cannot be resolved (no antecedent for the pronoun anywhere), make your best educated guess but keep the answer specific and grounded in the apparent topic.`
           },
           {
             role: 'user',
-            content: `${source_transcript ? `Lecture context (PRIMARY source — use this to derive the correct answer and realistic distractors):\n"${source_transcript.slice(-6000)}"\n\n` : ''}Generate 4 multiple choice options for this question:\n\n${question_text}\n\nIMPORTANT: Format each option as "A. text", "B. text", "C. text", "D. text". Ground the correct answer in the lecture context above whenever possible. Never generate options like "was not mentioned in the lecture".`
+            content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION (turn this into a 4-option MCQ) ===\n"${question_text}"\n\nGenerate 4 multiple choice options. Format each option as "A. text", "B. text", "C. text", "D. text". The correct answer MUST be a specific fact drawn from the teaching context (resolve any pronouns first). Distractors must be specific and topic-relevant — never vague phrases like "the output of the process" or "the end result of a procedure".`
           }
         ],
         tools: [
