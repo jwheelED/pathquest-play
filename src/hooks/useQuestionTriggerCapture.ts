@@ -334,7 +334,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     return combined;
   }, [lookbackMs]);
 
-  const finalizeCapture = useCallback((now: number) => {
+  const finalizeCapture = useCallback((now: number, isForced = false) => {
     const pending = pendingTriggerRef.current;
     if (!pending) {
       clearCompletionTimer();
@@ -350,17 +350,60 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       console.log(`🎯 [slice] lookback≈${lookbackUsed}ms lookahead≈${elapsedSinceTrigger}ms text="${sliceText.substring(0, 120)}"`);
     }
 
-    // Reset pending state
-    pendingTriggerRef.current = null;
-    clearCompletionTimer();
-    setIsCapturing(false);
-
     if (!sliceText) {
       if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
+      pendingTriggerRef.current = null;
+      extensionsUsedRef.current = 0;
+      clearCompletionTimer();
+      setIsCapturing(false);
       return;
     }
 
     const question = postProcess(sliceText);
+
+    // ===== Semantic completion gate =====
+    if (enableCompletionGate) {
+      const verdict = evaluateCompleteness(question, {
+        minWords: minCompleteWords,
+        elapsedMs: elapsedSinceTrigger,
+        softCompleteMs,
+      });
+
+      if (verdict.status === 'hold' && !isForced && extensionsUsedRef.current < maxExtensions) {
+        extensionsUsedRef.current += 1;
+        if (debug) {
+          console.log(`🚦 [gate-hold] reason="${verdict.reason}" extension=${extensionsUsedRef.current}/${maxExtensions}`);
+        }
+        // Extend timer; do NOT reset pending
+        clearCompletionTimer();
+        const isFinalExtension = extensionsUsedRef.current >= maxExtensions;
+        completionTimerRef.current = setTimeout(() => {
+          if (debug) console.log(`🚦 [gate-extend] timer fired (+${extensionMs}ms)`);
+          finalizeCapture(Date.now(), isFinalExtension);
+        }, extensionMs);
+        return;
+      }
+
+      if (verdict.status === 'reject' || (verdict.status === 'hold' && (isForced || extensionsUsedRef.current >= maxExtensions))) {
+        if (debug) {
+          const tag = verdict.status === 'reject' ? 'gate-reject' : 'gate-reject (max-ext)';
+          console.log(`🚦 [${tag}] reason="${verdict.reason}"`);
+        }
+        pendingTriggerRef.current = null;
+        extensionsUsedRef.current = 0;
+        clearCompletionTimer();
+        setIsCapturing(false);
+        return;
+      }
+
+      if (debug) console.log(`🚦 [gate-pass] ${verdict.reason}`);
+    }
+
+    // Reset pending state — passing the gate
+    pendingTriggerRef.current = null;
+    extensionsUsedRef.current = 0;
+    clearCompletionTimer();
+    setIsCapturing(false);
 
     if (isRhetoricalOrGreeting(question)) {
       if (debug) console.log('🎯 [trigger-capture] blocked — rhetorical/greeting');
@@ -380,7 +423,17 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
     if (debug) console.log('🎯 [trigger-capture] FINAL:', question);
     onCaptureCompleteRef.current?.(candidate);
-  }, [getSliceAroundTrigger, clearCompletionTimer, lookbackMs, debug]);
+  }, [
+    getSliceAroundTrigger,
+    clearCompletionTimer,
+    lookbackMs,
+    debug,
+    enableCompletionGate,
+    minCompleteWords,
+    softCompleteMs,
+    maxExtensions,
+    extensionMs,
+  ]);
 
   /**
    * Feed a transcript chunk into the trigger capture system.
