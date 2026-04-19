@@ -1347,17 +1347,21 @@ export const LectureTranscription = ({
       setBatchProgress("📝 Extracting and formatting question...");
 
       // Provide richer context for better question formatting.
-      // Prefer the focused priorContext captured by the trigger pipeline
-      // (the teaching prose immediately before the question — used to resolve pronouns).
+      // ALWAYS include a generous slice of the rolling transcript buffer (broad lecture history)
+      // so Gemini can resolve vague pronoun references like "what does it produce?" to earlier
+      // teaching content (e.g. "the mitochondria produces ATP" said 15s ago).
+      // The focused priorContext from the trigger pipeline is sent ALONGSIDE the broad tail —
+      // never instead of it. This guarantees every question has access to prior conversation.
       const priorContextFromTrigger = pendingPriorContextRef.current ?? '';
-      const transcriptTail = transcriptBufferRef.current.slice(-2000);
-      const fullContext = priorContextFromTrigger || transcriptTail;
+      const transcriptTail = transcriptBufferRef.current.slice(-4000); // ~80-90s of speech
+      // The broad tail is the primary context for resolving references; trigger context is a
+      // focused supplement that the edge function can also use.
+      const fullContext = transcriptTail;
 
-      if (priorContextFromTrigger) {
-        console.log(`📤 [send] using priorContext from trigger (${priorContextFromTrigger.length} chars)`);
-      } else {
-        console.log(`📤 [send] using transcript tail (${transcriptTail.length} chars, fallback)`);
-      }
+      console.log(
+        `📤 [send] context: tail=${transcriptTail.length} chars` +
+        (priorContextFromTrigger ? `, priorContext=${priorContextFromTrigger.length} chars (focused supplement)` : ', no focused trigger context')
+      );
 
       // Get the recent transcript for display (for voice-sent questions)
       const isVoiceSent = detectionData.source === "voice_command" || detectionData.source === "manual_button";
