@@ -46,7 +46,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, source_transcript } = await req.json();
+    const { question_text, source_transcript, prior_context } = await req.json();
 
     if (!question_text || question_text.trim() === '') {
       return new Response(
