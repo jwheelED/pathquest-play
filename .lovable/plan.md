@@ -1,83 +1,105 @@
 
 
-## Problem Analysis
+## Problem Analysis (from logs + code review)
 
-After fixing the rolling buffer (Problem 1), the trigger capture still fires on **timer expiry** or **first sentence-ending punctuation** after the trigger. Neither is a reliable signal of *semantic completeness*:
+Reviewed `src/hooks/useQuestionTriggerCapture.ts` and the call site in `LectureTranscription.tsx`. Found **three concrete bugs** behind the "first ask gets missed, second works" pattern:
 
-- Deepgram appends `?` or `.` on intonation pauses mid-thought (e.g. *"What is the relationship between..."* → `?` lands after "between")
-- The 4.5s `completionTimeoutMs` fires regardless of whether the speaker actually finished
-- `is_final=true` on a chunk only means Deepgram's acoustic model committed — not that the thought is done
+### Bug A — Cooldown is set on *arm*, not on *successful pass*
 
-Result: fragments like *"What is the relationship between"* or *"How many of these"* still leak through to Gemini, which then either generates a nonsense question or guesses at the missing context.
+In `feedChunk` (line 486), the moment a trigger word matches, we do:
+```ts
+lastTriggerTimeRef.current = now;       // ← 15s cooldown starts HERE
+pendingTriggerRef.current = { ... };
+```
+Then 4.5s later `finalizeCapture` runs the gate. If the gate **rejects** (e.g. "what does it" caught mid-sentence as too short, or the slice trimmed wrong), the cooldown is **still active for ~10 more seconds**. When the instructor immediately repeats themselves, the trigger scanner sees the cooldown is active → returns early → second ask is silently dropped too. The user's experience: "first miss, then nothing happens, then eventually it works."
 
-## Fix Strategy: Semantic Completion Gate
+### Bug B — No re-trigger lock during pending capture
 
-Insert a **gate** between `finalizeCapture()` and `onCaptureCompleteRef.current?.(candidate)` in `useQuestionTriggerCapture.ts`. The gate evaluates the candidate slice and either:
+While `pendingTriggerRef` is set, `feedChunk` returns `true` and skips passive detection — good. But there is **no protection against the same utterance arming twice** if the buffer scan finds another trigger word later in the same sentence (e.g. "what does it produce, and how does it work?" — both `what does` and `how does` match). The first arm sets pending; subsequent chunks with sentence-end finalize, the gate passes → `pendingTriggerRef` cleared → next chunk sees `cooldownMs` only. If `cooldownMs` was reset (Bug A fix), a re-arm could happen on the SAME generated question's tail.
 
-- **PASS** → forward to generation (existing behavior)
-- **HOLD** → extend the completion timer by `extensionMs` (default 2500ms) up to `maxExtensions` (default 2) and re-evaluate when more buffer arrives
-- **REJECT** → drop the candidate, log reason, do not call generation
+### Bug C — No minimum silence before finalize
 
-### Gate checks (all must pass)
+`finalizeCapture` runs the moment the 4.5s completion timer fires OR a sentence-ending chunk arrives after `minHoldMs` (800ms). There is **no check that the buffer has actually gone quiet** — chunks may still be arriving rapid-fire. The gate evaluates a slice that may be missing the last 1–2 chunks Deepgram is about to finalize. This is why short questions like *"what does it produce?"* sometimes pass the gate with insufficient surrounding context, then fail downstream at Gemini ("not enough context").
 
-Implemented in a new helper `evaluateCompleteness(text)` returning `{ status: 'pass' | 'hold' | 'reject', reason: string }`:
+### Bug D (related) — Passive detection cooldown poisons retries
 
-1. **Minimum word count** — < 6 words → `reject`. A real interrogative needs subject + verb + object minimum.
-2. **Trailing dangling token** — ends in a preposition / conjunction / article / aux verb (`of, to, for, with, in, on, between, about, the, a, an, and, or, but, is, are, was, were, do, does, did, can, could, would, should`) → `hold`. These are mid-thought signals.
-3. **Hanging interrogative** — ends with the trigger word itself or within 2 words of it (`What is?`, `How many of?`) → `hold`.
-4. **Subject-verb presence** — must contain at least one noun-like token AFTER the trigger word. Heuristic: at least one word ≥4 chars that isn't a stopword between the trigger and the end → otherwise `hold`.
-5. **Comparative / relational dangler** — ends with `than, as, like, versus, vs, compared` → `hold`.
-6. **Repetition / stutter** — same trigram repeated 3+ times (Deepgram hallucination signature) → `reject`.
-7. **Trailing filler** — ends with `um, uh, like, you know, sort of, kind of` after stripping → `hold`.
-8. **Punctuation sanity** — if buffer never produced a `.`, `?`, or `!` AND elapsed time < `softCompleteMs` (3000ms) → `hold`.
+`usePassiveQuestionDetection` has its own independent 15s cooldown (`lastDetectionTimeRef`). If the first chunk of the instructor's utterance ("So we just said the mitochondria produces ATP") triggers passive detection and creates a candidate, the candidate may be auto-dismissed silently — but `lastDetectionTimeRef` is now set, blocking the trigger pipeline's downstream `checkPassiveQuestion()` call too. Second ask 5s later → both pipelines locked out.
 
-### State machine update
+---
 
-```text
-[armed] ──completion timer fires──► evaluateCompleteness(slice)
-                                      │
-                                ┌─────┼──────┐
-                              pass  hold   reject
-                                │     │      │
-                                │     │      └─► drop, log [gate-reject]
-                                │     │
-                                │     └─► extend timer +2500ms
-                                │         (max 2 extensions = +5s)
-                                │         after max → final eval; if still hold → reject
-                                │
-                                └─► forward to onCaptureComplete
+## Fix Plan
+
+All changes in `src/hooks/useQuestionTriggerCapture.ts` plus one tiny coordination fix in `LectureTranscription.tsx`.
+
+### 1. Move cooldown to *successful pass*, not *arm*
+
+Replace `lastTriggerTimeRef.current = now` at arm time with setting it **only after a `pass` verdict**, just before `onCaptureCompleteRef.current?.(candidate)`. Rejected captures (gate `reject` or empty slice) leave the cooldown untouched, so the instructor's immediate retry can arm again.
+
+### 2. Add a `lastSuccessTs` cooldown lock distinct from arm-time
+
+Introduce `lastSuccessTimeRef`. Cooldown check at the top of `feedChunk` becomes:
+```ts
+if (now - lastSuccessTimeRef.current < cooldownMs) return false;
+```
+This is the **debounce-after-success lock** the user asked for.
+
+### 3. Add minimum-silence check before finalize
+
+Track `lastChunkTs` on every `feedChunk` call. In `finalizeCapture`, if `now - lastChunkTs < minSilenceMs` (default **1200ms**), do **not** finalize yet — schedule one more 800ms wait (counted as an extension). This prevents finalizing while Deepgram is still emitting.
+
+New option:
+```ts
+minSilenceMs: 1200   // require this much silence before finalizing
 ```
 
-### New options on `useQuestionTriggerCapture`
+### 4. Hard re-trigger lock while pending
+
+Move the trigger scan AFTER an explicit `pendingTriggerRef.current` early-return. Already done structurally, but add a flag `isFinalizingRef` set true during the `finalizeCapture` body so concurrent timer + sentence-end races can't double-emit the same candidate. Clear it in all exit paths.
+
+### 5. Coordinate with passive detection
+
+In `LectureTranscription.tsx` (line 2493–2498), after a successful trigger capture emits a candidate via `checkPassiveQuestion`, **also** reset `usePassiveQuestionDetection`'s internal cooldown so a follow-up retry by the instructor (in the rare case the gate still rejects) isn't blocked by stale passive state. Expose `resetDetection` and call it in the `setTriggerCaptureComplete` callback after handing off.
+
+Additionally: when the trigger pipeline **rejects** a capture (gate-reject), it should NOT leak into passive detection. Today it doesn't (only successful captures call `checkPassiveQuestion`), but verify the path returns early cleanly.
+
+### 6. Logging additions (debug)
+
+- `🚦 [cooldown-block] remaining=Xms` when post-success lock is active
+- `🤫 [silence-wait] lastChunk=Xms ago, deferring finalize` when min-silence not met
+- `🔒 [finalize-lock] already finalizing, skip`
+
+These will make the next debug session trivial.
+
+---
+
+## Tunables (final defaults)
 
 | Option | Default | Purpose |
 |---|---|---|
-| `enableCompletionGate` | `true` | Master switch (lets us A/B test) |
-| `extensionMs` | 2500 | How long to wait after a `hold` verdict |
-| `maxExtensions` | 2 | Cap on extensions before forced reject |
-| `minCompleteWords` | 6 | Reject threshold |
-| `softCompleteMs` | 3000 | Min elapsed before allowing punctuation-less pass |
+| `cooldownMs` | 12000 (down from 15000) | Post-success debounce lock |
+| `minSilenceMs` | 1200 | Min quiet time before finalize |
+| `completionTimeoutMs` | 4500 | Unchanged |
+| `minHoldMs` | 800 | Unchanged |
+| `extensionMs` | 2500 | Unchanged |
+| `maxExtensions` | 2 | Unchanged |
 
-### Logging (debug mode)
+Lowering `cooldownMs` to 12s is safer now that it only counts from successful pass.
 
-- `🚦 [gate-pass] words=X`
-- `🚦 [gate-hold] reason="trailing preposition: of" extension=1/2`
-- `🚦 [gate-reject] reason="too short (4 words)"`
+---
 
-This makes it trivial to tune the dangling-token list and thresholds from console output during real lectures.
+## Files touched
 
-### Files touched
+- `src/hooks/useQuestionTriggerCapture.ts` — refactor cooldown, add `minSilenceMs`, `lastSuccessTimeRef`, `isFinalizingRef`, `lastChunkTimeRef`; add new logs.
+- `src/components/instructor/LectureTranscription.tsx` — pass `minSilenceMs: 1200` option; reset passive detection cooldown after successful trigger capture handoff.
+- `src/hooks/useLectureRecording.ts` — mirror the option change for consistency.
 
-- `src/hooks/useQuestionTriggerCapture.ts` — add `evaluateCompleteness()` helper, extend state machine with `extensionsUsedRef`, wire into `finalizeCapture()`
-- No edge function, DB, or downstream consumer changes. Candidate shape unchanged.
+No edge function, DB, or API changes. Candidate shape unchanged.
 
-### Validation
+## Validation
 
-Test cases (verified in console):
-- *"What is the relationship between"* → `hold` (trailing `between`) → extends → if no more comes → `reject`
-- *"What is the relationship between frequency and wavelength?"* → `pass`
-- *"How many of"* → `hold` (trailing `of` + too short)
-- *"How many planets are in our solar system?"* → `pass`
-- *"Why does water boil at 100 degrees Celsius?"* → `pass`
-- *"What is the"* → `reject` (too short, 3 words)
+Test the exact failing case:
+- Say *"So we just said the mitochondria produces ATP, what does it produce?"* once.
+- Console should show: `[trigger-armed] word="what does"` → `[silence-wait]` (if mid-stream) → `[gate-pass]` → emitted.
+- If first attempt fails (gate-reject), repeat immediately. Console should show NO `[cooldown-block]` — second arm proceeds normally.
+- After a successful capture, console shows `[cooldown-block] remaining=...` for ~12s on subsequent triggers. Confirms re-trigger lock works.
 
