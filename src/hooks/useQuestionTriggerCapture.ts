@@ -489,6 +489,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
           triggerWord,
           armedAt: now,
         };
+        extensionsUsedRef.current = 0;
         setIsCapturing(true);
 
         if (debug) {
