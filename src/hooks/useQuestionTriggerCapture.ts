@@ -563,22 +563,17 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     clearCompletionTimer,
     debug,
   ]);
-    cooldownMs,
-    minHoldMs,
-    completionTimeoutMs,
-    trimBuffer,
-    finalizeCapture,
-    clearCompletionTimer,
-    debug,
-  ]);
 
   const resetCapture = useCallback(() => {
     bufferRef.current = [];
     pendingTriggerRef.current = null;
     extensionsUsedRef.current = 0;
+    isFinalizingRef.current = false;
     clearCompletionTimer();
     setIsCapturing(false);
     lastTriggerTimeRef.current = 0;
+    lastSuccessTimeRef.current = 0;
+    lastChunkTimeRef.current = 0;
   }, [clearCompletionTimer]);
 
   return {
