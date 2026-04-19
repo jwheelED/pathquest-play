@@ -260,7 +260,7 @@ export function QuestionOnDeck({
   useEffect(() => {
     if (!candidate || generatedForRef.current === candidate.text) return;
     generatedForRef.current = candidate.text;
-    generatePreview(candidate.text, effectiveFormat);
+    generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
   }, [candidate?.text, effectiveFormat]);
 
   // Reset generated state when candidate is cleared
@@ -273,16 +273,22 @@ export function QuestionOnDeck({
     }
   }, [candidate]);
 
-  const generatePreview = async (questionText: string, format: typeof effectiveFormat) => {
+  const generatePreview = async (questionText: string, format: typeof effectiveFormat, priorContext?: string) => {
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
     setExpectedAnswer('');
 
     try {
+      const body: Record<string, unknown> = {
+        question_text: questionText,
+        source_transcript: transcriptContext,
+      };
+      if (priorContext && priorContext.trim()) {
+        body.prior_context = priorContext;
+      }
+
       if (format === 'multiple_choice' || format === 'poll') {
-        const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
-          body: { question_text: questionText, source_transcript: transcriptContext },
-        });
+        const { data, error } = await supabase.functions.invoke('generate-mcq-options', { body });
         if (!error && data?.options?.length === 4) {
           setMcqOptions(data.options);
           if (data.correct_answer && format === 'multiple_choice') {
@@ -290,9 +296,7 @@ export function QuestionOnDeck({
           }
         }
       } else {
-        const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
-          body: { question_text: questionText, source_transcript: transcriptContext },
-        });
+        const { data, error } = await supabase.functions.invoke('generate-expected-answer', { body });
         if (!error && data?.expected_answer) {
           setExpectedAnswer(data.expected_answer);
         }
