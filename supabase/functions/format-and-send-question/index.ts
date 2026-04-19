@@ -776,7 +776,7 @@ serve(async (req) => {
         // Fallback: Generate structured problem from simple question text
         const codingProblem = await generateCodingQuestion(
           typeof question_text === "string" ? question_text : JSON.stringify(question_text),
-          context || "",
+          effectiveContext,
           course_context,
         );
         formattedQuestion = {
@@ -832,7 +832,7 @@ serve(async (req) => {
       } else {
         // Fallback: generate with AI
         console.log("🤖 Generating MCQ options with AI");
-        const mcq = await generateMCQ(question_text, context || "", course_context);
+        const mcq = await generateMCQ(question_text, effectiveContext, course_context);
         formattedQuestion = {
           question: mcq.question,
           type: "multiple_choice",
@@ -859,7 +859,7 @@ serve(async (req) => {
         };
       } else {
         // Generate poll options with AI
-        const mcq = await generateMCQ(question_text, context || "", course_context);
+        const mcq = await generateMCQ(question_text, effectiveContext, course_context);
         formattedQuestion = {
           question: mcq.question,
           type: "poll",
