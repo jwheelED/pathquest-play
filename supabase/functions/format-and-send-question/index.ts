@@ -486,6 +486,7 @@ serve(async (req) => {
       question_text,
       suggested_type,
       context,
+      prior_context = null, // Optional focused teaching prose from trigger pipeline (preferred when present)
       source = "manual_button",
       use_answer_key = false,
       course_context = null,
@@ -496,6 +497,15 @@ serve(async (req) => {
       course_id = null,
       source_transcript = null, // Raw transcript to display with question
     } = await req.json();
+
+    // Prefer the focused prior_context (from the trigger pipeline) over the generic transcript tail.
+    // It contains the teaching prose immediately before the question — needed to resolve pronouns.
+    const effectiveContext: string = (typeof prior_context === "string" && prior_context.trim().length > 0)
+      ? prior_context
+      : (context || "");
+    if (prior_context) {
+      console.log(`📥 Using prior_context from trigger pipeline (${effectiveContext.length} chars)`);
+    }
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
