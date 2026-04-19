@@ -230,7 +230,7 @@ function isRhetoricalOrGreeting(text: string): boolean {
 
 export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOptions = {}) {
   const {
-    cooldownMs = 15000,
+    cooldownMs = 12000,
     silenceGapMs = 2500,
     bufferWindowMs = 12000,
     lookbackMs = 8000,
@@ -242,12 +242,19 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     maxExtensions = 2,
     minCompleteWords = 6,
     softCompleteMs = 3000,
+    minSilenceMs = 1200,
     debug = true,
   } = options;
 
   // Persistent rolling buffer — never cleared on trigger, only trimmed by age/size
   const bufferRef = useRef<BufferChunk[]>([]);
   const lastTriggerTimeRef = useRef<number>(0);
+  // Cooldown lock — only set on successful PASS to prevent re-trigger on same utterance
+  const lastSuccessTimeRef = useRef<number>(0);
+  // Track most recent chunk arrival to enforce min-silence before finalize
+  const lastChunkTimeRef = useRef<number>(0);
+  // Concurrency guard against timer + sentence-end races
+  const isFinalizingRef = useRef<boolean>(false);
 
   // Pending trigger state (decoupled from "capturing")
   const pendingTriggerRef = useRef<{
