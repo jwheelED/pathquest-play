@@ -43,6 +43,120 @@ const TRIGGER_PATTERNS = [
 // Leading filler words to strip
 const FILLER_PREFIXES = /^(so+|um+|uh+|like|well|okay so|okay|now|and so|but)\s+/i;
 
+// ===== Semantic completion gate constants =====
+const DANGLING_TAIL_TOKENS = new Set([
+  'of', 'to', 'for', 'with', 'in', 'on', 'between', 'about', 'at', 'by', 'from', 'into', 'onto', 'upon',
+  'the', 'a', 'an',
+  'and', 'or', 'but', 'nor', 'yet', 'so',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'am',
+  'do', 'does', 'did',
+  'can', 'could', 'would', 'should', 'will', 'shall', 'may', 'might', 'must',
+  'has', 'have', 'had',
+]);
+
+const COMPARATIVE_TAIL_TOKENS = new Set([
+  'than', 'as', 'like', 'versus', 'vs', 'compared',
+]);
+
+const TRAILING_FILLER_PATTERNS = [
+  /\bum+$/i, /\buh+$/i, /\blike$/i, /\byou know$/i, /\bsort of$/i, /\bkind of$/i,
+];
+
+const STOPWORDS_AFTER_TRIGGER = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'do', 'does', 'did', 'has', 'have', 'had',
+  'of', 'to', 'for', 'with', 'in', 'on', 'at', 'by', 'from',
+  'and', 'or', 'but', 'so', 'this', 'that', 'these', 'those',
+  'my', 'your', 'our', 'their', 'his', 'her', 'its',
+  'about', 'into', 'than', 'as', 'like',
+]);
+
+type GateStatus = 'pass' | 'hold' | 'reject';
+interface GateVerdict {
+  status: GateStatus;
+  reason: string;
+}
+
+function evaluateCompleteness(
+  text: string,
+  opts: { minWords: number; elapsedMs: number; softCompleteMs: number }
+): GateVerdict {
+  const cleaned = text.trim().replace(/[?.!,;:]+$/, '').trim();
+  if (!cleaned) return { status: 'reject', reason: 'empty' };
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  const lower = cleaned.toLowerCase();
+
+  // 1. Minimum word count
+  if (words.length < opts.minWords) {
+    return { status: 'reject', reason: `too short (${words.length} words)` };
+  }
+
+  // 6. Repetition / stutter — same trigram 3+ times
+  if (words.length >= 9) {
+    const trigrams = new Map<string, number>();
+    for (let i = 0; i <= words.length - 3; i++) {
+      const tg = words.slice(i, i + 3).join(' ').toLowerCase();
+      trigrams.set(tg, (trigrams.get(tg) ?? 0) + 1);
+    }
+    for (const [tg, count] of trigrams) {
+      if (count >= 3) return { status: 'reject', reason: `stutter "${tg}" x${count}` };
+    }
+  }
+
+  const lastWord = words[words.length - 1].toLowerCase().replace(/[^a-z']/g, '');
+
+  // 7. Trailing filler
+  for (const pat of TRAILING_FILLER_PATTERNS) {
+    if (pat.test(lower)) return { status: 'hold', reason: `trailing filler` };
+  }
+
+  // 2. Trailing dangling token (preposition / conjunction / article / aux)
+  if (DANGLING_TAIL_TOKENS.has(lastWord)) {
+    return { status: 'hold', reason: `trailing dangling token: "${lastWord}"` };
+  }
+
+  // 5. Comparative / relational dangler
+  if (COMPARATIVE_TAIL_TOKENS.has(lastWord)) {
+    return { status: 'hold', reason: `trailing comparative: "${lastWord}"` };
+  }
+
+  // 3. Hanging interrogative — trigger word at or near the end
+  let triggerIdx = -1;
+  for (const pattern of TRIGGER_PATTERNS) {
+    const m = lower.match(pattern);
+    if (m && m.index !== undefined) {
+      // approximate word index of trigger
+      const before = lower.substring(0, m.index);
+      triggerIdx = before.split(/\s+/).filter(Boolean).length;
+      break;
+    }
+  }
+  if (triggerIdx >= 0 && triggerIdx >= words.length - 3) {
+    return { status: 'hold', reason: `hanging interrogative (trigger near end)` };
+  }
+
+  // 4. Subject-verb presence — at least one substantive word (≥4 chars, non-stopword) after trigger
+  if (triggerIdx >= 0) {
+    const afterTrigger = words.slice(triggerIdx + 1);
+    const hasSubstantive = afterTrigger.some(w => {
+      const clean = w.toLowerCase().replace(/[^a-z']/g, '');
+      return clean.length >= 4 && !STOPWORDS_AFTER_TRIGGER.has(clean);
+    });
+    if (!hasSubstantive) {
+      return { status: 'hold', reason: 'no substantive content after trigger' };
+    }
+  }
+
+  // 8. Punctuation sanity — no terminal punct AND too soon
+  const hasTerminalPunct = /[.?!]/.test(text);
+  if (!hasTerminalPunct && opts.elapsedMs < opts.softCompleteMs) {
+    return { status: 'hold', reason: `no punctuation yet (elapsed ${opts.elapsedMs}ms)` };
+  }
+
+  return { status: 'pass', reason: `${words.length} words` };
+}
+
 interface UseQuestionTriggerCaptureOptions {
   cooldownMs?: number;
   silenceGapMs?: number;
@@ -51,6 +165,11 @@ interface UseQuestionTriggerCaptureOptions {
   completionTimeoutMs?: number;
   minHoldMs?: number;
   maxBufferChars?: number;
+  enableCompletionGate?: boolean;
+  extensionMs?: number;
+  maxExtensions?: number;
+  minCompleteWords?: number;
+  softCompleteMs?: number;
   debug?: boolean;
 }
 
@@ -117,6 +236,11 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     completionTimeoutMs = 4500,
     minHoldMs = 800,
     maxBufferChars = 2000,
+    enableCompletionGate = true,
+    extensionMs = 2500,
+    maxExtensions = 2,
+    minCompleteWords = 6,
+    softCompleteMs = 3000,
     debug = true,
   } = options;
 
@@ -131,6 +255,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     armedAt: number;
   } | null>(null);
 
+  const extensionsUsedRef = useRef<number>(0);
   const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
@@ -209,7 +334,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     return combined;
   }, [lookbackMs]);
 
-  const finalizeCapture = useCallback((now: number) => {
+  const finalizeCapture = useCallback((now: number, isForced = false) => {
     const pending = pendingTriggerRef.current;
     if (!pending) {
       clearCompletionTimer();
@@ -225,17 +350,60 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       console.log(`🎯 [slice] lookback≈${lookbackUsed}ms lookahead≈${elapsedSinceTrigger}ms text="${sliceText.substring(0, 120)}"`);
     }
 
-    // Reset pending state
-    pendingTriggerRef.current = null;
-    clearCompletionTimer();
-    setIsCapturing(false);
-
     if (!sliceText) {
       if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
+      pendingTriggerRef.current = null;
+      extensionsUsedRef.current = 0;
+      clearCompletionTimer();
+      setIsCapturing(false);
       return;
     }
 
     const question = postProcess(sliceText);
+
+    // ===== Semantic completion gate =====
+    if (enableCompletionGate) {
+      const verdict = evaluateCompleteness(question, {
+        minWords: minCompleteWords,
+        elapsedMs: elapsedSinceTrigger,
+        softCompleteMs,
+      });
+
+      if (verdict.status === 'hold' && !isForced && extensionsUsedRef.current < maxExtensions) {
+        extensionsUsedRef.current += 1;
+        if (debug) {
+          console.log(`🚦 [gate-hold] reason="${verdict.reason}" extension=${extensionsUsedRef.current}/${maxExtensions}`);
+        }
+        // Extend timer; do NOT reset pending
+        clearCompletionTimer();
+        const isFinalExtension = extensionsUsedRef.current >= maxExtensions;
+        completionTimerRef.current = setTimeout(() => {
+          if (debug) console.log(`🚦 [gate-extend] timer fired (+${extensionMs}ms)`);
+          finalizeCapture(Date.now(), isFinalExtension);
+        }, extensionMs);
+        return;
+      }
+
+      if (verdict.status === 'reject' || (verdict.status === 'hold' && (isForced || extensionsUsedRef.current >= maxExtensions))) {
+        if (debug) {
+          const tag = verdict.status === 'reject' ? 'gate-reject' : 'gate-reject (max-ext)';
+          console.log(`🚦 [${tag}] reason="${verdict.reason}"`);
+        }
+        pendingTriggerRef.current = null;
+        extensionsUsedRef.current = 0;
+        clearCompletionTimer();
+        setIsCapturing(false);
+        return;
+      }
+
+      if (debug) console.log(`🚦 [gate-pass] ${verdict.reason}`);
+    }
+
+    // Reset pending state — passing the gate
+    pendingTriggerRef.current = null;
+    extensionsUsedRef.current = 0;
+    clearCompletionTimer();
+    setIsCapturing(false);
 
     if (isRhetoricalOrGreeting(question)) {
       if (debug) console.log('🎯 [trigger-capture] blocked — rhetorical/greeting');
@@ -255,7 +423,17 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
     if (debug) console.log('🎯 [trigger-capture] FINAL:', question);
     onCaptureCompleteRef.current?.(candidate);
-  }, [getSliceAroundTrigger, clearCompletionTimer, lookbackMs, debug]);
+  }, [
+    getSliceAroundTrigger,
+    clearCompletionTimer,
+    lookbackMs,
+    debug,
+    enableCompletionGate,
+    minCompleteWords,
+    softCompleteMs,
+    maxExtensions,
+    extensionMs,
+  ]);
 
   /**
    * Feed a transcript chunk into the trigger capture system.
@@ -311,6 +489,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
           triggerWord,
           armedAt: now,
         };
+        extensionsUsedRef.current = 0;
         setIsCapturing(true);
 
         if (debug) {
@@ -343,6 +522,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
   const resetCapture = useCallback(() => {
     bufferRef.current = [];
     pendingTriggerRef.current = null;
+    extensionsUsedRef.current = 0;
     clearCompletionTimer();
     setIsCapturing(false);
     lastTriggerTimeRef.current = 0;
