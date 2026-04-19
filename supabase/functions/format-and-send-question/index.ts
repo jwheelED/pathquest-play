@@ -88,20 +88,20 @@ Write all math as plain readable text using Unicode:
 - Multiplication: · or juxtapose
 - Apply to question AND all answer options`;
 
-  const prompt = `=== TEACHING CONTEXT (background — earlier in the lecture) ===
+  const prompt = `=== TEACHING CONTEXT (everything the instructor has said recently — may include EARLIER LECTURE HISTORY and MOST RECENT TEACHING sections) ===
 "${context}"
 
 === INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
 "${questionText}"
 
 INSTRUCTIONS:
-- The TEACHING CONTEXT is background information the instructor already covered.
-- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked the class.
-- Resolve any pronouns (it, this, they, that, these, those) in the question using the teaching context BEFORE generating the MCQ.
-  Example: question "what does it produce?" + context "the mitochondria converts glucose"
-           → resolved: "What does the mitochondria produce?"
-- Generate the check-in based on the RESOLVED question, grounded in the teaching context.
-- If the question still cannot be resolved into a concrete topic after reading the context, base the question on the most prominent concept in the teaching context.
+- The TEACHING CONTEXT is the running transcript of what the instructor has been saying. It may span 60+ seconds of speech and contain multiple topics.
+- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked the class. It is often vague and contains pronouns ("it", "this", "they", "that") whose antecedents appear EARLIER in the teaching context — sometimes many sentences back.
+- BEFORE generating the MCQ, scan the ENTIRE teaching context (not just the last sentence) to find what the pronouns refer to. Look at concrete nouns, named concepts, and the most prominent subject discussed.
+  Example: question "what does it produce?" + context "...we covered the cell. The mitochondria converts glucose into energy. Now class..."
+           → "it" = the mitochondria → resolved question: "What does the mitochondria produce?"
+- Generate the check-in based on the RESOLVED, fully-specified question, grounded in the teaching context.
+- If after scanning the full context the pronoun still has no clear antecedent, base the question on the MOST PROMINENT concept in the teaching context.
 ${courseInfo}${mathGuidance}
 
 ANSWER RULES:
