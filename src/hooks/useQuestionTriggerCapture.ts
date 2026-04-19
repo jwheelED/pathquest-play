@@ -471,6 +471,8 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     softCompleteMs,
     maxExtensions,
     extensionMs,
+    minSilenceMs,
+    cooldownMs,
   ]);
 
   /**
