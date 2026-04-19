@@ -295,23 +295,22 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
   }, [bufferWindowMs, maxBufferChars]);
 
   /**
-   * Get a slice of buffer text from [centerTs - lookback, now], with sentence-boundary trimming.
+   * Get a structured slice of the buffer around the trigger:
+   *  - `question`: text from the most recent sentence boundary up to `now`
+   *               (the current interrogative utterance only).
+   *  - `context`:  text from `triggerTs - lookbackMs` up to that boundary
+   *               (the teaching prose that came BEFORE the question — used
+   *                downstream to resolve pronouns like "it" / "this").
    */
-  const getSliceAroundTrigger = useCallback((triggerTs: number, now: number): string => {
+  const getSliceAroundTrigger = useCallback((triggerTs: number, now: number): { question: string; context: string } => {
     const startCutoff = triggerTs - lookbackMs;
     const relevantChunks = bufferRef.current.filter(
       c => c.timestamp >= startCutoff && c.timestamp <= now
     );
 
-    if (relevantChunks.length === 0) return '';
+    if (relevantChunks.length === 0) return { question: '', context: '' };
 
-    let combined = relevantChunks.map(c => c.text).join(' ').trim();
-
-    // Find the start of the current sentence: look for the last sentence-ending
-    // punctuation BEFORE the trigger word position. We need to find roughly where
-    // the trigger was in the combined text.
-    // Strategy: locate the trigger word in the combined text, then look backwards
-    // for the most recent .!? before it. Slice from there.
+    const combined = relevantChunks.map(c => c.text).join(' ').trim();
     const lower = combined.toLowerCase();
 
     // Find position of any trigger pattern match
@@ -325,7 +324,6 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     }
 
     if (triggerPos > 0) {
-      // Look backwards from trigger for sentence boundary
       const beforeTrigger = combined.substring(0, triggerPos);
       const lastBoundary = Math.max(
         beforeTrigger.lastIndexOf('.'),
@@ -333,13 +331,19 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         beforeTrigger.lastIndexOf('!')
       );
       if (lastBoundary >= 0) {
-        // Slice from after the boundary — keeps current sentence only
-        combined = combined.substring(lastBoundary + 1).trim();
+        const context = combined.substring(0, lastBoundary + 1).trim();
+        const question = combined.substring(lastBoundary + 1).trim();
+        return { question, context };
       }
-      // Otherwise: keep full combined (entire buffer is one running sentence)
+      // No prior boundary — the entire buffer is one running utterance.
+      // Treat everything before trigger as context, trigger-onwards as question.
+      const context = combined.substring(0, triggerPos).trim();
+      const question = combined.substring(triggerPos).trim();
+      return { question, context };
     }
 
-    return combined;
+    // No trigger found in combined (shouldn't happen at this point) — return all as question
+    return { question: combined, context: '' };
   }, [lookbackMs]);
 
   const finalizeCapture = useCallback((now: number, isForced = false) => {
