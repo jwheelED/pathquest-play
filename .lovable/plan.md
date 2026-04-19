@@ -1,54 +1,87 @@
 
+## Problem Analysis
 
-## Problem
+Looked at `useQuestionTriggerCapture.ts` and `usePassiveQuestionDetection.ts`. The current capture flow:
 
-Two issues, one root cause: the **Question on Deck preview** (MCQ options + short-answer expected answer) is generated from the **question text alone**, with no lecture transcript context.
+1. **Trigger detection runs per-chunk** on a 5-chunk / 500-char sliding window
+2. Once an interrogative pattern (`what is`, `how many`, etc.) matches, it **immediately enters "capturing" mode** starting from the trigger word
+3. It then accumulates subsequent chunks until either: silence gap (1.5s), sentence-ending punctuation, max words (200), or max duration (15s)
 
-### What's happening today
+**Root causes of partial / inconsistent captures:**
 
-In `src/components/instructor/QuestionOnDeck.tsx` (lines 281–296), when a candidate question is captured, it calls:
+- **Trigger word can land mid-utterance**: If Deepgram finalizes "what is the wavelength" as one chunk and "smaller but the number of waves per second stays the same" follows, but the question was actually "if the frequency goes up, what is the wavelength doing — it gets smaller but the number of waves per second stays the same?" — the leading conditional context before "what is" is **discarded** because `recentChunksRef` is cleared on trigger and capture starts at `triggerIdx`.
+- **Single-chunk early exit**: If the triggering chunk already ends with `.`, `!`, or `?` (Deepgram often appends `?` on rising intonation), `finishCapture()` runs immediately on just that one chunk — no rolling buffer, no surrounding context.
+- **Reactive, not retrospective**: There is no continuous rolling buffer of finalized prose. The 500-char window exists only to *find* a trigger; it is wiped the moment one fires. There is no "look back 5–10s before the trigger and look forward 5–10s after" semantic.
+- **Silence-gap finalization is fragile**: A 1.5s pause inside a long question (e.g. instructor pausing for emphasis) ends capture prematurely.
 
-```ts
-supabase.functions.invoke('generate-mcq-options', { body: { question_text } })
-supabase.functions.invoke('generate-expected-answer', { body: { question_text } })
+## Fix Strategy
+
+Replace the "trigger → start capturing forward" model with a **continuous rolling utterance buffer** that always holds the last N seconds of finalized transcript. When a trigger fires, generation uses the **full buffer slice around the trigger**, not just chunks after it.
+
+### Architecture
+
+```text
+finalized chunks ──► RollingBuffer (last 10s, ~1500 chars)
+                          │
+                          ├──► trigger scanner (every chunk)
+                          │         │
+                          │         └─► on match: arm "complete-utterance" timer
+                          │
+                          └──► on timer fire OR sentence-end:
+                                   slice = buffer.windowAround(triggerTime, -8s, +5s)
+                                   send slice to generator
 ```
 
-Notice — **no transcript is passed**. The full lecture transcript (`transcriptBufferRef.current`) lives in `LectureTranscription.tsx` but is never piped down into `QuestionOnDeck`.
+### Concrete changes to `src/hooks/useQuestionTriggerCapture.ts`
 
-The edge functions (`generate-mcq-options`, `generate-expected-answer`) already accept an optional `source_transcript` field — they just never receive it from this code path. And `generate-expected-answer`'s prompt literally says *"Base your answer on the lecture context above, not general knowledge"* — so when context is empty, the model has nothing to ground on and produces vague or wrong "ideal" answers, which then makes auto-grading wrong.
+1. **Introduce a persistent `RollingBuffer`** (replaces the wipe-on-trigger `recentChunksRef`):
+   - Stores `{text, timestamp}` chunks
+   - Eviction: drop chunks older than `bufferWindowMs` (default 12000ms) AND cap at ~2000 chars
+   - Never cleared on trigger; only trimmed by age
+   - Exposes `getSliceAround(centerTs, lookbackMs, lookaheadMs)` returning concatenated text
 
-Separately, even where transcript IS passed elsewhere in the app, only `.slice(-800)` (≈last 800 chars, ~30 seconds) is used — way too narrow for "full context."
+2. **Decouple "trigger detected" from "capture started"**:
+   - On trigger match, record `pendingTriggerTs` and `pendingTriggerWord` — do NOT slice immediately
+   - Start a `completionTimer` (default 4–5s after trigger) to allow the full utterance to land in the buffer
+   - Cancel/restart the timer if a sentence-ending punctuation (`?`, `.`, `!`) lands AFTER the trigger
+   - On timer fire OR sentence-end-after-trigger, slice the buffer: lookback 8s before trigger, lookahead from trigger to "now"
 
-## Fix
+3. **Remove single-chunk early-finish path**: even if the triggering chunk ends with `?`, still wait at least `minHoldMs` (e.g. 800ms) so the buffer can absorb 1–2 more finalized chunks of preceding context that may finalize out of order.
 
-Three small, surgical changes:
+4. **Preserve preceding context**: the slice MUST start at the older of (a) `triggerTs - lookbackMs` or (b) the start of the current sentence (split on prior `.`/`?`/`!`). This is what fixes the "smaller but the number of waves per second" bug — the conditional clause before the trigger word is included.
 
-### 1. Pipe the full lecture transcript into Question on Deck
-Add a `transcriptContext: string` prop to `QuestionOnDeck`. In `LectureTranscription.tsx`, pass `transcriptBufferRef.current` (the running lecture buffer) on every render where Question on Deck is rendered.
+5. **Soft silence handling**: silence gap no longer hard-finalizes; it just *enables* finalization once the completion timer has also expired. Long pauses inside a question don't truncate.
 
-### 2. Forward transcript to both edge functions
-Update the two `supabase.functions.invoke` calls in `QuestionOnDeck.generatePreview()` to include `source_transcript: transcriptContext`.
+6. **Post-process unchanged**: existing `postProcess()` overlap-dedup + filler-strip + `?` enforcement still runs on the final slice.
 
-### 3. Widen the context window in the edge functions
-In `generate-mcq-options` and `generate-expected-answer`, change `source_transcript.slice(-800)` to `source_transcript.slice(-6000)` (≈last 3–4 minutes, well within Gemini Flash's context window). Also strengthen the prompts:
-- **MCQ**: "Use the lecture context as the primary source for the correct answer. Use world knowledge only as a fallback."
-- **Short answer**: Keep "ground in lecture" but add: "If the lecture explicitly states the answer, quote/paraphrase it directly. The expected answer should be specific and factually correct, not vague."
+### Tunables (exported via options)
 
-### 4. (Bonus) Also widen context for the candidate text itself
-The trigger-capture system pulls a ~500-char window around the trigger. That stays as-is for *detecting* the question, but the **transcript passed to AI generation** should be the full rolling lecture buffer (not just the trigger window) — which is what change #1 accomplishes.
+| Option | Default | Purpose |
+|---|---|---|
+| `bufferWindowMs` | 12000 | How far back the rolling buffer retains chunks |
+| `lookbackMs` | 8000 | How much pre-trigger context to include in slice |
+| `completionTimeoutMs` | 4500 | How long to wait after trigger before finalizing |
+| `minHoldMs` | 800 | Minimum hold before allowing sentence-end finalization |
+| `silenceGapMs` | 2500 | Raised from 1500; pause tolerance inside questions |
+| `cooldownMs` | 15000 | Unchanged |
 
-## Files Changed
+### Logging additions (debug mode)
 
-| File | Change |
-|---|---|
-| `src/components/instructor/QuestionOnDeck.tsx` | Add `transcriptContext` prop, pass it into the two `invoke()` calls |
-| `src/components/instructor/LectureTranscription.tsx` | Pass `transcriptContext={transcriptBufferRef.current}` to `<QuestionOnDeck />` |
-| `supabase/functions/generate-mcq-options/index.ts` | Increase slice to 6000, strengthen prompt to prefer lecture context |
-| `supabase/functions/generate-expected-answer/index.ts` | Increase slice to 6000, strengthen prompt for specific/grounded answers |
+- `[buffer]` log on every chunk: current buffer size in chars + age of oldest chunk
+- `[trigger-armed]` log with trigger word, position, and current buffer length
+- `[slice]` log showing the final text passed to generation, with `lookback=Xms, lookahead=Yms` annotations
 
-## Expected Outcome
+This makes it obvious in console whether the buffer was healthy at trigger time.
 
-- **MCQ options**: Correct answer + distractors are derived from what was actually said in the lecture, not just the question stem.
-- **Short answer expected answer**: Becomes a clear, specific, lecture-grounded reference — so AI grading correctly marks correct student answers as correct.
-- **Question on Deck text itself**: Stays as the captured trigger utterance (that's the actual instructor question — paraphrasing it would be wrong). Only the *answer/options generation* gets the full context, which is what was missing.
+### Files touched
 
+- `src/hooks/useQuestionTriggerCapture.ts` — the entire `feedChunk` + state machine
+- No changes to `usePassiveQuestionDetection.ts`, edge functions, or DB. The downstream consumer (`onCaptureCompleteRef`) still receives a `PassiveQuestionCandidate` with the same shape — just a more complete `text` field.
+
+### Validation plan
+
+After implementation, verify with the exact failure case the user described ("if frequency goes up, what is the wavelength doing — it gets smaller but…"):
+- Console should show `[buffer]` accumulating the conditional clause
+- `[trigger-armed]` fires on "what is"
+- `[slice]` should include the **entire** sentence including the pre-trigger conditional
+- Final candidate text should be the full question, not the post-trigger fragment
