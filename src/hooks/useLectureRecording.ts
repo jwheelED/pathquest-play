@@ -225,6 +225,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     cooldownMs: 12000,
     silenceGapMs: 2500,
     minSilenceMs: 1200,
+    bufferWindowMs: 60000,
+    lookbackMs: 30000,
+    maxBufferChars: 8000,
   });
 
   // Route trigger-captured questions into the same passive candidate pipeline

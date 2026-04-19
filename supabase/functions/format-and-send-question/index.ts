@@ -88,9 +88,21 @@ Write all math as plain readable text using Unicode:
 - Multiplication: · or juxtapose
 - Apply to question AND all answer options`;
 
-  const prompt = `The professor asked: "${questionText}"
+  const prompt = `=== TEACHING CONTEXT (background — earlier in the lecture) ===
+"${context}"
 
-Context from lecture: "${context}"${courseInfo}${mathGuidance}
+=== INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
+"${questionText}"
+
+INSTRUCTIONS:
+- The TEACHING CONTEXT is background information the instructor already covered.
+- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked the class.
+- Resolve any pronouns (it, this, they, that, these, those) in the question using the teaching context BEFORE generating the MCQ.
+  Example: question "what does it produce?" + context "the mitochondria converts glucose"
+           → resolved: "What does the mitochondria produce?"
+- Generate the check-in based on the RESOLVED question, grounded in the teaching context.
+- If the question still cannot be resolved into a concrete topic after reading the context, base the question on the most prominent concept in the teaching context.
+${courseInfo}${mathGuidance}
 
 ANSWER RULES:
 - Always include the factually correct answer as one of the options, even if it was not explicitly mentioned in the lecture transcript.
@@ -111,7 +123,7 @@ Each distractor should represent a specific type of error a student might make.
 
 Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
-  "question": "the question text (use plain Unicode math, no LaTeX)",
+  "question": "the resolved question text (use plain Unicode math, no LaTeX)",
   "options": ["A. first option text", "B. second option text", "C. third option text", "D. fourth option text"],
   "correctAnswer": "A" | "B" | "C" | "D",
   "explanation": "Why this is correct and explain what mistakes lead to each wrong answer"
@@ -204,10 +216,17 @@ const generateCodingQuestion = async (
 
   const prompt = `Based on the lecture content, create a LeetCode-style coding problem.
 
-PROFESSOR'S QUESTION/TOPIC: "${questionText}"
+=== TEACHING CONTEXT (background — earlier in the lecture) ===
+"${context}"
 
-LECTURE CONTEXT:
-"${context}"${courseInfo}
+=== INSTRUCTOR'S QUESTION/TOPIC (what to turn into a check-in) ===
+"${questionText}"${courseInfo}
+
+INSTRUCTIONS:
+- The TEACHING CONTEXT is background information the instructor already covered.
+- The INSTRUCTOR'S QUESTION/TOPIC is the short prompt the instructor just asked.
+- Resolve any pronouns (it, this, they, that) in the question using the teaching context BEFORE generating the problem.
+- Generate the coding challenge based on the RESOLVED question, grounded strictly in the teaching context.
 
 Generate a professional coding challenge with this EXACT JSON structure:
 
@@ -254,7 +273,7 @@ CRITICAL REQUIREMENTS:
 5. Include 2-3 hints that reference lecture concepts
 6. Starter code should match the detected language syntax
 7. Problem should be solvable based on lecture content
-8. GROUNDING: The problem MUST be based on concepts from the lecture context above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
+8. GROUNDING: The problem MUST be based on concepts from the TEACHING CONTEXT above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
 
   // Add timeout handling (30 seconds)
   const controller = new AbortController();
@@ -467,6 +486,7 @@ serve(async (req) => {
       question_text,
       suggested_type,
       context,
+      prior_context = null, // Optional focused teaching prose from trigger pipeline (preferred when present)
       source = "manual_button",
       use_answer_key = false,
       course_context = null,
@@ -477,6 +497,15 @@ serve(async (req) => {
       course_id = null,
       source_transcript = null, // Raw transcript to display with question
     } = await req.json();
+
+    // Prefer the focused prior_context (from the trigger pipeline) over the generic transcript tail.
+    // It contains the teaching prose immediately before the question — needed to resolve pronouns.
+    const effectiveContext: string = (typeof prior_context === "string" && prior_context.trim().length > 0)
+      ? prior_context
+      : (context || "");
+    if (prior_context) {
+      console.log(`📥 Using prior_context from trigger pipeline (${effectiveContext.length} chars)`);
+    }
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -747,7 +776,7 @@ serve(async (req) => {
         // Fallback: Generate structured problem from simple question text
         const codingProblem = await generateCodingQuestion(
           typeof question_text === "string" ? question_text : JSON.stringify(question_text),
-          context || "",
+          effectiveContext,
           course_context,
         );
         formattedQuestion = {
@@ -803,7 +832,7 @@ serve(async (req) => {
       } else {
         // Fallback: generate with AI
         console.log("🤖 Generating MCQ options with AI");
-        const mcq = await generateMCQ(question_text, context || "", course_context);
+        const mcq = await generateMCQ(question_text, effectiveContext, course_context);
         formattedQuestion = {
           question: mcq.question,
           type: "multiple_choice",
@@ -830,7 +859,7 @@ serve(async (req) => {
         };
       } else {
         // Generate poll options with AI
-        const mcq = await generateMCQ(question_text, context || "", course_context);
+        const mcq = await generateMCQ(question_text, effectiveContext, course_context);
         formattedQuestion = {
           question: mcq.question,
           type: "poll",

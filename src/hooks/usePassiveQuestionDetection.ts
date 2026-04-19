@@ -4,6 +4,8 @@ export interface PassiveQuestionCandidate {
   text: string;
   detectedAt: number;
   id: string;
+  /** Optional teaching prose that came BEFORE the question — used to resolve pronouns downstream */
+  priorContext?: string;
 }
 
 interface UsePassiveQuestionDetectionOptions {
