@@ -262,9 +262,7 @@ export const LectureTranscription = ({
     setOnCaptureComplete: setTriggerCaptureComplete,
   } = useQuestionTriggerCapture({
     cooldownMs: 15000,
-    silenceGapMs: 1500,
-    maxWords: 200,
-    maxDurationMs: 15000,
+    silenceGapMs: 2500,
   });
 
   // Route trigger-captured questions into the passive candidate pipeline

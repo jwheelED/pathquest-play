@@ -31,13 +31,13 @@ const RHETORICAL_BLOCKLIST = [
 
 // Interrogative trigger patterns — must appear at the start of an utterance
 const TRIGGER_PATTERNS = [
-  /^what\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part)/i,
-  /^why\s+(is|are|do|does|did|would|can|could|should)/i,
-  /^how\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far)/i,
-  /^when\s+(is|are|do|does|did|would|was|were|can|should)/i,
-  /^where\s+(is|are|do|does|did|would|was|were|can)/i,
-  /^who\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed)/i,
-  /^which\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method)/i,
+  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part)\b/i,
+  /\bwhy\s+(is|are|do|does|did|would|can|could|should)\b/i,
+  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far)\b/i,
+  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should)\b/i,
+  /\bwhere\s+(is|are|do|does|did|would|was|were|can)\b/i,
+  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed)\b/i,
+  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method)\b/i,
 ];
 
 // Leading filler words to strip
@@ -46,24 +46,17 @@ const FILLER_PREFIXES = /^(so+|um+|uh+|like|well|okay so|okay|now|and so|but)\s+
 interface UseQuestionTriggerCaptureOptions {
   cooldownMs?: number;
   silenceGapMs?: number;
-  maxWords?: number;
-  maxDurationMs?: number;
+  bufferWindowMs?: number;
+  lookbackMs?: number;
+  completionTimeoutMs?: number;
+  minHoldMs?: number;
+  maxBufferChars?: number;
   debug?: boolean;
 }
 
-interface RecentChunk {
+interface BufferChunk {
   text: string;
   timestamp: number;
-}
-
-const MAX_WINDOW_CHUNKS = 5;
-const MAX_WINDOW_CHARS = 500;
-
-interface CaptureState {
-  isCapturing: boolean;
-  buffer: string[];
-  triggerTime: number;
-  lastChunkTime: number;
 }
 
 let triggerIdCounter = 0;
@@ -76,46 +69,22 @@ function wordCount(text: string): number {
  * Minimal post-processing: merge chunks, deduplicate boundary words,
  * strip filler, ensure trailing ?.  NO paraphrasing.
  */
-function postProcess(chunks: string[]): string {
-  if (chunks.length === 0) return '';
+function postProcess(text: string): string {
+  if (!text) return '';
 
-  // 1. Merge with overlap deduplication
-  let merged = chunks[0];
-  for (let i = 1; i < chunks.length; i++) {
-    const prev = merged.split(/\s+/);
-    const curr = chunks[i].split(/\s+/);
+  let merged = text.trim();
 
-    // Find overlap: check if last N words of prev match first N words of curr
-    let overlapLen = 0;
-    const maxOverlap = Math.min(prev.length, curr.length, 6);
-    for (let n = maxOverlap; n >= 1; n--) {
-      const prevTail = prev.slice(-n).map(w => w.toLowerCase());
-      const currHead = curr.slice(0, n).map(w => w.toLowerCase());
-      if (prevTail.join(' ') === currHead.join(' ')) {
-        overlapLen = n;
-        break;
-      }
-    }
-
-    if (overlapLen > 0) {
-      merged += ' ' + curr.slice(overlapLen).join(' ');
-    } else {
-      merged += ' ' + chunks[i];
-    }
-  }
-
-  // 2. Strip leading filler
+  // Strip leading filler (multiple passes)
   merged = merged.replace(FILLER_PREFIXES, '').trim();
-  // May need multiple passes
   merged = merged.replace(FILLER_PREFIXES, '').trim();
 
-  // 3. Ensure trailing ?
+  // Ensure trailing ?
   merged = merged.replace(/[.!,;:]+$/, '').trim();
   if (!merged.endsWith('?')) {
     merged += '?';
   }
 
-  // 4. Capitalize first letter
+  // Capitalize first letter
   if (merged.length > 0) {
     merged = merged.charAt(0).toUpperCase() + merged.slice(1);
   }
@@ -142,62 +111,137 @@ function isRhetoricalOrGreeting(text: string): boolean {
 export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOptions = {}) {
   const {
     cooldownMs = 15000,
-    silenceGapMs = 1500,
-    maxWords = 200,
-    maxDurationMs = 15000,
+    silenceGapMs = 2500,
+    bufferWindowMs = 12000,
+    lookbackMs = 8000,
+    completionTimeoutMs = 4500,
+    minHoldMs = 800,
+    maxBufferChars = 2000,
     debug = true,
   } = options;
 
-  const captureRef = useRef<CaptureState>({
-    isCapturing: false,
-    buffer: [],
-    triggerTime: 0,
-    lastChunkTime: 0,
-  });
+  // Persistent rolling buffer — never cleared on trigger, only trimmed by age/size
+  const bufferRef = useRef<BufferChunk[]>([]);
   const lastTriggerTimeRef = useRef<number>(0);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recentChunksRef = useRef<RecentChunk[]>([]);
+
+  // Pending trigger state (decoupled from "capturing")
+  const pendingTriggerRef = useRef<{
+    triggerTs: number;
+    triggerWord: string;
+    armedAt: number;
+  } | null>(null);
+
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  // Callback when a full question is captured
   const onCaptureCompleteRef = useRef<((candidate: PassiveQuestionCandidate) => void) | null>(null);
 
   const setOnCaptureComplete = useCallback((cb: (candidate: PassiveQuestionCandidate) => void) => {
     onCaptureCompleteRef.current = cb;
   }, []);
 
-  const clearTimeout_ = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+  const clearCompletionTimer = useCallback(() => {
+    if (completionTimerRef.current) {
+      clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = null;
     }
   }, []);
 
-  const finishCapture = useCallback(() => {
-    const state = captureRef.current;
-    if (!state.isCapturing || state.buffer.length === 0) {
-      captureRef.current.isCapturing = false;
+  /**
+   * Trim buffer: drop chunks older than bufferWindowMs, then cap total chars.
+   */
+  const trimBuffer = useCallback((now: number) => {
+    const cutoff = now - bufferWindowMs;
+    bufferRef.current = bufferRef.current.filter(c => c.timestamp >= cutoff);
+
+    let totalChars = bufferRef.current.reduce((s, c) => s + c.text.length, 0);
+    while (totalChars > maxBufferChars && bufferRef.current.length > 1) {
+      const dropped = bufferRef.current.shift();
+      totalChars -= dropped?.text.length ?? 0;
+    }
+  }, [bufferWindowMs, maxBufferChars]);
+
+  /**
+   * Get a slice of buffer text from [centerTs - lookback, now], with sentence-boundary trimming.
+   */
+  const getSliceAroundTrigger = useCallback((triggerTs: number, now: number): string => {
+    const startCutoff = triggerTs - lookbackMs;
+    const relevantChunks = bufferRef.current.filter(
+      c => c.timestamp >= startCutoff && c.timestamp <= now
+    );
+
+    if (relevantChunks.length === 0) return '';
+
+    let combined = relevantChunks.map(c => c.text).join(' ').trim();
+
+    // Find the start of the current sentence: look for the last sentence-ending
+    // punctuation BEFORE the trigger word position. We need to find roughly where
+    // the trigger was in the combined text.
+    // Strategy: locate the trigger word in the combined text, then look backwards
+    // for the most recent .!? before it. Slice from there.
+    const lower = combined.toLowerCase();
+
+    // Find position of any trigger pattern match
+    let triggerPos = -1;
+    for (const pattern of TRIGGER_PATTERNS) {
+      const m = lower.match(pattern);
+      if (m && m.index !== undefined) {
+        triggerPos = m.index;
+        break;
+      }
+    }
+
+    if (triggerPos > 0) {
+      // Look backwards from trigger for sentence boundary
+      const beforeTrigger = combined.substring(0, triggerPos);
+      const lastBoundary = Math.max(
+        beforeTrigger.lastIndexOf('.'),
+        beforeTrigger.lastIndexOf('?'),
+        beforeTrigger.lastIndexOf('!')
+      );
+      if (lastBoundary >= 0) {
+        // Slice from after the boundary — keeps current sentence only
+        combined = combined.substring(lastBoundary + 1).trim();
+      }
+      // Otherwise: keep full combined (entire buffer is one running sentence)
+    }
+
+    return combined;
+  }, [lookbackMs]);
+
+  const finalizeCapture = useCallback((now: number) => {
+    const pending = pendingTriggerRef.current;
+    if (!pending) {
+      clearCompletionTimer();
       setIsCapturing(false);
-      clearTimeout_();
       return;
     }
 
-    const question = postProcess(state.buffer);
-    if (debug) console.log('🎯 [trigger-capture] finished:', question);
+    const sliceText = getSliceAroundTrigger(pending.triggerTs, now);
+    const elapsedSinceTrigger = now - pending.triggerTs;
+    const lookbackUsed = Math.min(lookbackMs, pending.triggerTs - (bufferRef.current[0]?.timestamp ?? pending.triggerTs));
 
-    // Reset state + clear context window
-    captureRef.current = { isCapturing: false, buffer: [], triggerTime: 0, lastChunkTime: 0 };
-    recentChunksRef.current = [];
+    if (debug) {
+      console.log(`🎯 [slice] lookback≈${lookbackUsed}ms lookahead≈${elapsedSinceTrigger}ms text="${sliceText.substring(0, 120)}"`);
+    }
+
+    // Reset pending state
+    pendingTriggerRef.current = null;
+    clearCompletionTimer();
     setIsCapturing(false);
-    clearTimeout_();
 
-    // Filter rhetorical / greeting
+    if (!sliceText) {
+      if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
+      return;
+    }
+
+    const question = postProcess(sliceText);
+
     if (isRhetoricalOrGreeting(question)) {
       if (debug) console.log('🎯 [trigger-capture] blocked — rhetorical/greeting');
       return;
     }
 
-    // Min word check (the question should be substantive)
     if (wordCount(question) < 5) {
       if (debug) console.log('🎯 [trigger-capture] blocked — too short');
       return;
@@ -209,135 +253,100 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       id: `tq-${++triggerIdCounter}`,
     };
 
+    if (debug) console.log('🎯 [trigger-capture] FINAL:', question);
     onCaptureCompleteRef.current?.(candidate);
-  }, [clearTimeout_, debug]);
+  }, [getSliceAroundTrigger, clearCompletionTimer, lookbackMs, debug]);
 
   /**
    * Feed a transcript chunk into the trigger capture system.
-   * Returns `true` if the system is currently capturing (caller should skip passive detection).
+   * Returns `true` if the system has armed/pending capture (caller should skip passive detection).
    */
   const feedChunk = useCallback((text: string, timestamp?: number): boolean => {
     const now = timestamp ?? Date.now();
-    const state = captureRef.current;
 
-    // If currently capturing, accumulate
-    if (state.isCapturing) {
-      // Check silence gap
-      if (state.lastChunkTime > 0 && (now - state.lastChunkTime) > silenceGapMs) {
-        if (debug) console.log('🎯 [trigger-capture] silence gap detected, finishing');
-        // Add this last chunk then finish
-        state.buffer.push(text);
-        state.lastChunkTime = now;
-        finishCapture();
-        return false; // capture done, caller can proceed
-      }
+    // Always push into rolling buffer + trim
+    bufferRef.current.push({ text, timestamp: now });
+    trimBuffer(now);
 
-      // Check sentence-ending punctuation
+    if (debug) {
+      const oldestAge = bufferRef.current[0] ? now - bufferRef.current[0].timestamp : 0;
+      const totalChars = bufferRef.current.reduce((s, c) => s + c.text.length, 0);
+      console.log(`🎯 [buffer] chunks=${bufferRef.current.length} chars=${totalChars} oldestAge=${oldestAge}ms`);
+    }
+
+    // If a trigger is already armed, check for sentence-end finalization
+    if (pendingTriggerRef.current) {
+      const pending = pendingTriggerRef.current;
+      const heldFor = now - pending.armedAt;
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
 
-      state.buffer.push(text);
-      state.lastChunkTime = now;
-
-      // Check termination conditions
-      const totalWords = state.buffer.reduce((sum, chunk) => sum + wordCount(chunk), 0);
-      const elapsed = now - state.triggerTime;
-
-      if (hasSentenceEnd || totalWords >= maxWords || elapsed >= maxDurationMs) {
-        if (debug) console.log(`🎯 [trigger-capture] boundary hit (sentenceEnd=${hasSentenceEnd}, words=${totalWords}, elapsed=${elapsed}ms)`);
-        finishCapture();
+      if (hasSentenceEnd && heldFor >= minHoldMs) {
+        if (debug) console.log(`🎯 [trigger-capture] sentence-end after ${heldFor}ms hold, finalizing`);
+        finalizeCapture(now);
         return false;
       }
 
-      // Reset safety timeout
-      clearTimeout_();
-      timeoutRef.current = setTimeout(() => {
-        if (debug) console.log('🎯 [trigger-capture] safety timeout, finishing');
-        finishCapture();
-      }, silenceGapMs + 500);
-
-      return true; // still capturing
+      // Otherwise keep waiting for completion timer
+      return true;
     }
 
-    // Not capturing — update sliding context window then scan
+    // Cooldown check
     if (now - lastTriggerTimeRef.current < cooldownMs) {
-      // Still maintain the window even during cooldown
-      recentChunksRef.current.push({ text, timestamp: now });
-      if (recentChunksRef.current.length > MAX_WINDOW_CHUNKS) {
-        recentChunksRef.current.shift();
-      }
-      // Cap total chars
-      while (recentChunksRef.current.reduce((s, c) => s + c.text.length, 0) > MAX_WINDOW_CHARS && recentChunksRef.current.length > 1) {
-        recentChunksRef.current.shift();
-      }
       return false;
     }
 
-    // Push new chunk into sliding window
-    recentChunksRef.current.push({ text, timestamp: now });
-    if (recentChunksRef.current.length > MAX_WINDOW_CHUNKS) {
-      recentChunksRef.current.shift();
-    }
-    while (recentChunksRef.current.reduce((s, c) => s + c.text.length, 0) > MAX_WINDOW_CHARS && recentChunksRef.current.length > 1) {
-      recentChunksRef.current.shift();
-    }
-
-    // Concatenate window and scan for triggers
-    const combinedWindow = recentChunksRef.current.map(c => c.text).join(' ').trim().toLowerCase();
-    const strippedWindow = combinedWindow.replace(FILLER_PREFIXES, '').trim();
+    // Scan combined buffer for trigger
+    const combined = bufferRef.current.map(c => c.text).join(' ').trim();
+    const lower = combined.toLowerCase().replace(FILLER_PREFIXES, '').trim();
 
     for (const pattern of TRIGGER_PATTERNS) {
-      const match = strippedWindow.match(pattern);
+      const match = lower.match(pattern);
       if (match && match.index !== undefined) {
-        // Extract from trigger word onward in the ORIGINAL (non-lowercased) combined text
-        const originalCombined = recentChunksRef.current.map(c => c.text).join(' ').trim();
-        // Find approximate position in original text (case-insensitive search)
         const triggerWord = match[0];
-        const origLower = originalCombined.toLowerCase();
-        // Search for the trigger starting from roughly the same position
-        const triggerIdx = origLower.indexOf(triggerWord.toLowerCase(), Math.max(0, match.index - 5));
-        
-        if (triggerIdx === -1) continue;
 
-        const captureText = originalCombined.substring(triggerIdx).trim();
-        if (debug) console.log(`🎯 [trigger-capture] TRIGGER detected via window: "${captureText.substring(0, 80)}"`);
-
-        const hasSentenceEnd = /[.!?]\s*$/.test(captureText);
-
+        // Arm the trigger — do NOT slice yet
         lastTriggerTimeRef.current = now;
-        captureRef.current = {
-          isCapturing: true,
-          buffer: [captureText],
-          triggerTime: now,
-          lastChunkTime: now,
+        pendingTriggerRef.current = {
+          triggerTs: now,
+          triggerWord,
+          armedAt: now,
         };
         setIsCapturing(true);
-        recentChunksRef.current = []; // Clear window on trigger
 
-        if (hasSentenceEnd) {
-          if (debug) console.log('🎯 [trigger-capture] single-chunk question, finishing immediately');
-          finishCapture();
-          return false;
+        if (debug) {
+          const totalChars = combined.length;
+          console.log(`🎯 [trigger-armed] word="${triggerWord}" bufferChars=${totalChars}`);
         }
 
-        timeoutRef.current = setTimeout(() => {
-          if (debug) console.log('🎯 [trigger-capture] safety timeout, finishing');
-          finishCapture();
-        }, maxDurationMs);
+        // Schedule completion
+        clearCompletionTimer();
+        completionTimerRef.current = setTimeout(() => {
+          if (debug) console.log(`🎯 [trigger-capture] completion timer fired (${completionTimeoutMs}ms)`);
+          finalizeCapture(Date.now());
+        }, completionTimeoutMs);
 
         return true;
       }
     }
 
     return false;
-  }, [cooldownMs, silenceGapMs, maxWords, maxDurationMs, finishCapture, clearTimeout_, debug]);
+  }, [
+    cooldownMs,
+    minHoldMs,
+    completionTimeoutMs,
+    trimBuffer,
+    finalizeCapture,
+    clearCompletionTimer,
+    debug,
+  ]);
 
   const resetCapture = useCallback(() => {
-    captureRef.current = { isCapturing: false, buffer: [], triggerTime: 0, lastChunkTime: 0 };
-    recentChunksRef.current = [];
+    bufferRef.current = [];
+    pendingTriggerRef.current = null;
+    clearCompletionTimer();
     setIsCapturing(false);
-    clearTimeout_();
     lastTriggerTimeRef.current = 0;
-  }, [clearTimeout_]);
+  }, [clearCompletionTimer]);
 
   return {
     feedChunk,
