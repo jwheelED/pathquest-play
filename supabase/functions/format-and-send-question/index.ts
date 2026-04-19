@@ -88,20 +88,20 @@ Write all math as plain readable text using Unicode:
 - Multiplication: · or juxtapose
 - Apply to question AND all answer options`;
 
-  const prompt = `=== TEACHING CONTEXT (background — earlier in the lecture) ===
+  const prompt = `=== TEACHING CONTEXT (everything the instructor has said recently — may include EARLIER LECTURE HISTORY and MOST RECENT TEACHING sections) ===
 "${context}"
 
 === INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
 "${questionText}"
 
 INSTRUCTIONS:
-- The TEACHING CONTEXT is background information the instructor already covered.
-- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked the class.
-- Resolve any pronouns (it, this, they, that, these, those) in the question using the teaching context BEFORE generating the MCQ.
-  Example: question "what does it produce?" + context "the mitochondria converts glucose"
-           → resolved: "What does the mitochondria produce?"
-- Generate the check-in based on the RESOLVED question, grounded in the teaching context.
-- If the question still cannot be resolved into a concrete topic after reading the context, base the question on the most prominent concept in the teaching context.
+- The TEACHING CONTEXT is the running transcript of what the instructor has been saying. It may span 60+ seconds of speech and contain multiple topics.
+- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked the class. It is often vague and contains pronouns ("it", "this", "they", "that") whose antecedents appear EARLIER in the teaching context — sometimes many sentences back.
+- BEFORE generating the MCQ, scan the ENTIRE teaching context (not just the last sentence) to find what the pronouns refer to. Look at concrete nouns, named concepts, and the most prominent subject discussed.
+  Example: question "what does it produce?" + context "...we covered the cell. The mitochondria converts glucose into energy. Now class..."
+           → "it" = the mitochondria → resolved question: "What does the mitochondria produce?"
+- Generate the check-in based on the RESOLVED, fully-specified question, grounded in the teaching context.
+- If after scanning the full context the pronoun still has no clear antecedent, base the question on the MOST PROMINENT concept in the teaching context.
 ${courseInfo}${mathGuidance}
 
 ANSWER RULES:
@@ -498,14 +498,27 @@ serve(async (req) => {
       source_transcript = null, // Raw transcript to display with question
     } = await req.json();
 
-    // Prefer the focused prior_context (from the trigger pipeline) over the generic transcript tail.
-    // It contains the teaching prose immediately before the question — needed to resolve pronouns.
-    const effectiveContext: string = (typeof prior_context === "string" && prior_context.trim().length > 0)
-      ? prior_context
-      : (context || "");
-    if (prior_context) {
-      console.log(`📥 Using prior_context from trigger pipeline (${effectiveContext.length} chars)`);
+    // ALWAYS combine the broad transcript tail (context) with the focused trigger prior_context.
+    // The broad tail provides earlier-lecture history needed to resolve vague references like
+    // "what does it produce?" to antecedents mentioned 15-60s ago. The focused prior_context
+    // (when present) highlights the teaching prose immediately before the question.
+    // Sending BOTH gives Gemini the richest possible window for pronoun resolution.
+    const broadContext: string = typeof context === "string" ? context : "";
+    const focusedContext: string = typeof prior_context === "string" ? prior_context.trim() : "";
+
+    let effectiveContext: string;
+    if (focusedContext && broadContext) {
+      // Combine: broad history first, then focused recent prose (highlighted as most recent)
+      effectiveContext =
+        `[EARLIER LECTURE HISTORY]\n${broadContext}\n\n[MOST RECENT TEACHING — IMMEDIATELY BEFORE THE QUESTION]\n${focusedContext}`;
+    } else if (focusedContext) {
+      effectiveContext = focusedContext;
+    } else {
+      effectiveContext = broadContext;
     }
+    console.log(
+      `📥 Context assembled: broad=${broadContext.length} chars, focused=${focusedContext.length} chars, total=${effectiveContext.length} chars`
+    );
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
