@@ -264,12 +264,20 @@ export const LectureTranscription = ({
     cooldownMs: 12000,
     silenceGapMs: 2500,
     minSilenceMs: 1200,
+    bufferWindowMs: 60000,
+    lookbackMs: 30000,
+    maxBufferChars: 8000,
   });
+
+  // Stash priorContext from the trigger capture so the send path can prefer it over the generic transcript tail
+  const pendingPriorContextRef = useRef<string | null>(null);
 
   // Route trigger-captured questions into the passive candidate pipeline
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
+      // Stash structured prior context for the next send (cleared after send completes)
+      pendingPriorContextRef.current = candidate.priorContext ?? null;
       // Reset passive detection cooldown so its stale state doesn't block follow-ups
       resetPassiveDetection?.();
       checkPassiveQuestion(candidate.text);
