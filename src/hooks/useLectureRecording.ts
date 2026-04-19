@@ -223,9 +223,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     setOnCaptureComplete: setTriggerCaptureComplete,
   } = useQuestionTriggerCapture({
     cooldownMs: 15000,
-    silenceGapMs: 1500,
-    maxWords: 200,
-    maxDurationMs: 15000,
+    silenceGapMs: 2500,
   });
 
   // Route trigger-captured questions into the same passive candidate pipeline
