@@ -236,6 +236,11 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     completionTimeoutMs = 4500,
     minHoldMs = 800,
     maxBufferChars = 2000,
+    enableCompletionGate = true,
+    extensionMs = 2500,
+    maxExtensions = 2,
+    minCompleteWords = 6,
+    softCompleteMs = 3000,
     debug = true,
   } = options;
 
@@ -250,6 +255,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     armedAt: number;
   } | null>(null);
 
+  const extensionsUsedRef = useRef<number>(0);
   const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
