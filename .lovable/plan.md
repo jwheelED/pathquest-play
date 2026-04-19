@@ -1,105 +1,124 @@
 
 
-## Problem Analysis (from logs + code review)
+## Problem
 
-Reviewed `src/hooks/useQuestionTriggerCapture.ts` and the call site in `LectureTranscription.tsx`. Found **three concrete bugs** behind the "first ask gets missed, second works" pattern:
+Two related gaps remain in the trigger pipeline:
 
-### Bug A — Cooldown is set on *arm*, not on *successful pass*
+**Part 1 — Buffer is too short and topic-bound.** The rolling buffer in `useQuestionTriggerCapture.ts` keeps only ~12 s / 2000 chars and `getSliceAroundTrigger` slices to the **current sentence boundary** (line 327-340). When the instructor says *"So we just said the mitochondria produces ATP."* and then 15 s later asks *"class, what does it produce?"* — the antecedent ("mitochondria/ATP") has already been evicted AND the slice cuts at the `.` right before the question, so Gemini receives only *"class, what does it produce?"* with no referent. It hallucinates or replies "not enough context".
 
-In `feedChunk` (line 486), the moment a trigger word matches, we do:
+**Part 2 — Context and question are sent as one blob.** In `LectureTranscription.tsx` line 1342-1356 we send `question_text` (the captured slice) and `context` (`transcriptBufferRef.current.slice(-1500)`) to `format-and-send-question`. The prompt in `format-and-send-question/index.ts` (line 91-93) does separate them with `"The professor asked: ... Context from lecture: ..."` — but the captured `question_text` itself **still contains the trailing teaching prose** because we sliced from the prior sentence boundary forward. There's no explicit "background vs question" split, no instruction to resolve pronouns using earlier context, and the longer `transcriptBufferRef` is ignored when the captured slice already "looks complete".
+
+## Fix Strategy
+
+### 1. Extend rolling buffer to 60 s (`useQuestionTriggerCapture.ts`)
+
+- `bufferWindowMs`: **12 000 → 60 000 ms**
+- `maxBufferChars`: **2000 → 8000** (≈ 60 s of normal speech at ~130 wpm)
+- `lookbackMs` (slice window): **8000 → 30 000 ms** so the slice can pull in referents up to 30 s before the trigger.
+- Keep eviction logic (age-then-size) — unchanged shape.
+
+### 2. Stop slicing at the prior sentence boundary; emit two fields
+
+Change `getSliceAroundTrigger` to return **a structured object** instead of a single string:
+
 ```ts
-lastTriggerTimeRef.current = now;       // ← 15s cooldown starts HERE
-pendingTriggerRef.current = { ... };
-```
-Then 4.5s later `finalizeCapture` runs the gate. If the gate **rejects** (e.g. "what does it" caught mid-sentence as too short, or the slice trimmed wrong), the cooldown is **still active for ~10 more seconds**. When the instructor immediately repeats themselves, the trigger scanner sees the cooldown is active → returns early → second ask is silently dropped too. The user's experience: "first miss, then nothing happens, then eventually it works."
-
-### Bug B — No re-trigger lock during pending capture
-
-While `pendingTriggerRef` is set, `feedChunk` returns `true` and skips passive detection — good. But there is **no protection against the same utterance arming twice** if the buffer scan finds another trigger word later in the same sentence (e.g. "what does it produce, and how does it work?" — both `what does` and `how does` match). The first arm sets pending; subsequent chunks with sentence-end finalize, the gate passes → `pendingTriggerRef` cleared → next chunk sees `cooldownMs` only. If `cooldownMs` was reset (Bug A fix), a re-arm could happen on the SAME generated question's tail.
-
-### Bug C — No minimum silence before finalize
-
-`finalizeCapture` runs the moment the 4.5s completion timer fires OR a sentence-ending chunk arrives after `minHoldMs` (800ms). There is **no check that the buffer has actually gone quiet** — chunks may still be arriving rapid-fire. The gate evaluates a slice that may be missing the last 1–2 chunks Deepgram is about to finalize. This is why short questions like *"what does it produce?"* sometimes pass the gate with insufficient surrounding context, then fail downstream at Gemini ("not enough context").
-
-### Bug D (related) — Passive detection cooldown poisons retries
-
-`usePassiveQuestionDetection` has its own independent 15s cooldown (`lastDetectionTimeRef`). If the first chunk of the instructor's utterance ("So we just said the mitochondria produces ATP") triggers passive detection and creates a candidate, the candidate may be auto-dismissed silently — but `lastDetectionTimeRef` is now set, blocking the trigger pipeline's downstream `checkPassiveQuestion()` call too. Second ask 5s later → both pipelines locked out.
-
----
-
-## Fix Plan
-
-All changes in `src/hooks/useQuestionTriggerCapture.ts` plus one tiny coordination fix in `LectureTranscription.tsx`.
-
-### 1. Move cooldown to *successful pass*, not *arm*
-
-Replace `lastTriggerTimeRef.current = now` at arm time with setting it **only after a `pass` verdict**, just before `onCaptureCompleteRef.current?.(candidate)`. Rejected captures (gate `reject` or empty slice) leave the cooldown untouched, so the instructor's immediate retry can arm again.
-
-### 2. Add a `lastSuccessTs` cooldown lock distinct from arm-time
-
-Introduce `lastSuccessTimeRef`. Cooldown check at the top of `feedChunk` becomes:
-```ts
-if (now - lastSuccessTimeRef.current < cooldownMs) return false;
-```
-This is the **debounce-after-success lock** the user asked for.
-
-### 3. Add minimum-silence check before finalize
-
-Track `lastChunkTs` on every `feedChunk` call. In `finalizeCapture`, if `now - lastChunkTs < minSilenceMs` (default **1200ms**), do **not** finalize yet — schedule one more 800ms wait (counted as an extension). This prevents finalizing while Deepgram is still emitting.
-
-New option:
-```ts
-minSilenceMs: 1200   // require this much silence before finalizing
+{ question: string;   // only the trigger sentence (current behavior, trimmed)
+  context:  string;   // the lookback window BEFORE the trigger sentence,
+                      // up to lookbackMs old, NOT trimmed at boundary
+}
 ```
 
-### 4. Hard re-trigger lock while pending
+- `question` = text from the last sentence boundary (`.`/`?`/`!`) up to `now` — same as today.
+- `context` = text from `triggerTs - lookbackMs` up to that boundary — the teaching prose.
+- Both pulled from the same persistent buffer; if no boundary exists (single long utterance), `context` is empty and `question` is the whole slice.
 
-Move the trigger scan AFTER an explicit `pendingTriggerRef.current` early-return. Already done structurally, but add a flag `isFinalizingRef` set true during the `finalizeCapture` body so concurrent timer + sentence-end races can't double-emit the same candidate. Clear it in all exit paths.
+### 3. Propagate the split through the candidate
 
-### 5. Coordinate with passive detection
+Extend `PassiveQuestionCandidate` (in `usePassiveQuestionDetection.ts`) with optional `priorContext?: string`:
 
-In `LectureTranscription.tsx` (line 2493–2498), after a successful trigger capture emits a candidate via `checkPassiveQuestion`, **also** reset `usePassiveQuestionDetection`'s internal cooldown so a follow-up retry by the instructor (in the rare case the gate still rejects) isn't blocked by stale passive state. Expose `resetDetection` and call it in the `setTriggerCaptureComplete` callback after handing off.
+```ts
+export interface PassiveQuestionCandidate {
+  text: string;
+  detectedAt: number;
+  id: string;
+  priorContext?: string;   // NEW
+}
+```
 
-Additionally: when the trigger pipeline **rejects** a capture (gate-reject), it should NOT leak into passive detection. Today it doesn't (only successful captures call `checkPassiveQuestion`), but verify the path returns early cleanly.
+- `useQuestionTriggerCapture` populates `priorContext` from the slice's context field (after light cleanup: strip leading filler, cap at ~1500 chars).
+- `usePassiveQuestionDetection` candidates leave it `undefined` (unchanged behaviour for that path).
 
-### 6. Logging additions (debug)
+### 4. Plumb `priorContext` through to the edge function
 
-- `🚦 [cooldown-block] remaining=Xms` when post-success lock is active
-- `🤫 [silence-wait] lastChunk=Xms ago, deferring finalize` when min-silence not met
-- `🔒 [finalize-lock] already finalizing, skip`
+In `LectureTranscription.tsx`:
+- The trigger-capture handoff (`setTriggerCaptureComplete` callback, line 271-276) currently calls `checkPassiveQuestion(candidate.text)`. Change it to also stash `candidate.priorContext` on a ref (`pendingPriorContextRef`).
+- In the send path (line 1342-1368), when `pendingPriorContextRef.current` is set, send it as a new field `prior_context` and prefer it over the generic `transcriptBufferRef.slice(-1500)` when building `context`. Concretely:
 
-These will make the next debug session trivial.
+```ts
+const priorContext = pendingPriorContextRef.current ?? '';
+const transcriptTail = transcriptBufferRef.current.slice(-2000);
+// Prefer the focused prior context; fall back to tail if empty
+const context = priorContext || transcriptTail;
+```
 
----
+Clear the ref after the send completes (success or fail).
 
-## Tunables (final defaults)
+### 5. Restructure the Gemini prompt to separate teaching from question
 
-| Option | Default | Purpose |
-|---|---|---|
-| `cooldownMs` | 12000 (down from 15000) | Post-success debounce lock |
-| `minSilenceMs` | 1200 | Min quiet time before finalize |
-| `completionTimeoutMs` | 4500 | Unchanged |
-| `minHoldMs` | 800 | Unchanged |
-| `extensionMs` | 2500 | Unchanged |
-| `maxExtensions` | 2 | Unchanged |
+In `supabase/functions/format-and-send-question/index.ts`, update both `generateMCQ` (line 91) and `generateCodingQuestion` (line 207) to a **labelled, role-explicit** prompt:
 
-Lowering `cooldownMs` to 12s is safer now that it only counts from successful pass.
+```
+=== TEACHING CONTEXT (background — earlier in the lecture) ===
+"${context}"
 
----
+=== INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
+"${questionText}"
+
+INSTRUCTIONS:
+- The TEACHING CONTEXT is background information the instructor already covered.
+- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked.
+- Resolve any pronouns (it, this, they, that) in the question using the teaching context.
+  Example: question "what does it produce?" + context "the mitochondria converts glucose"
+           → resolved: "What does the mitochondria produce?"
+- Generate the check-in based on the RESOLVED question, grounded in the teaching context.
+- If the question still cannot be resolved after reading the context, set "needs_more_context": true in the response.
+```
+
+Apply the same split to short-answer generation if it exists in the same file. No changes to other edge functions in this pass.
+
+### 6. Logging additions
+
+- `🎯 [slice-split] question="..." context="..." (Xms lookback)` in trigger capture.
+- `📤 [send] using priorContext from trigger (Xchars)` vs `📤 [send] using transcript tail (fallback)` in `LectureTranscription`.
+
+## Tunables (final)
+
+| Option | Old | New | Purpose |
+|---|---|---|---|
+| `bufferWindowMs` | 12 000 | **60 000** | Hold last minute of speech |
+| `maxBufferChars` | 2000 | **8000** | Match 60 s capacity |
+| `lookbackMs` | 8000 | **30 000** | How far back to grab context |
+
+All other gate / cooldown / silence options unchanged.
 
 ## Files touched
 
-- `src/hooks/useQuestionTriggerCapture.ts` — refactor cooldown, add `minSilenceMs`, `lastSuccessTimeRef`, `isFinalizingRef`, `lastChunkTimeRef`; add new logs.
-- `src/components/instructor/LectureTranscription.tsx` — pass `minSilenceMs: 1200` option; reset passive detection cooldown after successful trigger capture handoff.
-- `src/hooks/useLectureRecording.ts` — mirror the option change for consistency.
+- `src/hooks/useQuestionTriggerCapture.ts` — extend buffer, change slice to return `{question, context}`, populate `priorContext` on candidate.
+- `src/hooks/usePassiveQuestionDetection.ts` — add optional `priorContext` to `PassiveQuestionCandidate` type.
+- `src/components/instructor/LectureTranscription.tsx` — capture `priorContext` from trigger candidate via ref; send as `prior_context` in `format-and-send-question` body; prefer it over generic tail.
+- `src/hooks/useLectureRecording.ts` — mirror buffer-size option changes for parity.
+- `supabase/functions/format-and-send-question/index.ts` — restructure MCQ + coding prompts with labelled `TEACHING CONTEXT` / `INSTRUCTOR'S QUESTION` sections + pronoun-resolution instructions; accept new `prior_context` field in body and use it for `context` when present.
 
-No edge function, DB, or API changes. Candidate shape unchanged.
+No DB / migration / other edge function changes. `PassiveQuestionCandidate` shape is additive (optional field), so all existing consumers keep working.
 
 ## Validation
 
-Test the exact failing case:
-- Say *"So we just said the mitochondria produces ATP, what does it produce?"* once.
-- Console should show: `[trigger-armed] word="what does"` → `[silence-wait]` (if mid-stream) → `[gate-pass]` → emitted.
-- If first attempt fails (gate-reject), repeat immediately. Console should show NO `[cooldown-block]` — second arm proceeds normally.
-- After a successful capture, console shows `[cooldown-block] remaining=...` for ~12s on subsequent triggers. Confirms re-trigger lock works.
+Test the failing case end-to-end:
+- Say *"So we just said the mitochondria produces ATP."* — pause 10–15 s — *"Class, what does it produce?"*
+- Console should show:
+  - `[buffer] chunks=N chars=~600 oldestAge=~15000ms` (proves the antecedent is still in buffer)
+  - `[trigger-armed] word="what does"`
+  - `[slice-split] question="Class, what does it produce?" context="So we just said the mitochondria produces ATP."`
+  - `[send] using priorContext from trigger (Xchars)`
+- Generated MCQ should resolve the pronoun and ask about ATP / mitochondria, not return "not enough context".
 
