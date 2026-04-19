@@ -222,18 +222,20 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     resetCapture: resetTriggerCapture,
     setOnCaptureComplete: setTriggerCaptureComplete,
   } = useQuestionTriggerCapture({
-    cooldownMs: 15000,
+    cooldownMs: 12000,
     silenceGapMs: 2500,
+    minSilenceMs: 1200,
   });
 
   // Route trigger-captured questions into the same passive candidate pipeline
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
-      // Directly set as passive candidate by checking the utterance
+      // Reset passive detection cooldown so it doesn't block follow-up retries
+      resetPassiveDetection?.();
       checkPassiveQuestion(candidate.text);
     });
-  }, [setTriggerCaptureComplete, checkPassiveQuestion]);
+  }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 
 
   // Deepgram streaming refs for real-time transcription
