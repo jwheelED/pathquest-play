@@ -498,14 +498,27 @@ serve(async (req) => {
       source_transcript = null, // Raw transcript to display with question
     } = await req.json();
 
-    // Prefer the focused prior_context (from the trigger pipeline) over the generic transcript tail.
-    // It contains the teaching prose immediately before the question — needed to resolve pronouns.
-    const effectiveContext: string = (typeof prior_context === "string" && prior_context.trim().length > 0)
-      ? prior_context
-      : (context || "");
-    if (prior_context) {
-      console.log(`📥 Using prior_context from trigger pipeline (${effectiveContext.length} chars)`);
+    // ALWAYS combine the broad transcript tail (context) with the focused trigger prior_context.
+    // The broad tail provides earlier-lecture history needed to resolve vague references like
+    // "what does it produce?" to antecedents mentioned 15-60s ago. The focused prior_context
+    // (when present) highlights the teaching prose immediately before the question.
+    // Sending BOTH gives Gemini the richest possible window for pronoun resolution.
+    const broadContext: string = typeof context === "string" ? context : "";
+    const focusedContext: string = typeof prior_context === "string" ? prior_context.trim() : "";
+
+    let effectiveContext: string;
+    if (focusedContext && broadContext) {
+      // Combine: broad history first, then focused recent prose (highlighted as most recent)
+      effectiveContext =
+        `[EARLIER LECTURE HISTORY]\n${broadContext}\n\n[MOST RECENT TEACHING — IMMEDIATELY BEFORE THE QUESTION]\n${focusedContext}`;
+    } else if (focusedContext) {
+      effectiveContext = focusedContext;
+    } else {
+      effectiveContext = broadContext;
     }
+    console.log(
+      `📥 Context assembled: broad=${broadContext.length} chars, focused=${focusedContext.length} chars, total=${effectiveContext.length} chars`
+    );
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
