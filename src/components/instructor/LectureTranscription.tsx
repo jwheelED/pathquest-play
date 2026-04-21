@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Mic,
   MicOff,
@@ -21,6 +22,7 @@ import {
   PictureInPicture2,
   BookOpen,
   Award,
+  Check,
 } from "lucide-react";
 import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 import { useToast } from "@/hooks/use-toast";
@@ -160,6 +162,10 @@ export const LectureTranscription = ({
   const [sessionId] = useState<string>(() => crypto.randomUUID());
   const [dailyQuotaLimit, setDailyQuotaLimit] = useState<number>(200);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
+  // CONFIDENCE CHECK — UI state for the Auto check-ins toggle and indicator
+  const [confidenceCheckEnabled, setConfidenceCheckEnabled] = useState<boolean>(false);
+  const [lastConfidenceCheckTime, setLastConfidenceCheckTime] = useState<number | null>(null);
+  const [confidenceTickNow, setConfidenceTickNow] = useState<number>(() => Date.now());
   const [autoQuestionInterval, setAutoQuestionInterval] = useState<number>(15);
   const [autoQuestionForceSend, setAutoQuestionForceSend] = useState(false);
   const [lastAutoQuestionTime, setLastAutoQuestionTime] = useState<number>(0);
@@ -282,6 +288,22 @@ export const LectureTranscription = ({
       cooldownMs: 30000,
     });
   }
+
+  // Sync UI toggle state -> service (also persists nothing yet — local session setting)
+  useEffect(() => {
+    if (confidenceCheckEnabled) {
+      confidenceCheckServiceRef.current?.enable();
+    } else {
+      confidenceCheckServiceRef.current?.disable();
+    }
+  }, [confidenceCheckEnabled]);
+
+  // Tick once per 30s so the "Last auto check-in: X minutes ago" label stays fresh
+  useEffect(() => {
+    if (lastConfidenceCheckTime === null) return;
+    const id = setInterval(() => setConfidenceTickNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, [lastConfidenceCheckTime]);
 
   // Route trigger-captured questions into the passive candidate pipeline
   useEffect(() => {
@@ -2588,8 +2610,17 @@ export const LectureTranscription = ({
             ?.processChunk(cleanText)
             .then((result) => {
               if (result?.triggered && result.template) {
-                sonnerToast.success(`Confidence check sent: "${result.phrase}"`, {
-                  description: result.template.prompt,
+                setLastConfidenceCheckTime(result.timestamp);
+                // Firing notification toast — subtle green left border, white bg, checkmark, auto-dismiss 3s
+                sonnerToast("Sending quick check-in...", {
+                  icon: <Check className="w-4 h-4" style={{ color: "#388e6e" }} />,
+                  duration: 3000,
+                  position: "bottom-center",
+                  style: {
+                    background: "#ffffff",
+                    color: "#000000",
+                    borderLeft: "3px solid #388e6e",
+                  },
                 });
               }
             })
@@ -4024,6 +4055,28 @@ export const LectureTranscription = ({
       {/* Question on Deck — persistent autodraft card */}
       {isRecording && (
         <div className="mt-4">
+          {/* CONFIDENCE CHECK — Auto check-ins toggle (Element 1) */}
+          <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
+            <div className="min-w-0">
+              <Label
+                htmlFor="confidence-check-toggle"
+                className="text-sm font-semibold cursor-pointer"
+                style={{ color: "#000000" }}
+              >
+                Auto check-ins
+              </Label>
+              <p className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
+                Fires on phrases like &ldquo;does that make sense&rdquo;
+              </p>
+            </div>
+            <Switch
+              id="confidence-check-toggle"
+              checked={confidenceCheckEnabled}
+              onCheckedChange={setConfidenceCheckEnabled}
+              className="data-[state=checked]:bg-[#388e6e] shrink-0 mt-0.5"
+            />
+          </div>
+
           <QuestionOnDeck
             candidate={passiveCandidate}
             candidateHistory={passiveCandidateHistory}
@@ -4084,6 +4137,17 @@ export const LectureTranscription = ({
             onDismiss={dismissPassiveCandidate}
             onRemoveFromHistory={removePassiveFromHistory}
           />
+
+          {/* CONFIDENCE CHECK — Last auto check-in indicator (Element 3) */}
+          {lastConfidenceCheckTime !== null && (() => {
+            const minsAgo = Math.max(0, Math.floor((confidenceTickNow - lastConfidenceCheckTime) / 60000));
+            const label = minsAgo === 0 ? "just now" : `${minsAgo} minute${minsAgo === 1 ? "" : "s"} ago`;
+            return (
+              <p className="mt-2 text-xs" style={{ color: "#6b7280" }}>
+                Last auto check-in: {label}
+              </p>
+            );
+          })()}
         </div>
       )}
     </>
