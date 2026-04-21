@@ -79,11 +79,15 @@ serve(async (req) => {
     console.log('Generating expected answer for question:', question_text.substring(0, 100));
     console.log(`Context received — broad=${broadContext.length} chars, focused=${focusedContext.length} chars`);
 
+    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
     const response = await callClaude({
       messages: [
         {
           role: 'system',
-          content: `You are an expert educator generating an ideal answer used as a grading reference. The answer must be SPECIFIC and FACTUALLY CORRECT — never vague.
+          content: `Today's date is ${todayStr}. Your training data has a cutoff and may be out of date for time-sensitive facts (current officeholders, recent events, current prices, latest versions, sports champions, etc.). If the question asks about something that may have changed since your training cutoff, you MUST acknowledge uncertainty in the answer (e.g. "As of my last training data, X — please verify against current sources") rather than confidently asserting an outdated fact. When the teaching context provides the answer, ALWAYS prefer it over your own knowledge.
+
+You are an expert educator generating an ideal answer used as a grading reference. The answer must be SPECIFIC and FACTUALLY CORRECT — never vague.
 
 CRITICAL: Instructor questions are often SHORT and contain pronouns ("it", "this", "they", "that") that refer back to topics discussed earlier. You MUST resolve these pronouns using the TEACHING CONTEXT before answering.
 
