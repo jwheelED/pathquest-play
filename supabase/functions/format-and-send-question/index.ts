@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -134,26 +135,17 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an educational AI that creates high-quality multiple choice questions. Always include the factually correct answer as one option, using your world knowledge when necessary. Use lecture context to inform distractors. Return ONLY valid JSON, no markdown formatting.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-      signal: controller.signal,
+    const response = await callClaude({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an educational AI that creates high-quality multiple choice questions. Always include the factually correct answer as one option, using your world knowledge when necessary. Use lecture context to inform distractors. Return ONLY valid JSON, no markdown formatting.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
     clearTimeout(timeoutId);
@@ -280,26 +272,17 @@ CRITICAL REQUIREMENTS:
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-      signal: controller.signal,
+    const response = await callClaude({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
     clearTimeout(timeoutId);
