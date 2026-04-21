@@ -2583,7 +2583,20 @@ export const LectureTranscription = ({
             checkPassiveQuestion(cleanText);
           }
 
-          
+          // CONFIDENCE CHECK — runs after main detection, non-blocking
+          confidenceCheckServiceRef.current
+            ?.processChunk(cleanText)
+            .then((result) => {
+              if (result?.triggered && result.template) {
+                sonnerToast.success(`Confidence check sent: "${result.phrase}"`, {
+                  description: result.template.prompt,
+                });
+              }
+            })
+            .catch((err) => {
+              console.warn('Confidence check failed:', err);
+            });
+
           // Accumulate clean text in transcript buffer
           if (transcriptBufferRef.current) {
             transcriptBufferRef.current += " " + cleanText;
