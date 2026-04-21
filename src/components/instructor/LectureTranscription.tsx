@@ -64,6 +64,7 @@ import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
 import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
 import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
+import { ConfidenceCheckService } from "@/lib/confidenceCheck/service";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
@@ -271,6 +272,16 @@ export const LectureTranscription = ({
 
   // Stash priorContext from the trigger capture so the send path can prefer it over the generic transcript tail
   const pendingPriorContextRef = useRef<string | null>(null);
+
+  // CONFIDENCE CHECK — runs after main detection, non-blocking
+  // Disabled by default; flip enable() to turn on auto-fire of pre-built confidence templates.
+  const confidenceCheckServiceRef = useRef<ConfidenceCheckService | null>(null);
+  if (confidenceCheckServiceRef.current === null) {
+    confidenceCheckServiceRef.current = new ConfidenceCheckService(sessionId, {
+      enabled: false,
+      cooldownMs: 30000,
+    });
+  }
 
   // Route trigger-captured questions into the passive candidate pipeline
   useEffect(() => {
@@ -2572,7 +2583,20 @@ export const LectureTranscription = ({
             checkPassiveQuestion(cleanText);
           }
 
-          
+          // CONFIDENCE CHECK — runs after main detection, non-blocking
+          confidenceCheckServiceRef.current
+            ?.processChunk(cleanText)
+            .then((result) => {
+              if (result?.triggered && result.template) {
+                sonnerToast.success(`Confidence check sent: "${result.phrase}"`, {
+                  description: result.template.prompt,
+                });
+              }
+            })
+            .catch((err) => {
+              console.warn('Confidence check failed:', err);
+            });
+
           // Accumulate clean text in transcript buffer
           if (transcriptBufferRef.current) {
             transcriptBufferRef.current += " " + cleanText;
