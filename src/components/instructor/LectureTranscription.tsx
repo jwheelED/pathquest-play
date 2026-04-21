@@ -64,6 +64,7 @@ import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
 import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
 import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
+import { ConfidenceCheckService } from "@/lib/confidenceCheck/service";
 
 interface LectureTranscriptionProps {
   onQuestionGenerated: () => void;
