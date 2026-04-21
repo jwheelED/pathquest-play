@@ -616,9 +616,14 @@ export function LiveCopilotHero({
   // Accumulate question candidates into local history
   useEffect(() => {
     if (!questionCandidate?.text) return;
+    const candidateText = questionCandidate.text;
+    const candidatePrior = questionCandidate.priorContext ?? "";
+    if (candidatePrior) {
+      priorContextByQuestionRef.current.set(candidateText, candidatePrior);
+    }
     setQuestionHistory((prev) => {
-      if (prev.includes(questionCandidate.text)) return prev;
-      const next = [...prev, questionCandidate.text];
+      if (prev.includes(candidateText)) return prev;
+      const next = [...prev, candidateText];
       setHistoryIndex(next.length - 1);
       return next;
     });
