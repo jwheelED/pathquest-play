@@ -4153,7 +4153,4 @@ export const LectureTranscription = ({
     </>
   );
 };
-    </>
-  );
-};
 
