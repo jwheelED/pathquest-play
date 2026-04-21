@@ -598,6 +598,7 @@ export function LiveCopilotHero({
   const [previewExpectedAnswer, setPreviewExpectedAnswer] = useState("");
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const generatedForRef = useRef<string | null>(null);
+  const priorContextByQuestionRef = useRef<Map<string, string>>(new Map());
 
   const effectiveFormat: QuestionType = formatPreference === 'short_answer' ? 'short_answer' : formatPreference === 'poll' ? 'poll' : 'mcq';
 
