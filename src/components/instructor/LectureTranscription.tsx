@@ -4055,6 +4055,28 @@ export const LectureTranscription = ({
       {/* Question on Deck — persistent autodraft card */}
       {isRecording && (
         <div className="mt-4">
+          {/* CONFIDENCE CHECK — Auto check-ins toggle (Element 1) */}
+          <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
+            <div className="min-w-0">
+              <Label
+                htmlFor="confidence-check-toggle"
+                className="text-sm font-semibold cursor-pointer"
+                style={{ color: "#000000" }}
+              >
+                Auto check-ins
+              </Label>
+              <p className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
+                Fires on phrases like &ldquo;does that make sense&rdquo;
+              </p>
+            </div>
+            <Switch
+              id="confidence-check-toggle"
+              checked={confidenceCheckEnabled}
+              onCheckedChange={setConfidenceCheckEnabled}
+              className="data-[state=checked]:bg-[#388e6e] shrink-0 mt-0.5"
+            />
+          </div>
+
           <QuestionOnDeck
             candidate={passiveCandidate}
             candidateHistory={passiveCandidateHistory}
@@ -4115,8 +4137,22 @@ export const LectureTranscription = ({
             onDismiss={dismissPassiveCandidate}
             onRemoveFromHistory={removePassiveFromHistory}
           />
+
+          {/* CONFIDENCE CHECK — Last auto check-in indicator (Element 3) */}
+          {lastConfidenceCheckTime !== null && (() => {
+            const minsAgo = Math.max(0, Math.floor((confidenceTickNow - lastConfidenceCheckTime) / 60000));
+            const label = minsAgo === 0 ? "just now" : `${minsAgo} minute${minsAgo === 1 ? "" : "s"} ago`;
+            return (
+              <p className="mt-2 text-xs" style={{ color: "#6b7280" }}>
+                Last auto check-in: {label}
+              </p>
+            );
+          })()}
         </div>
       )}
+    </>
+  );
+};
     </>
   );
 };
