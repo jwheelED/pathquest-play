@@ -316,21 +316,46 @@ export const LectureTranscription = ({
     if (onSendQuestionRef) {
       onSendQuestionRef.current = (questionText: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => {
         dismissPassiveCandidate();
+        // Normalize legacy 'mcq' alias to canonical 'multiple_choice' so downstream
+        // (preview dialog radio group + edge function) can match it.
+        const normalizedType = type === 'mcq' ? 'multiple_choice' : type;
+        const finalType = normalizedType || questionFormatPreference || 'multiple_choice';
         const qData = {
           question_text: questionText,
-          suggested_type: (type as any) || 'multiple_choice',
+          suggested_type: finalType as any,
           options: options?.length ? options : undefined,
           correct_answer: correctAnswer || undefined,
           expected_answer: expectedAnswer || undefined,
         };
-        setPreviewQuestionData({ question_text: questionText, suggested_type: qData.suggested_type });
         pendingQuestionDataRef.current = {
           ...qData,
           confidence: 1.0,
           extraction_method: 'passive_detection',
           source: 'passive_detection',
         };
-        setIsPreviewOpen(true);
+
+        // If the caller (e.g. LiveCopilotHero inline preview) already collected the
+        // type AND the supporting data (options+correctAnswer for MCQ/poll, or
+        // expectedAnswer for short answer), skip the review modal and send directly.
+        // This is the same shortcut QuestionOnDeck uses and ensures the instructor's
+        // chosen format is honored end-to-end.
+        const hasMCQReady = (finalType === 'multiple_choice') && options && options.length >= 2 && !!correctAnswer;
+        const hasPollReady = (finalType === 'poll') && options && options.length >= 2;
+        const hasShortAnswerReady = (finalType === 'short_answer'); // expected_answer optional
+        const canBypassModal = !!normalizedType && (hasMCQReady || hasPollReady || hasShortAnswerReady);
+
+        if (canBypassModal) {
+          handleConfirmPreviewSend({
+            question_text: questionText,
+            suggested_type: finalType as any,
+            options: qData.options,
+            correct_answer: qData.correct_answer as any,
+            expected_answer: qData.expected_answer,
+          });
+        } else {
+          setPreviewQuestionData({ question_text: questionText, suggested_type: qData.suggested_type });
+          setIsPreviewOpen(true);
+        }
       };
     }
     if (onPreviewQuestionRef) {
@@ -609,7 +634,28 @@ export const LectureTranscription = ({
       }
     }, 30000);
 
-    return () => clearInterval(interval);
+    // Re-fetch the format preference when the tab regains focus, so changing it in
+    // Settings (in another tab) propagates without a full reload. This prevents the
+    // Live Copilot from sending the wrong question type after a setting change.
+    const refreshPreference = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("question_format_preference")
+        .eq("id", user.id)
+        .single();
+      if (profile?.question_format_preference) {
+        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+      }
+    };
+    const onFocus = () => refreshPreference();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [isRecording]);
 
   // Monitor system health
