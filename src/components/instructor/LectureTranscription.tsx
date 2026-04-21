@@ -22,6 +22,7 @@ import {
   PictureInPicture2,
   BookOpen,
   Award,
+  Check,
 } from "lucide-react";
 import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
 import { useToast } from "@/hooks/use-toast";
