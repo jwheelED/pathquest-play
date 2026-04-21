@@ -289,6 +289,22 @@ export const LectureTranscription = ({
     });
   }
 
+  // Sync UI toggle state -> service (also persists nothing yet — local session setting)
+  useEffect(() => {
+    if (confidenceCheckEnabled) {
+      confidenceCheckServiceRef.current?.enable();
+    } else {
+      confidenceCheckServiceRef.current?.disable();
+    }
+  }, [confidenceCheckEnabled]);
+
+  // Tick once per 30s so the "Last auto check-in: X minutes ago" label stays fresh
+  useEffect(() => {
+    if (lastConfidenceCheckTime === null) return;
+    const id = setInterval(() => setConfidenceTickNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, [lastConfidenceCheckTime]);
+
   // Route trigger-captured questions into the passive candidate pipeline
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
