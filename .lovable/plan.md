@@ -1,124 +1,62 @@
 
 
-## Problem
+## Instant Confidence Check — Phrase Detector Module
 
-Two related gaps remain in the trigger pipeline:
+Build a single, dependency-free phrase detection module at `src/lib/confidenceCheck/detector.ts` that scans transcript chunks for instructor confidence-check cues (e.g., "does that make sense", "are we good") and returns the matched phrase along with the appropriate response widget type.
 
-**Part 1 — Buffer is too short and topic-bound.** The rolling buffer in `useQuestionTriggerCapture.ts` keeps only ~12 s / 2000 chars and `getSliceAroundTrigger` slices to the **current sentence boundary** (line 327-340). When the instructor says *"So we just said the mitochondria produces ATP."* and then 15 s later asks *"class, what does it produce?"* — the antecedent ("mitochondria/ATP") has already been evicted AND the slice cuts at the `.` right before the question, so Gemini receives only *"class, what does it produce?"* with no referent. It hallucinates or replies "not enough context".
+### What gets built
 
-**Part 2 — Context and question are sent as one blob.** In `LectureTranscription.tsx` line 1342-1356 we send `question_text` (the captured slice) and `context` (`transcriptBufferRef.current.slice(-1500)`) to `format-and-send-question`. The prompt in `format-and-send-question/index.ts` (line 91-93) does separate them with `"The professor asked: ... Context from lecture: ..."` — but the captured `question_text` itself **still contains the trailing teaching prose** because we sliced from the prior sentence boundary forward. There's no explicit "background vs question" split, no instruction to resolve pronouns using earlier context, and the longer `transcriptBufferRef` is ignored when the captured slice already "looks complete".
+A new file: `src/lib/confidenceCheck/detector.ts`
 
-## Fix Strategy
+Two exports:
+1. `CONFIDENCE_PHRASES` — the full phrase map constant
+2. `detectConfidencePhrase(transcript: string)` — pure synchronous detector
 
-### 1. Extend rolling buffer to 60 s (`useQuestionTriggerCapture.ts`)
+### Phrase map
 
-- `bufferWindowMs`: **12 000 → 60 000 ms**
-- `maxBufferChars`: **2000 → 8000** (≈ 60 s of normal speech at ~130 wpm)
-- `lookbackMs` (slice window): **8000 → 30 000 ms** so the slice can pull in referents up to 30 s before the trigger.
-- Keep eviction logic (age-then-size) — unchanged shape.
+| Phrase | Response Type | Template ID |
+|---|---|---|
+| does that make sense | yes_no | makes_sense_that |
+| does this make sense | yes_no | makes_sense_this |
+| make sense? | yes_no | makes_sense_short |
+| are we good | thumbs | are_we_good |
+| everyone following | yes_no | everyone_following |
+| are you following | yes_no | are_you_following |
+| still with me | yes_no | still_with_me |
+| how confident are you | scale_1_5 | how_confident |
+| how are we feeling about this | scale_1_5 | how_feeling |
+| on a scale | scale_1_5 | on_a_scale |
+| any questions so far | thumbs | any_questions |
+| got it? | yes_no | got_it |
 
-### 2. Stop slicing at the prior sentence boundary; emit two fields
+### Detection logic
 
-Change `getSliceAroundTrigger` to return **a structured object** instead of a single string:
+- Lowercase the transcript once per call.
+- Iterate the phrase map in declared order and return the first phrase whose lowercase form is found via `String.prototype.includes` in the transcript.
+- Returns `null` when no phrase matches or input is empty/non-string.
+- Longer/more specific phrases (e.g., "does that make sense") are listed before shorter overlapping ones (e.g., "make sense?") so the more descriptive template wins when both could match.
+- Pure function: no async, no I/O, no regex compilation in the hot path beyond plain `includes` checks. Safe to call on every transcript chunk.
 
-```ts
-{ question: string;   // only the trigger sentence (current behavior, trimmed)
-  context:  string;   // the lookback window BEFORE the trigger sentence,
-                      // up to lookbackMs old, NOT trimmed at boundary
-}
-```
-
-- `question` = text from the last sentence boundary (`.`/`?`/`!`) up to `now` — same as today.
-- `context` = text from `triggerTs - lookbackMs` up to that boundary — the teaching prose.
-- Both pulled from the same persistent buffer; if no boundary exists (single long utterance), `context` is empty and `question` is the whole slice.
-
-### 3. Propagate the split through the candidate
-
-Extend `PassiveQuestionCandidate` (in `usePassiveQuestionDetection.ts`) with optional `priorContext?: string`:
-
-```ts
-export interface PassiveQuestionCandidate {
-  text: string;
-  detectedAt: number;
-  id: string;
-  priorContext?: string;   // NEW
-}
-```
-
-- `useQuestionTriggerCapture` populates `priorContext` from the slice's context field (after light cleanup: strip leading filler, cap at ~1500 chars).
-- `usePassiveQuestionDetection` candidates leave it `undefined` (unchanged behaviour for that path).
-
-### 4. Plumb `priorContext` through to the edge function
-
-In `LectureTranscription.tsx`:
-- The trigger-capture handoff (`setTriggerCaptureComplete` callback, line 271-276) currently calls `checkPassiveQuestion(candidate.text)`. Change it to also stash `candidate.priorContext` on a ref (`pendingPriorContextRef`).
-- In the send path (line 1342-1368), when `pendingPriorContextRef.current` is set, send it as a new field `prior_context` and prefer it over the generic `transcriptBufferRef.slice(-1500)` when building `context`. Concretely:
+### Return shape
 
 ```ts
-const priorContext = pendingPriorContextRef.current ?? '';
-const transcriptTail = transcriptBufferRef.current.slice(-2000);
-// Prefer the focused prior context; fall back to tail if empty
-const context = priorContext || transcriptTail;
+type ConfidenceMatch = {
+  phrase: string;          // the matched phrase, exactly as in the map
+  responseType: "yes_no" | "scale_1_5" | "thumbs";
+  templateId: string;
+} | null;
 ```
 
-Clear the ref after the send completes (success or fail).
+### Constraints honored
 
-### 5. Restructure the Gemini prompt to separate teaching from question
+- No other files touched.
+- No new dependencies.
+- No edits to `src/integrations/supabase/types.ts`, `supabase/migrations/`, or `package-lock.json`.
+- TypeScript strict — explicit types, no `any`.
 
-In `supabase/functions/format-and-send-question/index.ts`, update both `generateMCQ` (line 91) and `generateCodingQuestion` (line 207) to a **labelled, role-explicit** prompt:
+### Out of scope (future work, not in this task)
 
-```
-=== TEACHING CONTEXT (background — earlier in the lecture) ===
-"${context}"
-
-=== INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
-"${questionText}"
-
-INSTRUCTIONS:
-- The TEACHING CONTEXT is background information the instructor already covered.
-- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked.
-- Resolve any pronouns (it, this, they, that) in the question using the teaching context.
-  Example: question "what does it produce?" + context "the mitochondria converts glucose"
-           → resolved: "What does the mitochondria produce?"
-- Generate the check-in based on the RESOLVED question, grounded in the teaching context.
-- If the question still cannot be resolved after reading the context, set "needs_more_context": true in the response.
-```
-
-Apply the same split to short-answer generation if it exists in the same file. No changes to other edge functions in this pass.
-
-### 6. Logging additions
-
-- `🎯 [slice-split] question="..." context="..." (Xms lookback)` in trigger capture.
-- `📤 [send] using priorContext from trigger (Xchars)` vs `📤 [send] using transcript tail (fallback)` in `LectureTranscription`.
-
-## Tunables (final)
-
-| Option | Old | New | Purpose |
-|---|---|---|---|
-| `bufferWindowMs` | 12 000 | **60 000** | Hold last minute of speech |
-| `maxBufferChars` | 2000 | **8000** | Match 60 s capacity |
-| `lookbackMs` | 8000 | **30 000** | How far back to grab context |
-
-All other gate / cooldown / silence options unchanged.
-
-## Files touched
-
-- `src/hooks/useQuestionTriggerCapture.ts` — extend buffer, change slice to return `{question, context}`, populate `priorContext` on candidate.
-- `src/hooks/usePassiveQuestionDetection.ts` — add optional `priorContext` to `PassiveQuestionCandidate` type.
-- `src/components/instructor/LectureTranscription.tsx` — capture `priorContext` from trigger candidate via ref; send as `prior_context` in `format-and-send-question` body; prefer it over generic tail.
-- `src/hooks/useLectureRecording.ts` — mirror buffer-size option changes for parity.
-- `supabase/functions/format-and-send-question/index.ts` — restructure MCQ + coding prompts with labelled `TEACHING CONTEXT` / `INSTRUCTOR'S QUESTION` sections + pronoun-resolution instructions; accept new `prior_context` field in body and use it for `context` when present.
-
-No DB / migration / other edge function changes. `PassiveQuestionCandidate` shape is additive (optional field), so all existing consumers keep working.
-
-## Validation
-
-Test the failing case end-to-end:
-- Say *"So we just said the mitochondria produces ATP."* — pause 10–15 s — *"Class, what does it produce?"*
-- Console should show:
-  - `[buffer] chunks=N chars=~600 oldestAge=~15000ms` (proves the antecedent is still in buffer)
-  - `[trigger-armed] word="what does"`
-  - `[slice-split] question="Class, what does it produce?" context="So we just said the mitochondria produces ATP."`
-  - `[send] using priorContext from trigger (Xchars)`
-- Generated MCQ should resolve the pronoun and ask about ATP / mitochondria, not return "not enough context".
+- Wiring the detector into the live transcript pipeline (`useQuestionTriggerCapture` / `usePassiveQuestionDetection`).
+- UI widgets for yes_no / scale_1_5 / thumbs responses.
+- Cooldown/debouncing across chunks (this module is pure; dedupe lives at the call site).
 
