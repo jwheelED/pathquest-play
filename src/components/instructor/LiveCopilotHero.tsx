@@ -683,16 +683,24 @@ export function LiveCopilotHero({
 
   const sendWithPreviewData = (questionText: string) => {
     if (!onSendQuestion) return;
+    // CRITICAL: pass canonical type strings ('multiple_choice', 'poll', 'short_answer')
+    // — the downstream modal/edge-function radio groups & switch statements expect these
+    // exact values; passing 'mcq' caused the type to silently fall back to a default,
+    // which is why instructor preferences appeared to be ignored.
     if (effectiveFormat === 'mcq' && previewOptions.length > 0) {
       const correctOpt = previewOptions.find(o => o.isCorrect);
       const correctAnswer = correctOpt ? correctOpt.label : '';
       const options = previewOptions.map(o => `${o.label}. ${o.text}`);
-      onSendQuestion(questionText, 'mcq', options, correctAnswer, '');
+      onSendQuestion(questionText, 'multiple_choice', options, correctAnswer, '');
     } else if (effectiveFormat === 'poll' && previewOptions.length > 0) {
       const options = previewOptions.map(o => `${o.label}. ${o.text}`);
       onSendQuestion(questionText, 'poll', options, '', '');
     } else if (effectiveFormat === 'short_answer') {
       onSendQuestion(questionText, 'short_answer', [], '', previewExpectedAnswer);
+    } else if (effectiveFormat === 'mcq') {
+      // MCQ pref but options not yet generated — still send canonical type so the
+      // modal/edge fn knows what the instructor wants.
+      onSendQuestion(questionText, 'multiple_choice');
     } else {
       onSendQuestion(questionText);
     }
