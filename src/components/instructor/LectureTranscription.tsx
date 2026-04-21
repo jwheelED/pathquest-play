@@ -313,7 +313,9 @@ export const LectureTranscription = ({
       pendingPriorContextRef.current = candidate.priorContext ?? null;
       // Reset passive detection cooldown so its stale state doesn't block follow-ups
       resetPassiveDetection?.();
-      checkPassiveQuestion(candidate.text);
+      // Prefer the trigger capture's own prior context; fall back to rolling buffer
+      const priorContext = candidate.priorContext || (intervalTranscriptRef.current || "").trim();
+      checkPassiveQuestion(candidate.text, priorContext);
     });
   }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 

@@ -236,7 +236,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
       // Reset passive detection cooldown so it doesn't block follow-up retries
       resetPassiveDetection?.();
-      checkPassiveQuestion(candidate.text);
+      // Prefer the trigger capture's own prior context; fall back to rolling buffer
+      const priorContext = candidate.priorContext || intervalTranscriptRef.current;
+      checkPassiveQuestion(candidate.text, priorContext);
     });
   }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 
