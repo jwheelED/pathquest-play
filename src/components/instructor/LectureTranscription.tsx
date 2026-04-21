@@ -273,6 +273,16 @@ export const LectureTranscription = ({
   // Stash priorContext from the trigger capture so the send path can prefer it over the generic transcript tail
   const pendingPriorContextRef = useRef<string | null>(null);
 
+  // CONFIDENCE CHECK — runs after main detection, non-blocking
+  // Disabled by default; flip enable() to turn on auto-fire of pre-built confidence templates.
+  const confidenceCheckServiceRef = useRef<ConfidenceCheckService | null>(null);
+  if (confidenceCheckServiceRef.current === null) {
+    confidenceCheckServiceRef.current = new ConfidenceCheckService(sessionId, {
+      enabled: false,
+      cooldownMs: 30000,
+    });
+  }
+
   // Route trigger-captured questions into the passive candidate pipeline
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
