@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,18 +79,11 @@ serve(async (req) => {
     console.log('Generating expected answer for question:', question_text.substring(0, 100));
     console.log(`Context received — broad=${broadContext.length} chars, focused=${focusedContext.length} chars`);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert educator generating an ideal answer used as a grading reference. The answer must be SPECIFIC and FACTUALLY CORRECT — never vague.
+    const response = await callClaude({
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert educator generating an ideal answer used as a grading reference. The answer must be SPECIFIC and FACTUALLY CORRECT — never vague.
 
 CRITICAL: Instructor questions are often SHORT and contain pronouns ("it", "this", "they", "that") that refer back to topics discussed earlier. You MUST resolve these pronouns using the TEACHING CONTEXT before answering.
 
@@ -100,34 +94,33 @@ EXAMPLE:
   → Expected answer: "ATP (adenosine triphosphate) — the energy currency of the cell."
 
 If the teaching context explicitly states or implies the answer, quote/paraphrase it directly. Only fall back to general world knowledge if the lecture context truly does not address the question.`
-          },
-          {
-            role: 'user',
-            content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION ===\n"${question_text}"\n\nGenerate the ideal expected answer. Resolve any pronouns in the question using the teaching context first. The answer should be clear, specific, and factually correct so it can serve as a reliable grading reference.`
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'generate_expected_answer',
-              description: 'Generate an expected/ideal answer for a short answer question',
-              parameters: {
-                type: 'object',
-                properties: {
-                  expected_answer: {
-                    type: 'string',
-                    description: 'The ideal/expected answer that will be used as a grading reference'
-                  }
-                },
-                required: ['expected_answer'],
-                additionalProperties: false
-              }
+        },
+        {
+          role: 'user',
+          content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION ===\n"${question_text}"\n\nGenerate the ideal expected answer. Resolve any pronouns in the question using the teaching context first. The answer should be clear, specific, and factually correct so it can serve as a reliable grading reference.`
+        }
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'generate_expected_answer',
+            description: 'Generate an expected/ideal answer for a short answer question',
+            parameters: {
+              type: 'object',
+              properties: {
+                expected_answer: {
+                  type: 'string',
+                  description: 'The ideal/expected answer that will be used as a grading reference'
+                }
+              },
+              required: ['expected_answer'],
+              additionalProperties: false
             }
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'generate_expected_answer' } }
-      }),
+        }
+      ],
+      tool_choice: { type: 'function', function: { name: 'generate_expected_answer' } }
     });
 
     if (!response.ok) {

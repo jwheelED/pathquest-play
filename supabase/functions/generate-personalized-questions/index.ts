@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,61 +75,53 @@ serve(async (req) => {
 
     console.log(`Generating ${questionCount} ${difficulty} questions for material: ${material.title}`);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert educator creating practice questions for students. Generate exactly ${questionCount} questions at ${difficulty} difficulty level based on the provided study material. Mix question types: multiple choice and short answer. For multiple choice, provide 4 options. Questions should test understanding, not just recall.`
-          },
-          {
-            role: 'user',
-            content: `Generate ${questionCount} practice questions from this study material:\n\n${trimmedContext}`
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'save_questions',
-              description: 'Save generated practice questions',
-              parameters: {
-                type: 'object',
-                properties: {
-                  questions: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        question_text: { type: 'string', description: 'The question' },
-                        question_type: { type: 'string', enum: ['multiple_choice', 'short_answer'] },
-                        options: {
-                          type: 'array',
-                          items: { type: 'string' },
-                          description: 'Options for multiple choice (4 items). Null for short answer.'
-                        },
-                        correct_answer: { type: 'string', description: 'The correct answer' },
-                        explanation: { type: 'string', description: 'Why this answer is correct' },
-                        topic_tags: { type: 'array', items: { type: 'string' }, description: '1-3 topic tags' }
+    const response = await callClaude({
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert educator creating practice questions for students. Generate exactly ${questionCount} questions at ${difficulty} difficulty level based on the provided study material. Mix question types: multiple choice and short answer. For multiple choice, provide 4 options. Questions should test understanding, not just recall.`
+        },
+        {
+          role: 'user',
+          content: `Generate ${questionCount} practice questions from this study material:\n\n${trimmedContext}`
+        }
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'save_questions',
+            description: 'Save generated practice questions',
+            parameters: {
+              type: 'object',
+              properties: {
+                questions: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      question_text: { type: 'string', description: 'The question' },
+                      question_type: { type: 'string', enum: ['multiple_choice', 'short_answer'] },
+                      options: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Options for multiple choice (4 items). Null for short answer.'
                       },
-                      required: ['question_text', 'question_type', 'correct_answer', 'explanation']
-                    }
+                      correct_answer: { type: 'string', description: 'The correct answer' },
+                      explanation: { type: 'string', description: 'Why this answer is correct' },
+                      topic_tags: { type: 'array', items: { type: 'string' }, description: '1-3 topic tags' }
+                    },
+                    required: ['question_text', 'question_type', 'correct_answer', 'explanation']
                   }
-                },
-                required: ['questions'],
-                additionalProperties: false
-              }
+                }
+              },
+              required: ['questions'],
+              additionalProperties: false
             }
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'save_questions' } }
-      }),
+        }
+      ],
+      tool_choice: { type: 'function', function: { name: 'save_questions' } }
     });
 
     if (!response.ok) {

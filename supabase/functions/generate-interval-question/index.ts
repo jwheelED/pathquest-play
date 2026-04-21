@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -416,24 +417,16 @@ Generate ONE focused question that tests understanding of the most important con
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: diffLevel === "hard" ? 0.5 : 0.7,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
+      const response = await callClaude({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: diffLevel === "hard" ? 0.5 : 0.7,
+        response_format: { type: "json_object" },
       });
 
+      // (kept for parity with previous timeout cleanup)
       clearTimeout(timeoutId);
 
       if (!response.ok) {
