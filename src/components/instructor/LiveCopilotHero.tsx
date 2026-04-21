@@ -165,12 +165,14 @@ function ReviewModal({
 
   const typeLabels: Record<QuestionType, string> = {
     mcq: "Multiple Choice",
+    multiple_choice: "Multiple Choice",
     short_answer: "Short Answer",
     poll: "Poll",
   };
 
   const questionLabel: Record<QuestionType, string> = {
     mcq: "Multiple Choice Question",
+    multiple_choice: "Multiple Choice Question",
     short_answer: "Short Answer Question",
     poll: "Poll Question",
   };
