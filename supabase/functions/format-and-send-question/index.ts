@@ -89,7 +89,11 @@ Write all math as plain readable text using Unicode:
 - Multiplication: · or juxtapose
 - Apply to question AND all answer options`;
 
-  const prompt = `=== TEACHING CONTEXT (everything the instructor has said recently — may include EARLIER LECTURE HISTORY and MOST RECENT TEACHING sections) ===
+  const todayStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  const prompt = `Today's date is ${todayStr}.
+
+=== TEACHING CONTEXT (everything the instructor has said recently — may include EARLIER LECTURE HISTORY and MOST RECENT TEACHING sections) ===
 "${context}"
 
 === INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
@@ -106,13 +110,15 @@ INSTRUCTIONS:
 ${courseInfo}${mathGuidance}
 
 ANSWER RULES:
-- Always include the factually correct answer as one of the options, even if it was not explicitly mentioned in the lecture transcript.
-- Use your world knowledge to determine the correct answer for factual questions.
+- If the lecture context explicitly provides the answer, use it.
+- If the question is time-sensitive and asks for a CURRENT fact not explicitly given in the lecture, do NOT confidently answer from possibly outdated model memory.
+- For those CURRENT questions, make the correct answer a verification-safe option such as "Needs current verification" and explain that current sources should be checked.
+- Never confidently provide a possibly outdated officeholder, champion, price, or other current status.
 - Use the lecture context to craft relevant, plausible distractors when available.
 - Never generate an option like "was not mentioned in the lecture" or similar non-answers.
 
 Generate a multiple choice question with 4 options:
-- One correct answer (factually accurate, based on world knowledge if needed)
+- One correct answer
 - Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""} and typical errors
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
@@ -140,7 +146,7 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
         {
           role: "system",
           content:
-            "You are an educational AI that creates high-quality multiple choice questions. Always include the factually correct answer as one option, using your world knowledge when necessary. Use lecture context to inform distractors. Return ONLY valid JSON, no markdown formatting.",
+            "You are an educational AI that creates high-quality multiple choice questions. If a question asks for a CURRENT time-sensitive fact that is not explicitly provided in the lecture context, do NOT guess from stale memory. Use a verification-safe correct answer instead and explain that current sources should be checked. Return ONLY valid JSON, no markdown formatting.",
         },
         { role: "user", content: prompt },
       ],
