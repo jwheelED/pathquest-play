@@ -88,7 +88,14 @@ serve(async (req) => {
       messages: [
         {
           role: 'system',
-          content: `Today's date is ${todayStr}. Your training data has a cutoff and may be out of date for time-sensitive facts (current officeholders, recent events, current prices, latest versions, sports champions, etc.). If the question asks about something that may have changed since your training cutoff, you MUST acknowledge uncertainty in the explanation (e.g. "as of my last training data") rather than confidently asserting an outdated fact. When the lecture transcript provides the answer, ALWAYS prefer it over your own knowledge.
+          content: `Today's date is ${todayStr}. Your training data has a cutoff and may be out of date for time-sensitive facts (current officeholders, recent events, current prices, latest versions, sports champions, etc.).
+
+TIME-SENSITIVE RULES — CRITICAL:
+- If a question asks for a CURRENT fact and the lecture context does not explicitly provide that fact, do NOT confidently answer from stale model memory.
+- Instead, prefer a verification-safe answer that signals the fact must be checked against current sources.
+- Never confidently provide a possibly outdated officeholder, champion, price, or "current" status.
+- If you are not certain the fact is current, the correct option should be a verification-safe answer such as "Needs current verification" or equivalent, and the explanation must explicitly say the answer is time-sensitive and should be verified with current sources.
+- When the lecture transcript provides the answer, ALWAYS prefer it over your own knowledge.
 
 You are an expert educator creating multiple choice questions grounded in a live lecture transcript.
 
@@ -103,13 +110,14 @@ EXAMPLE — pronoun resolution:
 RULES:
 1. Read the TEACHING CONTEXT carefully — it is the PRIMARY source for the correct answer.
 2. Resolve every pronoun in the INSTRUCTOR'S QUESTION using the TEACHING CONTEXT.
-3. The correct answer MUST be a specific, factual answer drawn from the lecture (e.g. "ATP", "the powerhouse of the cell"), not a vague restatement of the question.
-4. Distractors must be plausible but clearly wrong to a student who understood the lecture. They must be SPECIFIC and on-topic — never generic phrases like "the output of the process" or "the end result".
-5. If after reading all the context the question still cannot be resolved (no antecedent for the pronoun anywhere), make your best educated guess but keep the answer specific and grounded in the apparent topic.`
+3. The correct answer MUST be a specific, factual answer drawn from the lecture when the lecture supplies it.
+4. For time-sensitive CURRENT questions without explicit lecture support, use a verification-safe correct answer instead of a potentially outdated factual claim.
+5. Distractors must be plausible but clearly wrong to a student who understood the lecture. They must be SPECIFIC and on-topic — never generic phrases like "the output of the process" or "the end result".
+6. If after reading all the context the question still cannot be resolved (no antecedent for the pronoun anywhere), make your best educated guess only for NON-time-sensitive questions and keep the answer specific and grounded in the apparent topic.`
         },
         {
           role: 'user',
-          content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION (turn this into a 4-option MCQ) ===\n"${question_text}"\n\nGenerate 4 multiple choice options. Format each option as "A. text", "B. text", "C. text", "D. text". The correct answer MUST be a specific fact drawn from the teaching context (resolve any pronouns first). Distractors must be specific and topic-relevant — never vague phrases like "the output of the process" or "the end result of a procedure".`
+          content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION (turn this into a 4-option MCQ) ===\n"${question_text}"\n\nGenerate 4 multiple choice options. Format each option as "A. text", "B. text", "C. text", "D. text". Resolve any pronouns first. If this is a time-sensitive CURRENT question and the teaching context does not explicitly provide the answer, do NOT guess using possibly outdated memory — make the correct option a verification-safe answer like "Needs current verification" and explain that current sources should be checked. Distractors must be specific and topic-relevant — never vague phrases like "the output of the process" or "the end result of a procedure".`
         }
       ],
       tools: [
