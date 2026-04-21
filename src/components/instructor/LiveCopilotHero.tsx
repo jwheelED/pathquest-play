@@ -45,7 +45,11 @@ import type { PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetecti
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type QuestionType = "mcq" | "short_answer" | "poll";
+// 'multiple_choice' is the canonical wire-format type used by the modal & edge function.
+// 'mcq' is kept as an internal alias for legacy local UI logic but should NOT be sent
+// downstream — sending it caused the radio group to fail to preselect, which dropped
+// MCQ options and made the instructor's preference appear ignored.
+type QuestionType = "mcq" | "multiple_choice" | "short_answer" | "poll";
 
 interface SentQuestionStats {
   responded: number;
