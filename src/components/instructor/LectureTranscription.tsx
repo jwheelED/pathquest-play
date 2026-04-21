@@ -2593,8 +2593,17 @@ export const LectureTranscription = ({
             ?.processChunk(cleanText)
             .then((result) => {
               if (result?.triggered && result.template) {
-                sonnerToast.success(`Confidence check sent: "${result.phrase}"`, {
-                  description: result.template.prompt,
+                setLastConfidenceCheckTime(result.timestamp);
+                // Firing notification toast — subtle green left border, white bg, checkmark, auto-dismiss 3s
+                sonnerToast("Sending quick check-in...", {
+                  icon: <Check className="w-4 h-4" style={{ color: "#388e6e" }} />,
+                  duration: 3000,
+                  position: "bottom-center",
+                  style: {
+                    background: "#ffffff",
+                    color: "#000000",
+                    borderLeft: "3px solid #388e6e",
+                  },
                 });
               }
             })
