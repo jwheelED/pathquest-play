@@ -634,7 +634,28 @@ export const LectureTranscription = ({
       }
     }, 30000);
 
-    return () => clearInterval(interval);
+    // Re-fetch the format preference when the tab regains focus, so changing it in
+    // Settings (in another tab) propagates without a full reload. This prevents the
+    // Live Copilot from sending the wrong question type after a setting change.
+    const refreshPreference = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("question_format_preference")
+        .eq("id", user.id)
+        .single();
+      if (profile?.question_format_preference) {
+        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+      }
+    };
+    const onFocus = () => refreshPreference();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [isRecording]);
 
   // Monitor system health
