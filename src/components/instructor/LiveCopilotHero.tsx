@@ -654,10 +654,12 @@ export function LiveCopilotHero({
     setPreviewExpectedAnswer("");
 
     const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
+    const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
+    const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
 
     if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
       supabase.functions.invoke('generate-mcq-options', {
-        body: { question_text: displayedQuestion, source_transcript: lastChunk },
+        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
       }).then(({ data, error }) => {
         if (!error && data?.options && Array.isArray(data.options)) {
           const labels = ['A', 'B', 'C', 'D'];
@@ -676,7 +678,7 @@ export function LiveCopilotHero({
       }).catch(() => setIsGeneratingPreview(false));
     } else {
       supabase.functions.invoke('generate-expected-answer', {
-        body: { question_text: displayedQuestion, source_transcript: lastChunk },
+        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
       }).then(({ data, error }) => {
         if (!error && data?.expected_answer) {
           setPreviewExpectedAnswer(data.expected_answer as string);
