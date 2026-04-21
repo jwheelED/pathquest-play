@@ -598,6 +598,7 @@ export function LiveCopilotHero({
   const [previewExpectedAnswer, setPreviewExpectedAnswer] = useState("");
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const generatedForRef = useRef<string | null>(null);
+  const priorContextByQuestionRef = useRef<Map<string, string>>(new Map());
 
   const effectiveFormat: QuestionType = formatPreference === 'short_answer' ? 'short_answer' : formatPreference === 'poll' ? 'poll' : 'mcq';
 
@@ -615,9 +616,14 @@ export function LiveCopilotHero({
   // Accumulate question candidates into local history
   useEffect(() => {
     if (!questionCandidate?.text) return;
+    const candidateText = questionCandidate.text;
+    const candidatePrior = questionCandidate.priorContext ?? "";
+    if (candidatePrior) {
+      priorContextByQuestionRef.current.set(candidateText, candidatePrior);
+    }
     setQuestionHistory((prev) => {
-      if (prev.includes(questionCandidate.text)) return prev;
-      const next = [...prev, questionCandidate.text];
+      if (prev.includes(candidateText)) return prev;
+      const next = [...prev, candidateText];
       setHistoryIndex(next.length - 1);
       return next;
     });
@@ -648,10 +654,12 @@ export function LiveCopilotHero({
     setPreviewExpectedAnswer("");
 
     const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
+    const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
+    const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
 
     if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
       supabase.functions.invoke('generate-mcq-options', {
-        body: { question_text: displayedQuestion, source_transcript: lastChunk },
+        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
       }).then(({ data, error }) => {
         if (!error && data?.options && Array.isArray(data.options)) {
           const labels = ['A', 'B', 'C', 'D'];
@@ -670,7 +678,7 @@ export function LiveCopilotHero({
       }).catch(() => setIsGeneratingPreview(false));
     } else {
       supabase.functions.invoke('generate-expected-answer', {
-        body: { question_text: displayedQuestion, source_transcript: lastChunk },
+        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
       }).then(({ data, error }) => {
         if (!error && data?.expected_answer) {
           setPreviewExpectedAnswer(data.expected_answer as string);
@@ -745,9 +753,11 @@ export function LiveCopilotHero({
       setPreviewOptions([]);
       setPreviewExpectedAnswer("");
       const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
+      const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
+      const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
       if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
         supabase.functions.invoke('generate-mcq-options', {
-          body: { question_text: displayedQuestion, source_transcript: lastChunk },
+          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
         }).then(({ data, error }) => {
           if (!error && data?.options && Array.isArray(data.options)) {
             const labels = ['A', 'B', 'C', 'D'];
@@ -766,7 +776,7 @@ export function LiveCopilotHero({
         }).catch(() => setIsGeneratingPreview(false));
       } else {
         supabase.functions.invoke('generate-expected-answer', {
-          body: { question_text: displayedQuestion, source_transcript: lastChunk },
+          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
         }).then(({ data, error }) => {
           if (!error && data?.expected_answer) {
             setPreviewExpectedAnswer(data.expected_answer as string);
