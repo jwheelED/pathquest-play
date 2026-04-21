@@ -82,11 +82,15 @@ serve(async (req) => {
     console.log('Generating MCQ options for question:', question_text.substring(0, 100));
     console.log(`Context received — broad=${broadContext.length} chars, focused=${focusedContext.length} chars`);
 
+    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
     const response = await callClaude({
       messages: [
         {
           role: 'system',
-          content: `You are an expert educator creating multiple choice questions grounded in a live lecture transcript.
+          content: `Today's date is ${todayStr}. Your training data has a cutoff and may be out of date for time-sensitive facts (current officeholders, recent events, current prices, latest versions, sports champions, etc.). If the question asks about something that may have changed since your training cutoff, you MUST acknowledge uncertainty in the explanation (e.g. "as of my last training data") rather than confidently asserting an outdated fact. When the lecture transcript provides the answer, ALWAYS prefer it over your own knowledge.
+
+You are an expert educator creating multiple choice questions grounded in a live lecture transcript.
 
 CRITICAL: Instructor questions are often SHORT and contain pronouns ("it", "this", "they", "that", "these", "those") that refer back to topics discussed earlier in the lecture. You MUST resolve these pronouns using the TEACHING CONTEXT before generating options.
 
