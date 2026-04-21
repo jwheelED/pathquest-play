@@ -82,18 +82,11 @@ serve(async (req) => {
     console.log('Generating MCQ options for question:', question_text.substring(0, 100));
     console.log(`Context received — broad=${broadContext.length} chars, focused=${focusedContext.length} chars`);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert educator creating multiple choice questions grounded in a live lecture transcript.
+    const response = await callClaude({
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert educator creating multiple choice questions grounded in a live lecture transcript.
 
 CRITICAL: Instructor questions are often SHORT and contain pronouns ("it", "this", "they", "that", "these", "those") that refer back to topics discussed earlier in the lecture. You MUST resolve these pronouns using the TEACHING CONTEXT before generating options.
 
@@ -109,46 +102,45 @@ RULES:
 3. The correct answer MUST be a specific, factual answer drawn from the lecture (e.g. "ATP", "the powerhouse of the cell"), not a vague restatement of the question.
 4. Distractors must be plausible but clearly wrong to a student who understood the lecture. They must be SPECIFIC and on-topic — never generic phrases like "the output of the process" or "the end result".
 5. If after reading all the context the question still cannot be resolved (no antecedent for the pronoun anywhere), make your best educated guess but keep the answer specific and grounded in the apparent topic.`
-          },
-          {
-            role: 'user',
-            content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION (turn this into a 4-option MCQ) ===\n"${question_text}"\n\nGenerate 4 multiple choice options. Format each option as "A. text", "B. text", "C. text", "D. text". The correct answer MUST be a specific fact drawn from the teaching context (resolve any pronouns first). Distractors must be specific and topic-relevant — never vague phrases like "the output of the process" or "the end result of a procedure".`
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'generate_mcq_options',
-              description: 'Generate 4 multiple choice options with a correct answer',
-              parameters: {
-                type: 'object',
-                properties: {
-                  options: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    description: 'Array of exactly 4 answer options (A, B, C, D)',
-                    minItems: 4,
-                    maxItems: 4
-                  },
-                  correct_answer: {
-                    type: 'string',
-                    enum: ['A', 'B', 'C', 'D'],
-                    description: 'The letter of the correct answer'
-                  },
-                  explanation: {
-                    type: 'string',
-                    description: 'Brief explanation of why the correct answer is correct'
-                  }
+        },
+        {
+          role: 'user',
+          content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION (turn this into a 4-option MCQ) ===\n"${question_text}"\n\nGenerate 4 multiple choice options. Format each option as "A. text", "B. text", "C. text", "D. text". The correct answer MUST be a specific fact drawn from the teaching context (resolve any pronouns first). Distractors must be specific and topic-relevant — never vague phrases like "the output of the process" or "the end result of a procedure".`
+        }
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'generate_mcq_options',
+            description: 'Generate 4 multiple choice options with a correct answer',
+            parameters: {
+              type: 'object',
+              properties: {
+                options: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of exactly 4 answer options (A, B, C, D)',
+                  minItems: 4,
+                  maxItems: 4
                 },
-                required: ['options', 'correct_answer'],
-                additionalProperties: false
-              }
+                correct_answer: {
+                  type: 'string',
+                  enum: ['A', 'B', 'C', 'D'],
+                  description: 'The letter of the correct answer'
+                },
+                explanation: {
+                  type: 'string',
+                  description: 'Brief explanation of why the correct answer is correct'
+                }
+              },
+              required: ['options', 'correct_answer'],
+              additionalProperties: false
             }
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'generate_mcq_options' } }
-      }),
+        }
+      ],
+      tool_choice: { type: 'function', function: { name: 'generate_mcq_options' } }
     });
 
     if (!response.ok) {
