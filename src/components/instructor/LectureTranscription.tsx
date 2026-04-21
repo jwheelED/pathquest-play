@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Mic,
   MicOff,
@@ -160,6 +161,10 @@ export const LectureTranscription = ({
   const [sessionId] = useState<string>(() => crypto.randomUUID());
   const [dailyQuotaLimit, setDailyQuotaLimit] = useState<number>(200);
   const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
+  // CONFIDENCE CHECK — UI state for the Auto check-ins toggle and indicator
+  const [confidenceCheckEnabled, setConfidenceCheckEnabled] = useState<boolean>(false);
+  const [lastConfidenceCheckTime, setLastConfidenceCheckTime] = useState<number | null>(null);
+  const [confidenceTickNow, setConfidenceTickNow] = useState<number>(() => Date.now());
   const [autoQuestionInterval, setAutoQuestionInterval] = useState<number>(15);
   const [autoQuestionForceSend, setAutoQuestionForceSend] = useState(false);
   const [lastAutoQuestionTime, setLastAutoQuestionTime] = useState<number>(0);
