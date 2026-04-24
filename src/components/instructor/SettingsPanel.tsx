@@ -104,8 +104,6 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
             <KalturaSettings instructorId={currentUserId} />
           </div>
         );
-      case "billing":
-        return null;
       default:
         return null;
     }
