@@ -100,7 +100,6 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
               <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS or Kaltura to sync grades and content.</p>
             </div>
             <LMSIntegrationSettings />
-            <KalturaSettings instructorId={currentUserId} />
           </div>
         );
       default:
