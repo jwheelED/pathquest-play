@@ -1,16 +1,14 @@
 import { useState } from "react";
-import { MessageSquare, Video, CheckSquare, Plug, CreditCard } from "lucide-react";
+import { MessageSquare, Video, CheckSquare, Plug } from "lucide-react";
 import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
-import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
 import { KalturaSettings } from "@/components/instructor/KalturaSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const TABS = [
@@ -20,11 +18,7 @@ const TABS = [
   { key: "integrations", label: "Integrations", icon: Plug },
 ] as const;
 
-const ACCOUNT_TABS = [
-  { key: "billing", label: "Plan & Billing", icon: CreditCard },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
+type TabKey = (typeof TABS)[number]["key"];
 
 interface SettingsPanelProps {
   currentUserId: string;
