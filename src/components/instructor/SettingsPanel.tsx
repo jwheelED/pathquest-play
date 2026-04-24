@@ -6,7 +6,6 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
-import { KalturaSettings } from "@/components/instructor/KalturaSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -98,10 +97,9 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Integrations</h2>
-              <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS or Kaltura to sync grades and content.</p>
+              <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS to sync grades and content.</p>
             </div>
             <LMSIntegrationSettings />
-            <KalturaSettings instructorId={currentUserId} />
           </div>
         );
       default:
