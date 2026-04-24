@@ -105,15 +105,7 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
           </div>
         );
       case "billing":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Plan & Billing</h2>
-              <p className="text-sm text-muted-foreground mt-1">Manage your subscription and usage limits.</p>
-            </div>
-            <BillingSettings />
-          </div>
-        );
+        return null;
       default:
         return null;
     }
@@ -127,8 +119,6 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
           <ScrollArea className="w-full">
             <div className="flex items-center gap-1 px-3 py-2">
               {TABS.map((item) => renderMobileNavItem(item, activeTab === item.key))}
-              <div className="w-px h-6 bg-border flex-shrink-0 mx-1" />
-              {ACCOUNT_TABS.map((item) => renderMobileNavItem(item, activeTab === item.key))}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -142,9 +132,6 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
             <div className="sticky top-24 space-y-1">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Teaching</p>
               {TABS.map((item) => renderNavItem(item, activeTab === item.key))}
-              <Separator className="my-3" />
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Account</p>
-              {ACCOUNT_TABS.map((item) => renderNavItem(item, activeTab === item.key))}
             </div>
           </nav>
         )}
