@@ -305,6 +305,8 @@ serve(async (req) => {
       ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
       : "";
 
+    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
+
     // Build difficulty instructions
     let difficultyInstructions = "";
     const diffLevel = (difficulty_preference || "medium").toLowerCase();
