@@ -346,8 +346,6 @@ MCQ Distractor Requirements (when format is multiple_choice):
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
-    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
-
     const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from ${groundingSource}.
 
 CRITICAL GROUNDING RULES:
