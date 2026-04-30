@@ -1,62 +1,27 @@
 
 
-## Instant Confidence Check — Phrase Detector Module
+## Plan: Fix Question on Deck wrong answers + slow generation
 
-Build a single, dependency-free phrase detection module at `src/lib/confidenceCheck/detector.ts` that scans transcript chunks for instructor confidence-check cues (e.g., "does that make sense", "are we good") and returns the matched phrase along with the appropriate response widget type.
+### Root causes
 
-### What gets built
+**Wrong answers (screenshot — "Needs current verification" × 4):**
+`LiveCopilotHero.tsx` calls `generate-mcq-options` at lines 653–654 and 749–750 with **no `prior_context`** field. The candidate's `.priorContext` (which holds "the mitochondria produces ATP") is dropped. The edge function — correctly applying our new system prompt — sees an unresolvable "it" with no transcript anchor and falls back to the verification-safe path. Logs confirm this exactly: two parallel calls fire on the same question, one with `focused=84 chars` (QuestionOnDeck — correct), one with `focused=0 chars` (LiveCopilotHero — broken). The broken one is what renders.
 
-A new file: `src/lib/confidenceCheck/detector.ts`
+**Slow on-deck after Nova-3:**
+Same root cause × 2. `LiveCopilotHero` and `QuestionOnDeck` independently call the same edge function for the same question — that's a duplicate Anthropic round-trip per detection. Nova-3's slightly different chunk pacing makes this more visible. Removing the duplicate halves the perceived latency.
 
-Two exports:
-1. `CONFIDENCE_PHRASES` — the full phrase map constant
-2. `detectConfidencePhrase(transcript: string)` — pure synchronous detector
+### Fix
 
-### Phrase map
+**File: `src/components/instructor/LiveCopilotHero.tsx`**
 
-| Phrase | Response Type | Template ID |
-|---|---|---|
-| does that make sense | yes_no | makes_sense_that |
-| does this make sense | yes_no | makes_sense_this |
-| make sense? | yes_no | makes_sense_short |
-| are we good | thumbs | are_we_good |
-| everyone following | yes_no | everyone_following |
-| are you following | yes_no | are_you_following |
-| still with me | yes_no | still_with_me |
-| how confident are you | scale_1_5 | how_confident |
-| how are we feeling about this | scale_1_5 | how_feeling |
-| on a scale | scale_1_5 | on_a_scale |
-| any questions so far | thumbs | any_questions |
-| got it? | yes_no | got_it |
+1. **Lines 643–681 (auto-preview effect)** — Pass `questionCandidate?.priorContext` as `prior_context` and use the joined transcript history (`transcriptChunks.join(' ').slice(-6000)`) as `source_transcript` instead of just `lastChunk`. This brings parity with `QuestionOnDeck`.
+2. **Lines 741–775 (regen handler)** — Same fix.
+3. **Optional latency win** — Add a guard so `LiveCopilotHero` skips its own generation when it's about to render `QuestionOnDeck` below it (which already does the work). For now, the safer scoped fix is just to make both calls succeed quickly with the right context — duplicate elimination is a follow-up if latency persists.
 
-### Detection logic
+### Out of scope
 
-- Lowercase the transcript once per call.
-- Iterate the phrase map in declared order and return the first phrase whose lowercase form is found via `String.prototype.includes` in the transcript.
-- Returns `null` when no phrase matches or input is empty/non-string.
-- Longer/more specific phrases (e.g., "does that make sense") are listed before shorter overlapping ones (e.g., "make sense?") so the more descriptive template wins when both could match.
-- Pure function: no async, no I/O, no regex compilation in the hot path beyond plain `includes` checks. Safe to call on every transcript chunk.
-
-### Return shape
-
-```ts
-type ConfidenceMatch = {
-  phrase: string;          // the matched phrase, exactly as in the map
-  responseType: "yes_no" | "scale_1_5" | "thumbs";
-  templateId: string;
-} | null;
-```
-
-### Constraints honored
-
-- No other files touched.
-- No new dependencies.
-- No edits to `src/integrations/supabase/types.ts`, `supabase/migrations/`, or `package-lock.json`.
-- TypeScript strict — explicit types, no `any`.
-
-### Out of scope (future work, not in this task)
-
-- Wiring the detector into the live transcript pipeline (`useQuestionTriggerCapture` / `usePassiveQuestionDetection`).
-- UI widgets for yes_no / scale_1_5 / thumbs responses.
-- Cooldown/debouncing across chunks (this module is pure; dedupe lives at the call site).
+- No changes to the edge function (already optimized last turn).
+- No changes to `QuestionOnDeck` (already correct).
+- No changes to the trigger-capture pipeline (already wires `priorContext` correctly).
+- No Deepgram / Nova-3 config changes — the latency is from the duplicate AI call, not transcription.
 

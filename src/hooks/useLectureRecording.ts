@@ -236,7 +236,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
       // Reset passive detection cooldown so it doesn't block follow-up retries
       resetPassiveDetection?.();
-      checkPassiveQuestion(candidate.text);
+      // Prefer the trigger capture's own prior context; fall back to rolling buffer
+      const priorContext = candidate.priorContext || intervalTranscriptRef.current;
+      checkPassiveQuestion(candidate.text, priorContext);
     });
   }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 
@@ -988,8 +990,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           const capturing = feedTriggerChunk(cleanText, Date.now());
           
           // Passive question detection — only if trigger capture is NOT active
+          // Pass rolling transcript buffer as priorContext for pronoun/reference resolution
           if (!capturing) {
-            checkPassiveQuestion(cleanText);
+            checkPassiveQuestion(cleanText, intervalTranscriptRef.current);
           }
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)

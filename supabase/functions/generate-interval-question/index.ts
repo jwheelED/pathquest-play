@@ -305,6 +305,8 @@ serve(async (req) => {
       ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
       : "";
 
+    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
+
     // Build difficulty instructions
     let difficultyInstructions = "";
     const diffLevel = (difficulty_preference || "medium").toLowerCase();
@@ -343,8 +345,6 @@ MCQ Distractor Requirements (when format is multiple_choice):
     } else {
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
-
-    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
 
     const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from ${groundingSource}.
 

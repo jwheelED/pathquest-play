@@ -313,7 +313,9 @@ export const LectureTranscription = ({
       pendingPriorContextRef.current = candidate.priorContext ?? null;
       // Reset passive detection cooldown so its stale state doesn't block follow-ups
       resetPassiveDetection?.();
-      checkPassiveQuestion(candidate.text);
+      // Prefer the trigger capture's own prior context; fall back to rolling buffer
+      const priorContext = candidate.priorContext || (intervalTranscriptRef.current || "").trim();
+      checkPassiveQuestion(candidate.text, priorContext);
     });
   }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 
@@ -2601,8 +2603,10 @@ export const LectureTranscription = ({
           const capturing = feedTriggerChunk(cleanText, Date.now());
           
           // Passive question detection — only if trigger capture is NOT active
+          // Pass rolling transcript buffer as priorContext for pronoun/reference resolution
           if (!capturing) {
-            checkPassiveQuestion(cleanText);
+            const rollingBuffer = (intervalTranscriptRef.current || "").trim();
+            checkPassiveQuestion(cleanText, rollingBuffer);
           }
 
           // CONFIDENCE CHECK — runs after main detection, non-blocking

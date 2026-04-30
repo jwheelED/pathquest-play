@@ -198,7 +198,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     setCandidateHistory(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  const checkUtterance = useCallback((text: string) => {
+  const checkUtterance = useCallback((text: string, recentTranscript?: string) => {
     if (!enabled || !text) return;
 
     const now = Date.now();
@@ -240,6 +240,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         text: q,
         detectedAt: now,
         id: `pq-${++candidateIdCounter}`,
+        priorContext: recentTranscript || undefined,
       };
 
       // Move current candidate to history before replacing
