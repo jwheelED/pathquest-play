@@ -362,6 +362,36 @@ export default function InstructorAuth() {
             </div>
           ) : (
             <div className="space-y-5">
+              {/* Prominent Sign In / Sign Up tab toggle */}
+              {!isResetMode && (
+                <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 gap-1 p-1 bg-muted/50 border border-border/50 rounded-[10px]">
+                  <button
+                    role="tab"
+                    aria-selected={!isSignUp}
+                    onClick={() => setIsSignUp(false)}
+                    className={`h-9 rounded-[7px] text-[13px] font-semibold transition-all ${
+                      !isSignUp
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={isSignUp}
+                    onClick={() => setIsSignUp(true)}
+                    className={`h-9 rounded-[7px] text-[13px] font-semibold transition-all ${
+                      isSignUp
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Create account
+                  </button>
+                </div>
+              )}
+
               {/* Fields */}
               <div className="space-y-3.5">
                 {!isResetMode && isSignUp && (
