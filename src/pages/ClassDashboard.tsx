@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, FileText, Trophy, CheckCircle2, Target, PlayCircle, TrendingUp, Users, ChevronRight } from "lucide-react";
+import { ArrowLeft, BookOpen, Video, FileText, Trophy } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
@@ -31,10 +31,9 @@ interface ClassStats {
   nextIncompleteLecture: string | null;
 }
 
-type TabValue = "overview" | "assigned" | "lectures" | "results";
+type TabValue = "assigned" | "lectures" | "results";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
-  { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "assigned", label: "Assigned Content", icon: FileText },
   { value: "lectures", label: "Pre-Recorded Lectures", icon: Video },
   { value: "results", label: "Results", icon: Trophy },
@@ -57,7 +56,7 @@ export default function ClassDashboard() {
     nextIncompleteLecture: null,
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabValue>("overview");
+  const [activeTab, setActiveTab] = useState<TabValue>("assigned");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -347,215 +346,7 @@ export default function ClassDashboard() {
 
           {/* Main Content */}
           <main className="flex-1 min-w-0">
-            {activeTab === "overview" && (
-              <div className="space-y-6 animate-fade-in">
-                {/* Course Info Strip */}
-                {courseInfo && (
-                  <div className="command-card px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2 text-charcoal-muted">
-                        <Users className="h-4 w-4 text-charcoal-subtle" />
-                        <span>{courseInfo.instructorName}</span>
-                      </div>
-                      {courseInfo.courseSchedule && (
-                        <div className="flex items-center gap-2 text-charcoal-muted">
-                          <Calendar className="h-4 w-4 text-charcoal-subtle" />
-                          <span>{courseInfo.courseSchedule}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Quick Stats Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="signal-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">Completed</span>
-                    </div>
-                    <p className="text-2xl font-semibold text-charcoal">{classStats.itemsCompleted}</p>
-                    <p className="text-xs text-charcoal-subtle mt-0.5">Assignments & lectures</p>
-                  </div>
-                  
-                  <div className="signal-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-sky-600" />
-                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">Avg Score</span>
-                    </div>
-                    <p className={cn(
-                      "text-2xl font-semibold",
-                      classStats.averageScore !== null && classStats.averageScore >= 70 
-                        ? "text-emerald-600" 
-                        : classStats.averageScore !== null && classStats.averageScore >= 40
-                          ? "text-amber-600"
-                          : "text-charcoal"
-                    )}>
-                      {classStats.averageScore !== null ? `${classStats.averageScore}%` : "—"}
-                    </p>
-                    <p className="text-xs text-charcoal-subtle mt-0.5">
-                      {classStats.averageScore !== null
-                        ? classStats.averageScore >= 70
-                          ? "Strong performance"
-                          : classStats.averageScore >= 40
-                            ? "Room to improve"
-                            : "Needs review"
-                        : "No grades yet"}
-                    </p>
-                  </div>
-                  
-                  <div className="signal-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="h-4 w-4 text-amber-600" />
-                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">To Review</span>
-                    </div>
-                    <p className={cn(
-                      "text-2xl font-semibold",
-                      classStats.itemsToReview > 0 ? "text-amber-600" : "text-charcoal"
-                    )}>
-                      {classStats.itemsToReview}
-                    </p>
-                    <p className="text-xs text-charcoal-subtle mt-0.5">Items below 70%</p>
-                  </div>
-                  
-                  <div className="signal-card p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Video className="h-4 w-4 text-violet-600" />
-                      <span className="text-[10px] font-semibold text-charcoal-subtle uppercase tracking-wide">Lectures</span>
-                    </div>
-                    <p className="text-2xl font-semibold text-charcoal">
-                      {classStats.lecturesTotal > 0 ? `${classStats.lecturesCompleted}/${classStats.lecturesTotal}` : "—"}
-                    </p>
-                    <p className="text-xs text-charcoal-subtle mt-0.5">
-                      {classStats.lecturesTotal > 0 ? "Pre-recorded progress" : "None available"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Next Action Banner */}
-                {classStats.nextIncompleteLecture ? (
-                  <div className="command-card p-4 border-l-4 border-l-emerald-500">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-                        <PlayCircle className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-charcoal">Continue watching</p>
-                        <p className="text-sm text-charcoal-muted truncate">{classStats.nextIncompleteLecture}</p>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        onClick={() => setActiveTab("lectures")} 
-                        className="flex-shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-4"
-                      >
-                        Continue
-                      </Button>
-                    </div>
-                  </div>
-                ) : classStats.itemsToReview > 0 ? (
-                  <div className="command-card p-4 border-l-4 border-l-amber-500">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
-                        <Target className="w-5 h-5 text-amber-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-charcoal">
-                          Review {classStats.itemsToReview} missed item{classStats.itemsToReview > 1 ? "s" : ""}
-                        </p>
-                        <p className="text-sm text-charcoal-muted">Check feedback to improve your understanding</p>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => setActiveTab("results")} 
-                        className="flex-shrink-0 rounded-full border-amber-300 text-amber-700 hover:bg-amber-50 px-4"
-                      >
-                        Review
-                      </Button>
-                    </div>
-                  </div>
-                ) : classStats.itemsCompleted > 0 ? (
-                  <div className="command-card p-3 bg-emerald-50/50 border-emerald-100">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                      <p className="text-sm text-emerald-700 font-medium">You're all caught up — keep it going!</p>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Quick Links */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button
-                    onClick={() => setActiveTab("assigned")}
-                    className="command-card p-4 hover:border-slate-200 transition-colors text-left group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center">
-                          <FileText className="h-4 w-4 text-sky-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-charcoal">Assigned Content</p>
-                          <p className="text-xs text-charcoal-subtle">Quizzes & assignments</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-charcoal-subtle opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("lectures")}
-                    className="command-card p-4 hover:border-slate-200 transition-colors text-left group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-violet-50 border border-violet-100 flex items-center justify-center">
-                          <Video className="h-4 w-4 text-violet-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-charcoal">Pre-Recorded Lectures</p>
-                          <p className="text-xs text-charcoal-subtle">Watch & answer questions</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-charcoal-subtle opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("results")}
-                    className="command-card p-4 hover:border-slate-200 transition-colors text-left group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center">
-                          <Trophy className="h-4 w-4 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-charcoal">View Results</p>
-                          <p className="text-xs text-charcoal-subtle">Grades & feedback</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-charcoal-subtle opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </button>
-                </div>
-
-                {/* Topic Tags */}
-                {courseInfo?.courseTopics && courseInfo.courseTopics.length > 0 && (
-                  <div className="pt-4 border-t border-slate-100">
-                    <h3 className="text-[10px] font-semibold text-charcoal-subtle mb-3 uppercase tracking-widest">Topics Covered</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {courseInfo.courseTopics.map((topic, idx) => (
-                        <span
-                          key={idx}
-                          className="px-3 py-1.5 bg-slate-50 text-charcoal-muted border border-slate-100 rounded-full text-xs font-medium"
-                        >
-                          {topic}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Overview removed — Assigned Content is the default landing tab */}
             
             {activeTab === "assigned" && user && (
               <div className="space-y-6 animate-fade-in">
