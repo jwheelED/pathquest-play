@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Calendar, Sparkles, LayoutDashboard, Video, FileText, Trophy, CheckCircle2, Target, PlayCircle, TrendingUp, Users, ChevronRight } from "lucide-react";
+import { ArrowLeft, BookOpen, Video, FileText, Trophy } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
