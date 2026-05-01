@@ -267,6 +267,9 @@ Deno.serve(async (req) => {
         studentCount: successCount,
         failedCount,
         questionTitle: question.title,
+        liveDelivered,
+        liveParticipantCount,
+        sessionCode: liveSessionCode,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
