@@ -10,6 +10,7 @@ import { SimpleClassList } from "@/components/student/SimpleClassList";
 import { LectureCheckInHistory } from "@/components/student/LectureCheckInHistory";
 import { SimplifiedStudyMaterials } from "@/components/student/SimplifiedStudyMaterials";
 import { PracticeQuestionsCard } from "@/components/student/PracticeQuestionsCard";
+import { PendingInstructorQuestions } from "@/components/student/PendingInstructorQuestions";
 
 import { logger } from "@/lib/logger";
 
@@ -144,6 +145,11 @@ export default function StudentTraining() {
         {/* 2. Join a Class */}
         <section className="animate-fade-in">
           <JoinClassHero userId={user.id} onClassJoined={handleClassJoined} />
+        </section>
+
+        {/* 2b. Pending Questions from Instructor — surfaces sent questions on main dashboard */}
+        <section className="animate-fade-in">
+          <PendingInstructorQuestions userId={user.id} />
         </section>
 
         {/* 3. My Classes */}
