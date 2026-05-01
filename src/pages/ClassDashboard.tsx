@@ -31,10 +31,9 @@ interface ClassStats {
   nextIncompleteLecture: string | null;
 }
 
-type TabValue = "overview" | "assigned" | "lectures" | "results";
+type TabValue = "assigned" | "lectures" | "results";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
-  { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "assigned", label: "Assigned Content", icon: FileText },
   { value: "lectures", label: "Pre-Recorded Lectures", icon: Video },
   { value: "results", label: "Results", icon: Trophy },
@@ -57,7 +56,7 @@ export default function ClassDashboard() {
     nextIncompleteLecture: null,
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabValue>("overview");
+  const [activeTab, setActiveTab] = useState<TabValue>("assigned");
   const navigate = useNavigate();
 
   useEffect(() => {
