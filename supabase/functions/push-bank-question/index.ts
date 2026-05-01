@@ -85,6 +85,61 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Question verified: "${question.title}" (${question.question_type})`);
 
+    // Build formatted question payload (used by both live_questions and student_assignments)
+    const questionContent = question.question_content as Record<string, any>;
+    const formattedQuestion = {
+      ...questionContent,
+      title: question.title,
+      difficulty: question.difficulty,
+    };
+
+    // 2.5 Dual-delivery: if instructor has an active live session, also write to live_questions
+    // so anonymous Kahoot-style participants receive the question via realtime.
+    let liveDelivered = false;
+    let liveSessionCode: string | null = null;
+    let liveParticipantCount = 0;
+    const { data: liveSession } = await supabase
+      .from("live_sessions")
+      .select("id, session_code")
+      .eq("instructor_id", user.id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (liveSession) {
+      console.log(`🔴 LIVE SESSION DETECTED: ${liveSession.session_code} - dual delivery for bank question`);
+
+      const { count: questionCount } = await supabase
+        .from("live_questions")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", liveSession.id);
+
+      const liveQuestionNumber = (questionCount || 0) + 1;
+
+      const { error: liveInsertError } = await supabase.from("live_questions").insert({
+        session_id: liveSession.id,
+        instructor_id: user.id,
+        question_content: formattedQuestion,
+        question_number: liveQuestionNumber,
+      });
+
+      if (liveInsertError) {
+        console.error("❌ Failed to insert live question (bank):", liveInsertError);
+      } else {
+        liveDelivered = true;
+        liveSessionCode = liveSession.session_code;
+
+        const { count: participantCount } = await supabase
+          .from("live_participants")
+          .select("*", { count: "exact", head: true })
+          .eq("session_id", liveSession.id);
+
+        liveParticipantCount = participantCount || 0;
+        console.log(`✅ Bank question delivered to ${liveParticipantCount} live participant(s)`);
+      }
+    }
+
     // 3. Get all students in the course (including legacy students with null course_id for backward compatibility)
     // Query 1: Students explicitly enrolled in this course
     const { data: courseStudents, error: courseStudentsError } = await supabase
