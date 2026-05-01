@@ -147,6 +147,11 @@ export default function StudentTraining() {
           <JoinClassHero userId={user.id} onClassJoined={handleClassJoined} />
         </section>
 
+        {/* 2b. Pending Questions from Instructor — surfaces sent questions on main dashboard */}
+        <section className="animate-fade-in">
+          <PendingInstructorQuestions userId={user.id} />
+        </section>
+
         {/* 3. My Classes */}
         <section key={refreshKey} className="animate-fade-in">
           <SimpleClassList userId={user.id} onClassesLoaded={handleClassesLoaded} />
