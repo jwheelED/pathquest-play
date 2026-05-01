@@ -172,7 +172,16 @@ Deno.serve(async (req) => {
     if (uniqueStudentIds.length === 0) {
       console.log("⚠️ No students enrolled in this course");
       return new Response(
-        JSON.stringify({ success: true, studentCount: 0, message: "No students enrolled" }),
+        JSON.stringify({
+          success: true,
+          studentCount: 0,
+          liveDelivered,
+          liveParticipantCount,
+          sessionCode: liveSessionCode,
+          message: liveDelivered
+            ? `Delivered to ${liveParticipantCount} live participant(s)`
+            : "No students enrolled",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -188,14 +197,7 @@ Deno.serve(async (req) => {
       return "manual_grade";
     };
 
-    // 5. Format the question content for student_assignments
-    const questionContent = question.question_content as Record<string, any>;
-    const formattedQuestion = {
-      ...questionContent,
-      title: question.title,
-      difficulty: question.difficulty,
-    };
-
+    // 5. Build student_assignments content (formattedQuestion built earlier for dual delivery)
     const assignmentContent = {
       questions: [formattedQuestion],
       source: "question_bank",
