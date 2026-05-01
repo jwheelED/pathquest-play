@@ -506,15 +506,6 @@ export default function AuthPage() {
                     Continue with Google
                   </button>
 
-                  <p className="text-[13px] text-center text-muted-foreground/70 pt-1">
-                    {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-                    <button
-                      onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-primary/80 hover:text-primary hover:underline font-medium transition-colors"
-                    >
-                      {isSignUp ? "Sign In" : "Sign Up"}
-                    </button>
-                  </p>
                 </>
               )}
 

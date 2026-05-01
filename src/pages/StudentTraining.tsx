@@ -10,6 +10,7 @@ import { SimpleClassList } from "@/components/student/SimpleClassList";
 import { LectureCheckInHistory } from "@/components/student/LectureCheckInHistory";
 import { SimplifiedStudyMaterials } from "@/components/student/SimplifiedStudyMaterials";
 import { PracticeQuestionsCard } from "@/components/student/PracticeQuestionsCard";
+import { PendingInstructorQuestions } from "@/components/student/PendingInstructorQuestions";
 
 import { logger } from "@/lib/logger";
 

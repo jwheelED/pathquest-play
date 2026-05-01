@@ -492,12 +492,6 @@ export default function InstructorAuth() {
                     Continue with Google
                   </Button>
 
-                  <button
-                    onClick={() => setIsSignUp(!isSignUp)}
-                    className="w-full text-center text-[13px] text-muted-foreground/70 hover:text-muted-foreground transition-colors pt-1"
-                  >
-                    {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
-                  </button>
                 </>
               )}
 
