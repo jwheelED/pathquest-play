@@ -365,9 +365,44 @@ export default function AuthPage() {
               {/* Header */}
               <div className="text-center pb-1">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                  {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Sign in to your account"}
+                  {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Welcome back"}
                 </h2>
+                {!isResetMode && (
+                  <p className="text-[13px] text-muted-foreground/70 mt-1.5">
+                    {isSignUp ? "Sign up to start learning" : "Sign in to continue"}
+                  </p>
+                )}
               </div>
+
+              {/* Prominent Sign In / Sign Up tab toggle */}
+              {!isResetMode && (
+                <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 gap-1 p-1 bg-muted/50 border border-border/50 rounded-[10px]">
+                  <button
+                    role="tab"
+                    aria-selected={!isSignUp}
+                    onClick={() => { setIsSignUp(false); setError(""); setSuccess(""); }}
+                    className={`h-9 rounded-[7px] text-[13px] font-semibold transition-all ${
+                      !isSignUp
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={isSignUp}
+                    onClick={() => { setIsSignUp(true); setError(""); setSuccess(""); }}
+                    className={`h-9 rounded-[7px] text-[13px] font-semibold transition-all ${
+                      isSignUp
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Create account
+                  </button>
+                </div>
+              )}
 
               {error && <div role="alert" className="text-destructive text-[13px] leading-snug">{error}</div>}
               {success && <div role="status" className="text-primary text-[13px] leading-snug">{success}</div>}
