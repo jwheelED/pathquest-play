@@ -210,6 +210,10 @@ export function VoiceQuestionPreviewDialog({
 
     setIsGeneratingExpectedAnswer(true);
     try {
+      // First try the question bank for an exact/semantic match
+      const bankHit = await tryApplyBankMatch('short_answer');
+      if (bankHit) return;
+
       const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
         body: {
           question_text: questionText,
