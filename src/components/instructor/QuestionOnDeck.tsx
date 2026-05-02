@@ -47,6 +47,7 @@ interface QuestionOnDeckProps {
   suggestedType?: 'multiple_choice' | 'short_answer' | 'poll';
   formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
   transcriptContext?: string;
+  courseId?: string | null;
 }
 
 function timeAgo(ts: number): string {
