@@ -1,64 +1,70 @@
-# Bug: Question Bank pushes don't reach live-session participants
+## Short answer: Yes, this is fully possible.
 
-## Root cause (confirmed from code + schema)
+Today the Live Copilot pipeline (voice → "Question on Deck" → MCQ choices) is completely independent from the Question Bank. When you speak a question, `QuestionOnDeck` calls the `generate-mcq-options` edge function, which asks Claude to invent 4 fresh distractors using only the lecture transcript — it never looks at `instructor_question_bank`, even if that exact question was extracted from a PDF you uploaded.
 
-There are two delivery pipelines and they are not equivalent:
+We can fix that by adding a "bank-first" lookup step before the AI generates new options.
 
-**Copilot / voice / auto questions** → `supabase/functions/format-and-send-question`
-- Looks up the instructor's active `live_sessions` row.
-- If one exists: inserts into `live_questions` (anonymous live participants subscribe here via Supabase Realtime in `src/pages/LiveStudent.tsx` line 199–210).
-- THEN also inserts into `student_assignments` (authenticated/registered students).
-- This is explicitly called "dual delivery mode" in the code.
+---
 
-**Question Bank push** → `supabase/functions/push-bank-question`
-- Only inserts into `student_assignments`.
-- Never checks for an active `live_sessions` row.
-- Never writes to `live_questions`.
+## How it works today
 
-Result: anyone who joined the live session via the 6-digit code / QR (anonymous Kahoot-style join) is subscribed to `live_questions` only. Bank pushes never land there, so their screens stay empty. Registered students who are also enrolled in the course still receive it via `student_assignments`, which is why the bug looks intermittent depending on who's in the room.
+1. Instructor uploads a PDF → questions get parsed and stored in `instructor_question_bank` (with `question_content` JSONB containing `question`, `options`, `correctAnswer`, etc.).
+2. During a live session, voice detection produces a candidate question and hands it to `QuestionOnDeck`.
+3. `QuestionOnDeck` calls `generate-mcq-options` with just `{ question_text, source_transcript, prior_context }`.
+4. Claude invents 4 brand-new options based on the lecture transcript — **the bank is never queried**.
 
-## Fix
+So even if you spoke an exact bank question, the choices on deck would be AI-fabricated and could differ from what's in the bank.
 
-Make `push-bank-question` mirror the dual-delivery logic from `format-and-send-question`.
+## Proposed change
 
-### Edit `supabase/functions/push-bank-question/index.ts`
+Add a semantic match step that, when a candidate question appears, first searches the instructor's question bank for a close match. If found, populate the on-deck preview with the bank's exact options/correct answer. If not found, fall back to today's AI generation.
 
-After verifying the instructor owns the question and before the existing `student_assignments` batch insert (around line 135, right before "Format the question content"):
+### Pipeline
 
-1. Query for an active live session for this instructor:
-   ```ts
-   const { data: liveSession } = await supabase
-     .from("live_sessions")
-     .select("id, session_code")
-     .eq("instructor_id", user.id)
-     .eq("is_active", true)
-     .order("created_at", { ascending: false })
-     .limit(1)
-     .maybeSingle();
-   ```
+```text
+voice candidate
+      │
+      ▼
+┌────────────────────────┐    match found
+│ match-bank-question    │──────────────► use bank's options + correctAnswer
+│ (new edge function)    │                (mark as "From bank: <title>")
+└────────────────────────┘
+      │ no match
+      ▼
+generate-mcq-options (existing) ─────► AI-generated options
+```
 
-2. If `liveSession` exists, build the same payload shape `live_questions.question_content` expects (the formatted question body — same `formattedQuestion` object the bank already constructs, including `title` and `difficulty`), compute `question_number` via a count on `live_questions` for that `session_id`, and insert one row into `live_questions`. Log failures but don't abort — keep going so registered students still get it.
+### Matching strategy (new edge function `match-bank-question`)
 
-3. Continue with the existing `student_assignments` batched insert unchanged (preserves backward compatibility for registered/enrolled students, matches the copilot's dual-delivery behavior).
+1. Pull the instructor's bank rows scoped to the active `course_id` (and org), filtered to MCQ-compatible types (`multiple_choice`, `mcq`, plus `short_answer` for SA format).
+2. Cheap lexical pre-filter: normalize text (lowercase, strip punctuation) and keep candidates with ≥40% token overlap with the spoken question.
+3. Send the candidate + top ~10 pre-filtered bank items to Gemini/Claude with a tool call that returns `{ match_id | null, confidence }`.
+4. Accept the match only if `confidence ≥ 0.75`. Return the full `question_content` so the client can use it verbatim.
 
-4. Include `sessionCode` and `liveDelivered: true/false` in the success response so the UI can optionally surface that the question went to the live room as well.
+### Client changes (`QuestionOnDeck.tsx`)
 
-### Why this is safe
+- In the existing `generatePreview` flow, call `match-bank-question` first.
+- On match: set `mcqOptions`/`correctAnswer` (or `expectedAnswer` for short answer) directly from `question_content`, skip `generate-mcq-options`, and show a small "From your question bank" badge above the preview panel.
+- On no match: keep current behavior (call `generate-mcq-options`).
+- Pass the matched `bank_item_id` through `OnDeckSendData` so the eventual send can increment `times_used` / `last_used_at` on the bank row (reusing the existing `push-bank-question` accounting logic where reasonable).
 
-- `live_questions` schema (`session_id`, `instructor_id`, `question_content` jsonb, `question_number`, `sent_at`) is already what the copilot writes — no migration needed.
-- Students on `LiveStudent.tsx` are already subscribed to realtime INSERTs on `live_questions` filtered by `session_id`, so they'll pick it up automatically with no client changes.
-- Registered students continue to receive via the existing `student_assignments` path, so nothing regresses.
-- No DB schema changes, no new RLS, no client changes.
+### Format respect
 
-### Out of scope / not changing
+- If the bank item's type doesn't match the instructor's current `formatPreference` (e.g. bank has MCQ but preference is short_answer), still prefer bank content but adapt: show the bank's `question` text and either (a) use bank options if format aligns, or (b) fall back to AI for the alternate format. Simplest v1: only use the bank match when types align; otherwise fall back to AI.
 
-- `PushQuestionDialog.tsx` UI — no change required, but we could later add a "delivered to N live participants" line using the new response field (optional follow-up).
-- The `format-and-send-question` pipeline — already correct.
-- Realtime subscriptions in `LiveStudent.tsx` — already correct.
+### Optional enhancement (low cost, high value)
 
-## Verification after fix
+Also pass the top 3 pre-filtered bank items as **additional context** into `generate-mcq-options` even when no match crosses the confidence threshold. This way AI-generated distractors stay consistent with the style/terminology the instructor used in their bank PDF.
 
-1. Start a live session as instructor, have a second browser join anonymously via the 6-digit code.
-2. Open Question Bank, push any question.
-3. Confirm the anonymous participant's screen shows the question within ~1s (realtime).
-4. Check edge function logs for `push-bank-question` — should see a "LIVE SESSION DETECTED" log and a successful `live_questions` insert.
+## Files to change
+
+- `supabase/functions/match-bank-question/index.ts` — new edge function (auth + instructor role check, like `generate-mcq-options`).
+- `src/components/instructor/QuestionOnDeck.tsx` — call match function first in `generatePreview`, show "From bank" badge, pass `bank_item_id` in send data.
+- `src/components/instructor/QuestionOnDeck.tsx` (`OnDeckSendData` type) — add optional `sourceBankItemId?: string`.
+- `src/components/instructor/LectureTranscription.tsx` — when `sourceBankItemId` is present in send data, route through `push-bank-question` (or include the id in the standard send so usage tracking fires).
+
+## Risks / things to watch
+
+- Latency: bank match adds one extra call before MCQ generation. We'll run match + generation in a "match-or-fallback" sequence; for instructors with empty banks we short-circuit (skip match entirely if the bank query returns 0 rows).
+- False matches: confidence threshold of 0.75 + token overlap pre-filter keeps this conservative. Always show the bank title in the badge so the instructor can spot a wrong match before sending.
+- Bank items with non-standard JSON shape: normalize on read; if `options`/`correctAnswer` missing, treat as no match and fall back to AI.
