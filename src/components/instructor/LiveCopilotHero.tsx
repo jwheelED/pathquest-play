@@ -600,6 +600,7 @@ export function LiveCopilotHero({
   intervalMinutes = 15,
   nextQuestionIn = 0,
   onIntervalChange,
+  courseId,
 }: LiveCopilotHeroProps) {
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const [editText, setEditText] = useState("");
@@ -613,6 +614,7 @@ export function LiveCopilotHero({
   const [previewOptions, setPreviewOptions] = useState<MCQOption[]>([]);
   const [previewExpectedAnswer, setPreviewExpectedAnswer] = useState("");
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [bankMatch, setBankMatch] = useState<BankMatchPreview | null>(null);
   const generatedForRef = useRef<string | null>(null);
   const priorContextByQuestionRef = useRef<Map<string, string>>(new Map());
 
