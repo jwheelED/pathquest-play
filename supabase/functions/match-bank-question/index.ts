@@ -153,6 +153,7 @@ serve(async (req) => {
             title: exactHit.title,
             question_type: exactHit.question_type,
             question_content: exactHit.question_content,
+            source_table: exactHit.source_table,
           },
           confidence: 1.0,
           source: 'exact_match',
@@ -167,6 +168,7 @@ serve(async (req) => {
       title: string;
       question_type: string;
       question_content: any;
+      source_table?: string;
       score: number;
       bankQuestion: string;
     };
@@ -178,6 +180,7 @@ serve(async (req) => {
         title: r.title,
         question_type: r.question_type,
         question_content: r.question_content,
+        source_table: r.source_table,
         bankQuestion: bq,
         score: overlap(askTokens, tokens(bq)),
       };
@@ -281,6 +284,7 @@ serve(async (req) => {
         title: picked.title,
         question_type: picked.question_type,
         question_content: picked.question_content,
+        source_table: picked.source_table,
       },
       confidence,
       source: 'ai_match',
