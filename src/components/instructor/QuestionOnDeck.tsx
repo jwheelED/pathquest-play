@@ -31,6 +31,7 @@ export interface OnDeckSendData {
   correctAnswer?: 'A' | 'B' | 'C' | 'D';
   expectedAnswer?: string;
   type: 'multiple_choice' | 'short_answer' | 'poll';
+  sourceBankItemId?: string;
 }
 
 interface QuestionOnDeckProps {
