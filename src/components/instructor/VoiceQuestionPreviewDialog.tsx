@@ -447,6 +447,17 @@ export function VoiceQuestionPreviewDialog({
             </div>
           )}
 
+          {/* Bank match indicator */}
+          {bankMatch && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>
+                Matched from Question Bank: <span className="font-semibold">{bankMatch.title}</span>
+                <span className="text-xs text-emerald-700 ml-1">({bankMatch.source})</span>
+              </span>
+            </div>
+          )}
+
           {/* Question Type Selector */}
           <div className="space-y-2">
             <Label>Question Type</Label>
