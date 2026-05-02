@@ -137,6 +137,15 @@ function formatTimeLeft(seconds: number, fallback = "Now") {
   return `${secs}s`;
 }
 
+function parseOptions(options: string[], correctLetter = "A", markCorrect = true): MCQOption[] {
+  const labels = ["A", "B", "C", "D"];
+  return options.slice(0, 4).map((opt, i) => {
+    const label = labels[i] ?? String.fromCharCode(65 + i);
+    const stripped = opt.replace(/^[A-D]\.?\s*/i, "");
+    return { label, text: stripped, isCorrect: markCorrect ? label === correctLetter : false };
+  });
+}
+
 const INTERVAL_OPTIONS = [
   { minutes: 1, label: "Every 1 minute" },
   { minutes: 2, label: "Every 2 minutes" },
