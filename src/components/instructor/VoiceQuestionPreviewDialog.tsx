@@ -59,6 +59,61 @@ export function VoiceQuestionPreviewDialog({
   const [expectedAnswer, setExpectedAnswer] = useState('');
   const [isGeneratingExpectedAnswer, setIsGeneratingExpectedAnswer] = useState(false);
   const [showMathPreview, setShowMathPreview] = useState(false);
+  const [bankMatch, setBankMatch] = useState<{ id: string; title: string; source: string } | null>(null);
+
+  // Reset bank match indicator when the question changes
+  useEffect(() => {
+    setBankMatch(null);
+  }, [extractedQuestion?.question_text]);
+
+  /**
+   * Look up an exact/semantic match in the instructor's question bank for the
+   * given format. Returns true if a match was found and applied to local state
+   * (caller should then skip AI generation).
+   */
+  const tryApplyBankMatch = async (
+    format: 'multiple_choice' | 'poll' | 'short_answer'
+  ): Promise<boolean> => {
+    try {
+      const { data: matchData } = await supabase.functions.invoke('match-bank-question', {
+        body: { question_text: questionText, course_id: courseId ?? null, format },
+      });
+      const m = matchData?.match;
+      if (!m || !m.question_content) return false;
+      const qc = m.question_content;
+
+      if (format === 'multiple_choice' || format === 'poll') {
+        const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+        if (opts && opts.length === 4) {
+          setMcqOptions(opts);
+          const ca = qc.correctAnswer || qc.correct_answer;
+          if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+            setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+          }
+          setBankMatch({ id: m.id, title: m.title, source: matchData?.source || 'match' });
+          toast({
+            title: 'Matched from Question Bank',
+            description: `Using "${m.title}" instead of generating new options.`,
+          });
+          return true;
+        }
+      } else if (format === 'short_answer') {
+        const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+        if (ea) {
+          setExpectedAnswer(String(ea));
+          setBankMatch({ id: m.id, title: m.title, source: matchData?.source || 'match' });
+          toast({
+            title: 'Matched from Question Bank',
+            description: `Using expected answer from "${m.title}".`,
+          });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Bank match lookup failed, falling back to AI', e);
+    }
+    return false;
+  };
 
   // Initialize state when extracted question changes
   useEffect(() => {
