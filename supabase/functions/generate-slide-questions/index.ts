@@ -71,7 +71,8 @@ serve(async (req) => {
     const orgId = profile?.org_id || null;
     const difficulty = profile?.question_difficulty_preference || "medium";
 
-    const results: Array<{ slide_number: number; success: boolean; error?: string }> = [];
+    const results: Array<{ slide_number: number; success: boolean; questions_added?: number; error?: string }> = [];
+    const MAX_QUESTIONS_PER_SLIDE = 8;
 
     // Process each slide
     for (const slide of slides) {
