@@ -38,6 +38,7 @@ interface VoiceQuestionPreviewDialogProps {
   onConfirmSend: (editedQuestion: ExtractedVoiceQuestion) => void;
   isSending: boolean;
   sourceTranscript?: string;
+  courseId?: string | null;
 }
 
 export function VoiceQuestionPreviewDialog({
@@ -47,6 +48,7 @@ export function VoiceQuestionPreviewDialog({
   onConfirmSend,
   isSending,
   sourceTranscript,
+  courseId,
 }: VoiceQuestionPreviewDialogProps) {
   const { toast } = useToast();
   const [questionText, setQuestionText] = useState('');
