@@ -1175,6 +1175,11 @@ export function LiveCopilotHero({
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
                         {effectiveFormat === 'mcq' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
                       </span>
+                      {bankMatch && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700">
+                          From bank
+                        </span>
+                      )}
                       {questionHistory.length > 1 && (
                         <span className="text-[10px] text-neutral-400 tabular-nums">
                           {historyIndex + 1} of {questionHistory.length}
