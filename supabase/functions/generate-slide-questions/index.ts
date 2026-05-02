@@ -316,7 +316,7 @@ Hard cap: maximum 8 questions in the array. Return ONLY valid JSON.`;
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.reduce((sum, r) => sum + (r.questions_added || (r.success ? 1 : 0)), 0);
     const skippedCount = results.filter(r => r.error === "skipped").length;
 
     return new Response(
