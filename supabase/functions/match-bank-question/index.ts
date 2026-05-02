@@ -19,6 +19,17 @@ function tokens(s: string): string[] {
     .filter(t => t.length > 2 && !STOP.has(t));
 }
 
+// Aggressive normalization for exact-string compare: lowercase, strip all
+// non-alphanumerics, collapse whitespace. Strips leading "1." / "Q2:" prefixes
+// that PDF parsing often preserves.
+function normalizeForExact(s: string): string {
+  return (s || '')
+    .toLowerCase()
+    .replace(/^\s*(q\s*\d+\s*[:.\-)]\s*|\d+\s*[:.\-)]\s*)/i, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
 function overlap(a: string[], b: string[]): number {
   if (!a.length || !b.length) return 0;
   const setA = new Set(a);
