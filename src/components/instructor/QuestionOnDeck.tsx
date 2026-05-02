@@ -439,6 +439,15 @@ export function QuestionOnDeck({
                 {effectiveFormat === 'multiple_choice' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
               </Badge>
             )}
+            {hasCandidate && bankMatch && (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-medium border-emerald-500/40 text-emerald-700 bg-emerald-50"
+                title={`Matched from question bank: ${bankMatch.title}`}
+              >
+                From bank
+              </Badge>
+            )}
             {isHeld && (
               <Badge variant="secondary" className="text-[10px] font-medium">
                 <Pause className="h-2.5 w-2.5 mr-0.5" />
