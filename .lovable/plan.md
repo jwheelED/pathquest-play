@@ -1,70 +1,67 @@
-## Short answer: Yes, this is fully possible.
+## Why your exact-match question still got AI-generated options
 
-Today the Live Copilot pipeline (voice → "Question on Deck" → MCQ choices) is completely independent from the Question Bank. When you speak a question, `QuestionOnDeck` calls the `generate-mcq-options` edge function, which asks Claude to invent 4 fresh distractors using only the lecture transcript — it never looks at `instructor_question_bank`, even if that exact question was extracted from a PDF you uploaded.
+The bank-matching logic exists, but it's **only wired into one of two question entry paths**.
 
-We can fix that by adding a "bank-first" lookup step before the AI generates new options.
+### Two paths, only one checks the bank
 
----
+1. **Passive trigger pipeline** (the `Question on Deck` card that appears automatically when speech is detected as a question)
+   - Lives in `QuestionOnDeck.tsx`
+   - Calls `match-bank-question` first, falls back to `generate-mcq-options` only if no match
+   - This path works correctly
 
-## How it works today
+2. **Voice command pipeline** ("Hey Edvana, ask…" or manual button) — **this is the path you used**
+   - Voice → `extract-voice-command-question` edge fn → `VoiceQuestionPreviewDialog` opens
+   - `VoiceQuestionPreviewDialog` calls `generate-mcq-options` immediately to fill the preview
+   - On confirm → `format-and-send-question` with the AI-generated options
+   - **`match-bank-question` is never called anywhere in this flow**
 
-1. Instructor uploads a PDF → questions get parsed and stored in `instructor_question_bank` (with `question_content` JSONB containing `question`, `options`, `correctAnswer`, etc.).
-2. During a live session, voice detection produces a candidate question and hands it to `QuestionOnDeck`.
-3. `QuestionOnDeck` calls `generate-mcq-options` with just `{ question_text, source_transcript, prior_context }`.
-4. Claude invents 4 brand-new options based on the lecture transcript — **the bank is never queried**.
+That's why "What is the main function of ribosomes?" came back with freshly generated MCQ options even though `instructor_question_bank` row `524999f4-…` exists with the exact text and the exact A/B/C/D options the slide PDF parsed. I confirmed the row exists and has the four ribosome options verbatim.
 
-So even if you spoke an exact bank question, the choices on deck would be AI-fabricated and could differ from what's in the bank.
+### Secondary issue in the matcher itself
 
-## Proposed change
+Even if we wire the voice path to call `match-bank-question`, the matcher has one subtle gap that could miss obvious matches:
 
-Add a semantic match step that, when a candidate question appears, first searches the instructor's question bank for a close match. If found, populate the on-deck preview with the bank's exact options/correct answer. If not found, fall back to today's AI generation.
+- The lexical pre-filter requires `overlap >= 0.4` of non-stopword tokens. For very short questions ("ribosomes function") it's fine, but it never short-circuits on near-identical strings, so the LLM step is always required (extra latency + a chance the AI returns `match_index = -1` despite a verbatim match).
+- The matcher filters `course_id.eq.X,course_id.is.null` only when `course_id` is provided. If the voice flow doesn't pass `course_id` we'd silently see all instructor bank items, which is fine — but we should make sure the voice flow does pass it for consistency.
 
-### Pipeline
+## The fix
 
-```text
-voice candidate
-      │
-      ▼
-┌────────────────────────┐    match found
-│ match-bank-question    │──────────────► use bank's options + correctAnswer
-│ (new edge function)    │                (mark as "From bank: <title>")
-└────────────────────────┘
-      │ no match
-      ▼
-generate-mcq-options (existing) ─────► AI-generated options
-```
+### 1. Inject bank lookup into the voice preview dialog
 
-### Matching strategy (new edge function `match-bank-question`)
+In `src/components/instructor/VoiceQuestionPreviewDialog.tsx`, before either `generate-mcq-options` or `generate-expected-answer` call:
 
-1. Pull the instructor's bank rows scoped to the active `course_id` (and org), filtered to MCQ-compatible types (`multiple_choice`, `mcq`, plus `short_answer` for SA format).
-2. Cheap lexical pre-filter: normalize text (lowercase, strip punctuation) and keep candidates with ≥40% token overlap with the spoken question.
-3. Send the candidate + top ~10 pre-filtered bank items to Gemini/Claude with a tool call that returns `{ match_id | null, confidence }`.
-4. Accept the match only if `confidence ≥ 0.75`. Return the full `question_content` so the client can use it verbatim.
+- Call `supabase.functions.invoke('match-bank-question', { body: { question_text, course_id, format } })`
+- If `match.question_content` is returned:
+  - For MCQ/poll: set the 4 options + correct answer from the bank row, set a `bankMatch` state so we can label it in the UI ("Matched from Question Bank: <title>")
+  - For short answer: set the expected answer from the bank row
+  - Skip the AI generation call entirely
+- Otherwise fall through to current AI generation
 
-### Client changes (`QuestionOnDeck.tsx`)
+### 2. Pass the bank match through to send
 
-- In the existing `generatePreview` flow, call `match-bank-question` first.
-- On match: set `mcqOptions`/`correctAnswer` (or `expectedAnswer` for short answer) directly from `question_content`, skip `generate-mcq-options`, and show a small "From your question bank" badge above the preview panel.
-- On no match: keep current behavior (call `generate-mcq-options`).
-- Pass the matched `bank_item_id` through `OnDeckSendData` so the eventual send can increment `times_used` / `last_used_at` on the bank row (reusing the existing `push-bank-question` accounting logic where reasonable).
+When the user confirms the preview, include the bank options/correct_answer in the `editedQuestion` payload (it already supports `options`, `correct_answer`, `expected_answer`). `format-and-send-question` already has a "use pre-generated options" branch — so if the bank match makes it into the dialog, the send path will respect it without further changes.
 
-### Format respect
+Optionally also pass a `source_bank_item_id` field through `format-and-send-question` so analytics can show "served from bank" vs "AI generated". Same field is already used by `QuestionOnDeck`.
 
-- If the bank item's type doesn't match the instructor's current `formatPreference` (e.g. bank has MCQ but preference is short_answer), still prefer bank content but adapt: show the bank's `question` text and either (a) use bank options if format aligns, or (b) fall back to AI for the alternate format. Simplest v1: only use the bank match when types align; otherwise fall back to AI.
+### 3. Tighten the matcher for verbatim hits
 
-### Optional enhancement (low cost, high value)
+In `supabase/functions/match-bank-question/index.ts`:
 
-Also pass the top 3 pre-filtered bank items as **additional context** into `generate-mcq-options` even when no match crosses the confidence threshold. This way AI-generated distractors stay consistent with the style/terminology the instructor used in their bank PDF.
+- Before the lexical/AI pipeline, do a normalized exact-string compare (lowercase, strip punctuation, collapse whitespace) on `question_content.question`. If any row matches → return immediately with `confidence: 1.0, source: 'exact_match'`. This guarantees verbatim questions like the ribosome one always hit.
+- Lower the lexical pre-filter threshold from `0.4` to `0.3` so the AI step gets to evaluate a few more candidates for short questions.
+- Add a small log line on the chosen branch (`exact`, `lexical_fallback`, `ai_match`, `no_lexical_match`, `low_confidence`) so future debugging doesn't require sifting through silent runs.
 
-## Files to change
+### 4. Also wire bank lookup into the auto-interval question path
 
-- `supabase/functions/match-bank-question/index.ts` — new edge function (auth + instructor role check, like `generate-mcq-options`).
-- `src/components/instructor/QuestionOnDeck.tsx` — call match function first in `generatePreview`, show "From bank" badge, pass `bank_item_id` in send data.
-- `src/components/instructor/QuestionOnDeck.tsx` (`OnDeckSendData` type) — add optional `sourceBankItemId?: string`.
-- `src/components/instructor/LectureTranscription.tsx` — when `sourceBankItemId` is present in send data, route through `push-bank-question` (or include the id in the standard send so usage tracking fires).
+`generate-interval-question` (used when the auto-question timer fires every N minutes) currently doesn't consult the bank either. As long as we're touching the bank-match logic, add the same pre-check there so timer-fired questions also prefer bank items when content matches. Low risk, same pattern.
 
-## Risks / things to watch
+### Files touched
 
-- Latency: bank match adds one extra call before MCQ generation. We'll run match + generation in a "match-or-fallback" sequence; for instructors with empty banks we short-circuit (skip match entirely if the bank query returns 0 rows).
-- False matches: confidence threshold of 0.75 + token overlap pre-filter keeps this conservative. Always show the bank title in the badge so the instructor can spot a wrong match before sending.
-- Bank items with non-standard JSON shape: normalize on read; if `options`/`correctAnswer` missing, treat as no match and fall back to AI.
+- `src/components/instructor/VoiceQuestionPreviewDialog.tsx` — add bank lookup before AI generation, surface a "from bank" indicator, plumb `course_id` from props
+- `src/components/instructor/LectureTranscription.tsx` — pass `courseId` prop into `VoiceQuestionPreviewDialog` (one-line addition where the dialog is rendered)
+- `supabase/functions/match-bank-question/index.ts` — exact-match short-circuit, lower threshold to 0.3, add branch logging
+- `supabase/functions/generate-interval-question/index.ts` — call `match-bank-question` first, skip AI generation on hit (optional but recommended)
+
+### How you'll know it worked
+
+After the change, asking the ribosome question via voice will show the preview dialog with the four PDF-parsed options pre-filled and a small "Matched from Question Bank: Slide 1 Question 2" badge. Pushing it sends those exact options to students. Edge logs for `match-bank-question` will show `source=exact_match, confidence=1.0`.
