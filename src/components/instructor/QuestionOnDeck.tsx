@@ -31,6 +31,7 @@ export interface OnDeckSendData {
   correctAnswer?: 'A' | 'B' | 'C' | 'D';
   expectedAnswer?: string;
   type: 'multiple_choice' | 'short_answer' | 'poll';
+  sourceBankItemId?: string;
 }
 
 interface QuestionOnDeckProps {
@@ -47,6 +48,7 @@ interface QuestionOnDeckProps {
   suggestedType?: 'multiple_choice' | 'short_answer' | 'poll';
   formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
   transcriptContext?: string;
+  courseId?: string | null;
 }
 
 function timeAgo(ts: number): string {
@@ -235,6 +237,7 @@ export function QuestionOnDeck({
   suggestedType = 'multiple_choice',
   formatPreference,
   transcriptContext,
+  courseId,
 }: QuestionOnDeckProps) {
   const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
 
@@ -247,6 +250,7 @@ export function QuestionOnDeck({
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [expectedAnswer, setExpectedAnswer] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [bankMatch, setBankMatch] = useState<{ id: string; title: string } | null>(null);
 
   // Track which candidate text we last generated for to avoid duplicate calls
   const generatedForRef = useRef<string | null>(null);
@@ -270,6 +274,7 @@ export function QuestionOnDeck({
       setMcqOptions(['', '', '', '']);
       setCorrectAnswer('A');
       setExpectedAnswer('');
+      setBankMatch(null);
     }
   }, [candidate]);
 
@@ -277,8 +282,42 @@ export function QuestionOnDeck({
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
     setExpectedAnswer('');
+    setBankMatch(null);
 
     try {
+      // 1) First try to match against the instructor's question bank.
+      try {
+        const { data: matchData } = await supabase.functions.invoke('match-bank-question', {
+          body: { question_text: questionText, course_id: courseId ?? null, format },
+        });
+        const m = matchData?.match;
+        if (m && m.question_content) {
+          const qc = m.question_content;
+          if (format === 'multiple_choice' || format === 'poll') {
+            const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+            if (opts && opts.length === 4) {
+              setMcqOptions(opts);
+              const ca = qc.correctAnswer || qc.correct_answer;
+              if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+                setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+              }
+              setBankMatch({ id: m.id, title: m.title });
+              return; // skip AI generation
+            }
+          } else if (format === 'short_answer') {
+            const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+            if (ea) {
+              setExpectedAnswer(String(ea));
+              setBankMatch({ id: m.id, title: m.title });
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Bank match lookup failed, falling back to AI', e);
+      }
+
+      // 2) Fall back to AI generation.
       const body: Record<string, unknown> = {
         question_text: questionText,
         source_transcript: transcriptContext,
@@ -338,6 +377,7 @@ export function QuestionOnDeck({
         ? { options: mcqOptions, correctAnswer: effectiveFormat === 'multiple_choice' ? correctAnswer : undefined }
         : {}),
       ...(!isChoice && expectedAnswer.trim() ? { expectedAnswer } : {}),
+      ...(bankMatch ? { sourceBankItemId: bankMatch.id } : {}),
     };
 
     onSendNow(questionText, data);
@@ -397,6 +437,15 @@ export function QuestionOnDeck({
             {hasCandidate && (
               <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary">
                 {effectiveFormat === 'multiple_choice' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
+              </Badge>
+            )}
+            {hasCandidate && bankMatch && (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-medium border-emerald-500/40 text-emerald-700 bg-emerald-50"
+                title={`Matched from question bank: ${bankMatch.title}`}
+              >
+                From bank
               </Badge>
             )}
             {isHeld && (

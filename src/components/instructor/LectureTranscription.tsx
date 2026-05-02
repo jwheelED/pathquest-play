@@ -4090,6 +4090,7 @@ export const LectureTranscription = ({
             onToggleHold={() => setOnDeckHeld(h => !h)}
             formatPreference={questionFormatPreference}
             transcriptContext={transcriptBufferRef.current}
+            courseId={selectedCourseId}
             onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
               if (data) {

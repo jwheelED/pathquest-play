@@ -45,6 +45,9 @@ verify_jwt = false
 [functions.push-bank-question]
 verify_jwt = false
 
+[functions.match-bank-question]
+verify_jwt = false
+
 [functions.generate-detailed-explanation]
 verify_jwt = false
 
