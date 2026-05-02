@@ -47,6 +47,7 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [mode, setMode] = useState<"prep" | "live">("prep");
+  const [view, setView] = useState<"bank" | "results">("bank");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   
   // Dialog states
