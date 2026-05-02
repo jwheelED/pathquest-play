@@ -216,6 +216,18 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 <h2 className="text-lg font-semibold text-foreground">Question Bank</h2>
               </div>
               <div className="flex items-center gap-2">
+                <Tabs value={view} onValueChange={(v) => setView(v as "bank" | "results")}>
+                  <TabsList className="h-9">
+                    <TabsTrigger value="bank" className="text-xs px-3 gap-1.5">
+                      <Library className="w-3.5 h-3.5" />
+                      Bank
+                    </TabsTrigger>
+                    <TabsTrigger value="results" className="text-xs px-3 gap-1.5">
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      Results
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 <Button variant="outline" size="sm" onClick={() => setShowUploadFlow(true)}>
                   <FileUp className="w-4 h-4 mr-1.5" />
                   Upload Slides
