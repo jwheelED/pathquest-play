@@ -71,18 +71,24 @@ serve(async (req) => {
     const orgId = profile?.org_id || null;
     const difficulty = profile?.question_difficulty_preference || "medium";
 
-    const results: Array<{ slide_number: number; success: boolean; error?: string }> = [];
+    const results: Array<{ slide_number: number; success: boolean; questions_added?: number; error?: string }> = [];
+    const MAX_QUESTIONS_PER_SLIDE = 8;
 
     // Process each slide
     for (const slide of slides) {
       try {
         console.log(`📋 Generating question for slide ${slide.number}`);
 
-        const prompt = `You are analyzing a lecture slide image. Your job is to determine if this slide has enough educational content to generate a question, and if so, generate ONE high-quality question.
+        const prompt = `You are analyzing a lecture slide image. Extract or generate ALL high-quality multiple choice questions present on this slide.
 
 SKIP slides that are: title slides, table of contents, "thank you" slides, transition slides, or slides with only images/logos and no educational text.
 
-Difficulty level: ${difficulty}
+EXTRACTION PRIORITY:
+1. If the slide ALREADY contains one or more questions (e.g. numbered Q1, Q2, practice problems, quiz items), extract EVERY question VERBATIM. Preserve the original question text and answer choices exactly. Do not paraphrase. Cap at 8 questions per slide.
+2. If the slide does NOT contain explicit questions but has meaningful educational content, GENERATE up to 2 multiple choice questions testing the key concepts.
+3. If neither applies, mark the slide as skipped.
+
+Difficulty level (for generated questions only): ${difficulty}
 
 MATH FORMATTING - CRITICAL:
 Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
@@ -98,29 +104,31 @@ Write all math as plain readable text using Unicode:
 - Apply to the question AND all answer options
 - Reproduce the EXACT notation from the slide using Unicode
 
-If the slide has meaningful educational content, generate a multiple choice question.
+For graphs, charts, diagrams: read axis labels, data points, trends and test understanding of the visual data.
 
-For graphs, charts, diagrams:
-- Read axis labels, data points, trends
-- Generate questions testing understanding of the visual data
+DISTRACTOR RULES: All MCQ options must be plausible and realistic. NEVER use "None of the above", "All of the above", or "Not specified".
 
-Return ONLY valid JSON in one of these formats:
+Return ONLY valid JSON in this exact format:
 
-If question can be generated:
+If one or more questions can be extracted/generated:
 {
   "found": true,
-  "questionType": "mcq",
-  "question": "Clear, specific question based on slide content (plain Unicode math, no LaTeX)",
-  "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
-  "correctAnswer": "A",
-  "explanation": "Brief explanation of the correct answer",
-  "difficulty": "${difficulty}"
+  "questions": [
+    {
+      "questionType": "mcq",
+      "question": "Clear, specific question (plain Unicode math, no LaTeX)",
+      "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
+      "correctAnswer": "A",
+      "explanation": "Brief explanation",
+      "source": "extracted" | "generated"
+    }
+  ]
 }
 
 If slide should be skipped:
-{"found": false, "reason": "title slide" }
+{"found": false, "reason": "title slide"}
 
-Return ONLY valid JSON.`;
+Hard cap: maximum 8 questions in the array. Return ONLY valid JSON.`;
 
         const response = await callClaude({
           messages: [
@@ -177,91 +185,123 @@ Return ONLY valid JSON.`;
           continue;
         }
 
-        // Build question_content in the same shape as ExtractedQuestionData
-        const questionType = parsed.questionType || "mcq";
-        let questionContent: Record<string, unknown> = {};
+        // Backward compat: support both new {questions: [...]} and old single-question shape
+        const rawQuestions: any[] = Array.isArray(parsed.questions)
+          ? parsed.questions
+          : (parsed.question || parsed.questionType)
+            ? [{
+                questionType: parsed.questionType || "mcq",
+                question: parsed.question,
+                options: parsed.options,
+                correctAnswer: parsed.correctAnswer,
+                expectedAnswer: parsed.expectedAnswer,
+                explanation: parsed.explanation,
+                source: "generated",
+              }]
+            : [];
 
-        if (questionType === "mcq") {
-          questionContent = {
-            mcq: {
-              question: parsed.question || "",
-              options: parsed.options || ["", "", "", ""],
-              correct_answer: parsed.correctAnswer || "A",
-              explanation: parsed.explanation || "",
-            },
-          };
-        } else if (questionType === "short_answer") {
-          questionContent = {
-            short_answer: {
-              question: parsed.question || "",
-              expected_answer: parsed.expectedAnswer || "",
-              explanation: parsed.explanation || "",
-            },
-          };
-        }
-
-        // Insert into appropriate table based on target
-        const questionName = `Slide ${slide.number} Question`;
-        let insertError;
-
-        if (target === "question_bank") {
-          // Insert into instructor_question_bank
-          // Flatten question_content for bank format
-          const bankContent: Record<string, unknown> = {};
-          if (questionType === "mcq" && questionContent.mcq) {
-            bankContent.question = (questionContent.mcq as Record<string, unknown>).question;
-            bankContent.options = (questionContent.mcq as Record<string, unknown>).options;
-            bankContent.correctAnswer = (questionContent.mcq as Record<string, unknown>).correct_answer;
-            bankContent.explanation = (questionContent.mcq as Record<string, unknown>).explanation;
-          } else if (questionType === "short_answer" && questionContent.short_answer) {
-            bankContent.question = (questionContent.short_answer as Record<string, unknown>).question;
-            bankContent.expectedAnswer = (questionContent.short_answer as Record<string, unknown>).expected_answer;
-            bankContent.explanation = (questionContent.short_answer as Record<string, unknown>).explanation;
-          }
-
-          const bankQuestionType = questionType === "mcq" ? "multiple_choice" : questionType;
-          const { error } = await supabase
-            .from("instructor_question_bank")
-            .insert({
-              instructor_id: user.id,
-              title: questionName,
-              question_type: bankQuestionType,
-              question_content: bankContent,
-              difficulty: difficulty,
-              source_material_id: material_id,
-              source_material_title: source_material_title || null,
-              org_id: orgId,
-              course_id: course_id || null,
-            });
-          insertError = error;
-        } else {
-          // Legacy: insert into slide_preset_questions
-          const { error } = await supabase
-            .from("slide_preset_questions")
-            .insert({
-              material_id,
-              instructor_id: user.id,
-              slide_number: slide.number,
-              question_type: questionType,
-              question_content: questionContent,
-              question_name: questionName,
-              is_enabled: true,
-              order_index: 0,
-              generation_source: "auto",
-              org_id: orgId,
-              course_id: course_id || null,
-            });
-          insertError = error;
-        }
-
-        if (insertError) {
-          console.error(`DB insert error for slide ${slide.number}:`, insertError);
-          results.push({ slide_number: slide.number, success: false, error: insertError.message });
+        if (rawQuestions.length === 0) {
+          results.push({ slide_number: slide.number, success: false, error: "no questions in AI response" });
           continue;
         }
 
-        console.log(`✅ Question generated for slide ${slide.number}`);
-        results.push({ slide_number: slide.number, success: true });
+        const cappedQuestions = rawQuestions.slice(0, MAX_QUESTIONS_PER_SLIDE);
+        let addedForSlide = 0;
+        let lastError: string | undefined;
+
+        for (let qIdx = 0; qIdx < cappedQuestions.length; qIdx++) {
+          const q = cappedQuestions[qIdx];
+          const questionType = q.questionType || "mcq";
+          let questionContent: Record<string, unknown> = {};
+
+          if (questionType === "mcq") {
+            questionContent = {
+              mcq: {
+                question: q.question || "",
+                options: q.options || ["", "", "", ""],
+                correct_answer: q.correctAnswer || "A",
+                explanation: q.explanation || "",
+              },
+            };
+          } else if (questionType === "short_answer") {
+            questionContent = {
+              short_answer: {
+                question: q.question || "",
+                expected_answer: q.expectedAnswer || "",
+                explanation: q.explanation || "",
+              },
+            };
+          }
+
+          const questionName = cappedQuestions.length > 1
+            ? `Slide ${slide.number} Question ${qIdx + 1}`
+            : `Slide ${slide.number} Question`;
+          let insertError;
+
+          if (target === "question_bank") {
+            const bankContent: Record<string, unknown> = {};
+            if (questionType === "mcq" && questionContent.mcq) {
+              const mcq = questionContent.mcq as Record<string, unknown>;
+              bankContent.question = mcq.question;
+              bankContent.options = mcq.options;
+              bankContent.correctAnswer = mcq.correct_answer;
+              bankContent.explanation = mcq.explanation;
+            } else if (questionType === "short_answer" && questionContent.short_answer) {
+              const sa = questionContent.short_answer as Record<string, unknown>;
+              bankContent.question = sa.question;
+              bankContent.expectedAnswer = sa.expected_answer;
+              bankContent.explanation = sa.explanation;
+            }
+
+            const bankQuestionType = questionType === "mcq" ? "multiple_choice" : questionType;
+            const { error } = await supabase
+              .from("instructor_question_bank")
+              .insert({
+                instructor_id: user.id,
+                title: questionName,
+                question_type: bankQuestionType,
+                question_content: bankContent,
+                difficulty: difficulty,
+                source_material_id: material_id,
+                source_material_title: source_material_title || null,
+                org_id: orgId,
+                course_id: course_id || null,
+              });
+            insertError = error;
+          } else {
+            const { error } = await supabase
+              .from("slide_preset_questions")
+              .insert({
+                material_id,
+                instructor_id: user.id,
+                slide_number: slide.number,
+                question_type: questionType,
+                question_content: questionContent,
+                question_name: questionName,
+                is_enabled: true,
+                order_index: qIdx,
+                generation_source: "auto",
+                org_id: orgId,
+                course_id: course_id || null,
+              });
+            insertError = error;
+          }
+
+          if (insertError) {
+            console.error(`DB insert error for slide ${slide.number} q${qIdx + 1}:`, insertError);
+            lastError = insertError.message;
+            continue;
+          }
+          addedForSlide++;
+        }
+
+        if (addedForSlide === 0) {
+          results.push({ slide_number: slide.number, success: false, error: lastError || "no questions inserted" });
+          continue;
+        }
+
+        console.log(`✅ Slide ${slide.number}: ${addedForSlide} question(s) added`);
+        results.push({ slide_number: slide.number, success: true, questions_added: addedForSlide });
 
         // Small delay between API calls to avoid rate limiting
         await new Promise(r => setTimeout(r, 500));
@@ -276,7 +316,7 @@ Return ONLY valid JSON.`;
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.reduce((sum, r) => sum + (r.questions_added || (r.success ? 1 : 0)), 0);
     const skippedCount = results.filter(r => r.error === "skipped").length;
 
     return new Response(
