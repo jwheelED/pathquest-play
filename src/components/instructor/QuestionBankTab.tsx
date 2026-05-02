@@ -239,57 +239,61 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
               </div>
             </div>
 
-            {/* Row 2: Mode tabs + search + filter */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              <Tabs value={mode} onValueChange={(v) => setMode(v as "prep" | "live")} className="shrink-0">
-                <TabsList className="h-9">
-                  <TabsTrigger value="prep" className="text-xs px-3 gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    Prep
-                  </TabsTrigger>
-                  <TabsTrigger value="live" className="text-xs px-3 gap-1.5">
-                    <Zap className="w-3.5 h-3.5" />
-                    Live Push
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search questions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9"
-                />
-              </div>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px] h-9">
-                  <SelectValue placeholder="Filter type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {view === "bank" && (
+              <>
+                {/* Row 2: Mode tabs + search + filter */}
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                  <Tabs value={mode} onValueChange={(v) => setMode(v as "prep" | "live")} className="shrink-0">
+                    <TabsList className="h-9">
+                      <TabsTrigger value="prep" className="text-xs px-3 gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Prep
+                      </TabsTrigger>
+                      <TabsTrigger value="live" className="text-xs px-3 gap-1.5">
+                        <Zap className="w-3.5 h-3.5" />
+                        Live Push
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search questions..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="Filter type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTypes.map(type => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Row 3: Stats */}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{totalCount} question{totalCount !== 1 ? "s" : ""}</span>
-              <span>·</span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                {readyCount} ready
-              </span>
-              <span>·</span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-secondary" />
-                {pushedCount} pushed
-              </span>
-            </div>
+                {/* Row 3: Stats */}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{totalCount} question{totalCount !== 1 ? "s" : ""}</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                    {readyCount} ready
+                  </span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-secondary" />
+                    {pushedCount} pushed
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
