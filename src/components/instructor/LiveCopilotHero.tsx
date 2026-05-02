@@ -717,38 +717,42 @@ export function LiveCopilotHero({
     setIsGeneratingPreview(true);
     setPreviewOptions([]);
     setPreviewExpectedAnswer("");
+    setBankMatch(null);
 
     const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
     const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
     const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
 
     if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
-      supabase.functions.invoke('generate-mcq-options', {
-        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-      }).then(({ data, error }) => {
+      applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
+        if (matched) {
+          setIsGeneratingPreview(false);
+          return;
+        }
+        supabase.functions.invoke('generate-mcq-options', {
+          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
+        }).then(({ data, error }) => {
         if (!error && data?.options && Array.isArray(data.options)) {
-          const labels = ['A', 'B', 'C', 'D'];
           const correctLetter: string = data.correct_answer ?? 'A';
-          const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
-            const stripped = opt.replace(/^[A-D]\.\s*/i, '');
-            return {
-              label: labels[i] ?? String.fromCharCode(65 + i),
-              text: stripped,
-              isCorrect: effectiveFormat === 'mcq' ? labels[i] === correctLetter : false,
-            };
-          });
-          setPreviewOptions(parsed);
+          setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
         }
         setIsGeneratingPreview(false);
+        }).catch(() => setIsGeneratingPreview(false));
       }).catch(() => setIsGeneratingPreview(false));
     } else {
-      supabase.functions.invoke('generate-expected-answer', {
-        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-      }).then(({ data, error }) => {
+      applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
+        if (matched) {
+          setIsGeneratingPreview(false);
+          return;
+        }
+        supabase.functions.invoke('generate-expected-answer', {
+          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
+        }).then(({ data, error }) => {
         if (!error && data?.expected_answer) {
           setPreviewExpectedAnswer(data.expected_answer as string);
         }
         setIsGeneratingPreview(false);
+        }).catch(() => setIsGeneratingPreview(false));
       }).catch(() => setIsGeneratingPreview(false));
     }
   }, [displayedQuestion, effectiveFormat]); // eslint-disable-line react-hooks/exhaustive-deps
