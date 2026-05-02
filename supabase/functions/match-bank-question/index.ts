@@ -19,6 +19,17 @@ function tokens(s: string): string[] {
     .filter(t => t.length > 2 && !STOP.has(t));
 }
 
+// Aggressive normalization for exact-string compare: lowercase, strip all
+// non-alphanumerics, collapse whitespace. Strips leading "1." / "Q2:" prefixes
+// that PDF parsing often preserves.
+function normalizeForExact(s: string): string {
+  return (s || '')
+    .toLowerCase()
+    .replace(/^\s*(q\s*\d+\s*[:.\-)]\s*|\d+\s*[:.\-)]\s*)/i, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
 function overlap(a: string[], b: string[]): number {
   if (!a.length || !b.length) return 0;
   const setA = new Set(a);
@@ -84,6 +95,29 @@ serve(async (req) => {
       });
     }
 
+    // 0) Exact-string short-circuit. If a bank question's text matches the
+    // spoken question after aggressive normalization, return it immediately.
+    const askExact = normalizeForExact(question_text);
+    if (askExact.length > 0) {
+      const exactHit = bankRows.find((r: any) => {
+        const bq: string = r.question_content?.question || r.title || '';
+        return normalizeForExact(bq) === askExact;
+      });
+      if (exactHit) {
+        console.log(`[match-bank] exact_match id=${exactHit.id} title="${exactHit.title}"`);
+        return new Response(JSON.stringify({
+          match: {
+            id: exactHit.id,
+            title: exactHit.title,
+            question_type: exactHit.question_type,
+            question_content: exactHit.question_content,
+          },
+          confidence: 1.0,
+          source: 'exact_match',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     const askTokens = tokens(question_text);
 
     type Scored = {
@@ -107,8 +141,9 @@ serve(async (req) => {
       };
     }).sort((a, b) => b.score - a.score);
 
-    const top = scored.filter(s => s.score >= 0.4).slice(0, 8);
+    const top = scored.filter(s => s.score >= 0.3).slice(0, 8);
     if (top.length === 0) {
+      console.log(`[match-bank] no_lexical_match bank_size=${bankRows.length} top_score=${scored[0]?.score ?? 0}`);
       return new Response(JSON.stringify({ match: null, reason: 'no_lexical_match' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -190,12 +225,14 @@ serve(async (req) => {
     const confidence = args.confidence ?? 0;
 
     if (typeof idx !== 'number' || idx < 0 || idx >= top.length || confidence < 0.75) {
+      console.log(`[match-bank] low_confidence idx=${idx} conf=${confidence} top_score=${top[0]?.score}`);
       return new Response(JSON.stringify({ match: null, confidence, reason: 'low_confidence' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const picked = top[idx];
+    console.log(`[match-bank] ai_match id=${picked.id} conf=${confidence} title="${picked.title}"`);
     return new Response(JSON.stringify({
       match: {
         id: picked.id,

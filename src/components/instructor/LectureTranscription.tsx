@@ -4054,6 +4054,7 @@ export const LectureTranscription = ({
         onConfirmSend={handleConfirmPreviewSend}
         isSending={isSendingFromPreview}
         sourceTranscript={transcriptBufferRef.current.slice(-500)}
+        courseId={selectedCourseId}
       />
 
       {/* Question on Deck — persistent autodraft card */}
