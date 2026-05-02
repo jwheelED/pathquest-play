@@ -298,110 +298,114 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
         </CardContent>
       </Card>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: Question List (2/3) */}
-        <div className="lg:col-span-2 space-y-3">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : manualQuestions.length === 0 && sourceGroups.length === 0 ? (
-            <Card className="headspace-card">
-              <CardContent className="text-center py-12">
-                <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                <h3 className="font-medium text-muted-foreground mb-1">
-                  {questions.length === 0 ? "No questions yet" : "No matching questions"}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {questions.length === 0 
-                    ? "Create your first question or upload slides to get started" 
-                    : "Try adjusting your search or filters"
-                  }
-                </p>
-                {questions.length === 0 && (
-                  <div className="flex gap-2 justify-center">
-                    <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
-                      <FileUp className="w-4 h-4 mr-2" />
-                      Upload Slides
-                    </Button>
-                    <Button onClick={() => setCreateDialogOpen(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Question
-                    </Button>
+      {view === "results" ? (
+        <QuestionBankResults />
+      ) : (
+        /* Two-column layout */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Left: Question List (2/3) */}
+          <div className="lg:col-span-2 space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : manualQuestions.length === 0 && sourceGroups.length === 0 ? (
+              <Card className="headspace-card">
+                <CardContent className="text-center py-12">
+                  <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <h3 className="font-medium text-muted-foreground mb-1">
+                    {questions.length === 0 ? "No questions yet" : "No matching questions"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {questions.length === 0 
+                      ? "Create your first question or upload slides to get started" 
+                      : "Try adjusting your search or filters"
+                    }
+                  </p>
+                  {questions.length === 0 && (
+                    <div className="flex gap-2 justify-center">
+                      <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
+                        <FileUp className="w-4 h-4 mr-2" />
+                        Upload Slides
+                      </Button>
+                      <Button onClick={() => setCreateDialogOpen(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Question
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Manual questions */}
+                {manualQuestions.length > 0 && (
+                  <div className="space-y-2">
+                    {manualQuestions.map(question => (
+                      <QuestionBankCard
+                        key={question.id}
+                        question={question}
+                        mode={mode}
+                        selected={selectedQuestionId === question.id}
+                        onSelect={(q) => setSelectedQuestionId(q.id)}
+                        onEdit={(q) => {
+                          setEditQuestion(q);
+                          setCreateDialogOpen(true);
+                        }}
+                        onDelete={(q) => setDeleteQuestion(q)}
+                        onPush={(q) => setPushQuestion(q)}
+                      />
+                    ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Manual questions */}
-              {manualQuestions.length > 0 && (
-                <div className="space-y-2">
-                  {manualQuestions.map(question => (
-                    <QuestionBankCard
-                      key={question.id}
-                      question={question}
-                      mode={mode}
-                      selected={selectedQuestionId === question.id}
-                      onSelect={(q) => setSelectedQuestionId(q.id)}
-                      onEdit={(q) => {
-                        setEditQuestion(q);
-                        setCreateDialogOpen(true);
-                      }}
-                      onDelete={(q) => setDeleteQuestion(q)}
-                      onPush={(q) => setPushQuestion(q)}
-                    />
-                  ))}
-                </div>
-              )}
 
-              {/* Source material groups */}
-              {sourceGroups.length > 0 && (
-                <div className="space-y-3">
-                  {manualQuestions.length > 0 && (
-                    <h3 className="text-sm font-medium text-muted-foreground px-1 pt-2">
-                      From Uploaded Slides
-                    </h3>
-                  )}
-                  {sourceGroups.map(group => (
-                    <SourceMaterialCard
-                      key={group.id}
-                      sourceId={group.id}
-                      sourceTitle={group.title}
-                      questions={group.questions}
-                      mode={mode}
-                      selectedQuestionId={selectedQuestionId}
-                      onSelect={(q) => setSelectedQuestionId(q.id)}
-                      onEdit={(q) => {
-                        setEditQuestion(q);
-                        setCreateDialogOpen(true);
-                      }}
-                      onDelete={(q) => setDeleteQuestion(q)}
-                      onPush={(q) => setPushQuestion(q)}
-                      onDeleteAll={(id) => setDeleteSourceId(id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                {/* Source material groups */}
+                {sourceGroups.length > 0 && (
+                  <div className="space-y-3">
+                    {manualQuestions.length > 0 && (
+                      <h3 className="text-sm font-medium text-muted-foreground px-1 pt-2">
+                        From Uploaded Slides
+                      </h3>
+                    )}
+                    {sourceGroups.map(group => (
+                      <SourceMaterialCard
+                        key={group.id}
+                        sourceId={group.id}
+                        sourceTitle={group.title}
+                        questions={group.questions}
+                        mode={mode}
+                        selectedQuestionId={selectedQuestionId}
+                        onSelect={(q) => setSelectedQuestionId(q.id)}
+                        onEdit={(q) => {
+                          setEditQuestion(q);
+                          setCreateDialogOpen(true);
+                        }}
+                        onDelete={(q) => setDeleteQuestion(q)}
+                        onPush={(q) => setPushQuestion(q)}
+                        onDeleteAll={(id) => setDeleteSourceId(id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
-        {/* Right: Preview Panel (1/3) */}
-        <div className="hidden lg:block">
-          <div className="sticky top-4">
-            <QuestionPreviewPanel
-              question={selectedQuestion}
-              onPush={(q) => setPushQuestion(q)}
-              onEdit={(q) => {
-                setEditQuestion(q);
-                setCreateDialogOpen(true);
-              }}
-            />
+          {/* Right: Preview Panel (1/3) */}
+          <div className="hidden lg:block">
+            <div className="sticky top-4">
+              <QuestionPreviewPanel
+                question={selectedQuestion}
+                onPush={(q) => setPushQuestion(q)}
+                onEdit={(q) => {
+                  setEditQuestion(q);
+                  setCreateDialogOpen(true);
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Dialogs (unchanged) */}
       <CreateQuestionDialog
