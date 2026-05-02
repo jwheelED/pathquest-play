@@ -38,6 +38,25 @@ function overlap(a: string[], b: string[]): number {
   return hits / Math.max(a.length, b.length);
 }
 
+function normalizeQuestionContent(questionType: string, content: any): Record<string, unknown> {
+  if (content?.mcq) {
+    return {
+      question: content.mcq.question || '',
+      options: content.mcq.options || [],
+      correctAnswer: content.mcq.correct_answer || content.mcq.correctAnswer || 'A',
+      explanation: content.mcq.explanation || '',
+    };
+  }
+  if (content?.short_answer) {
+    return {
+      question: content.short_answer.question || '',
+      expectedAnswer: content.short_answer.expected_answer || content.short_answer.expectedAnswer || '',
+      explanation: content.short_answer.explanation || '',
+    };
+  }
+  return content || { question: '', type: questionType };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -87,8 +106,31 @@ serve(async (req) => {
       q = q.or(`course_id.eq.${course_id},course_id.is.null`);
     }
 
-    const { data: bankRows, error: bankErr } = await q;
+    let slideQ = supabase
+      .from('slide_preset_questions')
+      .select('id, question_name, question_type, question_content')
+      .eq('instructor_id', user.id)
+      .in('question_type', formatTypes)
+      .limit(200);
+
+    if (course_id) {
+      slideQ = slideQ.or(`course_id.eq.${course_id},course_id.is.null`);
+    }
+
+    const [{ data: bankData, error: bankErr }, { data: slideData, error: slideErr }] = await Promise.all([q, slideQ]);
     if (bankErr) throw bankErr;
+    if (slideErr) throw slideErr;
+
+    const bankRows = [
+      ...((bankData || []) as any[]).map((r) => ({ ...r, source_table: 'instructor_question_bank' })),
+      ...((slideData || []) as any[]).map((r) => ({
+        id: r.id,
+        title: r.question_name || 'Slide Question',
+        question_type: r.question_type === 'mcq' ? 'multiple_choice' : r.question_type,
+        question_content: normalizeQuestionContent(r.question_type, r.question_content),
+        source_table: 'slide_preset_questions',
+      })),
+    ];
     if (!bankRows || bankRows.length === 0) {
       return new Response(JSON.stringify({ match: null, reason: 'empty_bank' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
