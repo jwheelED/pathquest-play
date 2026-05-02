@@ -282,8 +282,42 @@ export function QuestionOnDeck({
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
     setExpectedAnswer('');
+    setBankMatch(null);
 
     try {
+      // 1) First try to match against the instructor's question bank.
+      try {
+        const { data: matchData } = await supabase.functions.invoke('match-bank-question', {
+          body: { question_text: questionText, course_id: courseId ?? null, format },
+        });
+        const m = matchData?.match;
+        if (m && m.question_content) {
+          const qc = m.question_content;
+          if (format === 'multiple_choice' || format === 'poll') {
+            const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+            if (opts && opts.length === 4) {
+              setMcqOptions(opts);
+              const ca = qc.correctAnswer || qc.correct_answer;
+              if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+                setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+              }
+              setBankMatch({ id: m.id, title: m.title });
+              return; // skip AI generation
+            }
+          } else if (format === 'short_answer') {
+            const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+            if (ea) {
+              setExpectedAnswer(String(ea));
+              setBankMatch({ id: m.id, title: m.title });
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Bank match lookup failed, falling back to AI', e);
+      }
+
+      // 2) Fall back to AI generation.
       const body: Record<string, unknown> = {
         question_text: questionText,
         source_transcript: transcriptContext,
