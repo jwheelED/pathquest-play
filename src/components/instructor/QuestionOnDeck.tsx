@@ -377,6 +377,7 @@ export function QuestionOnDeck({
         ? { options: mcqOptions, correctAnswer: effectiveFormat === 'multiple_choice' ? correctAnswer : undefined }
         : {}),
       ...(!isChoice && expectedAnswer.trim() ? { expectedAnswer } : {}),
+      ...(bankMatch ? { sourceBankItemId: bankMatch.id } : {}),
     };
 
     onSendNow(questionText, data);
