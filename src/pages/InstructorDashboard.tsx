@@ -579,6 +579,7 @@ export default function InstructorDashboard() {
                 intervalMinutes={autoQuestionState.intervalMinutes}
                 nextQuestionIn={autoQuestionState.nextQuestionIn}
                 onIntervalChange={(minutes) => onAutoQuestionIntervalChangeRef.current?.(minutes)}
+                courseId={selectedCourseId}
               />
             </section>
 
