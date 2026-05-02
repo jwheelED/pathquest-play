@@ -185,91 +185,123 @@ Hard cap: maximum 8 questions in the array. Return ONLY valid JSON.`;
           continue;
         }
 
-        // Build question_content in the same shape as ExtractedQuestionData
-        const questionType = parsed.questionType || "mcq";
-        let questionContent: Record<string, unknown> = {};
+        // Backward compat: support both new {questions: [...]} and old single-question shape
+        const rawQuestions: any[] = Array.isArray(parsed.questions)
+          ? parsed.questions
+          : (parsed.question || parsed.questionType)
+            ? [{
+                questionType: parsed.questionType || "mcq",
+                question: parsed.question,
+                options: parsed.options,
+                correctAnswer: parsed.correctAnswer,
+                expectedAnswer: parsed.expectedAnswer,
+                explanation: parsed.explanation,
+                source: "generated",
+              }]
+            : [];
 
-        if (questionType === "mcq") {
-          questionContent = {
-            mcq: {
-              question: parsed.question || "",
-              options: parsed.options || ["", "", "", ""],
-              correct_answer: parsed.correctAnswer || "A",
-              explanation: parsed.explanation || "",
-            },
-          };
-        } else if (questionType === "short_answer") {
-          questionContent = {
-            short_answer: {
-              question: parsed.question || "",
-              expected_answer: parsed.expectedAnswer || "",
-              explanation: parsed.explanation || "",
-            },
-          };
-        }
-
-        // Insert into appropriate table based on target
-        const questionName = `Slide ${slide.number} Question`;
-        let insertError;
-
-        if (target === "question_bank") {
-          // Insert into instructor_question_bank
-          // Flatten question_content for bank format
-          const bankContent: Record<string, unknown> = {};
-          if (questionType === "mcq" && questionContent.mcq) {
-            bankContent.question = (questionContent.mcq as Record<string, unknown>).question;
-            bankContent.options = (questionContent.mcq as Record<string, unknown>).options;
-            bankContent.correctAnswer = (questionContent.mcq as Record<string, unknown>).correct_answer;
-            bankContent.explanation = (questionContent.mcq as Record<string, unknown>).explanation;
-          } else if (questionType === "short_answer" && questionContent.short_answer) {
-            bankContent.question = (questionContent.short_answer as Record<string, unknown>).question;
-            bankContent.expectedAnswer = (questionContent.short_answer as Record<string, unknown>).expected_answer;
-            bankContent.explanation = (questionContent.short_answer as Record<string, unknown>).explanation;
-          }
-
-          const bankQuestionType = questionType === "mcq" ? "multiple_choice" : questionType;
-          const { error } = await supabase
-            .from("instructor_question_bank")
-            .insert({
-              instructor_id: user.id,
-              title: questionName,
-              question_type: bankQuestionType,
-              question_content: bankContent,
-              difficulty: difficulty,
-              source_material_id: material_id,
-              source_material_title: source_material_title || null,
-              org_id: orgId,
-              course_id: course_id || null,
-            });
-          insertError = error;
-        } else {
-          // Legacy: insert into slide_preset_questions
-          const { error } = await supabase
-            .from("slide_preset_questions")
-            .insert({
-              material_id,
-              instructor_id: user.id,
-              slide_number: slide.number,
-              question_type: questionType,
-              question_content: questionContent,
-              question_name: questionName,
-              is_enabled: true,
-              order_index: 0,
-              generation_source: "auto",
-              org_id: orgId,
-              course_id: course_id || null,
-            });
-          insertError = error;
-        }
-
-        if (insertError) {
-          console.error(`DB insert error for slide ${slide.number}:`, insertError);
-          results.push({ slide_number: slide.number, success: false, error: insertError.message });
+        if (rawQuestions.length === 0) {
+          results.push({ slide_number: slide.number, success: false, error: "no questions in AI response" });
           continue;
         }
 
-        console.log(`✅ Question generated for slide ${slide.number}`);
-        results.push({ slide_number: slide.number, success: true });
+        const cappedQuestions = rawQuestions.slice(0, MAX_QUESTIONS_PER_SLIDE);
+        let addedForSlide = 0;
+        let lastError: string | undefined;
+
+        for (let qIdx = 0; qIdx < cappedQuestions.length; qIdx++) {
+          const q = cappedQuestions[qIdx];
+          const questionType = q.questionType || "mcq";
+          let questionContent: Record<string, unknown> = {};
+
+          if (questionType === "mcq") {
+            questionContent = {
+              mcq: {
+                question: q.question || "",
+                options: q.options || ["", "", "", ""],
+                correct_answer: q.correctAnswer || "A",
+                explanation: q.explanation || "",
+              },
+            };
+          } else if (questionType === "short_answer") {
+            questionContent = {
+              short_answer: {
+                question: q.question || "",
+                expected_answer: q.expectedAnswer || "",
+                explanation: q.explanation || "",
+              },
+            };
+          }
+
+          const questionName = cappedQuestions.length > 1
+            ? `Slide ${slide.number} Question ${qIdx + 1}`
+            : `Slide ${slide.number} Question`;
+          let insertError;
+
+          if (target === "question_bank") {
+            const bankContent: Record<string, unknown> = {};
+            if (questionType === "mcq" && questionContent.mcq) {
+              const mcq = questionContent.mcq as Record<string, unknown>;
+              bankContent.question = mcq.question;
+              bankContent.options = mcq.options;
+              bankContent.correctAnswer = mcq.correct_answer;
+              bankContent.explanation = mcq.explanation;
+            } else if (questionType === "short_answer" && questionContent.short_answer) {
+              const sa = questionContent.short_answer as Record<string, unknown>;
+              bankContent.question = sa.question;
+              bankContent.expectedAnswer = sa.expected_answer;
+              bankContent.explanation = sa.explanation;
+            }
+
+            const bankQuestionType = questionType === "mcq" ? "multiple_choice" : questionType;
+            const { error } = await supabase
+              .from("instructor_question_bank")
+              .insert({
+                instructor_id: user.id,
+                title: questionName,
+                question_type: bankQuestionType,
+                question_content: bankContent,
+                difficulty: difficulty,
+                source_material_id: material_id,
+                source_material_title: source_material_title || null,
+                org_id: orgId,
+                course_id: course_id || null,
+              });
+            insertError = error;
+          } else {
+            const { error } = await supabase
+              .from("slide_preset_questions")
+              .insert({
+                material_id,
+                instructor_id: user.id,
+                slide_number: slide.number,
+                question_type: questionType,
+                question_content: questionContent,
+                question_name: questionName,
+                is_enabled: true,
+                order_index: qIdx,
+                generation_source: "auto",
+                org_id: orgId,
+                course_id: course_id || null,
+              });
+            insertError = error;
+          }
+
+          if (insertError) {
+            console.error(`DB insert error for slide ${slide.number} q${qIdx + 1}:`, insertError);
+            lastError = insertError.message;
+            continue;
+          }
+          addedForSlide++;
+        }
+
+        if (addedForSlide === 0) {
+          results.push({ slide_number: slide.number, success: false, error: lastError || "no questions inserted" });
+          continue;
+        }
+
+        console.log(`✅ Slide ${slide.number}: ${addedForSlide} question(s) added`);
+        results.push({ slide_number: slide.number, success: true, questions_added: addedForSlide });
 
         // Small delay between API calls to avoid rate limiting
         await new Promise(r => setTimeout(r, 500));
