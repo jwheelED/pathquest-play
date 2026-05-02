@@ -237,6 +237,7 @@ export function QuestionOnDeck({
   suggestedType = 'multiple_choice',
   formatPreference,
   transcriptContext,
+  courseId,
 }: QuestionOnDeckProps) {
   const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
 
@@ -249,6 +250,7 @@ export function QuestionOnDeck({
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [expectedAnswer, setExpectedAnswer] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [bankMatch, setBankMatch] = useState<{ id: string; title: string } | null>(null);
 
   // Track which candidate text we last generated for to avoid duplicate calls
   const generatedForRef = useRef<string | null>(null);
@@ -272,6 +274,7 @@ export function QuestionOnDeck({
       setMcqOptions(['', '', '', '']);
       setCorrectAnswer('A');
       setExpectedAnswer('');
+      setBankMatch(null);
     }
   }, [candidate]);
 
