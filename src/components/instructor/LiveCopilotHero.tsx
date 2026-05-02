@@ -663,6 +663,53 @@ export function LiveCopilotHero({
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < questionHistory.length - 1;
 
+  const applyBankMatch = async (questionText: string, format: QuestionType): Promise<boolean> => {
+    const matchFormat = format === "mcq" ? "multiple_choice" : format;
+    const { data, error } = await supabase.functions.invoke("match-bank-question", {
+      body: { question_text: questionText, course_id: courseId ?? null, format: matchFormat },
+    });
+    if (error) return false;
+
+    const matchData = data as {
+      match?: {
+        id?: string;
+        title?: string;
+        source_table?: string;
+        question_content?: {
+          options?: unknown;
+          correctAnswer?: unknown;
+          correct_answer?: unknown;
+          expectedAnswer?: unknown;
+          expected_answer?: unknown;
+          finalAnswer?: unknown;
+        };
+      };
+      source?: string;
+    } | null;
+    const match = matchData?.match;
+    const content = match?.question_content;
+    if (!match || !content) return false;
+
+    if (format === "mcq" || format === "poll") {
+      const options = Array.isArray(content.options) ? content.options.slice(0, 4).map(String) : [];
+      if (options.length !== 4) return false;
+      const rawCorrect = content.correctAnswer ?? content.correct_answer;
+      const correctLetter = typeof rawCorrect === "string" && ["A", "B", "C", "D"].includes(rawCorrect) ? rawCorrect : "A";
+      setPreviewOptions(parseOptions(options, correctLetter, format === "mcq"));
+      setBankMatch({ id: match.id ?? "", title: match.title ?? "Question Bank", source: matchData?.source ?? match.source_table ?? "bank_match" });
+      return true;
+    }
+
+    const expected = content.expectedAnswer ?? content.expected_answer ?? content.finalAnswer;
+    if (typeof expected === "string" && expected.trim()) {
+      setPreviewExpectedAnswer(expected);
+      setBankMatch({ id: match.id ?? "", title: match.title ?? "Question Bank", source: matchData?.source ?? match.source_table ?? "bank_match" });
+      return true;
+    }
+
+    return false;
+  };
+
   // Auto-generate preview when displayedQuestion changes
   useEffect(() => {
     if (!displayedQuestion || generatedForRef.current === displayedQuestion) return;
