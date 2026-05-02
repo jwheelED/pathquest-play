@@ -287,6 +287,11 @@ export function VoiceQuestionPreviewDialog({
     try {
       console.log('🔄 Auto-generating MCQ options for:', questionText.substring(0, 50));
 
+      // First try the question bank for an exact/semantic match (MCQ + poll share opts)
+      const fmt = questionType === 'poll' ? 'poll' : 'multiple_choice';
+      const bankHit = await tryApplyBankMatch(fmt);
+      if (bankHit) return;
+
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
