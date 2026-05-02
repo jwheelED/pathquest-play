@@ -71,6 +71,12 @@ interface MCQOption {
   isCorrect: boolean;
 }
 
+interface BankMatchPreview {
+  id: string;
+  title: string;
+  source: string;
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface LiveCopilotHeroProps {
@@ -96,6 +102,7 @@ interface LiveCopilotHeroProps {
   intervalMinutes?: number;
   nextQuestionIn?: number;
   onIntervalChange?: (minutes: number) => void;
+  courseId?: string | null;
 }
 
 // ─── Default MCQ options ─────────────────────────────────────────────────────
