@@ -225,12 +225,14 @@ serve(async (req) => {
     const confidence = args.confidence ?? 0;
 
     if (typeof idx !== 'number' || idx < 0 || idx >= top.length || confidence < 0.75) {
+      console.log(`[match-bank] low_confidence idx=${idx} conf=${confidence} top_score=${top[0]?.score}`);
       return new Response(JSON.stringify({ match: null, confidence, reason: 'low_confidence' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const picked = top[idx];
+    console.log(`[match-bank] ai_match id=${picked.id} conf=${confidence} title="${picked.title}"`);
     return new Response(JSON.stringify({
       match: {
         id: picked.id,
