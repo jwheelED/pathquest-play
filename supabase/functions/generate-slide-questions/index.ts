@@ -78,11 +78,16 @@ serve(async (req) => {
       try {
         console.log(`📋 Generating question for slide ${slide.number}`);
 
-        const prompt = `You are analyzing a lecture slide image. Your job is to determine if this slide has enough educational content to generate a question, and if so, generate ONE high-quality question.
+        const prompt = `You are analyzing a lecture slide image. Extract or generate ALL high-quality multiple choice questions present on this slide.
 
 SKIP slides that are: title slides, table of contents, "thank you" slides, transition slides, or slides with only images/logos and no educational text.
 
-Difficulty level: ${difficulty}
+EXTRACTION PRIORITY:
+1. If the slide ALREADY contains one or more questions (e.g. numbered Q1, Q2, practice problems, quiz items), extract EVERY question VERBATIM. Preserve the original question text and answer choices exactly. Do not paraphrase. Cap at 8 questions per slide.
+2. If the slide does NOT contain explicit questions but has meaningful educational content, GENERATE up to 2 multiple choice questions testing the key concepts.
+3. If neither applies, mark the slide as skipped.
+
+Difficulty level (for generated questions only): ${difficulty}
 
 MATH FORMATTING - CRITICAL:
 Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
@@ -98,29 +103,31 @@ Write all math as plain readable text using Unicode:
 - Apply to the question AND all answer options
 - Reproduce the EXACT notation from the slide using Unicode
 
-If the slide has meaningful educational content, generate a multiple choice question.
+For graphs, charts, diagrams: read axis labels, data points, trends and test understanding of the visual data.
 
-For graphs, charts, diagrams:
-- Read axis labels, data points, trends
-- Generate questions testing understanding of the visual data
+DISTRACTOR RULES: All MCQ options must be plausible and realistic. NEVER use "None of the above", "All of the above", or "Not specified".
 
-Return ONLY valid JSON in one of these formats:
+Return ONLY valid JSON in this exact format:
 
-If question can be generated:
+If one or more questions can be extracted/generated:
 {
   "found": true,
-  "questionType": "mcq",
-  "question": "Clear, specific question based on slide content (plain Unicode math, no LaTeX)",
-  "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
-  "correctAnswer": "A",
-  "explanation": "Brief explanation of the correct answer",
-  "difficulty": "${difficulty}"
+  "questions": [
+    {
+      "questionType": "mcq",
+      "question": "Clear, specific question (plain Unicode math, no LaTeX)",
+      "options": ["A. First option", "B. Second option", "C. Third option", "D. Fourth option"],
+      "correctAnswer": "A",
+      "explanation": "Brief explanation",
+      "source": "extracted" | "generated"
+    }
+  ]
 }
 
 If slide should be skipped:
-{"found": false, "reason": "title slide" }
+{"found": false, "reason": "title slide"}
 
-Return ONLY valid JSON.`;
+Hard cap: maximum 8 questions in the array. Return ONLY valid JSON.`;
 
         const response = await callClaude({
           messages: [
