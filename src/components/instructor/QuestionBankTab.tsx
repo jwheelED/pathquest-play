@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Library, Loader2, FileUp, Zap, BookOpen } from "lucide-react";
+import { Plus, Search, Library, Loader2, FileUp, Zap, BookOpen, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -34,6 +34,7 @@ import {
   type BankQuestion 
 } from "./question-bank";
 import { QuestionPreviewPanel } from "./question-bank/QuestionPreviewPanel";
+import { QuestionBankResults } from "./QuestionBankResults";
 
 interface QuestionBankTabProps {
   professorType: string | null;
