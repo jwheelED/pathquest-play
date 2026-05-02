@@ -71,6 +71,12 @@ interface MCQOption {
   isCorrect: boolean;
 }
 
+interface BankMatchPreview {
+  id: string;
+  title: string;
+  source: string;
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface LiveCopilotHeroProps {
@@ -96,6 +102,7 @@ interface LiveCopilotHeroProps {
   intervalMinutes?: number;
   nextQuestionIn?: number;
   onIntervalChange?: (minutes: number) => void;
+  courseId?: string | null;
 }
 
 // ─── Default MCQ options ─────────────────────────────────────────────────────
@@ -128,6 +135,15 @@ function formatTimeLeft(seconds: number, fallback = "Now") {
   const secs = seconds % 60;
   if (mins > 0) return `${mins}m ${secs}s`;
   return `${secs}s`;
+}
+
+function parseOptions(options: string[], correctLetter = "A", markCorrect = true): MCQOption[] {
+  const labels = ["A", "B", "C", "D"];
+  return options.slice(0, 4).map((opt, i) => {
+    const label = labels[i] ?? String.fromCharCode(65 + i);
+    const stripped = opt.replace(/^[A-D]\.?\s*/i, "");
+    return { label, text: stripped, isCorrect: markCorrect ? label === correctLetter : false };
+  });
 }
 
 const INTERVAL_OPTIONS = [
@@ -584,6 +600,7 @@ export function LiveCopilotHero({
   intervalMinutes = 15,
   nextQuestionIn = 0,
   onIntervalChange,
+  courseId,
 }: LiveCopilotHeroProps) {
   const [isEditingQuestion, setIsEditingQuestion] = useState(false);
   const [editText, setEditText] = useState("");
@@ -597,6 +614,7 @@ export function LiveCopilotHero({
   const [previewOptions, setPreviewOptions] = useState<MCQOption[]>([]);
   const [previewExpectedAnswer, setPreviewExpectedAnswer] = useState("");
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [bankMatch, setBankMatch] = useState<BankMatchPreview | null>(null);
   const generatedForRef = useRef<string | null>(null);
   const priorContextByQuestionRef = useRef<Map<string, string>>(new Map());
 
@@ -645,6 +663,53 @@ export function LiveCopilotHero({
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < questionHistory.length - 1;
 
+  const applyBankMatch = async (questionText: string, format: QuestionType): Promise<boolean> => {
+    const matchFormat = format === "mcq" ? "multiple_choice" : format;
+    const { data, error } = await supabase.functions.invoke("match-bank-question", {
+      body: { question_text: questionText, course_id: courseId ?? null, format: matchFormat },
+    });
+    if (error) return false;
+
+    const matchData = data as {
+      match?: {
+        id?: string;
+        title?: string;
+        source_table?: string;
+        question_content?: {
+          options?: unknown;
+          correctAnswer?: unknown;
+          correct_answer?: unknown;
+          expectedAnswer?: unknown;
+          expected_answer?: unknown;
+          finalAnswer?: unknown;
+        };
+      };
+      source?: string;
+    } | null;
+    const match = matchData?.match;
+    const content = match?.question_content;
+    if (!match || !content) return false;
+
+    if (format === "mcq" || format === "poll") {
+      const options = Array.isArray(content.options) ? content.options.slice(0, 4).map(String) : [];
+      if (options.length !== 4) return false;
+      const rawCorrect = content.correctAnswer ?? content.correct_answer;
+      const correctLetter = typeof rawCorrect === "string" && ["A", "B", "C", "D"].includes(rawCorrect) ? rawCorrect : "A";
+      setPreviewOptions(parseOptions(options, correctLetter, format === "mcq"));
+      setBankMatch({ id: match.id ?? "", title: match.title ?? "Question Bank", source: matchData?.source ?? match.source_table ?? "bank_match" });
+      return true;
+    }
+
+    const expected = content.expectedAnswer ?? content.expected_answer ?? content.finalAnswer;
+    if (typeof expected === "string" && expected.trim()) {
+      setPreviewExpectedAnswer(expected);
+      setBankMatch({ id: match.id ?? "", title: match.title ?? "Question Bank", source: matchData?.source ?? match.source_table ?? "bank_match" });
+      return true;
+    }
+
+    return false;
+  };
+
   // Auto-generate preview when displayedQuestion changes
   useEffect(() => {
     if (!displayedQuestion || generatedForRef.current === displayedQuestion) return;
@@ -652,38 +717,42 @@ export function LiveCopilotHero({
     setIsGeneratingPreview(true);
     setPreviewOptions([]);
     setPreviewExpectedAnswer("");
+    setBankMatch(null);
 
     const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
     const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
     const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
 
     if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
-      supabase.functions.invoke('generate-mcq-options', {
-        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-      }).then(({ data, error }) => {
+      applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
+        if (matched) {
+          setIsGeneratingPreview(false);
+          return;
+        }
+        supabase.functions.invoke('generate-mcq-options', {
+          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
+        }).then(({ data, error }) => {
         if (!error && data?.options && Array.isArray(data.options)) {
-          const labels = ['A', 'B', 'C', 'D'];
           const correctLetter: string = data.correct_answer ?? 'A';
-          const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
-            const stripped = opt.replace(/^[A-D]\.\s*/i, '');
-            return {
-              label: labels[i] ?? String.fromCharCode(65 + i),
-              text: stripped,
-              isCorrect: effectiveFormat === 'mcq' ? labels[i] === correctLetter : false,
-            };
-          });
-          setPreviewOptions(parsed);
+          setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
         }
         setIsGeneratingPreview(false);
+        }).catch(() => setIsGeneratingPreview(false));
       }).catch(() => setIsGeneratingPreview(false));
     } else {
-      supabase.functions.invoke('generate-expected-answer', {
-        body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-      }).then(({ data, error }) => {
+      applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
+        if (matched) {
+          setIsGeneratingPreview(false);
+          return;
+        }
+        supabase.functions.invoke('generate-expected-answer', {
+          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
+        }).then(({ data, error }) => {
         if (!error && data?.expected_answer) {
           setPreviewExpectedAnswer(data.expected_answer as string);
         }
         setIsGeneratingPreview(false);
+        }).catch(() => setIsGeneratingPreview(false));
       }).catch(() => setIsGeneratingPreview(false));
     }
   }, [displayedQuestion, effectiveFormat]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -752,36 +821,40 @@ export function LiveCopilotHero({
       setIsGeneratingPreview(true);
       setPreviewOptions([]);
       setPreviewExpectedAnswer("");
+      setBankMatch(null);
       const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
       const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
       const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
       if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
-        supabase.functions.invoke('generate-mcq-options', {
-          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-        }).then(({ data, error }) => {
+        applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
+          if (matched) {
+            setIsGeneratingPreview(false);
+            return;
+          }
+          supabase.functions.invoke('generate-mcq-options', {
+            body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
+          }).then(({ data, error }) => {
           if (!error && data?.options && Array.isArray(data.options)) {
-            const labels = ['A', 'B', 'C', 'D'];
             const correctLetter: string = data.correct_answer ?? 'A';
-            const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
-              const stripped = opt.replace(/^[A-D]\.\s*/i, '');
-              return {
-                label: labels[i] ?? String.fromCharCode(65 + i),
-                text: stripped,
-                isCorrect: effectiveFormat === 'mcq' ? labels[i] === correctLetter : false,
-              };
-            });
-            setPreviewOptions(parsed);
+            setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
           }
           setIsGeneratingPreview(false);
+          }).catch(() => setIsGeneratingPreview(false));
         }).catch(() => setIsGeneratingPreview(false));
       } else {
-        supabase.functions.invoke('generate-expected-answer', {
-          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-        }).then(({ data, error }) => {
+        applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
+          if (matched) {
+            setIsGeneratingPreview(false);
+            return;
+          }
+          supabase.functions.invoke('generate-expected-answer', {
+            body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
+          }).then(({ data, error }) => {
           if (!error && data?.expected_answer) {
             setPreviewExpectedAnswer(data.expected_answer as string);
           }
           setIsGeneratingPreview(false);
+          }).catch(() => setIsGeneratingPreview(false));
         }).catch(() => setIsGeneratingPreview(false));
       }
     }
@@ -1102,6 +1175,11 @@ export function LiveCopilotHero({
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
                         {effectiveFormat === 'mcq' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
                       </span>
+                      {bankMatch && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700">
+                          From bank
+                        </span>
+                      )}
                       {questionHistory.length > 1 && (
                         <span className="text-[10px] text-neutral-400 tabular-nums">
                           {historyIndex + 1} of {questionHistory.length}
