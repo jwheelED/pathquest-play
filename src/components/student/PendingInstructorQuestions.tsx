@@ -55,10 +55,13 @@ export function PendingInstructorQuestions({ userId }: Props) {
           const a = payload.new as PendingAssignment;
           sonnerToast.success("New question from your instructor", {
             description: a.title || "Open it on your class dashboard",
-            action: a.course_id
+            action: a.instructor_id
               ? {
                   label: "Open",
-                  onClick: () => navigate(`/dashboard/class/${a.course_id}`),
+                  onClick: () =>
+                    navigate(
+                      `/class/${a.instructor_id}${a.course_id ? `?course=${a.course_id}` : ""}`
+                    ),
                 }
               : undefined,
           });
