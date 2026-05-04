@@ -165,8 +165,10 @@ export function PendingInstructorQuestions({ userId }: Props) {
             <button
               key={q.id}
               onClick={() => {
-                if (q.course_id) {
-                  navigate(`/dashboard/class/${q.course_id}`);
+                if (q.instructor_id) {
+                  navigate(
+                    `/class/${q.instructor_id}${q.course_id ? `?course=${q.course_id}` : ""}`
+                  );
                 } else {
                   sonnerToast.info("Open your class to answer this question");
                 }
