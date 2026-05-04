@@ -55,10 +55,13 @@ export function PendingInstructorQuestions({ userId }: Props) {
           const a = payload.new as PendingAssignment;
           sonnerToast.success("New question from your instructor", {
             description: a.title || "Open it on your class dashboard",
-            action: a.course_id
+            action: a.instructor_id
               ? {
                   label: "Open",
-                  onClick: () => navigate(`/dashboard/class/${a.course_id}`),
+                  onClick: () =>
+                    navigate(
+                      `/class/${a.instructor_id}${a.course_id ? `?course=${a.course_id}` : ""}`
+                    ),
                 }
               : undefined,
           });
@@ -162,8 +165,10 @@ export function PendingInstructorQuestions({ userId }: Props) {
             <button
               key={q.id}
               onClick={() => {
-                if (q.course_id) {
-                  navigate(`/dashboard/class/${q.course_id}`);
+                if (q.instructor_id) {
+                  navigate(
+                    `/class/${q.instructor_id}${q.course_id ? `?course=${q.course_id}` : ""}`
+                  );
                 } else {
                   sonnerToast.info("Open your class to answer this question");
                 }
@@ -184,12 +189,16 @@ export function PendingInstructorQuestions({ userId }: Props) {
             </button>
           );
         })}
-        {pending.length > 0 && pending[0].course_id && (
+        {pending.length > 0 && pending[0].instructor_id && (
           <Button
             variant="outline"
             size="sm"
             className="w-full mt-1"
-            onClick={() => navigate(`/dashboard/class/${pending[0].course_id}`)}
+            onClick={() =>
+              navigate(
+                `/class/${pending[0].instructor_id}${pending[0].course_id ? `?course=${pending[0].course_id}` : ""}`
+              )
+            }
           >
             Open class dashboard
             <ArrowRight className="w-4 h-4 ml-2" />
