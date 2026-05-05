@@ -2599,15 +2599,10 @@ export const LectureTranscription = ({
           setTranscriptChunks((prev) => [...prev, cleanText]);
           setLastTranscript(cleanText);
           
-          // Trigger-based question capture — try buffered capture first
-          const capturing = feedTriggerChunk(cleanText, Date.now());
-          
-          // Passive question detection — only if trigger capture is NOT active
-          // Pass rolling transcript buffer as priorContext for pronoun/reference resolution
-          if (!capturing) {
-            const rollingBuffer = (intervalTranscriptRef.current || "").trim();
-            checkPassiveQuestion(cleanText, rollingBuffer);
-          }
+          // Trigger-based question capture only — interrogative trigger phrases
+          // (what/why/how/when/where/who/which …). Question-mark-only utterances
+          // no longer trigger Question on Deck — too noisy from rhetorical asides.
+          feedTriggerChunk(cleanText, Date.now());
 
           // CONFIDENCE CHECK — runs after main detection, non-blocking
           confidenceCheckServiceRef.current
