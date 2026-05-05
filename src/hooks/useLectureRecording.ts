@@ -986,14 +986,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
-          // Trigger-based question capture — try buffered capture first
-          const capturing = feedTriggerChunk(cleanText, Date.now());
-          
-          // Passive question detection — only if trigger capture is NOT active
-          // Pass rolling transcript buffer as priorContext for pronoun/reference resolution
-          if (!capturing) {
-            checkPassiveQuestion(cleanText, intervalTranscriptRef.current);
-          }
+          // Trigger-based question capture only — interrogative trigger phrases.
+          // Bare question marks no longer fall back to passive detection
+          // (too many rhetorical asides were slipping through).
+          feedTriggerChunk(cleanText, Date.now());
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 
