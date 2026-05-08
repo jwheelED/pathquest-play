@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, Brain, BarChart3, FileText } from "lucide-react";
+import { Mic, Brain, BarChart3, FileText, GraduationCap, Presentation } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
 const MarketingLanding = () => {
@@ -35,19 +35,21 @@ const MarketingLanding = () => {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
             <Button 
-              size="lg" 
+              size="xl" 
               onClick={() => navigate("/instructor/auth")}
-              className="w-full sm:w-auto min-w-[200px]"
+              className="w-full sm:w-auto min-w-[240px] shadow-glow hover:shadow-neon transform hover:scale-105 transition-all"
             >
-              Get Started as Instructor
+              <Presentation className="w-5 h-5" />
+              Instructor Sign In
             </Button>
             <Button 
-              size="lg" 
-              variant="outline" 
+              size="xl" 
+              variant="secondary"
               onClick={() => navigate("/auth")}
-              className="w-full sm:w-auto min-w-[200px]"
+              className="w-full sm:w-auto min-w-[240px] shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
             >
-              Join as Student
+              <GraduationCap className="w-5 h-5" />
+              Student Sign In
             </Button>
           </div>
         </div>
