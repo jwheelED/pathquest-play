@@ -1188,29 +1188,28 @@ export const InteractiveLecturePlayer = ({
                       </div>
                     )}
 
-                    {/* Confidence Selector */}
+                    {/* Confidence Selector — selecting auto-submits */}
                     <div className="pt-4 border-t">
                       <InlineConfidenceSelector
                         selected={confidenceLevel}
-                        onSelect={setConfidenceLevel}
+                        disabled={
+                          isGrading ||
+                          (currentQuestion.question_type === 'multiple_choice'
+                            ? !selectedAnswer
+                            : !shortAnswer.trim())
+                        }
+                        onSelect={(level) => {
+                          setConfidenceLevel(level);
+                          handleSubmitAnswer(level);
+                        }}
                       />
-                    </div>
-
-                    <Button
-                      onClick={handleSubmitAnswer}
-                      className="w-full"
-                      size="lg"
-                      disabled={isGrading || !confidenceLevel || (currentQuestion.question_type === 'multiple_choice' ? !selectedAnswer : !shortAnswer.trim())}
-                    >
-                      {isGrading ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      {isGrading && (
+                        <div className="flex items-center justify-center gap-2 pt-3 text-sm text-muted-foreground">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
                           Grading...
-                        </>
-                      ) : (
-                        'Submit Answer'
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   </>
                 ) : (
                   <>
