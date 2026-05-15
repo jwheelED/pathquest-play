@@ -607,8 +607,9 @@ export const InteractiveLecturePlayer = ({
   const [shortAnswerGrade, setShortAnswerGrade] = useState<number | null>(null);
   const [shortAnswerFeedback, setShortAnswerFeedback] = useState<string | null>(null);
 
-  const handleSubmitAnswer = async () => {
-    if (!currentQuestion || !confidenceLevel) {
+  const handleSubmitAnswer = async (levelOverride?: string) => {
+    const effectiveLevel = levelOverride || confidenceLevel;
+    if (!currentQuestion || !effectiveLevel) {
       toast.error('Please select your confidence level');
       return;
     }
