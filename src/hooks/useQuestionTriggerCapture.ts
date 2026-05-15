@@ -253,18 +253,18 @@ function isRhetoricalOrGreeting(text: string): boolean {
 export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOptions = {}) {
   const {
     cooldownMs = 12000,
-    silenceGapMs = 2500,
-    bufferWindowMs = 60000,
-    lookbackMs = 30000,
-    completionTimeoutMs = 4500,
-    minHoldMs = 800,
-    maxBufferChars = 8000,
+    silenceGapMs = 1500,
+    bufferWindowMs = 90000,
+    lookbackMs = 45000,
+    completionTimeoutMs = 3500,
+    minHoldMs = 600,
+    maxBufferChars = 10000,
     enableCompletionGate = true,
-    extensionMs = 2500,
-    maxExtensions = 2,
+    extensionMs = 1500,
+    maxExtensions = 1,
     minCompleteWords = 6,
-    softCompleteMs = 3000,
-    minSilenceMs = 1200,
+    softCompleteMs = 2500,
+    minSilenceMs = 900,
     debug = true,
   } = options;
 
