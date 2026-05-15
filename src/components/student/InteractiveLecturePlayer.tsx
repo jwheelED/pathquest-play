@@ -674,7 +674,7 @@ export const InteractiveLecturePlayer = ({
     };
     
     const basePoints = 100;
-    const multiplier = multipliers[confidenceLevel] || 1;
+    const multiplier = multipliers[effectiveLevel] || 1;
     
     // For short answers, scale points by grade percentage
     let points: number;
