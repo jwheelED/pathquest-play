@@ -112,9 +112,9 @@ const CONFIDENCE_OPTIONS = [
   { key: 'absolutely_sure', label: 'Absolutely Sure', icon: Flame, multiplier: 3.0, color: 'text-red-500', bg: 'bg-red-500/10' },
 ];
 
-const InlineConfidenceSelector = ({ selected, onSelect }: { selected: string; onSelect: (val: string) => void }) => (
+const InlineConfidenceSelector = ({ selected, onSelect, disabled }: { selected: string; onSelect: (val: string) => void; disabled?: boolean }) => (
   <div className="space-y-2">
-    <Label className="text-sm font-medium">How confident are you?</Label>
+    <Label className="text-sm font-medium">How confident are you? <span className="text-xs text-muted-foreground font-normal">(tap to submit)</span></Label>
     <div className="grid grid-cols-2 gap-2">
       {CONFIDENCE_OPTIONS.map((opt) => {
         const Icon = opt.icon;
@@ -122,9 +122,11 @@ const InlineConfidenceSelector = ({ selected, onSelect }: { selected: string; on
           <button
             key={opt.key}
             type="button"
+            disabled={disabled}
             onClick={() => onSelect(opt.key)}
             className={cn(
               "flex items-center gap-2 p-3 rounded-lg border transition-all text-left",
+              disabled && "opacity-50 cursor-not-allowed",
               selected === opt.key 
                 ? `${opt.bg} border-current ${opt.color}` 
                 : "border-border hover:border-primary/30"
