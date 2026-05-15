@@ -535,7 +535,7 @@ export function QuestionOnDeck({
             </div>
 
             {/* Right: live editable preview */}
-            <div className="w-52 shrink-0">
+            <div className="w-[22rem] xl:w-[26rem] shrink-0">
               <PreviewPanel
                 questionText={candidate.text}
                 formatType={effectiveFormat}
