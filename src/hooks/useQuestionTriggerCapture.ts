@@ -318,11 +318,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
   /**
    * Get a structured slice of the buffer around the trigger:
-   *  - `question`: text from the most recent sentence boundary up to `now`
-   *               (the current interrogative utterance only).
-   *  - `context`:  text from `triggerTs - lookbackMs` up to that boundary
-   *               (the teaching prose that came BEFORE the question — used
-   *                downstream to resolve pronouns like "it" / "this").
+   *  - `question`: text from the trigger word forward.
+   *  - `context`:  teaching prose preceding the question, walking back from the
+   *               trigger and stopping at (a) a chunk-time gap > CHUNK_GAP_BOUNDARY_MS
+   *               (a real pause in speech) or (b) a topic-shift marker. Punctuation
+   *               from Deepgram is unreliable mid-lecture so we no longer rely on it
+   *               as the primary boundary — pauses are far more reliable signals of
+   *               where one teaching segment ends and another begins.
    */
   const getSliceAroundTrigger = useCallback((triggerTs: number, now: number): { question: string; context: string } => {
     const startCutoff = triggerTs - lookbackMs;
@@ -335,7 +337,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     const combined = relevantChunks.map(c => c.text).join(' ').trim();
     const lower = combined.toLowerCase();
 
-    // Find position of any trigger pattern match
+    // 1. Find position of trigger pattern in the combined text.
     let triggerPos = -1;
     for (const pattern of TRIGGER_PATTERNS) {
       const m = lower.match(pattern);
@@ -345,27 +347,66 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       }
     }
 
-    if (triggerPos > 0) {
-      const beforeTrigger = combined.substring(0, triggerPos);
-      const lastBoundary = Math.max(
-        beforeTrigger.lastIndexOf('.'),
-        beforeTrigger.lastIndexOf('?'),
-        beforeTrigger.lastIndexOf('!')
-      );
-      if (lastBoundary >= 0) {
-        const context = combined.substring(0, lastBoundary + 1).trim();
-        const question = combined.substring(lastBoundary + 1).trim();
-        return { question, context };
+    // 2. Map character position → chunk index (approximate, +1 per join space).
+    const chunkBoundaries: Array<{ end: number; idx: number }> = [];
+    let runningLen = 0;
+    relevantChunks.forEach((c, idx) => {
+      runningLen += (idx === 0 ? 0 : 1) + c.text.length;
+      chunkBoundaries.push({ end: runningLen, idx });
+    });
+
+    let triggerChunkIdx = relevantChunks.length - 1;
+    if (triggerPos >= 0) {
+      for (const b of chunkBoundaries) {
+        if (b.end >= triggerPos) {
+          triggerChunkIdx = b.idx;
+          break;
+        }
       }
-      // No prior boundary — the entire buffer is one running utterance.
-      // Treat everything before trigger as context, trigger-onwards as question.
-      const context = combined.substring(0, triggerPos).trim();
-      const question = combined.substring(triggerPos).trim();
-      return { question, context };
     }
 
-    // No trigger found in combined (shouldn't happen at this point) — return all as question
-    return { question: combined, context: '' };
+    // 3. Walk back from the trigger chunk to find the topic-segment start:
+    //    stop at a chunk gap > CHUNK_GAP_BOUNDARY_MS or at a topic-shift marker.
+    let contextStartIdx = 0;
+    for (let i = triggerChunkIdx; i > 0; i--) {
+      const gap = relevantChunks[i].timestamp - relevantChunks[i - 1].timestamp;
+      if (gap > CHUNK_GAP_BOUNDARY_MS) {
+        contextStartIdx = i;
+        break;
+      }
+      if (TOPIC_SHIFT_MARKERS.some(p => p.test(relevantChunks[i - 1].text))) {
+        contextStartIdx = i;
+        break;
+      }
+    }
+
+    const contextChunks = relevantChunks.slice(contextStartIdx, triggerChunkIdx);
+    const triggerOnwardChunks = relevantChunks.slice(triggerChunkIdx);
+
+    // 4. Within the trigger chunk + onward, the question starts at triggerPos.
+    //    Anything BEFORE the trigger word in that same chunk is part of the same
+    //    breath, so it counts as context.
+    const triggerOnwardText = triggerOnwardChunks.map(c => c.text).join(' ').trim();
+    let question = triggerOnwardText;
+    let triggerChunkPrefix = '';
+
+    if (triggerPos >= 0) {
+      const lowerOnward = triggerOnwardText.toLowerCase();
+      for (const pattern of TRIGGER_PATTERNS) {
+        const m = lowerOnward.match(pattern);
+        if (m && m.index !== undefined) {
+          triggerChunkPrefix = triggerOnwardText.substring(0, m.index).trim();
+          question = triggerOnwardText.substring(m.index).trim();
+          break;
+        }
+      }
+    }
+
+    const contextParts = [contextChunks.map(c => c.text).join(' ').trim(), triggerChunkPrefix]
+      .filter(Boolean);
+    const context = contextParts.join(' ').trim();
+
+    return { question: question || combined, context };
   }, [lookbackMs]);
 
   const finalizeCapture = useCallback((now: number, isForced = false) => {
