@@ -514,11 +514,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
-      // Light cleanup of priorContext: strip leading filler, cap at ~1500 chars
+      // Light cleanup of priorContext: strip leading filler, cap at ~3000 chars.
+      // Keep both head and tail when truncating so antecedents earlier in the
+      // segment aren't lost (most pronoun referents live in the head).
       let priorContext = (slice.context || '').trim();
       priorContext = priorContext.replace(FILLER_PREFIXES, '').trim();
-      if (priorContext.length > 1500) {
-        priorContext = priorContext.slice(-1500).trim();
+      if (priorContext.length > 3000) {
+        const head = priorContext.slice(0, 1200).trim();
+        const tail = priorContext.slice(-1700).trim();
+        priorContext = `${head} […] ${tail}`;
       }
 
       const candidate: PassiveQuestionCandidate = {
