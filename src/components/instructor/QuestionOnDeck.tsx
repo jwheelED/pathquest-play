@@ -185,14 +185,15 @@ function PreviewPanel({
                   />
                 )}
                 <span className="text-[10px] font-semibold text-muted-foreground w-3 shrink-0">{letter}</span>
-                <Input
+                <Textarea
                   value={options[idx] ?? ''}
                   onChange={(e) => {
                     const next = [...options];
                     next[idx] = e.target.value;
                     onOptionsChange(next);
                   }}
-                  className="h-6 text-[11px] px-2 py-0 flex-1 min-w-0"
+                  rows={1}
+                  className="text-[11px] leading-snug px-2 py-1 flex-1 min-w-0 min-h-[28px] resize-none break-words"
                   placeholder={`Option ${letter}`}
                 />
               </div>
