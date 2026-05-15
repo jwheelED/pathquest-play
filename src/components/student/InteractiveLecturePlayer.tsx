@@ -725,7 +725,7 @@ export const InteractiveLecturePlayer = ({
         correct,
         grade,
         feedback,
-        confidence: confidenceLevel,
+        confidence: effectiveLevel,
         points,
         timestamp: new Date().toISOString()
       };
