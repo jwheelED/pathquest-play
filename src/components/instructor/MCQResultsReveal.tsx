@@ -324,12 +324,6 @@ export const MCQResultsReveal = ({
         );
       })}
 
-      {/* Per-spec misconception variant label override */}
-      {classWideMisconception && beat >= 3 && misconceptionIdx >= 0 && (
-        <p className="text-xs italic text-slate-600 pl-12 -mt-1">
-          Class-wide misconception
-        </p>
-      )}
 
       {fullClassGotIt && (
         <p className="text-xs font-medium text-emerald-600 text-center pt-1 animate-fade-in">
