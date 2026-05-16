@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, Sparkles, Loader2 } from "lucide-react";
+import { X, Plus, Sparkles, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -244,8 +244,8 @@ export function CreateQuestionDialog({
     return true;
   };
   
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const handleSave = async (options?: { silent?: boolean }): Promise<string | null> => {
+    if (!validateForm()) return null;
     
     setSaving(true);
     try {
@@ -263,32 +263,67 @@ export function CreateQuestionDialog({
         updated_at: new Date().toISOString(),
       };
       
+      let savedId: string | null = null;
       if (editQuestion) {
-        // Update existing
         const { error } = await supabase
           .from("instructor_question_bank")
           .update(questionData)
           .eq("id", editQuestion.id);
-        
         if (error) throw error;
-        toast.success("Question updated!");
+        savedId = editQuestion.id;
+        if (!options?.silent) toast.success("Question updated!");
       } else {
-        // Create new
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("instructor_question_bank")
-          .insert(questionData);
-        
+          .insert(questionData)
+          .select("id")
+          .single();
         if (error) throw error;
-        toast.success("Question saved to bank!");
+        savedId = data.id;
+        if (!options?.silent) toast.success("Question saved to bank!");
       }
       
-      onSuccess();
-      onOpenChange(false);
+      return savedId;
     } catch (error: any) {
       console.error("Error saving question:", error);
       toast.error(error.message || "Failed to save question");
+      return null;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveClick = async () => {
+    const id = await handleSave();
+    if (id) {
+      onSuccess();
+      onOpenChange(false);
+    }
+  };
+
+  const [pushing, setPushing] = useState(false);
+  const handleSaveAndPush = async () => {
+    if (!selectedCourseId) {
+      toast.error("Please select a course first");
+      return;
+    }
+    const id = await handleSave({ silent: true });
+    if (!id) return;
+    setPushing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-bank-question", {
+        body: { questionId: id, courseId: selectedCourseId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Question pushed to ${data.studentCount || 0} student(s)!`);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Error pushing question:", error);
+      toast.error(error.message || "Failed to push question");
+    } finally {
+      setPushing(false);
     }
   };
   
@@ -366,18 +401,34 @@ export function CreateQuestionDialog({
           {questionType === "multiple_choice" && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
-                <Label>Question Text *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Question Text *</Label>
+                  {generatingMcq && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> AI generating options...
+                    </span>
+                  )}
+                </div>
                 <Textarea
-                  placeholder="Enter your question..."
+                  placeholder="Just write your question — AI fills in the options."
                   value={mcqQuestion}
                   onChange={(e) => setMcqQuestion(e.target.value)}
+                  onBlur={() => {
+                    if (
+                      mcqQuestion.trim().length > 5 &&
+                      mcqOptions.every((o) => !o.trim()) &&
+                      !generatingMcq
+                    ) {
+                      handleAiGenerateMcqOptions();
+                    }
+                  }}
                   rows={3}
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="mt-2"
+                  className="mt-1"
                   disabled={generatingMcq || !mcqQuestion.trim()}
                   onClick={handleAiGenerateMcqOptions}
                 >
@@ -386,7 +437,7 @@ export function CreateQuestionDialog({
                   ) : (
                     <Sparkles className="w-4 h-4 mr-2" />
                   )}
-                  {generatingMcq ? "Generating..." : "AI Suggest Options"}
+                  {generatingMcq ? "Generating..." : "Regenerate with AI"}
                 </Button>
               </div>
               
@@ -437,11 +488,27 @@ export function CreateQuestionDialog({
           {questionType === "short_answer" && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
-                <Label>Question Text *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Question Text *</Label>
+                  {generatingExpected && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> AI drafting expected answer...
+                    </span>
+                  )}
+                </div>
                 <Textarea
-                  placeholder="Enter your question..."
+                  placeholder="Just write your question — AI drafts the expected answer."
                   value={shortQuestion}
                   onChange={(e) => setShortQuestion(e.target.value)}
+                  onBlur={() => {
+                    if (
+                      shortQuestion.trim().length > 5 &&
+                      !shortExpectedAnswer.trim() &&
+                      !generatingExpected
+                    ) {
+                      handleAiGenerateExpectedAnswer();
+                    }
+                  }}
                   rows={3}
                 />
               </div>
@@ -558,13 +625,25 @@ export function CreateQuestionDialog({
           </div>
         </div>
         
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : editQuestion ? "Update Question" : "Save Question"}
+          <Button onClick={handleSaveClick} disabled={saving || pushing} variant="secondary">
+            {saving && !pushing ? "Saving..." : editQuestion ? "Update Question" : "Save Question"}
           </Button>
+          {!editQuestion && (
+            <Button onClick={handleSaveAndPush} disabled={saving || pushing || !selectedCourseId}>
+              {pushing ? (
+                "Pushing..."
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Save & Push Now
+                </>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
