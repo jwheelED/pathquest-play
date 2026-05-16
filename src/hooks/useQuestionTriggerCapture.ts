@@ -29,16 +29,38 @@ const RHETORICAL_BLOCKLIST = [
   'how are we doing', 'how are you doing', 'how is everyone doing',
 ];
 
-// Interrogative trigger patterns — must appear at the start of an utterance
+// Interrogative trigger patterns. Cover both classic WH-fronted questions AND
+// embedded/conversational forms ("tell me what...", "anyone know...", "could
+// someone explain...", "do you know..."). These match anywhere in the utterance,
+// not just at the start, so detection is far less brittle.
 const TRIGGER_PATTERNS = [
-  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part)\b/i,
-  /\bwhy\s+(is|are|do|does|did|would|can|could|should)\b/i,
-  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far)\b/i,
-  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should)\b/i,
-  /\bwhere\s+(is|are|do|does|did|would|was|were|can)\b/i,
-  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed)\b/i,
-  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method)\b/i,
+  // Classic WH questions
+  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i,
+  /\bwhy\s+(is|are|do|does|did|would|can|could|should|might|don'?t|doesn'?t|didn'?t)\b/i,
+  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far|come|might)\b/i,
+  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should|will|might)\b/i,
+  /\bwhere\s+(is|are|do|does|did|would|was|were|can|will|might)\b/i,
+  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed|made|wrote|said)\b/i,
+  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method|step|stage|phase|option|choice)\b/i,
+  // Embedded / conversational interrogatives
+  /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
+  /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
+  /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
+  /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
+  // "What if X?" / "What happens when X?" style
+  /\bwhat\s+would\s+happen\b/i,
+  /\bsuppose\s+that\b/i,
 ];
+
+// Topic-shift markers — when scanning back for context, stop at these.
+const TOPIC_SHIFT_MARKERS = [
+  /\b(alright|okay|ok|so|now)\s+(let'?s|let us|moving|next|switching|turning)\b/i,
+  /\b(next|moving on to|let'?s talk about|switching gears|on to)\b/i,
+  /\bnew topic\b/i,
+];
+
+// Chunks separated by more than this gap belong to a different breath/topic.
+const CHUNK_GAP_BOUNDARY_MS = 4000;
 
 // Leading filler words to strip
 const FILLER_PREFIXES = /^(so+|um+|uh+|like|well|okay so|okay|now|and so|but)\s+/i;
@@ -231,18 +253,18 @@ function isRhetoricalOrGreeting(text: string): boolean {
 export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOptions = {}) {
   const {
     cooldownMs = 12000,
-    silenceGapMs = 2500,
-    bufferWindowMs = 60000,
-    lookbackMs = 30000,
-    completionTimeoutMs = 4500,
-    minHoldMs = 800,
-    maxBufferChars = 8000,
+    silenceGapMs = 1500,
+    bufferWindowMs = 90000,
+    lookbackMs = 45000,
+    completionTimeoutMs = 3500,
+    minHoldMs = 600,
+    maxBufferChars = 10000,
     enableCompletionGate = true,
-    extensionMs = 2500,
-    maxExtensions = 2,
+    extensionMs = 1500,
+    maxExtensions = 1,
     minCompleteWords = 6,
-    softCompleteMs = 3000,
-    minSilenceMs = 1200,
+    softCompleteMs = 2500,
+    minSilenceMs = 900,
     debug = true,
   } = options;
 
@@ -296,11 +318,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
   /**
    * Get a structured slice of the buffer around the trigger:
-   *  - `question`: text from the most recent sentence boundary up to `now`
-   *               (the current interrogative utterance only).
-   *  - `context`:  text from `triggerTs - lookbackMs` up to that boundary
-   *               (the teaching prose that came BEFORE the question — used
-   *                downstream to resolve pronouns like "it" / "this").
+   *  - `question`: text from the trigger word forward.
+   *  - `context`:  teaching prose preceding the question, walking back from the
+   *               trigger and stopping at (a) a chunk-time gap > CHUNK_GAP_BOUNDARY_MS
+   *               (a real pause in speech) or (b) a topic-shift marker. Punctuation
+   *               from Deepgram is unreliable mid-lecture so we no longer rely on it
+   *               as the primary boundary — pauses are far more reliable signals of
+   *               where one teaching segment ends and another begins.
    */
   const getSliceAroundTrigger = useCallback((triggerTs: number, now: number): { question: string; context: string } => {
     const startCutoff = triggerTs - lookbackMs;
@@ -313,7 +337,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     const combined = relevantChunks.map(c => c.text).join(' ').trim();
     const lower = combined.toLowerCase();
 
-    // Find position of any trigger pattern match
+    // 1. Find position of trigger pattern in the combined text.
     let triggerPos = -1;
     for (const pattern of TRIGGER_PATTERNS) {
       const m = lower.match(pattern);
@@ -323,27 +347,66 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       }
     }
 
-    if (triggerPos > 0) {
-      const beforeTrigger = combined.substring(0, triggerPos);
-      const lastBoundary = Math.max(
-        beforeTrigger.lastIndexOf('.'),
-        beforeTrigger.lastIndexOf('?'),
-        beforeTrigger.lastIndexOf('!')
-      );
-      if (lastBoundary >= 0) {
-        const context = combined.substring(0, lastBoundary + 1).trim();
-        const question = combined.substring(lastBoundary + 1).trim();
-        return { question, context };
+    // 2. Map character position → chunk index (approximate, +1 per join space).
+    const chunkBoundaries: Array<{ end: number; idx: number }> = [];
+    let runningLen = 0;
+    relevantChunks.forEach((c, idx) => {
+      runningLen += (idx === 0 ? 0 : 1) + c.text.length;
+      chunkBoundaries.push({ end: runningLen, idx });
+    });
+
+    let triggerChunkIdx = relevantChunks.length - 1;
+    if (triggerPos >= 0) {
+      for (const b of chunkBoundaries) {
+        if (b.end >= triggerPos) {
+          triggerChunkIdx = b.idx;
+          break;
+        }
       }
-      // No prior boundary — the entire buffer is one running utterance.
-      // Treat everything before trigger as context, trigger-onwards as question.
-      const context = combined.substring(0, triggerPos).trim();
-      const question = combined.substring(triggerPos).trim();
-      return { question, context };
     }
 
-    // No trigger found in combined (shouldn't happen at this point) — return all as question
-    return { question: combined, context: '' };
+    // 3. Walk back from the trigger chunk to find the topic-segment start:
+    //    stop at a chunk gap > CHUNK_GAP_BOUNDARY_MS or at a topic-shift marker.
+    let contextStartIdx = 0;
+    for (let i = triggerChunkIdx; i > 0; i--) {
+      const gap = relevantChunks[i].timestamp - relevantChunks[i - 1].timestamp;
+      if (gap > CHUNK_GAP_BOUNDARY_MS) {
+        contextStartIdx = i;
+        break;
+      }
+      if (TOPIC_SHIFT_MARKERS.some(p => p.test(relevantChunks[i - 1].text))) {
+        contextStartIdx = i;
+        break;
+      }
+    }
+
+    const contextChunks = relevantChunks.slice(contextStartIdx, triggerChunkIdx);
+    const triggerOnwardChunks = relevantChunks.slice(triggerChunkIdx);
+
+    // 4. Within the trigger chunk + onward, the question starts at triggerPos.
+    //    Anything BEFORE the trigger word in that same chunk is part of the same
+    //    breath, so it counts as context.
+    const triggerOnwardText = triggerOnwardChunks.map(c => c.text).join(' ').trim();
+    let question = triggerOnwardText;
+    let triggerChunkPrefix = '';
+
+    if (triggerPos >= 0) {
+      const lowerOnward = triggerOnwardText.toLowerCase();
+      for (const pattern of TRIGGER_PATTERNS) {
+        const m = lowerOnward.match(pattern);
+        if (m && m.index !== undefined) {
+          triggerChunkPrefix = triggerOnwardText.substring(0, m.index).trim();
+          question = triggerOnwardText.substring(m.index).trim();
+          break;
+        }
+      }
+    }
+
+    const contextParts = [contextChunks.map(c => c.text).join(' ').trim(), triggerChunkPrefix]
+      .filter(Boolean);
+    const context = contextParts.join(' ').trim();
+
+    return { question: question || combined, context };
   }, [lookbackMs]);
 
   const finalizeCapture = useCallback((now: number, isForced = false) => {
@@ -451,11 +514,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
-      // Light cleanup of priorContext: strip leading filler, cap at ~1500 chars
+      // Light cleanup of priorContext: strip leading filler, cap at ~3000 chars.
+      // Keep both head and tail when truncating so antecedents earlier in the
+      // segment aren't lost (most pronoun referents live in the head).
       let priorContext = (slice.context || '').trim();
       priorContext = priorContext.replace(FILLER_PREFIXES, '').trim();
-      if (priorContext.length > 1500) {
-        priorContext = priorContext.slice(-1500).trim();
+      if (priorContext.length > 3000) {
+        const head = priorContext.slice(0, 1200).trim();
+        const tail = priorContext.slice(-1700).trim();
+        priorContext = `${head} […] ${tail}`;
       }
 
       const candidate: PassiveQuestionCandidate = {
