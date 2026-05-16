@@ -176,6 +176,8 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [filters, setFilters] = useState<Record<string, number | null>>({});
+  const [revealKeys, setRevealKeys] = useState<Record<string, number>>({});
 
   const fetchResults = useCallback(async () => {
     if (!sessionId) return;
