@@ -72,7 +72,7 @@ interface BarRowProps {
   count: number;
   total: number;
   isCorrect: boolean;
-  isMisconception: boolean;
+  misconceptionLabel: string | null;
   beat: 1 | 2 | 3;
   delayMs: number;
   reduced: boolean;
