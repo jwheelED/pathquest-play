@@ -35,12 +35,14 @@ import {
 } from "./question-bank";
 import { QuestionPreviewPanel } from "./question-bank/QuestionPreviewPanel";
 import { QuestionBankResults } from "./QuestionBankResults";
+import { LiveResponsesEmpty } from "./LiveResponsesEmpty";
 
 interface QuestionBankTabProps {
   professorType: string | null;
+  activeSessionId?: string | null;
 }
 
-export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
+export function QuestionBankTab({ professorType, activeSessionId }: QuestionBankTabProps) {
   const { selectedCourseId } = useCourseContext();
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
   const [loading, setLoading] = useState(true);
