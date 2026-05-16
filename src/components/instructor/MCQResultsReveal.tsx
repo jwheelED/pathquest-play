@@ -183,7 +183,7 @@ const BarRow = ({
           </div>
           {showMisconception && (
             <p className="text-xs italic text-slate-600 mt-1 animate-fade-in">
-              Most common misconception
+              {misconceptionLabel}
             </p>
           )}
         </div>
