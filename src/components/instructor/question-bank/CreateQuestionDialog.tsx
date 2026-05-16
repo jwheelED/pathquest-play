@@ -261,7 +261,7 @@ export function CreateQuestionDialog({
       const questionData = {
         instructor_id: user.id,
         course_id: selectedCourseId || null,
-        title: title.trim(),
+        title: (editQuestion ? title.trim() : "") || deriveTitle(),
         question_type: questionType === "coding" ? "coding_simple" : questionType,
         difficulty,
         tags: tags.length > 0 ? tags : null,
