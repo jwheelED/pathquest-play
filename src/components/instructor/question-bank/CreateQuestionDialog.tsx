@@ -349,20 +349,9 @@ export function CreateQuestionDialog({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              placeholder="e.g., Derivative of x² or Cell Biology Basics"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              A descriptive name to help you identify this question
-            </p>
-          </div>
+          {/* Title is auto-derived from the question text on save */}
           
+
           {/* Question Type */}
           <div className="space-y-2">
             <Label>Question Type *</Label>
