@@ -244,8 +244,8 @@ export function CreateQuestionDialog({
     return true;
   };
   
-  const handleSave = async () => {
-    if (!validateForm()) return;
+  const handleSave = async (options?: { silent?: boolean }): Promise<string | null> => {
+    if (!validateForm()) return null;
     
     setSaving(true);
     try {
@@ -263,32 +263,67 @@ export function CreateQuestionDialog({
         updated_at: new Date().toISOString(),
       };
       
+      let savedId: string | null = null;
       if (editQuestion) {
-        // Update existing
         const { error } = await supabase
           .from("instructor_question_bank")
           .update(questionData)
           .eq("id", editQuestion.id);
-        
         if (error) throw error;
-        toast.success("Question updated!");
+        savedId = editQuestion.id;
+        if (!options?.silent) toast.success("Question updated!");
       } else {
-        // Create new
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("instructor_question_bank")
-          .insert(questionData);
-        
+          .insert(questionData)
+          .select("id")
+          .single();
         if (error) throw error;
-        toast.success("Question saved to bank!");
+        savedId = data.id;
+        if (!options?.silent) toast.success("Question saved to bank!");
       }
       
-      onSuccess();
-      onOpenChange(false);
+      return savedId;
     } catch (error: any) {
       console.error("Error saving question:", error);
       toast.error(error.message || "Failed to save question");
+      return null;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveClick = async () => {
+    const id = await handleSave();
+    if (id) {
+      onSuccess();
+      onOpenChange(false);
+    }
+  };
+
+  const [pushing, setPushing] = useState(false);
+  const handleSaveAndPush = async () => {
+    if (!selectedCourseId) {
+      toast.error("Please select a course first");
+      return;
+    }
+    const id = await handleSave({ silent: true });
+    if (!id) return;
+    setPushing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("push-bank-question", {
+        body: { questionId: id, courseId: selectedCourseId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Question pushed to ${data.studentCount || 0} student(s)!`);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Error pushing question:", error);
+      toast.error(error.message || "Failed to push question");
+    } finally {
+      setPushing(false);
     }
   };
   
