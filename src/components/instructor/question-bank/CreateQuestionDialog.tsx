@@ -401,18 +401,34 @@ export function CreateQuestionDialog({
           {questionType === "multiple_choice" && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
-                <Label>Question Text *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Question Text *</Label>
+                  {generatingMcq && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> AI generating options...
+                    </span>
+                  )}
+                </div>
                 <Textarea
-                  placeholder="Enter your question..."
+                  placeholder="Just write your question — AI fills in the options."
                   value={mcqQuestion}
                   onChange={(e) => setMcqQuestion(e.target.value)}
+                  onBlur={() => {
+                    if (
+                      mcqQuestion.trim().length > 5 &&
+                      mcqOptions.every((o) => !o.trim()) &&
+                      !generatingMcq
+                    ) {
+                      handleAiGenerateMcqOptions();
+                    }
+                  }}
                   rows={3}
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="mt-2"
+                  className="mt-1"
                   disabled={generatingMcq || !mcqQuestion.trim()}
                   onClick={handleAiGenerateMcqOptions}
                 >
@@ -421,7 +437,7 @@ export function CreateQuestionDialog({
                   ) : (
                     <Sparkles className="w-4 h-4 mr-2" />
                   )}
-                  {generatingMcq ? "Generating..." : "AI Suggest Options"}
+                  {generatingMcq ? "Generating..." : "Regenerate with AI"}
                 </Button>
               </div>
               
