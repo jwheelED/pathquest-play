@@ -277,6 +277,14 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
     await fetchResults();
   };
 
+  const replayReveal = (questionId: string) => {
+    setRevealKeys((prev) => ({ ...prev, [questionId]: (prev[questionId] || 0) + 1 }));
+  };
+
+  const setFilter = (questionId: string, idx: number | null) => {
+    setFilters((prev) => ({ ...prev, [questionId]: idx }));
+  };
+
   const formatLastSynced = () => {
     if (!lastUpdated) return "Never";
     const s = Math.floor((Date.now() - lastUpdated.getTime()) / 1000);
