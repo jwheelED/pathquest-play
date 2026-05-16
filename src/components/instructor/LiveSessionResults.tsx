@@ -240,6 +240,21 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
     fetchResults();
   }, [fetchResults]);
 
+  // Trigger reveal animation the first time a question has any responses.
+  useEffect(() => {
+    setRevealKeys((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const g of questionGroups) {
+        if (g.totalResponses > 0 && next[g.question.id] == null) {
+          next[g.question.id] = 1;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [questionGroups]);
+
   useEffect(() => {
     if (!sessionId) return;
 
