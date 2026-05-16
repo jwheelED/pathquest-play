@@ -409,6 +409,17 @@ export function QuestionBankTab({ professorType, activeSessionId }: QuestionBank
         </div>
       )}
 
+      {/* Live check-in results — visible without flipping to Live Copilot */}
+      {view === "bank" && (
+        <div className="pt-2">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Live Check-In Results</h3>
+          </div>
+          <LiveResponsesEmpty hasActiveSession={!!activeSessionId} activeSessionId={activeSessionId || undefined} />
+        </div>
+      )}
+
       {/* Dialogs (unchanged) */}
       <CreateQuestionDialog
         open={createDialogOpen}
