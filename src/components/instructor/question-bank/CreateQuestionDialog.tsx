@@ -210,12 +210,18 @@ export function CreateQuestionDialog({
     }
   };
   
+  const deriveTitle = (): string => {
+    const source =
+      questionType === "multiple_choice" ? mcqQuestion :
+      questionType === "short_answer" ? shortQuestion :
+      codingProblem;
+    const cleaned = source.trim().replace(/\s+/g, " ");
+    if (!cleaned) return "Untitled question";
+    const firstSentence = cleaned.split(/[.?!]/)[0] || cleaned;
+    return firstSentence.length > 80 ? firstSentence.slice(0, 77).trim() + "…" : firstSentence;
+  };
+
   const validateForm = () => {
-    if (!title.trim()) {
-      toast.error("Please enter a title");
-      return false;
-    }
-    
     switch (questionType) {
       case "multiple_choice":
         if (!mcqQuestion.trim()) {
@@ -255,7 +261,7 @@ export function CreateQuestionDialog({
       const questionData = {
         instructor_id: user.id,
         course_id: selectedCourseId || null,
-        title: title.trim(),
+        title: (editQuestion ? title.trim() : "") || deriveTitle(),
         question_type: questionType === "coding" ? "coding_simple" : questionType,
         difficulty,
         tags: tags.length > 0 ? tags : null,
@@ -343,20 +349,9 @@ export function CreateQuestionDialog({
         </DialogHeader>
         
         <div className="space-y-6 py-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              placeholder="e.g., Derivative of x² or Cell Biology Basics"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              A descriptive name to help you identify this question
-            </p>
-          </div>
+          {/* Title is auto-derived from the question text on save */}
           
+
           {/* Question Type */}
           <div className="space-y-2">
             <Label>Question Type *</Label>
