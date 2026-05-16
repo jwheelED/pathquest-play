@@ -488,11 +488,27 @@ export function CreateQuestionDialog({
           {questionType === "short_answer" && (
             <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
               <div className="space-y-2">
-                <Label>Question Text *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Question Text *</Label>
+                  {generatingExpected && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> AI drafting expected answer...
+                    </span>
+                  )}
+                </div>
                 <Textarea
-                  placeholder="Enter your question..."
+                  placeholder="Just write your question — AI drafts the expected answer."
                   value={shortQuestion}
                   onChange={(e) => setShortQuestion(e.target.value)}
+                  onBlur={() => {
+                    if (
+                      shortQuestion.trim().length > 5 &&
+                      !shortExpectedAnswer.trim() &&
+                      !generatingExpected
+                    ) {
+                      handleAiGenerateExpectedAnswer();
+                    }
+                  }}
                   rows={3}
                 />
               </div>
