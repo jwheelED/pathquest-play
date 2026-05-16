@@ -113,7 +113,7 @@ const BarRow = ({
 
   const showCorrectEmphasis = beat >= 2 && isCorrect;
   const showIncorrectFade = beat >= 2 && !isCorrect;
-  const showMisconception = beat >= 3 && isMisconception;
+  const showMisconception = beat >= 3 && !!misconceptionLabel;
   const pulse = beat === 2 && isCorrect && !reduced;
 
   return (
@@ -122,7 +122,7 @@ const BarRow = ({
         type="button"
         onClick={onClick}
         aria-pressed={selected}
-        aria-label={`Option ${letter}: ${text}. ${count} of ${total} responses${isCorrect ? ", correct answer" : ""}${isMisconception ? ", most common misconception" : ""}. Click to filter responses.`}
+        aria-label={`Option ${letter}: ${text}. ${count} of ${total} responses${isCorrect ? ", correct answer" : ""}${showMisconception ? `, ${misconceptionLabel}` : ""}. Click to filter responses.`}
         className={cn(
           "w-full flex items-center gap-3 text-left rounded-lg px-2 py-2 transition-all duration-300 group",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400",
