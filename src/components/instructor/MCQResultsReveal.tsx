@@ -307,12 +307,12 @@ export const MCQResultsReveal = ({
             count={counts[idx]}
             total={total}
             isCorrect={idx === correctIdx}
-            isMisconception={
-              idx === misconceptionIdx &&
-              beat >= 3 &&
-              classWideMisconception === false
-                ? true
-                : idx === misconceptionIdx && classWideMisconception
+            misconceptionLabel={
+              idx === misconceptionIdx
+                ? classWideMisconception
+                  ? "Class-wide misconception"
+                  : "Most common misconception"
+                : null
             }
             beat={beat}
             delayMs={reduced ? 0 : idx * 100}
