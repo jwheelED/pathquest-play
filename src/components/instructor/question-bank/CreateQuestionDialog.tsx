@@ -210,12 +210,18 @@ export function CreateQuestionDialog({
     }
   };
   
+  const deriveTitle = (): string => {
+    const source =
+      questionType === "multiple_choice" ? mcqQuestion :
+      questionType === "short_answer" ? shortQuestion :
+      codingProblem;
+    const cleaned = source.trim().replace(/\s+/g, " ");
+    if (!cleaned) return "Untitled question";
+    const firstSentence = cleaned.split(/[.?!]/)[0] || cleaned;
+    return firstSentence.length > 80 ? firstSentence.slice(0, 77).trim() + "…" : firstSentence;
+  };
+
   const validateForm = () => {
-    if (!title.trim()) {
-      toast.error("Please enter a title");
-      return false;
-    }
-    
     switch (questionType) {
       case "multiple_choice":
         if (!mcqQuestion.trim()) {
