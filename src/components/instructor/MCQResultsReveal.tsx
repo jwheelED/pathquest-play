@@ -87,7 +87,7 @@ const BarRow = ({
   count,
   total,
   isCorrect,
-  isMisconception,
+  misconceptionLabel,
   beat,
   delayMs,
   reduced,
