@@ -593,13 +593,25 @@ export function CreateQuestionDialog({
           </div>
         </div>
         
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : editQuestion ? "Update Question" : "Save Question"}
+          <Button onClick={handleSaveClick} disabled={saving || pushing} variant="secondary">
+            {saving && !pushing ? "Saving..." : editQuestion ? "Update Question" : "Save Question"}
           </Button>
+          {!editQuestion && (
+            <Button onClick={handleSaveAndPush} disabled={saving || pushing || !selectedCourseId}>
+              {pushing ? (
+                "Pushing..."
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Save & Push Now
+                </>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
