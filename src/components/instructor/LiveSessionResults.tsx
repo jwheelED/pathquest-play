@@ -21,6 +21,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
+import { MCQResultsReveal } from "./MCQResultsReveal";
 
 interface LiveResponse {
   id: string;
@@ -175,6 +176,8 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [filters, setFilters] = useState<Record<string, number | null>>({});
+  const [revealKeys, setRevealKeys] = useState<Record<string, number>>({});
 
   const fetchResults = useCallback(async () => {
     if (!sessionId) return;
@@ -237,6 +240,21 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
     fetchResults();
   }, [fetchResults]);
 
+  // Trigger reveal animation the first time a question has any responses.
+  useEffect(() => {
+    setRevealKeys((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const g of questionGroups) {
+        if (g.totalResponses > 0 && next[g.question.id] == null) {
+          next[g.question.id] = 1;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [questionGroups]);
+
   useEffect(() => {
     if (!sessionId) return;
 
@@ -257,6 +275,14 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchResults();
+  };
+
+  const replayReveal = (questionId: string) => {
+    setRevealKeys((prev) => ({ ...prev, [questionId]: (prev[questionId] || 0) + 1 }));
+  };
+
+  const setFilter = (questionId: string, idx: number | null) => {
+    setFilters((prev) => ({ ...prev, [questionId]: idx }));
   };
 
   const formatLastSynced = () => {
@@ -422,30 +448,105 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                       <MathRenderer content={questionText} />
                     </div>
 
-                    {/* Individual responses */}
-                    {group.responses.length > 0 ? (
-                      <div className="max-h-80 overflow-y-auto border border-border/40 rounded-lg bg-white px-2 py-1">
-                        {group.responses.map((r) => {
-                          const fullAnswer = resolveAnswerToFullText(
-                            r.answer,
-                            group.question.question_content
-                          );
-                          const isLong = fullAnswer.length > 60;
-                          return (
-                            <ExpandableResponseRow
-                              key={r.id}
-                              response={r}
-                              fullAnswer={fullAnswer}
-                              isLong={isLong}
-                            />
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-3">
-                        No responses yet
-                      </p>
-                    )}
+                    {/* MCQ reveal — staged animation. Short-answer falls through to list below. */}
+                    {/* TODO: short-answer reveal design (currently uses existing response list only) */}
+                    {(() => {
+                      const options: string[] = group.question.question_content?.options || [];
+                      const isMCQ = Array.isArray(options) && options.length > 0;
+                      const filterIdx = filters[group.question.id] ?? null;
+
+                      const filteredResponses =
+                        isMCQ && filterIdx !== null
+                          ? group.responses.filter((r) => {
+                              const trimmed = (r.answer || "").trim();
+                              const letterMatch = trimmed.match(/^([A-Da-d])[.):\s]?/);
+                              if (letterMatch) {
+                                return letterMatch[1].toUpperCase().charCodeAt(0) - 65 === filterIdx;
+                              }
+                              const directIdx = options.findIndex((opt) => {
+                                const clean = opt.replace(/^[A-Da-d][.):\s]+/, "").trim();
+                                return clean === trimmed || opt === trimmed;
+                              });
+                              return directIdx === filterIdx;
+                            })
+                          : group.responses;
+
+                      return (
+                        <>
+                          {isMCQ && (
+                            <div className="p-3 bg-white border border-border/50 rounded-lg">
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                  Response Distribution
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  {filterIdx !== null && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setFilter(group.question.id, null)}
+                                      className="text-[11px] text-emerald-600 hover:text-emerald-700 font-medium"
+                                    >
+                                      Clear filter
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => replayReveal(group.question.id)}
+                                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                                    aria-label="Replay reveal animation"
+                                  >
+                                    Replay
+                                  </button>
+                                </div>
+                              </div>
+                              <MCQResultsReveal
+                                questionId={group.question.id}
+                                options={options}
+                                responses={group.responses.map((r) => ({
+                                  answer: r.answer,
+                                  is_correct: r.is_correct,
+                                }))}
+                                revealKey={revealKeys[group.question.id] || 0}
+                                selectedOptionIdx={filterIdx}
+                                onOptionClick={(idx) => setFilter(group.question.id, idx)}
+                              />
+                            </div>
+                          )}
+
+                          {/* Individual responses */}
+                          {filteredResponses.length > 0 ? (
+                            <div className="max-h-80 overflow-y-auto border border-border/40 rounded-lg bg-white px-2 py-1">
+                              {filterIdx !== null && (
+                                <p className="text-[11px] text-muted-foreground px-2 py-1.5 border-b border-border/30">
+                                  Showing {filteredResponses.length} of {group.responses.length} responses for option {String.fromCharCode(65 + filterIdx)}
+                                </p>
+                              )}
+                              {filteredResponses.map((r) => {
+                                const fullAnswer = resolveAnswerToFullText(
+                                  r.answer,
+                                  group.question.question_content
+                                );
+                                const isLong = fullAnswer.length > 60;
+                                return (
+                                  <ExpandableResponseRow
+                                    key={r.id}
+                                    response={r}
+                                    fullAnswer={fullAnswer}
+                                    isLong={isLong}
+                                  />
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-3">
+                              {group.responses.length === 0
+                                ? "No responses yet"
+                                : "No responses match this filter"}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </AccordionContent>
               </AccordionItem>
