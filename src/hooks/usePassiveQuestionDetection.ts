@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 
 export interface PassiveQuestionCandidate {
   text: string;
@@ -8,6 +8,11 @@ export interface PassiveQuestionCandidate {
   priorContext?: string;
 }
 
+export interface CheckUtteranceOptions {
+  confidence?: number;
+  recentTranscript?: string;
+}
+
 interface UsePassiveQuestionDetectionOptions {
   enabled?: boolean;
   cooldownMs?: number;
@@ -15,6 +20,10 @@ interface UsePassiveQuestionDetectionOptions {
   autoDismissMs?: number;
   /** Timestamp of the last question sent (any method) — skip detection if recent */
   lastQuestionSentTime?: number;
+  /** Minimum Deepgram transcript confidence (0-1) required to consider a candidate. */
+  minTranscriptConfidence?: number;
+  /** Trailing silence (ms) required after question before promoting pending -> visible candidate. */
+  trailingSilenceMs?: number;
   debug?: boolean;
 }
 
@@ -32,6 +41,7 @@ const RHETORICAL_BLOCKLIST = [
   "don't you think",
   'does that make sense',
   'make sense',
+  'make sense to you',
   'with me so far',
   'any questions',
   'everyone with me',
@@ -46,6 +56,7 @@ const RHETORICAL_BLOCKLIST = [
   "isn't that right",
   'see',
   'you see',
+  'you get it',
   'you follow',
   'shall we',
   'shall i',
@@ -65,7 +76,6 @@ const RHETORICAL_BLOCKLIST = [
   "can everyone see",
   "can you hear me",
   "can everyone hear me",
-  // Rhetorical WH-questions (checked before the WH bypass)
   'what do you think',
   'what do you guys think',
   'what do you all think',
@@ -77,6 +87,8 @@ const RHETORICAL_BLOCKLIST = [
   'how so',
   'where were we',
   'where was i',
+  'what was i saying',
+  'where was i going',
   'who knows',
   'who can tell me',
   'who would have thought',
@@ -108,6 +120,27 @@ const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) hear me/i,
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
+
+// Interrogative trigger patterns — require a real question form, not just "?"
+const TRIGGER_PATTERNS = [
+  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i,
+  /\bwhy\s+(is|are|do|does|did|would|can|could|should|might|don'?t|doesn'?t|didn'?t)\b/i,
+  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far|come|might)\b/i,
+  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should|will|might)\b/i,
+  /\bwhere\s+(is|are|do|does|did|would|was|were|can|will|might)\b/i,
+  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed|made|wrote|said)\b/i,
+  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method|step|stage|phase|option|choice)\b/i,
+  /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
+  /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
+  /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
+  /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
+  /\bwhat\s+would\s+happen\b/i,
+  /\bsuppose\s+that\b/i,
+];
+
+function hasInterrogativeTrigger(text: string): boolean {
+  return TRIGGER_PATTERNS.some(p => p.test(text));
+}
 
 function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -167,9 +200,11 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const {
     enabled = true,
     cooldownMs = 15000,
-    minWordCount = 5,
+    minWordCount = 6,
     autoDismissMs = 30000,
     lastQuestionSentTime = 0,
+    minTranscriptConfidence = 0.8,
+    trailingSilenceMs = 1200,
     debug = true,
   } = options;
 
@@ -179,13 +214,25 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const [candidateHistory, setCandidateHistory] = useState<PassiveQuestionCandidate[]>([]);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep ref in sync with prop to avoid stale closures
+  // Pending candidate — waiting for trailing silence before being promoted
+  const pendingRef = useRef<PassiveQuestionCandidate | null>(null);
+  const [pendingCandidate, setPendingCandidate] = useState<PassiveQuestionCandidate | null>(null);
+  const [pendingStartedAt, setPendingStartedAt] = useState<number>(0);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   lastQuestionSentTimeRef.current = lastQuestionSentTime;
 
   const clearAutoDismiss = useCallback(() => {
     if (autoDismissTimerRef.current) {
       clearTimeout(autoDismissTimerRef.current);
       autoDismissTimerRef.current = null;
+    }
+  }, []);
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
   }, []);
 
@@ -198,12 +245,76 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     setCandidateHistory(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  const checkUtterance = useCallback((text: string, recentTranscript?: string) => {
+  // Promote pending -> visible candidate after trailing silence elapses
+  const promotePending = useCallback(() => {
+    const p = pendingRef.current;
+    if (!p) return;
+    pendingRef.current = null;
+    setPendingCandidate(null);
+    setPendingStartedAt(0);
+
+    const now = Date.now();
+    lastDetectionTimeRef.current = now;
+
+    clearAutoDismiss();
+
+    setCandidate(current => {
+      if (current) {
+        setCandidateHistory(prev => [current, ...prev]);
+      }
+      return p;
+    });
+
+    autoDismissTimerRef.current = setTimeout(() => {
+      setCandidate(current => {
+        if (current?.id === p.id) {
+          setCandidateHistory(prev => [current, ...prev]);
+          return null;
+        }
+        return current;
+      });
+    }, autoDismissMs);
+
+    if (debug) console.log('✅ [passive] promoted pending → candidate:', p.text);
+  }, [autoDismissMs, clearAutoDismiss, debug]);
+
+  const armSilenceTimer = useCallback(() => {
+    clearSilenceTimer();
+    silenceTimerRef.current = setTimeout(() => {
+      promotePending();
+    }, trailingSilenceMs);
+  }, [clearSilenceTimer, promotePending, trailingSilenceMs]);
+
+  /**
+   * Notify the detector that the instructor is currently speaking (a new transcript chunk
+   * arrived). If we have a pending candidate waiting on trailing silence, this resets
+   * the silence timer — preventing premature promotion when the instructor keeps talking.
+   */
+  const notifySpeech = useCallback(() => {
+    if (!pendingRef.current) return;
+    if (debug) console.log('🔄 [passive] speech detected, resetting trailing-silence timer');
+    armSilenceTimer();
+  }, [armSilenceTimer, debug]);
+
+  const checkUtterance = useCallback((
+    text: string,
+    optsOrRecentTranscript?: string | CheckUtteranceOptions,
+  ) => {
     if (!enabled || !text) return;
+
+    // Backward-compat: accept string OR options object
+    let confidence: number | undefined;
+    let recentTranscript: string | undefined;
+    if (typeof optsOrRecentTranscript === 'string') {
+      recentTranscript = optsOrRecentTranscript;
+    } else if (optsOrRecentTranscript) {
+      confidence = optsOrRecentTranscript.confidence;
+      recentTranscript = optsOrRecentTranscript.recentTranscript;
+    }
 
     const now = Date.now();
 
-    if (debug) console.log('🔍 [passive] checking utterance:', text.substring(0, 80));
+    if (debug) console.log('🔍 [passive] checking utterance:', text.substring(0, 80), { confidence });
 
     if (now - lastDetectionTimeRef.current < cooldownMs) {
       if (debug) console.log('🔍 [passive] skipped — cooldown active');
@@ -213,6 +324,12 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     const recentSentTime = lastQuestionSentTimeRef.current;
     if (recentSentTime && now - recentSentTime < cooldownMs) {
       if (debug) console.log('🔍 [passive] skipped — recent question sent');
+      return;
+    }
+
+    // Confidence floor — reject low-confidence Deepgram output
+    if (typeof confidence === 'number' && confidence < minTranscriptConfidence) {
+      if (debug) console.log(`🔍 [passive] skipped — low confidence (${confidence.toFixed(2)} < ${minTranscriptConfidence})`);
       return;
     }
 
@@ -230,11 +347,14 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         if (debug) console.log(`🔍 [passive] skipped "${q}" — rhetorical`);
         continue;
       }
+      // Stricter trigger requirement — must contain a real interrogative pattern,
+      // not just a "?" Deepgram guessed from intonation.
+      if (!hasInterrogativeTrigger(q)) {
+        if (debug) console.log(`🔍 [passive] skipped "${q}" — no interrogative trigger`);
+        continue;
+      }
 
-      console.log('🔍 Passive question detected:', q);
-      lastDetectionTimeRef.current = now;
-
-      clearAutoDismiss();
+      console.log('🔍 Passive question candidate (pending trailing silence):', q);
 
       const newCandidate: PassiveQuestionCandidate = {
         text: q,
@@ -243,40 +363,42 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         priorContext: recentTranscript || undefined,
       };
 
-      // Move current candidate to history before replacing
-      setCandidate(current => {
-        if (current) {
-          setCandidateHistory(prev => [current, ...prev]);
-        }
-        return newCandidate;
-      });
-
-      autoDismissTimerRef.current = setTimeout(() => {
-        setCandidate(current => {
-          if (current?.detectedAt === now) {
-            // Move to history instead of discarding
-            setCandidateHistory(prev => [current, ...prev]);
-            return null;
-          }
-          return current;
-        });
-      }, autoDismissMs);
+      // Replace any existing pending candidate with the newer/longer one and re-arm timer
+      pendingRef.current = newCandidate;
+      setPendingCandidate(newCandidate);
+      setPendingStartedAt(now);
+      armSilenceTimer();
 
       return;
     }
-  }, [enabled, cooldownMs, minWordCount, autoDismissMs, clearAutoDismiss, debug]);
+  }, [enabled, cooldownMs, minWordCount, minTranscriptConfidence, armSilenceTimer, debug]);
 
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
     clearAutoDismiss();
+    clearSilenceTimer();
+    pendingRef.current = null;
+    setPendingCandidate(null);
+    setPendingStartedAt(0);
     setCandidate(null);
     setCandidateHistory([]);
-  }, [clearAutoDismiss]);
+  }, [clearAutoDismiss, clearSilenceTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearAutoDismiss();
+      clearSilenceTimer();
+    };
+  }, [clearAutoDismiss, clearSilenceTimer]);
 
   return {
     candidate,
     candidateHistory,
+    pendingCandidate,
+    pendingStartedAt,
+    trailingSilenceMs,
     checkUtterance,
+    notifySpeech,
     dismissCandidate,
     removeFromHistory,
     resetDetection,

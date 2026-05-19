@@ -204,13 +204,19 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    pendingCandidate: passivePendingCandidate,
+    pendingStartedAt: passivePendingStartedAt,
+    trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 8000,
-    minWordCount: 5,
+    minWordCount: 6,
+    minTranscriptConfidence: 0.8,
+    trailingSilenceMs: 1200,
     autoDismissMs: 60000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
@@ -990,6 +996,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           // Bare question marks no longer fall back to passive detection
           // (too many rhetorical asides were slipping through).
           feedTriggerChunk(cleanText, Date.now());
+
+          // Notify passive detection that the instructor is still speaking — resets
+          // the trailing-silence timer on any pending candidate.
+          notifyPassiveSpeech();
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 
@@ -1399,6 +1409,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
     // Passive question detection
     passiveCandidate,
+    passivePendingCandidate,
+    passivePendingStartedAt,
+    passiveTrailingSilenceMs,
     passiveDetectionEnabled,
     setPassiveDetectionEnabled,
     dismissPassiveCandidate,
