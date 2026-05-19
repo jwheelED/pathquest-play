@@ -204,13 +204,19 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    pendingCandidate: passivePendingCandidate,
+    pendingStartedAt: passivePendingStartedAt,
+    trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 8000,
-    minWordCount: 5,
+    minWordCount: 6,
+    minTranscriptConfidence: 0.8,
+    trailingSilenceMs: 1200,
     autoDismissMs: 60000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
