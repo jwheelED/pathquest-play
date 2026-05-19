@@ -249,14 +249,20 @@ export const LectureTranscription = ({
   const {
     candidate: passiveCandidate,
     candidateHistory: passiveCandidateHistory,
+    pendingCandidate: passivePendingCandidate,
+    pendingStartedAt: passivePendingStartedAt,
+    trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     removeFromHistory: removePassiveFromHistory,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 1500,
-    minWordCount: 5,
+    minWordCount: 6,
+    minTranscriptConfidence: 0.8,
+    trailingSilenceMs: 1200,
     autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
