@@ -996,6 +996,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           // Bare question marks no longer fall back to passive detection
           // (too many rhetorical asides were slipping through).
           feedTriggerChunk(cleanText, Date.now());
+
+          // Notify passive detection that the instructor is still speaking — resets
+          // the trailing-silence timer on any pending candidate.
+          notifyPassiveSpeech();
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 
