@@ -1409,6 +1409,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
     // Passive question detection
     passiveCandidate,
+    passivePendingCandidate,
+    passivePendingStartedAt,
+    passiveTrailingSilenceMs,
     passiveDetectionEnabled,
     setPassiveDetectionEnabled,
     dismissPassiveCandidate,
