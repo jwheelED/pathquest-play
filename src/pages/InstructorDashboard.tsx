@@ -665,7 +665,7 @@ export default function InstructorDashboard() {
         );
 
       case "question-bank":
-        return <QuestionBankTab professorType={professorType} activeSessionId={activeSession?.id} />;
+        return <QuestionBankTab professorType={professorType} />;
 
       case "summaries":
         return <SavedSummariesTab />;

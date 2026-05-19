@@ -35,14 +35,12 @@ import {
 } from "./question-bank";
 import { QuestionPreviewPanel } from "./question-bank/QuestionPreviewPanel";
 import { QuestionBankResults } from "./QuestionBankResults";
-import { LiveResponsesEmpty } from "./LiveResponsesEmpty";
 
 interface QuestionBankTabProps {
   professorType: string | null;
-  activeSessionId?: string | null;
 }
 
-export function QuestionBankTab({ professorType, activeSessionId }: QuestionBankTabProps) {
+export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const { selectedCourseId } = useCourseContext();
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -406,17 +404,6 @@ export function QuestionBankTab({ professorType, activeSessionId }: QuestionBank
               />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Live check-in results — visible without flipping to Live Copilot */}
-      {view === "bank" && (
-        <div className="pt-2">
-          <div className="flex items-center gap-2 mb-3 px-1">
-            <BarChart3 className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-foreground">Live Check-In Results</h3>
-          </div>
-          <LiveResponsesEmpty hasActiveSession={!!activeSessionId} activeSessionId={activeSessionId || undefined} />
         </div>
       )}
 
