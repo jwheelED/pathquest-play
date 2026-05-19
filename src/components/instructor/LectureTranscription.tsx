@@ -2610,6 +2610,10 @@ export const LectureTranscription = ({
           // no longer trigger Question on Deck — too noisy from rhetorical asides.
           feedTriggerChunk(cleanText, Date.now());
 
+          // Reset trailing-silence timer on any pending passive candidate —
+          // the instructor is still talking, so don't promote yet.
+          notifyPassiveSpeech();
+
           // CONFIDENCE CHECK — runs after main detection, non-blocking
           confidenceCheckServiceRef.current
             ?.processChunk(cleanText)
