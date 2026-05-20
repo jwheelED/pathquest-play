@@ -11,17 +11,6 @@ import { StudentLectureQuestions } from "@/components/student/StudentLectureQues
 import { PastTranscriptsList } from "@/components/student/PastTranscriptsList";
 import { cn } from "@/lib/utils";
 
-interface User {
-  id: string;
-  email?: string;
-}
-
-interface CourseInfo {
-  instructorName: string;
-  courseTitle: string;
-  courseTopics?: string[];
-  courseSchedule?: string;
-}
 
 interface User {
   id: string;
