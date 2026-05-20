@@ -731,7 +731,7 @@ const LiveStudent = () => {
           role="status"
           aria-live="polite"
           aria-label={`Session score: ${sessionTotalXP} XP, ${questionsAnswered} question${questionsAnswered !== 1 ? 's' : ''} answered`}
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg motion-safe:transition-all motion-safe:duration-300 ${showXPPulse ? 'motion-safe:scale-110 ring-2 ring-primary/50' : 'scale-100'}`}
+          className={`fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full bg-card border border-border shadow-lg max-w-[calc(100vw-1rem)] motion-safe:transition-all motion-safe:duration-300 ${showXPPulse ? 'motion-safe:scale-110 ring-2 ring-primary/50' : 'scale-100'}`}
         >
           <div className="flex items-center gap-1.5">
             <Zap className="w-5 h-5 text-primary fill-primary" aria-hidden="true" />
