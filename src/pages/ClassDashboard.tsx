@@ -2,13 +2,26 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Video, FileText, Trophy } from "lucide-react";
+import { ArrowLeft, BookOpen, Video, FileText, Trophy, MessageSquareText } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
 import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
 import { StudentLectureQuestions } from "@/components/student/StudentLectureQuestions";
+import { PastTranscriptsList } from "@/components/student/PastTranscriptsList";
 import { cn } from "@/lib/utils";
+
+interface User {
+  id: string;
+  email?: string;
+}
+
+interface CourseInfo {
+  instructorName: string;
+  courseTitle: string;
+  courseTopics?: string[];
+  courseSchedule?: string;
+}
 
 interface User {
   id: string;
