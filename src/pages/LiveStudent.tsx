@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, AlertCircle, Zap } from "lucide-react";
+import { useAnnouncer } from "@/components/accessibility";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ const BASE_REWARD = 10; // Base XP for live questions
 const LiveStudent = () => {
   const { sessionCode } = useParams();
   const navigate = useNavigate();
+  const { announce } = useAnnouncer();
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   const [codeAnswer, setCodeAnswer] = useState<string>("");
@@ -94,7 +96,24 @@ const LiveStudent = () => {
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
+    // A11y: announce new question to screen readers (assertive — replaces prior)
+    if (currentQuestion?.question_content?.question) {
+      const qType = currentQuestion.question_content.type === "multiple_choice"
+        ? "Multiple choice question"
+        : currentQuestion.question_content.type === "short_answer"
+          ? "Short answer question"
+          : "Coding question";
+      announce(`New ${qType}: ${currentQuestion.question_content.question}`, "assertive");
+    }
   }, [currentQuestion?.id]);
+
+  // A11y: announce grading result
+  useEffect(() => {
+    if (!hasAnswered) return;
+    if (isCorrect === true) announce("Correct answer.", "assertive");
+    else if (isCorrect === false) announce(`Incorrect. Correct answer was ${currentQuestion?.question_content?.correctAnswer ?? "shown above"}.`, "assertive");
+    else announce("Answer submitted.", "polite");
+  }, [hasAnswered, isCorrect]);
 
   // Session ID resolved from session_code for realtime subscription
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -655,49 +674,56 @@ const LiveStudent = () => {
 
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <main id="main-content" aria-label="Live session" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
             <div className="text-center space-y-2">
               <p className="text-xl font-semibold">Welcome, {nickname}!</p>
-              <p className="text-muted-foreground">Waiting for the instructor to send a question...</p>
+              <p className="text-muted-foreground" role="status" aria-live="polite">
+                Waiting for the instructor to send a question...
+              </p>
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   // Safeguard: ensure question_content exists before rendering
   if (!currentQuestion?.question_content) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <main id="main-content" aria-label="Live session" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading question...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
+            <p className="text-muted-foreground" role="status" aria-live="polite">Loading question...</p>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   const isMCQ = currentQuestion.question_content.type === "multiple_choice";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+    <main id="main-content" aria-label="Live session question" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
       {/* Session XP Tracker - Fixed top right */}
       {questionsAnswered > 0 && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg transition-all duration-300 ${showXPPulse ? 'scale-110 ring-2 ring-primary/50' : 'scale-100'}`}>
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label={`Session score: ${sessionTotalXP} XP, ${questionsAnswered} question${questionsAnswered !== 1 ? 's' : ''} answered`}
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg motion-safe:transition-all motion-safe:duration-300 ${showXPPulse ? 'motion-safe:scale-110 ring-2 ring-primary/50' : 'scale-100'}`}
+        >
           <div className="flex items-center gap-1.5">
-            <Zap className="w-5 h-5 text-primary fill-primary" />
+            <Zap className="w-5 h-5 text-primary fill-primary" aria-hidden="true" />
             <span className="text-lg font-bold text-foreground">
               {sessionTotalXP > 0 ? '+' : ''}{sessionTotalXP}
             </span>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">XP</span>
           </div>
-          <div className="w-px h-5 bg-border" />
+          <div className="w-px h-5 bg-border" aria-hidden="true" />
           <span className="text-xs text-muted-foreground">
             {questionsAnswered} Q{questionsAnswered !== 1 ? 's' : ''}
           </span>
@@ -1041,7 +1067,7 @@ const LiveStudent = () => {
         </CardContent>
       </Card>
       </div>
-    </div>
+    </main>
   );
 };
 
