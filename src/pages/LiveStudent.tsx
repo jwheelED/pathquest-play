@@ -807,14 +807,25 @@ const LiveStudent = () => {
               {/* Short answer (no confidence betting) */}
               {currentQuestion.question_content.type === "short_answer" && (
                 <>
+                  <Label htmlFor="short-answer-input" className="sr-only">
+                    Your short answer
+                  </Label>
                   <Textarea
+                    id="short-answer-input"
                     value={selectedAnswer}
-                    onChange={(e) => setSelectedAnswer(e.target.value)}
+                    onChange={(e) => { setSelectedAnswer(e.target.value); if (submitError) setSubmitError(null); }}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
                     placeholder="Type your answer here..."
                     className="min-h-[120px]"
+                    aria-invalid={!!submitError}
+                    aria-describedby={submitError ? "submit-error" : undefined}
                   />
+                  {submitError && (
+                    <p id="submit-error" role="alert" className="text-sm font-medium text-destructive">
+                      {submitError}
+                    </p>
+                  )}
                   <Button 
                     onClick={handleSubmit} 
                     className="w-full" 
