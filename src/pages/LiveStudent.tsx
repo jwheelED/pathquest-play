@@ -71,6 +71,15 @@ const LiveStudent = () => {
   const [explanation, setExplanation] = useState<string>("");
   const [loadingExplanation, setLoadingExplanation] = useState(false);
 
+  // WCAG 3.3.1 / 3.3.3 — programmatically identifiable submit errors
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // WCAG 2.2.1 — Timing Adjustable
+  // NOTE: Live questions intentionally have NO per-question countdown on the
+  // student side. The instructor controls when answers are released, and
+  // students can take as long as they need to submit. This satisfies 2.2.1
+  // by removing the time limit entirely (the strongest form of compliance).
+
   // Keep refs in sync with state
   useEffect(() => {
     isTypingRef.current = isTyping;
@@ -94,6 +103,7 @@ const LiveStudent = () => {
     setConfidenceMultiplier(1);
     setPointsEarned(0);
     setGradePending(false); // Reset pending state
+    setSubmitError(null);
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
@@ -412,6 +422,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your answer. Check your connection and try again.");
         toast.error("Failed to submit answer");
       }
     } finally {
@@ -556,6 +567,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your answer. Check your connection and try again.");
         toast.error("Failed to submit answer");
       }
     } finally {
@@ -666,6 +678,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your code. Check your connection and try again.");
         toast.error("Failed to submit code. Please try again.");
       }
     } finally {
@@ -718,7 +731,7 @@ const LiveStudent = () => {
           role="status"
           aria-live="polite"
           aria-label={`Session score: ${sessionTotalXP} XP, ${questionsAnswered} question${questionsAnswered !== 1 ? 's' : ''} answered`}
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg motion-safe:transition-all motion-safe:duration-300 ${showXPPulse ? 'motion-safe:scale-110 ring-2 ring-primary/50' : 'scale-100'}`}
+          className={`fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full bg-card border border-border shadow-lg max-w-[calc(100vw-1rem)] motion-safe:transition-all motion-safe:duration-300 ${showXPPulse ? 'motion-safe:scale-110 ring-2 ring-primary/50' : 'scale-100'}`}
         >
           <div className="flex items-center gap-1.5">
             <Zap className="w-5 h-5 text-primary fill-primary" aria-hidden="true" />
@@ -794,14 +807,25 @@ const LiveStudent = () => {
               {/* Short answer (no confidence betting) */}
               {currentQuestion.question_content.type === "short_answer" && (
                 <>
+                  <Label htmlFor="short-answer-input" className="sr-only">
+                    Your short answer
+                  </Label>
                   <Textarea
+                    id="short-answer-input"
                     value={selectedAnswer}
-                    onChange={(e) => setSelectedAnswer(e.target.value)}
+                    onChange={(e) => { setSelectedAnswer(e.target.value); if (submitError) setSubmitError(null); }}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
                     placeholder="Type your answer here..."
                     className="min-h-[120px]"
+                    aria-invalid={!!submitError}
+                    aria-describedby={submitError ? "submit-error" : undefined}
                   />
+                  {submitError && (
+                    <p id="submit-error" role="alert" className="text-sm font-medium text-destructive">
+                      {submitError}
+                    </p>
+                  )}
                   <Button 
                     onClick={handleSubmit} 
                     className="w-full" 
@@ -872,6 +896,14 @@ const LiveStudent = () => {
                       simpleMode={currentQuestion.question_content.type === "coding_simple"}
                     />
                   </div>
+
+                  {submitError && (
+                    <p id="submit-error" role="alert" className="text-sm font-medium text-destructive">
+                      {submitError}
+                    </p>
+                  )}
+
+
                   
                   <Button 
                     onClick={handleCodingSubmit} 
