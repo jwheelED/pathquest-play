@@ -1065,7 +1065,7 @@ const LiveStudent = () => {
         </CardContent>
       </Card>
       </div>
-    </div>
+    </main>
   );
 };
 
