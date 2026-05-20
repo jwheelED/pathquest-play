@@ -96,7 +96,24 @@ const LiveStudent = () => {
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
+    // A11y: announce new question to screen readers (assertive — replaces prior)
+    if (currentQuestion?.question_content?.question) {
+      const qType = currentQuestion.question_content.type === "multiple_choice"
+        ? "Multiple choice question"
+        : currentQuestion.question_content.type === "short_answer"
+          ? "Short answer question"
+          : "Coding question";
+      announce(`New ${qType}: ${currentQuestion.question_content.question}`, "assertive");
+    }
   }, [currentQuestion?.id]);
+
+  // A11y: announce grading result
+  useEffect(() => {
+    if (!hasAnswered) return;
+    if (isCorrect === true) announce("Correct answer.", "assertive");
+    else if (isCorrect === false) announce(`Incorrect. Correct answer was ${currentQuestion?.question_content?.correctAnswer ?? "shown above"}.`, "assertive");
+    else announce("Answer submitted.", "polite");
+  }, [hasAnswered, isCorrect]);
 
   // Session ID resolved from session_code for realtime subscription
   const [sessionId, setSessionId] = useState<string | null>(null);
