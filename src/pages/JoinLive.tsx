@@ -90,9 +90,9 @@ const JoinLive = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center mastery-bg p-4">
+    <main id="main-content" aria-label="Join live session" className="min-h-screen flex flex-col items-center justify-center mastery-bg p-4">
       {/* Ambient glow */}
-      <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
+      <div aria-hidden="true" className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
       
       <div className="w-full max-w-md space-y-4 relative z-10">
         <Button
