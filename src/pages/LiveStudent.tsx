@@ -71,6 +71,15 @@ const LiveStudent = () => {
   const [explanation, setExplanation] = useState<string>("");
   const [loadingExplanation, setLoadingExplanation] = useState(false);
 
+  // WCAG 3.3.1 / 3.3.3 — programmatically identifiable submit errors
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // WCAG 2.2.1 — Timing Adjustable
+  // NOTE: Live questions intentionally have NO per-question countdown on the
+  // student side. The instructor controls when answers are released, and
+  // students can take as long as they need to submit. This satisfies 2.2.1
+  // by removing the time limit entirely (the strongest form of compliance).
+
   // Keep refs in sync with state
   useEffect(() => {
     isTypingRef.current = isTyping;
