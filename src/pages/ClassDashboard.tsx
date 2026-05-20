@@ -366,6 +366,12 @@ export default function ClassDashboard() {
                 <PreRecordedLectureList instructorId={instructorId} />
               </div>
             )}
+
+            {activeTab === "transcripts" && (
+              <div className="space-y-6 animate-fade-in">
+                <PastTranscriptsList instructorId={instructorId} courseId={courseId ?? undefined} />
+              </div>
+            )}
             
             {activeTab === "results" && (
               <div className="space-y-6 animate-fade-in">
