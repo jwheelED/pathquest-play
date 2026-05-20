@@ -1732,6 +1732,47 @@ export type Database = {
           },
         ]
       }
+      live_session_transcripts: {
+        Row: {
+          chunk_index: number
+          course_id: string | null
+          created_at: string
+          id: string
+          instructor_id: string
+          org_id: string | null
+          session_id: string
+          text: string
+        }
+        Insert: {
+          chunk_index: number
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          session_id: string
+          text: string
+        }
+        Update: {
+          chunk_index?: number
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          session_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_transcripts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_sessions: {
         Row: {
           course_id: string | null
