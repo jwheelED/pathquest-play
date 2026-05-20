@@ -36,6 +36,7 @@ import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { useLiveTranscriptBroadcast } from "@/hooks/useLiveTranscriptBroadcast";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
 import { LiveSessionStrip } from "@/components/instructor/LiveSessionStrip";
 import { LiveCopilotHero } from "@/components/instructor/LiveCopilotHero";
