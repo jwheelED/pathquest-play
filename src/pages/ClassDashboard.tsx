@@ -33,11 +33,12 @@ interface ClassStats {
   nextIncompleteLecture: string | null;
 }
 
-type TabValue = "assigned" | "lectures" | "results";
+type TabValue = "assigned" | "lectures" | "transcripts" | "results";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "assigned", label: "Assigned Content", icon: FileText },
   { value: "lectures", label: "Pre-Recorded Lectures", icon: Video },
+  { value: "transcripts", label: "Transcripts", icon: MessageSquareText },
   { value: "results", label: "Results", icon: Trophy },
 ];
 
