@@ -103,6 +103,7 @@ const LiveStudent = () => {
     setConfidenceMultiplier(1);
     setPointsEarned(0);
     setGradePending(false); // Reset pending state
+    setSubmitError(null);
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
