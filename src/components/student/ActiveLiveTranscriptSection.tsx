@@ -88,28 +88,6 @@ export function ActiveLiveTranscriptSection({ instructorId, courseId }: Props) {
       </h2>
 
       <Card className="p-4 space-y-3 border-emerald-200 bg-emerald-50/40">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {session.title ?? "Live session in progress"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Read along with the instructor's transcript in real time.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Live</Badge>
-            {session.session_code && (
-              <Button asChild size="sm" variant="outline">
-                <Link to={`/join?code=${session.session_code}`}>
-                  Join session
-                  <ExternalLink className="h-3.5 w-3.5 ml-1" aria-hidden="true" />
-                </Link>
-              </Button>
-            )}
-          </div>
-        </div>
-
         <LiveTranscriptPanel sessionId={session.id} canFetchHistory />
       </Card>
     </section>
