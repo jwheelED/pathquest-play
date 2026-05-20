@@ -1071,6 +1071,9 @@ const LiveStudent = () => {
         </CardContent>
       </Card>
       </div>
+      <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-2xl z-30 pointer-events-auto">
+        <LiveTranscriptPanel sessionId={sessionId} />
+      </div>
     </main>
   );
 };
