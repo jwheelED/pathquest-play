@@ -107,6 +107,15 @@ export default function InstructorDashboard() {
   
   const professorType = instructorProfile?.professor_type;
 
+  // Stream live transcript chunks to enrolled students (realtime + persistence)
+  useLiveTranscriptBroadcast({
+    sessionId: liveSessionId,
+    instructorId: currentUser?.id ?? null,
+    courseId: selectedCourseId ?? null,
+    chunks: transcriptChunks,
+    enabled: isListening && !!liveSessionId,
+  });
+
   useEffect(() => {
     checkAuth();
   }, []);
