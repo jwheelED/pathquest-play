@@ -674,31 +674,33 @@ const LiveStudent = () => {
 
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <main id="main-content" aria-label="Live session" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
             <div className="text-center space-y-2">
               <p className="text-xl font-semibold">Welcome, {nickname}!</p>
-              <p className="text-muted-foreground">Waiting for the instructor to send a question...</p>
+              <p className="text-muted-foreground" role="status" aria-live="polite">
+                Waiting for the instructor to send a question...
+              </p>
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   // Safeguard: ensure question_content exists before rendering
   if (!currentQuestion?.question_content) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <main id="main-content" aria-label="Live session" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading question...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
+            <p className="text-muted-foreground" role="status" aria-live="polite">Loading question...</p>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
