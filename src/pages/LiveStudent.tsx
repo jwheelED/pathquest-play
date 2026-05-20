@@ -37,6 +37,7 @@ const BASE_REWARD = 10; // Base XP for live questions
 const LiveStudent = () => {
   const { sessionCode } = useParams();
   const navigate = useNavigate();
+  const { announce } = useAnnouncer();
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   const [codeAnswer, setCodeAnswer] = useState<string>("");
