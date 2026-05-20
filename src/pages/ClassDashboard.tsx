@@ -9,6 +9,7 @@ import { AssignedContent } from "@/components/student/AssignedContent";
 import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
 import { StudentLectureQuestions } from "@/components/student/StudentLectureQuestions";
 import { PastTranscriptsList } from "@/components/student/PastTranscriptsList";
+import { ActiveLiveTranscriptSection } from "@/components/student/ActiveLiveTranscriptSection";
 import { cn } from "@/lib/utils";
 
 
@@ -369,6 +370,7 @@ export default function ClassDashboard() {
 
             {activeTab === "transcripts" && (
               <div className="space-y-6 animate-fade-in">
+                <ActiveLiveTranscriptSection instructorId={instructorId} courseId={courseId ?? undefined} />
                 <PastTranscriptsList instructorId={instructorId} courseId={courseId ?? undefined} />
               </div>
             )}
