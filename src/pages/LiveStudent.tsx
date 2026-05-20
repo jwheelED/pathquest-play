@@ -678,6 +678,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your code. Check your connection and try again.");
         toast.error("Failed to submit code. Please try again.");
       }
     } finally {
