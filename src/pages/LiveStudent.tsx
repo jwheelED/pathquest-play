@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
+import { LiveTranscriptPanel } from "@/components/student/LiveTranscriptPanel";
 import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
