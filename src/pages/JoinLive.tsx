@@ -204,7 +204,7 @@ const JoinLive = () => {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 
