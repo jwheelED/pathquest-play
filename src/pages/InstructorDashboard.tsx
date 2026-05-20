@@ -36,6 +36,7 @@ import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { useLiveTranscriptBroadcast } from "@/hooks/useLiveTranscriptBroadcast";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
 import { LiveSessionStrip } from "@/components/instructor/LiveSessionStrip";
 import { LiveCopilotHero } from "@/components/instructor/LiveCopilotHero";
@@ -105,6 +106,15 @@ export default function InstructorDashboard() {
   const { selectedCourseId, selectedCourse } = useCourseContext();
   
   const professorType = instructorProfile?.professor_type;
+
+  // Stream live transcript chunks to enrolled students (realtime + persistence)
+  useLiveTranscriptBroadcast({
+    sessionId: liveSessionId,
+    instructorId: currentUser?.id ?? null,
+    courseId: selectedCourseId ?? null,
+    chunks: transcriptChunks,
+    enabled: isListening && !!liveSessionId,
+  });
 
   useEffect(() => {
     checkAuth();

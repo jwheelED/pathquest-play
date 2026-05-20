@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
+import { LiveTranscriptPanel } from "@/components/student/LiveTranscriptPanel";
 import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
@@ -686,6 +687,9 @@ const LiveStudent = () => {
             </div>
           </CardContent>
         </Card>
+        <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-2xl z-30 pointer-events-auto">
+          <LiveTranscriptPanel sessionId={sessionId} />
+        </div>
       </main>
     );
   }
@@ -1066,6 +1070,9 @@ const LiveStudent = () => {
           )}
         </CardContent>
       </Card>
+      </div>
+      <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-2xl z-30 pointer-events-auto">
+        <LiveTranscriptPanel sessionId={sessionId} />
       </div>
     </main>
   );
