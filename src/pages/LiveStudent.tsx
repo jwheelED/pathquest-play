@@ -896,6 +896,14 @@ const LiveStudent = () => {
                       simpleMode={currentQuestion.question_content.type === "coding_simple"}
                     />
                   </div>
+
+                  {submitError && (
+                    <p id="submit-error" role="alert" className="text-sm font-medium text-destructive">
+                      {submitError}
+                    </p>
+                  )}
+
+
                   
                   <Button 
                     onClick={handleCodingSubmit} 
