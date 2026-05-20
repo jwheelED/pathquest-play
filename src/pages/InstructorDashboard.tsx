@@ -116,6 +116,60 @@ export default function InstructorDashboard() {
     enabled: isListening && !!liveSessionId,
   });
 
+  // Auto-create a lightweight live_session whenever the instructor starts
+  // recording (even without explicitly opening a live class). This lets
+  // enrolled students see the live transcript from their class dashboard the
+  // moment "Start Recording" is pressed.
+  const autoCreatedSessionRef = useRef<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const ensureSession = async () => {
+      if (!isListening || liveSessionId || !currentUser?.id) return;
+      try {
+        const { data, error } = await (supabase
+          .from("live_sessions") as any)
+          .insert({
+            instructor_id: currentUser.id,
+            course_id: selectedCourseId ?? null,
+            title: "Recording session",
+            is_active: true,
+          })
+          .select("id")
+          .single();
+        if (cancelled) return;
+        if (error || !data?.id) {
+          console.warn("Failed to auto-create live session for recording", error);
+          return;
+        }
+        autoCreatedSessionRef.current = data.id;
+        setLiveSessionId(data.id);
+      } catch (err) {
+        console.warn("Auto live_session creation threw", err);
+      }
+    };
+    ensureSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [isListening, liveSessionId, currentUser?.id, selectedCourseId]);
+
+  // When recording stops, close out any session we auto-created so the
+  // "Live now" indicator disappears from the student dashboard.
+  useEffect(() => {
+    if (isListening) return;
+    const id = autoCreatedSessionRef.current;
+    if (!id) return;
+    autoCreatedSessionRef.current = null;
+    (supabase.from("live_sessions") as any)
+      .update({ is_active: false })
+      .eq("id", id)
+      .then(({ error }: any) => {
+        if (error) console.warn("Failed to close auto live session", error);
+      });
+    setLiveSessionId((curr) => (curr === id ? null : curr));
+  }, [isListening]);
+
+
   useEffect(() => {
     checkAuth();
   }, []);
