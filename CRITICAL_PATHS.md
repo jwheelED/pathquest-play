@@ -1,14 +1,15 @@
 # Critical Paths — Edvana
 
-Load-bearing flows. Any code change touching these files MUST follow the **pre-change checklist** at the bottom of this file.
+Load-bearing flows. **Any code change to ANY file in this repo MUST follow the pre-change checklist at the bottom of this file** — not just auth. Read this document before opening an editor.
 
-Tests pinning these invariants live in:
+If your change touches a file referenced under any numbered path below, you are in a critical path and the extra rules for that path also apply.
+
+Tests pinning auth invariants live in:
 - `src/lib/__tests__/validation.test.ts`
 - `src/components/__tests__/ProtectedRoute.test.tsx`
 
 Run before/after editing any auth file: `bun run test:auth`.
-
----
+Run before/after any other change: `bun test` (full suite).
 
 ## 1. Authentication & role assignment
 
@@ -58,18 +59,21 @@ Run before/after editing any auth file: `bun run test:auth`.
 
 ---
 
-## Pre-change checklist (REQUIRED for any AI/contributor)
+## Pre-change checklist (REQUIRED for ANY edit, in ANY file)
 
-Before editing a file listed in any path above, answer in your PR / chat reply:
+Before editing **any** file in this repo, answer in your PR / chat reply:
 
-1. **Which numbered path does this change affect?**
-2. **Which invariant could this break?** (cite by number)
-3. **Which test covers it?** If none, write the test first, then make the change.
-4. **Did you run `bun run test:auth` (or the relevant suite) and confirm it passes?**
+1. **Read this file (`CRITICAL_PATHS.md`) first.** Confirm you have.
+2. **Does this change touch a file listed in a numbered path above?** If yes, cite the path number; if no, say "no critical path".
+3. **Which invariant could this break?** (cite by number, or write "none identified" with a one-line justification)
+4. **Which test covers it?** If none and you're in a critical path, write the test first, then make the change.
+5. **Did you run the relevant test suite and confirm it passes?** (`bun run test:auth` for auth, `bun test` otherwise)
+
+This checklist is not optional. It exists because changes outside critical paths still routinely break critical paths via shared imports, shared state, or shared types.
 
 ## Rules
 
-1. Identify the affected path before writing code.
+1. Identify the affected path before writing code (or confirm none).
 2. Do not modify code in adjacent paths unless explicitly approved.
 3. Changes that touch BOTH a Postgres trigger AND a frontend handler must be paired and reviewed together.
 4. After change, list every file modified and why.
