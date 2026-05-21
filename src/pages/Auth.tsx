@@ -44,6 +44,7 @@ export default function AuthPage() {
     } else {
       setSuccess("Password updated successfully!");
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();

@@ -101,7 +101,7 @@ export default function InstructorAuth() {
                 .from('profiles')
                 .select('org_id, onboarded')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
               
               if (profile?.onboarded === true) {
                 navigate("/instructor/dashboard");
@@ -133,9 +133,10 @@ export default function InstructorAuth() {
                 navigate("/instructor/org-onboarding");
               }
             } else {
-              // Existing user who is not an instructor - redirect them appropriately
-              toast.error("This account is not registered as an instructor. Please use the student login.");
+              // Existing user who is not an instructor - redirect them to the student portal so they aren't stranded.
+              toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
               await supabase.auth.signOut();
+              navigate("/auth");
             }
           }
         }, 0);
@@ -145,10 +146,10 @@ export default function InstructorAuth() {
     // Check for existing session on mount (but not during recovery)
     if (!isRecoveryModeRef.current) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session && !isRecoveryModeRef.current) {
+        if (session && !isRecoveryModeRef.current && !isSigningUpRef.current) {
           // Trigger the same logic as SIGNED_IN
           setTimeout(async () => {
-            if (isRecoveryModeRef.current) return;
+            if (isRecoveryModeRef.current || isSigningUpRef.current) return;
             const { data: roleData } = await supabase
               .from("user_roles")
               .select("role")
@@ -161,7 +162,7 @@ export default function InstructorAuth() {
                 .from('profiles')
                 .select('org_id, onboarded')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
               
               if (profile?.onboarded === true) {
                 navigate("/instructor/dashboard");
@@ -277,6 +278,8 @@ export default function InstructorAuth() {
           return;
         }
 
+        // Guard against the SIGNED_IN listener racing with handleAuth navigation
+        isSigningUpRef.current = true;
         const { error } = await supabase.auth.signInWithPassword({ 
           email: validationResult.data.email, 
           password: validationResult.data.password 
@@ -303,7 +306,7 @@ export default function InstructorAuth() {
               .from('profiles')  
               .select('org_id, onboarded')  
               .eq('id', user.id)  
-              .single();  
+              .maybeSingle();  
             
             if (profile?.onboarded === true) {
               navigate("/instructor/dashboard");
