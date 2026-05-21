@@ -1089,7 +1089,8 @@ const Index = () => {
               </h4>
               <ul className="space-y-2.5">
                 {[
-                  { label: "About", action: () => scrollToSection("hero") },
+                  { label: "About", action: () => navigate("/accessibility") },
+                  { label: "Accessibility", action: () => navigate("/accessibility") },
                   { label: "Contact", action: handleContact },
                   { label: "Privacy", action: () => navigate("/privacy") },
                   { label: "Terms", action: () => navigate("/terms") },
