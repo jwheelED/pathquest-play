@@ -211,6 +211,9 @@ const BoothFlyer = () => {
                 <p className="text-[#388e6e] font-bold text-xs md:text-sm">
                   johnathan@edvana.dev &nbsp;•&nbsp; www.edvana.dev
                 </p>
+                <p className="text-[#388e6e] font-bold text-xs md:text-sm">
+                  (516) 736-2517
+                </p>
               </div>
 
               {/* Bottom bar with logo */}
