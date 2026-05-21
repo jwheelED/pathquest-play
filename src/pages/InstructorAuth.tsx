@@ -148,34 +148,36 @@ export default function InstructorAuth() {
     // Check for existing session on mount (but not during recovery)
     if (!isRecoveryModeRef.current) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session && !isRecoveryModeRef.current && !isSigningUpRef.current) {
-          // Trigger the same logic as SIGNED_IN
-          setTimeout(async () => {
-            if (isRecoveryModeRef.current || isSigningUpRef.current) return;
-            const { data: roleData } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("role", "instructor")
+        if (!session || isRecoveryModeRef.current || isSigningUpRef.current) return;
+        // Respect the same single-resolve guard as the listener path.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
+        // Trigger the same logic as SIGNED_IN
+        setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningUpRef.current) return;
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .eq("role", "instructor")
+            .maybeSingle();
+
+          if (roleData) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('org_id, onboarded')
+              .eq('id', session.user.id)
               .maybeSingle();
-            
-            if (roleData) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('org_id, onboarded')
-                .eq('id', session.user.id)
-                .maybeSingle();
-              
-              if (profile?.onboarded === true) {
-                navigate("/instructor/dashboard");
-              } else if (!profile?.org_id) {
-                navigate("/instructor/org-onboarding");
-              } else {
-                navigate("/instructor/onboarding");
-              }
+
+            if (profile?.onboarded === true) {
+              navigate("/instructor/dashboard");
+            } else if (!profile?.org_id) {
+              navigate("/instructor/org-onboarding");
+            } else {
+              navigate("/instructor/onboarding");
             }
-          }, 0);
-        }
+          }
+        }, 0);
       });
     }
 
