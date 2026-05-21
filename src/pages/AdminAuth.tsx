@@ -16,19 +16,8 @@ export default function AdminAuth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const isRecoveryModeRef = useRef(false);
   const navigate = useNavigate();
-
-  // Handle password recovery flow when user clicks link from email
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveryMode(true);
-        toast.info("Please enter your new password");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const handlePasswordUpdate = async () => {
     setLoading(true);
