@@ -20,15 +20,19 @@ export function ProtectedRoute({
   const navigate = useNavigate();
   const location = useLocation();
   const hasCheckedRef = useRef<string | null>(null);
+  const hasResolvedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    hasResolvedRef.current = false;
 
     // Set up auth state listener FIRST to catch session restoration
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (cancelled) return;
         if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (hasResolvedRef.current) return;
+          hasResolvedRef.current = true;
           checkAuthorization(session);
           setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
@@ -41,7 +45,8 @@ export function ProtectedRoute({
 
     // Fallback: if INITIAL_SESSION never fires (missed event), resolve via getSession
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (cancelled) return;
+      if (cancelled || hasResolvedRef.current) return;
+      hasResolvedRef.current = true;
       checkAuthorization(session);
       setIsLoading(false);
     });
