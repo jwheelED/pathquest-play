@@ -87,6 +87,7 @@ export default function InstructorAuth() {
       if (event === 'SIGNED_IN' && session) {
         // Use setTimeout to avoid Supabase auth deadlock
         setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningUpRef.current) return;
           // Check if user has instructor role
           const { data: roleData } = await supabase
             .from("user_roles")
