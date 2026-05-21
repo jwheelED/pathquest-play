@@ -18,6 +18,7 @@ export default function AdminAuth() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isSigningInRef = useRef(false);
+  const hasResolvedRef = useRef(false);
   const navigate = useNavigate();
 
   const handlePasswordUpdate = async () => {
@@ -79,7 +80,9 @@ export default function AdminAuth() {
       }
 
       // Handle sign-in: route based on admin role + onboarding state
-      if (event === 'SIGNED_IN' && session) {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
         setTimeout(async () => {
           if (isRecoveryModeRef.current || isSigningInRef.current) return;
           const { data: roleData } = await supabase
