@@ -71,13 +71,15 @@ export default function InstructorAuth() {
       
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
         setIsRecoveryMode(true);
         toast.info("Please enter your new password");
         return; // Don't proceed with session checks
       }
 
       // Skip session checks if we're in recovery mode or actively signing up
-      if (isRecoveryMode || isSigningUp) {
+      // Use refs to avoid stale closures (PASSWORD_RECOVERY → SIGNED_IN fire back-to-back)
+      if (isRecoveryModeRef.current || isSigningUpRef.current) {
         return;
       }
 
