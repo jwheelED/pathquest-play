@@ -268,6 +268,7 @@ const PrivacyPolicy = () => {
               <div className="bg-muted/50 rounded-lg p-4 mt-2">
                 <p className="font-medium text-foreground">Edvana Privacy Team</p>
                 <p>Email: johnathan@edvana.dev</p>
+                <p>Phone: (516) 736-2517</p>
               </div>
             </AccordionContent>
           </AccordionItem>
