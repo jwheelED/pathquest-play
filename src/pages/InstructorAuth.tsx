@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ export default function InstructorAuth() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const isRecoveryModeRef = useRef(false);
+  const isSigningUpRef = useRef(false);
   const navigate = useNavigate();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -40,6 +42,7 @@ export default function InstructorAuth() {
       if (error) throw error;
 
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();
@@ -55,6 +58,7 @@ export default function InstructorAuth() {
     // Check if this is a password recovery redirect (has type=recovery in hash)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
@@ -67,13 +71,15 @@ export default function InstructorAuth() {
       
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
         setIsRecoveryMode(true);
         toast.info("Please enter your new password");
         return; // Don't proceed with session checks
       }
 
       // Skip session checks if we're in recovery mode or actively signing up
-      if (isRecoveryMode || isSigningUp) {
+      // Use refs to avoid stale closures (PASSWORD_RECOVERY → SIGNED_IN fire back-to-back)
+      if (isRecoveryModeRef.current || isSigningUpRef.current) {
         return;
       }
 
@@ -81,6 +87,7 @@ export default function InstructorAuth() {
       if (event === 'SIGNED_IN' && session) {
         // Use setTimeout to avoid Supabase auth deadlock
         setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningUpRef.current) return;
           // Check if user has instructor role
           const { data: roleData } = await supabase
             .from("user_roles")
@@ -136,11 +143,12 @@ export default function InstructorAuth() {
     });
 
     // Check for existing session on mount (but not during recovery)
-    if (!isRecoveryMode) {
+    if (!isRecoveryModeRef.current) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
+        if (session && !isRecoveryModeRef.current) {
           // Trigger the same logic as SIGNED_IN
           setTimeout(async () => {
+            if (isRecoveryModeRef.current) return;
             const { data: roleData } = await supabase
               .from("user_roles")
               .select("role")
@@ -169,7 +177,7 @@ export default function InstructorAuth() {
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode, isSigningUp]);
+  }, [navigate]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
@@ -216,10 +224,12 @@ export default function InstructorAuth() {
         const validData = validationResult.data;
 
         setIsSigningUp(true);
+        isSigningUpRef.current = true;
         const { data, error } = await supabase.auth.signUp({ 
           email: validData.email, 
           password: validData.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/instructor/auth`,
             data: {
               full_name: validData.name,
               role: "instructor"
@@ -305,6 +315,7 @@ export default function InstructorAuth() {
     } finally {
       setLoading(false);
       setIsSigningUp(false);
+      isSigningUpRef.current = false;
     }
   };
 

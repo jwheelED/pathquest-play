@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,19 +16,8 @@ export default function AdminAuth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const isRecoveryModeRef = useRef(false);
   const navigate = useNavigate();
-
-  // Handle password recovery flow when user clicks link from email
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveryMode(true);
-        toast.info("Please enter your new password");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const handlePasswordUpdate = async () => {
     setLoading(true);
@@ -44,6 +33,7 @@ export default function AdminAuth() {
       if (error) throw error;
 
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();
@@ -65,6 +55,7 @@ export default function AdminAuth() {
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
@@ -75,73 +66,98 @@ export default function AdminAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
         setIsRecoveryMode(true);
         toast.info("Please enter your new password");
         return;
       }
 
-      // Skip session checks if we're in recovery mode
-      if (isRecoveryMode) {
+      // Skip session checks if we're in recovery mode (use ref to avoid stale closure)
+      if (isRecoveryModeRef.current) {
         return;
       }
-    });
 
-    // Check for existing session on mount (but not during recovery)
-    if (!isRecoveryMode) {
-      const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // Check if user has admin role
+      // Handle sign-in: route based on admin role + onboarding state
+      if (event === 'SIGNED_IN' && session) {
+        setTimeout(async () => {
+          if (isRecoveryModeRef.current) return;
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", session.user.id)
             .eq("role", "admin")
             .maybeSingle();
-          
+
           if (roleData) {
-            // Check if admin has org_id set
             const { data: profileData } = await supabase
               .from("profiles")
               .select("org_id, onboarded")
               .eq("id", session.user.id)
               .single();
-            
+
             if (profileData?.org_id && profileData?.onboarded) {
               navigate("/admin/dashboard");
             } else {
               navigate("/admin/onboarding");
             }
           } else {
-            // Check if this is a new OAuth signup (only has student role)
+            // Possibly a fresh OAuth signup - check for student role to upgrade
             const { data: studentRole } = await supabase
               .from("user_roles")
               .select("role")
               .eq("user_id", session.user.id)
               .eq("role", "student")
               .maybeSingle();
-            
+
             if (studentRole) {
-              // New OAuth signup - assign admin role
               const { data: success } = await supabase
-                .rpc('assign_oauth_role', { 
-                  p_user_id: session.user.id, 
-                  p_role: 'admin' 
+                .rpc('assign_oauth_role', {
+                  p_user_id: session.user.id,
+                  p_role: 'admin'
                 });
-              
+
               if (success) {
                 toast.success("Admin account created!");
                 navigate("/admin/onboarding");
               }
             }
           }
-        }
-      };
-      checkSession();
+        }, 0);
+      }
+    });
+
+    // Check for existing session on mount (but not during recovery)
+    if (!isRecoveryModeRef.current) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session || isRecoveryModeRef.current) return;
+        setTimeout(async () => {
+          if (isRecoveryModeRef.current) return;
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          if (roleData) {
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("org_id, onboarded")
+              .eq("id", session.user.id)
+              .single();
+
+            if (profileData?.org_id && profileData?.onboarded) {
+              navigate("/admin/dashboard");
+            } else {
+              navigate("/admin/onboarding");
+            }
+          }
+        }, 0);
+      });
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode]);
+  }, [navigate]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
@@ -192,6 +208,7 @@ export default function AdminAuth() {
           email: validData.email, 
           password: validData.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/admin/auth`,
             data: {
               full_name: validData.name,
               role: "admin"
