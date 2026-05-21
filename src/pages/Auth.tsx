@@ -123,26 +123,19 @@ export default function AuthPage() {
 
       const user = data.user;
       if (user) {
-        // Create user profile with onboarded set to true
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: user.id,
-          full_name: validData.name,
-          onboarded: true, // Student is onboarded immediately
-        });
+        // Profile is created by the handle_new_user trigger (with onboarded=true
+        // from user_metadata). Do NOT upsert from the client — it races with the
+        // trigger and overwrites trigger-managed fields.
 
-        // Create user stats for gamification (no org_id initially)
+        // user_stats is not created by the trigger, so insert it here.
         const { error: statsError } = await supabase.from("user_stats").insert({
           user_id: user.id,
           org_id: null,
         });
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-        }
         if (statsError) {
           console.error("Stats creation error:", statsError);
         }
-        
+
         setSuccess("Account created! Please check your email to confirm your account.");
         toast.success("Account created! Check your email to confirm before signing in.");
         setIsSignUp(false); // Switch to sign-in mode
