@@ -215,9 +215,19 @@ export default function AdminAuth() {
             }
           }
         });
-        if (error) throw error;
+        if (error) {
+          // Newer Supabase returns an explicit error for duplicate emails
+          const msg = error.message.toLowerCase();
+          if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
+            toast.error("This email is already registered. Please sign in instead.");
+            setIsSignUp(false);
+            return;
+          }
+          throw error;
+        }
 
         if (data.user) {
+          // Legacy fallback: obfuscated duplicate (older Supabase returns empty identities)
           if (data.user.identities && data.user.identities.length === 0) {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);

@@ -50,18 +50,38 @@ export default function AuthPage() {
     }
   };
 
-  // Helper to navigate user to the correct dashboard based on their role
+  // Helper to navigate user to the correct dashboard based on their role + onboarding state
   const navigateByRole = async (userId: string) => {
     // Check roles in order of priority: admin > instructor > student
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
     if (isAdmin) {
-      navigate("/admin/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.org_id && profile?.onboarded) {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/admin/onboarding");
+      }
       return;
     }
 
     const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: userId, _role: 'instructor' });
     if (isInstructor) {
-      navigate("/instructor/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.onboarded === true) {
+        navigate("/instructor/dashboard");
+      } else if (!profile?.org_id) {
+        navigate("/instructor/org-onboarding");
+      } else {
+        navigate("/instructor/onboarding");
+      }
       return;
     }
 
@@ -80,109 +100,114 @@ export default function AuthPage() {
     setSuccess("");
     isHandlingAuthRef.current = true;
 
-    if (isSignUp) {
-      // Validate student signup inputs
-      const validationResult = studentSignUpSchema.safeParse({
-        email: email.trim(),
-        password,
-        name: name.trim(),
-        instructorCode: '' // Not collected during auth
-      });
-
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        setError(firstError.message);
-        toast.error(firstError.message);
-        return;
-      }
-
-      const validData = validationResult.data;
-
-      const { data, error } = await supabase.auth.signUp({
-        email: validData.email,
-        password: validData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
-          data: {
-            full_name: validData.name
-          }
-        }
-      });
-
-      if (error) {
-        // Check if user already exists
-        if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
-          setError('This email is already registered. Please sign in instead.');
-          toast.error('This email is already registered. Please sign in instead.');
-        } else {
-          setError(error.message);
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      const user = data.user;
-      if (user) {
-        // Profile is created by the handle_new_user trigger (with onboarded=true
-        // from user_metadata). Do NOT upsert from the client — it races with the
-        // trigger and overwrites trigger-managed fields.
-
-        // user_stats is not created by the trigger, so insert it here.
-        const { error: statsError } = await supabase.from("user_stats").insert({
-          user_id: user.id,
-          org_id: null,
+    try {
+      if (isSignUp) {
+        // Validate student signup inputs
+        const validationResult = studentSignUpSchema.safeParse({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          instructorCode: '' // Not collected during auth
         });
-        if (statsError) {
-          console.error("Stats creation error:", statsError);
+
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          setError(firstError.message);
+          toast.error(firstError.message);
+          return;
         }
 
-        setSuccess("Account created! Please check your email to confirm your account.");
-        toast.success("Account created! Check your email to confirm before signing in.");
-        setIsSignUp(false); // Switch to sign-in mode
-      }
-    } else {
-      // Validate sign-in inputs
-      const validationResult = signInSchema.safeParse({
-        email: email.trim(),
-        password
-      });
+        const validData = validationResult.data;
 
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        setError(firstError.message);
-        toast.error(firstError.message);
-        return;
-      }
+        const { data, error } = await supabase.auth.signUp({
+          email: validData.email,
+          password: validData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
+            data: {
+              full_name: validData.name
+            }
+          }
+        });
 
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: validationResult.data.email, 
-        password: validationResult.data.password 
-      });
+        if (error) {
+          // Check if user already exists
+          if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
+            setError('This email is already registered. Please sign in instead.');
+            toast.error('This email is already registered. Please sign in instead.');
+          } else {
+            setError(error.message);
+            toast.error(error.message);
+          }
+          return;
+        }
 
-      if (error) {
-        // Check for email not confirmed error
-        if (error.message.toLowerCase().includes('email not confirmed') || 
-            error.message.toLowerCase().includes('verify your email')) {
-          setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-          toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-        } else if (error.message.toLowerCase().includes('invalid login credentials')) {
-          // Could be wrong password OR unconfirmed email
-          setError('Invalid email or password. If you just signed up, please confirm your email first.');
-          toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
-        } else {
-          setError(error.message);
-          toast.error(error.message);
+        const user = data.user;
+        if (user) {
+          // Profile is created by the handle_new_user trigger (with onboarded=true
+          // from user_metadata). Do NOT upsert from the client — it races with the
+          // trigger and overwrites trigger-managed fields.
+
+          // user_stats is not created by the trigger, so insert it here.
+          const { error: statsError } = await supabase.from("user_stats").insert({
+            user_id: user.id,
+            org_id: null,
+          });
+          if (statsError) {
+            console.error("Stats creation error:", statsError);
+          }
+
+          setSuccess("Account created! Please check your email to confirm your account.");
+          toast.success("Account created! Check your email to confirm before signing in.");
+          setIsSignUp(false); // Switch to sign-in mode
         }
       } else {
-        setSuccess("Signed in successfully!");
-        // If there's a redirect (e.g. from live session), go there
-        if (redirectTo) {
-          navigate(redirectTo);
+        // Validate sign-in inputs
+        const validationResult = signInSchema.safeParse({
+          email: email.trim(),
+          password
+        });
+
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          setError(firstError.message);
+          toast.error(firstError.message);
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email: validationResult.data.email, 
+          password: validationResult.data.password 
+        });
+
+        if (error) {
+          // Check for email not confirmed error
+          if (error.message.toLowerCase().includes('email not confirmed') || 
+              error.message.toLowerCase().includes('verify your email')) {
+            setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+            toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+          } else if (error.message.toLowerCase().includes('invalid login credentials')) {
+            // Could be wrong password OR unconfirmed email
+            setError('Invalid email or password. If you just signed up, please confirm your email first.');
+            toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
+          } else {
+            setError(error.message);
+            toast.error(error.message);
+          }
         } else {
-          // Navigate based on user role
-          await navigateByRole(data.user.id);
+          setSuccess("Signed in successfully!");
+          // If there's a redirect (e.g. from live session), go there
+          if (redirectTo) {
+            navigate(redirectTo);
+          } else {
+            // Navigate based on user role
+            await navigateByRole(data.user.id);
+          }
         }
       }
+    } finally {
+      // Always release the lock so the auth listener can resume normal navigation
+      isHandlingAuthRef.current = false;
     }
   };
 
