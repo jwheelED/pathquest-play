@@ -304,8 +304,11 @@ export default function InstructorAuth() {
               navigate("/instructor/onboarding");
             }
           } else {
-            toast.error("This account is not registered as an instructor");
+            // Signed in to instructor portal but doesn't have instructor role.
+            // Sign out and send them to the student portal so they aren't stranded.
+            toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
             await supabase.auth.signOut();
+            navigate("/auth");
           }
         }
       }
