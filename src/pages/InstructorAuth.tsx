@@ -224,10 +224,12 @@ export default function InstructorAuth() {
         const validData = validationResult.data;
 
         setIsSigningUp(true);
+        isSigningUpRef.current = true;
         const { data, error } = await supabase.auth.signUp({ 
           email: validData.email, 
           password: validData.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/instructor/auth`,
             data: {
               full_name: validData.name,
               role: "instructor"
