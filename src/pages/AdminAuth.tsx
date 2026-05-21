@@ -208,6 +208,7 @@ export default function AdminAuth() {
           email: validData.email, 
           password: validData.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/admin/auth`,
             data: {
               full_name: validData.name,
               role: "admin"
