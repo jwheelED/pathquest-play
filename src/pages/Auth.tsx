@@ -149,11 +149,10 @@ export default function AuthPage() {
           // from user_metadata). Do NOT upsert from the client — it races with the
           // trigger and overwrites trigger-managed fields.
 
-          // user_stats is not created by the trigger, so insert it here.
-          const { error: statsError } = await supabase.from("user_stats").insert({
-            user_id: user.id,
-            org_id: null,
-          });
+          // user_stats may also be created by the trigger; use upsert to avoid 23505 collisions.
+          const { error: statsError } = await supabase
+            .from("user_stats")
+            .upsert({ user_id: user.id, org_id: null }, { onConflict: "user_id", ignoreDuplicates: true });
           if (statsError) {
             console.error("Stats creation error:", statsError);
           }
@@ -207,8 +206,9 @@ export default function AuthPage() {
         }
       }
     } finally {
-      // Always release the lock so the auth listener can resume normal navigation
-      isHandlingAuthRef.current = false;
+      // Hold the lock briefly so the async SIGNED_IN listener (which fires after
+      // signInWithPassword resolves) sees it as still set and skips a duplicate navigate.
+      setTimeout(() => { isHandlingAuthRef.current = false; }, 1500);
     }
   };
 
@@ -285,33 +285,35 @@ export default function AuthPage() {
         }
 
         const initializeUser = async () => {
-          // Ensure profile exists with onboarded true
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("id, onboarded")
-            .eq("id", session.user.id)
-            .maybeSingle();
+          // Only auto-provision/onboard student-role users here. Instructors and
+          // admins have their own onboarding flows and must not be marked onboarded
+          // by this generic path (would skip /instructor/org-onboarding etc.).
+          const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
+          const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'instructor' });
+          const isStudent = !isAdmin && !isInstructor;
 
-          if (!profile) {
-            // Create profile for OAuth users
-            await supabase.from("profiles").upsert({
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-              onboarded: true,
-            });
+          if (isStudent) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("id, onboarded")
+              .eq("id", session.user.id)
+              .maybeSingle();
 
-            // Create user stats
-            await supabase.from("user_stats").insert({
-              user_id: session.user.id,
-              org_id: null,
-            }).then(() => {
-              // Errors are OK here - record might already exist
-            });
-          } else if (!profile.onboarded) {
-            await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+            if (!profile) {
+              await supabase.from("profiles").upsert({
+                id: session.user.id,
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
+                onboarded: true,
+              });
+
+              await supabase
+                .from("user_stats")
+                .upsert({ user_id: session.user.id, org_id: null }, { onConflict: "user_id", ignoreDuplicates: true });
+            } else if (!profile.onboarded) {
+              await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+            }
           }
 
-          // Navigate based on user role
           await navigateByRole(session.user.id);
         };
 

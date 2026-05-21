@@ -20,6 +20,7 @@ export default function InstructorAuth() {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isSigningUpRef = useRef(false);
+  const hasResolvedRef = useRef(false);
   const navigate = useNavigate();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -67,8 +68,6 @@ export default function InstructorAuth() {
   // Combined auth state change handler
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event);
-      
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
         isRecoveryModeRef.current = true;
@@ -78,14 +77,14 @@ export default function InstructorAuth() {
       }
 
       // Skip session checks if we're in recovery mode or actively signing up
-      // Use refs to avoid stale closures (PASSWORD_RECOVERY → SIGNED_IN fire back-to-back)
       if (isRecoveryModeRef.current || isSigningUpRef.current) {
         return;
       }
 
-      // Handle signed in event - check role and redirect
-      if (event === 'SIGNED_IN' && session) {
-        // Use setTimeout to avoid Supabase auth deadlock
+      // Handle signed in event - check role and redirect (only once per mount)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
         setTimeout(async () => {
           if (isRecoveryModeRef.current || isSigningUpRef.current) return;
           // Check if user has instructor role
