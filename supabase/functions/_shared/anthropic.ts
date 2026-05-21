@@ -4,7 +4,7 @@
 // now routes to Google Gemini via the Lovable AI Gateway.
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const DEFAULT_MODEL = "google/gemini-2.5-flash";
+const DEFAULT_MODEL = "google/gemini-3.5-flash";
 
 interface OpenAIMessage {
   role: "system" | "user" | "assistant";
