@@ -1,3 +1,6 @@
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Invariants enforced by src/components/__tests__/ProtectedRoute.test.tsx
+// Before editing: read the test file. After editing: run `bun run test:auth`.
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';

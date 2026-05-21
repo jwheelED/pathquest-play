@@ -1,3 +1,6 @@
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Mirror any guard/ref changes in Auth.tsx and InstructorAuth.tsx.
+// Before editing: read CRITICAL_PATHS.md §1. After editing: run `bun run test:auth`.
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
