@@ -1,3 +1,7 @@
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Invariants enforced by src/lib/__tests__/validation.test.ts and
+// src/components/__tests__/ProtectedRoute.test.tsx.
+// Before editing: read CRITICAL_PATHS.md §1. After editing: run `bun run test:auth`.
 "use client";
 
 import { useEffect, useState, useRef } from "react";
