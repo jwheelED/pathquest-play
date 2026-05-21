@@ -267,8 +267,11 @@ export default function AdminAuth() {
           if (roleData) {
             navigate("/admin/dashboard");
           } else {
-            toast.error("This account is not registered as an administrator");
+            // Signed in to admin portal but doesn't have admin role.
+            // Sign out and send them to the student portal so they aren't stranded.
+            toast.error("This account isn't registered as an administrator. Redirecting to the student sign-in.");
             await supabase.auth.signOut();
+            navigate("/auth");
           }
         }
       }
