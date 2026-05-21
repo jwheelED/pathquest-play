@@ -25,6 +25,7 @@ export default function AuthPage() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isHandlingAuthRef = useRef(false);
+  const hasResolvedRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
@@ -287,6 +288,11 @@ export default function AuthPage() {
           // They can see "You are signed in" and logout to switch accounts
           return;
         }
+
+        // Single-resolve guard: an OAuth callback can produce both INITIAL_SESSION
+        // and SIGNED_IN; without this, initializeUser + navigateByRole runs twice.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
 
         const initializeUser = async () => {
           // Only auto-provision/onboard student-role users here. Instructors and

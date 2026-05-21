@@ -145,9 +145,12 @@ export default function AdminAuth() {
     // Check for existing session on mount (but not during recovery)
     if (!isRecoveryModeRef.current) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session || isRecoveryModeRef.current) return;
+        if (!session || isRecoveryModeRef.current || isSigningInRef.current) return;
+        // Respect the same single-resolve guard as the listener path.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
         setTimeout(async () => {
-          if (isRecoveryModeRef.current) return;
+          if (isRecoveryModeRef.current || isSigningInRef.current) return;
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
