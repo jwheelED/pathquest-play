@@ -17,6 +17,7 @@ export default function AdminAuth() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
+  const isSigningInRef = useRef(false);
   const navigate = useNavigate();
 
   const handlePasswordUpdate = async () => {
@@ -72,15 +73,15 @@ export default function AdminAuth() {
         return;
       }
 
-      // Skip session checks if we're in recovery mode (use ref to avoid stale closure)
-      if (isRecoveryModeRef.current) {
+      // Skip session checks if we're in recovery mode or actively handling sign-in
+      if (isRecoveryModeRef.current || isSigningInRef.current) {
         return;
       }
 
       // Handle sign-in: route based on admin role + onboarding state
       if (event === 'SIGNED_IN' && session) {
         setTimeout(async () => {
-          if (isRecoveryModeRef.current) return;
+          if (isRecoveryModeRef.current || isSigningInRef.current) return;
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
@@ -93,7 +94,7 @@ export default function AdminAuth() {
               .from("profiles")
               .select("org_id, onboarded")
               .eq("id", session.user.id)
-              .single();
+              .maybeSingle();
 
             if (profileData?.org_id && profileData?.onboarded) {
               navigate("/admin/dashboard");
@@ -109,7 +110,11 @@ export default function AdminAuth() {
               .eq("role", "student")
               .maybeSingle();
 
-            if (studentRole) {
+            // Detect fresh OAuth callback so we don't strand existing non-admin users on a dead screen
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
+
+            if (studentRole && hasOAuthCallback) {
               const { data: success } = await supabase
                 .rpc('assign_oauth_role', {
                   p_user_id: session.user.id,
@@ -120,6 +125,11 @@ export default function AdminAuth() {
                 toast.success("Admin account created!");
                 navigate("/admin/onboarding");
               }
+            } else {
+              // Existing user lacking admin role - bounce to student portal so they aren't stranded.
+              toast.error("This account isn't registered as an administrator. Redirecting to the student sign-in.");
+              await supabase.auth.signOut();
+              navigate("/auth");
             }
           }
         }, 0);
@@ -144,7 +154,7 @@ export default function AdminAuth() {
               .from("profiles")
               .select("org_id, onboarded")
               .eq("id", session.user.id)
-              .single();
+              .maybeSingle();
 
             if (profileData?.org_id && profileData?.onboarded) {
               navigate("/admin/dashboard");
@@ -253,6 +263,8 @@ export default function AdminAuth() {
           return;
         }
 
+        // Guard the SIGNED_IN listener so it doesn't race with this navigation
+        isSigningInRef.current = true;
         const { error } = await supabase.auth.signInWithPassword({ 
           email: validationResult.data.email, 
           password: validationResult.data.password 
@@ -290,6 +302,7 @@ export default function AdminAuth() {
       toast.error(message);
     } finally {
       setLoading(false);
+      isSigningInRef.current = false;
     }
   };
 
