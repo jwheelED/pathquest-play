@@ -58,6 +58,7 @@ export default function InstructorAuth() {
     // Check if this is a password recovery redirect (has type=recovery in hash)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
