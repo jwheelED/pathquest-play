@@ -327,11 +327,21 @@ export default function InstructorDashboard() {
       return;
     }
 
-    if (!profile?.course_title || !profile.course_schedule || 
-        !profile.course_topics || profile.course_topics.length === 0) {
-      toast.warning("⚠️ Your course details are incomplete. Please update them in onboarding.", {
-        duration: 5000,
-      });
+    // Check the courses table (source of truth) instead of legacy profile fields.
+    // Legacy accounts may have onboarded=true but no course row yet — send them
+    // back to onboarding to create their first course rather than stranding them
+    // on a dashboard with no course context.
+    const { data: existingCourses } = await supabase
+      .from("courses")
+      .select("id")
+      .eq("instructor_id", session.user.id)
+      .eq("is_active", true)
+      .limit(1);
+
+    if (!existingCourses || existingCourses.length === 0) {
+      toast.info("Let's finish setting up your first course.");
+      navigate("/instructor/onboarding");
+      return;
     }
 
     setCurrentUser(session.user);
