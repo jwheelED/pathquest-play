@@ -315,6 +315,7 @@ export default function InstructorAuth() {
     } finally {
       setLoading(false);
       setIsSigningUp(false);
+      isSigningUpRef.current = false;
     }
   };
 
