@@ -50,18 +50,38 @@ export default function AuthPage() {
     }
   };
 
-  // Helper to navigate user to the correct dashboard based on their role
+  // Helper to navigate user to the correct dashboard based on their role + onboarding state
   const navigateByRole = async (userId: string) => {
     // Check roles in order of priority: admin > instructor > student
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
     if (isAdmin) {
-      navigate("/admin/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.org_id && profile?.onboarded) {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/admin/onboarding");
+      }
       return;
     }
 
     const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: userId, _role: 'instructor' });
     if (isInstructor) {
-      navigate("/instructor/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.onboarded === true) {
+        navigate("/instructor/dashboard");
+      } else if (!profile?.org_id) {
+        navigate("/instructor/org-onboarding");
+      } else {
+        navigate("/instructor/onboarding");
+      }
       return;
     }
 
