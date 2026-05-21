@@ -143,11 +143,12 @@ export default function InstructorAuth() {
     });
 
     // Check for existing session on mount (but not during recovery)
-    if (!isRecoveryMode) {
+    if (!isRecoveryModeRef.current) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
+        if (session && !isRecoveryModeRef.current) {
           // Trigger the same logic as SIGNED_IN
           setTimeout(async () => {
+            if (isRecoveryModeRef.current) return;
             const { data: roleData } = await supabase
               .from("user_roles")
               .select("role")
@@ -176,7 +177,7 @@ export default function InstructorAuth() {
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode, isSigningUp]);
+  }, [navigate]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
