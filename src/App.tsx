@@ -14,6 +14,7 @@ import MarketingLanding from "./pages/MarketingLanding";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import BoothFlyer from "./pages/BoothFlyer";
+import AccessibilityStatement from "./pages/AccessibilityStatement";
 
 import ClassDashboard from "./pages/ClassDashboard";
 import Auth from "./pages/Auth";
