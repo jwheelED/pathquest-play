@@ -22,23 +22,34 @@ export function ProtectedRoute({
   const hasCheckedRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     // Set up auth state listener FIRST to catch session restoration
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (event === 'INITIAL_SESSION') {
-          // Auth is now initialized - check authorization
+        if (cancelled) return;
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           checkAuthorization(session);
           setIsLoading(false);
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          checkAuthorization(session);
         } else if (event === 'SIGNED_OUT') {
           setAuthorized(false);
+          setIsLoading(false);
           navigate(redirectTo);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    // Fallback: if INITIAL_SESSION never fires (missed event), resolve via getSession
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      checkAuthorization(session);
+      setIsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [requiredRole, redirectTo, navigate]);
 
   const checkAuthorization = async (session: Session | null) => {
