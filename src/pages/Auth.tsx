@@ -1,3 +1,7 @@
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Invariants enforced by src/lib/__tests__/validation.test.ts and
+// src/components/__tests__/ProtectedRoute.test.tsx.
+// Before editing: read CRITICAL_PATHS.md §1. After editing: run `bun run test:auth`.
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -21,6 +25,7 @@ export default function AuthPage() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isHandlingAuthRef = useRef(false);
+  const hasResolvedRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
@@ -44,24 +49,45 @@ export default function AuthPage() {
     } else {
       setSuccess("Password updated successfully!");
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();
     }
   };
 
-  // Helper to navigate user to the correct dashboard based on their role
+  // Helper to navigate user to the correct dashboard based on their role + onboarding state
   const navigateByRole = async (userId: string) => {
     // Check roles in order of priority: admin > instructor > student
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
     if (isAdmin) {
-      navigate("/admin/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.org_id && profile?.onboarded) {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/admin/onboarding");
+      }
       return;
     }
 
     const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: userId, _role: 'instructor' });
     if (isInstructor) {
-      navigate("/instructor/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.onboarded === true) {
+        navigate("/instructor/dashboard");
+      } else if (!profile?.org_id) {
+        navigate("/instructor/org-onboarding");
+      } else {
+        navigate("/instructor/onboarding");
+      }
       return;
     }
 
@@ -80,116 +106,114 @@ export default function AuthPage() {
     setSuccess("");
     isHandlingAuthRef.current = true;
 
-    if (isSignUp) {
-      // Validate student signup inputs
-      const validationResult = studentSignUpSchema.safeParse({
-        email: email.trim(),
-        password,
-        name: name.trim(),
-        instructorCode: '' // Not collected during auth
-      });
+    try {
+      if (isSignUp) {
+        // Validate student signup inputs
+        const validationResult = studentSignUpSchema.safeParse({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          instructorCode: '' // Not collected during auth
+        });
 
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        setError(firstError.message);
-        toast.error(firstError.message);
-        return;
-      }
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          setError(firstError.message);
+          toast.error(firstError.message);
+          return;
+        }
 
-      const validData = validationResult.data;
+        const validData = validationResult.data;
 
-      const { data, error } = await supabase.auth.signUp({
-        email: validData.email,
-        password: validData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
-          data: {
-            full_name: validData.name
+        const { data, error } = await supabase.auth.signUp({
+          email: validData.email,
+          password: validData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
+            data: {
+              full_name: validData.name
+            }
           }
-        }
-      });
-
-      if (error) {
-        // Check if user already exists
-        if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
-          setError('This email is already registered. Please sign in instead.');
-          toast.error('This email is already registered. Please sign in instead.');
-        } else {
-          setError(error.message);
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      const user = data.user;
-      if (user) {
-        // Create user profile with onboarded set to true
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: user.id,
-          full_name: validData.name,
-          onboarded: true, // Student is onboarded immediately
         });
 
-        // Create user stats for gamification (no org_id initially)
-        const { error: statsError } = await supabase.from("user_stats").insert({
-          user_id: user.id,
-          org_id: null,
-        });
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
+        if (error) {
+          // Check if user already exists
+          if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
+            setError('This email is already registered. Please sign in instead.');
+            toast.error('This email is already registered. Please sign in instead.');
+          } else {
+            setError(error.message);
+            toast.error(error.message);
+          }
+          return;
         }
-        if (statsError) {
-          console.error("Stats creation error:", statsError);
-        }
-        
-        setSuccess("Account created! Please check your email to confirm your account.");
-        toast.success("Account created! Check your email to confirm before signing in.");
-        setIsSignUp(false); // Switch to sign-in mode
-      }
-    } else {
-      // Validate sign-in inputs
-      const validationResult = signInSchema.safeParse({
-        email: email.trim(),
-        password
-      });
 
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        setError(firstError.message);
-        toast.error(firstError.message);
-        return;
-      }
+        const user = data.user;
+        if (user) {
+          // Profile is created by the handle_new_user trigger (with onboarded=true
+          // from user_metadata). Do NOT upsert from the client — it races with the
+          // trigger and overwrites trigger-managed fields.
 
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: validationResult.data.email, 
-        password: validationResult.data.password 
-      });
+          // user_stats may also be created by the trigger; use upsert to avoid 23505 collisions.
+          const { error: statsError } = await supabase
+            .from("user_stats")
+            .upsert({ user_id: user.id, org_id: null }, { onConflict: "user_id", ignoreDuplicates: true });
+          if (statsError) {
+            console.error("Stats creation error:", statsError);
+          }
 
-      if (error) {
-        // Check for email not confirmed error
-        if (error.message.toLowerCase().includes('email not confirmed') || 
-            error.message.toLowerCase().includes('verify your email')) {
-          setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-          toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-        } else if (error.message.toLowerCase().includes('invalid login credentials')) {
-          // Could be wrong password OR unconfirmed email
-          setError('Invalid email or password. If you just signed up, please confirm your email first.');
-          toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
-        } else {
-          setError(error.message);
-          toast.error(error.message);
+          setSuccess("Account created! Please check your email to confirm your account.");
+          toast.success("Account created! Check your email to confirm before signing in.");
+          setIsSignUp(false); // Switch to sign-in mode
         }
       } else {
-        setSuccess("Signed in successfully!");
-        // If there's a redirect (e.g. from live session), go there
-        if (redirectTo) {
-          navigate(redirectTo);
+        // Validate sign-in inputs
+        const validationResult = signInSchema.safeParse({
+          email: email.trim(),
+          password
+        });
+
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          setError(firstError.message);
+          toast.error(firstError.message);
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email: validationResult.data.email, 
+          password: validationResult.data.password 
+        });
+
+        if (error) {
+          // Check for email not confirmed error
+          if (error.message.toLowerCase().includes('email not confirmed') || 
+              error.message.toLowerCase().includes('verify your email')) {
+            setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+            toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+          } else if (error.message.toLowerCase().includes('invalid login credentials')) {
+            // Could be wrong password OR unconfirmed email
+            setError('Invalid email or password. If you just signed up, please confirm your email first.');
+            toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
+          } else {
+            setError(error.message);
+            toast.error(error.message);
+          }
         } else {
-          // Navigate based on user role
-          await navigateByRole(data.user.id);
+          setSuccess("Signed in successfully!");
+          // If there's a redirect (e.g. from live session), go there
+          if (redirectTo) {
+            navigate(redirectTo);
+          } else {
+            // Navigate based on user role
+            await navigateByRole(data.user.id);
+          }
         }
       }
+    } finally {
+      // Hold the lock briefly so the async SIGNED_IN listener (which fires after
+      // signInWithPassword resolves) sees it as still set and skips a duplicate navigate.
+      setTimeout(() => { isHandlingAuthRef.current = false; }, 1500);
     }
   };
 
@@ -265,34 +289,41 @@ export default function AuthPage() {
           return;
         }
 
+        // Single-resolve guard: an OAuth callback can produce both INITIAL_SESSION
+        // and SIGNED_IN; without this, initializeUser + navigateByRole runs twice.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
+
         const initializeUser = async () => {
-          // Ensure profile exists with onboarded true
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("id, onboarded")
-            .eq("id", session.user.id)
-            .maybeSingle();
+          // Only auto-provision/onboard student-role users here. Instructors and
+          // admins have their own onboarding flows and must not be marked onboarded
+          // by this generic path (would skip /instructor/org-onboarding etc.).
+          const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
+          const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'instructor' });
+          const isStudent = !isAdmin && !isInstructor;
 
-          if (!profile) {
-            // Create profile for OAuth users
-            await supabase.from("profiles").upsert({
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-              onboarded: true,
-            });
+          if (isStudent) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("id, onboarded")
+              .eq("id", session.user.id)
+              .maybeSingle();
 
-            // Create user stats
-            await supabase.from("user_stats").insert({
-              user_id: session.user.id,
-              org_id: null,
-            }).then(() => {
-              // Errors are OK here - record might already exist
-            });
-          } else if (!profile.onboarded) {
-            await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+            if (!profile) {
+              await supabase.from("profiles").upsert({
+                id: session.user.id,
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
+                onboarded: true,
+              });
+
+              await supabase
+                .from("user_stats")
+                .upsert({ user_id: session.user.id, org_id: null }, { onConflict: "user_id", ignoreDuplicates: true });
+            } else if (!profile.onboarded) {
+              await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+            }
           }
 
-          // Navigate based on user role
           await navigateByRole(session.user.id);
         };
 

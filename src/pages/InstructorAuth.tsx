@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Mirror any guard/ref changes in Auth.tsx and AdminAuth.tsx.
+// Before editing: read CRITICAL_PATHS.md §1. After editing: run `bun run test:auth`.
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +21,9 @@ export default function InstructorAuth() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const isRecoveryModeRef = useRef(false);
+  const isSigningUpRef = useRef(false);
+  const hasResolvedRef = useRef(false);
   const navigate = useNavigate();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -40,6 +46,7 @@ export default function InstructorAuth() {
       if (error) throw error;
 
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();
@@ -55,6 +62,7 @@ export default function InstructorAuth() {
     // Check if this is a password recovery redirect (has type=recovery in hash)
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
@@ -63,24 +71,25 @@ export default function InstructorAuth() {
   // Combined auth state change handler
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event);
-      
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
         setIsRecoveryMode(true);
         toast.info("Please enter your new password");
         return; // Don't proceed with session checks
       }
 
       // Skip session checks if we're in recovery mode or actively signing up
-      if (isRecoveryMode || isSigningUp) {
+      if (isRecoveryModeRef.current || isSigningUpRef.current) {
         return;
       }
 
-      // Handle signed in event - check role and redirect
-      if (event === 'SIGNED_IN' && session) {
-        // Use setTimeout to avoid Supabase auth deadlock
+      // Handle signed in event - check role and redirect (only once per mount)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
         setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningUpRef.current) return;
           // Check if user has instructor role
           const { data: roleData } = await supabase
             .from("user_roles")
@@ -94,7 +103,7 @@ export default function InstructorAuth() {
                 .from('profiles')
                 .select('org_id, onboarded')
                 .eq('id', session.user.id)
-                .single();
+                .maybeSingle();
               
               if (profile?.onboarded === true) {
                 navigate("/instructor/dashboard");
@@ -126,9 +135,10 @@ export default function InstructorAuth() {
                 navigate("/instructor/org-onboarding");
               }
             } else {
-              // Existing user who is not an instructor - redirect them appropriately
-              toast.error("This account is not registered as an instructor. Please use the student login.");
+              // Existing user who is not an instructor - redirect them to the student portal so they aren't stranded.
+              toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
               await supabase.auth.signOut();
+              navigate("/auth");
             }
           }
         }, 0);
@@ -136,40 +146,43 @@ export default function InstructorAuth() {
     });
 
     // Check for existing session on mount (but not during recovery)
-    if (!isRecoveryMode) {
+    if (!isRecoveryModeRef.current) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          // Trigger the same logic as SIGNED_IN
-          setTimeout(async () => {
-            const { data: roleData } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("role", "instructor")
+        if (!session || isRecoveryModeRef.current || isSigningUpRef.current) return;
+        // Respect the same single-resolve guard as the listener path.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
+        // Trigger the same logic as SIGNED_IN
+        setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningUpRef.current) return;
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .eq("role", "instructor")
+            .maybeSingle();
+
+          if (roleData) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('org_id, onboarded')
+              .eq('id', session.user.id)
               .maybeSingle();
-            
-            if (roleData) {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('org_id, onboarded')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (profile?.onboarded === true) {
-                navigate("/instructor/dashboard");
-              } else if (!profile?.org_id) {
-                navigate("/instructor/org-onboarding");
-              } else {
-                navigate("/instructor/onboarding");
-              }
+
+            if (profile?.onboarded === true) {
+              navigate("/instructor/dashboard");
+            } else if (!profile?.org_id) {
+              navigate("/instructor/org-onboarding");
+            } else {
+              navigate("/instructor/onboarding");
             }
-          }, 0);
-        }
+          }
+        }, 0);
       });
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode, isSigningUp]);
+  }, [navigate]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
@@ -216,20 +229,31 @@ export default function InstructorAuth() {
         const validData = validationResult.data;
 
         setIsSigningUp(true);
+        isSigningUpRef.current = true;
         const { data, error } = await supabase.auth.signUp({ 
           email: validData.email, 
           password: validData.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/instructor/auth`,
             data: {
               full_name: validData.name,
               role: "instructor"
             }
           }
         });
-        if (error) throw error;
+        if (error) {
+          // Newer Supabase returns an explicit error for duplicate emails
+          const msg = error.message.toLowerCase();
+          if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
+            toast.error("This email is already registered. Please sign in instead.");
+            setIsSignUp(false);
+            return;
+          }
+          throw error;
+        }
 
         if (data.user) {
-          // Check if email confirmation is required
+          // Legacy fallback: obfuscated duplicate (older Supabase returns empty identities)
           if (data.user.identities && data.user.identities.length === 0) {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);
@@ -258,6 +282,8 @@ export default function InstructorAuth() {
           return;
         }
 
+        // Guard against the SIGNED_IN listener racing with handleAuth navigation
+        isSigningUpRef.current = true;
         const { error } = await supabase.auth.signInWithPassword({ 
           email: validationResult.data.email, 
           password: validationResult.data.password 
@@ -284,7 +310,7 @@ export default function InstructorAuth() {
               .from('profiles')  
               .select('org_id, onboarded')  
               .eq('id', user.id)  
-              .single();  
+              .maybeSingle();  
             
             if (profile?.onboarded === true) {
               navigate("/instructor/dashboard");
@@ -294,8 +320,11 @@ export default function InstructorAuth() {
               navigate("/instructor/onboarding");
             }
           } else {
-            toast.error("This account is not registered as an instructor");
+            // Signed in to instructor portal but doesn't have instructor role.
+            // Sign out and send them to the student portal so they aren't stranded.
+            toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
             await supabase.auth.signOut();
+            navigate("/auth");
           }
         }
       }
@@ -305,6 +334,7 @@ export default function InstructorAuth() {
     } finally {
       setLoading(false);
       setIsSigningUp(false);
+      isSigningUpRef.current = false;
     }
   };
 

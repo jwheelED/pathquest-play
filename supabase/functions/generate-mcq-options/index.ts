@@ -268,7 +268,7 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
     // fast model for general-knowledge fallback questions.
     const primaryModel = focusedContext.length > 80
       ? 'google/gemini-2.5-pro'
-      : 'google/gemini-2.5-flash';
+      : 'google/gemini-3.5-flash';
 
     let response = await callModel(primaryModel);
 

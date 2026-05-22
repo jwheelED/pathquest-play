@@ -1,50 +1,80 @@
 # Critical Paths — Edvana
 
-These are load-bearing flows. Any AI tool modifying code that touches these paths must be told explicitly which path is affected and warned not to alter unrelated logic.
+Load-bearing flows. **Any code change to ANY file in this repo MUST follow the pre-change checklist at the bottom of this file** — not just auth. Read this document before opening an editor.
+
+If your change touches a file referenced under any numbered path below, you are in a critical path and the extra rules for that path also apply.
+
+Tests pinning auth invariants live in:
+- `src/lib/__tests__/validation.test.ts`
+- `src/components/__tests__/ProtectedRoute.test.tsx`
+
+Run before/after editing any auth file: `bun run test:auth`.
+Run before/after any other change: `bun test` (full suite).
 
 ## 1. Authentication & role assignment
-- Postgres trigger: handle_new_user
-- RPC: assign_oauth_role
-- Frontend: signup handler, OAuth callback handler
-- Invariant: instructor role is inserted exactly once per signup. Trigger and RPC must not both attempt insertion.
+
+**Files**
+- `src/pages/Auth.tsx`, `src/pages/InstructorAuth.tsx`, `src/pages/AdminAuth.tsx`
+- `src/components/ProtectedRoute.tsx`
+- Postgres trigger `handle_new_user`, RPC `assign_oauth_role`, RPC `has_role`
+
+**Invariants** (each must remain true; tests assert them where possible)
+
+1. Each role (instructor/admin/student) is inserted exactly once per signup. The Postgres trigger and `assign_oauth_role` RPC must not both insert the same role.
+2. `onAuthStateChange` listeners must guard against double-resolve. When both `INITIAL_SESSION` (listener) and `getSession()` (fallback) resolve, role-check / navigation runs **once**. Enforced by `hasResolvedRef` in `ProtectedRoute` and the three Auth pages.
+3. When `PASSWORD_RECOVERY` fires (or URL hash contains `type=recovery`), no SIGNED_IN navigation may run until the user submits a new password and is signed out. Enforced by `isRecoveryModeRef`.
+4. When `handleAuth` is mid-flight (email/password sign-in), the listener must not also navigate. Enforced by `isHandlingAuthRef` / `isSigningInRef` (held until after navigation completes, with a short post-call delay so the async SIGNED_IN event sees the guard as still set).
+5. A user signing into the wrong portal (e.g. a student hitting `/instructor/auth`) is signed out and redirected to `/auth`, never stranded on a "Loading…" screen.
+6. `Auth.tsx#initializeUser` must only auto-set `onboarded: true` for **student-role** users. Instructors/admins keep their existing `onboarded` state so they aren't bounced past `/instructor/org-onboarding`.
+7. Validation schemas in `src/lib/validation.ts` are the single source of truth for sign-up input. UI code must not bypass them.
+8. Client-side `user_stats` writes must use `upsert({...}, { onConflict: 'user_id', ignoreDuplicates: true })` — never bare `insert` — because the `handle_new_user` trigger may have already created the row.
 
 ## 2. Live session lifecycle
-- Session creation, join, real-time student presence, session end
-- Tables: sessions, session_participants
-- Real-time channels: anything subscribed to session state
-- Invariant: students see instructor state changes within 2 seconds.
+- Files: session creation, join, real-time presence, session end
+- Tables: `sessions`, `session_participants`
+- **Invariant:** students see instructor state changes within 2 seconds.
 
 ## 3. Question pickup & trigger detection
-- Hook: usePassiveQuestionDetection
-- Deepgram interim and final transcript handlers
-- Cooldown logic, trigger-fire conditions
-- Invariant: a question fires once per natural utterance, not on partial chunks.
+- Hook: `usePassiveQuestionDetection`
+- Deepgram interim/final transcript handlers, cooldown logic
+- **Invariant:** a question fires once per natural utterance, not on partial chunks.
 
 ## 4. Question generation & dispatch
-- Edge function: generate-mcq-options
-- Edge function: detect-speaker-questions
+- Edge functions: `generate-mcq-options`, `detect-speaker-questions`
 - Frontend: question preview, send-to-students action
-- Invariant: question dispatched to students matches question previewed by instructor.
+- **Invariant:** the question dispatched to students is byte-identical to what the instructor previewed.
 
 ## 5. Answer collection & grading
-- Student answer submission
-- Grading logic (correct, incorrect, partial)
-- Aggregate display for instructor
-- Invariant: every submitted answer is recorded once. No double-submission.
+- Student answer submission, grading logic (correct / incorrect / partial), aggregate display
+- **Invariant:** every submitted answer is recorded exactly once. No double-submission.
 
 ## 6. Transcript persistence
-- Deepgram pipeline
-- Storage of utterances and lecture_pause_points
-- Invariant: no transcript chunks lost on disconnect or session end.
+- Deepgram pipeline, `utterances` + `lecture_pause_points` storage
+- **Invariant:** no transcript chunks lost on disconnect or session end.
 
 ## 7. Billing & tier limits
-- Stripe webhooks
-- Usage tracking (teaching hours)
-- Tier transitions: free, Starter, Professional, Department, Institution
-- Invariant: usage cannot exceed tier limit without upgrade prompt or block.
+- Stripe webhooks, usage tracking (teaching hours)
+- Tiers: free, Starter, Professional, Department, Institution
+- **Invariant:** usage cannot exceed tier limit without an upgrade prompt or hard block.
 
-## Rules for AI tools modifying any of the above
-1. Identify which numbered path the change affects before writing code.
+---
+
+## Pre-change checklist (REQUIRED for ANY edit, in ANY file)
+
+Before editing **any** file in this repo, answer in your PR / chat reply:
+
+1. **Read this file (`CRITICAL_PATHS.md`) first.** Confirm you have.
+2. **Does this change touch a file listed in a numbered path above?** If yes, cite the path number; if no, say "no critical path".
+3. **Which invariant could this break?** (cite by number, or write "none identified" with a one-line justification)
+4. **Which test covers it?** If none and you're in a critical path, write the test first, then make the change.
+5. **Did you run the relevant test suite and confirm it passes?** (`bun run test:auth` for auth, `bun test` otherwise)
+
+This checklist is not optional. It exists because changes outside critical paths still routinely break critical paths via shared imports, shared state, or shared types.
+
+## Rules
+
+1. Identify the affected path before writing code (or confirm none).
 2. Do not modify code in adjacent paths unless explicitly approved.
-3. Flag any change to a Postgres trigger AND a frontend handler in the same PR. These must be paired and reviewed together.
+3. Changes that touch BOTH a Postgres trigger AND a frontend handler must be paired and reviewed together.
 4. After change, list every file modified and why.
+5. Any new auth-related ref/guard added to one of the three Auth pages must be mirrored in the other two if applicable.

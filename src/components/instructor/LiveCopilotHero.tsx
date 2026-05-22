@@ -1241,7 +1241,7 @@ export function LiveCopilotHero({
                 </div>
 
                 {/* Right: Inline auto-generated preview panel */}
-                <div className="w-56 shrink-0 border border-neutral-200 rounded-xl bg-neutral-50/50 overflow-hidden flex flex-col">
+                <div className="w-[420px] max-w-[55%] shrink-0 border border-neutral-200 rounded-xl bg-neutral-50/50 overflow-hidden flex flex-col">
                   <div className="px-3 py-2 bg-neutral-100/60 border-b border-neutral-200 flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
                       {effectiveFormat === 'mcq' ? 'Answer Options' : effectiveFormat === 'poll' ? 'Poll Choices' : 'Expected Answer'}
@@ -1277,7 +1277,7 @@ export function LiveCopilotHero({
                             )}
                           >
                             <span className="font-semibold text-neutral-400 w-3 shrink-0">{opt.label}</span>
-                            <span className="flex-1 min-w-0 truncate">{opt.text}</span>
+                            <span className="flex-1 min-w-0 break-words whitespace-normal leading-snug">{opt.text}</span>
                             {effectiveFormat === 'mcq' && opt.isCorrect && (
                               <Check className="w-3 h-3 text-emerald-500 shrink-0" />
                             )}
