@@ -84,7 +84,7 @@ export default function AuthPage() {
       if (profile?.onboarded === true) {
         navigate("/instructor/dashboard");
       } else if (!profile?.org_id) {
-        navigate("/instructor/org-onboarding");
+        navigate("/instructor/onboarding");
       } else {
         navigate("/instructor/onboarding");
       }
@@ -297,7 +297,7 @@ export default function AuthPage() {
         const initializeUser = async () => {
           // Only auto-provision/onboard student-role users here. Instructors and
           // admins have their own onboarding flows and must not be marked onboarded
-          // by this generic path (would skip /instructor/org-onboarding etc.).
+          // by this generic path (would skip /instructor/onboarding etc.).
           const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
           const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'instructor' });
           const isStudent = !isAdmin && !isInstructor;
