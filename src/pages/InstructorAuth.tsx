@@ -108,7 +108,7 @@ export default function InstructorAuth() {
               if (profile?.onboarded === true) {
                 navigate("/instructor/dashboard");
               } else if (!profile?.org_id) {
-                navigate("/instructor/org-onboarding");
+                navigate("/instructor/onboarding");
               } else {
                 navigate("/instructor/onboarding");
               }
@@ -132,7 +132,7 @@ export default function InstructorAuth() {
               
               if (success) {
                 toast.success("Instructor account created!");
-                navigate("/instructor/org-onboarding");
+                navigate("/instructor/onboarding");
               }
             } else {
               // Existing user who is not an instructor - redirect them to the student portal so they aren't stranded.
@@ -172,7 +172,7 @@ export default function InstructorAuth() {
             if (profile?.onboarded === true) {
               navigate("/instructor/dashboard");
             } else if (!profile?.org_id) {
-              navigate("/instructor/org-onboarding");
+              navigate("/instructor/onboarding");
             } else {
               navigate("/instructor/onboarding");
             }
@@ -261,7 +261,7 @@ export default function InstructorAuth() {
             // handle_new_user trigger already created the instructor profile + role
             // (role was passed in user_metadata above). Just navigate.
             toast.success("Account created successfully!");
-            navigate("/instructor/org-onboarding");
+            navigate("/instructor/onboarding");
           } else {
             // Email confirmation required
             toast.success("Account created! Please check your email to confirm your account before signing in.");
@@ -315,7 +315,7 @@ export default function InstructorAuth() {
             if (profile?.onboarded === true) {
               navigate("/instructor/dashboard");
             } else if (!profile?.org_id) {
-              navigate("/instructor/org-onboarding");
+              navigate("/instructor/onboarding");
             } else {
               navigate("/instructor/onboarding");
             }
