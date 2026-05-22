@@ -104,11 +104,6 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/instructor/auth" element={<InstructorAuth />} />
-          <Route path="/instructor/org-onboarding" element={
-            <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
-              <InstructorOrgOnboarding />
-            </ProtectedRoute>
-          } />
           <Route path="/instructor/onboarding" element={
             <ProtectedRoute requiredRole="instructor" redirectTo="/instructor/auth">
               <InstructorOnboarding />
