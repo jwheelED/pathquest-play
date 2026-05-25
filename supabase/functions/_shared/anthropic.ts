@@ -4,7 +4,10 @@
 // now routes to Google Gemini via the Lovable AI Gateway.
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const DEFAULT_MODEL = "google/gemini-3.5-flash";
+// NOTE: "google/gemini-3.5-flash" never existed — the typo silently fell back
+// through the gateway and added latency to every default-model call. Fixed to
+// the real fast model exposed by Lovable.
+const DEFAULT_MODEL = "google/gemini-2.5-flash";
 
 interface OpenAIMessage {
   role: "system" | "user" | "assistant";

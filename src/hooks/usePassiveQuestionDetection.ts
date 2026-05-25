@@ -1,4 +1,26 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import {
+  extractQuestions,
+  hasInterrogativeTrigger,
+  isRhetorical,
+  wordCount,
+  MIN_WORD_COUNT,
+  RHETORICAL_BLOCKLIST,
+  GREETING_PATTERNS,
+  TRIGGER_PATTERNS,
+} from '../../supabase/functions/_shared/questionDetection';
+
+// Re-export the canonical detection helpers so existing imports keep working
+// and tests can exercise them via the hook module path.
+export {
+  extractQuestions,
+  hasInterrogativeTrigger,
+  isRhetorical,
+  wordCount,
+  RHETORICAL_BLOCKLIST,
+  GREETING_PATTERNS,
+  TRIGGER_PATTERNS,
+};
 
 export interface PassiveQuestionCandidate {
   text: string;
@@ -24,174 +46,9 @@ interface UsePassiveQuestionDetectionOptions {
   minTranscriptConfidence?: number;
   /** Trailing silence (ms) required after question before promoting pending -> visible candidate. */
   trailingSilenceMs?: number;
+  /** Hard cap on how long a pending candidate may wait before being force-promoted. */
+  maxPendingMs?: number;
   debug?: boolean;
-}
-
-// Rhetorical / filler questions to ignore (normalized lowercase, no trailing ?)
-const RHETORICAL_BLOCKLIST = [
-  'right',
-  'okay',
-  'ok',
-  'understand',
-  'got it',
-  'you know',
-  'see what i mean',
-  "isn't it",
-  "aren't they",
-  "don't you think",
-  'does that make sense',
-  'make sense',
-  'make sense to you',
-  'with me so far',
-  'any questions',
-  'everyone with me',
-  'following along',
-  'clear',
-  'is that clear',
-  'yes',
-  'no',
-  'huh',
-  'correct',
-  'true',
-  "isn't that right",
-  'see',
-  'you see',
-  'you get it',
-  'you follow',
-  'shall we',
-  'shall i',
-  'ready',
-  'are we good',
-  'good so far',
-  'sound good',
-  'sounds good',
-  'know what i mean',
-  'fair enough',
-  'yeah',
-  'everyone got that',
-  'all good',
-  'is it not',
-  "wouldn't you say",
-  "can you see",
-  "can everyone see",
-  "can you hear me",
-  "can everyone hear me",
-  'what do you think',
-  'what do you guys think',
-  'what do you all think',
-  'what do you say',
-  'what say you',
-  'how about that',
-  'how does that sound',
-  'how about',
-  'how so',
-  'where were we',
-  'where was i',
-  'what was i saying',
-  'where was i going',
-  'who knows',
-  'who can tell me',
-  'who would have thought',
-  'what just happened',
-  'what about that',
-  'what about it',
-  'what would you do',
-  'what would you say',
-  'how are we doing',
-  'how are you doing',
-  'how is everyone doing',
-  'how is everybody doing',
-  'how are we looking',
-];
-
-// Greeting patterns that should never be treated as audience checks
-const GREETING_PATTERNS = [
-  /^how('?s| is) everyone/i,
-  /^how('?s| is) everybody/i,
-  /^how('?s| are) (you|y'all|ya'll|yall) (all )?(doing|today|this|feeling)/i,
-  /^how are (we|you|you guys|y'all|everyone|everybody) (doing|today|this|feeling)/i,
-  /^how('?s| is) it going/i,
-  /^what('?s| is) up/i,
-  /^how('?s| is| are) (your|the) (day|morning|afternoon|evening)/i,
-  /^how('?s| is| are) (you|everyone|everybody|you guys) feeling/i,
-  /^(good )?(morning|afternoon|evening|hey|hello|hi|welcome)/i,
-  /^(is )?everyone (here|ready|good|doing)/i,
-  /^(are )?we (all )?(here|ready|good|set)/i,
-  /^can (you|everyone|everybody) hear me/i,
-  /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
-];
-
-// Interrogative trigger patterns — require a real question form, not just "?"
-const TRIGGER_PATTERNS = [
-  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i,
-  /\bwhy\s+(is|are|do|does|did|would|can|could|should|might|don'?t|doesn'?t|didn'?t)\b/i,
-  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far|come|might)\b/i,
-  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should|will|might)\b/i,
-  /\bwhere\s+(is|are|do|does|did|would|was|were|can|will|might)\b/i,
-  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed|made|wrote|said)\b/i,
-  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method|step|stage|phase|option|choice)\b/i,
-  /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
-  /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
-  /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
-  /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
-  /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
-];
-
-function hasInterrogativeTrigger(text: string): boolean {
-  return TRIGGER_PATTERNS.some(p => p.test(text));
-}
-
-function extractQuestions(text: string): string[] {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized.includes('?') && !normalized.includes('？')) return [];
-
-  const sentences = normalized.split(/[.!;:]\s+/);
-
-  const questions: string[] = [];
-  for (const sentence of sentences) {
-    const trimmed = sentence.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes('?') || trimmed.includes('？')) {
-      const matches = trimmed.match(/[^?？]*[?？]/g);
-      if (matches) {
-        questions.push(...matches.map(s => s.trim()).filter(Boolean));
-      } else {
-        questions.push(trimmed);
-      }
-    }
-  }
-
-  return questions;
-}
-
-function isRhetorical(question: string): boolean {
-  const normalized = question
-    .replace(/[?？]+$/, '')
-    .trim()
-    .toLowerCase();
-
-  for (const pattern of GREETING_PATTERNS) {
-    if (pattern.test(normalized)) return true;
-  }
-
-  for (const phrase of RHETORICAL_BLOCKLIST) {
-    if (normalized === phrase) return true;
-    const stripped = normalized
-      .replace(/^(so|and|but|well|now|or|um|uh|like)\s+/i, '')
-      .trim();
-    if (stripped === phrase) return true;
-  }
-
-  if (/^(what|how|why|when|where|who|which)\b/.test(normalized)) {
-    return false;
-  }
-
-  return false;
-}
-
-function wordCount(text: string): number {
-  return text.split(/\s+/).filter(Boolean).length;
 }
 
 let candidateIdCounter = 0;
@@ -200,27 +57,34 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const {
     enabled = true,
     cooldownMs = 15000,
-    minWordCount = 6,
+    minWordCount = MIN_WORD_COUNT,
     autoDismissMs = 30000,
     lastQuestionSentTime = 0,
     minTranscriptConfidence = 0.8,
     trailingSilenceMs = 1200,
+    maxPendingMs = 4000,
     debug = true,
   } = options;
 
   const lastDetectionTimeRef = useRef<number>(0);
   const lastQuestionSentTimeRef = useRef<number>(lastQuestionSentTime);
   const [candidate, setCandidate] = useState<PassiveQuestionCandidate | null>(null);
+  const candidateRef = useRef<PassiveQuestionCandidate | null>(null);
   const [candidateHistory, setCandidateHistory] = useState<PassiveQuestionCandidate[]>([]);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pending candidate — waiting for trailing silence before being promoted
   const pendingRef = useRef<PassiveQuestionCandidate | null>(null);
+  const pendingStartedAtRef = useRef<number>(0);
   const [pendingCandidate, setPendingCandidate] = useState<PassiveQuestionCandidate | null>(null);
   const [pendingStartedAt, setPendingStartedAt] = useState<number>(0);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   lastQuestionSentTimeRef.current = lastQuestionSentTime;
+
+  useEffect(() => {
+    candidateRef.current = candidate;
+  }, [candidate]);
 
   const clearAutoDismiss = useCallback(() => {
     if (autoDismissTimerRef.current) {
@@ -250,6 +114,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     const p = pendingRef.current;
     if (!p) return;
     pendingRef.current = null;
+    pendingStartedAtRef.current = 0;
     setPendingCandidate(null);
     setPendingStartedAt(0);
 
@@ -289,12 +154,22 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
    * Notify the detector that the instructor is currently speaking (a new transcript chunk
    * arrived). If we have a pending candidate waiting on trailing silence, this resets
    * the silence timer — preventing premature promotion when the instructor keeps talking.
+   *
+   * If the pending candidate has been waiting longer than maxPendingMs, force-promote
+   * instead of resetting — otherwise a continuously-talking instructor would let a
+   * stale question sit indefinitely.
    */
   const notifySpeech = useCallback(() => {
     if (!pendingRef.current) return;
+    const age = Date.now() - pendingStartedAtRef.current;
+    if (age >= maxPendingMs) {
+      if (debug) console.log(`🔂 [passive] pending exceeded maxPendingMs (${age}ms ≥ ${maxPendingMs}) — force-promoting`);
+      promotePending();
+      return;
+    }
     if (debug) console.log('🔄 [passive] speech detected, resetting trailing-silence timer');
     armSilenceTimer();
-  }, [armSilenceTimer, debug]);
+  }, [armSilenceTimer, debug, maxPendingMs, promotePending]);
 
   const checkUtterance = useCallback((
     text: string,
@@ -316,8 +191,15 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
     if (debug) console.log('🔍 [passive] checking utterance:', text.substring(0, 80), { confidence });
 
-    if (now - lastDetectionTimeRef.current < cooldownMs) {
-      if (debug) console.log('🔍 [passive] skipped — cooldown active');
+    // Cooldown only applies if there's actually a visible candidate on screen.
+    // If the prior candidate was dismissed or auto-expired, a fresh question
+    // should be allowed to surface immediately — otherwise we drop the question
+    // the instructor actually wants answered.
+    if (
+      candidateRef.current &&
+      now - lastDetectionTimeRef.current < cooldownMs
+    ) {
+      if (debug) console.log('🔍 [passive] skipped — cooldown active and candidate visible');
       return;
     }
 
@@ -365,6 +247,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
       // Replace any existing pending candidate with the newer/longer one and re-arm timer
       pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
       setPendingStartedAt(now);
       armSilenceTimer();
@@ -378,6 +261,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     clearAutoDismiss();
     clearSilenceTimer();
     pendingRef.current = null;
+    pendingStartedAtRef.current = 0;
     setPendingCandidate(null);
     setPendingStartedAt(0);
     setCandidate(null);
