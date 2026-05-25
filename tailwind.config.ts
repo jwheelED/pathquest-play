@@ -195,16 +195,16 @@ export default {
           "50%": { transform: "scale(1.04)", opacity: "1" },
         },
         "edvana-spark-1": {
-          "0%": { transform: "translate(0, 0) scale(1)", opacity: "1" },
-          "100%": { transform: "translate(120px, -90px) scale(0)", opacity: "0" },
+          "0%": { transform: "translate(-50%, -50%) translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { transform: "translate(-50%, -50%) translate(120px, -90px) scale(0)", opacity: "0" },
         },
         "edvana-spark-2": {
-          "0%": { transform: "translate(0, 0) scale(1)", opacity: "1" },
-          "100%": { transform: "translate(-110px, -70px) scale(0)", opacity: "0" },
+          "0%": { transform: "translate(-50%, -50%) translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { transform: "translate(-50%, -50%) translate(-110px, -70px) scale(0)", opacity: "0" },
         },
         "edvana-spark-3": {
-          "0%": { transform: "translate(0, 0) scale(1)", opacity: "1" },
-          "100%": { transform: "translate(60px, 110px) scale(0)", opacity: "0" },
+          "0%": { transform: "translate(-50%, -50%) translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { transform: "translate(-50%, -50%) translate(60px, 110px) scale(0)", opacity: "0" },
         },
       },
       animation: {
