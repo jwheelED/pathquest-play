@@ -392,6 +392,8 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
+        setCelebrationCorrect(!!responseData.isCorrect);
+        setCelebrationTrigger(Date.now());
         if (responseData.isCorrect) {
           toast.success(`Correct! +${responseData.pointsEarned} XP 🎉`);
         } else {
