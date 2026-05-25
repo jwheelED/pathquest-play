@@ -468,11 +468,15 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
     }
   };
 
-  const handleConfidenceSelect = (assignmentId: string, level: ConfidenceLevel, multiplier: number) => {
+  const handleConfidenceSelect = (assignmentId: string, level: ConfidenceLevel, multiplier: number, assignment?: Assignment) => {
     setConfidenceData(prev => ({
       ...prev,
       [assignmentId]: { level, multiplier, locked: true }
     }));
+    // Auto-submit after confidence is locked to reduce taps
+    if (assignment) {
+      setTimeout(() => handleSubmitQuiz(assignment), 250);
+    }
   };
 
   const handleTextAnswerChange = (assignmentId: string, questionIndex: number, answer: string) => {
@@ -1941,7 +1945,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                         <div className="border-t pt-4">
                           <ConfidenceSelector
                             baseReward={BASE_REWARD}
-                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier)}
+                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier, assignment)}
                           />
                         </div>
                       )}
