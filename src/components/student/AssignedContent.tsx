@@ -19,6 +19,7 @@ import ReactMarkdown from "react-markdown";
 import { LectureCountdownTimer } from "./LectureCountdownTimer";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EdvanaAnswerCelebration } from "./EdvanaAnswerCelebration";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
@@ -78,6 +79,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
+  const [celebrationTrigger, setCelebrationTrigger] = useState<number | null>(null);
+  const [celebrationCorrect, setCelebrationCorrect] = useState(false);
+  const [celebrationMultiplier, setCelebrationMultiplier] = useState(1);
   const [codeExecutionResults, setCodeExecutionResults] = useState<Record<string, any>>({});
   const [executingCode, setExecutingCode] = useState<Record<string, boolean>>({});
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
