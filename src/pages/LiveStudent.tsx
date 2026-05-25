@@ -550,6 +550,8 @@ const LiveStudent = () => {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
         } else if (responseData.aiGrade !== null) {
           const gradeText = `${responseData.aiGrade}%`;
+          setCelebrationCorrect(responseData.aiGrade >= 70);
+          setCelebrationTrigger(Date.now());
           if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
           } else if (responseData.aiGrade >= 50) {
