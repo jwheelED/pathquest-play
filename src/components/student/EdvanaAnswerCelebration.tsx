@@ -103,23 +103,23 @@ export function EdvanaAnswerCelebration({
         )}
       />
 
-      {/* Concentric pulses */}
+      {/* Concentric pulses (centered with translate origin in keyframes) */}
       <span
         className={cn(
-          "absolute rounded-full animate-edvana-pulse-1",
+          "absolute left-1/2 top-1/2 rounded-full animate-edvana-pulse-1",
           ringColor,
           tier === "soar" ? "w-64 h-64" : "w-52 h-52"
         )}
       />
       <span
         className={cn(
-          "absolute rounded-full animate-edvana-pulse-2",
+          "absolute left-1/2 top-1/2 rounded-full animate-edvana-pulse-2",
           ringColor,
           tier === "soar" ? "w-96 h-96" : "w-72 h-72"
         )}
       />
       {tier === "soar" && isCorrect && (
-        <span className="absolute rounded-full bg-emerald-400/15 w-[32rem] h-[32rem] animate-edvana-pulse-3" />
+        <span className="absolute left-1/2 top-1/2 rounded-full bg-emerald-400/15 w-[32rem] h-[32rem] animate-edvana-pulse-3" />
       )}
 
       {/* Edvana mark */}
