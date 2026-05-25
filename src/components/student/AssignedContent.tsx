@@ -1167,6 +1167,11 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
 
   return (
     <>
+      <EdvanaAnswerCelebration
+        trigger={celebrationTrigger}
+        isCorrect={celebrationCorrect}
+        multiplier={celebrationMultiplier}
+      />
       {/* Lecture Countdown Timer - shows when instructor has auto-questions enabled */}
       {instructorId && (
         <div className="mb-4">
