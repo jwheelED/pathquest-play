@@ -245,7 +245,9 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
       }
     ];
 
-    async function callModel(model: string, retryHint?: string) {
+    // D1 — structured timing log. Each call emits a single JSON line so the
+    // Supabase Functions dashboard can be filtered/aggregated by `evt`.
+    async function callModel(model: string, stage: 'primary' | 'retry', retryHint?: string) {
       const messages: Array<{ role: 'system' | 'user'; content: string }> = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -256,21 +258,35 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
           content: `RETRY: Your previous attempt failed validation: ${retryHint}. Re-read the transcript carefully. Identify the answer FROM the transcript first, then assign the correct letter to the option that matches that answer. Fill \`citation\` with the exact transcript span.`,
         });
       }
-      return await callClaude({
+      const t0 = performance.now();
+      const res = await callClaude({
         model,
         messages,
         tools,
         tool_choice: { type: 'function', function: { name: 'generate_mcq_options' } },
       });
+      const elapsed = Math.round(performance.now() - t0);
+      console.log(JSON.stringify({
+        evt: 'mcq.llm_call',
+        stage,
+        model,
+        ms: elapsed,
+        ok: res.ok,
+        status: res.status,
+        focused_ctx_chars: focusedContext.length,
+        broad_ctx_chars: broadContext.length,
+      }));
+      return res;
     }
 
-    // Stronger model when we have transcript context worth reasoning over;
-    // fast model for general-knowledge fallback questions.
-    const primaryModel = focusedContext.length > 80
-      ? 'google/gemini-2.5-pro'
-      : 'google/gemini-3.5-flash';
+    // R2 — default to Gemini 2.5 Flash for the primary call. Reserve
+    // 2.5 Pro for the validator-retry path only (a 2.5 Pro tool-call with
+    // 6KB context routinely takes 20–60s; the two-call worst case was the
+    // dominant contributor to the observed ~90s "preparing" hang).
+    const primaryModel = 'google/gemini-2.5-flash';
 
-    let response = await callModel(primaryModel);
+    const primaryStart = performance.now();
+    let response = await callModel(primaryModel, 'primary');
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -295,7 +311,7 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
     let verdict = validateAnswer(result, focusedContext, broadContext);
     if (!verdict.ok) {
       console.warn(`MCQ validator REJECTED first attempt: ${verdict.reason}. Retrying once with stronger model.`);
-      const retryResp = await callModel('google/gemini-2.5-pro', verdict.reason);
+      const retryResp = await callModel('google/gemini-2.5-pro', 'retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
         const retryCall = retryData.choices?.[0]?.message?.tool_calls?.[0];
@@ -316,7 +332,14 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
       }
     }
 
-    console.log('MCQ options generated successfully');
+    const totalMs = Math.round(performance.now() - primaryStart);
+    console.log(JSON.stringify({
+      evt: 'mcq.complete',
+      total_ms: totalMs,
+      validator_ok: verdict.ok,
+      validator_warning: verdict.ok ? null : verdict.reason,
+      question_chars: question_text.length,
+    }));
 
     return new Response(
       JSON.stringify({

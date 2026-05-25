@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Edvana — Live Lecture Reliability Decision Guide</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f242d;
+    --border: #2a3140;
+    --text: #e8ecf2;
+    --muted: #9aa3b2;
+    --accent: #7cc4ff;
+    --accent-2: #a48bff;
+    --good: #6ddf9b;
+    --warn: #ffcb6b;
+    --bad: #ff7b72;
+    --focus: #ffd866;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7fa;
+      --panel: #ffffff;
+      --panel-2: #f1f3f7;
+      --border: #d5dae3;
+      --text: #11151c;
+      --muted: #525a68;
+      --accent: #0a64c8;
+      --accent-2: #6438d6;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  a:focus, button:focus, [tabindex]:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px clamp(16px, 4vw, 40px) 96px; }
+  header { display: flex; flex-direction: column; gap: 6px; padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+  header h1 { margin: 0; font-size: clamp(22px, 3vw, 30px); line-height: 1.2; }
+  header p { margin: 0; color: var(--muted); }
+  nav.progress { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; padding: 0; list-style: none; }
+  nav.progress li { font-size: 12px; padding: 4px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); cursor: pointer; background: transparent; }
+  nav.progress li[aria-current="step"] { color: var(--text); background: var(--panel-2); border-color: var(--accent); }
+  nav.progress li:hover { color: var(--text); }
+  section.step { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: clamp(16px, 3vw, 28px); margin-bottom: 18px; }
+  section.step h2 { margin: 0 0 4px; font-size: 22px; }
+  section.step .lead { color: var(--muted); margin: 0 0 18px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .card h3 { margin: 0; font-size: 16px; }
+  .card .meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .pill.good { color: var(--good); border-color: rgba(109,223,155,0.45); }
+  .pill.warn { color: var(--warn); border-color: rgba(255,203,107,0.45); }
+  .pill.bad { color: var(--bad); border-color: rgba(255,123,114,0.45); }
+  .card p { margin: 0; color: var(--text); font-size: 14px; }
+  .card .why { color: var(--muted); font-size: 13px; }
+  .card label.choose { display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--border); cursor: pointer; }
+  .card label.choose input { transform: scale(1.1); }
+  details { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  details + details { margin-top: 8px; }
+  summary { cursor: pointer; font-weight: 600; }
+  code, pre { font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; }
+  code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: 13px; }
+  .nav-buttons { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; }
+  button.btn { font: inherit; cursor: pointer; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
+  button.btn.primary { background: var(--accent); color: #061322; border-color: transparent; }
+  button.btn:hover { filter: brightness(1.1); }
+  .status { background: var(--panel-2); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 6px; margin: 12px 0; color: var(--muted); font-size: 14px; }
+  .status strong { color: var(--text); }
+  .smoking-gun { background: rgba(255,123,114,0.08); border: 1px solid rgba(255,123,114,0.45); padding: 12px 14px; border-radius: 8px; }
+  .smoking-gun strong { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  @media print {
+    body { background: white; color: black; }
+    section.step { display: block !important; page-break-inside: avoid; }
+    .nav-buttons, nav.progress { display: none; }
+  }
+</style>
+</head>
+<body>
+<main role="main" aria-label="Edvana Live Lecture Reliability Decision Guide">
+  <header>
+    <h1>Live Lecture Reliability — Decision Guide</h1>
+    <p>Two issues to resolve: slow MCQ preparation (~90s) and Deepgram chunking that splits long questions. Walk through the diagnostics, pick remediations, get a sequenced plan.</p>
+    <nav class="progress" aria-label="Progress">
+      <ol id="progress" style="display:contents; list-style:none; padding:0; margin:0"></ol>
+    </nav>
+  </header>
+
+  <div id="announcer" role="status" aria-live="polite" class="visually-hidden"></div>
+
+  <!-- STEP 1 -->
+  <section class="step" id="s1" data-title="Overview">
+    <h2>1. What we're deciding</h2>
+    <p class="lead">You face two independent reliability problems with the live lecture capture pipeline. This guide walks each one through diagnostics → remediation options → a recommended order of operations.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Issue A — MCQ "preparing" stalls ~90s</h3>
+        <p>From the moment passive detection picks up a question to the moment students see four options, ~90 seconds elapse.</p>
+        <p class="why">Hot path: <code>src/hooks/usePassiveQuestionDetection.ts</code> → <code>supabase/functions/generate-mcq-options/index.ts</code> → Lovable AI Gateway → Gemini.</p>
+      </div>
+      <div class="card">
+        <h3>Issue B — long questions get split</h3>
+        <p>Sentences like <em>"If a cell has a high surface-area-to-volume ratio, what advantage does that give it?"</em> never arrive at the detector as a single utterance — Deepgram finalizes mid-sentence on the breath pause.</p>
+        <p class="why">Hot path: Deepgram WSS → relay → <code>src/lib/deepgramStreaming.ts</code> → <code>checkUtterance()</code>.</p>
+      </div>
+    </div>
+
+    <div class="status">These two issues are <strong>independent</strong>. Fixing one does not fix the other. You can ship them on separate branches.</div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step" id="s2" data-title="Issue A — Hypotheses">
+    <h2>2. Issue A — root-cause hypotheses, ranked</h2>
+    <p class="lead">Read top-down. The first two are likely most of your 90 seconds.</p>
+
+    <div class="smoking-gun">
+      <strong>Smoking gun (high confidence):</strong> <code>supabase/functions/generate-mcq-options/index.ts:271</code> references the model string <code>'google/gemini-3.5-flash'</code>. There is no such model — Gemini went 1.5 → 2.0 → 2.5. This path either 404s through the Lovable gateway (forcing an error fallback) or is silently routed to a slow default. Either way it is broken as intended.
+    </div>
+
+    <h3 style="margin-top:18px">Hypotheses</h3>
+    <ol>
+      <li><strong>Sequential double-call to slow model.</strong> <code>callModel(primaryModel)</code> at line 273, then if the deterministic <code>validateAnswer()</code> rejects (lines 295–317), a <em>second</em> <code>callModel('google/gemini-2.5-pro', verdict.reason)</code>. Two sequential 2.5 Pro tool-calls with 6 KB transcript context = 40–80 s easily.</li>
+      <li><strong>Wrong/nonexistent model name in fast-path branch.</strong> When <code>focusedContext.length &lt;= 80</code> (rare in live use), the code asks for <code>gemini-3.5-flash</code>. Gateway 404 → retry/timeout latency on top of whatever fallback fires.</li>
+      <li><strong>Cold-start of the edge function.</strong> Supabase edge functions cold-start in 100–500ms; not 90s on its own, but contributes 0.5–2 s when the function hasn't been hit in a while.</li>
+      <li><strong>No request timeout / abort signal.</strong> If Gemini stalls, there's no client-side circuit breaker. The UI sits on "preparing" until the function returns or its 60s timeout fires.</li>
+      <li><strong>No streaming.</strong> The endpoint returns only after the full tool call completes. Even a fast model with streaming would <em>feel</em> faster.</li>
+      <li><strong>Validator runs <em>after</em> full generation.</strong> Strict but expensive: the wrong-letter check forces a full second pass on the slowest model.</li>
+    </ol>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step" id="s3" data-title="Issue A — Diagnostics">
+    <h2>3. Issue A — diagnostic steps (cheap, do first)</h2>
+    <p class="lead">Don't pick a fix until you've confirmed which hypothesis is the actual bottleneck. These take under an hour combined.</p>
+
+    <details open>
+      <summary>D1. Add timing logs around the LLM calls</summary>
+      <p>Wrap each <code>callModel(...)</code> in <code>performance.now()</code> and log the model used, request size, response time, and whether validation passed:</p>
+<pre>const t0 = performance.now();
+const response = await callModel(primaryModel);
+console.log(JSON.stringify({
+  evt: "mcq.primary_call",
+  model: primaryModel,
+  ms: Math.round(performance.now() - t0),
+  focused_ctx: focusedContext.length,
+  broad_ctx: broadContext.length,
+}));</pre>
+      <p>Then re-deploy and run a single live capture. The logs in the Supabase Functions dashboard will tell you exactly where the 90 s went.</p>
+    </details>
+
+    <details>
+      <summary>D2. Re-run with the typo fixed first</summary>
+      <p>Change line 271 from <code>'google/gemini-3.5-flash'</code> to <code>'google/gemini-2.5-flash'</code> (or whatever Lovable exposes) and measure again. If MCQ latency drops, the typo was masking a real fallback storm.</p>
+    </details>
+
+    <details>
+      <summary>D3. Force the fast path and measure</summary>
+      <p>Temporarily set <code>primaryModel = 'google/gemini-2.5-flash'</code> unconditionally and measure. If 2.5 Flash returns in 5–10s, the bottleneck is the model choice on the "I have context" branch.</p>
+    </details>
+
+    <details>
+      <summary>D4. Inspect validator rejection rate</summary>
+      <p>Count <code>console.warn("MCQ validator REJECTED ...")</code> hits per session. If &gt;30%, every other question pays the second-call tax — making the validator itself the bottleneck on average.</p>
+    </details>
+  </section>
+
+  <!-- STEP 4 -->
+  <section class="step" id="s4" data-title="Issue A — Remediations">
+    <h2>4. Issue A — remediation options</h2>
+    <p class="lead">Pick one or more. The effort/risk/expected-gain pills are calibrated to <em>this</em> codebase, not generic.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>R1. Fix the model-name typo</h3>
+        <div class="meta">
+          <span class="pill good">Effort: 5 min</span>
+          <span class="pill good">Risk: trivial</span>
+          <span class="pill warn">Gain: unknown until measured</span>
+        </div>
+        <p>Change <code>'google/gemini-3.5-flash'</code> → <code>'google/gemini-2.5-flash'</code>. Possibly a no-op (if the gateway already silently rerouted), possibly a 60s win. Do it regardless.</p>
+        <label class="choose"><input type="checkbox" data-pick="R1"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R2. Swap default model: 2.5 Pro → 2.5 Flash</h3>
+        <div class="meta">
+          <span class="pill good">Effort: 15 min</span>
+          <span class="pill warn">Risk: MCQ quality may drop on long-context questions</span>
+          <span class="pill good">Gain: 3–6× latency cut</span>
+        </div>
+        <p>Use <code>gemini-2.5-flash</code> as the primary in both branches. Reserve <code>gemini-2.5-pro</code> for the retry path only (when the validator rejects). Most questions don't need Pro-level reasoning.</p>
+        <label class="choose"><input type="checkbox" data-pick="R2"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R3. Add request timeout + user-visible fallback</h3>
+        <div class="meta">
+          <span class="pill good">Effort: 30 min</span>
+          <span class="pill good">Risk: low</span>
+          <span class="pill warn">Gain: bounds worst case, doesn't fix average</span>
+        </div>
+        <p>Wrap the fetch in an <code>AbortController</code> with a 20 s ceiling. If it fires, surface a "Send as short-answer instead?" CTA so the instructor isn't stuck staring at a spinner.</p>
+        <label class="choose"><input type="checkbox" data-pick="R3"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R4. Speculative pre-generation</h3>
+        <div class="meta">
+          <span class="pill warn">Effort: 4–6 h</span>
+          <span class="pill warn">Risk: doubles LLM spend per detection</span>
+          <span class="pill good">Gain: perceived 0s latency</span>
+        </div>
+        <p>Fire <code>generate-mcq-options</code> the moment a candidate enters <code>pendingCandidate</code> state — before the instructor confirms. By the time they click "Send", the response is cached. Cancel the request via abort if they dismiss instead.</p>
+        <label class="choose"><input type="checkbox" data-pick="R4"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R5. Stream MCQ to the client</h3>
+        <div class="meta">
+          <span class="pill bad">Effort: 1–2 days</span>
+          <span class="pill warn">Risk: tool-call streaming is fiddly</span>
+          <span class="pill warn">Gain: perceived 50% reduction</span>
+        </div>
+        <p>Lovable gateway → Gemini supports streaming. Pipe partial deltas through the edge function via SSE. Render options as they arrive. Doesn't reduce real latency, but the spinner stops being a wall.</p>
+        <label class="choose"><input type="checkbox" data-pick="R5"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R6. Validate first, generate once</h3>
+        <div class="meta">
+          <span class="pill warn">Effort: half day</span>
+          <span class="pill warn">Risk: requires rewriting the validator into the prompt</span>
+          <span class="pill good">Gain: eliminates retry path entirely</span>
+        </div>
+        <p>Push the deterministic <code>validateAnswer</code> logic into the prompt as a self-check the model must run before emitting. Removes the second-call tax that costs you 20–60s on the &gt;30% of questions that fail validation.</p>
+        <label class="choose"><input type="checkbox" data-pick="R6"> Include in plan</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5 -->
+  <section class="step" id="s5" data-title="Issue B — Hypotheses">
+    <h2>5. Issue B — root-cause hypotheses, ranked</h2>
+    <p class="lead">Long sentences with breath pauses get finalized mid-sentence by Deepgram. The detector then sees fragments, each of which fails one or more gates (no "?", below min word count, no interrogative trigger).</p>
+
+    <ol>
+      <li><strong>Endpointing too aggressive.</strong> Deepgram's default endpointing finalizes after ~10ms of silence. A natural sentence-internal pause (300–600ms) trips this. Your long question gets cut into two finals: <em>"If a cell has a high surface-area-to-volume ratio."</em> + <em>"What advantage does that give it?"</em></li>
+      <li><strong>No use of <code>UtteranceEnd</code> events.</strong> Deepgram emits an <code>UtteranceEnd</code> event after a longer silence window (configurable via <code>utterance_end_ms</code>). That's the right boundary for "speaker stopped talking," not <code>is_final</code>.</li>
+      <li><strong>Per-chunk detection.</strong> <code>checkUtterance()</code> runs on each final independently. It never sees the joined sentence even if you fix Deepgram, unless you buffer client-side.</li>
+      <li><strong>The first fragment ends in <code>.</code> instead of <code>?</code>.</strong> Even with the new fallback regex, <code>extractQuestions()</code> requires a <code>?</code> to return anything. The first fragment is silently discarded.</li>
+    </ol>
+  </section>
+
+  <!-- STEP 6 -->
+  <section class="step" id="s6" data-title="Issue B — Diagnostics">
+    <h2>6. Issue B — diagnostic steps</h2>
+
+    <details open>
+      <summary>D5. Log raw finals with timing</summary>
+      <p>In <code>handleTranscript()</code>, log every final with start/end timestamps and the silence gap since the previous final:</p>
+<pre>console.log(JSON.stringify({
+  evt: "dg.final",
+  text: transcript,
+  end_ms: data.duration ? Math.round(data.start * 1000 + data.duration * 1000) : null,
+  gap_ms: this.lastTranscriptTime ? Date.now() - this.lastTranscriptTime : null,
+}));</pre>
+      <p>Have someone deliberately ask a long sentence with one breath pause. The logs will show whether you get one final or two.</p>
+    </details>
+
+    <details>
+      <summary>D6. Inspect the WebSocket URL Deepgram is being called with</summary>
+      <p>The relay (likely a separate Supabase function or Fly.io app — not in this repo) builds the Deepgram URL. Find it and check whether <code>endpointing</code>, <code>utterance_end_ms</code>, <code>interim_results</code>, and <code>smart_format</code> are set. Typical good values for live lecture: <code>endpointing=500</code>, <code>utterance_end_ms=1500</code>, <code>interim_results=true</code>, <code>smart_format=true</code>, <code>punctuate=true</code>.</p>
+    </details>
+
+    <details>
+      <summary>D7. Test with a known sentence</summary>
+      <p>Pre-record the surface-area-to-volume sentence with a natural pause and play it into the mic 5×. Note how often it arrives as one final vs split. That gives you a baseline to measure against after any fix.</p>
+    </details>
+  </section>
+
+  <!-- STEP 7 -->
+  <section class="step" id="s7" data-title="Issue B — Remediations">
+    <h2>7. Issue B — remediation options</h2>
+
+    <div class="grid">
+      <div class="card">
+        <h3>R7. Tune Deepgram endpointing</h3>
+        <div class="meta">
+          <span class="pill good">Effort: 15 min (relay config)</span>
+          <span class="pill good">Risk: low</span>
+          <span class="pill good">Gain: catches most natural pauses</span>
+        </div>
+        <p>Add <code>endpointing=500</code> and <code>utterance_end_ms=1500</code> to the Deepgram WSS URL in the relay. Sentences with sub-500ms gaps will stay as one final.</p>
+        <label class="choose"><input type="checkbox" data-pick="R7"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R8. Use <code>UtteranceEnd</code> as the detection trigger</h3>
+        <div class="meta">
+          <span class="pill warn">Effort: 2–3 h</span>
+          <span class="pill good">Risk: low</span>
+          <span class="pill good">Gain: structurally correct</span>
+        </div>
+        <p>Buffer all incoming <code>is_final</code> chunks. Only call <code>checkUtterance()</code> on the joined buffer when the <code>UtteranceEnd</code> event arrives (or after <code>trailingSilenceMs</code> elapses with no new data). This is what Deepgram designed those events for.</p>
+        <label class="choose"><input type="checkbox" data-pick="R8"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R9. Client-side rolling buffer + interrogative recall</h3>
+        <div class="meta">
+          <span class="pill good">Effort: 1–2 h</span>
+          <span class="pill warn">Risk: false positives if not bounded</span>
+          <span class="pill good">Gain: complements R7/R8</span>
+        </div>
+        <p>Keep a 15-second rolling buffer of recent finals. Whenever a new chunk ends with <code>?</code>, run <code>extractQuestions()</code> on the <em>joined buffer</em>, not just the new chunk. Clears on long silence or after promotion.</p>
+        <label class="choose"><input type="checkbox" data-pick="R9"> Include in plan</label>
+      </div>
+      <div class="card">
+        <h3>R10. Accept "?-implied" pre-fragments</h3>
+        <div class="meta">
+          <span class="pill good">Effort: 1 h</span>
+          <span class="pill bad">Risk: high false-positive rate</span>
+          <span class="pill warn">Gain: catches edge cases R7+R9 miss</span>
+        </div>
+        <p>If a final ends in <code>?</code> and the previous final ended in <code>.</code> within 2 s and starts with a conditional (<em>"If…", "When…", "Suppose…"</em>), treat them as one question. Powerful but trips on natural classroom speech — only do this if R7+R9 still leave gaps.</p>
+        <label class="choose"><input type="checkbox" data-pick="R10"> Include in plan</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 8 -->
+  <section class="step" id="s8" data-title="Recommended order">
+    <h2>8. Recommended sequenced plan</h2>
+    <p class="lead">If you do nothing else, do these three in this order. Each is small, measurable, and de-risks the next.</p>
+
+    <table>
+      <thead><tr><th>Order</th><th>Action</th><th>Why now</th><th>Stop here if…</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>D1 + R1 + R2</strong>: add timing logs, fix the model typo, swap primary to Flash</td>
+          <td>30 minutes of work. The typo and Pro-default explain most of the 90s. Logs prove it.</td>
+          <td>MCQ latency drops below 10s — ship and move on.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>D5 + R7</strong>: log finals, raise <code>endpointing</code> and <code>utterance_end_ms</code> on the relay</td>
+          <td>Lowest-effort path to keeping long sentences whole. No client code change.</td>
+          <td>Long sentences arrive intact in &gt;80% of cases — ship.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>R8 or R9</strong>: switch detection to UtteranceEnd <em>or</em> add the rolling buffer</td>
+          <td>Belt-and-suspenders against the cases R7 still misses (pauses &gt;500ms). R9 is faster to ship; R8 is structurally correct.</td>
+          <td>Use R8 if you're investing in this long-term, R9 if you need it this week.</td>
+        </tr>
+        <tr>
+          <td>4 (optional)</td>
+          <td><strong>R4</strong>: speculative pre-generation on pending candidates</td>
+          <td>The "feels instant" win. Only worth it after the easy wins above stabilize latency below 10s.</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>5 (optional)</td>
+          <td><strong>R6</strong>: fold validator into the prompt</td>
+          <td>Removes the retry tax if &gt;30% of MCQs are failing validation today.</td>
+          <td>D4 shows &lt;10% rejection rate — skip.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- STEP 9 -->
+  <section class="step" id="s9" data-title="Pre-mortem & decision">
+    <h2>9. Pre-mortem — what could still go wrong?</h2>
+    <ul>
+      <li><strong>Flash quality regression.</strong> Some MCQs that 2.5 Pro got right may now be wrong with Flash. Mitigate: keep Pro on the validator-rejection retry path so weak first attempts get a second chance. Track validator rejection rate before/after as your canary.</li>
+      <li><strong>Endpointing too high → questions arrive late.</strong> If you set <code>endpointing=800</code>, you add up to 800ms of latency to every detection. Stick to 500ms unless you see chunking still happening.</li>
+      <li><strong>Speculative pre-gen doubles your LLM bill.</strong> If most pending candidates get dismissed (rhetorical / instructor changes mind), you're paying for thrown-away generations. Mitigate: only pre-generate after the pending candidate has survived 500ms of trailing silence.</li>
+      <li><strong>Rolling buffer fires on the wrong question.</strong> If you concatenate too aggressively, you'll detect a question that spans two unrelated thoughts. Mitigate: clear the buffer on any sentence-final punctuation followed by &gt;3s silence.</li>
+    </ul>
+
+    <h3 style="margin-top:18px">Your selections</h3>
+    <div id="selections" class="status">Nothing selected yet. Tick "Include in plan" on the cards above.</div>
+
+    <div class="nav-buttons">
+      <button class="btn" type="button" onclick="window.print()">Print / Save as PDF</button>
+      <button class="btn primary" type="button" onclick="copySummary()">Copy plan to clipboard</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // Persistent state across reloads
+  const STORAGE = "edvana-decision-guide-v1";
+  const REMEDIATIONS = {
+    R1: "Fix model-name typo (gemini-3.5-flash → 2.5-flash)",
+    R2: "Swap primary model to Gemini 2.5 Flash, reserve Pro for retry",
+    R3: "Add AbortController timeout (20s) + fallback UI",
+    R4: "Speculative pre-generation on pending candidates",
+    R5: "Stream MCQ deltas to the client via SSE",
+    R6: "Fold validator logic into the LLM prompt, single-call",
+    R7: "Tune Deepgram endpointing=500 & utterance_end_ms=1500",
+    R8: "Switch detection to UtteranceEnd-driven buffering",
+    R9: "Client-side rolling 15s buffer for question recall",
+    R10: "Accept conditional 'If…' pre-fragments before '?'",
+  };
+
+  function save() {
+    const picks = [...document.querySelectorAll('[data-pick]:checked')].map(c => c.dataset.pick);
+    localStorage.setItem(STORAGE, JSON.stringify(picks));
+    renderSelections(picks);
+  }
+  function restore() {
+    let picks = [];
+    try { picks = JSON.parse(localStorage.getItem(STORAGE) || "[]"); } catch {}
+    picks.forEach(p => {
+      const el = document.querySelector(`[data-pick="${p}"]`);
+      if (el) el.checked = true;
+    });
+    renderSelections(picks);
+  }
+  function renderSelections(picks) {
+    const el = document.getElementById("selections");
+    if (!picks.length) {
+      el.innerHTML = 'Nothing selected yet. Tick "Include in plan" on the cards above.';
+      return;
+    }
+    el.innerHTML = "<strong>Plan:</strong><ol style='margin:8px 0 0 20px'>" +
+      picks.map(p => `<li><code>${p}</code> — ${REMEDIATIONS[p] || p}</li>`).join("") +
+      "</ol>";
+  }
+  function copySummary() {
+    const picks = [...document.querySelectorAll('[data-pick]:checked')].map(c => c.dataset.pick);
+    const lines = ["Edvana live-lecture reliability plan:", ""];
+    picks.forEach((p, i) => lines.push(`${i+1}. ${p} — ${REMEDIATIONS[p] || p}`));
+    if (!picks.length) lines.push("(no remediations selected)");
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      document.getElementById("announcer").textContent = "Plan copied to clipboard.";
+    });
+  }
+
+  // Build progress nav
+  const steps = [...document.querySelectorAll("section.step")];
+  const progress = document.getElementById("progress");
+  steps.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.textContent = `${i+1}. ${s.dataset.title}`;
+    li.tabIndex = 0;
+    li.setAttribute("role", "link");
+    li.addEventListener("click", () => s.scrollIntoView({ behavior: "smooth", block: "start" }));
+    li.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); s.scrollIntoView({ behavior: "smooth" }); } });
+    progress.appendChild(li);
+  });
+
+  // Mark step in view via IntersectionObserver
+  const items = [...progress.querySelectorAll("li")];
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const idx = steps.indexOf(e.target);
+        items.forEach((it, i) => it.setAttribute("aria-current", i === idx ? "step" : "false"));
+      }
+    });
+  }, { rootMargin: "-40% 0px -50% 0px" });
+  steps.forEach(s => io.observe(s));
+
+  document.querySelectorAll('[data-pick]').forEach(c => c.addEventListener("change", save));
+  restore();
+</script>
+</body>
+</html>
