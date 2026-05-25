@@ -19,6 +19,7 @@ import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { trackQuestionAnswered } from "@/lib/posthogTracking";
+import { EdvanaAnswerCelebration } from "@/components/student/EdvanaAnswerCelebration";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Question {
@@ -65,6 +66,8 @@ const LiveStudent = () => {
   const [sessionTotalXP, setSessionTotalXP] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [showXPPulse, setShowXPPulse] = useState(false);
+  const [celebrationTrigger, setCelebrationTrigger] = useState<number | null>(null);
+  const [celebrationCorrect, setCelebrationCorrect] = useState(false);
 
   // AI Explanation state
   const [showExplanation, setShowExplanation] = useState(false);
