@@ -728,6 +728,11 @@ const LiveStudent = () => {
 
   return (
     <main id="main-content" aria-label="Live session question" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+      <EdvanaAnswerCelebration
+        trigger={celebrationTrigger}
+        isCorrect={celebrationCorrect}
+        multiplier={confidenceMultiplier}
+      />
       {/* Session XP Tracker - Fixed top right */}
       {questionsAnswered > 0 && (
         <div
