@@ -1945,7 +1945,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                         <div className="border-t pt-4">
                           <ConfidenceSelector
                             baseReward={BASE_REWARD}
-                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier)}
+                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier, assignment)}
                           />
                         </div>
                       )}
