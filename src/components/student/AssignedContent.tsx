@@ -942,6 +942,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
             sonnerToast.success(`Graded: ${avgGrade}%`, {
               description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
             });
+            setCelebrationCorrect(avgGrade >= 70);
+            setCelebrationMultiplier(1);
+            setCelebrationTrigger(Date.now());
           } else {
             toast({ 
               title: "✅ Quiz Submitted Successfully!",
