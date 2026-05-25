@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import edvanaMark from "@/assets/edvana-mark.png";
 import { playMasteryChime, playReflectTone } from "@/lib/audioNotification";
 
 export type CelebrationTier = "soft" | "lift" | "soar";
@@ -122,26 +121,8 @@ export function EdvanaAnswerCelebration({
         <span className="absolute left-1/2 top-1/2 rounded-full bg-emerald-400/15 w-[32rem] h-[32rem] animate-edvana-pulse-3" />
       )}
 
-      {/* Edvana mark */}
+      {/* Rising caption block */}
       <div className="relative flex flex-col items-center gap-4 animate-edvana-rise">
-        <div
-          className={cn(
-            "relative rounded-full flex items-center justify-center",
-            glowColor,
-            !isCorrect && "grayscale-[0.4] opacity-90"
-          )}
-        >
-          <img
-            src={edvanaMark}
-            alt=""
-            aria-hidden="true"
-            className={cn(
-              markSize,
-              "object-contain drop-shadow-xl",
-              isCorrect ? "animate-edvana-spin-soft" : "animate-edvana-breath"
-            )}
-          />
-        </div>
 
         {/* Caption */}
         <div className="text-center">
