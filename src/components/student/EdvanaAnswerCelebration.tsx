@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import edvanaMark from "@/assets/edvana-mark.png";
 import { playMasteryChime, playReflectTone } from "@/lib/audioNotification";
 
 export type CelebrationTier = "soft" | "lift" | "soar";
