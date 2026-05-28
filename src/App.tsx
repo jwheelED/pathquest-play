@@ -40,7 +40,6 @@ import CorporateEvents from "./pages/CorporateEvents";
 import CorporateEnterprise from "./pages/CorporateEnterprise";
 import CreateEvent from "./pages/CreateEvent";
 import EventDetail from "./pages/EventDetail";
-import TempPasswordChange from "./pages/TempPasswordChange";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -183,7 +182,6 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsOfService />} />
           <Route path="/accessibility" element={<AccessibilityStatement />} />
           <Route path="/temp-password" element={<TempPasswordChange />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
