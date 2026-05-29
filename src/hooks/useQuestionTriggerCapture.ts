@@ -270,15 +270,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     silenceGapMs = 1500,
     bufferWindowMs = 90000,
     lookbackMs = 45000,
-    completionTimeoutMs = 3500,
-    minHoldMs = 600,
+    completionTimeoutMs = 2000,
+    minHoldMs = 400,
     maxBufferChars = 10000,
     enableCompletionGate = true,
-    extensionMs = 1500,
+    extensionMs = 800,
     maxExtensions = 1,
     minCompleteWords = 6,
     softCompleteMs = 2500,
-    minSilenceMs = 900,
+    minSilenceMs = 700,
     debug = true,
   } = options;
 
@@ -625,7 +625,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     if (pendingTriggerRef.current) {
       const pending = pendingTriggerRef.current;
       const heldFor = now - pending.armedAt;
+      const hasQuestionMark = /\?\s*$/.test(text.trim());
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
+
+      // Fast path: explicit "?" → skip min-silence wait, finalize now.
+      if (hasQuestionMark && !isFinalizingRef.current) {
+        if (debug) console.log(`🎯 [trigger-capture] "?" sentence-end after ${heldFor}ms hold, fast-finalize`);
+        finalizeCapture(now, true);
+        return false;
+      }
 
       if (hasSentenceEnd && heldFor >= minHoldMs && !isFinalizingRef.current) {
         if (debug) console.log(`🎯 [trigger-capture] sentence-end after ${heldFor}ms hold, finalizing`);
