@@ -121,15 +121,17 @@ const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
 
-// Interrogative trigger patterns — require a real question form, not just "?"
+// Interrogative trigger patterns — broadened to fire on any word following the
+// WH-word. Rhetorical/greeting blocklists + minWordCount continue to filter
+// out conversational filler.
 const TRIGGER_PATTERNS = [
-  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i,
-  /\bwhy\s+(is|are|do|does|did|would|can|could|should|might|don'?t|doesn'?t|didn'?t)\b/i,
-  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far|come|might)\b/i,
-  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should|will|might)\b/i,
-  /\bwhere\s+(is|are|do|does|did|would|was|were|can|will|might)\b/i,
-  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed|made|wrote|said)\b/i,
-  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method|step|stage|phase|option|choice)\b/i,
+  /\bwhat\s+\w+/i,
+  /\bwhy\s+\w+/i,
+  /\bhow\s+\w+/i,
+  /\bwhen\s+\w+/i,
+  /\bwhere\s+\w+/i,
+  /\bwho\s+\w+/i,
+  /\bwhich\s+\w+/i,
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
@@ -373,6 +375,32 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     }
   }, [enabled, cooldownMs, minWordCount, minTranscriptConfidence, armSilenceTimer, debug]);
 
+  /**
+   * Promote a fully-vetted candidate (e.g. from useQuestionTriggerCapture) straight
+   * into the pending → visible pipeline. Skips the narrow allow-list and cooldown
+   * checks because the trigger-capture hook has its own broader trigger detection,
+   * semantic completeness gate, rhetorical/greeting filter, and 12s cooldown.
+   * Still respects trailingSilenceMs for consistent on-deck behavior.
+   */
+  const acceptVettedCandidate = useCallback(
+    (text: string, priorContext?: string) => {
+      if (!enabled || !text) return;
+      const now = Date.now();
+      const newCandidate: PassiveQuestionCandidate = {
+        text,
+        detectedAt: now,
+        id: `tq-${++candidateIdCounter}`,
+        priorContext: priorContext || undefined,
+      };
+      if (debug) console.log('✅ [passive] accepted vetted candidate:', text);
+      pendingRef.current = newCandidate;
+      setPendingCandidate(newCandidate);
+      setPendingStartedAt(now);
+      armSilenceTimer();
+    },
+    [enabled, armSilenceTimer, debug]
+  );
+
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
     clearAutoDismiss();
@@ -398,6 +426,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     pendingStartedAt,
     trailingSilenceMs,
     checkUtterance,
+    acceptVettedCandidate,
     notifySpeech,
     dismissCandidate,
     removeFromHistory,
