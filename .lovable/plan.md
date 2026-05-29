@@ -1,78 +1,68 @@
+## Why the example fails today
 
-# Plan: Stricter Passive Detection with Pause-After-Question Confirmation
+For: `"If a cell has a high surface-area-to-volume ratio, what advantage does that give it?"`
 
-Implements option #5 (stricter passive detection) and adds a "trailing silence" requirement: a candidate question only fires after the instructor *stops talking* for a moment, proving they finished asking.
+Deepgram emits this as ~2 chunks split at the natural pause after `ratio,`. In `src/hooks/useQuestionTriggerCapture.ts`:
 
-## What changes (UX)
-Today: you say something with a "?" → it gets picked up almost immediately, sometimes mid-thought.
-After: a candidate is only proposed when **all** of these are true:
-1. Utterance contains a real interrogative trigger (`what/how/why/which/who/when/where` + verb), not just a "?" Deepgram guessed.
-2. Utterance is **≥ 8 words** (raised from 5).
-3. Deepgram transcript confidence ≥ **0.8** (today there's no confidence floor for passive).
-4. Not in the rhetorical/greeting blocklist (kept as-is, lightly expanded).
-5. **NEW — Trailing silence:** at least **1200ms of no new transcript chunks** after the "?" before we fire. If you keep talking ("…what is the death penalty *— and also why do we use it?*"), the candidate gets **replaced** by the newer, longer version instead of firing the first one.
+1. **Trigger never arms.** Line 38's pattern requires `what` to be followed by a fixed allow-list (`is/are/do/does/would/...`). `"what advantage"` is not in that list, so `feedChunk` finds no trigger and the question is dropped entirely.
+2. **Even if it armed, the premise is lost.** `getSliceAroundTrigger` (lines 329-410) splits the buffer at the trigger word: everything before `what` is routed into `priorContext`, not `question`. The "If…ratio," clause — which defines the question — would not appear in the captured `question.text` sent to Question on Deck.
 
-Result: opinions, asides, and half-formed thoughts almost never trigger. Real questions you finish and pause on still do — just ~1 second later than today.
+## Fix
 
-## Visual indicator (small but important)
-While the silence timer is counting down, the existing passive-question toast shows a thin amber progress bar ("Listening for pause…") so you can *see* it's about to fire and abort by speaking again. No new component, just a 4px bar on the existing toast.
+Two surgical changes in `src/hooks/useQuestionTriggerCapture.ts`. No UI or schema changes.
 
-## Files to modify
+### 1. Broaden the `what / how / why` triggers
 
-### 1. `src/hooks/usePassiveQuestionDetection.ts` (core logic)
-- Add new option `minTranscriptConfidence` (default `0.8`).
-- Add new option `trailingSilenceMs` (default `1200`).
-- Raise `minWordCount` default from `5` → `8`.
-- Change `checkUtterance(text, recentTranscript?)` signature → `checkUtterance(text, { confidence?, recentTranscript? })`.
-- New internal state: `pendingCandidate` (the question waiting for silence) + `silenceTimerRef`.
-  - When a candidate passes all filters, store as `pendingCandidate` and start a `trailingSilenceMs` timer.
-  - Each new transcript chunk that arrives during the wait:
-    - If it contains another interrogative → **replace** `pendingCandidate` and restart timer.
-    - If it's just more speech (no new trigger) → **extend** `pendingCandidate.text` and restart timer (handles "what is X… and Y?").
-    - If it's a topic-shift marker or > 4s gap → **discard** `pendingCandidate`.
-  - When timer fires with no new chunks → promote `pendingCandidate` → `candidate` (existing flow takes over, toast appears).
-- Stricter trigger check: require a `TRIGGER_PATTERNS` match (reuse the regex set from `useQuestionTriggerCapture.ts`) in addition to the existing `?`/rhetorical filters. Reject "I think the answer is yes?" (no trigger word).
-- Expand `RHETORICAL_BLOCKLIST` with: "what was i saying", "where was i going", "you get it", "make sense to you".
+Replace the strict allow-lists with patterns that also fire on `what <noun>`, `how <adj/adv>`, etc., while keeping existing rhetorical guards intact:
 
-### 2. `src/hooks/useLectureRecording.ts` (or wherever `checkUtterance` is called — confirm during impl)
-- Pass `confidence` from Deepgram's response to `checkUtterance({ confidence, recentTranscript })`. Deepgram already exposes this per-utterance.
-- Surface `pendingCandidate` (or a derived `isPending` + `pendingProgress 0-1`) from the hook for the toast.
+- `\bwhat\s+\w+` (was: `\bwhat\s+(is|are|...)`) — catches `what advantage`, `what mechanism`, `what role`.
+- Same broadening for `how`, `why`, `which` (still excluding the rhetorical phrases already filtered by `RHETORICAL_BLOCKLIST` / `GREETING_PATTERNS`).
+- Keep the embedded/conversational patterns unchanged.
 
-### 3. Passive question toast component (whichever renders `candidate`)
-- When `isPending` is true, render a thin amber `<div>` at the bottom with `style={{ width: progress*100 + '%' }}` updating via `requestAnimationFrame`. ~10 LOC.
-- Tooltip: "Will send when you pause. Keep talking to refine."
+The existing semantic completion gate (`evaluateCompleteness`) already rejects fragments like `"what is the"`, so loosening triggers does not raise false-positive risk meaningfully — it just lets the gate do its job on a wider net.
 
-## Files NOT touched
-- `src/pages/LiveStudent.tsx`
-- Any `supabase/functions/*` edge function
-- `useQuestionTriggerCapture.ts` (it already has its own min-silence; this plan only changes the *passive* path)
+### 2. Pull a leading premise clause into `question`, not `context`
 
-## Edge cases handled
-- **Long question with mid-sentence pause**: `trailingSilenceMs` is short (1.2s). Natural breath pauses < 1.2s won't fire prematurely because we also require terminal `?` first.
-- **Two questions back-to-back**: second interrogative replaces first; only the most recent fires.
-- **You speak again right as it's about to fire**: new chunk arrives before timer → timer resets. No accidental sends.
-- **Low-confidence Deepgram hallucination**: filtered before becoming a candidate.
-- **Reduced-motion users**: progress bar respects `prefers-reduced-motion` (no animation, just static amber fill at current %).
+In `getSliceAroundTrigger`, after computing `triggerChunkPrefix` and `contextChunks`, detect whether the immediately-preceding text is a **premise clause of the same question** and, if so, prepend it to `question`. Heuristics (all must be cheap, no LLM):
 
-## Tunables (all exposed as hook options for easy A/B later)
-| Option | Default | Today |
-|---|---|---|
-| `minWordCount` | 8 | 5 |
-| `minTranscriptConfidence` | 0.8 | (none) |
-| `trailingSilenceMs` | 1200 | (none) |
-| `cooldownMs` | 15000 | 15000 (unchanged) |
+- The text segment immediately before the trigger word, within the same topic segment, **ends with a comma** (`,`) with no intervening `.`/`?`/`!`, OR
+- That segment **starts with a subordinator**: `if|when|whenever|suppose|given|assuming|provided|since|because|once|unless|although|though|while|as`
+- AND the chunk-time gap between the premise chunk and the trigger chunk is ≤ `CHUNK_GAP_BOUNDARY_MS` (already 4000ms) — confirming "same breath/utterance".
 
-## Test checklist (manual, after build)
-1. Say "What is the death penalty?" then stop → fires ~1.2s later. ✅
-2. Say "What is the death penalty? And why do we use it?" with no pause → only second question fires. ✅
-3. Say "I think this is interesting?" (no trigger word) → never fires. ✅
-4. Say "What was I saying?" → blocked by rhetorical list. ✅
-5. Mumble a question with Deepgram confidence 0.6 → never fires. ✅
-6. Say a 5-word question "What is photosynthesis exactly?" → blocked (< 8 words). ✅ — *flag for review: may be too strict, revisit if real questions get dropped.*
+When matched, that premise text moves from `context` into the front of `question`. Everything earlier still becomes `priorContext`.
 
-## Open question for you
-**Item 6 above** — raising min word count to 8 is the most aggressive change here. Real short questions like "What is photosynthesis?" (3 words) would get filtered. Two options:
-- **(A)** Keep 8 — maximum precision, lose some short legit questions.
-- **(B)** Set to 6 — middle ground, catches "What is X exactly?" but still blocks 2-3 word filler.
+### Example trace after fix
 
-I'd default to **(B) = 6** unless you say otherwise. Confirm and I'll build.
+Buffer chunks:
+```
+[t=0]    "If a cell has a high surface-area-to-volume ratio,"
+[t=1800] "what advantage does that give it?"
+```
+
+- Broader trigger matches `what advantage` at t=1800 → armed.
+- `getSliceAroundTrigger` finds the trigger; the chunk before ends with `,` and starts with `If` → merged into `question`.
+- `postProcess` → `"If a cell has a high surface-area-to-volume ratio, what advantage does that give it?"`
+- Completion gate passes (≥6 words, no dangling tail) → delivered to Question on Deck.
+
+### Technical details
+
+File: `src/hooks/useQuestionTriggerCapture.ts`
+
+- Lines 36-53 (`TRIGGER_PATTERNS`): broaden the WH patterns from explicit alternation lists to `\bwhat\s+\w+`, `\bwhy\s+\w+`, `\bhow\s+\w+`, `\bwhich\s+\w+`. Keep `who` slightly tighter since it's more often rhetorical, but allow `\bwho\s+\w+` too (rhetorical filter handles "who knows"/"who can tell me").
+- Add a new constant `PREMISE_SUBORDINATORS` (regex) used only inside `getSliceAroundTrigger`.
+- Lines 383-409: after building `contextChunks` and `triggerChunkPrefix`, inspect the trailing portion of the combined "context" text; if it satisfies the comma-end OR subordinator-start rule AND is within the same topic segment, slice it off the context and prepend it to `question` (with a single space before the trigger word).
+- No changes to `evaluateCompleteness`, cooldowns, or the public API of the hook.
+
+### Verification
+
+- Unit-style mental trace on the user's example + a couple of variants:
+  - `"When you compress a gas, what happens to its temperature?"` — premise via `When`.
+  - `"Given a uniform field, how do charges accelerate?"` — premise via `Given`.
+  - `"What is photosynthesis?"` — no premise, unchanged behavior.
+- Watch dev console for `🎯 [trigger-armed]`, `🎯 [slice-split]`, `🚦 [gate-pass]` logs in a live recording and confirm the full sentence reaches Question on Deck.
+- Confirm rhetorical guards still block `"what do you think?"`, `"how about that?"` (already covered by `RHETORICAL_BLOCKLIST`).
+
+### Out of scope
+
+- No changes to Deepgram chunking, edge functions, UI, or the passive detection path used for pre-recorded lectures.
+- No LLM-based reassembly — kept fully deterministic to stay within the existing low-latency budget.

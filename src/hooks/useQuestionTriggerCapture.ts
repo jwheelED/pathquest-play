@@ -34,14 +34,15 @@ const RHETORICAL_BLOCKLIST = [
 // someone explain...", "do you know..."). These match anywhere in the utterance,
 // not just at the start, so detection is far less brittle.
 const TRIGGER_PATTERNS = [
-  // Classic WH questions
-  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i,
-  /\bwhy\s+(is|are|do|does|did|would|can|could|should|might|don'?t|doesn'?t|didn'?t)\b/i,
-  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far|come|might)\b/i,
-  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should|will|might)\b/i,
-  /\bwhere\s+(is|are|do|does|did|would|was|were|can|will|might)\b/i,
-  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed|made|wrote|said)\b/i,
-  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method|step|stage|phase|option|choice)\b/i,
+  // Classic WH questions — broadened to fire on any following word.
+  // The semantic completion gate + rhetorical blocklists prevent false positives.
+  /\bwhat\s+\w+/i,
+  /\bwhy\s+\w+/i,
+  /\bhow\s+\w+/i,
+  /\bwhen\s+\w+/i,
+  /\bwhere\s+\w+/i,
+  /\bwho\s+\w+/i,
+  /\bwhich\s+\w+/i,
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
@@ -51,6 +52,12 @@ const TRIGGER_PATTERNS = [
   /\bwhat\s+would\s+happen\b/i,
   /\bsuppose\s+that\b/i,
 ];
+
+// Subordinators that introduce a premise clause preceding the interrogative
+// (e.g., "If a cell has X, what happens?"). When the chunk before the trigger
+// starts with one of these AND is within the same breath, we include it as
+// part of the question rather than demoting it to priorContext.
+const PREMISE_SUBORDINATORS = /^(if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as)\b/i;
 
 // Topic-shift markers — when scanning back for context, stop at these.
 const TOPIC_SHIFT_MARKERS = [
