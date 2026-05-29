@@ -79,8 +79,15 @@ function validateAnswer(
     return { ok: true };
   }
 
-  // 2. No citation provided. Score every option against the transcript and
-  //    require the chosen one to be at least tied-best (within 0.05 of the max).
+  // 2. No citation provided. If the transcript is too short to reliably score
+  //    overlap, skip validation — the overlap heuristic produces too many
+  //    false rejects below ~400 chars and triggers a needless Pro retry.
+  if (transcript.length < 400) {
+    return { ok: true };
+  }
+
+  // Score every option against the transcript and require the chosen one to
+  // be at least tied-best (within 0.15 of the max).
   const scores = result.options.map(opt => tokenOverlap(opt, transcript));
   const maxScore = Math.max(...scores);
   const correctScore = scores[idx];
