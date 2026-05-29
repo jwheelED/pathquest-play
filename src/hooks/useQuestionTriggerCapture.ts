@@ -411,7 +411,42 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
     const contextParts = [contextChunks.map(c => c.text).join(' ').trim(), triggerChunkPrefix]
       .filter(Boolean);
-    const context = contextParts.join(' ').trim();
+    let context = contextParts.join(' ').trim();
+
+    // Premise-clause rescue: if the tail of `context` is a subordinate clause
+    // belonging to the same question (e.g. "If a cell has high SA:V ratio,"
+    // immediately before "what advantage..."), promote it into `question`.
+    //
+    // Conditions:
+    //  - The "premise tail" is the text after the last sentence-terminator
+    //    (./?/!) in context. If there is none, the whole context is the tail.
+    //  - The tail must either (a) end with a comma OR (b) start with a known
+    //    subordinator (if/when/given/...).
+    //  - The chunk immediately before the trigger must be within
+    //    CHUNK_GAP_BOUNDARY_MS of the trigger chunk (same breath).
+    if (context && triggerChunkIdx > 0) {
+      const gapToTrigger =
+        relevantChunks[triggerChunkIdx].timestamp - relevantChunks[triggerChunkIdx - 1].timestamp;
+      if (gapToTrigger <= CHUNK_GAP_BOUNDARY_MS) {
+        const lastTerm = Math.max(
+          context.lastIndexOf('.'),
+          context.lastIndexOf('?'),
+          context.lastIndexOf('!'),
+        );
+        const tail = (lastTerm >= 0 ? context.slice(lastTerm + 1) : context).trim();
+        const tailEndsWithComma = /,\s*$/.test(tail);
+        const tailStartsWithSubordinator = PREMISE_SUBORDINATORS.test(tail);
+
+        if (tail && (tailEndsWithComma || tailStartsWithSubordinator)) {
+          // Move the tail to the front of question; keep earlier text as context.
+          const newContext = (lastTerm >= 0 ? context.slice(0, lastTerm + 1) : '').trim();
+          // Ensure a comma separator between premise and trigger word.
+          const premise = tailEndsWithComma ? tail : `${tail.replace(/[,;:]+$/, '')},`;
+          question = `${premise} ${question}`.replace(/\s+/g, ' ').trim();
+          context = newContext;
+        }
+      }
+    }
 
     return { question: question || combined, context };
   }, [lookbackMs]);
