@@ -1,68 +1,118 @@
-## Why the example fails today
+# Diagnosis: "What advantage does that give it?" never reaches Question on Deck
 
-For: `"If a cell has a high surface-area-to-volume ratio, what advantage does that give it?"`
+## Root cause
 
-Deepgram emits this as ~2 chunks split at the natural pause after `ratio,`. In `src/hooks/useQuestionTriggerCapture.ts`:
+The trigger-capture rewrite is doing its job — it arms on `what advantage`, rescues the `If a cell has…` premise, passes its semantic gate, and fires the candidate. You can confirm this in the console: you'll see `🎯 [trigger-armed] word="what advantage"` and `🎯 Trigger capture emitted question: "What advantage does that give it?"`.
 
-1. **Trigger never arms.** Line 38's pattern requires `what` to be followed by a fixed allow-list (`is/are/do/does/would/...`). `"what advantage"` is not in that list, so `feedChunk` finds no trigger and the question is dropped entirely.
-2. **Even if it armed, the premise is lost.** `getSliceAroundTrigger` (lines 329-410) splits the buffer at the trigger word: everything before `what` is routed into `priorContext`, not `question`. The "If…ratio," clause — which defines the question — would not appear in the captured `question.text` sent to Question on Deck.
+The problem is what happens **next**. In `src/components/instructor/LectureTranscription.tsx` (line 324) the trigger capture doesn't emit straight to the UI — it pipes its candidate through the *old* passive detection hook:
+
+```ts
+setTriggerCaptureComplete((candidate) => {
+  ...
+  checkPassiveQuestion(candidate.text, priorContext);   // ← second gate
+});
+```
+
+And `usePassiveQuestionDetection.checkUtterance` still has the original narrow allow-list patterns (`src/hooks/usePassiveQuestionDetection.ts` lines 124–139):
+
+```ts
+/\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i
+```
+
+`what advantage` is not in that list, so `hasInterrogativeTrigger("What advantage does that give it?")` returns `false`, and the candidate is silently dropped with the log line:
+
+```
+🔍 [passive] skipped "What advantage does that give it?" — no interrogative trigger
+```
+
+(The same narrow lists would also drop `what mechanism…`, `why evolutionarily…`, `how come…`, `which advantage…`, etc. — i.e. every example we broadened in the trigger-capture hook.)
+
+A secondary, smaller issue: `checkPassiveQuestion` also re-applies its own 1.5 s cooldown and `lastQuestionSentTime` cooldown, plus a `trailingSilenceMs` (1.2 s) timer before promoting to visible. So even if we broadened the allow-list, a trigger capture immediately after a manual send would still be dropped.
 
 ## Fix
 
-Two surgical changes in `src/hooks/useQuestionTriggerCapture.ts`. No UI or schema changes.
+Trigger captures have already passed a stricter pipeline (broad trigger + premise rescue + semantic completeness gate + rhetorical/greeting check + 5-word minimum + 900 ms silence). Re-running them through a narrower allow-list is wrong. Two surgical changes:
 
-### 1. Broaden the `what / how / why` triggers
+### 1. Bypass the redundant gate for trigger-captured candidates
 
-Replace the strict allow-lists with patterns that also fire on `what <noun>`, `how <adj/adv>`, etc., while keeping existing rhetorical guards intact:
+In `src/hooks/usePassiveQuestionDetection.ts`, add a small public method that promotes a fully-vetted candidate straight into the pending → visible pipeline, skipping `extractQuestions`, `hasInterrogativeTrigger`, and rhetorical re-checks but still respecting `trailingSilenceMs` so the on-deck card behaves consistently:
 
-- `\bwhat\s+\w+` (was: `\bwhat\s+(is|are|...)`) — catches `what advantage`, `what mechanism`, `what role`.
-- Same broadening for `how`, `why`, `which` (still excluding the rhetorical phrases already filtered by `RHETORICAL_BLOCKLIST` / `GREETING_PATTERNS`).
-- Keep the embedded/conversational patterns unchanged.
-
-The existing semantic completion gate (`evaluateCompleteness`) already rejects fragments like `"what is the"`, so loosening triggers does not raise false-positive risk meaningfully — it just lets the gate do its job on a wider net.
-
-### 2. Pull a leading premise clause into `question`, not `context`
-
-In `getSliceAroundTrigger`, after computing `triggerChunkPrefix` and `contextChunks`, detect whether the immediately-preceding text is a **premise clause of the same question** and, if so, prepend it to `question`. Heuristics (all must be cheap, no LLM):
-
-- The text segment immediately before the trigger word, within the same topic segment, **ends with a comma** (`,`) with no intervening `.`/`?`/`!`, OR
-- That segment **starts with a subordinator**: `if|when|whenever|suppose|given|assuming|provided|since|because|once|unless|although|though|while|as`
-- AND the chunk-time gap between the premise chunk and the trigger chunk is ≤ `CHUNK_GAP_BOUNDARY_MS` (already 4000ms) — confirming "same breath/utterance".
-
-When matched, that premise text moves from `context` into the front of `question`. Everything earlier still becomes `priorContext`.
-
-### Example trace after fix
-
-Buffer chunks:
-```
-[t=0]    "If a cell has a high surface-area-to-volume ratio,"
-[t=1800] "what advantage does that give it?"
+```ts
+const acceptVettedCandidate = useCallback(
+  (text: string, priorContext?: string) => {
+    if (!enabled || !text) return;
+    const now = Date.now();
+    // Skip cooldown checks — trigger capture has its own 12s cooldown.
+    const newCandidate: PassiveQuestionCandidate = {
+      text,
+      detectedAt: now,
+      id: `tq-${++candidateIdCounter}`,
+      priorContext: priorContext || undefined,
+    };
+    pendingRef.current = newCandidate;
+    setPendingCandidate(newCandidate);
+    setPendingStartedAt(now);
+    armSilenceTimer();
+  },
+  [enabled, armSilenceTimer]
+);
 ```
 
-- Broader trigger matches `what advantage` at t=1800 → armed.
-- `getSliceAroundTrigger` finds the trigger; the chunk before ends with `,` and starts with `If` → merged into `question`.
-- `postProcess` → `"If a cell has a high surface-area-to-volume ratio, what advantage does that give it?"`
-- Completion gate passes (≥6 words, no dangling tail) → delivered to Question on Deck.
+Export it from the hook return.
 
-### Technical details
+### 2. Route trigger captures through the new bypass
 
-File: `src/hooks/useQuestionTriggerCapture.ts`
+In `src/components/instructor/LectureTranscription.tsx` (~line 314–326), swap the bridge:
 
-- Lines 36-53 (`TRIGGER_PATTERNS`): broaden the WH patterns from explicit alternation lists to `\bwhat\s+\w+`, `\bwhy\s+\w+`, `\bhow\s+\w+`, `\bwhich\s+\w+`. Keep `who` slightly tighter since it's more often rhetorical, but allow `\bwho\s+\w+` too (rhetorical filter handles "who knows"/"who can tell me").
-- Add a new constant `PREMISE_SUBORDINATORS` (regex) used only inside `getSliceAroundTrigger`.
-- Lines 383-409: after building `contextChunks` and `triggerChunkPrefix`, inspect the trailing portion of the combined "context" text; if it satisfies the comma-end OR subordinator-start rule AND is within the same topic segment, slice it off the context and prepend it to `question` (with a single space before the trigger word).
-- No changes to `evaluateCompleteness`, cooldowns, or the public API of the hook.
+```ts
+setTriggerCaptureComplete((candidate) => {
+  console.log('🎯 Trigger capture emitted question:', candidate.text);
+  pendingPriorContextRef.current = candidate.priorContext ?? null;
+  resetPassiveDetection?.();
+  const priorContext =
+    candidate.priorContext || (intervalTranscriptRef.current || '').trim();
+  acceptVettedCandidate(candidate.text, priorContext);   // ← new path
+});
+```
 
-### Verification
+### 3. (Defense-in-depth) Broaden the passive-detection allow-list too
 
-- Unit-style mental trace on the user's example + a couple of variants:
-  - `"When you compress a gas, what happens to its temperature?"` — premise via `When`.
-  - `"Given a uniform field, how do charges accelerate?"` — premise via `Given`.
-  - `"What is photosynthesis?"` — no premise, unchanged behavior.
-- Watch dev console for `🎯 [trigger-armed]`, `🎯 [slice-split]`, `🚦 [gate-pass]` logs in a live recording and confirm the full sentence reaches Question on Deck.
-- Confirm rhetorical guards still block `"what do you think?"`, `"how about that?"` (already covered by `RHETORICAL_BLOCKLIST`).
+So that the *organic* passive path (Deepgram emitting a sentence with `?`) also stops missing `what advantage / why evolutionarily / how come / which advantage`. Mirror the trigger-capture regexes in `usePassiveQuestionDetection.ts`:
 
-### Out of scope
+```ts
+const TRIGGER_PATTERNS = [
+  /\bwhat\s+\w+/i,
+  /\bwhy\s+\w+/i,
+  /\bhow\s+\w+/i,
+  /\bwhen\s+\w+/i,
+  /\bwhere\s+\w+/i,
+  /\bwho\s+\w+/i,
+  /\bwhich\s+\w+/i,
+  /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
+  /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
+  /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
+  /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
+  /\bwhat\s+would\s+happen\b/i,
+  /\bsuppose\s+that\b/i,
+];
+```
 
-- No changes to Deepgram chunking, edge functions, UI, or the passive detection path used for pre-recorded lectures.
-- No LLM-based reassembly — kept fully deterministic to stay within the existing low-latency budget.
+The existing `RHETORICAL_BLOCKLIST`, `GREETING_PATTERNS`, `minWordCount`, and `trailingSilenceMs` continue to suppress greetings and conversational filler — same protections we already validated in the trigger-capture hook.
+
+## What you'll see after the fix
+
+Console for the same utterance:
+```
+🎯 [trigger-armed] word="what advantage"
+🎯 [slice-split] question="what advantage does that give it" context="If a cell has a high surface-area-to-volume ratio,"
+🚦 [gate-pass] 6 words
+🎯 Trigger capture emitted question: If a cell has a high surface-area-to-volume ratio, what advantage does that give it?
+✅ [passive] promoted pending → candidate
+```
+And the card appears on deck with the premise prepended.
+
+## Files touched
+- `src/hooks/usePassiveQuestionDetection.ts` — add `acceptVettedCandidate`, broaden `TRIGGER_PATTERNS`.
+- `src/components/instructor/LectureTranscription.tsx` — replace the bridge call (one line).
+
+No DB, no edge-function, no public-API changes.
