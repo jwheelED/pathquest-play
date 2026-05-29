@@ -312,19 +312,22 @@ export const LectureTranscription = ({
     return () => clearInterval(id);
   }, [lastConfidenceCheckTime]);
 
-  // Route trigger-captured questions into the passive candidate pipeline
+  // Route trigger-captured questions directly into the passive candidate pipeline.
+  // Bypass checkPassiveQuestion because the trigger-capture hook has already run a
+  // broader trigger match, semantic completeness gate, rhetorical/greeting filter,
+  // min-word check, and its own 12s cooldown — re-gating here was dropping valid
+  // questions like "What advantage does that give it?" via the narrow allow-list.
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
-      // Stash structured prior context for the next send (cleared after send completes)
       pendingPriorContextRef.current = candidate.priorContext ?? null;
-      // Reset passive detection cooldown so its stale state doesn't block follow-ups
       resetPassiveDetection?.();
-      // Prefer the trigger capture's own prior context; fall back to rolling buffer
       const priorContext = candidate.priorContext || (intervalTranscriptRef.current || "").trim();
-      checkPassiveQuestion(candidate.text, priorContext);
+      acceptVettedPassiveCandidate(candidate.text, priorContext);
     });
-  }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
+  }, [setTriggerCaptureComplete, acceptVettedPassiveCandidate, resetPassiveDetection]);
+
+
 
 
   // Keep isSendingQuestion ref in sync with state
