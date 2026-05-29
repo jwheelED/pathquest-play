@@ -263,7 +263,7 @@ export const LectureTranscription = ({
     cooldownMs: 1500,
     minWordCount: 6,
     minTranscriptConfidence: 0.8,
-    trailingSilenceMs: 1200,
+    // trailingSilenceMs: use hook default (700ms); "?" fast-path promotes instantly
     autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
@@ -277,7 +277,7 @@ export const LectureTranscription = ({
   } = useQuestionTriggerCapture({
     cooldownMs: 12000,
     silenceGapMs: 2500,
-    minSilenceMs: 1200,
+    // minSilenceMs: use hook default (700ms); "?" fast-path bypasses min-silence
     bufferWindowMs: 60000,
     lookbackMs: 30000,
     maxBufferChars: 8000,
