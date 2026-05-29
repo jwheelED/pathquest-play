@@ -401,9 +401,18 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       pendingRef.current = newCandidate;
       setPendingCandidate(newCandidate);
       setPendingStartedAt(now);
+
+      // Fast path: text already ends with "?" → promote immediately,
+      // skip trailing-silence wait.
+      if (/\?\s*$/.test(text.trim())) {
+        if (debug) console.log('⚡ [passive] "?" detected → promote without silence wait');
+        clearSilenceTimer();
+        promotePending();
+        return;
+      }
       armSilenceTimer();
     },
-    [enabled, armSilenceTimer, debug]
+    [enabled, armSilenceTimer, clearSilenceTimer, promotePending, debug]
   );
 
   const resetDetection = useCallback(() => {
