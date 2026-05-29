@@ -1,64 +1,91 @@
-# Why "are they more or less likely…?" isn't captured
 
-You're right — it's because it's an A/B (polar) question with no WH word.
+# Fix: question detection + MCQ generation latency
 
-The utterance is:
-> "If two genes are very close together on the same chromosome, **are they** more or less likely to be separated by crossing over?"
+Two independent fixes — one frontend, one edge function. Both safe to ship together.
 
-Both `useQuestionTriggerCapture.ts` and `usePassiveQuestionDetection.ts` only arm on WH-fronted patterns (`what/why/how/when/where/who/which + \w+`) plus a few embedded forms (`tell me…`, `anyone know…`, `do you know…`, `what would happen`, `suppose that`). They have **no patterns for subject-auxiliary inversion** — i.e. classic yes/no questions:
+---
 
-- "**Are** they more or less likely…"
-- "**Is** this an example of…"
-- "**Does** the cell divide…"
-- "**Can** anyone see why…"
-- "**Will** the reaction…"
+## Part 1 — Detection lag (~5-7s → ~2-3s)
 
-So the trigger never arms, the premise rescue never runs, and Question on Deck stays empty. The "If…" prefix doesn't help — `if` is only used as a premise *subordinator* after a trigger fires; it can't fire one itself.
+Current pipeline stacks these timers after the user finishes speaking:
+- `minSilenceMs` 1200ms (wait for silence)
+- `completionTimeoutMs` 3500ms (wait for more words)
+- optional `extensionMs` +1500ms
+- `trailingSilenceMs` 1200ms (pending → visible)
+= ~6s minimum, plus Deepgram's own ~1-2s final-chunk lag.
 
-Note: this also means "or" choice questions ("Is it A or B?", "More or less?") are missed too — same root cause.
+Most of these timers exist to handle the **risk that the speaker hasn't finished yet**. That risk is near-zero when the finalized utterance already ends in `?` and passes the trigger + word-count gate. We add a fast path for that case.
 
-## Fix
+### Changes
 
-Add a polar-question trigger family to **both** hooks, mirroring the WH approach (broad regex + existing semantic/rhetorical gates handle false positives).
+**`src/hooks/useQuestionTriggerCapture.ts`**
+- Add a helper `endsWithQuestionMark(text)` that checks the cleaned tail.
+- In the gate logic (around line 477 and 670-680), when the buffered candidate **ends with `?` AND passes the 6-word + trigger gate**, bypass `completionTimeoutMs` and `extensionMs` entirely — emit immediately on the next finalize.
+- Lower defaults for the "no question mark" path:
+  - `completionTimeoutMs`: 3500 → **2000**
+  - `extensionMs`: 1500 → **800**
+  - `minSilenceMs`: 1200 → **700**
 
-### 1. `src/hooks/useQuestionTriggerCapture.ts` — extend `TRIGGER_PATTERNS`
+**`src/hooks/usePassiveQuestionDetection.ts`**
+- Same `endsWithQuestionMark` shortcut: skip `trailingSilenceMs` and promote pending → visible on the same tick.
+- Lower default `trailingSilenceMs`: 1200 → **700** for the non-`?` path.
 
-Append polar inversion patterns. To minimise false positives on declaratives like "There **are** two genes…", we require the aux to be followed by a **pronoun, determiner, or quantifier** typical of question subjects:
+**`src/components/instructor/LectureTranscription.tsx`** (lines 261-284)
+- Update the hook call sites to match the new defaults (or drop the overrides so defaults apply).
 
-```ts
-// Subject-aux inversion (yes/no & A-or-B questions)
-/\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
-/\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
-/\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
-/\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
-```
+Net effect: a clean utterance ending in "?" surfaces in ~0.5-1s after Deepgram's final; ambiguous (no `?`) utterances still get a ~2s safety window instead of ~5s.
 
-Because the premise-rescue logic already keys off `PREMISE_SUBORDINATORS` (which includes `if/when/given/…`) and a comma at the end of the tail, the "If two genes…, are they…" form will be reconstructed correctly once the trigger arms on `are they`.
+---
 
-### 2. `src/hooks/usePassiveQuestionDetection.ts` — mirror the same patterns
+## Part 2 — MCQ generation lag (~12-17s → ~4-6s)
 
-Add the identical four polar patterns to its `TRIGGER_PATTERNS` so the defense-in-depth passive path also accepts these. The existing `RHETORICAL_BLOCKLIST` already covers the common false positives ("does that make sense", "are we good", "can you hear me", etc.).
-
-### 3. No changes needed
-
-- `acceptVettedCandidate` bridge is unchanged.
-- Semantic completion gate (`evaluateCompleteness`) still applies: 6-word minimum, no-dangling-tail, hanging-interrogative check, etc. — these continue to filter rhetorical "Right?", "Okay?", "Are we good?" type fragments.
-- Premise-clause rescue is unchanged; it already handles the "If X, are they Y?" shape.
-
-## Expected console after fix
+Logs prove the real cause is a **double Gemini Pro call**: the validator's token-overlap check rejects the first attempt because there are only ~229 chars of focused context, then we retry with Pro again. Two Pro calls = ~16s.
 
 ```
-🎯 [trigger-armed] word="are they"
-🎯 [slice-split] question="are they more or less likely to be separated by crossing over"
-                  context="If two genes are very close together on the same chromosome,"
-🎯 [premise-rescue] tail moved into question
-🚦 [gate-pass] 17 words
-🎯 Trigger capture emitted question: If two genes are very close together on the same chromosome, are they more or less likely to be separated by crossing over?
-✅ [passive] promoted pending → candidate
+Context received — broad=229 chars, focused=229 chars
+MCQ validator REJECTED first attempt: ...weakly supported by transcript (score=0.13, best=0.40)
+MCQ retry also rejected: ...(score=0.13, best=0.50). Shipping retry result anyway.
 ```
+
+The overlap heuristic is unreliable on short contexts — it's flagging answers that are actually correct.
+
+### Changes (single file: `supabase/functions/generate-mcq-options/index.ts`)
+
+1. **Use Flash as primary, escalate to Pro only on true failures.**
+   - Replace the `focusedContext.length > 80 ? 'gemini-2.5-pro' : 'gemini-3.5-flash'` rule with always `google/gemini-2.5-flash` on the first call.
+   - Flash is ~2-3s vs Pro's ~8-12s, and is more than capable for 4-option MCQs grounded in a short transcript.
+
+2. **Skip token-overlap validation when focused context is small/unreliable.**
+   - In `validateAnswer`, if `transcript.length < 400` AND no `citation` is provided, treat as `{ ok: true }` (we can't meaningfully validate). Right now we mis-reject in this regime.
+   - Keep the citation-based validation (when the model returns a citation, we still verify it appears in the transcript).
+
+3. **On retry, escalate to Pro once — not twice.**
+   - Current code already calls Pro on retry; with change #1 this becomes Flash → Pro (only when actually rejected), instead of Pro → Pro.
+   - Cap to one retry (already the case).
+
+4. **Lower `max_tokens` implicit ceiling** by leaving as-is (Gateway default is fine); don't add anything new here.
+
+Expected timing after fix: first Flash call ~2-4s, validator passes, ship → **~4-6s total**. On the rare bad output, Flash + Pro retry ≈ ~10s, still better than today's worst case.
+
+### Why not just remove the validator?
+
+It still catches the "wrong letter assigned to right text" failure mode when a citation is provided. Keeping it for that case; only short-context+no-citation gets the bypass.
+
+---
 
 ## Files touched
-- `src/hooks/useQuestionTriggerCapture.ts` — append 4 polar regexes to `TRIGGER_PATTERNS`.
-- `src/hooks/usePassiveQuestionDetection.ts` — append the same 4 regexes to its `TRIGGER_PATTERNS`.
 
-No DB, edge-function, or API changes.
+- `src/hooks/useQuestionTriggerCapture.ts` — add `endsWithQuestionMark` fast path, lower default timers.
+- `src/hooks/usePassiveQuestionDetection.ts` — same fast path + lower `trailingSilenceMs`.
+- `src/components/instructor/LectureTranscription.tsx` — update override values (or remove) at lines 266, 280.
+- `supabase/functions/generate-mcq-options/index.ts` — Flash-first model selection, skip overlap validation when transcript < 400 chars and no citation.
+
+No DB, schema, or new env vars.
+
+## Verification
+
+1. Speak: "What is mitosis?" — should appear in Question on Deck within ~1-2s of finishing.
+2. Click Send — MCQ options should appear within ~4-6s.
+3. Check edge function logs: should see one `MCQ options generated successfully` per send, not preceded by `REJECTED` + `retry`.
+4. Speak a fragment that's not actually a question — confirm the longer (~2s) gate still suppresses it.
+
