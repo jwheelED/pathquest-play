@@ -138,6 +138,11 @@ const TRIGGER_PATTERNS = [
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
   /\bsuppose\s+that\b/i,
+  // Subject-aux inversion (yes/no & A-or-B questions)
+  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
+  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
+  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
 ];
 
 function hasInterrogativeTrigger(text: string): boolean {

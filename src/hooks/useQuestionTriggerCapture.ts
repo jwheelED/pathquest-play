@@ -51,6 +51,13 @@ const TRIGGER_PATTERNS = [
   // "What if X?" / "What happens when X?" style
   /\bwhat\s+would\s+happen\b/i,
   /\bsuppose\s+that\b/i,
+  // Subject-aux inversion (yes/no & A-or-B questions). Aux must be followed by
+  // a pronoun/determiner/quantifier typical of question subjects to avoid
+  // matching declaratives like "There are two genes…".
+  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
+  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
+  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
 ];
 
 // Subordinators that introduce a premise clause preceding the interrogative

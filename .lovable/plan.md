@@ -1,118 +1,64 @@
-# Diagnosis: "What advantage does that give it?" never reaches Question on Deck
+# Why "are they more or less likely…?" isn't captured
 
-## Root cause
+You're right — it's because it's an A/B (polar) question with no WH word.
 
-The trigger-capture rewrite is doing its job — it arms on `what advantage`, rescues the `If a cell has…` premise, passes its semantic gate, and fires the candidate. You can confirm this in the console: you'll see `🎯 [trigger-armed] word="what advantage"` and `🎯 Trigger capture emitted question: "What advantage does that give it?"`.
+The utterance is:
+> "If two genes are very close together on the same chromosome, **are they** more or less likely to be separated by crossing over?"
 
-The problem is what happens **next**. In `src/components/instructor/LectureTranscription.tsx` (line 324) the trigger capture doesn't emit straight to the UI — it pipes its candidate through the *old* passive detection hook:
+Both `useQuestionTriggerCapture.ts` and `usePassiveQuestionDetection.ts` only arm on WH-fronted patterns (`what/why/how/when/where/who/which + \w+`) plus a few embedded forms (`tell me…`, `anyone know…`, `do you know…`, `what would happen`, `suppose that`). They have **no patterns for subject-auxiliary inversion** — i.e. classic yes/no questions:
 
-```ts
-setTriggerCaptureComplete((candidate) => {
-  ...
-  checkPassiveQuestion(candidate.text, priorContext);   // ← second gate
-});
-```
+- "**Are** they more or less likely…"
+- "**Is** this an example of…"
+- "**Does** the cell divide…"
+- "**Can** anyone see why…"
+- "**Will** the reaction…"
 
-And `usePassiveQuestionDetection.checkUtterance` still has the original narrow allow-list patterns (`src/hooks/usePassiveQuestionDetection.ts` lines 124–139):
+So the trigger never arms, the premise rescue never runs, and Question on Deck stays empty. The "If…" prefix doesn't help — `if` is only used as a premise *subordinator* after a trigger fires; it can't fire one itself.
 
-```ts
-/\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i
-```
-
-`what advantage` is not in that list, so `hasInterrogativeTrigger("What advantage does that give it?")` returns `false`, and the candidate is silently dropped with the log line:
-
-```
-🔍 [passive] skipped "What advantage does that give it?" — no interrogative trigger
-```
-
-(The same narrow lists would also drop `what mechanism…`, `why evolutionarily…`, `how come…`, `which advantage…`, etc. — i.e. every example we broadened in the trigger-capture hook.)
-
-A secondary, smaller issue: `checkPassiveQuestion` also re-applies its own 1.5 s cooldown and `lastQuestionSentTime` cooldown, plus a `trailingSilenceMs` (1.2 s) timer before promoting to visible. So even if we broadened the allow-list, a trigger capture immediately after a manual send would still be dropped.
+Note: this also means "or" choice questions ("Is it A or B?", "More or less?") are missed too — same root cause.
 
 ## Fix
 
-Trigger captures have already passed a stricter pipeline (broad trigger + premise rescue + semantic completeness gate + rhetorical/greeting check + 5-word minimum + 900 ms silence). Re-running them through a narrower allow-list is wrong. Two surgical changes:
+Add a polar-question trigger family to **both** hooks, mirroring the WH approach (broad regex + existing semantic/rhetorical gates handle false positives).
 
-### 1. Bypass the redundant gate for trigger-captured candidates
+### 1. `src/hooks/useQuestionTriggerCapture.ts` — extend `TRIGGER_PATTERNS`
 
-In `src/hooks/usePassiveQuestionDetection.ts`, add a small public method that promotes a fully-vetted candidate straight into the pending → visible pipeline, skipping `extractQuestions`, `hasInterrogativeTrigger`, and rhetorical re-checks but still respecting `trailingSilenceMs` so the on-deck card behaves consistently:
-
-```ts
-const acceptVettedCandidate = useCallback(
-  (text: string, priorContext?: string) => {
-    if (!enabled || !text) return;
-    const now = Date.now();
-    // Skip cooldown checks — trigger capture has its own 12s cooldown.
-    const newCandidate: PassiveQuestionCandidate = {
-      text,
-      detectedAt: now,
-      id: `tq-${++candidateIdCounter}`,
-      priorContext: priorContext || undefined,
-    };
-    pendingRef.current = newCandidate;
-    setPendingCandidate(newCandidate);
-    setPendingStartedAt(now);
-    armSilenceTimer();
-  },
-  [enabled, armSilenceTimer]
-);
-```
-
-Export it from the hook return.
-
-### 2. Route trigger captures through the new bypass
-
-In `src/components/instructor/LectureTranscription.tsx` (~line 314–326), swap the bridge:
+Append polar inversion patterns. To minimise false positives on declaratives like "There **are** two genes…", we require the aux to be followed by a **pronoun, determiner, or quantifier** typical of question subjects:
 
 ```ts
-setTriggerCaptureComplete((candidate) => {
-  console.log('🎯 Trigger capture emitted question:', candidate.text);
-  pendingPriorContextRef.current = candidate.priorContext ?? null;
-  resetPassiveDetection?.();
-  const priorContext =
-    candidate.priorContext || (intervalTranscriptRef.current || '').trim();
-  acceptVettedCandidate(candidate.text, priorContext);   // ← new path
-});
+// Subject-aux inversion (yes/no & A-or-B questions)
+/\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
+/\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
+/\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+/\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
 ```
 
-### 3. (Defense-in-depth) Broaden the passive-detection allow-list too
+Because the premise-rescue logic already keys off `PREMISE_SUBORDINATORS` (which includes `if/when/given/…`) and a comma at the end of the tail, the "If two genes…, are they…" form will be reconstructed correctly once the trigger arms on `are they`.
 
-So that the *organic* passive path (Deepgram emitting a sentence with `?`) also stops missing `what advantage / why evolutionarily / how come / which advantage`. Mirror the trigger-capture regexes in `usePassiveQuestionDetection.ts`:
+### 2. `src/hooks/usePassiveQuestionDetection.ts` — mirror the same patterns
 
-```ts
-const TRIGGER_PATTERNS = [
-  /\bwhat\s+\w+/i,
-  /\bwhy\s+\w+/i,
-  /\bhow\s+\w+/i,
-  /\bwhen\s+\w+/i,
-  /\bwhere\s+\w+/i,
-  /\bwho\s+\w+/i,
-  /\bwhich\s+\w+/i,
-  /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
-  /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
-  /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
-  /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
-  /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
-];
+Add the identical four polar patterns to its `TRIGGER_PATTERNS` so the defense-in-depth passive path also accepts these. The existing `RHETORICAL_BLOCKLIST` already covers the common false positives ("does that make sense", "are we good", "can you hear me", etc.).
+
+### 3. No changes needed
+
+- `acceptVettedCandidate` bridge is unchanged.
+- Semantic completion gate (`evaluateCompleteness`) still applies: 6-word minimum, no-dangling-tail, hanging-interrogative check, etc. — these continue to filter rhetorical "Right?", "Okay?", "Are we good?" type fragments.
+- Premise-clause rescue is unchanged; it already handles the "If X, are they Y?" shape.
+
+## Expected console after fix
+
 ```
-
-The existing `RHETORICAL_BLOCKLIST`, `GREETING_PATTERNS`, `minWordCount`, and `trailingSilenceMs` continue to suppress greetings and conversational filler — same protections we already validated in the trigger-capture hook.
-
-## What you'll see after the fix
-
-Console for the same utterance:
-```
-🎯 [trigger-armed] word="what advantage"
-🎯 [slice-split] question="what advantage does that give it" context="If a cell has a high surface-area-to-volume ratio,"
-🚦 [gate-pass] 6 words
-🎯 Trigger capture emitted question: If a cell has a high surface-area-to-volume ratio, what advantage does that give it?
+🎯 [trigger-armed] word="are they"
+🎯 [slice-split] question="are they more or less likely to be separated by crossing over"
+                  context="If two genes are very close together on the same chromosome,"
+🎯 [premise-rescue] tail moved into question
+🚦 [gate-pass] 17 words
+🎯 Trigger capture emitted question: If two genes are very close together on the same chromosome, are they more or less likely to be separated by crossing over?
 ✅ [passive] promoted pending → candidate
 ```
-And the card appears on deck with the premise prepended.
 
 ## Files touched
-- `src/hooks/usePassiveQuestionDetection.ts` — add `acceptVettedCandidate`, broaden `TRIGGER_PATTERNS`.
-- `src/components/instructor/LectureTranscription.tsx` — replace the bridge call (one line).
+- `src/hooks/useQuestionTriggerCapture.ts` — append 4 polar regexes to `TRIGGER_PATTERNS`.
+- `src/hooks/usePassiveQuestionDetection.ts` — append the same 4 regexes to its `TRIGGER_PATTERNS`.
 
-No DB, no edge-function, no public-API changes.
+No DB, edge-function, or API changes.
