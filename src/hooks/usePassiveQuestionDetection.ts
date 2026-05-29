@@ -211,7 +211,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     autoDismissMs = 30000,
     lastQuestionSentTime = 0,
     minTranscriptConfidence = 0.8,
-    trailingSilenceMs = 1200,
+    trailingSilenceMs = 700,
     debug = true,
   } = options;
 
