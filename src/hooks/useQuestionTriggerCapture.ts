@@ -625,7 +625,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     if (pendingTriggerRef.current) {
       const pending = pendingTriggerRef.current;
       const heldFor = now - pending.armedAt;
+      const hasQuestionMark = /\?\s*$/.test(text.trim());
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
+
+      // Fast path: explicit "?" → skip min-silence wait, finalize now.
+      if (hasQuestionMark && !isFinalizingRef.current) {
+        if (debug) console.log(`🎯 [trigger-capture] "?" sentence-end after ${heldFor}ms hold, fast-finalize`);
+        finalizeCapture(now, true);
+        return false;
+      }
 
       if (hasSentenceEnd && heldFor >= minHoldMs && !isFinalizingRef.current) {
         if (debug) console.log(`🎯 [trigger-capture] sentence-end after ${heldFor}ms hold, finalizing`);
