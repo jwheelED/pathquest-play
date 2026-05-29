@@ -271,11 +271,9 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
       });
     }
 
-    // Stronger model when we have transcript context worth reasoning over;
-    // fast model for general-knowledge fallback questions.
-    const primaryModel = focusedContext.length > 80
-      ? 'google/gemini-2.5-pro'
-      : 'google/gemini-3.5-flash';
+    // Always start with Flash — ~2-3s vs Pro's ~8-12s, and plenty capable for
+    // a 4-option MCQ. The validator will escalate to Pro on the rare retry.
+    const primaryModel = 'google/gemini-2.5-flash';
 
     let response = await callModel(primaryModel);
 
