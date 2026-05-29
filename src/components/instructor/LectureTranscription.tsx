@@ -253,6 +253,7 @@ export const LectureTranscription = ({
     pendingStartedAt: passivePendingStartedAt,
     trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    acceptVettedCandidate: acceptVettedPassiveCandidate,
     notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     removeFromHistory: removePassiveFromHistory,
