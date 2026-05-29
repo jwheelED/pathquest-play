@@ -375,6 +375,32 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     }
   }, [enabled, cooldownMs, minWordCount, minTranscriptConfidence, armSilenceTimer, debug]);
 
+  /**
+   * Promote a fully-vetted candidate (e.g. from useQuestionTriggerCapture) straight
+   * into the pending → visible pipeline. Skips the narrow allow-list and cooldown
+   * checks because the trigger-capture hook has its own broader trigger detection,
+   * semantic completeness gate, rhetorical/greeting filter, and 12s cooldown.
+   * Still respects trailingSilenceMs for consistent on-deck behavior.
+   */
+  const acceptVettedCandidate = useCallback(
+    (text: string, priorContext?: string) => {
+      if (!enabled || !text) return;
+      const now = Date.now();
+      const newCandidate: PassiveQuestionCandidate = {
+        text,
+        detectedAt: now,
+        id: `tq-${++candidateIdCounter}`,
+        priorContext: priorContext || undefined,
+      };
+      if (debug) console.log('✅ [passive] accepted vetted candidate:', text);
+      pendingRef.current = newCandidate;
+      setPendingCandidate(newCandidate);
+      setPendingStartedAt(now);
+      armSilenceTimer();
+    },
+    [enabled, armSilenceTimer, debug]
+  );
+
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
     clearAutoDismiss();
@@ -400,6 +426,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     pendingStartedAt,
     trailingSilenceMs,
     checkUtterance,
+    acceptVettedCandidate,
     notifySpeech,
     dismissCandidate,
     removeFromHistory,
