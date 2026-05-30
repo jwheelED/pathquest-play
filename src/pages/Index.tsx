@@ -106,7 +106,11 @@ const Index = () => {
   return (
     <div className="landing-page min-h-screen">
       <Helmet>
+        <title>Edvana — Live Understanding Copilot for instructors</title>
+        <meta name="description" content="Edvana captures every lecture, asks AI-generated check-ins in real time, and shows instructors who's keeping up — so no student falls behind." />
         <link rel="canonical" href="https://edvana.dev/" />
+        <meta property="og:title" content="Edvana — Live Understanding Copilot for instructors" />
+        <meta property="og:description" content="Capture lectures, run AI check-ins, and see who's keeping up — live." />
         <meta property="og:url" content="https://edvana.dev/" />
       </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
@@ -125,7 +129,7 @@ const Index = () => {
           >
             <img
               src={edvanaLogo}
-              alt="Edvana logo"
+              alt="Edvana - Live Understanding Copilot"
               className="h-7 transition-transform hover:scale-105"
             />
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,6 +92,14 @@ const JoinLive = () => {
 
   return (
     <main id="main-content" aria-label="Join live session" className="min-h-screen flex flex-col items-center justify-center mastery-bg p-4">
+      <Helmet>
+        <title>Join a live session — Edvana</title>
+        <meta name="description" content="Enter your 6-digit session code to join an Edvana live session and answer instructor check-ins from any device." />
+        <link rel="canonical" href="https://edvana.dev/join-live" />
+        <meta property="og:title" content="Join a live Edvana session" />
+        <meta property="og:description" content="Enter a 6-digit code to join your instructor's live session." />
+        <meta property="og:url" content="https://edvana.dev/join-live" />
+      </Helmet>
       {/* Ambient glow */}
       <div aria-hidden="true" className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
       

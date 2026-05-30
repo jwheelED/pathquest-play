@@ -22,7 +22,7 @@ const MarketingLanding = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={edvanaLogo} alt="Edvana logo" className="h-8" />
+          <img src={edvanaLogo} alt="Edvana - Live Understanding Copilot" className="h-8" />
           <Button onClick={() => navigate("/")} variant="ghost" size="sm">
             Back to Home
           </Button>
@@ -69,6 +69,7 @@ const MarketingLanding = () => {
       {/* Feature Cards */}
       <section className="py-12 px-4 bg-muted/30">
         <div className="container mx-auto max-w-5xl">
+          <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-8">Features built for live teaching</h2>
           <div className="grid md:grid-cols-3 gap-6">
             <Card className="border-primary/20">
               <CardHeader className="pb-4">
@@ -118,6 +119,7 @@ const MarketingLanding = () => {
       {/* Testimonials */}
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-4xl">
+          <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-8">What people are saying</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="border-primary/20">
               <CardContent className="pt-6">
@@ -143,7 +145,7 @@ const MarketingLanding = () => {
       {/* Booth Flyer */}
       <section className="py-12 px-4 bg-muted/30">
         <div className="container mx-auto max-w-4xl text-center space-y-4">
-          <h3 className="text-xl font-semibold text-foreground">Event Materials</h3>
+          <h2 className="text-xl font-semibold text-foreground">Event Materials</h2>
           <p className="text-muted-foreground">View our booth flyer for your reference.</p>
           <Button variant="outline" size="lg" className="gap-2" onClick={() => navigate("/flyer")}>
             <FileText className="w-4 h-4" />
