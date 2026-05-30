@@ -145,7 +145,7 @@ const MarketingLanding = () => {
       {/* Booth Flyer */}
       <section className="py-12 px-4 bg-muted/30">
         <div className="container mx-auto max-w-4xl text-center space-y-4">
-          <h3 className="text-xl font-semibold text-foreground">Event Materials</h3>
+          <h2 className="text-xl font-semibold text-foreground">Event Materials</h2>
           <p className="text-muted-foreground">View our booth flyer for your reference.</p>
           <Button variant="outline" size="lg" className="gap-2" onClick={() => navigate("/flyer")}>
             <FileText className="w-4 h-4" />
