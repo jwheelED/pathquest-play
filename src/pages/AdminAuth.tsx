@@ -116,11 +116,16 @@ export default function AdminAuth() {
               .eq("role", "student")
               .maybeSingle();
 
+            // Only auto-promote on a fresh OAuth signup (within last 30s) — prevents
+            // an existing student from self-elevating to admin by visiting /admin/auth.
+            const sessionCreatedAt = new Date(session.user.created_at).getTime();
+            const isRecentSignup = (Date.now() - sessionCreatedAt) < 30000;
+
             // Detect fresh OAuth callback so we don't strand existing non-admin users on a dead screen
             const urlParams = new URLSearchParams(window.location.search);
             const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
 
-            if (studentRole && hasOAuthCallback) {
+            if (studentRole && hasOAuthCallback && isRecentSignup) {
               const { data: success } = await supabase
                 .rpc('assign_oauth_role', {
                   p_user_id: session.user.id,
