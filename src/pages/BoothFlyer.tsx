@@ -39,11 +39,9 @@ const BoothFlyer = () => {
               {/* Hero */}
               <div className="text-center space-y-3">
                 <div className="w-24 h-[2px] bg-[#388e6e] mx-auto" />
-                <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-                  Every Lecture.
-                </h1>
-                <h1 className="text-4xl md:text-6xl font-bold text-[#388e6e] leading-tight">
-                  Understood.
+                <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+                  <span className="text-white">Every Lecture.</span>{" "}
+                  <span className="text-[#388e6e]">Understood.</span>
                 </h1>
                 <p className="text-[#ededed] text-sm md:text-lg max-w-md mx-auto pt-2">
                   AI-powered lecture capture &amp; real-time assessments that
@@ -220,7 +218,7 @@ const BoothFlyer = () => {
               <div className="w-full bg-[#388e6e] rounded-md py-2 flex justify-center">
                 <img
                   src={edvanaLogo}
-                  alt="Edvana"
+                  alt="Edvana logo"
                   className="h-7 object-contain"
                 />
               </div>

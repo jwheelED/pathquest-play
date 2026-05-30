@@ -1,18 +1,28 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, Brain, BarChart3, FileText, GraduationCap, Presentation } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
+
 
 const MarketingLanding = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Learn more about Edvana — lecture capture for educators</title>
+        <meta name="description" content="See how Edvana turns every lecture into actionable insights with real-time transcription, AI check-ins, and analytics for instructors and students." />
+        <link rel="canonical" href="https://edvana.dev/learn-more" />
+        <meta property="og:title" content="Learn more about Edvana — lecture capture for educators" />
+        <meta property="og:description" content="See how Edvana turns every lecture into actionable insights with real-time transcription, AI check-ins, and analytics." />
+        <meta property="og:url" content="https://edvana.dev/learn-more" />
+      </Helmet>
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={edvanaLogo} alt="Edvana" className="h-8" />
+          <img src={edvanaLogo} alt="Edvana logo" className="h-8" />
           <Button onClick={() => navigate("/")} variant="ghost" size="sm">
             Back to Home
           </Button>
@@ -22,12 +32,13 @@ const MarketingLanding = () => {
       {/* Hero Section with Immediate CTA */}
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-4xl text-center space-y-6">
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
+          <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
             Turn Every Lecture Into{" "}
             <span className="bg-gradient-primary bg-clip-text text-transparent">
               Actionable Insights
             </span>
-          </h2>
+          </h1>
+
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Smart lecture capture and real-time assessments that help instructors teach smarter and students learn better.
           </p>

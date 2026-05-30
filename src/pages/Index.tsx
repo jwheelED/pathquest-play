@@ -119,7 +119,7 @@ const Index = () => {
           >
             <img
               src={edvanaLogo}
-              alt="Edvana"
+              alt="Edvana logo"
               className="h-7 transition-transform hover:scale-105"
             />
           </div>

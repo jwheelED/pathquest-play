@@ -35,12 +35,18 @@ const CorporateEvents = () => {
         }}
       >
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <img
-            src={edvanaLogo}
-            alt="Edvana"
-            className="h-8 cursor-pointer"
+          <button
+            type="button"
+            aria-label="Edvana home"
             onClick={() => navigate("/")}
-          />
+            className="bg-transparent border-0 p-0 cursor-pointer"
+          >
+            <img
+              src={edvanaLogo}
+              alt="Edvana logo"
+              className="h-8"
+            />
+          </button>
           <button
             onClick={() => navigate("/")}
             className="landing-secondary-btn inline-flex items-center gap-2 text-sm"
