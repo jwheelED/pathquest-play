@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { studentSignUpSchema, signInSchema } from "@/lib/validation";
