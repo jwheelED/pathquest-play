@@ -119,6 +119,7 @@ const MarketingLanding = () => {
       {/* Testimonials */}
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-4xl">
+          <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-8">What people are saying</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="border-primary/20">
               <CardContent className="pt-6">
