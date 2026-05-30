@@ -105,6 +105,10 @@ const Index = () => {
 
   return (
     <div className="landing-page min-h-screen">
+      <Helmet>
+        <link rel="canonical" href="https://edvana.dev/" />
+        <meta property="og:url" content="https://edvana.dev/" />
+      </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
       <header
         className="sticky top-0 z-50 backdrop-blur-xl"
