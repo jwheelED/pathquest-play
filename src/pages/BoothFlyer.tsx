@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-logo-copilot.png";
@@ -8,6 +9,14 @@ const BoothFlyer = () => {
 
   return (
     <div className="min-h-screen bg-[#ededed] py-8 px-4">
+      <Helmet>
+        <title>Edvana booth flyer — every lecture, understood</title>
+        <meta name="description" content="Printable one-page overview of Edvana: live lecture capture, AI check-ins, and analytics for instructors." />
+        <link rel="canonical" href="https://edvana.dev/flyer" />
+        <meta property="og:title" content="Edvana booth flyer — every lecture, understood" />
+        <meta property="og:description" content="Printable one-page overview of Edvana." />
+        <meta property="og:url" content="https://edvana.dev/flyer" />
+      </Helmet>
       <div className="max-w-[8.5in] mx-auto space-y-10">
         {/* Back button */}
         <Button
