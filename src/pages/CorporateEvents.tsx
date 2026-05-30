@@ -53,7 +53,7 @@ const CorporateEvents = () => {
           >
             <img
               src={edvanaLogo}
-              alt="Edvana logo"
+              alt="Edvana - Live Understanding Copilot"
               className="h-8"
             />
           </button>
