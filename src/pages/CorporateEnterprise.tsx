@@ -20,7 +20,7 @@ const CorporateEnterprise = () => {
       <header className="border-b border-border bg-card/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-            <img src={edvanaLogo} alt="Edvana logo" className="h-8" />
+            <img src={edvanaLogo} alt="Edvana - Live Understanding Copilot" className="h-8" />
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
