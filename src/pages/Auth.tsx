@@ -338,6 +338,15 @@ export default function AuthPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12" style={{ background: 'hsl(210, 20%, 98%)' }}>
+      <Helmet>
+        <title>Sign in to Edvana — student & instructor login</title>
+        <meta name="description" content="Sign in or create your Edvana account to join live sessions, run AI check-ins, and track learning progress in real time." />
+        <link rel="canonical" href="https://edvana.dev/auth" />
+        <meta property="og:title" content="Sign in to Edvana" />
+        <meta property="og:description" content="Access your Edvana account to join live sessions and track learning." />
+        <meta property="og:url" content="https://edvana.dev/auth" />
+      </Helmet>
+      <h1 className="sr-only">Sign in to Edvana</h1>
       {/* Ambient glows */}
       <div className="absolute top-[-15%] right-[25%] w-[450px] h-[450px] rounded-full opacity-[0.05] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 84%, 42%), transparent 70%)' }} />
       <div className="absolute bottom-[-10%] left-[30%] w-[350px] h-[350px] rounded-full opacity-[0.035] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(199, 89%, 60%), transparent 70%)' }} />
