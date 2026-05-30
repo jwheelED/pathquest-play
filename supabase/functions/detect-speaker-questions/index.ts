@@ -91,16 +91,56 @@ serve(async (req) => {
   }
 
   try {
+    // ── Auth: require instructor JWT ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const userId = claimsData.claims.sub as string;
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+
+    // Verify instructor role
+    const { data: isInstructor } = await supabaseClient.rpc("has_role", {
+      _user_id: userId,
+      _role: "instructor",
+    });
+    if (!isInstructor) {
+      return new Response(JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const { lecture_video_id, transcript_segments } = await req.json();
 
     if (!lecture_video_id || !Array.isArray(transcript_segments)) {
       return new Response(JSON.stringify({ error: "Missing lecture_video_id or transcript_segments" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Confirm the lecture belongs to this instructor
+    const { data: lecture, error: lecErr } = await supabaseClient
+      .from("lecture_videos")
+      .select("id, instructor_id")
+      .eq("id", lecture_video_id)
+      .maybeSingle();
+    if (lecErr || !lecture || lecture.instructor_id !== userId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     console.log(`[detect-speaker-questions] Processing ${transcript_segments.length} segments for lecture ${lecture_video_id}`);
