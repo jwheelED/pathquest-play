@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Block private app surfaces from indexing
+Disallow: /dashboard
+Disallow: /onboarding
+Disallow: /class/
+Disallow: /lecture/
+Disallow: /training
+Disallow: /instructor/
+Disallow: /admin/
+Disallow: /events/
+Disallow: /auth
+
+Sitemap: https://edvana.dev/sitemap.xml
