@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { Menu, X, ChevronDown } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
+
 
 const NAV_ITEMS = ["Product", "How It Works", "Use Cases", "Results", "Demo"];
 
@@ -103,6 +105,10 @@ const Index = () => {
 
   return (
     <div className="landing-page min-h-screen">
+      <Helmet>
+        <link rel="canonical" href="https://edvana.dev/" />
+        <meta property="og:url" content="https://edvana.dev/" />
+      </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
       <header
         className="sticky top-0 z-50 backdrop-blur-xl"
@@ -119,7 +125,7 @@ const Index = () => {
           >
             <img
               src={edvanaLogo}
-              alt="Edvana"
+              alt="Edvana logo"
               className="h-7 transition-transform hover:scale-105"
             />
           </div>

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -24,6 +25,14 @@ const AccessibilityStatement = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Accessibility Statement — Edvana</title>
+        <meta name="description" content="Edvana's commitment to WCAG 2.1 AA accessibility, supported assistive technologies, and how to report accessibility issues." />
+        <link rel="canonical" href="https://edvana.dev/accessibility" />
+        <meta property="og:title" content="Accessibility Statement — Edvana" />
+        <meta property="og:description" content="Edvana's accessibility commitments and standards." />
+        <meta property="og:url" content="https://edvana.dev/accessibility" />
+      </Helmet>
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <img
