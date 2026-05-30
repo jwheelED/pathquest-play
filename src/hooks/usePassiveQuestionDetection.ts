@@ -1,26 +1,6 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
-import {
-  extractQuestions,
-  hasInterrogativeTrigger,
-  isRhetorical,
-  wordCount,
-  MIN_WORD_COUNT,
-  RHETORICAL_BLOCKLIST,
-  GREETING_PATTERNS,
-  TRIGGER_PATTERNS,
-} from '../../supabase/functions/_shared/questionDetection';
 
-// Re-export the canonical detection helpers so existing imports keep working
-// and tests can exercise them via the hook module path.
-export {
-  extractQuestions,
-  hasInterrogativeTrigger,
-  isRhetorical,
-  wordCount,
-  RHETORICAL_BLOCKLIST,
-  GREETING_PATTERNS,
-  TRIGGER_PATTERNS,
-};
+const MIN_WORD_COUNT = 4;
 
 export interface PassiveQuestionCandidate {
   text: string;
@@ -52,7 +32,7 @@ interface UsePassiveQuestionDetectionOptions {
 }
 
 // Rhetorical / filler questions to ignore (normalized lowercase, no trailing ?)
-const RHETORICAL_BLOCKLIST = [
+export const RHETORICAL_BLOCKLIST = [
   'right',
   'okay',
   'ok',
@@ -129,7 +109,7 @@ const RHETORICAL_BLOCKLIST = [
 ];
 
 // Greeting patterns that should never be treated as audience checks
-const GREETING_PATTERNS = [
+export const GREETING_PATTERNS = [
   /^how('?s| is) everyone/i,
   /^how('?s| is) everybody/i,
   /^how('?s| are) (you|y'all|ya'll|yall) (all )?(doing|today|this|feeling)/i,
@@ -148,7 +128,7 @@ const GREETING_PATTERNS = [
 // Interrogative trigger patterns — broadened to fire on any word following the
 // WH-word. Rhetorical/greeting blocklists + minWordCount continue to filter
 // out conversational filler.
-const TRIGGER_PATTERNS = [
+export const TRIGGER_PATTERNS = [
   /\bwhat\s+\w+/i,
   /\bwhy\s+\w+/i,
   /\bhow\s+\w+/i,
@@ -169,11 +149,11 @@ const TRIGGER_PATTERNS = [
   /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
 ];
 
-function hasInterrogativeTrigger(text: string): boolean {
+export function hasInterrogativeTrigger(text: string): boolean {
   return TRIGGER_PATTERNS.some(p => p.test(text));
 }
 
-function extractQuestions(text: string): string[] {
+export function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized.includes('?') && !normalized.includes('？')) return [];
 
@@ -196,7 +176,7 @@ function extractQuestions(text: string): string[] {
   return questions;
 }
 
-function isRhetorical(question: string): boolean {
+export function isRhetorical(question: string): boolean {
   const normalized = question
     .replace(/[?？]+$/, '')
     .trim()
@@ -221,7 +201,7 @@ function isRhetorical(question: string): boolean {
   return false;
 }
 
-function wordCount(text: string): number {
+export function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
@@ -236,6 +216,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     lastQuestionSentTime = 0,
     minTranscriptConfidence = 0.8,
     trailingSilenceMs = 700,
+    maxPendingMs = 4000,
     debug = true,
   } = options;
 
@@ -448,6 +429,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       };
       if (debug) console.log('✅ [passive] accepted vetted candidate:', text);
       pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
       setPendingStartedAt(now);
 
