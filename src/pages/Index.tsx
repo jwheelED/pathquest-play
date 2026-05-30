@@ -130,7 +130,11 @@ const Index = () => {
             <img
               src={edvanaLogo}
               alt="Edvana - Live Understanding Copilot"
-              className="h-7 transition-transform hover:scale-105"
+              width={140}
+              height={28}
+              fetchPriority="high"
+              decoding="async"
+              className="h-7 w-auto transition-transform hover:scale-105"
             />
           </div>
 
