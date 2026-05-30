@@ -1,4 +1,26 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import {
+  extractQuestions,
+  hasInterrogativeTrigger,
+  isRhetorical,
+  wordCount,
+  MIN_WORD_COUNT,
+  RHETORICAL_BLOCKLIST,
+  GREETING_PATTERNS,
+  TRIGGER_PATTERNS,
+} from '../../supabase/functions/_shared/questionDetection';
+
+// Re-export the canonical detection helpers so existing imports keep working
+// and tests can exercise them via the hook module path.
+export {
+  extractQuestions,
+  hasInterrogativeTrigger,
+  isRhetorical,
+  wordCount,
+  RHETORICAL_BLOCKLIST,
+  GREETING_PATTERNS,
+  TRIGGER_PATTERNS,
+};
 
 export interface PassiveQuestionCandidate {
   text: string;
@@ -24,6 +46,8 @@ interface UsePassiveQuestionDetectionOptions {
   minTranscriptConfidence?: number;
   /** Trailing silence (ms) required after question before promoting pending -> visible candidate. */
   trailingSilenceMs?: number;
+  /** Hard cap on how long a pending candidate may wait before being force-promoted. */
+  maxPendingMs?: number;
   debug?: boolean;
 }
 
@@ -207,7 +231,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const {
     enabled = true,
     cooldownMs = 15000,
-    minWordCount = 6,
+    minWordCount = MIN_WORD_COUNT,
     autoDismissMs = 30000,
     lastQuestionSentTime = 0,
     minTranscriptConfidence = 0.8,
@@ -218,16 +242,22 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const lastDetectionTimeRef = useRef<number>(0);
   const lastQuestionSentTimeRef = useRef<number>(lastQuestionSentTime);
   const [candidate, setCandidate] = useState<PassiveQuestionCandidate | null>(null);
+  const candidateRef = useRef<PassiveQuestionCandidate | null>(null);
   const [candidateHistory, setCandidateHistory] = useState<PassiveQuestionCandidate[]>([]);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Pending candidate — waiting for trailing silence before being promoted
   const pendingRef = useRef<PassiveQuestionCandidate | null>(null);
+  const pendingStartedAtRef = useRef<number>(0);
   const [pendingCandidate, setPendingCandidate] = useState<PassiveQuestionCandidate | null>(null);
   const [pendingStartedAt, setPendingStartedAt] = useState<number>(0);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   lastQuestionSentTimeRef.current = lastQuestionSentTime;
+
+  useEffect(() => {
+    candidateRef.current = candidate;
+  }, [candidate]);
 
   const clearAutoDismiss = useCallback(() => {
     if (autoDismissTimerRef.current) {
@@ -257,6 +287,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     const p = pendingRef.current;
     if (!p) return;
     pendingRef.current = null;
+    pendingStartedAtRef.current = 0;
     setPendingCandidate(null);
     setPendingStartedAt(0);
 
@@ -296,12 +327,22 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
    * Notify the detector that the instructor is currently speaking (a new transcript chunk
    * arrived). If we have a pending candidate waiting on trailing silence, this resets
    * the silence timer — preventing premature promotion when the instructor keeps talking.
+   *
+   * If the pending candidate has been waiting longer than maxPendingMs, force-promote
+   * instead of resetting — otherwise a continuously-talking instructor would let a
+   * stale question sit indefinitely.
    */
   const notifySpeech = useCallback(() => {
     if (!pendingRef.current) return;
+    const age = Date.now() - pendingStartedAtRef.current;
+    if (age >= maxPendingMs) {
+      if (debug) console.log(`🔂 [passive] pending exceeded maxPendingMs (${age}ms ≥ ${maxPendingMs}) — force-promoting`);
+      promotePending();
+      return;
+    }
     if (debug) console.log('🔄 [passive] speech detected, resetting trailing-silence timer');
     armSilenceTimer();
-  }, [armSilenceTimer, debug]);
+  }, [armSilenceTimer, debug, maxPendingMs, promotePending]);
 
   const checkUtterance = useCallback((
     text: string,
@@ -323,8 +364,15 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
     if (debug) console.log('🔍 [passive] checking utterance:', text.substring(0, 80), { confidence });
 
-    if (now - lastDetectionTimeRef.current < cooldownMs) {
-      if (debug) console.log('🔍 [passive] skipped — cooldown active');
+    // Cooldown only applies if there's actually a visible candidate on screen.
+    // If the prior candidate was dismissed or auto-expired, a fresh question
+    // should be allowed to surface immediately — otherwise we drop the question
+    // the instructor actually wants answered.
+    if (
+      candidateRef.current &&
+      now - lastDetectionTimeRef.current < cooldownMs
+    ) {
+      if (debug) console.log('🔍 [passive] skipped — cooldown active and candidate visible');
       return;
     }
 
@@ -372,6 +420,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
       // Replace any existing pending candidate with the newer/longer one and re-arm timer
       pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
       setPendingStartedAt(now);
       armSilenceTimer();
@@ -420,6 +469,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     clearAutoDismiss();
     clearSilenceTimer();
     pendingRef.current = null;
+    pendingStartedAtRef.current = 0;
     setPendingCandidate(null);
     setPendingStartedAt(0);
     setCandidate(null);
