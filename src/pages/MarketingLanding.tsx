@@ -69,6 +69,7 @@ const MarketingLanding = () => {
       {/* Feature Cards */}
       <section className="py-12 px-4 bg-muted/30">
         <div className="container mx-auto max-w-5xl">
+          <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-8">Features built for live teaching</h2>
           <div className="grid md:grid-cols-3 gap-6">
             <Card className="border-primary/20">
               <CardHeader className="pb-4">
