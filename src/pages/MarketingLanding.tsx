@@ -22,7 +22,7 @@ const MarketingLanding = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={edvanaLogo} alt="Edvana logo" className="h-8" />
+          <img src={edvanaLogo} alt="Edvana - Live Understanding Copilot" className="h-8" />
           <Button onClick={() => navigate("/")} variant="ghost" size="sm">
             Back to Home
           </Button>
