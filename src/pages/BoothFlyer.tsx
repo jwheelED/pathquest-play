@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-logo-copilot.png";
@@ -8,6 +9,14 @@ const BoothFlyer = () => {
 
   return (
     <div className="min-h-screen bg-[#ededed] py-8 px-4">
+      <Helmet>
+        <title>Edvana booth flyer — every lecture, understood</title>
+        <meta name="description" content="Printable one-page overview of Edvana: live lecture capture, AI check-ins, and analytics for instructors." />
+        <link rel="canonical" href="https://edvana.dev/flyer" />
+        <meta property="og:title" content="Edvana booth flyer — every lecture, understood" />
+        <meta property="og:description" content="Printable one-page overview of Edvana." />
+        <meta property="og:url" content="https://edvana.dev/flyer" />
+      </Helmet>
       <div className="max-w-[8.5in] mx-auto space-y-10">
         {/* Back button */}
         <Button
@@ -39,11 +48,9 @@ const BoothFlyer = () => {
               {/* Hero */}
               <div className="text-center space-y-3">
                 <div className="w-24 h-[2px] bg-[#388e6e] mx-auto" />
-                <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-                  Every Lecture.
-                </h1>
-                <h1 className="text-4xl md:text-6xl font-bold text-[#388e6e] leading-tight">
-                  Understood.
+                <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+                  <span className="text-white">Every Lecture.</span>{" "}
+                  <span className="text-[#388e6e]">Understood.</span>
                 </h1>
                 <p className="text-[#ededed] text-sm md:text-lg max-w-md mx-auto pt-2">
                   AI-powered lecture capture &amp; real-time assessments that
@@ -220,7 +227,7 @@ const BoothFlyer = () => {
               <div className="w-full bg-[#388e6e] rounded-md py-2 flex justify-center">
                 <img
                   src={edvanaLogo}
-                  alt="Edvana"
+                  alt="Edvana logo"
                   className="h-7 object-contain"
                 />
               </div>

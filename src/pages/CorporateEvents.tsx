@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { ArrowLeft, Check } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
+
 
 /* ── Pricing data ── */
 const SELF_SERVE_CAPACITIES = ["Up to 50", "Up to 150", "Up to 300"] as const;
@@ -26,6 +28,14 @@ const CorporateEvents = () => {
 
   return (
     <div className="landing-page min-h-screen">
+      <Helmet>
+        <title>Edvana for Corporate Events — live engagement & analytics</title>
+        <meta name="description" content="Run conferences and corporate events with live transcription, audience check-ins, and post-event analytics. Self-serve and premium pricing available." />
+        <link rel="canonical" href="https://edvana.dev/corporate/events" />
+        <meta property="og:title" content="Edvana for Corporate Events — live engagement & analytics" />
+        <meta property="og:description" content="Live transcription, audience check-ins, and analytics for conferences and corporate events." />
+        <meta property="og:url" content="https://edvana.dev/corporate/events" />
+      </Helmet>
       {/* ── Header ── */}
       <header
         className="sticky top-0 z-20 border-b backdrop-blur-sm"
@@ -35,12 +45,18 @@ const CorporateEvents = () => {
         }}
       >
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <img
-            src={edvanaLogo}
-            alt="Edvana"
-            className="h-8 cursor-pointer"
+          <button
+            type="button"
+            aria-label="Edvana home"
             onClick={() => navigate("/")}
-          />
+            className="bg-transparent border-0 p-0 cursor-pointer"
+          >
+            <img
+              src={edvanaLogo}
+              alt="Edvana - Live Understanding Copilot"
+              className="h-8"
+            />
+          </button>
           <button
             onClick={() => navigate("/")}
             className="landing-secondary-btn inline-flex items-center gap-2 text-sm"

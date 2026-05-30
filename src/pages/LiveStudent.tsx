@@ -19,6 +19,7 @@ import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { trackQuestionAnswered } from "@/lib/posthogTracking";
+import { EdvanaAnswerCelebration } from "@/components/student/EdvanaAnswerCelebration";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Question {
@@ -65,6 +66,8 @@ const LiveStudent = () => {
   const [sessionTotalXP, setSessionTotalXP] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [showXPPulse, setShowXPPulse] = useState(false);
+  const [celebrationTrigger, setCelebrationTrigger] = useState<number | null>(null);
+  const [celebrationCorrect, setCelebrationCorrect] = useState(false);
 
   // AI Explanation state
   const [showExplanation, setShowExplanation] = useState(false);
@@ -389,6 +392,8 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
+        setCelebrationCorrect(!!responseData.isCorrect);
+        setCelebrationTrigger(Date.now());
         if (responseData.isCorrect) {
           toast.success(`Correct! +${responseData.pointsEarned} XP 🎉`);
         } else {
@@ -545,6 +550,8 @@ const LiveStudent = () => {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
         } else if (responseData.aiGrade !== null) {
           const gradeText = `${responseData.aiGrade}%`;
+          setCelebrationCorrect(responseData.aiGrade >= 70);
+          setCelebrationTrigger(Date.now());
           if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
           } else if (responseData.aiGrade >= 50) {
@@ -656,6 +663,8 @@ const LiveStudent = () => {
         
         if (responseData.aiGrade !== null) {
           const gradeText = `${responseData.aiGrade}%`;
+          setCelebrationCorrect(responseData.aiGrade >= 70);
+          setCelebrationTrigger(Date.now());
           if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
           } else if (responseData.aiGrade >= 50) {
@@ -725,6 +734,11 @@ const LiveStudent = () => {
 
   return (
     <main id="main-content" aria-label="Live session question" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+      <EdvanaAnswerCelebration
+        trigger={celebrationTrigger}
+        isCorrect={celebrationCorrect}
+        multiplier={confidenceMultiplier}
+      />
       {/* Session XP Tracker - Fixed top right */}
       {questionsAnswered > 0 && (
         <div

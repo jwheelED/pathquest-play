@@ -79,8 +79,15 @@ function validateAnswer(
     return { ok: true };
   }
 
-  // 2. No citation provided. Score every option against the transcript and
-  //    require the chosen one to be at least tied-best (within 0.05 of the max).
+  // 2. No citation provided. If the transcript is too short to reliably score
+  //    overlap, skip validation — the overlap heuristic produces too many
+  //    false rejects below ~400 chars and triggers a needless Pro retry.
+  if (transcript.length < 400) {
+    return { ok: true };
+  }
+
+  // Score every option against the transcript and require the chosen one to
+  // be at least tied-best (within 0.15 of the max).
   const scores = result.options.map(opt => tokenOverlap(opt, transcript));
   const maxScore = Math.max(...scores);
   const correctScore = scores[idx];
@@ -279,10 +286,8 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
       return res;
     }
 
-    // R2 — default to Gemini 2.5 Flash for the primary call. Reserve
-    // 2.5 Pro for the validator-retry path only (a 2.5 Pro tool-call with
-    // 6KB context routinely takes 20–60s; the two-call worst case was the
-    // dominant contributor to the observed ~90s "preparing" hang).
+    // Always start with Flash — ~2-3s vs Pro's ~8-12s, and plenty capable for
+    // a 4-option MCQ. The validator will escalate to Pro on the rare retry.
     const primaryModel = 'google/gemini-2.5-flash';
 
     const primaryStart = performance.now();

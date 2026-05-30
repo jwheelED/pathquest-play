@@ -34,14 +34,15 @@ const RHETORICAL_BLOCKLIST = [
 // someone explain...", "do you know..."). These match anywhere in the utterance,
 // not just at the start, so detection is far less brittle.
 const TRIGGER_PATTERNS = [
-  // Classic WH questions
-  /\bwhat\s+(is|are|was|were|do|does|did|would|could|should|about|happens|happened|causes|type|kind|percentage|number|part|if|makes|caused)\b/i,
-  /\bwhy\s+(is|are|do|does|did|would|can|could|should|might|don'?t|doesn'?t|didn'?t)\b/i,
-  /\bhow\s+(many|much|do|does|did|is|are|would|could|can|should|long|often|far|come|might)\b/i,
-  /\bwhen\s+(is|are|do|does|did|would|was|were|can|should|will|might)\b/i,
-  /\bwhere\s+(is|are|do|does|did|would|was|were|can|will|might)\b/i,
-  /\bwho\s+(is|are|was|were|does|did|would|can|could|should|discovered|invented|proposed|made|wrote|said)\b/i,
-  /\bwhich\s+(one|of|is|are|type|kind|part|organ|bone|cell|structure|process|method|step|stage|phase|option|choice)\b/i,
+  // Classic WH questions — broadened to fire on any following word.
+  // The semantic completion gate + rhetorical blocklists prevent false positives.
+  /\bwhat\s+\w+/i,
+  /\bwhy\s+\w+/i,
+  /\bhow\s+\w+/i,
+  /\bwhen\s+\w+/i,
+  /\bwhere\s+\w+/i,
+  /\bwho\s+\w+/i,
+  /\bwhich\s+\w+/i,
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
@@ -50,7 +51,20 @@ const TRIGGER_PATTERNS = [
   // "What if X?" / "What happens when X?" style
   /\bwhat\s+would\s+happen\b/i,
   /\bsuppose\s+that\b/i,
+  // Subject-aux inversion (yes/no & A-or-B questions). Aux must be followed by
+  // a pronoun/determiner/quantifier typical of question subjects to avoid
+  // matching declaratives like "There are two genes…".
+  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
+  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
+  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
 ];
+
+// Subordinators that introduce a premise clause preceding the interrogative
+// (e.g., "If a cell has X, what happens?"). When the chunk before the trigger
+// starts with one of these AND is within the same breath, we include it as
+// part of the question rather than demoting it to priorContext.
+const PREMISE_SUBORDINATORS = /^(if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as)\b/i;
 
 // Topic-shift markers — when scanning back for context, stop at these.
 const TOPIC_SHIFT_MARKERS = [
@@ -256,15 +270,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     silenceGapMs = 1500,
     bufferWindowMs = 90000,
     lookbackMs = 45000,
-    completionTimeoutMs = 3500,
-    minHoldMs = 600,
+    completionTimeoutMs = 2000,
+    minHoldMs = 400,
     maxBufferChars = 10000,
     enableCompletionGate = true,
-    extensionMs = 1500,
+    extensionMs = 800,
     maxExtensions = 1,
     minCompleteWords = 6,
     softCompleteMs = 2500,
-    minSilenceMs = 900,
+    minSilenceMs = 700,
     debug = true,
   } = options;
 
@@ -404,7 +418,42 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
     const contextParts = [contextChunks.map(c => c.text).join(' ').trim(), triggerChunkPrefix]
       .filter(Boolean);
-    const context = contextParts.join(' ').trim();
+    let context = contextParts.join(' ').trim();
+
+    // Premise-clause rescue: if the tail of `context` is a subordinate clause
+    // belonging to the same question (e.g. "If a cell has high SA:V ratio,"
+    // immediately before "what advantage..."), promote it into `question`.
+    //
+    // Conditions:
+    //  - The "premise tail" is the text after the last sentence-terminator
+    //    (./?/!) in context. If there is none, the whole context is the tail.
+    //  - The tail must either (a) end with a comma OR (b) start with a known
+    //    subordinator (if/when/given/...).
+    //  - The chunk immediately before the trigger must be within
+    //    CHUNK_GAP_BOUNDARY_MS of the trigger chunk (same breath).
+    if (context && triggerChunkIdx > 0) {
+      const gapToTrigger =
+        relevantChunks[triggerChunkIdx].timestamp - relevantChunks[triggerChunkIdx - 1].timestamp;
+      if (gapToTrigger <= CHUNK_GAP_BOUNDARY_MS) {
+        const lastTerm = Math.max(
+          context.lastIndexOf('.'),
+          context.lastIndexOf('?'),
+          context.lastIndexOf('!'),
+        );
+        const tail = (lastTerm >= 0 ? context.slice(lastTerm + 1) : context).trim();
+        const tailEndsWithComma = /,\s*$/.test(tail);
+        const tailStartsWithSubordinator = PREMISE_SUBORDINATORS.test(tail);
+
+        if (tail && (tailEndsWithComma || tailStartsWithSubordinator)) {
+          // Move the tail to the front of question; keep earlier text as context.
+          const newContext = (lastTerm >= 0 ? context.slice(0, lastTerm + 1) : '').trim();
+          // Ensure a comma separator between premise and trigger word.
+          const premise = tailEndsWithComma ? tail : `${tail.replace(/[,;:]+$/, '')},`;
+          question = `${premise} ${question}`.replace(/\s+/g, ' ').trim();
+          context = newContext;
+        }
+      }
+    }
 
     return { question: question || combined, context };
   }, [lookbackMs]);
@@ -576,7 +625,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     if (pendingTriggerRef.current) {
       const pending = pendingTriggerRef.current;
       const heldFor = now - pending.armedAt;
+      const hasQuestionMark = /\?\s*$/.test(text.trim());
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
+
+      // Fast path: explicit "?" → skip min-silence wait, finalize now.
+      if (hasQuestionMark && !isFinalizingRef.current) {
+        if (debug) console.log(`🎯 [trigger-capture] "?" sentence-end after ${heldFor}ms hold, fast-finalize`);
+        finalizeCapture(now, true);
+        return false;
+      }
 
       if (hasSentenceEnd && heldFor >= minHoldMs && !isFinalizingRef.current) {
         if (debug) console.log(`🎯 [trigger-capture] sentence-end after ${heldFor}ms hold, finalizing`);

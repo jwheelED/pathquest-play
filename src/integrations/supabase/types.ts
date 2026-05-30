@@ -4297,6 +4297,13 @@ export type Database = {
           warning_level: string
         }[]
       }
+      get_org_codes: {
+        Args: { _org_id: string }
+        Returns: {
+          admin_code: string
+          instructor_invite_code: string
+        }[]
+      }
       get_problem_answer: {
         Args: { problem_id: string }
         Returns: {

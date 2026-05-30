@@ -1,25 +1,36 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ArrowLeft, Shield } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
+
 const PrivacyPolicy = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Privacy Policy — Edvana</title>
+        <meta name="description" content="How Edvana collects, uses, shares, and protects student, instructor, and institutional data. FERPA and COPPA compliance details included." />
+        <link rel="canonical" href="https://edvana.dev/privacy" />
+        <meta property="og:title" content="Privacy Policy — Edvana" />
+        <meta property="og:description" content="How Edvana collects, uses, and protects user data, including FERPA and COPPA compliance." />
+        <meta property="og:url" content="https://edvana.dev/privacy" />
+      </Helmet>
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={edvanaLogo} alt="Edvana" className="h-8 cursor-pointer" onClick={() => navigate("/")} />
+          <img src={edvanaLogo} alt="Edvana logo" className="h-8 cursor-pointer" onClick={() => navigate("/")} />
           <Button onClick={() => navigate("/")} variant="ghost" size="sm">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
         </div>
       </header>
+
 
       {/* Content */}
       <main className="container mx-auto px-4 py-12 max-w-4xl">
@@ -43,6 +54,7 @@ const PrivacyPolicy = () => {
           </CardContent>
         </Card>
 
+        <h2 className="text-2xl font-semibold text-foreground mb-4">Policy Details</h2>
         <Accordion type="single" collapsible className="space-y-4">
           <AccordionItem value="information-collected" className="border rounded-lg px-4">
             <AccordionTrigger className="text-lg font-semibold">1. Information We Collect</AccordionTrigger>
