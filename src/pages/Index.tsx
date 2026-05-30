@@ -129,7 +129,7 @@ const Index = () => {
           >
             <img
               src={edvanaLogo}
-              alt="Edvana logo"
+              alt="Edvana - Live Understanding Copilot"
               className="h-7 transition-transform hover:scale-105"
             />
           </div>
