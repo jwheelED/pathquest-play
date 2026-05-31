@@ -49,11 +49,11 @@ const PREMISE_SUBORDINATOR_SOURCE =
   'if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as|considering';
 const PREMISE_SUBORDINATORS = new RegExp(`^(${PREMISE_SUBORDINATOR_SOURCE})\\b`, 'i');
 // Premise-comma start: a hard sentence boundary (or buffer start), then a
-// subordinator-led clause, then a comma, then (optionally) discourse markers.
-// Anything between the subordinator and the comma must NOT cross another hard
-// terminator, otherwise we'd glue unrelated sentences together.
-const PREMISE_COMMA_START =
-  `(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]*?,\\s+${DISCOURSE_MARKERS}`;
+// subordinator-led clause, then a comma. Implemented as a lookbehind so the
+// match index lands on the WH-word — the premise is preserved in the buffer
+// and recovered by the premise-rescue logic in getSliceAroundTrigger.
+const PREMISE_COMMA_LOOKBEHIND =
+  `(?<=(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]{0,400}?,\\s+)`;
 const WH_WORDS = '(what|why|how|when|where|who|whom|whose|which)';
 const TRIGGER_PATTERNS = [
   // Classic WH questions — hard clause-start anchored, optional discourse markers.
