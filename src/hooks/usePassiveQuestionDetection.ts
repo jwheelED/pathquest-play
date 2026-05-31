@@ -392,6 +392,14 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         if (debug) console.log(`🔍 [passive] skipped "${q}" — too short (${wc} words < ${minWordCount})`);
         continue;
       }
+      if (wc > MAX_WORD_COUNT) {
+        if (debug) console.log(`🔍 [passive] skipped "${q.substring(0, 60)}…" — too long (${wc} words > ${MAX_WORD_COUNT}, likely monologue)`);
+        continue;
+      }
+      if (looksLikeMonologue(q)) {
+        if (debug) console.log(`🔍 [passive] skipped "${q.substring(0, 60)}…" — looks like monologue (multiple sentences)`);
+        continue;
+      }
       if (isRhetorical(q)) {
         if (debug) console.log(`🔍 [passive] skipped "${q}" — rhetorical`);
         continue;
