@@ -185,6 +185,56 @@ describe("hasInterrogativeTrigger", () => {
   });
 });
 
+  it("rejects a mid-sentence WH-word inside a declarative paragraph", () => {
+    // Regression: previously `\\bhow\\s+\\w+` matched "how they" mid-paragraph.
+    expect(
+      hasInterrogativeTrigger(
+        "and how dangerous certain bacterial components can be"
+      )
+    ).toBe(false);
+    expect(
+      hasInterrogativeTrigger(
+        "before we go deeper, remember this phrase. gram positive is thick peptidoglycan"
+      )
+    ).toBe(false);
+  });
+
+  it("still matches a WH-word at the start of the string", () => {
+    expect(hasInterrogativeTrigger("How dangerous is this?")).toBe(true);
+  });
+
+  it("matches a WH-word right after a sentence terminator", () => {
+    expect(
+      hasInterrogativeTrigger("That covers cells. What happens to the electron?")
+    ).toBe(true);
+  });
+});
+
+describe("looksLikeMonologue", () => {
+  // Regression for the three false-positive captures shown in the screenshots:
+  // multi-sentence teaching prose ending in an intonation-driven "?".
+  it("flags the 'Is this. Both types of bacteria…' blob as monologue", () => {
+    expect(
+      looksLikeMonologue(
+        "Is this. Both types of bacteria have a cell membrane and a cell wall?"
+      )
+    ).toBe(true);
+  });
+
+  it("flags the 'How they stain… peptidoglycan?' blob as monologue", () => {
+    expect(
+      looksLikeMonologue(
+        "How they stain, how they interact with antibiotics, and how dangerous certain bacterial components can be. Before we go deeper, remember this phrase. Gram positive is thick peptidoglycan?"
+      )
+    ).toBe(true);
+  });
+
+  it("does not flag a normal single-sentence question", () => {
+    expect(looksLikeMonologue("What happens to the electron?")).toBe(false);
+    expect(looksLikeMonologue("How many protons are in a carbon atom?")).toBe(false);
+  });
+});
+
 describe("isRhetorical — precedence", () => {
   it("rejects 'what do you think?' even though it starts with `what`", () => {
     // Regression: server used to short-circuit on leading interrogative and
