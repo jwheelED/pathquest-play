@@ -111,7 +111,7 @@ export const TRIGGER_PATTERNS = [
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
+  // NOTE: "suppose that" intentionally NOT a trigger — premise subordinator only.
 ];
 
 // Leading filler that may sit between the clause start and the WH-word
