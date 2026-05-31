@@ -471,14 +471,25 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         if (debug) console.log('🛑 [passive] vetted candidate rejected — looks like monologue');
         return;
       }
+      // Enforce interrogative trigger even on vetted candidates — defends against
+      // declaratives that Deepgram tagged with "?" based on rising intonation
+      // (e.g. "Today, we'll be talking about osmosis?").
+      if (!hasInterrogativeTrigger(text)) {
+        if (debug) console.log('🛑 [passive] vetted candidate rejected — no interrogative trigger:', text);
+        return;
+      }
+      const cleaned = stripLeadingFiller(text);
+      const displayed = cleaned.length > 0
+        ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1))
+        : text;
       const now = Date.now();
       const newCandidate: PassiveQuestionCandidate = {
-        text,
+        text: displayed,
         detectedAt: now,
         id: `tq-${++candidateIdCounter}`,
         priorContext: priorContext || undefined,
       };
-      if (debug) console.log('✅ [passive] accepted vetted candidate:', text);
+      if (debug) console.log('✅ [passive] accepted vetted candidate:', displayed);
       pendingRef.current = newCandidate;
       pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
@@ -486,7 +497,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
       // Fast path: text already ends with "?" → promote immediately,
       // skip trailing-silence wait.
-      if (/\?\s*$/.test(text.trim())) {
+      if (/\?\s*$/.test(displayed.trim())) {
         if (debug) console.log('⚡ [passive] "?" detected → promote without silence wait');
         clearSilenceTimer();
         promotePending();
