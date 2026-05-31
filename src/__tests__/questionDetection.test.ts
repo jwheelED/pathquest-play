@@ -4,6 +4,7 @@ import {
   isRhetorical,
   wordCount,
   hasInterrogativeTrigger,
+  looksLikeMonologue,
 } from "@/hooks/usePassiveQuestionDetection";
 
 /**
