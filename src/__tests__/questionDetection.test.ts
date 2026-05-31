@@ -183,7 +183,8 @@ describe("hasInterrogativeTrigger", () => {
     expect(hasInterrogativeTrigger("what")).toBe(false);
     expect(hasInterrogativeTrigger("why")).toBe(false);
   });
-});
+
+
 
   it("rejects a mid-sentence WH-word inside a declarative paragraph", () => {
     // Regression: previously `\\bhow\\s+\\w+` matched "how they" mid-paragraph.
