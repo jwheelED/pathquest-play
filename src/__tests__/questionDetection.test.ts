@@ -210,6 +210,25 @@ describe("hasInterrogativeTrigger", () => {
     ).toBe(true);
   });
 
+  it("does NOT match a bare premise clause starting with 'Suppose that'", () => {
+    // Regression: "Suppose that an array is already sorted" used to fire as a
+    // standalone question, burning the cooldown before the real question
+    // ("which search algorithm would you pick?") could be captured.
+    expect(
+      hasInterrogativeTrigger("Suppose that an array is already sorted")
+    ).toBe(false);
+    expect(
+      hasInterrogativeTrigger("Suppose that the temperature increases")
+    ).toBe(false);
+  });
+
+  it("still matches the real WH-question that follows a 'Suppose' premise", () => {
+    expect(
+      hasInterrogativeTrigger(
+        "Suppose that an array is already sorted, which search algorithm would you pick?"
+      )
+    ).toBe(true);
+
   it("matches WH-questions led by discourse fillers (So/Well/Now/Okay)", () => {
     // Regression: instructors often introduce a question with "So why…".
     // Previously the clause-start anchor rejected these because the WH-word
