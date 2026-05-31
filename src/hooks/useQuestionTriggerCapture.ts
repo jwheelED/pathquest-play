@@ -44,7 +44,9 @@ const TRIGGER_PATTERNS = [
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
+  // NOTE: "suppose that" is intentionally NOT a trigger — it's a PREMISE
+  // subordinator (handled below), not a question stem. The real question
+  // follows ("Suppose X, what would Y do?").
   // Subject-aux inversion (yes/no & A-or-B questions) — clause-start anchored.
   new RegExp(`${CLAUSE_START}(is|are|was|were|am)\\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\\b`, 'i'),
   new RegExp(`${CLAUSE_START}(do|does|did)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\\b`, 'i'),
