@@ -131,7 +131,7 @@ export const GREETING_PATTERNS = [
 // Leading filler that may sit between the clause start and the WH-word
 // ("So why…", "And how…", "Well, what…"). Stripped before trigger checks
 // and from the displayed candidate text so the on-deck card reads cleanly.
-export const FILLER_PREFIXES = /^(so+|um+|uh+|like|well|okay so|okay|ok|now|and so|and|but|or)[\s,]+/i;
+export const FILLER_PREFIXES = /^(so+|um+|uh+|well|okay so|okay|ok|now)[\s,]+/i;
 
 export function stripLeadingFiller(text: string): string {
   let out = text.trim();
