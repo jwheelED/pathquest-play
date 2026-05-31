@@ -228,6 +228,9 @@ describe("hasInterrogativeTrigger", () => {
         "Suppose that an array is already sorted, which search algorithm would you pick?"
       )
     ).toBe(true);
+  });
+
+
 
   it("matches WH-questions led by discourse fillers (So/Well/Now/Okay)", () => {
     // Regression: instructors often introduce a question with "So why…".
