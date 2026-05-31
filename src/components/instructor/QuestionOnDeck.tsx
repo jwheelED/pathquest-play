@@ -286,39 +286,6 @@ export function QuestionOnDeck({
     setBankMatch(null);
 
     try {
-      // 1) First try to match against the instructor's question bank.
-      try {
-        const { data: matchData } = await supabase.functions.invoke('match-bank-question', {
-          body: { question_text: questionText, course_id: courseId ?? null, format },
-        });
-        const m = matchData?.match;
-        if (m && m.question_content) {
-          const qc = m.question_content;
-          if (format === 'multiple_choice' || format === 'poll') {
-            const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
-            if (opts && opts.length === 4) {
-              setMcqOptions(opts);
-              const ca = qc.correctAnswer || qc.correct_answer;
-              if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
-                setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
-              }
-              setBankMatch({ id: m.id, title: m.title });
-              return; // skip AI generation
-            }
-          } else if (format === 'short_answer') {
-            const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
-            if (ea) {
-              setExpectedAnswer(String(ea));
-              setBankMatch({ id: m.id, title: m.title });
-              return;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Bank match lookup failed, falling back to AI', e);
-      }
-
-      // 2) Fall back to AI generation.
       const body: Record<string, unknown> = {
         question_text: questionText,
         source_transcript: transcriptContext,
@@ -327,17 +294,66 @@ export function QuestionOnDeck({
         body.prior_context = priorContext;
       }
 
-      if (format === 'multiple_choice' || format === 'poll') {
-        const { data, error } = await supabase.functions.invoke('generate-mcq-options', { body });
-        if (!error && data?.options?.length === 4) {
-          setMcqOptions(data.options);
-          if (data.correct_answer && format === 'multiple_choice') {
-            setCorrectAnswer(data.correct_answer);
+      // Fire bank match and AI generation IN PARALLEL — they used to run
+      // sequentially, costing one extra LLM round-trip (~1.5–3s) before MCQ
+      // generation even began. Bank match wins only when it's high-confidence.
+      const bankPromise = supabase.functions
+        .invoke('match-bank-question', {
+          body: { question_text: questionText, course_id: courseId ?? null, format },
+        })
+        .catch((e) => {
+          console.warn('Bank match lookup failed', e);
+          return { data: null } as { data: null };
+        });
+
+      const aiPromise =
+        format === 'multiple_choice' || format === 'poll'
+          ? supabase.functions.invoke('generate-mcq-options', { body })
+          : supabase.functions.invoke('generate-expected-answer', { body });
+
+      const [bankRes, aiRes] = await Promise.all([bankPromise, aiPromise]);
+
+      // 1) Prefer high-confidence bank match.
+      const matchData: any = (bankRes as any)?.data;
+      const m = matchData?.match;
+      const confidence: number = typeof matchData?.confidence === 'number' ? matchData.confidence : 0;
+      const isHighConfidenceBank =
+        m && m.question_content && (matchData?.source === 'exact_match' || confidence >= 0.8);
+
+      if (isHighConfidenceBank) {
+        const qc = m.question_content;
+        if (format === 'multiple_choice' || format === 'poll') {
+          const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+          if (opts && opts.length === 4) {
+            setMcqOptions(opts);
+            const ca = qc.correctAnswer || qc.correct_answer;
+            if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+              setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+            }
+            setBankMatch({ id: m.id, title: m.title });
+            return;
+          }
+        } else if (format === 'short_answer') {
+          const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+          if (ea) {
+            setExpectedAnswer(String(ea));
+            setBankMatch({ id: m.id, title: m.title });
+            return;
           }
         }
-      } else {
-        const { data, error } = await supabase.functions.invoke('generate-expected-answer', { body });
-        if (!error && data?.expected_answer) {
+      }
+
+      // 2) Fall back to the AI result we kicked off in parallel.
+      const { data, error } = aiRes as { data: any; error: any };
+      if (!error) {
+        if (format === 'multiple_choice' || format === 'poll') {
+          if (data?.options?.length === 4) {
+            setMcqOptions(data.options);
+            if (data.correct_answer && format === 'multiple_choice') {
+              setCorrectAnswer(data.correct_answer);
+            }
+          }
+        } else if (data?.expected_answer) {
           setExpectedAnswer(data.expected_answer);
         }
       }

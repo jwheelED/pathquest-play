@@ -1,59 +1,40 @@
+# Speed up MCQ generation after question detection
+
 ## Diagnosis
 
-From the edge-function logs and code review I traced three concrete bugs that match what you saw with the osmosis test.
+After a candidate question is detected, `QuestionOnDeck.generatePreview` runs two LLM-backed edge functions **sequentially**:
 
-### Bug 1 — "So why does it stop once equilibrium is reached?" gets dropped (unreliable pickup)
+1. `match-bank-question` — does a lexical filter, then (whenever any bank question overlaps ≥0.3) calls **Gemini 2.5 Flash** to semantically confirm. ~1.5–3s, even when it ultimately returns `null`.
+2. `generate-mcq-options` — calls **Gemini 2.5 Flash** for the MCQ (~2–3s). A deterministic validator can then trigger a **Gemini 2.5 Pro** retry (~8–12s) — the `correct option weakly supported by transcript` branch fires often on noisy live transcripts and is the main cause of the long wait.
 
-In `usePassiveQuestionDetection.ts`, the WH-trigger regex is anchored to a clause start (`^` or after `.?!;`). When Deepgram emits the question as `"So why does it stop…"`, the leading "So " sits between the clause start and the WH-word, so `hasInterrogativeTrigger` returns false and the candidate is dropped.
+No multi-provider hopping (the file is named `callClaude` for legacy reasons but it routes Gemini via Lovable AI Gateway). The slowness is **sequential chaining** + **noisy Pro-tier retry**.
 
-`useQuestionTriggerCapture.ts` strips `FILLER_PREFIXES` (`so|um|uh|well|now|and|but|…`) before scanning, but the passive hook and the shared module do not. That's the inconsistency causing missed pickups.
+## Fix
 
-### Bug 2 — "Osmosis moves water…?" promoted as a question (false positive)
+### 1. Parallelize bank match and MCQ generation (`src/components/instructor/QuestionOnDeck.tsx`)
 
-The MCQ log shows `Today, we'll be talking about osmosis?` and similar declaratives reaching `generate-mcq-options`. They get there via `acceptVettedCandidate` in the passive hook, which only checks word count + monologue shape and **does not** re-verify an interrogative trigger. A Deepgram-appended `?` on a declarative is enough to slip through, especially when paired with the fast-path immediate promote on trailing `?`.
+In `generatePreview`, fire both `match-bank-question` and `generate-mcq-options` / `generate-expected-answer` at the same time via `Promise.all`. When the bank lookup returns a high-confidence match (`source === 'exact_match'` or `confidence >= 0.8`), overwrite the AI-generated options with bank content; otherwise keep the AI result. Net: wall-clock = max(bank, mcq) instead of sum.
 
-### Bug 3 — "My question is, after remembering everything I said, why does this stop…?" (conflated text)
+### 2. Stop the heuristic-driven Pro retry (`supabase/functions/generate-mcq-options/index.ts`)
 
-In `useQuestionTriggerCapture.ts` → `getSliceAroundTrigger`, the **premise-clause rescue** (lines ~426–446) prepends any context tail that ends with a comma onto the question. That correctly handles `"If a cell has X, what happens?"` but also catches generic preambles like `"…everything I said, why does this stop…"`, producing a 16-word run-on. The rescue should require an explicit subordinator (`if/when/given/suppose/…`), not just a trailing comma.
+Only escalate to `google/gemini-2.5-pro` when the validator's failure is structural:
+- `correct_answer letter does not map to an option`
+- `citation not found in transcript` (model claimed a citation that doesn't exist)
+- `correct option does not overlap with its own citation`
 
----
+Skip retry for the `correct option weakly supported by transcript` branch — that's an overlap heuristic on live ASR text and produces too many false rejects. Ship the Flash result with a `validator_warning` instead.
 
-## Fix Plan
+### 3. Reduce transcript context payload (`supabase/functions/generate-mcq-options/index.ts`)
 
-### 1. `src/hooks/usePassiveQuestionDetection.ts`
+Lower `source_transcript.slice(-6000)` to `slice(-3000)`. `prior_context` (focused recent teaching) already carries the immediate antecedent for pronoun resolution; trimming the broad context shaves Flash time-to-first-token without measurable quality loss.
 
-- Add a `stripLeadingFiller()` helper using the same `FILLER_PREFIXES` regex as the trigger-capture hook (`/^(so+|um+|uh+|like|well|okay so|okay|now|and so|but|or)\s+/i`, multi-pass).
-- In `hasInterrogativeTrigger(text)`, test patterns against both `text` and `stripLeadingFiller(text)` so "So why…", "And how…", "Well, what…" trigger reliably.
-- In `acceptVettedCandidate`, after the monologue/length guards, call `hasInterrogativeTrigger(stripLeadingFiller(text))` and reject if false. This closes the declarative-`?` false-positive path.
-- When building the final candidate `text` for both `checkUtterance` and `acceptVettedCandidate`, strip the leading filler from the displayed question so the on-deck card shows `"Why does it stop once equilibrium is reached?"` rather than `"So why…"`.
+## Files changed
 
-### 2. `supabase/functions/_shared/questionDetection.ts`
+- `src/components/instructor/QuestionOnDeck.tsx` — parallelize the two invokes in `generatePreview`.
+- `supabase/functions/generate-mcq-options/index.ts` — gate Pro retry on structural failures only; trim broad context to 3000 chars.
 
-- Mirror the same `stripLeadingFiller()` helper and apply it inside `hasInterrogativeTrigger` and `FALLBACK_INTERROGATIVE_PATTERN` testing. Keeps server-side video detection (`detect-speaker-questions`) consistent with the client.
+No DB / schema changes. No client behavior change beyond faster preview.
 
-### 3. `src/hooks/useQuestionTriggerCapture.ts`
+## Expected impact
 
-- Tighten the premise-clause rescue: only prepend the context tail to the question when the tail **starts with a `PREMISE_SUBORDINATORS` token**. Drop the "ends with comma" branch — a bare trailing comma is not enough signal that the preceding clause is a question premise.
-- After `postProcess(slice.question)`, strip the leading filler (`FILLER_PREFIXES`) from the question itself (currently only stripped from the buffer scan), so the emitted candidate never starts with "So/And/But/Well/Now".
-- Final safety check before `onCaptureCompleteRef.current(candidate)`: run `hasInterrogativeTrigger` (imported from the shared module, post-strip) on the question. If false, log `gate-reject no-trigger` and abort with no cooldown — prevents declaratives leaking through when buffer-scan matched on `is/are/can` subject-aux that wasn't actually a question (the cause of `"Today, we'll be talking about osmosis?"`).
-
-### 4. Tests — `src/__tests__/questionDetection.test.ts` + `usePassiveQuestionDetection.test.ts`
-
-Add regression cases for the osmosis scenario:
-
-- `hasInterrogativeTrigger("So why does it stop once equilibrium is reached?")` → `true`
-- `hasInterrogativeTrigger("And how does osmosis work?")` → `true`
-- `hasInterrogativeTrigger("Today, we'll be talking about osmosis?")` → `false`
-- `hasInterrogativeTrigger("Osmosis moves water across a semipermeable membrane.")` → `false`
-- Passive-hook integration: feed the 3-sentence osmosis passage as a single utterance — assert the surfaced candidate text is exactly `"Why does it stop once equilibrium is reached?"` (leading "So " stripped) and the `priorContext` (when fed via `acceptVettedCandidate`) contains the two preceding sentences.
-- `acceptVettedCandidate("Today, we'll be talking about osmosis?")` → no pending candidate produced.
-
-### Files to be edited
-
-- `src/hooks/usePassiveQuestionDetection.ts`
-- `src/hooks/useQuestionTriggerCapture.ts`
-- `supabase/functions/_shared/questionDetection.ts`
-- `src/__tests__/questionDetection.test.ts`
-- `src/__tests__/usePassiveQuestionDetection.test.ts`
-
-No DB/schema/edge-function-deploy changes required.
+Typical detection → on-deck-ready time drops from ~5–8s (and up to ~15s on Pro-retry) to ~2–3s consistently.
