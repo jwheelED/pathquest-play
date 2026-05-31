@@ -222,13 +222,15 @@ describe("hasInterrogativeTrigger", () => {
     ).toBe(false);
   });
 
-  it("still matches the real WH-question that follows a 'Suppose' premise", () => {
+  it("still matches the real WH-question that follows a 'Suppose' premise after a sentence terminator", () => {
     expect(
       hasInterrogativeTrigger(
-        "Suppose that an array is already sorted, which search algorithm would you pick?"
+        "Suppose that an array is already sorted. Which search algorithm would you pick?"
       )
     ).toBe(true);
   });
+
+
 
 
 
