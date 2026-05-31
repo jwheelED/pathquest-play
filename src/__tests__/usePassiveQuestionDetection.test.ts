@@ -278,4 +278,47 @@ describe("usePassiveQuestionDetection", () => {
     });
     expect(result.current.candidate?.text).toBe("What happens now?");
   });
+
+  it("picks up 'So why…' questions and strips the leading filler in display text", () => {
+    const { result } = renderHook(() =>
+      usePassiveQuestionDetection({
+        minWordCount: 4,
+        trailingSilenceMs: 200,
+        debug: false,
+      }),
+    );
+
+    act(() => {
+      result.current.checkUtterance(
+        "So why does it stop once equilibrium is reached?",
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.candidate?.text).toBe(
+      "Why does it stop once equilibrium is reached?",
+    );
+  });
+
+  it("rejects a declarative tagged with '?' via acceptVettedCandidate", () => {
+    const { result } = renderHook(() =>
+      usePassiveQuestionDetection({
+        minWordCount: 4,
+        trailingSilenceMs: 100,
+        debug: false,
+      }),
+    );
+
+    act(() => {
+      result.current.acceptVettedCandidate(
+        "Today, we'll be talking about osmosis?",
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(result.current.candidate).toBeNull();
+    expect(result.current.pendingCandidate).toBeNull();
+  });
 });
