@@ -441,6 +441,18 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const acceptVettedCandidate = useCallback(
     (text: string, priorContext?: string) => {
       if (!enabled || !text) return;
+      // Final safety net — even though the trigger-capture hook applies its own
+      // gates, defend against monologue blobs and over-long captures slipping
+      // through (Deepgram intonation "?", run-on segments).
+      const wc = wordCount(text);
+      if (wc > MAX_WORD_COUNT) {
+        if (debug) console.log(`🛑 [passive] vetted candidate rejected — too long (${wc} words)`);
+        return;
+      }
+      if (looksLikeMonologue(text)) {
+        if (debug) console.log('🛑 [passive] vetted candidate rejected — looks like monologue');
+        return;
+      }
       const now = Date.now();
       const newCandidate: PassiveQuestionCandidate = {
         text,
