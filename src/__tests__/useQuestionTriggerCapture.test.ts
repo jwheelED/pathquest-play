@@ -25,7 +25,7 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
         extensionMs: 200,
         maxExtensions: 1,
         softCompleteMs: 300,
-        debug: false,
+        debug: true,
       }),
     );
     act(() => {
