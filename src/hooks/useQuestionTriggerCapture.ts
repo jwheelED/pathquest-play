@@ -228,6 +228,10 @@ function postProcess(text: string): string {
 
   let merged = text.trim();
 
+  // Strip leading punctuation/dashes left over from the slice split
+  // (e.g. "— which algorithm…", ", how did…").
+  merged = merged.replace(/^[\s,;:\-\u2014\u2013]+/, '').trim();
+
   // Strip leading filler (multiple passes)
   merged = merged.replace(FILLER_PREFIXES, '').trim();
   merged = merged.replace(FILLER_PREFIXES, '').trim();
