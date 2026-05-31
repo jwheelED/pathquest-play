@@ -1,0 +1,80 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
+import type { PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
+
+/**
+ * Regression: long premise-led questions must arm the trigger even when the
+ * WH-word is preceded by a comma or em-dash rather than a hard terminator.
+ *
+ * Before the fix, CLAUSE_START only allowed `.?!;` before WH-triggers, so
+ * these realistic instructor questions never armed capture.
+ */
+describe("useQuestionTriggerCapture — premise-led questions", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  function setup() {
+    const captured: PassiveQuestionCandidate[] = [];
+    const { result } = renderHook(() =>
+      useQuestionTriggerCapture({
+        cooldownMs: 12000,
+        minSilenceMs: 100,
+        minHoldMs: 100,
+        completionTimeoutMs: 500,
+        extensionMs: 200,
+        maxExtensions: 1,
+        softCompleteMs: 300,
+        debug: false,
+      }),
+    );
+    act(() => {
+      result.current.setOnCaptureComplete((c) => captured.push(c));
+    });
+    return { result, captured };
+  }
+
+  it("arms and finalizes on em-dash + WH-question", () => {
+    const { result, captured } = setup();
+    act(() => {
+      result.current.feedChunk(
+        "Suppose that the array is already sorted — which search algorithm would you pick, and how does its complexity compare to a linear scan?",
+        1000,
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+    expect(captured[0].text.toLowerCase()).toContain("which search algorithm");
+  });
+
+  it("arms and finalizes on comma + WH-question after a 'Considering…' premise", () => {
+    const { result, captured } = setup();
+    act(() => {
+      result.current.feedChunk(
+        "Considering the economic pressures we covered earlier, how did the war effort accelerate industrialization across the northern states?",
+        1000,
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+    expect(captured[0].text.toLowerCase()).toContain("how did the war effort");
+  });
+
+  it("does NOT arm on a mid-sentence WH inside a declarative", () => {
+    const { result, captured } = setup();
+    act(() => {
+      result.current.feedChunk(
+        "And we have to remember just how dangerous these components can be in everyday use.",
+        1000,
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(0);
+  });
+});

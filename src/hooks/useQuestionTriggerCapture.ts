@@ -34,7 +34,11 @@ const RHETORICAL_BLOCKLIST = [
 // immediately after a sentence/clause terminator. This stops mid-sentence
 // WH-words in declarative paragraphs ("…and how dangerous these components
 // can be…") from arming the trigger.
-const CLAUSE_START = '(?:^|[.?!;]\\s+)';
+// Accept: buffer start, hard terminator (.?!;), a soft clause boundary
+// (comma / em-dash / en-dash followed by space), or a space-wrapped dash.
+// Premise-led questions almost always use one of these before the WH-word
+// ("…sorted — which algorithm…", "…earlier, how did…").
+const CLAUSE_START = '(?:^|[.?!;,\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
 const TRIGGER_PATTERNS = [
   // Classic WH questions — clause-start anchored.
   new RegExp(`${CLAUSE_START}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
@@ -223,6 +227,10 @@ function postProcess(text: string): string {
   if (!text) return '';
 
   let merged = text.trim();
+
+  // Strip leading punctuation/dashes left over from the slice split
+  // (e.g. "— which algorithm…", ", how did…").
+  merged = merged.replace(/^[\s,;:\-\u2014\u2013]+/, '').trim();
 
   // Strip leading filler (multiple passes)
   merged = merged.replace(FILLER_PREFIXES, '').trim();
