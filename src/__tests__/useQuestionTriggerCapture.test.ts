@@ -64,6 +64,23 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
     expect(captured[0].text.toLowerCase()).toContain("how did the war effort");
   });
 
+  it("arms and finalizes on comma + WH-question after a 'Given…' premise (gram-positive)", () => {
+    const { result, captured } = setup();
+    act(() => {
+      result.current.feedChunk(
+        "Given what we just said about peptidoglycan thickness, why does a gram-positive wall hold the crystal violet stain when a gram-negative wall does not?",
+        1000,
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+    expect(captured[0].text.toLowerCase()).toContain("why does a gram-positive wall");
+  });
+
+
+
   it("does NOT arm on a mid-sentence WH inside a declarative", () => {
     const { result, captured } = setup();
     act(() => {
