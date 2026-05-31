@@ -115,9 +115,10 @@ export const TRIGGER_PATTERNS = [
 ];
 
 // Permissive fallback: any interrogative-led sentence with a verb-shaped token
-// after it qualifies. Catches things like "What changed?" / "What broke?" /
-// "Why now?" that the specific patterns above miss. Rhetorical phrases are
-// still filtered out separately via the blocklist.
+// after it qualifies. Anchored to the START of the trimmed text so a mid-
+// sentence WH-word inside a declarative ("…and how dangerous components can
+// be…") does not falsely match. Rhetorical phrases are still filtered out
+// separately via the blocklist.
 export const FALLBACK_INTERROGATIVE_PATTERN =
   /^(what|why|how|when|where|who|whom|whose|which)\b\s+\S+/i;
 
