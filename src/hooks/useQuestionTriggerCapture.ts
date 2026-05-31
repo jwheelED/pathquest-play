@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
-import { type PassiveQuestionCandidate } from './usePassiveQuestionDetection';
+import { type PassiveQuestionCandidate, hasInterrogativeTrigger } from './usePassiveQuestionDetection';
 
 // Re-use the same blocklists from passive detection
 const GREETING_PATTERNS = [
