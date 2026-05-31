@@ -1,29 +1,59 @@
-## Problem
+## Diagnosis
 
-The detector now over-fires. The screenshots show long monologue passages captured as "questions" — e.g. *"How they stain, how they interact with antibiotics, and how dangerous certain bacterial components can be… Gram positive is thick peptidoglycan?"* That is a teaching statement, not a question. It got captured because:
+From the edge-function logs and code review I traced three concrete bugs that match what you saw with the osmosis test.
 
-1. **Trigger patterns are too permissive.** `\bwhat\s+\w+`, `\bhow\s+\w+`, etc. match *anywhere* in the text. Phrases like "how they stain", "how dangerous", "how they interact" inside a declarative paragraph all trigger.
-2. **No sentence-boundary requirement.** A WH-word buried 20 words deep in a monologue counts the same as one that starts a real question.
-3. **No length ceiling.** Real spoken questions are short (typically ≤ 20 words). Multi-sentence paragraphs slip through.
-4. **`?` placement isn't checked.** Deepgram occasionally appends `?` based on intonation at the end of a declarative; if any WH-word appears earlier in that blob, it passes.
+### Bug 1 — "So why does it stop once equilibrium is reached?" gets dropped (unreliable pickup)
 
-## Fix
+In `usePassiveQuestionDetection.ts`, the WH-trigger regex is anchored to a clause start (`^` or after `.?!;`). When Deepgram emits the question as `"So why does it stop…"`, the leading "So " sits between the clause start and the WH-word, so `hasInterrogativeTrigger` returns false and the candidate is dropped.
 
-Tighten both detection paths (`usePassiveQuestionDetection.ts` + `useQuestionTriggerCapture.ts`) and the shared `_shared/questionDetection.ts`:
+`useQuestionTriggerCapture.ts` strips `FILLER_PREFIXES` (`so|um|uh|well|now|and|but|…`) before scanning, but the passive hook and the shared module do not. That's the inconsistency causing missed pickups.
 
-1. **WH-word must start the question clause.** Replace the broad `\b(what|why|how|…)\s+\w+` patterns with anchored ones that require the WH-word at the start of the sentence, after a clause boundary (`. ! ? ; ,` + space), or after a known subordinator (`if/when/suppose/given/…`). Keep the existing yes/no inversion patterns (`is/are/do/can + pronoun`) but also require them at clause start.
-2. **Hard word-count ceiling for passive candidates.** Reject any candidate over ~22 words — real spoken questions don't run that long; longer hits are monologue blobs.
-3. **Trigger must be close to the `?`.** In `extractQuestions`, after splitting on terminal punctuation, require the trigger to appear within the same clause as the `?` (not 30 words back).
-4. **Strip declarative-paragraph captures.** If the candidate contains more than one sentence-terminator (`.` or `!`) before the `?`, treat it as monologue and reject.
-5. **Update tests.** Add regression cases for the three offending captures from the screenshots; keep all existing passing tests green.
+### Bug 2 — "Osmosis moves water…?" promoted as a question (false positive)
 
-## Files
+The MCQ log shows `Today, we'll be talking about osmosis?` and similar declaratives reaching `generate-mcq-options`. They get there via `acceptVettedCandidate` in the passive hook, which only checks word count + monologue shape and **does not** re-verify an interrogative trigger. A Deepgram-appended `?` on a declarative is enough to slip through, especially when paired with the fast-path immediate promote on trailing `?`.
 
-- `src/hooks/usePassiveQuestionDetection.ts` — tighten `TRIGGER_PATTERNS`, add length cap + monologue check in `checkUtterance`.
-- `src/hooks/useQuestionTriggerCapture.ts` — same trigger tightening + same length/monologue gate before emitting.
-- `supabase/functions/_shared/questionDetection.ts` — mirror the trigger tightening so server-side detection stays consistent.
-- `src/__tests__/questionDetection.test.ts` + `usePassiveQuestionDetection.test.ts` — add regression cases for the three false-positive transcripts.
+### Bug 3 — "My question is, after remembering everything I said, why does this stop…?" (conflated text)
 
-## Out of scope
+In `useQuestionTriggerCapture.ts` → `getSliceAroundTrigger`, the **premise-clause rescue** (lines ~426–446) prepends any context tail that ends with a comma onto the question. That correctly handles `"If a cell has X, what happens?"` but also catches generic preambles like `"…everything I said, why does this stop…"`, producing a 16-word run-on. The rescue should require an explicit subordinator (`if/when/given/suppose/…`), not just a trailing comma.
 
-The "All of the above" distractor visible in screenshot #3 is an MCQ generation issue (separate from detection). Not touched here unless you want it bundled.
+---
+
+## Fix Plan
+
+### 1. `src/hooks/usePassiveQuestionDetection.ts`
+
+- Add a `stripLeadingFiller()` helper using the same `FILLER_PREFIXES` regex as the trigger-capture hook (`/^(so+|um+|uh+|like|well|okay so|okay|now|and so|but|or)\s+/i`, multi-pass).
+- In `hasInterrogativeTrigger(text)`, test patterns against both `text` and `stripLeadingFiller(text)` so "So why…", "And how…", "Well, what…" trigger reliably.
+- In `acceptVettedCandidate`, after the monologue/length guards, call `hasInterrogativeTrigger(stripLeadingFiller(text))` and reject if false. This closes the declarative-`?` false-positive path.
+- When building the final candidate `text` for both `checkUtterance` and `acceptVettedCandidate`, strip the leading filler from the displayed question so the on-deck card shows `"Why does it stop once equilibrium is reached?"` rather than `"So why…"`.
+
+### 2. `supabase/functions/_shared/questionDetection.ts`
+
+- Mirror the same `stripLeadingFiller()` helper and apply it inside `hasInterrogativeTrigger` and `FALLBACK_INTERROGATIVE_PATTERN` testing. Keeps server-side video detection (`detect-speaker-questions`) consistent with the client.
+
+### 3. `src/hooks/useQuestionTriggerCapture.ts`
+
+- Tighten the premise-clause rescue: only prepend the context tail to the question when the tail **starts with a `PREMISE_SUBORDINATORS` token**. Drop the "ends with comma" branch — a bare trailing comma is not enough signal that the preceding clause is a question premise.
+- After `postProcess(slice.question)`, strip the leading filler (`FILLER_PREFIXES`) from the question itself (currently only stripped from the buffer scan), so the emitted candidate never starts with "So/And/But/Well/Now".
+- Final safety check before `onCaptureCompleteRef.current(candidate)`: run `hasInterrogativeTrigger` (imported from the shared module, post-strip) on the question. If false, log `gate-reject no-trigger` and abort with no cooldown — prevents declaratives leaking through when buffer-scan matched on `is/are/can` subject-aux that wasn't actually a question (the cause of `"Today, we'll be talking about osmosis?"`).
+
+### 4. Tests — `src/__tests__/questionDetection.test.ts` + `usePassiveQuestionDetection.test.ts`
+
+Add regression cases for the osmosis scenario:
+
+- `hasInterrogativeTrigger("So why does it stop once equilibrium is reached?")` → `true`
+- `hasInterrogativeTrigger("And how does osmosis work?")` → `true`
+- `hasInterrogativeTrigger("Today, we'll be talking about osmosis?")` → `false`
+- `hasInterrogativeTrigger("Osmosis moves water across a semipermeable membrane.")` → `false`
+- Passive-hook integration: feed the 3-sentence osmosis passage as a single utterance — assert the surfaced candidate text is exactly `"Why does it stop once equilibrium is reached?"` (leading "So " stripped) and the `priorContext` (when fed via `acceptVettedCandidate`) contains the two preceding sentences.
+- `acceptVettedCandidate("Today, we'll be talking about osmosis?")` → no pending candidate produced.
+
+### Files to be edited
+
+- `src/hooks/usePassiveQuestionDetection.ts`
+- `src/hooks/useQuestionTriggerCapture.ts`
+- `supabase/functions/_shared/questionDetection.ts`
+- `src/__tests__/questionDetection.test.ts`
+- `src/__tests__/usePassiveQuestionDetection.test.ts`
+
+No DB/schema/edge-function-deploy changes required.
