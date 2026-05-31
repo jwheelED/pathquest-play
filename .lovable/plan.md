@@ -1,40 +1,55 @@
-# Speed up MCQ generation after question detection
+# Stop premature question capture on premise clauses + intonation "?"
 
 ## Diagnosis
 
-After a candidate question is detected, `QuestionOnDeck.generatePreview` runs two LLM-backed edge functions **sequentially**:
+Two compounding bugs in `src/hooks/useQuestionTriggerCapture.ts` (mirrored in `usePassiveQuestionDetection.ts` and `_shared/questionDetection.ts`):
 
-1. `match-bank-question` — does a lexical filter, then (whenever any bank question overlaps ≥0.3) calls **Gemini 2.5 Flash** to semantically confirm. ~1.5–3s, even when it ultimately returns `null`.
-2. `generate-mcq-options` — calls **Gemini 2.5 Flash** for the MCQ (~2–3s). A deterministic validator can then trigger a **Gemini 2.5 Pro** retry (~8–12s) — the `correct option weakly supported by transcript` branch fires often on noisy live transcripts and is the main cause of the long wait.
+### Bug 1 — `suppose that` is both a trigger AND a premise subordinator
 
-No multi-provider hopping (the file is named `callClaude` for legacy reasons but it routes Gemini via Lovable AI Gateway). The slowness is **sequential chaining** + **noisy Pro-tier retry**.
+`TRIGGER_PATTERNS` includes `/\bsuppose\s+that\b/i`, but the same phrase is also in `PREMISE_SUBORDINATORS`. `suppose` / `suppose that` introduces the setup ("Suppose X, what would Y do?"), it is not itself the question. So the trigger fires on the premise, the completeness gate passes (the premise is grammatically complete), capture finalizes, the 12s cooldown locks in, and the real question that follows is dropped.
+
+This is exactly what produced "Suppose that an array is already sorted?" in the screenshot — the instructor was about to continue with "...which search algorithm would you pick?", but the premise already armed and shipped.
+
+### Bug 2 — "?" fast-path bypasses the completeness gate
+
+In `feedChunk` (~line 635) any chunk ending in `?` triggers `finalizeCapture(now, true)` with `isForced=true`. With `isForced` the completeness gate's `hold` becomes a hard reject and silence-wait is skipped — but more importantly, the gate is still consulted; *however*, in many cases the gate passes on premise-shaped utterances (≥6 words, no dangling tail, trigger not near end). The fast-path makes the system trust Deepgram's intonation-driven `?`, which Deepgram routinely appends on dashes, commas, and rising-pitch pauses mid-sentence.
+
+Combined effect: a single intonation unit at the start of a sentence ("Suppose that an array is already sorted —") gets a `?` from Deepgram, the fast-path finalizes immediately, and the cooldown blocks the real question.
 
 ## Fix
 
-### 1. Parallelize bank match and MCQ generation (`src/components/instructor/QuestionOnDeck.tsx`)
+### 1. Remove `suppose that` from interrogative triggers (3 files)
 
-In `generatePreview`, fire both `match-bank-question` and `generate-mcq-options` / `generate-expected-answer` at the same time via `Promise.all`. When the bank lookup returns a high-confidence match (`source === 'exact_match'` or `confidence >= 0.8`), overwrite the AI-generated options with bank content; otherwise keep the AI result. Net: wall-clock = max(bank, mcq) instead of sum.
+`src/hooks/useQuestionTriggerCapture.ts`, `src/hooks/usePassiveQuestionDetection.ts`, and `supabase/functions/_shared/questionDetection.ts`:
 
-### 2. Stop the heuristic-driven Pro retry (`supabase/functions/generate-mcq-options/index.ts`)
+Delete the `/\bsuppose\s+that\b/i` line from `TRIGGER_PATTERNS`. Keep `suppose` / `supposing` in `PREMISE_SUBORDINATORS` — that's where it belongs, and the premise-rescue path will still attach it to the real question when the actual interrogative trigger fires later in the same breath.
 
-Only escalate to `google/gemini-2.5-pro` when the validator's failure is structural:
-- `correct_answer letter does not map to an option`
-- `citation not found in transcript` (model claimed a citation that doesn't exist)
-- `correct option does not overlap with its own citation`
+### 2. Tighten the "?" fast-path (`useQuestionTriggerCapture.ts`)
 
-Skip retry for the `correct option weakly supported by transcript` branch — that's an overlap heuristic on live ASR text and produces too many false rejects. Ship the Flash result with a `validator_warning` instead.
+In `feedChunk`, when a chunk arrives ending in `?`:
+- Still take the fast path (don't wait for min-silence), BUT
+- Require **either** the held-for time `>= minHoldMs` (~400ms — proves it's not the very first chunk after arming) **and** at least one full silence/sentence-end since arming, **or** the buffer contains a strong interrogative shape (a clause-anchored WH-word or subject-aux inversion **plus** ≥8 words after the trigger).
+- Otherwise treat the `?` like a normal sentence-end: run through the standard `finalizeCapture(now)` path (not forced), so the completeness gate can hold for one extension if the question still looks incomplete (trailing dangler, trigger near end, etc.).
 
-### 3. Reduce transcript context payload (`supabase/functions/generate-mcq-options/index.ts`)
+Concretely: replace the unconditional `finalizeCapture(now, true)` with a gated version that only forces when `heldFor >= minHoldMs && wordCount(buffer-after-trigger) >= 8`.
 
-Lower `source_transcript.slice(-6000)` to `slice(-3000)`. `prior_context` (focused recent teaching) already carries the immediate antecedent for pronoun resolution; trimming the broad context shaves Flash time-to-first-token without measurable quality loss.
+### 3. Add regression tests (`src/__tests__/`)
+
+- `useQuestionTriggerCapture` (or shared trigger tests): assert that "Suppose that an array is already sorted" alone does NOT arm a trigger, but "Suppose that an array is already sorted — which search algorithm would you pick?" DOES, and the resulting candidate text starts with "Which search algorithm…" with the premise carried in priorContext via the premise-rescue path.
+- `questionDetection.test.ts`: assert `hasInterrogativeTrigger("Suppose that an array is already sorted")` returns `false`.
 
 ## Files changed
 
-- `src/components/instructor/QuestionOnDeck.tsx` — parallelize the two invokes in `generatePreview`.
-- `supabase/functions/generate-mcq-options/index.ts` — gate Pro retry on structural failures only; trim broad context to 3000 chars.
+- `src/hooks/useQuestionTriggerCapture.ts` — drop `suppose that` trigger; gate the `?` fast-path on hold-time + word-count.
+- `src/hooks/usePassiveQuestionDetection.ts` — drop `suppose that` trigger.
+- `supabase/functions/_shared/questionDetection.ts` — drop `suppose that` trigger.
+- `src/__tests__/questionDetection.test.ts` — add regression case.
+- `src/__tests__/useQuestionTriggerCapture.test.ts` (create if absent) or extend `usePassiveQuestionDetection.test.ts` — premise-then-question scenario.
 
-No DB / schema changes. No client behavior change beyond faster preview.
+No DB / edge-function-deploy / schema changes.
 
 ## Expected impact
 
-Typical detection → on-deck-ready time drops from ~5–8s (and up to ~15s on Pro-retry) to ~2–3s consistently.
+- Opening premises like "Suppose…", "Imagine…", "Consider…" no longer trigger on their own and burn the 12s cooldown.
+- Deepgram's stray intonation-driven `?` mid-sentence no longer force-ships a half-formed question; the gate gets a chance to hold for the rest of the utterance.
+- The real question that follows the premise is correctly captured, with the premise attached as context.
