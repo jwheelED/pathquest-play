@@ -60,7 +60,7 @@ const TRIGGER_PATTERNS = [
   new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Premise-led WH questions — comma path only when the pre-comma clause
   // starts with a subordinator ("Given…, why…" / "Considering…, how…").
-  new RegExp(`${PREMISE_COMMA_START}${WH_WORDS}\\b\\s+\\S+`, 'i'),
+  new RegExp(`${PREMISE_COMMA_LOOKBEHIND}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
