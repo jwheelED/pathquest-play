@@ -128,32 +128,42 @@ export const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
 
-// Interrogative trigger patterns — broadened to fire on any word following the
-// WH-word. Rhetorical/greeting blocklists + minWordCount continue to filter
-// out conversational filler.
+// Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
+// MUST sit at the START of a clause — either the start of the string or
+// immediately after a sentence/clause boundary (./!/?/;). This prevents
+// mid-sentence WH-words from a declarative paragraph ("…and how dangerous
+// certain components can be…") from triggering as questions.
+const CLAUSE_START = '(?:^|[.?!;]\\s+|^\\s*)';
 export const TRIGGER_PATTERNS = [
-  /\bwhat\s+\w+/i,
-  /\bwhy\s+\w+/i,
-  /\bhow\s+\w+/i,
-  /\bwhen\s+\w+/i,
-  /\bwhere\s+\w+/i,
-  /\bwho\s+\w+/i,
-  /\bwhich\s+\w+/i,
+  new RegExp(`${CLAUSE_START}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
   /\bsuppose\s+that\b/i,
-  // Subject-aux inversion (yes/no & A-or-B questions)
-  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
-  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
-  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
-  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  // Subject-aux inversion (yes/no & A-or-B questions) — also clause-start anchored
+  new RegExp(`${CLAUSE_START}(is|are|was|were|am)\\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(do|does|did)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(can|could|would|should|will|shall|may|might|must)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(has|have|had)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
 ];
 
 export function hasInterrogativeTrigger(text: string): boolean {
   return TRIGGER_PATTERNS.some(p => p.test(text));
+}
+
+/**
+ * Reject candidates that look like multi-sentence monologue blobs Deepgram
+ * mis-punctuated with a "?". A real spoken question is one clause.
+ */
+export function looksLikeMonologue(text: string): boolean {
+  // Drop the trailing terminal "?" before counting internal terminators.
+  const body = text.trim().replace(/[?？]+\s*$/, '');
+  // Count sentence terminators inside the body. >= 1 means we have multiple
+  // sentences glued together — that's monologue, not a single question.
+  const terminators = (body.match(/[.!]/g) || []).length;
+  return terminators >= 1;
 }
 
 export function extractQuestions(text: string): string[] {
