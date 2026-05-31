@@ -128,6 +128,21 @@ export const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
 
+// Leading filler that may sit between the clause start and the WH-word
+// ("So why…", "And how…", "Well, what…"). Stripped before trigger checks
+// and from the displayed candidate text so the on-deck card reads cleanly.
+export const FILLER_PREFIXES = /^(so+|um+|uh+|like|well|okay so|okay|ok|now|and so|and|but|or)[\s,]+/i;
+
+export function stripLeadingFiller(text: string): string {
+  let out = text.trim();
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(FILLER_PREFIXES, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 // Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
 // MUST sit at the START of a clause — either the start of the string or
 // immediately after a sentence/clause boundary (./!/?/;). This prevents
@@ -150,7 +165,8 @@ export const TRIGGER_PATTERNS = [
 ];
 
 export function hasInterrogativeTrigger(text: string): boolean {
-  return TRIGGER_PATTERNS.some(p => p.test(text));
+  const stripped = stripLeadingFiller(text);
+  return TRIGGER_PATTERNS.some(p => p.test(text) || p.test(stripped));
 }
 
 /**
