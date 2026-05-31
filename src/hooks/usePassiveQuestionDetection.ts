@@ -1,6 +1,9 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
 
 const MIN_WORD_COUNT = 4;
+// Real spoken questions are short. Anything longer is almost certainly a
+// monologue blob that Deepgram appended a "?" to based on intonation.
+const MAX_WORD_COUNT = 22;
 
 export interface PassiveQuestionCandidate {
   text: string;
