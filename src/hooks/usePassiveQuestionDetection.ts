@@ -427,10 +427,12 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         continue;
       }
 
-      console.log('🔍 Passive question candidate (pending trailing silence):', q);
+      const cleaned = stripLeadingFiller(q);
+      const displayed = cleaned.length > 0 ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1)) : q;
+      console.log('🔍 Passive question candidate (pending trailing silence):', displayed);
 
       const newCandidate: PassiveQuestionCandidate = {
-        text: q,
+        text: displayed,
         detectedAt: now,
         id: `pq-${++candidateIdCounter}`,
         priorContext: recentTranscript || undefined,
