@@ -31,21 +31,36 @@ const RHETORICAL_BLOCKLIST = [
 
 // Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
 // MUST sit at the START of a clause — either the start of the buffer or
-// immediately after a sentence/clause terminator. This stops mid-sentence
-// WH-words in declarative paragraphs ("…and how dangerous these components
-// can be…") from arming the trigger.
-// Accept: buffer start, hard terminator (.?!;), a soft clause boundary
-// (comma / em-dash / en-dash followed by space), or a space-wrapped dash.
-// Premise-led questions almost always use one of these before the WH-word
-// ("…sorted — which algorithm…", "…earlier, how did…").
-const CLAUSE_START = '(?:^|[.?!;,\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
+// immediately after a hard sentence terminator / em-dash. A bare comma is
+// NOT a hard boundary: "…how they stain, how they interact, and how X…"
+// is a declarative enumeration, not three questions. The only comma path
+// that arms a WH-trigger is when the pre-comma clause is an explicit
+// PREMISE clause ("Given what we just said about X, why does Y…").
+const CLAUSE_START = '(?:^|[.?!;\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
 // Discourse markers that can sit between a clause boundary and the real WH-word
 // ("…flattens out. So why does it stop…", "…okay, now what happens…").
 // They are stripped later by FILLER_PREFIXES / postProcess.
 const DISCOURSE_MARKERS = '(?:(?:so|now|and|but|well|okay|ok|or|then|also|and so|but so)\\s+)*';
+// Subordinators that introduce a premise clause preceding the interrogative
+// (e.g., "If a cell has X, what happens?"). Used both as a regex source for
+// the premise-comma trigger pattern AND by the premise-rescue logic in
+// getSliceAroundTrigger.
+const PREMISE_SUBORDINATOR_SOURCE =
+  'if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as|considering';
+const PREMISE_SUBORDINATORS = new RegExp(`^(${PREMISE_SUBORDINATOR_SOURCE})\\b`, 'i');
+// Premise-comma start: a hard sentence boundary (or buffer start), then a
+// subordinator-led clause, then a comma. Implemented as a lookbehind so the
+// match index lands on the WH-word — the premise is preserved in the buffer
+// and recovered by the premise-rescue logic in getSliceAroundTrigger.
+const PREMISE_COMMA_LOOKBEHIND =
+  `(?<=(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]{0,400}?,\\s+)`;
+const WH_WORDS = '(what|why|how|when|where|who|whom|whose|which)';
 const TRIGGER_PATTERNS = [
-  // Classic WH questions — clause-start anchored, optional discourse markers.
-  new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
+  // Classic WH questions — hard clause-start anchored, optional discourse markers.
+  new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
+  // Premise-led WH questions — comma path only when the pre-comma clause
+  // starts with a subordinator ("Given…, why…" / "Considering…, how…").
+  new RegExp(`${PREMISE_COMMA_LOOKBEHIND}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
@@ -62,11 +77,8 @@ const TRIGGER_PATTERNS = [
   new RegExp(`${CLAUSE_START}(has|have|had)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
 ];
 
-// Subordinators that introduce a premise clause preceding the interrogative
-// (e.g., "If a cell has X, what happens?"). When the chunk before the trigger
-// starts with one of these AND is within the same breath, we include it as
-// part of the question rather than demoting it to priorContext.
-const PREMISE_SUBORDINATORS = /^(if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as)\b/i;
+// (PREMISE_SUBORDINATORS is declared above alongside the trigger patterns so
+// the premise-comma WH regex can share its source.)
 
 // Topic-shift markers — when scanning back for context, stop at these.
 const TOPIC_SHIFT_MARKERS = [
