@@ -557,6 +557,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
+      // Final trigger check on the cleaned question text — defends against
+      // declaratives where the buffer scan matched a subject-aux earlier in
+      // the segment but the slice produced a non-interrogative final string
+      // (e.g. "Today, we'll be talking about osmosis?").
+      if (!hasInterrogativeTrigger(question)) {
+        if (debug) console.log('🎯 [trigger-capture] blocked — no interrogative trigger in final question:', question);
+        return;
+      }
+
       // Light cleanup of priorContext: strip leading filler, cap at ~3000 chars.
       // Keep both head and tail when truncating so antecedents earlier in the
       // segment aren't lost (most pronoun referents live in the head).
