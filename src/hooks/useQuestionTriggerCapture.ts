@@ -29,35 +29,27 @@ const RHETORICAL_BLOCKLIST = [
   'how are we doing', 'how are you doing', 'how is everyone doing',
 ];
 
-// Interrogative trigger patterns. Cover both classic WH-fronted questions AND
-// embedded/conversational forms ("tell me what...", "anyone know...", "could
-// someone explain...", "do you know..."). These match anywhere in the utterance,
-// not just at the start, so detection is far less brittle.
+// Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
+// MUST sit at the START of a clause — either the start of the buffer or
+// immediately after a sentence/clause terminator. This stops mid-sentence
+// WH-words in declarative paragraphs ("…and how dangerous these components
+// can be…") from arming the trigger.
+const CLAUSE_START = '(?:^|[.?!;]\\s+)';
 const TRIGGER_PATTERNS = [
-  // Classic WH questions — broadened to fire on any following word.
-  // The semantic completion gate + rhetorical blocklists prevent false positives.
-  /\bwhat\s+\w+/i,
-  /\bwhy\s+\w+/i,
-  /\bhow\s+\w+/i,
-  /\bwhen\s+\w+/i,
-  /\bwhere\s+\w+/i,
-  /\bwho\s+\w+/i,
-  /\bwhich\s+\w+/i,
+  // Classic WH questions — clause-start anchored.
+  new RegExp(`${CLAUSE_START}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
-  // "What if X?" / "What happens when X?" style
   /\bwhat\s+would\s+happen\b/i,
   /\bsuppose\s+that\b/i,
-  // Subject-aux inversion (yes/no & A-or-B questions). Aux must be followed by
-  // a pronoun/determiner/quantifier typical of question subjects to avoid
-  // matching declaratives like "There are two genes…".
-  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
-  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
-  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
-  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  // Subject-aux inversion (yes/no & A-or-B questions) — clause-start anchored.
+  new RegExp(`${CLAUSE_START}(is|are|was|were|am)\\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(do|does|did)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(can|could|would|should|will|shall|may|might|must)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(has|have|had)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
 ];
 
 // Subordinators that introduce a premise clause preceding the interrogative
