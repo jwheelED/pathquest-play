@@ -77,11 +77,8 @@ const TRIGGER_PATTERNS = [
   new RegExp(`${CLAUSE_START}(has|have|had)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
 ];
 
-// Subordinators that introduce a premise clause preceding the interrogative
-// (e.g., "If a cell has X, what happens?"). When the chunk before the trigger
-// starts with one of these AND is within the same breath, we include it as
-// part of the question rather than demoting it to priorContext.
-const PREMISE_SUBORDINATORS = /^(if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as)\b/i;
+// (PREMISE_SUBORDINATORS is declared above alongside the trigger patterns so
+// the premise-comma WH regex can share its source.)
 
 // Topic-shift markers — when scanning back for context, stop at these.
 const TOPIC_SHIFT_MARKERS = [
