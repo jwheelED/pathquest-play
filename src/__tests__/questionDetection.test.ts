@@ -209,6 +209,31 @@ describe("hasInterrogativeTrigger", () => {
       hasInterrogativeTrigger("That covers cells. What happens to the electron?")
     ).toBe(true);
   });
+
+  it("matches WH-questions led by discourse fillers (So/Well/Now/Okay)", () => {
+    // Regression: instructors often introduce a question with "So why…".
+    // Previously the clause-start anchor rejected these because the WH-word
+    // wasn't the first token. Filler-strip restores reliable pickup.
+    expect(
+      hasInterrogativeTrigger("So why does it stop once equilibrium is reached?")
+    ).toBe(true);
+    expect(hasInterrogativeTrigger("Well, what does this mean?")).toBe(true);
+    expect(hasInterrogativeTrigger("Now how does osmosis work?")).toBe(true);
+    expect(hasInterrogativeTrigger("Okay, why is that?")).toBe(true);
+  });
+
+  it("does NOT treat declaratives ending in '?' as questions", () => {
+    // Regression: Deepgram occasionally appends "?" to a declarative based on
+    // rising intonation. These must not pass the trigger gate.
+    expect(
+      hasInterrogativeTrigger("Today, we'll be talking about osmosis?")
+    ).toBe(false);
+    expect(
+      hasInterrogativeTrigger(
+        "Osmosis moves water across a semipermeable membrane."
+      )
+    ).toBe(false);
+  });
 });
 
 describe("looksLikeMonologue", () => {

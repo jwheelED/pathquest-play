@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
-import { type PassiveQuestionCandidate } from './usePassiveQuestionDetection';
+import { type PassiveQuestionCandidate, hasInterrogativeTrigger } from './usePassiveQuestionDetection';
 
 // Re-use the same blocklists from passive detection
 const GREETING_PATTERNS = [
@@ -436,11 +436,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         const tailEndsWithComma = /,\s*$/.test(tail);
         const tailStartsWithSubordinator = PREMISE_SUBORDINATORS.test(tail);
 
-        if (tail && (tailEndsWithComma || tailStartsWithSubordinator)) {
-          // Move the tail to the front of question; keep earlier text as context.
+        // Only promote the prior clause into the question when it's an
+        // explicit subordinator-led premise (e.g. "If a cell has X, …").
+        // A bare trailing comma is NOT enough — that catches generic preambles
+        // like "…everything I said, why does this stop…" and produces run-ons.
+        if (tail && tailStartsWithSubordinator) {
           const newContext = (lastTerm >= 0 ? context.slice(0, lastTerm + 1) : '').trim();
-          // Ensure a comma separator between premise and trigger word.
-          const premise = tailEndsWithComma ? tail : `${tail.replace(/[,;:]+$/, '')},`;
+          const premise = tail.replace(/[,;:]+$/, '') + ',';
           question = `${premise} ${question}`.replace(/\s+/g, ' ').trim();
           context = newContext;
         }
@@ -552,6 +554,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
       if (wordCount(question) < 5) {
         if (debug) console.log('🎯 [trigger-capture] blocked — too short (no cooldown)');
+        return;
+      }
+
+      // Final trigger check on the cleaned question text — defends against
+      // declaratives where the buffer scan matched a subject-aux earlier in
+      // the segment but the slice produced a non-interrogative final string
+      // (e.g. "Today, we'll be talking about osmosis?").
+      if (!hasInterrogativeTrigger(question)) {
+        if (debug) console.log('🎯 [trigger-capture] blocked — no interrogative trigger in final question:', question);
         return;
       }
 

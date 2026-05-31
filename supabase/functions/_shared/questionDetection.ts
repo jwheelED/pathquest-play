@@ -114,6 +114,21 @@ export const TRIGGER_PATTERNS = [
   /\bsuppose\s+that\b/i,
 ];
 
+// Leading filler that may sit between the clause start and the WH-word
+// ("So why…", "And how…"). Stripped before trigger checks so an instructor
+// who introduces a question with a discourse marker still triggers detection.
+export const FILLER_PREFIXES = /^(so+|um+|uh+|well|okay so|okay|ok|now)[\s,]+/i;
+
+export function stripLeadingFiller(text: string): string {
+  let out = text.trim();
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(FILLER_PREFIXES, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 // Permissive fallback: any interrogative-led sentence with a verb-shaped token
 // after it qualifies. Anchored to the START of the trimmed text so a mid-
 // sentence WH-word inside a declarative ("…and how dangerous components can
@@ -126,8 +141,12 @@ export const FALLBACK_INTERROGATIVE_PATTERN =
 export const MIN_WORD_COUNT = 4;
 
 export function hasInterrogativeTrigger(text: string): boolean {
-  if (TRIGGER_PATTERNS.some((p) => p.test(text))) return true;
-  return FALLBACK_INTERROGATIVE_PATTERN.test(text.trim());
+  const stripped = stripLeadingFiller(text);
+  if (TRIGGER_PATTERNS.some((p) => p.test(text) || p.test(stripped))) return true;
+  return (
+    FALLBACK_INTERROGATIVE_PATTERN.test(text.trim()) ||
+    FALLBACK_INTERROGATIVE_PATTERN.test(stripped)
+  );
 }
 
 export function extractQuestions(text: string): string[] {

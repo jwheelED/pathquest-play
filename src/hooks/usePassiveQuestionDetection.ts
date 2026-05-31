@@ -128,6 +128,21 @@ export const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
 
+// Leading filler that may sit between the clause start and the WH-word
+// ("So why…", "And how…", "Well, what…"). Stripped before trigger checks
+// and from the displayed candidate text so the on-deck card reads cleanly.
+export const FILLER_PREFIXES = /^(so+|um+|uh+|well|okay so|okay|ok|now)[\s,]+/i;
+
+export function stripLeadingFiller(text: string): string {
+  let out = text.trim();
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(FILLER_PREFIXES, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 // Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
 // MUST sit at the START of a clause — either the start of the string or
 // immediately after a sentence/clause boundary (./!/?/;). This prevents
@@ -150,7 +165,8 @@ export const TRIGGER_PATTERNS = [
 ];
 
 export function hasInterrogativeTrigger(text: string): boolean {
-  return TRIGGER_PATTERNS.some(p => p.test(text));
+  const stripped = stripLeadingFiller(text);
+  return TRIGGER_PATTERNS.some(p => p.test(text) || p.test(stripped));
 }
 
 /**
@@ -411,10 +427,12 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         continue;
       }
 
-      console.log('🔍 Passive question candidate (pending trailing silence):', q);
+      const cleaned = stripLeadingFiller(q);
+      const displayed = cleaned.length > 0 ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1)) : q;
+      console.log('🔍 Passive question candidate (pending trailing silence):', displayed);
 
       const newCandidate: PassiveQuestionCandidate = {
-        text: q,
+        text: displayed,
         detectedAt: now,
         id: `pq-${++candidateIdCounter}`,
         priorContext: recentTranscript || undefined,
@@ -453,14 +471,25 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         if (debug) console.log('🛑 [passive] vetted candidate rejected — looks like monologue');
         return;
       }
+      // Enforce interrogative trigger even on vetted candidates — defends against
+      // declaratives that Deepgram tagged with "?" based on rising intonation
+      // (e.g. "Today, we'll be talking about osmosis?").
+      if (!hasInterrogativeTrigger(text)) {
+        if (debug) console.log('🛑 [passive] vetted candidate rejected — no interrogative trigger:', text);
+        return;
+      }
+      const cleaned = stripLeadingFiller(text);
+      const displayed = cleaned.length > 0
+        ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1))
+        : text;
       const now = Date.now();
       const newCandidate: PassiveQuestionCandidate = {
-        text,
+        text: displayed,
         detectedAt: now,
         id: `tq-${++candidateIdCounter}`,
         priorContext: priorContext || undefined,
       };
-      if (debug) console.log('✅ [passive] accepted vetted candidate:', text);
+      if (debug) console.log('✅ [passive] accepted vetted candidate:', displayed);
       pendingRef.current = newCandidate;
       pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
@@ -468,7 +497,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
 
       // Fast path: text already ends with "?" → promote immediately,
       // skip trailing-silence wait.
-      if (/\?\s*$/.test(text.trim())) {
+      if (/\?\s*$/.test(displayed.trim())) {
         if (debug) console.log('⚡ [passive] "?" detected → promote without silence wait');
         clearSilenceTimer();
         promotePending();
