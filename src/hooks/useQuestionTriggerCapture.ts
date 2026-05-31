@@ -633,11 +633,37 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       const hasQuestionMark = /\?\s*$/.test(text.trim());
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
 
-      // Fast path: explicit "?" → skip min-silence wait, finalize now.
+      // Fast path for "?" — but ONLY when we have evidence this is a real
+      // finished question, not Deepgram's intonation-driven "?" mid-sentence.
+      // Require both: (a) we've held long enough that this isn't the first
+      // chunk after arming, and (b) the buffer has a substantial question
+      // shape after the trigger (≥8 words). Otherwise fall through to the
+      // normal sentence-end path so the completeness gate can hold.
       if (hasQuestionMark && !isFinalizingRef.current) {
-        if (debug) console.log(`🎯 [trigger-capture] "?" sentence-end after ${heldFor}ms hold, fast-finalize`);
-        finalizeCapture(now, true);
-        return false;
+        const combinedBuffer = bufferRef.current.map(c => c.text).join(' ').trim();
+        const lowerBuffer = combinedBuffer.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+        let postTriggerWords = 0;
+        for (const pattern of TRIGGER_PATTERNS) {
+          const m = lowerBuffer.match(pattern);
+          if (m && m.index !== undefined) {
+            const after = lowerBuffer.slice(m.index + m[0].length).trim();
+            postTriggerWords = after.split(/\s+/).filter(Boolean).length;
+            break;
+          }
+        }
+        const strongShape = heldFor >= minHoldMs && postTriggerWords >= 8;
+
+        if (strongShape) {
+          if (debug) console.log(`🎯 [trigger-capture] "?" + strong shape (held=${heldFor}ms postTrigger=${postTriggerWords}w), fast-finalize`);
+          finalizeCapture(now, true);
+          return false;
+        }
+        if (debug) console.log(`🎯 [trigger-capture] "?" but weak shape (held=${heldFor}ms postTrigger=${postTriggerWords}w) — treating as normal sentence-end, gate may hold`);
+        if (heldFor >= minHoldMs) {
+          finalizeCapture(now);
+          return false;
+        }
+        return true;
       }
 
       if (hasSentenceEnd && heldFor >= minHoldMs && !isFinalizingRef.current) {
