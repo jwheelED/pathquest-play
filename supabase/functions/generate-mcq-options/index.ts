@@ -163,7 +163,7 @@ serve(async (req) => {
     // Build a labelled, role-explicit context block. Prior context (focused, recent teaching prose
     // captured at trigger time) is given highest priority for pronoun resolution; the broader
     // source_transcript tail is included as background lecture history.
-    const broadContext = (source_transcript || '').slice(-6000).trim();
+    const broadContext = (source_transcript || '').slice(-3000).trim();
     const focusedContext = (prior_context || '').trim();
     const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
 
