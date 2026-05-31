@@ -39,9 +39,13 @@ const RHETORICAL_BLOCKLIST = [
 // Premise-led questions almost always use one of these before the WH-word
 // ("…sorted — which algorithm…", "…earlier, how did…").
 const CLAUSE_START = '(?:^|[.?!;,\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
+// Discourse markers that can sit between a clause boundary and the real WH-word
+// ("…flattens out. So why does it stop…", "…okay, now what happens…").
+// They are stripped later by FILLER_PREFIXES / postProcess.
+const DISCOURSE_MARKERS = '(?:(?:so|now|and|but|well|okay|ok|or|then|also|and so|but so)\\s+)*';
 const TRIGGER_PATTERNS = [
-  // Classic WH questions — clause-start anchored.
-  new RegExp(`${CLAUSE_START}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
+  // Classic WH questions — clause-start anchored, optional discourse markers.
+  new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
@@ -230,7 +234,7 @@ function postProcess(text: string): string {
 
   // Strip leading punctuation/dashes left over from the slice split
   // (e.g. "— which algorithm…", ", how did…").
-  merged = merged.replace(/^[\s,;:\-\u2014\u2013]+/, '').trim();
+  merged = merged.replace(/^[\s.,;:!?\-\u2014\u2013]+/, '').trim();
 
   // Strip leading filler (multiple passes)
   merged = merged.replace(FILLER_PREFIXES, '').trim();
