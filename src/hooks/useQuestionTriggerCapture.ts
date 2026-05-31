@@ -31,21 +31,36 @@ const RHETORICAL_BLOCKLIST = [
 
 // Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
 // MUST sit at the START of a clause — either the start of the buffer or
-// immediately after a sentence/clause terminator. This stops mid-sentence
-// WH-words in declarative paragraphs ("…and how dangerous these components
-// can be…") from arming the trigger.
-// Accept: buffer start, hard terminator (.?!;), a soft clause boundary
-// (comma / em-dash / en-dash followed by space), or a space-wrapped dash.
-// Premise-led questions almost always use one of these before the WH-word
-// ("…sorted — which algorithm…", "…earlier, how did…").
-const CLAUSE_START = '(?:^|[.?!;,\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
+// immediately after a hard sentence terminator / em-dash. A bare comma is
+// NOT a hard boundary: "…how they stain, how they interact, and how X…"
+// is a declarative enumeration, not three questions. The only comma path
+// that arms a WH-trigger is when the pre-comma clause is an explicit
+// PREMISE clause ("Given what we just said about X, why does Y…").
+const CLAUSE_START = '(?:^|[.?!;\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
 // Discourse markers that can sit between a clause boundary and the real WH-word
 // ("…flattens out. So why does it stop…", "…okay, now what happens…").
 // They are stripped later by FILLER_PREFIXES / postProcess.
 const DISCOURSE_MARKERS = '(?:(?:so|now|and|but|well|okay|ok|or|then|also|and so|but so)\\s+)*';
+// Subordinators that introduce a premise clause preceding the interrogative
+// (e.g., "If a cell has X, what happens?"). Used both as a regex source for
+// the premise-comma trigger pattern AND by the premise-rescue logic in
+// getSliceAroundTrigger.
+const PREMISE_SUBORDINATOR_SOURCE =
+  'if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as|considering';
+const PREMISE_SUBORDINATORS = new RegExp(`^(${PREMISE_SUBORDINATOR_SOURCE})\\b`, 'i');
+// Premise-comma start: a hard sentence boundary (or buffer start), then a
+// subordinator-led clause, then a comma, then (optionally) discourse markers.
+// Anything between the subordinator and the comma must NOT cross another hard
+// terminator, otherwise we'd glue unrelated sentences together.
+const PREMISE_COMMA_START =
+  `(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]*?,\\s+${DISCOURSE_MARKERS}`;
+const WH_WORDS = '(what|why|how|when|where|who|whom|whose|which)';
 const TRIGGER_PATTERNS = [
-  // Classic WH questions — clause-start anchored, optional discourse markers.
-  new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
+  // Classic WH questions — hard clause-start anchored, optional discourse markers.
+  new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
+  // Premise-led WH questions — comma path only when the pre-comma clause
+  // starts with a subordinator ("Given…, why…" / "Considering…, how…").
+  new RegExp(`${PREMISE_COMMA_START}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
