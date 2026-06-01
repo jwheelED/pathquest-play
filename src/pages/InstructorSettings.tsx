@@ -175,6 +175,7 @@ export default function InstructorSettings() {
               <p className="text-sm text-muted-foreground mt-1">Manage your subscription and usage limits.</p>
             </div>
             <BillingSettings />
+            <PasswordUpdateSettings />
           </div>
         );
       default:
