@@ -10,6 +10,7 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
+import { PasswordUpdateSettings } from "@/components/instructor/PasswordUpdateSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -174,6 +175,7 @@ export default function InstructorSettings() {
               <p className="text-sm text-muted-foreground mt-1">Manage your subscription and usage limits.</p>
             </div>
             <BillingSettings />
+            <PasswordUpdateSettings />
           </div>
         );
       default:
