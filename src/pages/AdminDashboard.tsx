@@ -533,6 +533,17 @@ export default function AdminDashboard() {
               <Shield className="w-3 h-3 mr-1" />
               Admin
             </Badge>
+            <Button
+              onClick={handleSyncNow}
+              disabled={syncing || !orgId}
+              size="sm"
+              variant="outline"
+              className="ml-2"
+              title="Re-sync instructors & their students into your organization"
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+              {syncing ? "Syncing..." : "Sync Now"}
+            </Button>
           </div>
         </header>
 
