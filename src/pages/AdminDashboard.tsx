@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap } from "lucide-react";
+import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
@@ -436,6 +436,25 @@ export default function AdminDashboard() {
     navigate("/");
   };
 
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("admin_sync_org_members");
+      if (error) throw error;
+      const r = data || {};
+      toast.success(
+        `Sync complete · ${r.instructors_linked ?? 0} instructor(s), ${r.students_linked ?? 0} student(s) linked`
+      );
+      await fetchDashboardData();
+    } catch (e: any) {
+      logger.error("Sync failed", e);
+      toast.error(e?.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const navItems = [
     { value: "overview" as TabValue, label: "Overview", icon: LayoutDashboard },
     { value: "adoption" as TabValue, label: "Adoption", icon: BarChart3 },
@@ -510,10 +529,22 @@ export default function AdminDashboard() {
                 Institutional Analytics for Deans, Chairs & Administrators
               </p>
             </div>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-              <Shield className="w-3 h-3 mr-1" />
-              Admin
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Admin
+              </Badge>
+              <Button
+                onClick={handleSyncNow}
+                disabled={syncing || !orgId}
+                size="sm"
+                variant="outline"
+                title="Re-sync instructors & their students into your organization"
+              >
+                <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            </div>
           </div>
         </header>
 

@@ -4273,6 +4273,7 @@ export type Database = {
           warning_triggered: boolean
         }[]
       }
+      admin_sync_org_members: { Args: never; Returns: Json }
       assign_oauth_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
