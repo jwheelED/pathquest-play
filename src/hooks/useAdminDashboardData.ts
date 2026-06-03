@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfWeek, subWeeks, format } from "date-fns";
+import type { AdminFilters } from "@/hooks/useAdminFilters";
+import { getDateRangeBounds } from "@/hooks/useAdminFilters";
 
 export interface AggregateMetrics {
   sessionsUsed: number;
