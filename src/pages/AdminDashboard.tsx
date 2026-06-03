@@ -150,7 +150,8 @@ export default function AdminDashboard() {
 
       setAdminName(profile?.full_name || "Administrator");
       const userOrgId = profile?.org_id;
-      
+      setOrgId(userOrgId ?? null);
+
       if (!userOrgId) {
         // No org yet — let OrganizationSetup handle creation
         setLoading(false);
