@@ -292,13 +292,13 @@ export default function AtRiskStudentsTable({ students, loading }: AtRiskStudent
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Instructor</TableHead>
-                  <TableHead className="text-right">Avg Grade</TableHead>
+                  <SortableHead col="name" label="Student" />
+                  <SortableHead col="instructorName" label="Instructor" />
+                  <SortableHead col="avgGrade" label="Avg Grade" align="right" />
                   <TableHead>Last Active</TableHead>
-                  <TableHead className="text-right">Incomplete</TableHead>
-                  <TableHead>Risk Level</TableHead>
-                  <TableHead>Risk Factors</TableHead>
+                  <SortableHead col="incompleteAssignments" label="Incomplete" align="right" />
+                  <SortableHead col="riskLevel" label="Risk Level" />
+                  <SortableHead col="riskScore" label="Risk Score" align="right" />
                 </TableRow>
               </TableHeader>
               <TableBody>
