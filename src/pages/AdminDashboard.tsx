@@ -110,12 +110,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      const { data: connectedInstructors } = await supabase
-        .from('admin_instructors')
-        .select('instructor_id')
-        .eq('admin_id', user.id);
+      // Get every instructor in this admin's org (not just rows in admin_instructors,
+      // which is per-admin and often incomplete when an org has multiple admins).
+      const { data: orgInstructors } = await supabase
+        .from("user_roles")
+        .select("user_id, profiles!inner(org_id)")
+        .eq("role", "instructor")
+        .eq("profiles.org_id", userOrgId);
 
-      const fetchedInstructorIds = connectedInstructors?.map(ci => ci.instructor_id) || [];
+      const fetchedInstructorIds = (orgInstructors || []).map((r: any) => r.user_id);
       setInstructorIds(fetchedInstructorIds);
 
       if (fetchedInstructorIds.length === 0) {
