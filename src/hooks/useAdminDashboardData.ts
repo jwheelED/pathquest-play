@@ -262,7 +262,7 @@ export function useAdminDashboardData(
     } finally {
       setLoading(false);
     }
-  }, [instructorIds]);
+  }, [instructorIds, JSON.stringify(filters)]);
 
   useEffect(() => {
     fetchData();
