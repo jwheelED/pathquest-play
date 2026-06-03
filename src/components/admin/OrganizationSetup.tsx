@@ -103,8 +103,8 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
   };
 
   const createOrganization = async () => {
-    if (!orgName.trim() || !orgSlug.trim()) {
-      toast.error("Please enter both organization name and slug");
+    if (!orgName.trim()) {
+      toast.error("Please enter an organization name");
       return;
     }
 
@@ -117,11 +117,15 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
       const { data: adminCode } = await supabase.rpc("generate_admin_code");
       const { data: inviteCode } = await supabase.rpc("generate_org_invite_code");
 
+      // Auto-generate a URL-safe slug from the name; append a short suffix to keep it unique.
+      const baseSlug = orgName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "org";
+      const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+
       const { data: newOrg, error: orgError } = await supabase
         .from("organizations")
         .insert({
-          name: orgName,
-          slug: orgSlug.toLowerCase().replace(/\s+/g, "-"),
+          name: orgName.trim(),
+          slug,
           admin_code: adminCode,
           instructor_invite_code: inviteCode,
         })
@@ -145,6 +149,41 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
       toast.error(error.message || "Failed to create organization");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEditName = () => {
+    if (!organization) return;
+    setEditedName(organization.name);
+    setEditingName(true);
+  };
+
+  const saveName = async () => {
+    if (!organization) return;
+    const trimmed = editedName.trim();
+    if (!trimmed) {
+      toast.error("Organization name can't be empty");
+      return;
+    }
+    if (trimmed === organization.name) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    try {
+      const { error } = await supabase
+        .from("organizations")
+        .update({ name: trimmed })
+        .eq("id", organization.id);
+      if (error) throw error;
+      setOrganization({ ...organization, name: trimmed });
+      setEditingName(false);
+      toast.success("Organization renamed");
+    } catch (error: any) {
+      console.error("Error renaming organization:", error);
+      toast.error(error.message || "Failed to rename organization");
+    } finally {
+      setSavingName(false);
     }
   };
 
