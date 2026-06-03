@@ -519,6 +519,14 @@ export default function AdminDashboard() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
+          {/* Global filter bar + smart presets (hidden until org exists) */}
+          {orgId && activeTab !== "settings" && (
+            <div className="max-w-7xl mx-auto space-y-3 mb-6">
+              <SmartPresetChips />
+              <AdminFilterBar orgId={orgId} instructorIds={instructorIds} />
+            </div>
+          )}
+
           {activeTab === "overview" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               {/* Organization Setup */}
@@ -532,8 +540,8 @@ export default function AdminDashboard() {
 
               {/* Learning Insights */}
               <LearningInsightsCard
-                misconceptions={misconceptions}
-                confidenceIssues={confidenceIssues}
+                misconceptions={filteredMisconceptions}
+                confidenceIssues={filteredConfidenceIssues}
                 loading={aggregateLoading}
               />
 
@@ -545,7 +553,7 @@ export default function AdminDashboard() {
           {activeTab === "adoption" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               <InstructorPerformanceCard
-                instructors={instructorPerformance}
+                instructors={filteredInstructorPerf}
                 loading={loading}
               />
             </div>
@@ -554,13 +562,13 @@ export default function AdminDashboard() {
           {activeTab === "support" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               <RetentionHealthCard
-                atRiskCount={retentionMetrics.atRiskCount}
+                atRiskCount={filteredAtRisk.length}
                 totalStudents={stats.totalStudents}
                 passRate={retentionMetrics.passRate}
                 retentionRate={retentionMetrics.retentionRate}
                 avgCompletionRate={retentionMetrics.avgCompletionRate}
               />
-              <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
+              <AtRiskStudentsTable students={filteredAtRisk} loading={loading} />
             </div>
           )}
 
