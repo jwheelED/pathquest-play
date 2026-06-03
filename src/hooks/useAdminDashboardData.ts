@@ -37,7 +37,10 @@ export interface AdminDashboardData {
   refetch: () => Promise<void>;
 }
 
-export function useAdminDashboardData(instructorIds: string[]): AdminDashboardData {
+export function useAdminDashboardData(
+  instructorIds: string[],
+  filters?: AdminFilters,
+): AdminDashboardData {
   const [metrics, setMetrics] = useState<AggregateMetrics>({
     sessionsUsed: 0,
     checksPerSession: 0,
@@ -59,14 +62,38 @@ export function useAdminDashboardData(instructorIds: string[]): AdminDashboardDa
     setError(null);
 
     try {
-      const fourWeeksAgo = subWeeks(new Date(), 4);
+      // Scope instructors by filter (if provided)
+      const scopedInstructorIds =
+        filters && filters.instructorIds.length > 0
+          ? instructorIds.filter((id) => filters.instructorIds.includes(id))
+          : instructorIds;
 
-      // Fetch sessions from last 4 weeks
-      const { data: sessions, error: sessionsError } = await supabase
+      if (scopedInstructorIds.length === 0) {
+        setMetrics({ sessionsUsed: 0, checksPerSession: 0, responseRate: 0 });
+        setWeeklyUsage([]);
+        setMisconceptions([]);
+        setConfidenceIssues([]);
+        setLoading(false);
+        return;
+      }
+
+      // Date range: prefer filter range, fall back to last 4 weeks
+      const { from: rangeFrom } = filters
+        ? getDateRangeBounds(filters.dateRange, filters.fromDate, filters.toDate)
+        : { from: subWeeks(new Date(), 4) };
+
+      // Fetch sessions within date range
+      let sessionQuery = supabase
         .from("live_sessions")
-        .select("id, created_at")
-        .in("instructor_id", instructorIds)
-        .gte("created_at", fourWeeksAgo.toISOString());
+        .select("id, created_at, course_id")
+        .in("instructor_id", scopedInstructorIds)
+        .gte("created_at", rangeFrom.toISOString());
+
+      if (filters && filters.courseIds.length > 0) {
+        sessionQuery = sessionQuery.in("course_id", filters.courseIds);
+      }
+
+      const { data: sessions, error: sessionsError } = await sessionQuery;
 
       if (sessionsError) throw sessionsError;
 
