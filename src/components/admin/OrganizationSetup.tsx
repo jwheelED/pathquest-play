@@ -364,15 +364,9 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
               onChange={(e) => setOrgName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="orgSlug">Organization Slug (URL-friendly)</Label>
-            <Input
-              id="orgSlug"
-              placeholder="e.g., stanford-cs"
-              value={orgSlug}
-              onChange={(e) => setOrgSlug(e.target.value)}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            You can rename your organization any time from this page.
+          </p>
           <Button
             onClick={createOrganization}
             disabled={creating}
