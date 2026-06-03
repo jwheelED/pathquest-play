@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,11 @@ import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/compon
 import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
+import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
+import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
+import { useAdminFilters } from "@/hooks/useAdminFilters";
+import { SMART_PRESETS } from "@/lib/adminSmartPresets";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
