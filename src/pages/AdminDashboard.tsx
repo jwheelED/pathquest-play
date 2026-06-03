@@ -158,28 +158,15 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Get every instructor in this admin's org. There is no FK from user_roles
-      // to profiles, so PostgREST cannot resolve a nested `profiles!inner` embed —
-      // fetch org profile ids first, then intersect with the instructor role.
-      const { data: orgProfiles } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", userOrgId);
+      // Only show instructors actually connected to this admin — either they
+      // accepted an invite to this org or their email domain matches one
+      // registered to this org. Excludes bulk/legacy org members.
+      const { data: connectedRows } = await supabase
+        .rpc("get_admin_connected_instructors", { _admin_id: user.id });
 
-      const orgProfileIds = (orgProfiles || []).map((p: any) => p.id);
-
-      let fetchedInstructorIds: string[] = [];
-      if (orgProfileIds.length > 0) {
-        const { data: instructorRoleRows } = await supabase
-          .from("user_roles")
-          .select("user_id")
-          .eq("role", "instructor")
-          .in("user_id", orgProfileIds);
-
-        fetchedInstructorIds = [
-          ...new Set((instructorRoleRows || []).map((r: any) => r.user_id)),
-        ];
-      }
+      const fetchedInstructorIds: string[] = [
+        ...new Set(((connectedRows as any[]) || []).map((r) => r.instructor_id)),
+      ];
       setInstructorIds(fetchedInstructorIds);
 
       if (fetchedInstructorIds.length === 0) {
