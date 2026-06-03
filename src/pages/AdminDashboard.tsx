@@ -43,12 +43,55 @@ export default function AdminDashboard() {
     avgCompletionRate: 0,
   });
   const [adminName, setAdminName] = useState("");
+  const [orgId, setOrgId] = useState<string | null>(null);
   const [instructorIds, setInstructorIds] = useState<string[]>([]);
   const navigate = useNavigate();
 
-  // Use the new hook for aggregate data
-  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } = 
-    useAdminDashboardData(instructorIds);
+  const { filters } = useAdminFilters();
+  const activePreset = useMemo(
+    () => SMART_PRESETS.find((p) => p.id === filters.presetId),
+    [filters.presetId],
+  );
+
+  // Use the new hook for aggregate data (now filter-aware)
+  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } =
+    useAdminDashboardData(instructorIds, filters);
+
+  // Client-side refinements: filter atRiskStudents and instructorPerformance by global filters + preset refinement
+  const filteredAtRisk = useMemo(() => {
+    let list = atRiskStudents;
+    if (filters.instructorIds.length > 0) {
+      const names = new Set(
+        instructorPerformance
+          .filter((i) => filters.instructorIds.includes(i.id))
+          .map((i) => i.name),
+      );
+      list = list.filter((s) => names.has(s.instructorName));
+    }
+    const ref = activePreset?.refinement;
+    if (ref?.riskLevels) list = list.filter((s) => ref.riskLevels!.includes(s.riskLevel));
+    if (ref?.inactiveDays != null) {
+      list = list.filter((s) => s.lastActive.includes("day") || s.lastActive === "Never");
+    }
+    return list;
+  }, [atRiskStudents, instructorPerformance, filters.instructorIds, activePreset]);
+
+  const filteredInstructorPerf = useMemo(() => {
+    if (filters.instructorIds.length === 0) return instructorPerformance;
+    return instructorPerformance.filter((i) => filters.instructorIds.includes(i.id));
+  }, [instructorPerformance, filters.instructorIds]);
+
+  const filteredMisconceptions = useMemo(() => {
+    const ref = activePreset?.refinement;
+    if (!ref?.maxCorrectRate) return misconceptions;
+    return misconceptions.filter((m) => m.correctRate <= ref.maxCorrectRate!);
+  }, [misconceptions, activePreset]);
+
+  const filteredConfidenceIssues = useMemo(() => {
+    const ref = activePreset?.refinement;
+    if (!ref?.minConfidentWrong) return confidenceIssues;
+    return confidenceIssues.filter((c) => c.confidentWrongCount >= ref.minConfidentWrong!);
+  }, [confidenceIssues, activePreset]);
 
   useEffect(() => {
     checkSession();
