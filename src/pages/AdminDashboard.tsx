@@ -158,15 +158,28 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Get every instructor in this admin's org (not just rows in admin_instructors,
-      // which is per-admin and often incomplete when an org has multiple admins).
-      const { data: orgInstructors } = await supabase
-        .from("user_roles")
-        .select("user_id, profiles!inner(org_id)")
-        .eq("role", "instructor")
-        .eq("profiles.org_id", userOrgId);
+      // Get every instructor in this admin's org. There is no FK from user_roles
+      // to profiles, so PostgREST cannot resolve a nested `profiles!inner` embed —
+      // fetch org profile ids first, then intersect with the instructor role.
+      const { data: orgProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", userOrgId);
 
-      const fetchedInstructorIds = (orgInstructors || []).map((r: any) => r.user_id);
+      const orgProfileIds = (orgProfiles || []).map((p: any) => p.id);
+
+      let fetchedInstructorIds: string[] = [];
+      if (orgProfileIds.length > 0) {
+        const { data: instructorRoleRows } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "instructor")
+          .in("user_id", orgProfileIds);
+
+        fetchedInstructorIds = [
+          ...new Set((instructorRoleRows || []).map((r: any) => r.user_id)),
+        ];
+      }
       setInstructorIds(fetchedInstructorIds);
 
       if (fetchedInstructorIds.length === 0) {
