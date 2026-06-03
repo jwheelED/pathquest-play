@@ -43,11 +43,13 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [orgName, setOrgName] = useState("");
-  const [orgSlug, setOrgSlug] = useState("");
   const [newDomain, setNewDomain] = useState("");
   const [newInviteEmail, setNewInviteEmail] = useState("");
   const [addingDomain, setAddingDomain] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     fetchOrganization();
