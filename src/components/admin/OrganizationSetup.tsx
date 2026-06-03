@@ -386,18 +386,50 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="w-5 h-5" />
-            {organization.name}
+            {editingName ? (
+              <div className="flex items-center gap-2 flex-1">
+                <Input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveName();
+                    if (e.key === "Escape") setEditingName(false);
+                  }}
+                  autoFocus
+                  className="h-9 text-base"
+                  disabled={savingName}
+                />
+                <Button size="sm" onClick={saveName} disabled={savingName}>
+                  {savingName ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingName(false)}
+                  disabled={savingName}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                <span>{organization.name}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={startEditName}
+                  className="h-7 px-2"
+                  aria-label="Rename organization"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            )}
           </CardTitle>
           <CardDescription>
             Manage how instructors join your organization
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Slug:</span>
-            <code className="px-2 py-1 bg-muted rounded text-sm">{organization.slug}</code>
-          </div>
-        </CardContent>
       </Card>
 
       {/* Email Domain Matching */}
