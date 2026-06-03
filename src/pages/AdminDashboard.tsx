@@ -529,21 +529,22 @@ export default function AdminDashboard() {
                 Institutional Analytics for Deans, Chairs & Administrators
               </p>
             </div>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-              <Shield className="w-3 h-3 mr-1" />
-              Admin
-            </Badge>
-            <Button
-              onClick={handleSyncNow}
-              disabled={syncing || !orgId}
-              size="sm"
-              variant="outline"
-              className="ml-2"
-              title="Re-sync instructors & their students into your organization"
-            >
-              <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
-              {syncing ? "Syncing..." : "Sync Now"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Admin
+              </Badge>
+              <Button
+                onClick={handleSyncNow}
+                disabled={syncing || !orgId}
+                size="sm"
+                variant="outline"
+                title="Re-sync instructors & their students into your organization"
+              >
+                <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            </div>
           </div>
         </header>
 
