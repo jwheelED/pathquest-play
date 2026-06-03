@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,11 @@ import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/compon
 import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
+import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
+import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
+import { useAdminFilters } from "@/hooks/useAdminFilters";
+import { SMART_PRESETS } from "@/lib/adminSmartPresets";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -39,12 +43,55 @@ export default function AdminDashboard() {
     avgCompletionRate: 0,
   });
   const [adminName, setAdminName] = useState("");
+  const [orgId, setOrgId] = useState<string | null>(null);
   const [instructorIds, setInstructorIds] = useState<string[]>([]);
   const navigate = useNavigate();
 
-  // Use the new hook for aggregate data
-  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } = 
-    useAdminDashboardData(instructorIds);
+  const { filters } = useAdminFilters();
+  const activePreset = useMemo(
+    () => SMART_PRESETS.find((p) => p.id === filters.presetId),
+    [filters.presetId],
+  );
+
+  // Use the new hook for aggregate data (now filter-aware)
+  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } =
+    useAdminDashboardData(instructorIds, filters);
+
+  // Client-side refinements: filter atRiskStudents and instructorPerformance by global filters + preset refinement
+  const filteredAtRisk = useMemo(() => {
+    let list = atRiskStudents;
+    if (filters.instructorIds.length > 0) {
+      const names = new Set(
+        instructorPerformance
+          .filter((i) => filters.instructorIds.includes(i.id))
+          .map((i) => i.name),
+      );
+      list = list.filter((s) => names.has(s.instructorName));
+    }
+    const ref = activePreset?.refinement;
+    if (ref?.riskLevels) list = list.filter((s) => ref.riskLevels!.includes(s.riskLevel));
+    if (ref?.inactiveDays != null) {
+      list = list.filter((s) => s.lastActive.includes("day") || s.lastActive === "Never");
+    }
+    return list;
+  }, [atRiskStudents, instructorPerformance, filters.instructorIds, activePreset]);
+
+  const filteredInstructorPerf = useMemo(() => {
+    if (filters.instructorIds.length === 0) return instructorPerformance;
+    return instructorPerformance.filter((i) => filters.instructorIds.includes(i.id));
+  }, [instructorPerformance, filters.instructorIds]);
+
+  const filteredMisconceptions = useMemo(() => {
+    const ref = activePreset?.refinement;
+    if (!ref?.maxCorrectRate) return misconceptions;
+    return misconceptions.filter((m) => m.correctRate <= ref.maxCorrectRate!);
+  }, [misconceptions, activePreset]);
+
+  const filteredConfidenceIssues = useMemo(() => {
+    const ref = activePreset?.refinement;
+    if (!ref?.minConfidentWrong) return confidenceIssues;
+    return confidenceIssues.filter((c) => c.confidentWrongCount >= ref.minConfidentWrong!);
+  }, [confidenceIssues, activePreset]);
 
   useEffect(() => {
     checkSession();
@@ -103,7 +150,8 @@ export default function AdminDashboard() {
 
       setAdminName(profile?.full_name || "Administrator");
       const userOrgId = profile?.org_id;
-      
+      setOrgId(userOrgId ?? null);
+
       if (!userOrgId) {
         // No org yet — let OrganizationSetup handle creation
         setLoading(false);
@@ -471,6 +519,14 @@ export default function AdminDashboard() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
+          {/* Global filter bar + smart presets (hidden until org exists) */}
+          {orgId && activeTab !== "settings" && (
+            <div className="max-w-7xl mx-auto space-y-3 mb-6">
+              <SmartPresetChips />
+              <AdminFilterBar orgId={orgId} instructorIds={instructorIds} />
+            </div>
+          )}
+
           {activeTab === "overview" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               {/* Organization Setup */}
@@ -484,8 +540,8 @@ export default function AdminDashboard() {
 
               {/* Learning Insights */}
               <LearningInsightsCard
-                misconceptions={misconceptions}
-                confidenceIssues={confidenceIssues}
+                misconceptions={filteredMisconceptions}
+                confidenceIssues={filteredConfidenceIssues}
                 loading={aggregateLoading}
               />
 
@@ -497,7 +553,7 @@ export default function AdminDashboard() {
           {activeTab === "adoption" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               <InstructorPerformanceCard
-                instructors={instructorPerformance}
+                instructors={filteredInstructorPerf}
                 loading={loading}
               />
             </div>
@@ -506,13 +562,13 @@ export default function AdminDashboard() {
           {activeTab === "support" && (
             <div className="space-y-6 max-w-7xl mx-auto">
               <RetentionHealthCard
-                atRiskCount={retentionMetrics.atRiskCount}
+                atRiskCount={filteredAtRisk.length}
                 totalStudents={stats.totalStudents}
                 passRate={retentionMetrics.passRate}
                 retentionRate={retentionMetrics.retentionRate}
                 avgCompletionRate={retentionMetrics.avgCompletionRate}
               />
-              <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
+              <AtRiskStudentsTable students={filteredAtRisk} loading={loading} />
             </div>
           )}
 

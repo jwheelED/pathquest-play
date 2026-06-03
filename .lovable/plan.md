@@ -1,49 +1,86 @@
-# Fix admin ↔ instructor sync
+## Goal
 
-The dashboard currently asks "which instructors are mine?" via the `admin_instructors` join table keyed on `admin_id = auth.uid()`. That model is wrong for orgs with multiple admins, and the auto-connect trigger that populates it is fragile:
+Give admins a powerful, intuitive way to slice their dashboard data — by instructor, course, session, time, and engagement — with both a global filter bar and per-card refinements, plus savable presets and out-of-the-box "smart presets" curated for common admin questions.
 
-- 3 admins exist in the same org. Even when auto-connect fires, it picks the first admin via `LIMIT 1`, so the other two admins see "0 Instructors".
-- For the two accepted invites in question (`geneticsaccount2@gmail.com`, `auburndemo2@gmail.com`), `admin_instructors` has **zero rows** — the trigger ran while `user_roles` for the instructor didn't yet exist (`handle_new_user` inserts the profile before the role row), so `has_role(NEW.id, 'instructor')` returned false and the trigger short-circuited. The invite was still marked `accepted` later (via `PendingOrgInvites`), but its admin-loop also only inserts for one admin.
+## Filter dimensions (phase 1)
 
-Both instructor profiles have `org_id` correctly set to the org, so org-level joins are the source of truth — `admin_instructors` is redundant for "is this instructor in my org?".
+**Global (apply to every card)**
+- Instructor — multi-select (org's instructors)
+- Course — multi-select (auto-scoped to selected instructors)
+- Session type — Live / Pre-recorded / Scheduled Event
+- Date range — 7d / 30d / This term / Custom (default 30d)
 
-## Changes
+**Per-card refinements**
+- *At-Risk Students table*: risk level, activity status (active / inactive 7d+), grade band, student name/email search
+- *Misconceptions card*: min responses threshold, correct-rate ceiling
+- *Confidence Issues card*: min confidently-wrong count
+- *Usage Over Time chart*: granularity (day/week), metric toggle (sessions vs questions)
+- *Instructor Performance*: sort by sessions / response rate / avg grade
 
-### 1. Dashboard: query instructors by org, not by `admin_instructors`
+## Smart presets (built-in)
 
-In `src/pages/AdminDashboard.tsx` (`fetchDashboardData`):
-- Replace the `admin_instructors` lookup with: all profiles where `org_id = userOrgId` AND `user_roles.role = 'instructor'`. Implementation: fetch instructor user_ids from `user_roles` joined to `profiles.org_id`, or two queries (`profiles` by `org_id`, then filter by `user_roles.role='instructor'`).
-- Everything downstream (`instructor_students`, `student_assignments`, `user_stats`) already keys off `instructorIds` / `userOrgId`, so it inherits the fix automatically.
-- Students follow: `instructor_students` is already queried `.in('instructor_id', fetchedInstructorIds).eq('org_id', userOrgId)`, so once instructors resolve, their students resolve too.
+Pre-built filter combos surfaced as one-click chips above the global bar:
 
-### 2. Backfill `admin_instructors` for the existing org
+1. **At-risk this week** — last 7d, risk level = high/critical
+2. **Underperforming sessions** — last 30d, correct rate <50%, ≥10 responses
+3. **Inactive students** — no activity 7d+, enrolled in any course
+4. **Top struggling courses** — courses with lowest avg grade, last 30d
+5. **High-confidence misconceptions** — confidently-wrong ≥3, last 30d
+6. **Low engagement instructors** — response rate <50%, last 30d
+7. **New this term** — sessions created in current term
 
-One-time data fix so any other code path still keyed off `admin_instructors` (e.g., admin invite flow internals) is consistent: for every (admin, instructor) pair within the same org, insert a row if missing.
+## Custom saved presets
 
-```sql
-INSERT INTO admin_instructors (admin_id, instructor_id, org_id)
-SELECT a.id, i.id, a.org_id
-FROM profiles a
-JOIN user_roles ar ON ar.user_id = a.id AND ar.role = 'admin'
-JOIN profiles i ON i.org_id = a.org_id AND i.id <> a.id
-JOIN user_roles ir ON ir.user_id = i.id AND ir.role = 'instructor'
-WHERE a.org_id IS NOT NULL
-ON CONFLICT (admin_id, instructor_id) DO NOTHING;
+- Admin can save current filter state with a name + optional emoji/color
+- Presets appear in a "My views" dropdown next to smart presets
+- Stored per-admin (not org-wide) so each admin curates their own
+- Edit/rename/delete from a manage modal
+
+## UI layout
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Smart presets: [At-risk week] [Underperforming] [Inactive]…│
+│ My views:      [▼ Select preset] [+ Save current]          │
+├─────────────────────────────────────────────────────────────┤
+│ Filters: [Instructor ▼] [Course ▼] [Type ▼] [Date ▼] [Clear]│ ← sticky
+├─────────────────────────────────────────────────────────────┤
+│ Active filter chips: × Prof. Smith  × BIO 101  × Last 7d   │
+└─────────────────────────────────────────────────────────────┘
+   ↓ filtered cards below
 ```
 
-### 3. Make future connections fan out to all admins
+Each card keeps its existing local controls (search, sort) and adds 1–2 refinement filters specific to its data.
 
-Update `auto_connect_instructor_to_org` (trigger fn) and `auto_connect_on_seat_allocation` so they `INSERT … SELECT` one row per admin in the org, instead of `LIMIT 1`. Same for the manual `PendingOrgInvites.tsx` accept path — loop over every admin in the org. Removes the "first admin wins" bug for future invites.
+## Technical implementation
 
-Also tighten the trigger guard: `has_role` may be false at profile-INSERT time. Re-check on UPDATE by also accepting cases where `NEW.org_id IS NOT NULL` but `admin_instructors` has no row yet, and bind admin rows then.
+**Data layer**
+- New hook `useAdminFilters()` — central filter state, URL-synced (`?instructor=...&course=...&from=...&to=...&preset=...`)
+- Refactor `useAdminDashboardData(instructorIds)` → `useAdminDashboardData(filters)` to accept the full filter object; push `instructor_id IN`, `course_id IN`, date range, and session type into Supabase queries
+- Add `course_id` join through `live_sessions` (already exists)
+- Multi-select dropdowns use shadcn `Command` + `Popover` (combobox pattern)
 
-## Out of scope
+**Saved presets**
+- New table `admin_dashboard_presets` (admin_id, name, filters jsonb, icon, created_at)
+- RLS: admin can CRUD their own rows
+- GRANTs for authenticated + service_role
 
-- Larger admin dashboard IA / terminology pass (already flagged from the previous turn).
-- Re-architecting away `admin_instructors` — keep the table, just stop using it as the primary "which instructors do I see?" filter.
+**Smart presets** — hardcoded array in `src/lib/adminSmartPresets.ts`, each is a `{ id, label, icon, filters }` object that hydrates `useAdminFilters`
 
-## Files
+**New components**
+- `src/components/admin/AdminFilterBar.tsx` — sticky bar, multi-selects, date picker, active chips
+- `src/components/admin/SmartPresetChips.tsx` — horizontal scrollable preset row
+- `src/components/admin/SavedPresetsMenu.tsx` — dropdown + save/manage modal
+- `src/hooks/useAdminFilters.ts` — state + URL sync
 
-- `src/pages/AdminDashboard.tsx` — replace `admin_instructors` lookup with org-scoped instructor query.
-- `src/components/instructor/PendingOrgInvites.tsx` — loop all admins on accept.
-- New migration — backfill `admin_instructors`; update `auto_connect_instructor_to_org` and `auto_connect_on_seat_allocation` to fan out across all admins.
+**Refactored**
+- `src/pages/AdminDashboard.tsx` — wire filter bar, pass filters to data hook, pass card-specific subsets to each card
+- `src/hooks/useAdminDashboardData.ts` — accept filters, scope queries
+- `src/components/admin/AtRiskStudentsTable.tsx` — accept external filters, drop the duplicated risk pill filter when global one is active
+- All admin cards — accept filtered data as props (already do)
+
+## Out of scope (future phases)
+
+- Performance bands, integrity/LMS filters, seat usage filters → phase 2
+- Org-wide shared presets → phase 2
+- Filter analytics ("most-used preset") → phase 3
