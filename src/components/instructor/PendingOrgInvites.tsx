@@ -87,30 +87,22 @@ export function PendingOrgInvites() {
 
       if (profileError) throw profileError;
 
-      // Find an admin from this org and create connection
-      const { data: adminProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", invite.org_id)
-        .limit(10);
+      // Connect this instructor to EVERY admin in the org so all admins see them.
+      const { data: orgAdmins } = await supabase
+        .from("user_roles")
+        .select("user_id, profiles!inner(org_id)")
+        .eq("role", "admin")
+        .eq("profiles.org_id", invite.org_id);
 
-      if (adminProfile) {
-        for (const profile of adminProfile) {
-          const { data: isAdmin } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", profile.id)
-            .eq("role", "admin")
-            .maybeSingle();
-
-          if (isAdmin) {
-            await supabase
-              .from("admin_instructors")
-              .insert({ admin_id: profile.id, instructor_id: user.id, org_id: invite.org_id })
-              .select();
-            break;
-          }
-        }
+      if (orgAdmins && orgAdmins.length > 0) {
+        await supabase.from("admin_instructors").upsert(
+          orgAdmins.map((a: any) => ({
+            admin_id: a.user_id,
+            instructor_id: user.id,
+            org_id: invite.org_id,
+          })),
+          { onConflict: "admin_id,instructor_id", ignoreDuplicates: true }
+        );
       }
 
       setInvites(prev => prev.filter(i => i.id !== invite.id));
