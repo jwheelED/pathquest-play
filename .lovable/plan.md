@@ -1,116 +1,57 @@
-## Goal
+# Admin Dashboard Org UX Revamp
 
-Add a deterministic, vitest/jsdom test that drives the on-deck question pipeline end-to-end from "transcription output" through the real capture + passive detection hooks, asserting the final extracted question (or absence).
+Two focused fixes around organization identity. No structural redesign of the rest of the admin dashboard in this pass — we can do a broader pass after these land.
 
-## Honest seam choice
+## 1. Remove "Slug" from the admin view, add rename UI
 
-`useLectureRecording.ts` performs two non-testable things in jsdom: mic capture (`getUserMedia` + `MediaRecorder`) and Deepgram streaming. Past those, every final transcript chunk is fanned out into:
+Problem: `Slug: default` is meaningless to a dean/chair. Slug is an internal URL-safe identifier, not something an admin should think about.
 
-1. `triggerCapture.feedChunk(text, Date.now())` — real `useQuestionTriggerCapture`
-2. `passive.checkUtterance(text)` — real `usePassiveQuestionDetection`
+Changes in `src/components/admin/OrganizationSetup.tsx`:
+- Remove the "Slug:" row from the Organization Info card entirely (it stays in the DB, just hidden from the UI).
+- Add an inline "Edit" affordance next to the org name (pencil icon → input + Save/Cancel) that lets the admin rename the organization.
+- On save: `UPDATE organizations SET name = ... WHERE id = org.id`, then refresh local state and toast. Slug is left untouched — admins never see or edit it.
+- Keep the "Create Your Organization" form for first-time setup, but drop the "Organization Slug" input. Auto-generate the slug from the name (`name.toLowerCase().replace(/[^a-z0-9]+/g, '-')`) behind the scenes, with a uniqueness retry suffix if needed.
 
-…and the on-deck UI reads `triggerCapture` capture-complete callback OR `passive.candidate`. That fanout is the contract.
+RLS: there is no current UPDATE policy on `public.organizations`. Add a migration:
+```sql
+CREATE POLICY "Admins can update their organization"
+  ON public.organizations FOR UPDATE TO authenticated
+  USING (has_role(auth.uid(), 'admin') AND id = (SELECT org_id FROM profiles WHERE id = auth.uid()))
+  WITH CHECK (has_role(auth.uid(), 'admin') AND id = (SELECT org_id FROM profiles WHERE id = auth.uid()));
 
-So the test mocks **only** the transcription boundary by directly driving those two hooks with scripted final chunks (the exact shape `DeepgramStreamingClient.onTranscript` would produce after `sanitizeTranscript`). Everything downstream — trigger arming, buffering, semantic completion gate, premise rescue, priorContext slicing, rhetorical/greeting filtering, trailing-silence promotion, cooldown — runs as real production code. No stubbing of the logic under test. This is the most faithful e2e shape achievable without Playwright + real mic + real Deepgram.
-
-A `// SEAMS:` header comment in the test file will document this.
-
-## Files
-
-```text
-src/hooks/__tests__/
-  onDeckPipeline.fixtures.ts        # scenarios
-  onDeckPipeline.harness.ts         # renderHook wiring + chunk driver
-  onDeckPipeline.test.ts            # the test
+GRANT UPDATE (name) ON public.organizations TO authenticated;
 ```
+Only the `name` column is grantable to authenticated — slug stays admin-API/service-role only.
 
-### `onDeckPipeline.fixtures.ts`
+## 2. Fix "Unknown Organization" on instructor invite cards
 
-Exports `SCENARIOS: PipelineScenario[]`:
+Problem: `src/components/instructor/PendingOrgInvites.tsx` fetches `instructor_invites` for the user's email, then tries `SELECT id, name FROM organizations WHERE id IN (...)`. The current SELECT grant on `organizations` is column-scoped to `authenticated`, but there is no RLS SELECT policy that lets a not-yet-member instructor read a row by id — so the join returns nothing and we fall back to "Unknown Organization".
 
-```ts
-type Chunk = { text: string; gapMs?: number; confidence?: number };
-type PipelineScenario = {
-  audioId: string;              // logical clip id (no real audio)
-  note: string;
-  chunks: Chunk[];              // scripted final transcript chunks
-  expectedExtractedQuestion: string | null;
-  expectPriorContext?: 'present' | 'absent';
-};
+Fix with a `SECURITY DEFINER` RPC so we don't have to widen org visibility globally:
+```sql
+CREATE OR REPLACE FUNCTION public.get_invited_org_names(_email text)
+RETURNS TABLE(org_id uuid, org_name text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT o.id, o.name
+  FROM instructor_invites i
+  JOIN organizations o ON o.id = i.org_id
+  WHERE i.email = lower(_email) AND i.status = 'pending';
+$$;
+GRANT EXECUTE ON FUNCTION public.get_invited_org_names(text) TO authenticated;
 ```
+The RPC only exposes `(org_id, name)` for orgs that actually invited the caller's email — no broader leakage.
 
-Four required scenarios:
+In `PendingOrgInvites.tsx`:
+- Also filter `instructor_invites` by the caller's email (currently it pulls every pending invite the RLS lets through).
+- Replace the `organizations` lookup with `supabase.rpc('get_invited_org_names', { _email: user.email })` and build the name map from that.
+- Drop the "Unknown Organization" fallback string; if a name still can't be resolved (shouldn't happen), hide that invite rather than showing a confusing placeholder.
 
-1. **tp-short** — single chunk `"What happens to the electron here?"` → expected exactly that, `priorContext: 'absent'`.
-2. **tp-long-multichunk** — split across 3 chunks of `"Suppose that the array is already sorted —"`, `"which search algorithm would you pick,"`, `"and how does its complexity compare to a linear scan?"` with small gaps → expected merged form containing `"which search algorithm would you pick"` and ending with `?`.
-3. **fp-declarative-guard** — narration with trigger words used declaratively + rhetorical fillers, e.g.:
-   - `"We'll look at how they stain, how they interact with antibiotics, and how dangerous certain components can be."`
-   - `"Right? Make sense? Any questions?"`
-   - `"And we have to remember just how dangerous these components can be in everyday use."`
-   → `expectedExtractedQuestion: null`.
-4. **context-pull** — topic narration chunk, short pause, then `"So why does it stop once equilibrium is reached?"` → expected captured question without leading filler, `priorContext: 'present'` containing antecedent prose. Paired sub-assertion confirms scenario 1 (self-contained) has no priorContext.
+## Out of scope (call out for follow-up)
 
-### `onDeckPipeline.harness.ts`
+The broader "make the admin dashboard easier to understand / more important for what an admin wants" pass — reorganizing cards, prioritizing at-risk students / instructor performance / usage trends, terminology cleanup elsewhere — is intentionally not in this plan. After these two fixes ship, I'll come back with a layout/IA proposal for the dashboard itself.
 
-```ts
-export function renderPipeline(opts?) {
-  // renderHook(() => {
-  //   const trigger = useQuestionTriggerCapture({ debug: false, ...opts.trigger });
-  //   const passive = usePassiveQuestionDetection({ debug: false, ...opts.passive });
-  //   return { trigger, passive };
-  // })
-}
+## Files touched
 
-export async function playChunks(api, chunks) {
-  // For each chunk:
-  //   act(() => { api.trigger.feedChunk(c.text, nowRef); api.passive.checkUtterance(c.text); });
-  //   act(() => { vi.advanceTimersByTime(c.gapMs ?? 1500); nowRef += gap });
-  // After last chunk: advance enough time to flush trailing-silence + completion timer + max extensions.
-}
-
-export function readFinalCandidate(api, captured) {
-  // Prefer trigger-capture callback result (the production on-deck source);
-  // fall back to passive.candidate if no trigger fired (short questions path).
-}
-```
-
-Helper also wires `setOnCaptureComplete` to push into a captured[] array.
-
-### `onDeckPipeline.test.ts`
-
-Top comment block documenting seams (mocked: transcription output only; real: capture, detection, gating, promotion). Uses `vi.useFakeTimers()` / `vi.useRealTimers()` (matching `usePassiveQuestionDetection.test.ts` style).
-
-```ts
-describe.each(SCENARIOS)('on-deck pipeline — $audioId', (s) => {
-  it('produces the expected on-deck question', async () => {
-    const api = renderPipeline();
-    const captured: PassiveQuestionCandidate[] = [];
-    act(() => api.trigger.setOnCaptureComplete(c => captured.push(c)));
-    await playChunks(api, s.chunks);
-    const final = readFinalCandidate(api, captured);
-    if (s.expectedExtractedQuestion === null) {
-      expect(final).toBeNull();
-    } else {
-      expect(final).not.toBeNull();
-      expect(final!.text.toLowerCase()).toContain(s.expectedExtractedQuestion.toLowerCase());
-      if (s.expectPriorContext === 'present') expect(final!.priorContext).toBeTruthy();
-      if (s.expectPriorContext === 'absent') expect(final!.priorContext ?? '').toBe('');
-    }
-  });
-});
-```
-
-The false-positive guard scenario will **fail loudly** if detection regresses to emitting a card on declarative narration — exactly the production bug being prevented.
-
-## Optional live smoke (skipped by default)
-
-`it.skipIf(!process.env.RUN_LIVE_PIPELINE)('live smoke', ...)` — placeholder that, when both `RUN_LIVE_PIPELINE=1` and `VITE_DEEPGRAM_PROXY_URL` are set, would `supabase.functions.invoke('transcribe-lecture', { audio: <fixture> })` and feed real output through the same harness. Documented as manual-only because jsdom has no audio API.
-
-## Out of scope (called out explicitly)
-
-- `useLectureRecording` itself isn't rendered. Rendering it would require stubbing `getUserMedia`, `MediaRecorder`, `DeepgramStreamingClient`, **and** the transcription edge function — that's four mocks around the same boundary instead of one, with no added coverage of real logic. The fanout being verified (`feedChunk` + `checkUtterance`) is a one-line wiring that's better asserted (if desired) with a separate tiny unit test rather than an audio-simulating shell.
-- No Playwright/Cypress, no real network, no real `MediaRecorder` polyfill, no new deps.
-
-## Verification
-
-Run `bunx vitest run src/hooks/__tests__/onDeckPipeline.test.ts` and paste output. If any scenario fails I'll diagnose against the real hook (not loosen the assertion) and report; the false-positive guard in particular must stay strict.
+- `src/components/admin/OrganizationSetup.tsx` — remove slug row + slug input, add rename UI, auto-slug on create.
+- `src/components/instructor/PendingOrgInvites.tsx` — use RPC, filter by email, drop fallback.
+- New migration — `organizations` UPDATE policy + `name`-only grant, `get_invited_org_names` RPC.

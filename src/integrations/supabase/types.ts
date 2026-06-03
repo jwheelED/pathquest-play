@@ -4297,6 +4297,13 @@ export type Database = {
           warning_level: string
         }[]
       }
+      get_invited_org_names: {
+        Args: { _email: string }
+        Returns: {
+          org_id: string
+          org_name: string
+        }[]
+      }
       get_org_codes: {
         Args: { _org_id: string }
         Returns: {

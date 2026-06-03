@@ -32,7 +32,8 @@ export function PendingOrgInvites() {
       const { data, error } = await supabase
         .from("instructor_invites")
         .select("id, org_id, email, status, created_at")
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .eq("email", user.email.toLowerCase());
 
       if (error) throw error;
       if (!data || data.length === 0) {
@@ -41,19 +42,22 @@ export function PendingOrgInvites() {
         return;
       }
 
-      // Fetch org names
-      const orgIds = [...new Set(data.map(i => i.org_id))];
-      const { data: orgs } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .in("id", orgIds);
+      // Resolve org names via SECURITY DEFINER RPC — instructors don't yet
+      // belong to the org, so a direct SELECT on organizations is blocked by RLS.
+      const { data: orgRows } = await supabase.rpc("get_invited_org_names", {
+        _email: user.email,
+      });
 
-      const orgMap = new Map(orgs?.map(o => [o.id, o.name]) || []);
+      const orgMap = new Map(
+        (orgRows || []).map((o: { org_id: string; org_name: string }) => [o.org_id, o.org_name])
+      );
 
-      setInvites(data.map(i => ({
-        ...i,
-        org_name: orgMap.get(i.org_id) || "Unknown Organization",
-      })));
+      // Drop invites we can't name rather than showing "Unknown Organization".
+      const named = data
+        .map(i => ({ ...i, org_name: orgMap.get(i.org_id) }))
+        .filter((i): i is Invite & { org_name: string } => Boolean(i.org_name));
+
+      setInvites(named);
     } catch (error) {
       console.error("Error fetching invites:", error);
     } finally {
