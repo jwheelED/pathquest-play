@@ -4327,6 +4327,12 @@ export type Database = {
           total_questions_at_level: Json
         }[]
       }
+      get_admin_connected_instructors: {
+        Args: { _admin_id: string }
+        Returns: {
+          instructor_id: string
+        }[]
+      }
       get_current_usage: {
         Args: { p_instructor_id: string }
         Returns: {
