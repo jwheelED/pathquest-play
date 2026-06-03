@@ -436,6 +436,25 @@ export default function AdminDashboard() {
     navigate("/");
   };
 
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("admin_sync_org_members");
+      if (error) throw error;
+      const r = data || {};
+      toast.success(
+        `Sync complete · ${r.instructors_linked ?? 0} instructor(s), ${r.students_linked ?? 0} student(s) linked`
+      );
+      await fetchDashboardData();
+    } catch (e: any) {
+      logger.error("Sync failed", e);
+      toast.error(e?.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const navItems = [
     { value: "overview" as TabValue, label: "Overview", icon: LayoutDashboard },
     { value: "adoption" as TabValue, label: "Adoption", icon: BarChart3 },
