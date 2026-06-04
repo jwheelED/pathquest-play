@@ -44,10 +44,12 @@ export default function AdminDashboard() {
   const [courseEngagement, setCourseEngagement] = useState<CourseEngagement[]>([]);
   const [retentionMetrics, setRetentionMetrics] = useState({
     atRiskCount: 0,
-    passRate: 0,
-    retentionRate: 0,
-    avgCompletionRate: 0,
+    sevenDayResponseRate: null as number | null,
+    inactiveCount: 0,
+    sessionsPerStudent: null as number | null,
+    hasRecentSessions: false,
   });
+  const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [adminName, setAdminName] = useState("");
   const [orgId, setOrgId] = useState<string | null>(null);
   const [instructorIds, setInstructorIds] = useState<string[]>([]);
