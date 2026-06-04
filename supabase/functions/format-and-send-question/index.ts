@@ -742,7 +742,45 @@ serve(async (req) => {
     if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
 
-      if (isSimpleCoding) {
+      if (hasCodingPayload && isSimpleCoding) {
+        // Pre-generated simple check-in from on-deck preview - use as-is
+        console.log("📝 Using pre-generated simple coding payload");
+        formattedQuestion = {
+          question:
+            typeof question_text === "string"
+              ? question_text
+              : (question_text?.question_text || String(question_text)),
+          type: "coding_simple",
+          language: coding_payload.language || "python",
+          difficulty: "Easy",
+          functionSignature: "",
+          constraints: [],
+          examples: [],
+          hints: ["Focus on demonstrating the concept - minor syntax errors are okay!"],
+          starterCode: "",
+          testCases: [],
+          expectedAnswer: coding_payload.expected_answer || expected_answer || "",
+          gradingMode: "auto_grade", // simple check-ins always auto-grade
+        };
+      } else if (hasCodingPayload && !isSimpleCoding) {
+        // Pre-generated full LeetCode-style payload from on-deck preview
+        console.log("📝 Using pre-generated full coding payload");
+        formattedQuestion = {
+          title: coding_payload.title || (typeof question_text === "string" ? question_text : ""),
+          question: coding_payload.problemStatement || (typeof question_text === "string" ? question_text : ""),
+          type: "coding",
+          language: coding_payload.language || "python",
+          difficulty: coding_payload.difficulty || "Medium",
+          functionSignature: coding_payload.functionSignature || "",
+          constraints: coding_payload.constraints || [],
+          examples: coding_payload.examples || [],
+          hints: coding_payload.hints || [],
+          starterCode: coding_payload.starterCode || "",
+          testCases: coding_payload.testCases || [],
+          expectedAnswer: "",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade",
+        };
+      } else if (isSimpleCoding) {
         // Simple coding check-in - minimal structure, just show mini IDE with the question
         console.log("📝 Creating simple coding check-in (mini IDE)");
         formattedQuestion = {
