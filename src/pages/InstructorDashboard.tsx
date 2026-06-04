@@ -95,7 +95,7 @@ export default function InstructorDashboard() {
   const [isQuestionHeld, setIsQuestionHeld] = useState(false);
   const [autoQuestionState, setAutoQuestionState] = useState({ intervalMinutes: 15, nextQuestionIn: 0, isSending: false });
   // Refs for callbacks
-  const onSendQuestionRef = useRef<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>(null);
+  const onSendQuestionRef = useRef<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => void) | null>(null);
   const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
   const onDismissQuestionRef = useRef<(() => void) | null>(null);
   const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
@@ -315,7 +315,7 @@ export default function InstructorDashboard() {
     
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name, question_format_preference")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name, question_format_preference, coding_question_style")
       .eq("id", session.user.id)
       .single();
     
@@ -643,13 +643,14 @@ export default function InstructorDashboard() {
                 currentTranscript={currentTranscript}
                 questionCandidate={questionCandidate}
                 isSendingQuestion={isSendingQuestion}
-                onSendQuestion={(text, type, options, correctAnswer, expectedAnswer) => onSendQuestionRef.current?.(text, type, options, correctAnswer, expectedAnswer)}
+                onSendQuestion={(text, type, options, correctAnswer, expectedAnswer, codingPayload) => onSendQuestionRef.current?.(text, type, options, correctAnswer, expectedAnswer, codingPayload)}
                 onPreviewQuestion={(text) => onPreviewQuestionRef.current?.(text)}
                 onDismissQuestion={() => onDismissQuestionRef.current?.()}
                 isQuestionHeld={isQuestionHeld}
                 onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
                 onViewLiveResponses={() => setActiveTab("live")}
-                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | undefined}
+                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding' | undefined}
+                codingStyle={(instructorProfile?.coding_question_style as 'simple' | 'full' | undefined) ?? 'simple'}
                 intervalMinutes={autoQuestionState.intervalMinutes}
                 nextQuestionIn={autoQuestionState.nextQuestionIn}
                 onIntervalChange={(minutes) => onAutoQuestionIntervalChangeRef.current?.(minutes)}
