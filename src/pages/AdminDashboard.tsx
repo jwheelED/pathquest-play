@@ -770,9 +770,11 @@ export default function AdminDashboard() {
 
           {activeTab === "adoption" && (
             <div className="space-y-6 max-w-7xl mx-auto">
-              <InstructorPerformanceCard
-                instructors={filteredInstructorPerf}
+              <CourseEngagementHealthCard
+                courses={filteredCourseEngagement}
                 loading={loading}
+                lmsConnected={instructorIds.length > 0}
+                onConnectLms={() => setActiveTab("settings")}
               />
             </div>
           )}
