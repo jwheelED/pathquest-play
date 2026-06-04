@@ -485,7 +485,14 @@ serve(async (req) => {
       explanation = null,
       course_id = null,
       source_transcript = null, // Raw transcript to display with question
+      coding_payload = null, // Pre-generated/edited coding question from on-deck preview
     } = await req.json();
+
+    // Normalize coding_payload (may arrive as {style:'simple'|'full', ...fields})
+    const hasCodingPayload = coding_payload && typeof coding_payload === "object";
+    const codingPayloadStyle = hasCodingPayload
+      ? (coding_payload.style === "full" ? "full" : coding_payload.style === "simple" ? "simple" : null)
+      : null;
 
     // ALWAYS combine the broad transcript tail (context) with the focused trigger prior_context.
     // The broad tail provides earlier-lecture history needed to resolve vague references like
@@ -560,7 +567,11 @@ serve(async (req) => {
 
     let finalType: string;
 
-    if (hasPreGeneratedOptions && normalizedSuggestedType) {
+    if (hasCodingPayload && codingPayloadStyle) {
+      // Instructor pre-generated/edited coding question from on-deck preview - respect it
+      finalType = codingPayloadStyle === "simple" ? "coding_simple" : "coding";
+      console.log(`🔧 Using pre-edited coding payload, type: ${finalType}`);
+    } else if (hasPreGeneratedOptions && normalizedSuggestedType) {
       // Preview dialog with edited options - respect user's explicit choice
       finalType = normalizedSuggestedType;
       console.log(`📝 Using preview dialog type: ${finalType}`);
@@ -731,7 +742,45 @@ serve(async (req) => {
     if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
 
-      if (isSimpleCoding) {
+      if (hasCodingPayload && isSimpleCoding) {
+        // Pre-generated simple check-in from on-deck preview - use as-is
+        console.log("📝 Using pre-generated simple coding payload");
+        formattedQuestion = {
+          question:
+            typeof question_text === "string"
+              ? question_text
+              : (question_text?.question_text || String(question_text)),
+          type: "coding_simple",
+          language: coding_payload.language || "python",
+          difficulty: "Easy",
+          functionSignature: "",
+          constraints: [],
+          examples: [],
+          hints: ["Focus on demonstrating the concept - minor syntax errors are okay!"],
+          starterCode: "",
+          testCases: [],
+          expectedAnswer: coding_payload.expected_answer || expected_answer || "",
+          gradingMode: "auto_grade", // simple check-ins always auto-grade
+        };
+      } else if (hasCodingPayload && !isSimpleCoding) {
+        // Pre-generated full LeetCode-style payload from on-deck preview
+        console.log("📝 Using pre-generated full coding payload");
+        formattedQuestion = {
+          title: coding_payload.title || (typeof question_text === "string" ? question_text : ""),
+          question: coding_payload.problemStatement || (typeof question_text === "string" ? question_text : ""),
+          type: "coding",
+          language: coding_payload.language || "python",
+          difficulty: coding_payload.difficulty || "Medium",
+          functionSignature: coding_payload.functionSignature || "",
+          constraints: coding_payload.constraints || [],
+          examples: coding_payload.examples || [],
+          hints: coding_payload.hints || [],
+          starterCode: coding_payload.starterCode || "",
+          testCases: coding_payload.testCases || [],
+          expectedAnswer: "",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade",
+        };
+      } else if (isSimpleCoding) {
         // Simple coding check-in - minimal structure, just show mini IDE with the question
         console.log("📝 Creating simple coding check-in (mini IDE)");
         formattedQuestion = {

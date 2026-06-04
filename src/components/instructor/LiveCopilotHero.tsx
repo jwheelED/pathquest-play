@@ -49,7 +49,7 @@ import type { PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetecti
 // 'mcq' is kept as an internal alias for legacy local UI logic but should NOT be sent
 // downstream — sending it caused the radio group to fail to preselect, which dropped
 // MCQ options and made the instructor's preference appear ignored.
-type QuestionType = "mcq" | "multiple_choice" | "short_answer" | "poll";
+type QuestionType = "mcq" | "multiple_choice" | "short_answer" | "poll" | "coding";
 
 interface SentQuestionStats {
   responded: number;
@@ -98,7 +98,7 @@ interface LiveCopilotHeroProps {
   sentQuestion?: SentQuestion | null;
   onViewLiveResponses?: () => void;
   onSendFollowUp?: () => void;
-  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
+  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
   intervalMinutes?: number;
   nextQuestionIn?: number;
   onIntervalChange?: (minutes: number) => void;
@@ -184,6 +184,7 @@ function ReviewModal({
     multiple_choice: "Multiple Choice",
     short_answer: "Short Answer",
     poll: "Poll",
+    coding: "Coding",
   };
 
   const questionLabel: Record<QuestionType, string> = {
@@ -191,6 +192,7 @@ function ReviewModal({
     multiple_choice: "Multiple Choice Question",
     short_answer: "Short Answer Question",
     poll: "Poll Question",
+    coding: "Coding Question",
   };
 
   const fetchMcqOptions = async (text: string, transcript: string | undefined) => {
