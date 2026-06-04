@@ -1,32 +1,36 @@
-## Diagnosis
+## Why it is still coming up as MCQ
 
-Your saved database settings are correct: `question_format_preference = coding` and `coding_question_style = simple` for the current instructor.
+It is probably not onboarding. Your saved profile can be `coding/simple`, but there are still two code paths that can fall back to MCQ:
 
-The logs show the actual bug: when the question was detected, **both** preview generators ran for the same on-deck question:
+1. `QuestionOnDeck` displays `suggestedType = 'multiple_choice'` until `formatPreference` is loaded.
+2. `LiveCopilotHero` does not support `coding` in its `effectiveFormat`; it maps anything other than short answer/poll to `mcq`, so if that hero preview path is the one you are seeing, it will still generate MCQ options.
+3. The review modal converts `coding` / `coding_simple` back to short answer, which can create another fallback if on-deck does not bypass it.
 
-- `generate-coding-preview` ran with `style=simple`
-- `generate-mcq-options` also ran immediately afterward
+## Fix plan
 
-That means Question on Deck briefly uses the correct coding preference, but an older/default MCQ preview request can still complete and write MCQ options into the same card. The UI then renders the stale MCQ state, which is why you see an MCQ badge/options even though the setting is Coding → Simple check-in.
+1. **Make coding an explicit loaded state**
+   - Keep `questionFormatPreference` nullable while profile settings load.
+   - Do not render or generate an on-deck preview until the instructor preference is known.
+   - Show a small “Loading format…” state instead of allowing the MCQ default to appear.
 
-## Plan
+2. **Hard-lock `QuestionOnDeck` generation by preference**
+   - If `formatPreference === 'coding'`, only call `generate-coding-preview`.
+   - Never call `generate-mcq-options` or `match-bank-question` for coding previews.
+   - Clear MCQ options before and after coding generation so stale MCQ state cannot render.
 
-1. **Make preview generation request-safe**
-   - Add a monotonically increasing request id in `QuestionOnDeck.tsx`.
-   - Every `generatePreview` call captures its own id.
-   - Before any async response updates preview state, verify it is still the latest request.
-   - If a stale MCQ response returns after a newer coding request, ignore it.
+3. **Fix the alternate Live Copilot preview path**
+   - Update `LiveCopilotHero` so `formatPreference === 'coding'` resolves to coding, not `mcq`.
+   - For coding format, do not generate MCQ options in the hero path.
+   - Send coding as `coding_simple` or `coding` depending on `coding_question_style`.
 
-2. **Clear incompatible preview state per format**
-   - When format is `coding`, explicitly keep `mcqOptions` empty and never allow MCQ options to render from a previous request.
-   - When format is MCQ/poll, clear coding payload/expected answer as appropriate.
+4. **Prevent the modal fallback from changing coding into another type**
+   - Ensure coding on-deck sends bypass the modal with coding payload.
+   - If a coding item ever reaches the modal path, keep the wire type as coding instead of converting it to MCQ/short answer.
 
-3. **Lock the on-deck render to the resolved format**
-   - Ensure the right-side preview can only render the coding simple check-in panel when `effectiveFormat === 'coding'` and `codingStyle === 'simple'`.
-   - This prevents stale MCQ options from visually overriding the chosen format.
+5. **Add regression coverage**
+   - Add/update a focused test verifying that when the profile preference is Coding → Simple, the on-deck pipeline does not call MCQ generation and sends `coding_simple`.
+   - Add a second check for Coding → Full sending `coding`.
 
-4. **Add focused regression coverage**
-   - Add/update a test around the on-deck pipeline so a candidate that starts with the default MCQ state and then resolves to Coding Simple cannot display or send as MCQ.
+## Expected result
 
-5. **Optional deploy note**
-   - If the deployed edge function logs still show stale function behavior after the frontend fix, deploy `generate-coding-preview` / related functions so the preview environment matches the repo.
+When Question Format Settings is set to Coding, Question on Deck will be coding-only. MCQ options will not generate, display, or send from that on-deck flow.
