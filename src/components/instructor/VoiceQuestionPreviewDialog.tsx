@@ -18,9 +18,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MathRenderer } from '@/components/ui/math-renderer';
 
+export interface CodingPreviewPayload {
+  problemStatement?: string;
+  functionSignature?: string;
+  language?: string;
+  difficulty?: string;
+  constraints?: string[];
+  examples?: Array<{ input?: string; output?: string; explanation?: string }>;
+  hints?: string[];
+  starterCode?: string;
+  testCases?: Array<{ input?: string; expectedOutput?: string }>;
+  title?: string;
+  // Simple-style fallback: short reference answer used for grading
+  expected_answer?: string;
+}
+
 export interface ExtractedVoiceQuestion {
   question_text: string;
-  suggested_type: 'short_answer' | 'multiple_choice' | 'poll';
+  suggested_type: 'short_answer' | 'multiple_choice' | 'poll' | 'coding' | 'coding_simple';
   // MCQ fields (pre-generated for editing)
   options?: string[];
   correct_answer?: 'A' | 'B' | 'C' | 'D';
@@ -29,7 +44,11 @@ export interface ExtractedVoiceQuestion {
   expected_answer?: string;
   // Source transcript for context display
   source_transcript?: string;
+  // Coding payload (full or simple). When present, the backend uses these
+  // fields directly instead of regenerating the coding problem.
+  coding_payload?: CodingPreviewPayload;
 }
+
 
 interface VoiceQuestionPreviewDialogProps {
   open: boolean;
