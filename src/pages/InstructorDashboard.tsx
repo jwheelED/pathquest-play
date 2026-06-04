@@ -643,13 +643,14 @@ export default function InstructorDashboard() {
                 currentTranscript={currentTranscript}
                 questionCandidate={questionCandidate}
                 isSendingQuestion={isSendingQuestion}
-                onSendQuestion={(text, type, options, correctAnswer, expectedAnswer) => onSendQuestionRef.current?.(text, type, options, correctAnswer, expectedAnswer)}
+                onSendQuestion={(text, type, options, correctAnswer, expectedAnswer, codingPayload) => onSendQuestionRef.current?.(text, type, options, correctAnswer, expectedAnswer, codingPayload)}
                 onPreviewQuestion={(text) => onPreviewQuestionRef.current?.(text)}
                 onDismissQuestion={() => onDismissQuestionRef.current?.()}
                 isQuestionHeld={isQuestionHeld}
                 onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
                 onViewLiveResponses={() => setActiveTab("live")}
-                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | undefined}
+                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding' | undefined}
+                codingStyle={(instructorProfile?.coding_question_style as 'simple' | 'full' | undefined) ?? 'simple'}
                 intervalMinutes={autoQuestionState.intervalMinutes}
                 nextQuestionIn={autoQuestionState.nextQuestionIn}
                 onIntervalChange={(minutes) => onAutoQuestionIntervalChangeRef.current?.(minutes)}
