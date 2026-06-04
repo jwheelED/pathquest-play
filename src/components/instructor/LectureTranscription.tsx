@@ -4109,35 +4109,50 @@ export const LectureTranscription = ({
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
             formatPreference={questionFormatPreference}
+            codingStyle={codingStyle}
             transcriptContext={transcriptBufferRef.current}
             courseId={selectedCourseId}
             onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
+              // Map on-deck format → wire suggested_type. For coding, expand to
+              // 'coding_simple' or 'coding' based on the instructor's style.
+              const wireType = (() => {
+                if (!data) {
+                  return questionFormatPreference === 'coding'
+                    ? (codingStyle === 'simple' ? 'coding_simple' : 'coding')
+                    : (questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference);
+                }
+                if (data.type === 'coding') {
+                  return data.codingStyle === 'simple' ? 'coding_simple' : 'coding';
+                }
+                return data.type;
+              })();
+
               if (data) {
-                // Pre-generated data from inline preview — bypass modal
                 pendingQuestionDataRef.current = {
                   question_text: questionText,
-                  suggested_type: data.type,
+                  suggested_type: wireType as any,
                   confidence: 1.0,
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
+                  coding_payload: data.codingPayload,
                 };
                 handleConfirmPreviewSend({
                   question_text: questionText,
-                  suggested_type: data.type,
+                  suggested_type: wireType as any,
                   options: data.options,
                   correct_answer: data.correctAnswer,
                   expected_answer: data.expectedAnswer,
+                  coding_payload: data.codingPayload,
                 });
               } else {
-                // No pre-generated data — fall back to modal
                 setPreviewQuestionData({
                   question_text: questionText,
-                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  suggested_type: wireType as any,
                 });
                 pendingQuestionDataRef.current = {
                   question_text: questionText,
-                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  suggested_type: wireType as any,
                   confidence: 1.0,
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
@@ -4146,13 +4161,17 @@ export const LectureTranscription = ({
               }
             }}
             onPreview={(questionText) => {
+              const previewType = questionFormatPreference === 'coding'
+                ? (codingStyle === 'simple' ? 'coding_simple' : 'coding')
+                : (questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference);
               setPreviewQuestionData({
                 question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                suggested_type: previewType as any,
               });
               pendingQuestionDataRef.current = {
                 question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                suggested_type: previewType as any,
+
                 confidence: 1.0,
                 extraction_method: 'passive_detection',
                 source: 'passive_detection',
