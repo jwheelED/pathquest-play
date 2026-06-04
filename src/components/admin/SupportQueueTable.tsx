@@ -293,6 +293,3 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
     </Card>
   );
 }
-
-// import after default export usage above
-import { Lock } from "lucide-react";
