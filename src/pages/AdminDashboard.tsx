@@ -85,6 +85,16 @@ export default function AdminDashboard() {
     return instructorPerformance.filter((i) => filters.instructorIds.includes(i.id));
   }, [instructorPerformance, filters.instructorIds]);
 
+  const filteredCourseEngagement = useMemo(() => {
+    if (filters.instructorIds.length === 0) return courseEngagement;
+    const allowedNames = new Set(
+      instructorPerformance
+        .filter((i) => filters.instructorIds.includes(i.id))
+        .map((i) => i.name),
+    );
+    return courseEngagement.filter((c) => allowedNames.has(c.instructorName));
+  }, [courseEngagement, instructorPerformance, filters.instructorIds]);
+
   const filteredMisconceptions = useMemo(() => {
     const ref = activePreset?.refinement;
     if (!ref?.maxCorrectRate) return misconceptions;
