@@ -1266,11 +1266,14 @@ export const LectureTranscription = ({
         correct_answer: editedQuestion.correct_answer,
         // Include expected answer for short answer questions
         expected_answer: editedQuestion.expected_answer,
+        // Pre-edited coding payload (from inline on-deck preview)
+        coding_payload: (editedQuestion as any).coding_payload ?? pendingQuestionDataRef.current?.coding_payload,
       };
-      
+
       console.log("📤 Sending question from preview:", questionData);
-      
+
       await handleQuestionSend(questionData);
+
       
       // Reset auto-question timer after send
       if (autoQuestionEnabled) {
@@ -1485,12 +1488,15 @@ export const LectureTranscription = ({
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // Pre-edited coding payload from on-deck inline preview
+            coding_payload: detectionData.coding_payload,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
             // Pass source transcript for voice-sent questions (to show students where question came from)
             source_transcript: sourceTranscript,
           },
         });
+
       });
 
       // Clear the stashed prior context — single-use per send attempt
