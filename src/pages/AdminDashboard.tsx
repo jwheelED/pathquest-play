@@ -877,14 +877,39 @@ export default function AdminDashboard() {
 
           {activeTab === "support" && (
             <div className="space-y-6 max-w-7xl mx-auto">
+              <GovernanceBanner />
               <RetentionHealthCard
-                atRiskCount={filteredAtRisk.length}
+                lmsConnected={instructorIds.length > 0}
+                hasRecentSessions={retentionMetrics.hasRecentSessions}
+                atRiskCount={supportCases.length}
                 totalStudents={stats.totalStudents}
-                passRate={retentionMetrics.passRate}
-                retentionRate={retentionMetrics.retentionRate}
-                avgCompletionRate={retentionMetrics.avgCompletionRate}
+                sevenDayResponseRate={retentionMetrics.sevenDayResponseRate}
+                inactiveCount={retentionMetrics.inactiveCount}
+                sessionsPerStudent={retentionMetrics.sessionsPerStudent}
+                onConnect={() => setActiveTab("settings")}
               />
-              <AtRiskStudentsTable students={filteredAtRisk} loading={loading} />
+              <CourseAtRiskRollup
+                rows={Object.values(
+                  supportCases.reduce<Record<string, CourseRollupRow>>((acc, c) => {
+                    const key = c.instructorName;
+                    if (!acc[key]) acc[key] = {
+                      courseId: key,
+                      courseTitle: `${c.instructorName}'s students`,
+                      criticalCount: 0, highCount: 0, mediumCount: 0,
+                    };
+                    if (c.tier === "critical") acc[key].criticalCount++;
+                    else if (c.tier === "high") acc[key].highCount++;
+                    else acc[key].mediumCount++;
+                    return acc;
+                  }, {})
+                )}
+                loading={loading}
+              />
+              <SupportQueueTable
+                cases={supportCases}
+                loading={loading}
+                canViewIndividuals={true}
+              />
             </div>
           )}
 
