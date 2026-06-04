@@ -485,7 +485,14 @@ serve(async (req) => {
       explanation = null,
       course_id = null,
       source_transcript = null, // Raw transcript to display with question
+      coding_payload = null, // Pre-generated/edited coding question from on-deck preview
     } = await req.json();
+
+    // Normalize coding_payload (may arrive as {style:'simple'|'full', ...fields})
+    const hasCodingPayload = coding_payload && typeof coding_payload === "object";
+    const codingPayloadStyle = hasCodingPayload
+      ? (coding_payload.style === "full" ? "full" : coding_payload.style === "simple" ? "simple" : null)
+      : null;
 
     // ALWAYS combine the broad transcript tail (context) with the focused trigger prior_context.
     // The broad tail provides earlier-lecture history needed to resolve vague references like
