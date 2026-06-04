@@ -417,6 +417,157 @@ export default function AdminDashboard() {
 
       setInstructorPerformance(instructorPerf);
 
+      // ===== Course Engagement Health =====
+      try {
+        const { data: courseRows } = await supabase
+          .from("courses")
+          .select("id, title, instructor_id")
+          .in("instructor_id", fetchedInstructorIds)
+          .eq("is_active", true);
+
+        const courses = courseRows || [];
+        const now = Date.now();
+        const DAY = 24 * 60 * 60 * 1000;
+        const WINDOW_DAYS = 28;
+        const since = new Date(now - WINDOW_DAYS * DAY).toISOString();
+
+        const { data: sessionRows } = await (supabase.from("live_sessions") as any)
+          .select("id, course_id, instructor_id, created_at")
+          .in("instructor_id", fetchedInstructorIds)
+          .gte("created_at", since);
+
+        const sessions = (sessionRows || []) as Array<{ id: string; course_id: string | null; instructor_id: string; created_at: string }>;
+        const sessionIds = sessions.map(s => s.id);
+
+        let participantsBySession = new Map<string, number>();
+        let questionsBySession = new Map<string, number>();
+        let responsesBySession = new Map<string, number>();
+
+        if (sessionIds.length > 0) {
+          const [{ data: partRows }, { data: qRows }] = await Promise.all([
+            (supabase.from("live_participants") as any)
+              .select("session_id")
+              .in("session_id", sessionIds),
+            (supabase.from("live_questions") as any)
+              .select("id, session_id")
+              .in("session_id", sessionIds),
+          ]);
+
+          ((partRows || []) as Array<{ session_id: string }>).forEach(p => {
+            participantsBySession.set(p.session_id, (participantsBySession.get(p.session_id) || 0) + 1);
+          });
+
+          const questionToSession = new Map<string, string>();
+          ((qRows || []) as Array<{ id: string; session_id: string }>).forEach(q => {
+            questionToSession.set(q.id, q.session_id);
+            questionsBySession.set(q.session_id, (questionsBySession.get(q.session_id) || 0) + 1);
+          });
+
+          const questionIds = Array.from(questionToSession.keys());
+          if (questionIds.length > 0) {
+            // Chunk if huge — usually fine in <=1000
+            const { data: respRows } = await (supabase.from("live_responses") as any)
+              .select("question_id")
+              .in("question_id", questionIds);
+            ((respRows || []) as Array<{ question_id: string }>).forEach(r => {
+              const sid = questionToSession.get(r.question_id);
+              if (sid) responsesBySession.set(sid, (responsesBySession.get(sid) || 0) + 1);
+            });
+          }
+        }
+
+        const sessionRate = (sid: string) => {
+          const p = participantsBySession.get(sid) || 0;
+          const q = questionsBySession.get(sid) || 0;
+          const r = responsesBySession.get(sid) || 0;
+          const denom = p * q;
+          if (denom <= 0) return null;
+          return Math.min(100, Math.round((r / denom) * 100));
+        };
+
+        const courseSessions = new Map<string, typeof sessions>();
+        sessions.forEach(s => {
+          if (!s.course_id) return;
+          const arr = courseSessions.get(s.course_id) || [];
+          arr.push(s);
+          courseSessions.set(s.course_id, arr);
+        });
+
+        const engagement: CourseEngagement[] = courses.map(course => {
+          const csSessions = courseSessions.get(course.id) || [];
+          const inWindow = (days: number) => {
+            const cutoff = now - days * DAY;
+            return csSessions.filter(s => new Date(s.created_at).getTime() >= cutoff);
+          };
+
+          const avgRate = (list: typeof sessions) => {
+            const rates = list.map(s => sessionRate(s.id)).filter((v): v is number => v !== null);
+            if (!rates.length) return 0;
+            return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
+          };
+
+          const current = avgRate(inWindow(7));
+          const prior = avgRate(csSessions.filter(s => {
+            const t = new Date(s.created_at).getTime();
+            return t < now - 7 * DAY && t >= now - 14 * DAY;
+          }));
+
+          const sparkline = [3, 2, 1, 0].map(weeksAgo => {
+            const start = now - (weeksAgo + 1) * 7 * DAY;
+            const end = now - weeksAgo * 7 * DAY;
+            return avgRate(csSessions.filter(s => {
+              const t = new Date(s.created_at).getTime();
+              return t >= start && t < end;
+            }));
+          });
+
+          // students for this course = students of this instructor (proxy until course enrollment table is wired)
+          const courseStudentIds = (studentRelations || [])
+            .filter(r => r.instructor_id === course.instructor_id)
+            .map(r => r.student_id);
+          const uniqueStudents = new Set(courseStudentIds);
+          const studentCount = uniqueStudents.size;
+          const activeCount = Array.from(uniqueStudents).filter(id => activeUserIds.has(id)).length;
+          const sevenDayActiveRate = studentCount > 0 ? (activeCount / studentCount) * 100 : 0;
+          const studentsDisengaging = Math.max(0, studentCount - activeCount);
+
+          let signal: EngagementSignal = "steady";
+          if (current > 0 && prior > 0 && current < prior * 0.7) signal = "dropping";
+          else if (current > 0 && prior > 0 && current < prior * 0.9) signal = "softening";
+          else if (current >= 70) signal = "strong";
+
+          // grade context (avg across this instructor's students with grades — approximation)
+          const grades: number[] = [];
+          studentMetrics.forEach((m) => {
+            if (m.instructorId === course.instructor_id && m.grades.length > 0) {
+              grades.push(m.grades.reduce((a, b) => a + b, 0) / m.grades.length);
+            }
+          });
+          const avgGrade = grades.length > 0 ? grades.reduce((a, b) => a + b, 0) / grades.length : null;
+
+          return {
+            id: course.id,
+            title: course.title || "Untitled course",
+            instructorName: instructorMap.get(course.instructor_id) || "Course team",
+            studentCount,
+            responseRateCurrent: current,
+            responseRatePrior: prior,
+            studentsDisengaging,
+            sevenDayActiveRate,
+            sparkline,
+            signal,
+            avgGrade,
+            sessionsInWindow: csSessions.length,
+          };
+        });
+
+        setCourseEngagement(engagement);
+      } catch (e) {
+        logger.error("Course engagement compute failed:", e);
+        setCourseEngagement([]);
+      }
+
+
       const engagementScore = totalStudents && totalStudents > 0
         ? ((activeStudents || 0) / totalStudents) * 100
         : 0;
