@@ -90,7 +90,7 @@ interface LiveCopilotHeroProps {
   currentTranscript?: string;
   questionCandidate?: PassiveQuestionCandidate | null;
   isSendingQuestion?: boolean;
-  onSendQuestion?: (text: string, type?: QuestionType, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void;
+  onSendQuestion?: (text: string, type?: QuestionType | 'coding_simple', options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => void;
   onPreviewQuestion?: (text: string) => void;
   onDismissQuestion?: () => void;
   isQuestionHeld?: boolean;
@@ -99,6 +99,7 @@ interface LiveCopilotHeroProps {
   onViewLiveResponses?: () => void;
   onSendFollowUp?: () => void;
   formatPreference?: 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
+  codingStyle?: 'simple' | 'full';
   intervalMinutes?: number;
   nextQuestionIn?: number;
   onIntervalChange?: (minutes: number) => void;
