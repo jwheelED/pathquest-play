@@ -567,7 +567,11 @@ serve(async (req) => {
 
     let finalType: string;
 
-    if (hasPreGeneratedOptions && normalizedSuggestedType) {
+    if (hasCodingPayload && codingPayloadStyle) {
+      // Instructor pre-generated/edited coding question from on-deck preview - respect it
+      finalType = codingPayloadStyle === "simple" ? "coding_simple" : "coding";
+      console.log(`🔧 Using pre-edited coding payload, type: ${finalType}`);
+    } else if (hasPreGeneratedOptions && normalizedSuggestedType) {
       // Preview dialog with edited options - respect user's explicit choice
       finalType = normalizedSuggestedType;
       console.log(`📝 Using preview dialog type: ${finalType}`);
