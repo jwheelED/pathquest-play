@@ -380,7 +380,9 @@ export function QuestionOnDeck({
   const [isGenerating, setIsGenerating] = useState(false);
   const [bankMatch, setBankMatch] = useState<{ id: string; title: string } | null>(null);
 
-  // Track which candidate text we last generated for to avoid duplicate calls
+  // Track (candidate text + format + coding style) so a late-arriving format
+  // change (e.g. profile preference loaded after the candidate was detected)
+  // re-runs generation instead of being skipped by the dedupe guard.
   const generatedForRef = useRef<string | null>(null);
 
   const hasCandidate = !!candidate;
@@ -388,10 +390,13 @@ export function QuestionOnDeck({
   const visibleHistory = showAllHistory ? candidateHistory : candidateHistory.slice(0, 3);
   const hiddenCount = candidateHistory.length - 3;
 
-  // Auto-generate when a new candidate appears
+  // Auto-generate when a new candidate appears OR when the resolved format
+  // changes for the current candidate.
   useEffect(() => {
-    if (!candidate || generatedForRef.current === candidate.text) return;
-    generatedForRef.current = candidate.text;
+    if (!candidate) return;
+    const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
+    if (generatedForRef.current === key) return;
+    generatedForRef.current = key;
     generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate?.text, effectiveFormat, codingStyle]);
