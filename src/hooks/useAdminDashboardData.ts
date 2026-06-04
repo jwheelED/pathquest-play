@@ -200,14 +200,14 @@ export function useAdminDashboardData(
 
       const { data: recentActive } = await supabase
         .from("live_responses")
-        .select("participant_id, submitted_at")
-        .gte("submitted_at", fourteenDaysAgo.toISOString())
+        .select("participant_id, responded_at")
+        .gte("responded_at", fourteenDaysAgo.toISOString())
         .in("question_id", questionIds.length ? questionIds : ["00000000-0000-0000-0000-000000000000"]);
 
       const active7d = new Set<string>();
       const activePrior7d = new Set<string>();
       recentActive?.forEach((r: any) => {
-        const t = new Date(r.submitted_at).getTime();
+        const t = new Date(r.responded_at).getTime();
         if (t >= sevenDaysAgo.getTime()) active7d.add(r.participant_id);
         else if (t >= fourteenDaysAgo.getTime()) activePrior7d.add(r.participant_id);
       });
