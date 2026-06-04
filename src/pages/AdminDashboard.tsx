@@ -562,24 +562,44 @@ export default function AdminDashboard() {
 
           {activeTab === "overview" && (
             <div className="space-y-6 max-w-7xl mx-auto">
-              {/* Organization Setup */}
-              <OrganizationSetup onOrgCreated={fetchDashboardData} />
+              {/* If no org yet, show creation flow front-and-center */}
+              {!orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
 
-              {/* Aggregate Metrics */}
-              <AggregateMetricsCard metrics={metrics} loading={aggregateLoading} />
+              {orgId && (
+                <>
+                  {/* Governance chips */}
+                  <GovernanceChips />
 
-              {/* Usage Chart */}
-              <UsageOverTimeChart data={weeklyUsage} loading={aggregateLoading} />
+                  {/* Quick views */}
+                  <SmartPresetChips />
 
-              {/* Learning Insights */}
-              <LearningInsightsCard
-                misconceptions={filteredMisconceptions}
-                confidenceIssues={filteredConfidenceIssues}
-                loading={aggregateLoading}
-              />
+                  {/* KPI cards */}
+                  <AggregateMetricsCard
+                    metrics={metrics}
+                    loading={aggregateLoading}
+                    hasAnyData={hasAnyData}
+                    onConnect={() => setActiveTab("settings")}
+                  />
 
-              {/* Export Reports */}
-              <ExportReportsCard data={stats} />
+                  {/* Usage Chart */}
+                  <UsageOverTimeChart
+                    data={weeklyUsage}
+                    loading={aggregateLoading}
+                    hasAnyData={hasAnyData}
+                    onConnect={() => setActiveTab("settings")}
+                  />
+
+                  {/* Learning Insights */}
+                  <LearningInsightsCard
+                    misconceptions={filteredMisconceptions}
+                    confidenceIssues={filteredConfidenceIssues}
+                    loading={aggregateLoading}
+                  />
+
+                  {/* Export Reports */}
+                  <ExportReportsCard data={stats} />
+                </>
+              )}
             </div>
           )}
 
@@ -607,9 +627,11 @@ export default function AdminDashboard() {
 
           {activeTab === "settings" && (
             <div className="space-y-6 max-w-3xl mx-auto">
+              {orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
               <LMSIntegrationSettings mode="admin" />
             </div>
           )}
+
         </div>
 
         {/* Footer Disclaimer */}
