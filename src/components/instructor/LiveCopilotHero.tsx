@@ -184,6 +184,7 @@ function ReviewModal({
     multiple_choice: "Multiple Choice",
     short_answer: "Short Answer",
     poll: "Poll",
+    coding: "Coding",
   };
 
   const questionLabel: Record<QuestionType, string> = {
@@ -191,6 +192,7 @@ function ReviewModal({
     multiple_choice: "Multiple Choice Question",
     short_answer: "Short Answer Question",
     poll: "Poll Question",
+    coding: "Coding Question",
   };
 
   const fetchMcqOptions = async (text: string, transcript: string | undefined) => {
