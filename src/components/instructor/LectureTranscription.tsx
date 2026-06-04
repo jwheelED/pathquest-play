@@ -4137,7 +4137,7 @@ export const LectureTranscription = ({
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
-            formatPreference={questionFormatPreference}
+            formatPreference={questionFormatPreference ?? undefined}
             codingStyle={codingStyle}
             transcriptContext={transcriptBufferRef.current}
             courseId={selectedCourseId}
