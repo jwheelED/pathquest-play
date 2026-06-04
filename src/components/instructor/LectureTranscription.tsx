@@ -80,7 +80,7 @@ interface LectureTranscriptionProps {
   onAutoQuestionToggleRef?: React.MutableRefObject<((enabled: boolean) => Promise<void>) | null>;
   onAutoQuestionEnabledChange?: (enabled: boolean) => void;
   // Refs for external control
-  onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
+  onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
   onDismissQuestionRef?: React.MutableRefObject<(() => void) | null>;
   onStartRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
