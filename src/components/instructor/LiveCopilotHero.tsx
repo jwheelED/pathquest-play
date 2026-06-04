@@ -1202,7 +1202,10 @@ export function LiveCopilotHero({
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-neutral-100 border border-neutral-200 text-[10px] font-semibold text-neutral-600 uppercase tracking-wide">
-                        {effectiveFormat === 'mcq' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
+                        {effectiveFormat === 'mcq' ? 'MCQ'
+                          : effectiveFormat === 'poll' ? 'Poll'
+                          : effectiveFormat === 'coding' ? (codingStyle === 'simple' ? 'Coding · Check-in' : 'Coding · Full')
+                          : 'Short Answer'}
                       </span>
                       {bankMatch && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700">
