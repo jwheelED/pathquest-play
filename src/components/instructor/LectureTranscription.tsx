@@ -361,18 +361,19 @@ export const LectureTranscription = ({
   // Register external control refs
   useEffect(() => {
     if (onSendQuestionRef) {
-      onSendQuestionRef.current = (questionText: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => {
+      onSendQuestionRef.current = (questionText: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => {
         dismissPassiveCandidate();
-        // Normalize legacy 'mcq' alias to canonical 'multiple_choice' so downstream
-        // (preview dialog radio group + edge function) can match it.
+        // Normalize legacy 'mcq' alias to canonical 'multiple_choice'.
         const normalizedType = type === 'mcq' ? 'multiple_choice' : type;
         const finalType = normalizedType || questionFormatPreference || 'multiple_choice';
+        const isCodingType = finalType === 'coding' || finalType === 'coding_simple';
         const qData = {
           question_text: questionText,
           suggested_type: finalType as any,
           options: options?.length ? options : undefined,
           correct_answer: correctAnswer || undefined,
           expected_answer: expectedAnswer || undefined,
+          coding_payload: codingPayload,
         };
         pendingQuestionDataRef.current = {
           ...qData,
@@ -381,15 +382,11 @@ export const LectureTranscription = ({
           source: 'passive_detection',
         };
 
-        // If the caller (e.g. LiveCopilotHero inline preview) already collected the
-        // type AND the supporting data (options+correctAnswer for MCQ/poll, or
-        // expectedAnswer for short answer), skip the review modal and send directly.
-        // This is the same shortcut QuestionOnDeck uses and ensures the instructor's
-        // chosen format is honored end-to-end.
         const hasMCQReady = (finalType === 'multiple_choice') && options && options.length >= 2 && !!correctAnswer;
         const hasPollReady = (finalType === 'poll') && options && options.length >= 2;
-        const hasShortAnswerReady = (finalType === 'short_answer'); // expected_answer optional
-        const canBypassModal = !!normalizedType && (hasMCQReady || hasPollReady || hasShortAnswerReady);
+        const hasShortAnswerReady = (finalType === 'short_answer');
+        const hasCodingReady = isCodingType; // coding always bypasses the modal
+        const canBypassModal = !!normalizedType && (hasMCQReady || hasPollReady || hasShortAnswerReady || hasCodingReady);
 
         if (canBypassModal) {
           handleConfirmPreviewSend({
@@ -398,7 +395,8 @@ export const LectureTranscription = ({
             options: qData.options,
             correct_answer: qData.correct_answer as any,
             expected_answer: qData.expected_answer,
-          });
+            coding_payload: codingPayload,
+          } as any);
         } else {
           setPreviewQuestionData({ question_text: questionText, suggested_type: qData.suggested_type });
           setIsPreviewOpen(true);
