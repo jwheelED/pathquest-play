@@ -140,7 +140,14 @@ export function VoiceQuestionPreviewDialog({
       // Strip any HTML tags as defense-in-depth (AI sometimes returns markup)
       const sanitizedText = extractedQuestion.question_text.replace(/<[^>]*>/g, '').trim();
       setQuestionText(sanitizedText);
-      setQuestionType(extractedQuestion.suggested_type);
+      // VoiceQuestionPreviewDialog only renders MCQ/Short Answer/Poll. Coding
+      // bypasses this modal (handled inline via QuestionOnDeck), so narrow the
+      // type back to the modal's supported set.
+      const modalType = (extractedQuestion.suggested_type === 'coding' || extractedQuestion.suggested_type === 'coding_simple')
+        ? 'short_answer'
+        : extractedQuestion.suggested_type;
+      setQuestionType(modalType as 'short_answer' | 'multiple_choice' | 'poll');
+
       
       // Initialize MCQ options from pre-generated data or reset
       if (extractedQuestion.options && extractedQuestion.options.length === 4) {
