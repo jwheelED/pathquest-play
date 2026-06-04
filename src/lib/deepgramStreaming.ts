@@ -361,19 +361,32 @@ export class DeepgramStreamingClient {
       return;
     }
 
-    // LAYER 1: Stricter confidence threshold (75% for final, 60% for interim)
-    if (isFinal && confidence < 0.75) {
-      console.warn(`⚠️ Low confidence (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
+    // LAYER 1: Confidence threshold.
+    // Deepgram's confidence is consistently low (0.55–0.75) for the FIRST
+    // utterance after a connection opens while the acoustic model adapts to
+    // the speaker / room. Dropping those finals silently was causing the
+    // "first question never registers, I have to repeat myself" bug.
+    // We now only drop transcripts whose confidence is implausibly low
+    // (<0.45) AND which contain no question shape — anything plausibly
+    // useful is allowed through and validated by the downstream trigger /
+    // completeness gates instead.
+    const looksLikeQuestion = /[?]/.test(transcript) || /\b(what|why|how|when|where|who|which|can|could|would|should|is|are|do|does|did)\b/i.test(transcript);
+    if (isFinal && confidence < 0.45 && !looksLikeQuestion) {
+      console.warn(`⚠️ Dropping very-low-confidence final (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 60)}`);
       return;
     }
+    if (isFinal && confidence < 0.6) {
+      console.log(`ℹ️ Low-confidence final allowed through (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 60)}`);
+    }
 
-    // LAYER 2: Word-level confidence filtering
+    // LAYER 2: Word-level confidence — same reasoning. Only block when the
+    // vast majority of words are unreliable AND no question shape is present.
     const words: DeepgramWord[] = alternative.words || [];
-    if (isFinal && words.length > 0) {
-      const confidentWords = words.filter(w => w.confidence >= 0.6);
+    if (isFinal && words.length > 0 && !looksLikeQuestion) {
+      const confidentWords = words.filter(w => w.confidence >= 0.5);
       const confidentRatio = confidentWords.length / words.length;
-      
-      if (confidentRatio < 0.5) {
+
+      if (confidentRatio < 0.3) {
         console.warn(`⚠️ Too many low-confidence words (${(confidentRatio * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
         return;
       }
