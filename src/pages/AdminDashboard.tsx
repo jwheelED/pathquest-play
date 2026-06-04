@@ -191,6 +191,7 @@ export default function AdminDashboard() {
         });
         setAtRiskStudents([]);
         setInstructorPerformance([]);
+        setCourseEngagement([]);
         setRetentionMetrics({
           atRiskCount: 0,
           passRate: 0,
