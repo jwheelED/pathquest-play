@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   });
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [instructorPerformance, setInstructorPerformance] = useState<InstructorPerformance[]>([]);
+  const [courseEngagement, setCourseEngagement] = useState<CourseEngagement[]>([]);
   const [retentionMetrics, setRetentionMetrics] = useState({
     atRiskCount: 0,
     passRate: 0,
