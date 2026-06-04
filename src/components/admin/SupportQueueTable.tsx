@@ -8,7 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, HeartHandshake, Search, BookOpen, Info, Download } from "lucide-react";
+import { AlertTriangle, HeartHandshake, Search, BookOpen, Info, Download, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export type SupportTier = "critical" | "high" | "medium";
