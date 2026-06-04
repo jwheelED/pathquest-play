@@ -15,6 +15,9 @@ import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/compon
 import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
 import CourseEngagementHealthCard, { CourseEngagement, EngagementSignal } from "@/components/admin/CourseEngagementHealthCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
+import SupportQueueTable, { SupportCase, SupportTier, SupportSignal } from "@/components/admin/SupportQueueTable";
+import CourseAtRiskRollup, { CourseRollupRow } from "@/components/admin/CourseAtRiskRollup";
+import GovernanceBanner from "@/components/admin/GovernanceBanner";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
@@ -41,10 +44,12 @@ export default function AdminDashboard() {
   const [courseEngagement, setCourseEngagement] = useState<CourseEngagement[]>([]);
   const [retentionMetrics, setRetentionMetrics] = useState({
     atRiskCount: 0,
-    passRate: 0,
-    retentionRate: 0,
-    avgCompletionRate: 0,
+    sevenDayResponseRate: null as number | null,
+    inactiveCount: 0,
+    sessionsPerStudent: null as number | null,
+    hasRecentSessions: false,
   });
+  const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [adminName, setAdminName] = useState("");
   const [orgId, setOrgId] = useState<string | null>(null);
   const [instructorIds, setInstructorIds] = useState<string[]>([]);
@@ -194,10 +199,12 @@ export default function AdminDashboard() {
         setCourseEngagement([]);
         setRetentionMetrics({
           atRiskCount: 0,
-          passRate: 0,
-          retentionRate: 0,
-          avgCompletionRate: 0,
+          sevenDayResponseRate: null,
+          inactiveCount: 0,
+          sessionsPerStudent: null,
+          hasRecentSessions: false,
         });
+        setSupportCases([]);
         setLoading(false);
         return;
       }
@@ -578,16 +585,105 @@ export default function AdminDashboard() {
         avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
       });
 
-      const passRate = totalGradedStudents > 0 ? (passCount / totalGradedStudents) * 100 : 100;
-      const avgAssignmentCompletion = studentMetrics.size > 0
-        ? totalCompletionRate / studentMetrics.size
-        : 0;
+      // ===== Behavioral support cases (FERPA-friendly, no demographics, no grades) =====
+      const cases: SupportCase[] = [];
+      let inactiveCountAgg = 0;
+      const HAS_ANY_LIFETIME = (m: { total: number }) => m.total >= 3;
+
+      studentMetrics.forEach((metrics, studentId) => {
+        const lastActivityStat = userStats?.find(s => s.user_id === studentId);
+        const lastActivityDate = lastActivityStat?.last_activity_date
+          ? new Date(lastActivityStat.last_activity_date)
+          : metrics.lastActivity;
+        const daysSinceActive = lastActivityDate
+          ? Math.floor((Date.now() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        // seed-data hygiene: exclude unusable rows
+        const instructorName = instructorMap.get(metrics.instructorId);
+        if (!instructorName || instructorName === "Unknown Instructor") return;
+        if (daysSinceActive === null) return;
+        if (!HAS_ANY_LIFETIME(metrics)) return;
+
+        if (daysSinceActive >= 7) inactiveCountAgg++;
+
+        const signals: SupportSignal[] = [];
+        let score = 0;
+
+        if (daysSinceActive >= 9) {
+          signals.push({ label: `Inactive ${daysSinceActive} days`, weight: 3 });
+          score += 3;
+        } else if (daysSinceActive >= 4) {
+          signals.push({ label: `Inactive ${daysSinceActive} days`, weight: 1 });
+          score += 1;
+        }
+
+        const streakBroken =
+          lastActivityStat?.current_streak === 0 && (lastActivityStat?.longest_streak || 0) > 3;
+        if (streakBroken) {
+          signals.push({ label: "Streak broken", weight: 1 });
+          score += 1;
+        }
+
+        const incomplete = metrics.total - metrics.completed;
+        if (incomplete >= 3) {
+          signals.push({ label: `${incomplete} missed sessions`, weight: 2 });
+          score += 2;
+        } else if (incomplete >= 1) {
+          signals.push({ label: `${incomplete} missed session${incomplete > 1 ? "s" : ""}`, weight: 1 });
+          score += 1;
+        }
+
+        const completionRate = metrics.total > 0 ? metrics.completed / metrics.total : 1;
+        if (metrics.total >= 5 && completionRate < 0.4) {
+          signals.push({ label: `Submission rate ${Math.round(completionRate * 100)}%`, weight: 2 });
+          score += 2;
+        }
+
+        if (score < 2 || signals.length === 0) return;
+
+        const tier: SupportTier = score >= 6 ? "critical" : score >= 4 ? "high" : "medium";
+
+        // dominant signal → suggested action
+        const dominant = [...signals].sort((a, b) => b.weight - a.weight)[0];
+        let action = "Send check-in";
+        if (dominant.label.startsWith("Inactive")) action = "Send check-in";
+        else if (dominant.label.includes("missed")) action = "Flag to instructor";
+        else if (dominant.label === "Streak broken") action = "Refer to advising";
+        else if (dominant.label.startsWith("Submission")) action = "Flag to instructor";
+
+        cases.push({
+          id: studentId,
+          studentName: studentNameMap.get(studentId) || "Unknown Student",
+          instructorName,
+          signals,
+          tier,
+          score,
+          suggestedAction: action,
+          daysSinceActive,
+        });
+      });
+
+      cases.sort((a, b) => {
+        const tierOrder = { critical: 3, high: 2, medium: 1 };
+        return (tierOrder[b.tier] - tierOrder[a.tier]) ||
+               ((b.daysSinceActive ?? 0) - (a.daysSinceActive ?? 0));
+      });
+      setSupportCases(cases);
+
+      const hasRecentSessions = (assignments?.length || 0) > 0;
+      const sessionsPerStudent = studentMetrics.size > 0
+        ? Array.from(studentMetrics.values()).reduce((s, m) => s + m.total, 0) / studentMetrics.size
+        : null;
 
       setRetentionMetrics({
-        atRiskCount: atRiskList.length,
-        passRate,
-        retentionRate: engagementScore,
-        avgCompletionRate: avgAssignmentCompletion,
+        atRiskCount: cases.length,
+        sevenDayResponseRate: totalStudents && totalStudents > 0
+          ? ((activeStudents || 0) / totalStudents) * 100
+          : null,
+        inactiveCount: inactiveCountAgg,
+        sessionsPerStudent,
+        hasRecentSessions,
       });
 
     } catch (error) {
@@ -781,14 +877,39 @@ export default function AdminDashboard() {
 
           {activeTab === "support" && (
             <div className="space-y-6 max-w-7xl mx-auto">
+              <GovernanceBanner />
               <RetentionHealthCard
-                atRiskCount={filteredAtRisk.length}
+                lmsConnected={instructorIds.length > 0}
+                hasRecentSessions={retentionMetrics.hasRecentSessions}
+                atRiskCount={supportCases.length}
                 totalStudents={stats.totalStudents}
-                passRate={retentionMetrics.passRate}
-                retentionRate={retentionMetrics.retentionRate}
-                avgCompletionRate={retentionMetrics.avgCompletionRate}
+                sevenDayResponseRate={retentionMetrics.sevenDayResponseRate}
+                inactiveCount={retentionMetrics.inactiveCount}
+                sessionsPerStudent={retentionMetrics.sessionsPerStudent}
+                onConnect={() => setActiveTab("settings")}
               />
-              <AtRiskStudentsTable students={filteredAtRisk} loading={loading} />
+              <CourseAtRiskRollup
+                rows={Object.values(
+                  supportCases.reduce<Record<string, CourseRollupRow>>((acc, c) => {
+                    const key = c.instructorName;
+                    if (!acc[key]) acc[key] = {
+                      courseId: key,
+                      courseTitle: `${c.instructorName}'s students`,
+                      criticalCount: 0, highCount: 0, mediumCount: 0,
+                    };
+                    if (c.tier === "critical") acc[key].criticalCount++;
+                    else if (c.tier === "high") acc[key].highCount++;
+                    else acc[key].mediumCount++;
+                    return acc;
+                  }, {})
+                )}
+                loading={loading}
+              />
+              <SupportQueueTable
+                cases={supportCases}
+                loading={loading}
+                canViewIndividuals={true}
+              />
             </div>
           )}
 
