@@ -238,7 +238,8 @@ export default function AdminDashboard() {
       const { data: assignments } = await supabase
         .from("student_assignments")
         .select("student_id, instructor_id, grade, completed, created_at")
-        .in("student_id", studentIds);
+        .in("student_id", studentIds)
+        .in("instructor_id", fetchedInstructorIds);
 
       const studentMetrics = new Map<string, {
         grades: number[];
