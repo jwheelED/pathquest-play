@@ -210,7 +210,7 @@ export const LectureTranscription = ({
   const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
 
   // Instructor format preference (loaded from profile)
-  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll' | 'coding'>('multiple_choice');
+  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll' | 'coding' | null>(null);
   const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
 
 
@@ -4137,7 +4137,7 @@ export const LectureTranscription = ({
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
-            formatPreference={questionFormatPreference}
+            formatPreference={questionFormatPreference ?? undefined}
             codingStyle={codingStyle}
             transcriptContext={transcriptBufferRef.current}
             courseId={selectedCourseId}

@@ -384,6 +384,10 @@ export function QuestionOnDeck({
   // change (e.g. profile preference loaded after the candidate was detected)
   // re-runs generation instead of being skipped by the dedupe guard.
   const generatedForRef = useRef<string | null>(null);
+  // Monotonic request id — ensures a stale in-flight preview response cannot
+  // overwrite state belonging to a newer format selection (e.g. MCQ response
+  // arriving after we've already switched to Coding).
+  const requestIdRef = useRef(0);
 
   const hasCandidate = !!candidate;
   const hasHistory = candidateHistory.length > 0;
@@ -391,15 +395,19 @@ export function QuestionOnDeck({
   const hiddenCount = candidateHistory.length - 3;
 
   // Auto-generate when a new candidate appears OR when the resolved format
-  // changes for the current candidate.
+  // changes for the current candidate. We REQUIRE formatPreference to be
+  // explicitly provided (loaded from profile) before generating — otherwise
+  // an early render with the default MCQ format would kick off an MCQ preview
+  // that races the real coding/short_answer preview.
   useEffect(() => {
     if (!candidate) return;
+    if (formatPreference === undefined || formatPreference === null) return;
     const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
     if (generatedForRef.current === key) return;
     generatedForRef.current = key;
     generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidate?.text, effectiveFormat, codingStyle]);
+  }, [candidate?.text, effectiveFormat, codingStyle, formatPreference]);
 
   // Reset generated state when candidate is cleared
   useEffect(() => {
@@ -418,6 +426,9 @@ export function QuestionOnDeck({
     format: OnDeckFormat,
     priorContext?: string,
   ) => {
+    const reqId = ++requestIdRef.current;
+    const isLatest = () => requestIdRef.current === reqId;
+
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
     setExpectedAnswer('');
@@ -438,6 +449,7 @@ export function QuestionOnDeck({
         const { data, error } = await supabase.functions.invoke('generate-coding-preview', {
           body: { ...body, style: codingStyle },
         });
+        if (!isLatest()) return;
         if (!error && data) {
           if (codingStyle === 'simple') {
             setExpectedAnswer(data.expected_answer || '');
@@ -481,6 +493,7 @@ export function QuestionOnDeck({
           : supabase.functions.invoke('generate-expected-answer', { body });
 
       const [bankRes, aiRes] = await Promise.all([bankPromise, aiPromise]);
+      if (!isLatest()) return;
 
       // 1) Prefer high-confidence bank match.
       const matchData: any = (bankRes as any)?.data;
@@ -529,7 +542,7 @@ export function QuestionOnDeck({
     } catch {
       // Silent — user can still edit manually
     } finally {
-      setIsGenerating(false);
+      if (isLatest()) setIsGenerating(false);
     }
   };
 
