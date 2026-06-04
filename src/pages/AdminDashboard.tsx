@@ -13,6 +13,7 @@ import UsageOverTimeChart from "@/components/admin/UsageOverTimeChart";
 import LearningInsightsCard from "@/components/admin/LearningInsightsCard";
 import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/components/admin/AtRiskStudentsTable";
 import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
+import CourseEngagementHealthCard, { CourseEngagement, EngagementSignal } from "@/components/admin/CourseEngagementHealthCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
 import ExportReportsCard from "@/components/admin/ExportReportsCard";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
