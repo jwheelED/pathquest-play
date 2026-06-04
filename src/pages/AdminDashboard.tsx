@@ -7,6 +7,7 @@ import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHand
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
+import GovernanceChips from "@/components/admin/GovernanceChips";
 import AggregateMetricsCard from "@/components/admin/AggregateMetricsCard";
 import UsageOverTimeChart from "@/components/admin/UsageOverTimeChart";
 import LearningInsightsCard from "@/components/admin/LearningInsightsCard";
@@ -54,8 +55,9 @@ export default function AdminDashboard() {
   );
 
   // Use the new hook for aggregate data (now filter-aware)
-  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } =
+  const { metrics, weeklyUsage, misconceptions, confidenceIssues, hasAnyData, loading: aggregateLoading } =
     useAdminDashboardData(instructorIds, filters);
+
 
   // Client-side refinements: filter atRiskStudents and instructorPerformance by global filters + preset refinement
   const filteredAtRisk = useMemo(() => {
@@ -561,24 +563,44 @@ export default function AdminDashboard() {
 
           {activeTab === "overview" && (
             <div className="space-y-6 max-w-7xl mx-auto">
-              {/* Organization Setup */}
-              <OrganizationSetup onOrgCreated={fetchDashboardData} />
+              {/* If no org yet, show creation flow front-and-center */}
+              {!orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
 
-              {/* Aggregate Metrics */}
-              <AggregateMetricsCard metrics={metrics} loading={aggregateLoading} />
+              {orgId && (
+                <>
+                  {/* Governance chips */}
+                  <GovernanceChips />
 
-              {/* Usage Chart */}
-              <UsageOverTimeChart data={weeklyUsage} loading={aggregateLoading} />
+                  {/* Quick views */}
+                  <SmartPresetChips />
 
-              {/* Learning Insights */}
-              <LearningInsightsCard
-                misconceptions={filteredMisconceptions}
-                confidenceIssues={filteredConfidenceIssues}
-                loading={aggregateLoading}
-              />
+                  {/* KPI cards */}
+                  <AggregateMetricsCard
+                    metrics={metrics}
+                    loading={aggregateLoading}
+                    hasAnyData={hasAnyData}
+                    onConnect={() => setActiveTab("settings")}
+                  />
 
-              {/* Export Reports */}
-              <ExportReportsCard data={stats} />
+                  {/* Usage Chart */}
+                  <UsageOverTimeChart
+                    data={weeklyUsage}
+                    loading={aggregateLoading}
+                    hasAnyData={hasAnyData}
+                    onConnect={() => setActiveTab("settings")}
+                  />
+
+                  {/* Learning Insights */}
+                  <LearningInsightsCard
+                    misconceptions={filteredMisconceptions}
+                    confidenceIssues={filteredConfidenceIssues}
+                    loading={aggregateLoading}
+                  />
+
+                  {/* Export Reports */}
+                  <ExportReportsCard data={stats} />
+                </>
+              )}
             </div>
           )}
 
@@ -606,9 +628,11 @@ export default function AdminDashboard() {
 
           {activeTab === "settings" && (
             <div className="space-y-6 max-w-3xl mx-auto">
+              {orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
               <LMSIntegrationSettings mode="admin" />
             </div>
           )}
+
         </div>
 
         {/* Footer Disclaimer */}

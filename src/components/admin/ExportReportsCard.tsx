@@ -313,9 +313,14 @@ export default function ExportReportsCard({ data }: ExportReportsCardProps) {
             <li>• Student enrollment & activity metrics</li>
             <li>• Assignment completion rates</li>
             <li>• At-risk student identification</li>
-            <li>• Instructor performance data</li>
+            <li>• Course-level engagement summary</li>
           </ul>
+          <p className="text-xs text-muted-foreground mt-3 italic">
+            Student-level rows are only included for roles with documented legitimate interest
+            (FERPA). Chairs receive aggregate-only reports.
+          </p>
         </div>
+
       </CardContent>
     </Card>
   );
