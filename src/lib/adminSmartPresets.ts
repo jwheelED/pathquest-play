@@ -16,38 +16,23 @@ export interface SmartPreset {
   };
 }
 
+// Only include presets that map cleanly to filters available in the filter bar
+// (instructorIds, courseIds, sessionTypes, dateRange). Presets requiring
+// refinements that aren't exposed as filters have been removed.
 export const SMART_PRESETS: SmartPreset[] = [
   {
-    id: "at-risk-week",
-    label: "At-risk this week",
-    description: "Students flagged as high/critical risk in the last 7 days",
-    icon: "AlertTriangle",
+    id: "last-7d",
+    label: "Last 7 days",
+    description: "Snapshot of the most recent week",
+    icon: "Calendar",
     filters: { dateRange: "7d" },
-    refinement: { riskLevels: ["critical", "high"] },
   },
   {
-    id: "underperforming-sessions",
-    label: "Underperforming sessions",
-    description: "Questions with <50% correct rate over the last 30 days",
-    icon: "TrendingDown",
+    id: "last-30d",
+    label: "Last 30 days",
+    description: "Activity across the last 30 days",
+    icon: "CalendarRange",
     filters: { dateRange: "30d" },
-    refinement: { maxCorrectRate: 50 },
-  },
-  {
-    id: "inactive-students",
-    label: "Inactive students",
-    description: "Students with no activity in 7+ days",
-    icon: "Clock",
-    filters: {},
-    refinement: { inactiveDays: 7 },
-  },
-  {
-    id: "high-confidence-misconceptions",
-    label: "Confident misconceptions",
-    description: "Concepts where students are confidently wrong",
-    icon: "Brain",
-    filters: { dateRange: "30d" },
-    refinement: { minConfidentWrong: 3 },
   },
   {
     id: "this-term",
@@ -57,10 +42,24 @@ export const SMART_PRESETS: SmartPreset[] = [
     filters: { dateRange: "term" },
   },
   {
-    id: "last-7d",
-    label: "Last 7 days",
-    description: "Snapshot of the most recent week",
-    icon: "Calendar",
-    filters: { dateRange: "7d" },
+    id: "live-sessions",
+    label: "Live sessions",
+    description: "Only live sessions in the last 30 days",
+    icon: "Tv",
+    filters: { dateRange: "30d", sessionTypes: ["live"] },
+  },
+  {
+    id: "pre-recorded",
+    label: "Pre-recorded",
+    description: "Only pre-recorded sessions in the last 30 days",
+    icon: "Film",
+    filters: { dateRange: "30d", sessionTypes: ["pre_recorded"] },
+  },
+  {
+    id: "scheduled-events",
+    label: "Scheduled events",
+    description: "Only scheduled events in the last 30 days",
+    icon: "CalendarClock",
+    filters: { dateRange: "30d", sessionTypes: ["event"] },
   },
 ];
