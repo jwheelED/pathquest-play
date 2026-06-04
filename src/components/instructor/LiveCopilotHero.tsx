@@ -49,7 +49,7 @@ import type { PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetecti
 // 'mcq' is kept as an internal alias for legacy local UI logic but should NOT be sent
 // downstream — sending it caused the radio group to fail to preselect, which dropped
 // MCQ options and made the instructor's preference appear ignored.
-type QuestionType = "mcq" | "multiple_choice" | "short_answer" | "poll";
+type QuestionType = "mcq" | "multiple_choice" | "short_answer" | "poll" | "coding";
 
 interface SentQuestionStats {
   responded: number;
