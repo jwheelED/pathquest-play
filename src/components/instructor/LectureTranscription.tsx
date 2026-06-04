@@ -705,11 +705,34 @@ export const LectureTranscription = ({
     };
 
     const onFocus = () => refreshPreference();
+    const onVisibility = () => { if (document.visibilityState === 'visible') refreshPreference(); };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // Realtime: react instantly if the instructor toggles preference elsewhere.
+    const channel = supabase
+      .channel(`profile-prefs-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        (payload: any) => {
+          const row = payload?.new;
+          if (!row) return;
+          if (row.question_format_preference) {
+            setQuestionFormatPreference(row.question_format_preference);
+          }
+          if (row.coding_question_style) {
+            setCodingStyle(row.coding_question_style);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      supabase.removeChannel(channel);
     };
   }, [isRecording]);
 
