@@ -210,7 +210,9 @@ export const LectureTranscription = ({
   const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
 
   // Instructor format preference (loaded from profile)
-  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll'>('multiple_choice');
+  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll' | 'coding'>('multiple_choice');
+  const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
+
 
   // Question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -628,7 +630,7 @@ export const LectureTranscription = ({
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from("profiles")
-          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference, coding_question_style")
           .eq("id", user.id)
           .single();
 
@@ -646,11 +648,15 @@ export const LectureTranscription = ({
           setStrictModeEnabled(profile.auto_question_strict_mode !== false);
           // Question preview setting - default to true
           setQuestionPreviewEnabled(profile.question_preview_enabled !== false);
-          // Format preference for question on deck preview
+          // Format preference for question on deck preview (supports 'coding' too)
           if (profile.question_format_preference) {
-            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+          }
+          if (profile.coding_question_style) {
+            setCodingStyle(profile.coding_question_style as 'simple' | 'full');
           }
         }
+
 
         // Fetch today's question count
         const today = new Date().toISOString().split("T")[0];
@@ -687,13 +693,17 @@ export const LectureTranscription = ({
       if (!user) return;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("question_format_preference")
+        .select("question_format_preference, coding_question_style")
         .eq("id", user.id)
         .single();
       if (profile?.question_format_preference) {
-        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+      }
+      if (profile?.coding_question_style) {
+        setCodingStyle(profile.coding_question_style as 'simple' | 'full');
       }
     };
+
     const onFocus = () => refreshPreference();
     window.addEventListener('focus', onFocus);
 
@@ -1256,11 +1266,14 @@ export const LectureTranscription = ({
         correct_answer: editedQuestion.correct_answer,
         // Include expected answer for short answer questions
         expected_answer: editedQuestion.expected_answer,
+        // Pre-edited coding payload (from inline on-deck preview)
+        coding_payload: (editedQuestion as any).coding_payload ?? pendingQuestionDataRef.current?.coding_payload,
       };
-      
+
       console.log("📤 Sending question from preview:", questionData);
-      
+
       await handleQuestionSend(questionData);
+
       
       // Reset auto-question timer after send
       if (autoQuestionEnabled) {
@@ -1475,12 +1488,15 @@ export const LectureTranscription = ({
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // Pre-edited coding payload from on-deck inline preview
+            coding_payload: detectionData.coding_payload,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
             // Pass source transcript for voice-sent questions (to show students where question came from)
             source_transcript: sourceTranscript,
           },
         });
+
       });
 
       // Clear the stashed prior context — single-use per send attempt
@@ -4099,35 +4115,50 @@ export const LectureTranscription = ({
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
             formatPreference={questionFormatPreference}
+            codingStyle={codingStyle}
             transcriptContext={transcriptBufferRef.current}
             courseId={selectedCourseId}
             onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
+              // Map on-deck format → wire suggested_type. For coding, expand to
+              // 'coding_simple' or 'coding' based on the instructor's style.
+              const wireType = (() => {
+                if (!data) {
+                  return questionFormatPreference === 'coding'
+                    ? (codingStyle === 'simple' ? 'coding_simple' : 'coding')
+                    : (questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference);
+                }
+                if (data.type === 'coding') {
+                  return data.codingStyle === 'simple' ? 'coding_simple' : 'coding';
+                }
+                return data.type;
+              })();
+
               if (data) {
-                // Pre-generated data from inline preview — bypass modal
                 pendingQuestionDataRef.current = {
                   question_text: questionText,
-                  suggested_type: data.type,
+                  suggested_type: wireType as any,
                   confidence: 1.0,
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
+                  coding_payload: data.codingPayload,
                 };
                 handleConfirmPreviewSend({
                   question_text: questionText,
-                  suggested_type: data.type,
+                  suggested_type: wireType as any,
                   options: data.options,
                   correct_answer: data.correctAnswer,
                   expected_answer: data.expectedAnswer,
+                  coding_payload: data.codingPayload,
                 });
               } else {
-                // No pre-generated data — fall back to modal
                 setPreviewQuestionData({
                   question_text: questionText,
-                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  suggested_type: wireType as any,
                 });
                 pendingQuestionDataRef.current = {
                   question_text: questionText,
-                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  suggested_type: wireType as any,
                   confidence: 1.0,
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
@@ -4136,13 +4167,17 @@ export const LectureTranscription = ({
               }
             }}
             onPreview={(questionText) => {
+              const previewType = questionFormatPreference === 'coding'
+                ? (codingStyle === 'simple' ? 'coding_simple' : 'coding')
+                : (questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference);
               setPreviewQuestionData({
                 question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                suggested_type: previewType as any,
               });
               pendingQuestionDataRef.current = {
                 question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                suggested_type: previewType as any,
+
                 confidence: 1.0,
                 extraction_method: 'passive_detection',
                 source: 'passive_detection',

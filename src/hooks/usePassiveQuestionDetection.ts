@@ -156,6 +156,17 @@ export const TRIGGER_PATTERNS = [
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
+  // Imperative coding/asking-the-room patterns: "can you print hello world",
+  // "write a function that…", "create a variable named x". Deepgram often drops
+  // the terminal "?" on these so they wouldn't qualify via the WH-pattern alone.
+  new RegExp(
+    `${CLAUSE_START}(can|could|will|would)\\s+you\\s+(print|write|create|implement|build|define|declare|return|compute|calculate|solve|show|give|tell|explain|describe|demonstrate)\\b`,
+    'i'
+  ),
+  new RegExp(
+    `${CLAUSE_START}(please\\s+)?(write|print|create|implement|build|define|declare|return|compute|calculate|solve|show)\\s+(me\\s+)?(a|an|the|some)?\\s*\\S+`,
+    'i'
+  ),
   // NOTE: "suppose that" intentionally NOT a trigger — premise subordinator only.
   // Subject-aux inversion (yes/no & A-or-B questions) — also clause-start anchored
   new RegExp(`${CLAUSE_START}(is|are|was|were|am)\\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\\b`, 'i'),
@@ -168,6 +179,7 @@ export function hasInterrogativeTrigger(text: string): boolean {
   const stripped = stripLeadingFiller(text);
   return TRIGGER_PATTERNS.some(p => p.test(text) || p.test(stripped));
 }
+
 
 /**
  * Reject candidates that look like multi-sentence monologue blobs Deepgram
@@ -243,7 +255,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     minWordCount = MIN_WORD_COUNT,
     autoDismissMs = 30000,
     lastQuestionSentTime = 0,
-    minTranscriptConfidence = 0.8,
+    minTranscriptConfidence = 0.55,
     trailingSilenceMs = 700,
     maxPendingMs = 4000,
     debug = true,
