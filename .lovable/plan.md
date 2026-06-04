@@ -1,83 +1,107 @@
-## Goal
+# Rebuild Support Workflow Tab
 
-Reframe the Adoption tab from an instructor-grade scoreboard into a course-level engagement health instrument. Same underlying data, but anchored on participation/response rate with a *why* and *suggested action* on every flag.
+Reframe from "risk-ranking watchlist" to "support routing queue" — behavioral signals only, fully explainable, role-gated, with status workflow and proper empty states.
 
-## Files Affected
+## Files to touch
 
-- `src/pages/AdminDashboard.tsx` — replace the instructor performance data aggregation with a course-level aggregation; update header/summary chips; handle empty states.
-- `src/components/admin/InstructorPerformanceCard.tsx` → rename to `CourseEngagementHealthCard.tsx` (new component) with course rows, response-rate columns, sparkline, signal labels, and expandable why+action drawer.
-- `src/components/admin/AdminFilterBar.tsx` — minor: any "instructor" filter label stays valid since chair-scoping is fine; no major change.
-- Keep `InstructorPerformanceCard.tsx` for now (unused) until cleanup; reference it nowhere.
+- `src/pages/AdminDashboard.tsx` — data aggregation (drop grade-driven risk scoring, add behavioral signals + course aggregates), role gating, empty-state handling.
+- `src/components/admin/RetentionHealthCard.tsx` — re-anchor on behavioral signals; empty state when no LMS / no sessions; remove broken 100%/0% mix.
+- `src/components/admin/AtRiskStudentsTable.tsx` → replaced by new `SupportQueueTable.tsx` (kept file as legacy/unused). New table shows why + action + owner/status.
+- `src/components/admin/GovernanceBanner.tsx` (new) — visible no-demographics + behavioral-signals guarantee banner shown at top of Support tab.
+- `src/components/admin/CourseAtRiskRollup.tsx` (new) — course-level "N students need support in Biology" rollup shown to non-privileged admin roles.
+- DB migration: new `student_support_cases` table for status workflow (Open / Contacted / Resolved + owner + notes).
 
-## Data Aggregation Changes (AdminDashboard.tsx)
+## Governance + role gating
 
-Replace `instructorStats` map (keyed by instructor) with `courseStats` map (keyed by `course_id`):
+Roles allowed to see **named student rows**: `advisor`, `instructor`, `support_staff` (legitimate interest). All other admin roles (`dean`, `chair`, generic `admin` without scoped role) see only the **course-level rollup** with counts, never names.
 
-1. Fetch `courses` for `instructor_id IN fetchedInstructorIds` and `org_id = userOrgId`. Build `courseMap: id -> {title, instructor_id}`.
-2. Fetch `live_sessions` (last 28 days) with `course_id, created_at, id` filtered by `instructor_id IN fetchedInstructorIds`.
-3. Fetch `live_participants` count per session and `live_questions` count per session (already a pattern in `LiveUnderstandingHealth.tsx`) to compute response rate per session.
-4. Aggregate per course:
-   - `responseRateCurrent` — avg over last 7 days of sessions
-   - `responseRatePrior` — avg over the prior 7-day window (for trend arrow + delta)
-   - `sparkline` — week-by-week response rate over the last 4 weeks (array of 4 numbers)
-   - `studentsDisengaging` — count of enrolled students with no live response in 7d
-   - `sevenDayActive` — % of enrolled students active in 7d (reuse `activeUserIds` scoped to that course's roster)
-   - `signal`:
-     - `dropping` if currentRate < priorRate * 0.7 (sharp drop ≥30%) → red
-     - `softDecline` if currentRate < priorRate * 0.9 → amber
-     - `strong` if currentRate >= 70 → emerald
-     - `steady` otherwise → neutral
+Implementation:
+- Add `support_role` column to `profiles` (nullable enum: `advisor | instructor_of_record | support_staff`), set by org admin.
+- Gate logic in `AdminDashboard.tsx`: `canViewIndividuals = hasSupportRole || isInstructorOfRecord`. Otherwise render `CourseAtRiskRollup` only.
+- Banner explicitly states: "Individual student records are limited to staff with documented legitimate educational interest (FERPA §99.31)."
 
-5. Keep grade data per course but only expose it inside the expanded drilldown (not in main columns).
+## Behavioral-only risk model
 
-## New Component: CourseEngagementHealthCard
+Remove grade-as-primary. New signals (each visible, each weighted, no demographics):
 
-Header:
-- Title: **Course Engagement Health**
-- Subtitle: "How students are participating across courses this period. Aggregate, formative, not evaluation."
-- Summary chips: `X Courses · X Students · X% Avg Response Rate · X Needs Support`
-- Remove the "0.0% Avg" grade chip.
+| Signal | Threshold | Weight |
+|---|---|---|
+| Response-rate drop (last 7d vs prior 7d) | ≥30% drop | 3 |
+| Response-rate drop | ≥10% drop | 1 |
+| Inactive | ≥9 days | 3 |
+| Inactive | ≥4 days | 1 |
+| Missed last N consecutive sessions | ≥3 | 2 |
+| Submission-rate (live response participation) | <40% over 14d | 2 |
+| Streak broken (was ≥3, now 0) | — | 1 |
 
-Table columns:
-| Course | Response Rate (+ trend arrow + delta) | Students Disengaging | 7-Day Active | Sparkline | Signal |
+Tiers: Critical ≥6, High ≥4, Medium ≥2. Grades are NOT in the score. Grades from LMS show as **context-only** in the drilldown, never weighted, never sortable column.
 
-Behavior:
-- Default sort: by response-rate change ascending (biggest drop first).
-- Click row → expand inline panel showing:
-  - **Why:** e.g. "Response rate fell from 78% to 31% over the last 3 sessions."
-  - **Suggested action:** templated based on signal ("Check in with the course team", "Review last 2 session topics for confusion", "Keep current cadence").
-  - **Top misconception this week** (optional, from `lecture_summaries` or `student_concept_mastery` if available — pull only if cheap; otherwise omit in v1).
-  - Grade context (avg grade) shown here as supporting info, not headline.
-- Sparkline: small SVG of 4 weekly response-rate values.
+Every row displays the exact signals + thresholds that produced its tier — no chips collapsed under "+2 more." Tooltip on tier badge: "How this is computed →" opens score breakdown.
 
-Signal labels (replace "Needs Attention"):
-- `Engagement dropping` (red) — sharp drop
-- `Softening` (amber) — soft decline
-- `Steady` (neutral grey)
-- `Strong participation` (emerald)
+## Retention Health cards (fix broken read)
 
-## Empty States
+Current bug: Pass Rate 100% + 7-Day Active 0% + Completion 0% appears at once.
 
-In `AdminDashboard.tsx` for the adoption tab:
-- No LMS connected (detect via existing LMS settings check / `instructor_lms_connections` presence — reuse logic from Overview tab's empty state): show CTA card "Connect your LMS to see course engagement" + Connect button (link to settings tab).
-- LMS connected but no live sessions in window: show "No sessions run this period yet." Do NOT render zero-filled red rows.
+Rules:
+1. If `instructorIds.length === 0` OR no sessions in last 28d → render single empty-state card: "Connect your LMS to populate retention metrics" + Connect button. No metric tiles.
+2. Otherwise render 4 cards, hero = **7-Day Active Response Rate** (behavioral), then Inactive-≥7d Count, Sessions/Student, At-Risk Count. Pass Rate moved to a secondary "LMS Context" strip, clearly labeled "from Canvas," only if LMS grades exist.
+3. Any metric whose denominator is 0 renders "—" with tooltip "Not enough data yet," never `0.0%` or `100%`.
 
-## Governance / FERPA
+## Support Queue table (replaces AtRiskStudentsTable)
 
-- Rows are courses, never students.
-- Course rows show the course title; instructor name is shown only inside the expanded drilldown as "Course team: {name}", not as the row identity.
-- Scope: existing `get_admin_connected_instructors` already restricts to admin's org — keep as-is. No cross-department leaderboard logic added.
-- Keep `GovernanceChips` footer visible (already wired).
+Columns:
+- **Student** (gated)
+- **Why flagged** — full plain-text reason, e.g. "Response rate 78%→31% over 3 sessions; inactive 9 days"
+- **Suggested action** — templated: `Send check-in`, `Refer to advising`, `Flag to instructor` (chosen by dominant signal)
+- **Owner** — assignable from staff in the org with support roles
+- **Status** — `Open | Contacted | Resolved` (default Open), changeable inline, persisted in `student_support_cases`
+- **Tier** — Critical/High/Medium with "why" tooltip
 
-## Out of Scope (v1)
+Sort default: tier desc, then days-since-active desc. Status defaults filter to `Open`. Resolved auto-archives after 14d.
 
-- Department/chair vs dean role split — keep current admin scope; spec note acknowledged but not implemented here.
-- Removing/deleting `InstructorPerformanceCard.tsx` file — left in place, just unused.
-- LMS-derived grade trend in drilldown — only show grade if already aggregated.
+No "Avg Grade" column. No risk-score numeric column (tier label only).
 
-## Acceptance
+## Empty / seed-data hygiene
 
-- Adoption tab no longer shows named instructors as row identity or "Needs Attention" verdicts.
-- Table is sorted by biggest response-rate drop first.
-- Every flagged (red/amber) row exposes a why + suggested action when expanded.
-- Empty/no-LMS state shows a CTA instead of zero-filled red metrics.
+- Filter out rows where `instructorName === 'Unknown'`, `lastActivityDate` null, OR student has fewer than 3 lifetime responses (insufficient signal). These never appear as Critical.
+- If filtered list is empty post-cleanup, show: "No students currently need support — when behavioral signals dip we'll surface them here."
+
+## New table (migration)
+
+```sql
+CREATE TABLE public.student_support_cases (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  student_id uuid NOT NULL,
+  course_id uuid REFERENCES public.courses(id) ON DELETE SET NULL,
+  tier text NOT NULL CHECK (tier IN ('critical','high','medium')),
+  signals jsonb NOT NULL,
+  suggested_action text,
+  owner_id uuid,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','contacted','resolved')),
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  resolved_at timestamptz
+);
+GRANT SELECT, INSERT, UPDATE ON public.student_support_cases TO authenticated;
+GRANT ALL ON public.student_support_cases TO service_role;
+ALTER TABLE public.student_support_cases ENABLE ROW LEVEL SECURITY;
+-- Policy: only users with support_role in same org_id may select/update.
+```
+Plus `support_role` column on `profiles`.
+
+## Governance banner (top of tab)
+
+Two lines, always visible:
+1. "Risk flags use behavioral signals only — participation, response rate, activity. No race, gender, age, or any demographic variable is used."
+2. "Individual student records limited to staff with documented legitimate educational interest (FERPA §99.31)."
+
+Plus existing footer chips kept.
+
+## Out of scope (v1)
+
+- Canvas grade ingestion as a context column (stub the LMS Context strip; populate when LMS sync lands).
+- Audit log of who viewed which student row (recommended v2 for FERPA defensibility).
+- Bulk actions on queue rows.
+- Removing `AtRiskStudentsTable.tsx` file (left unused, can prune later).
