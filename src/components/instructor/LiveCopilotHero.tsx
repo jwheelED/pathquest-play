@@ -668,6 +668,7 @@ export function LiveCopilotHero({
       generatedForRef.current = null;
       setPreviewOptions([]);
       setPreviewExpectedAnswer("");
+      setPreviewCodingPayload(null);
     }
   }, [isListening]);
 
@@ -723,52 +724,100 @@ export function LiveCopilotHero({
     return false;
   };
 
-  // Auto-generate preview when displayedQuestion changes
-  useEffect(() => {
-    if (!displayedQuestion || generatedForRef.current === displayedQuestion) return;
-    generatedForRef.current = displayedQuestion;
+  // Single source of truth for preview generation. Branches by effectiveFormat
+  // and NEVER calls MCQ generation when the instructor preference is Coding,
+  // Short Answer, or Poll — preventing the stale MCQ fallback we used to see.
+  const runPreviewGeneration = (questionText: string) => {
     setIsGeneratingPreview(true);
     setPreviewOptions([]);
     setPreviewExpectedAnswer("");
+    setPreviewCodingPayload(null);
     setBankMatch(null);
 
-    const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
-    const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
-    const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
+    const lastChunkLocal = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
+    const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunkLocal;
+    const priorContext = priorContextByQuestionRef.current.get(questionText) || "";
 
-    if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
-      applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
-        if (matched) {
-          setIsGeneratingPreview(false);
-          return;
-        }
-        supabase.functions.invoke('generate-mcq-options', {
-          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-        }).then(({ data, error }) => {
-        if (!error && data?.options && Array.isArray(data.options)) {
-          const correctLetter: string = data.correct_answer ?? 'A';
-          setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
+    // ─── Coding: only call coding preview. No bank lookup, no MCQ. ─────────
+    if (effectiveFormat === 'coding') {
+      supabase.functions.invoke('generate-coding-preview', {
+        body: {
+          question_text: questionText,
+          source_transcript: fullTranscript,
+          prior_context: priorContext,
+          style: codingStyle,
+        },
+      }).then(({ data, error }) => {
+        if (!error && data) {
+          if (codingStyle === 'simple') {
+            setPreviewExpectedAnswer(data.expected_answer || '');
+            setPreviewCodingPayload({
+              language: data.language,
+              expected_answer: data.expected_answer || '',
+            });
+          } else {
+            setPreviewCodingPayload({
+              title: data.title,
+              problemStatement: data.problemStatement,
+              functionSignature: data.functionSignature,
+              language: data.language,
+              difficulty: data.difficulty,
+              constraints: data.constraints || [],
+              examples: data.examples || [],
+              hints: data.hints || [],
+              starterCode: data.starterCode || '',
+              testCases: data.testCases || [],
+            });
+          }
         }
         setIsGeneratingPreview(false);
+      }).catch(() => setIsGeneratingPreview(false));
+      return;
+    }
+
+    if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
+      applyBankMatch(questionText, effectiveFormat).then((matched) => {
+        if (matched) { setIsGeneratingPreview(false); return; }
+        supabase.functions.invoke('generate-mcq-options', {
+          body: { question_text: questionText, source_transcript: fullTranscript, prior_context: priorContext },
+        }).then(({ data, error }) => {
+          if (!error && data?.options && Array.isArray(data.options)) {
+            const correctLetter: string = data.correct_answer ?? 'A';
+            setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
+          }
+          setIsGeneratingPreview(false);
         }).catch(() => setIsGeneratingPreview(false));
       }).catch(() => setIsGeneratingPreview(false));
-    } else {
-      applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
-        if (matched) {
-          setIsGeneratingPreview(false);
-          return;
-        }
-        supabase.functions.invoke('generate-expected-answer', {
-          body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-        }).then(({ data, error }) => {
+      return;
+    }
+
+    // short_answer
+    applyBankMatch(questionText, effectiveFormat).then((matched) => {
+      if (matched) { setIsGeneratingPreview(false); return; }
+      supabase.functions.invoke('generate-expected-answer', {
+        body: { question_text: questionText, source_transcript: fullTranscript, prior_context: priorContext },
+      }).then(({ data, error }) => {
         if (!error && data?.expected_answer) {
           setPreviewExpectedAnswer(data.expected_answer as string);
         }
         setIsGeneratingPreview(false);
-        }).catch(() => setIsGeneratingPreview(false));
       }).catch(() => setIsGeneratingPreview(false));
-    }
-  }, [displayedQuestion, effectiveFormat]); // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch(() => setIsGeneratingPreview(false));
+  };
+
+  // Auto-generate preview when displayedQuestion changes, but ONLY once the
+  // instructor format preference has actually loaded. This prevents an early
+  // render with a default MCQ format from kicking off MCQ generation that
+  // then visually overrides the chosen Coding/Short Answer preview.
+  useEffect(() => {
+    if (!displayedQuestion) return;
+    if (formatPreference === undefined || formatPreference === null) return;
+    const key = `${displayedQuestion}::${effectiveFormat}::${codingStyle}`;
+    if (generatedForRef.current === key) return;
+    generatedForRef.current = key;
+    runPreviewGeneration(displayedQuestion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayedQuestion, effectiveFormat, codingStyle, formatPreference]);
 
   const handleStartEdit = () => {
     if (displayedQuestion) {
@@ -779,10 +828,19 @@ export function LiveCopilotHero({
 
   const sendWithPreviewData = (questionText: string) => {
     if (!onSendQuestion) return;
-    // CRITICAL: pass canonical type strings ('multiple_choice', 'poll', 'short_answer')
-    // — the downstream modal/edge-function radio groups & switch statements expect these
-    // exact values; passing 'mcq' caused the type to silently fall back to a default,
-    // which is why instructor preferences appeared to be ignored.
+    // CRITICAL: pass canonical type strings — 'multiple_choice', 'poll',
+    // 'short_answer', 'coding_simple', or 'coding'. Never 'mcq'.
+    if (effectiveFormat === 'coding') {
+      const codingType = codingStyle === 'simple' ? 'coding_simple' : 'coding';
+      const payload: Record<string, unknown> = {
+        ...(previewCodingPayload || {}),
+        ...(codingStyle === 'simple' && previewExpectedAnswer
+          ? { expected_answer: previewExpectedAnswer }
+          : {}),
+      };
+      onSendQuestion(questionText, codingType, [], '', previewExpectedAnswer, payload);
+      return;
+    }
     if (effectiveFormat === 'mcq' && previewOptions.length > 0) {
       const correctOpt = previewOptions.find(o => o.isCorrect);
       const correctAnswer = correctOpt ? correctOpt.label : '';
@@ -794,8 +852,6 @@ export function LiveCopilotHero({
     } else if (effectiveFormat === 'short_answer') {
       onSendQuestion(questionText, 'short_answer', [], '', previewExpectedAnswer);
     } else if (effectiveFormat === 'mcq') {
-      // MCQ pref but options not yet generated — still send canonical type so the
-      // modal/edge fn knows what the instructor wants.
       onSendQuestion(questionText, 'multiple_choice');
     } else {
       onSendQuestion(questionText);
@@ -830,47 +886,7 @@ export function LiveCopilotHero({
 
   const handleRegenPreview = () => {
     generatedForRef.current = null;
-    if (displayedQuestion) {
-      setIsGeneratingPreview(true);
-      setPreviewOptions([]);
-      setPreviewExpectedAnswer("");
-      setBankMatch(null);
-      const lastChunk = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
-      const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunk;
-      const priorContext = priorContextByQuestionRef.current.get(displayedQuestion) || "";
-      if (effectiveFormat === 'mcq' || effectiveFormat === 'poll') {
-        applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
-          if (matched) {
-            setIsGeneratingPreview(false);
-            return;
-          }
-          supabase.functions.invoke('generate-mcq-options', {
-            body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-          }).then(({ data, error }) => {
-          if (!error && data?.options && Array.isArray(data.options)) {
-            const correctLetter: string = data.correct_answer ?? 'A';
-            setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
-          }
-          setIsGeneratingPreview(false);
-          }).catch(() => setIsGeneratingPreview(false));
-        }).catch(() => setIsGeneratingPreview(false));
-      } else {
-        applyBankMatch(displayedQuestion, effectiveFormat).then((matched) => {
-          if (matched) {
-            setIsGeneratingPreview(false);
-            return;
-          }
-          supabase.functions.invoke('generate-expected-answer', {
-            body: { question_text: displayedQuestion, source_transcript: fullTranscript, prior_context: priorContext },
-          }).then(({ data, error }) => {
-          if (!error && data?.expected_answer) {
-            setPreviewExpectedAnswer(data.expected_answer as string);
-          }
-          setIsGeneratingPreview(false);
-          }).catch(() => setIsGeneratingPreview(false));
-        }).catch(() => setIsGeneratingPreview(false));
-      }
-    }
+    if (displayedQuestion) runPreviewGeneration(displayedQuestion);
   };
 
   const isSent = !!sentQuestion;
