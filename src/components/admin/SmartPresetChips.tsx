@@ -2,23 +2,21 @@ import { SMART_PRESETS, type SmartPreset } from "@/lib/adminSmartPresets";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  AlertTriangle,
-  TrendingDown,
-  Clock,
-  Brain,
   CalendarRange,
   Calendar,
+  CalendarClock,
+  Tv,
+  Film,
   Sparkles,
 } from "lucide-react";
 import { useAdminFilters, DEFAULT_ADMIN_FILTERS } from "@/hooks/useAdminFilters";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  AlertTriangle,
-  TrendingDown,
-  Clock,
-  Brain,
   CalendarRange,
   Calendar,
+  CalendarClock,
+  Tv,
+  Film,
 };
 
 export function SmartPresetChips() {
