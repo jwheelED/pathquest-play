@@ -585,16 +585,105 @@ export default function AdminDashboard() {
         avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
       });
 
-      const passRate = totalGradedStudents > 0 ? (passCount / totalGradedStudents) * 100 : 100;
-      const avgAssignmentCompletion = studentMetrics.size > 0
-        ? totalCompletionRate / studentMetrics.size
-        : 0;
+      // ===== Behavioral support cases (FERPA-friendly, no demographics, no grades) =====
+      const cases: SupportCase[] = [];
+      let inactiveCountAgg = 0;
+      const HAS_ANY_LIFETIME = (m: { total: number }) => m.total >= 3;
+
+      studentMetrics.forEach((metrics, studentId) => {
+        const lastActivityStat = userStats?.find(s => s.user_id === studentId);
+        const lastActivityDate = lastActivityStat?.last_activity_date
+          ? new Date(lastActivityStat.last_activity_date)
+          : metrics.lastActivity;
+        const daysSinceActive = lastActivityDate
+          ? Math.floor((Date.now() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        // seed-data hygiene: exclude unusable rows
+        const instructorName = instructorMap.get(metrics.instructorId);
+        if (!instructorName || instructorName === "Unknown Instructor") return;
+        if (daysSinceActive === null) return;
+        if (!HAS_ANY_LIFETIME(metrics)) return;
+
+        if (daysSinceActive >= 7) inactiveCountAgg++;
+
+        const signals: SupportSignal[] = [];
+        let score = 0;
+
+        if (daysSinceActive >= 9) {
+          signals.push({ label: `Inactive ${daysSinceActive} days`, weight: 3 });
+          score += 3;
+        } else if (daysSinceActive >= 4) {
+          signals.push({ label: `Inactive ${daysSinceActive} days`, weight: 1 });
+          score += 1;
+        }
+
+        const streakBroken =
+          lastActivityStat?.current_streak === 0 && (lastActivityStat?.longest_streak || 0) > 3;
+        if (streakBroken) {
+          signals.push({ label: "Streak broken", weight: 1 });
+          score += 1;
+        }
+
+        const incomplete = metrics.total - metrics.completed;
+        if (incomplete >= 3) {
+          signals.push({ label: `${incomplete} missed sessions`, weight: 2 });
+          score += 2;
+        } else if (incomplete >= 1) {
+          signals.push({ label: `${incomplete} missed session${incomplete > 1 ? "s" : ""}`, weight: 1 });
+          score += 1;
+        }
+
+        const completionRate = metrics.total > 0 ? metrics.completed / metrics.total : 1;
+        if (metrics.total >= 5 && completionRate < 0.4) {
+          signals.push({ label: `Submission rate ${Math.round(completionRate * 100)}%`, weight: 2 });
+          score += 2;
+        }
+
+        if (score < 2 || signals.length === 0) return;
+
+        const tier: SupportTier = score >= 6 ? "critical" : score >= 4 ? "high" : "medium";
+
+        // dominant signal → suggested action
+        const dominant = [...signals].sort((a, b) => b.weight - a.weight)[0];
+        let action = "Send check-in";
+        if (dominant.label.startsWith("Inactive")) action = "Send check-in";
+        else if (dominant.label.includes("missed")) action = "Flag to instructor";
+        else if (dominant.label === "Streak broken") action = "Refer to advising";
+        else if (dominant.label.startsWith("Submission")) action = "Flag to instructor";
+
+        cases.push({
+          id: studentId,
+          studentName: studentNameMap.get(studentId) || "Unknown Student",
+          instructorName,
+          signals,
+          tier,
+          score,
+          suggestedAction: action,
+          daysSinceActive,
+        });
+      });
+
+      cases.sort((a, b) => {
+        const tierOrder = { critical: 3, high: 2, medium: 1 };
+        return (tierOrder[b.tier] - tierOrder[a.tier]) ||
+               ((b.daysSinceActive ?? 0) - (a.daysSinceActive ?? 0));
+      });
+      setSupportCases(cases);
+
+      const hasRecentSessions = (assignments?.length || 0) > 0;
+      const sessionsPerStudent = studentMetrics.size > 0
+        ? Array.from(studentMetrics.values()).reduce((s, m) => s + m.total, 0) / studentMetrics.size
+        : null;
 
       setRetentionMetrics({
-        atRiskCount: atRiskList.length,
-        passRate,
-        retentionRate: engagementScore,
-        avgCompletionRate: avgAssignmentCompletion,
+        atRiskCount: cases.length,
+        sevenDayResponseRate: totalStudents && totalStudents > 0
+          ? ((activeStudents || 0) / totalStudents) * 100
+          : null,
+        inactiveCount: inactiveCountAgg,
+        sessionsPerStudent,
+        hasRecentSessions,
       });
 
     } catch (error) {
