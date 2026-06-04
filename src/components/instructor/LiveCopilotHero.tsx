@@ -98,7 +98,7 @@ interface LiveCopilotHeroProps {
   sentQuestion?: SentQuestion | null;
   onViewLiveResponses?: () => void;
   onSendFollowUp?: () => void;
-  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
+  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
   intervalMinutes?: number;
   nextQuestionIn?: number;
   onIntervalChange?: (minutes: number) => void;
