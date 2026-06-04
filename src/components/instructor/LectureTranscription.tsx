@@ -210,7 +210,9 @@ export const LectureTranscription = ({
   const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
 
   // Instructor format preference (loaded from profile)
-  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll'>('multiple_choice');
+  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll' | 'coding'>('multiple_choice');
+  const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
+
 
   // Question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -628,7 +630,7 @@ export const LectureTranscription = ({
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from("profiles")
-          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference, coding_question_style")
           .eq("id", user.id)
           .single();
 
@@ -646,11 +648,15 @@ export const LectureTranscription = ({
           setStrictModeEnabled(profile.auto_question_strict_mode !== false);
           // Question preview setting - default to true
           setQuestionPreviewEnabled(profile.question_preview_enabled !== false);
-          // Format preference for question on deck preview
+          // Format preference for question on deck preview (supports 'coding' too)
           if (profile.question_format_preference) {
-            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+          }
+          if (profile.coding_question_style) {
+            setCodingStyle(profile.coding_question_style as 'simple' | 'full');
           }
         }
+
 
         // Fetch today's question count
         const today = new Date().toISOString().split("T")[0];
@@ -687,13 +693,17 @@ export const LectureTranscription = ({
       if (!user) return;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("question_format_preference")
+        .select("question_format_preference, coding_question_style")
         .eq("id", user.id)
         .single();
       if (profile?.question_format_preference) {
-        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+      }
+      if (profile?.coding_question_style) {
+        setCodingStyle(profile.coding_question_style as 'simple' | 'full');
       }
     };
+
     const onFocus = () => refreshPreference();
     window.addEventListener('focus', onFocus);
 
