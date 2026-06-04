@@ -600,6 +600,7 @@ export function LiveCopilotHero({
   onViewLiveResponses,
   onSendFollowUp,
   formatPreference,
+  codingStyle = 'simple',
   intervalMinutes = 15,
   nextQuestionIn = 0,
   onIntervalChange,
@@ -616,12 +617,21 @@ export function LiveCopilotHero({
   // Auto-generated preview state
   const [previewOptions, setPreviewOptions] = useState<MCQOption[]>([]);
   const [previewExpectedAnswer, setPreviewExpectedAnswer] = useState("");
+  const [previewCodingPayload, setPreviewCodingPayload] = useState<Record<string, unknown> | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [bankMatch, setBankMatch] = useState<BankMatchPreview | null>(null);
   const generatedForRef = useRef<string | null>(null);
   const priorContextByQuestionRef = useRef<Map<string, string>>(new Map());
 
-  const effectiveFormat: QuestionType = formatPreference === 'short_answer' ? 'short_answer' : formatPreference === 'poll' ? 'poll' : 'mcq';
+  // effectiveFormat is the resolved instructor preference. Keep 'coding' as a
+  // first-class branch so we never silently fall back to MCQ when the
+  // instructor chose Coding in Question Format Settings.
+  const effectiveFormat: QuestionType =
+    formatPreference === 'short_answer' ? 'short_answer'
+    : formatPreference === 'poll' ? 'poll'
+    : formatPreference === 'coding' ? 'coding'
+    : 'mcq';
+  const isCoding = effectiveFormat === 'coding';
 
   // Timer
   useEffect(() => {
