@@ -199,10 +199,12 @@ export default function AdminDashboard() {
         setCourseEngagement([]);
         setRetentionMetrics({
           atRiskCount: 0,
-          passRate: 0,
-          retentionRate: 0,
-          avgCompletionRate: 0,
+          sevenDayResponseRate: null,
+          inactiveCount: 0,
+          sessionsPerStudent: null,
+          hasRecentSessions: false,
         });
+        setSupportCases([]);
         setLoading(false);
         return;
       }
