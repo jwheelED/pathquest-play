@@ -551,8 +551,8 @@ export default function AdminDashboard() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
-          {/* Global filter bar + smart presets (hidden until org exists) */}
-          {orgId && activeTab !== "settings" && (
+          {/* Filter bar + smart presets — adoption tab only */}
+          {orgId && activeTab === "adoption" && (
             <div className="max-w-7xl mx-auto space-y-3 mb-6">
               <SmartPresetChips />
               <AdminFilterBar orgId={orgId} instructorIds={instructorIds} />
