@@ -54,8 +54,9 @@ export default function AdminDashboard() {
   );
 
   // Use the new hook for aggregate data (now filter-aware)
-  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } =
+  const { metrics, weeklyUsage, misconceptions, confidenceIssues, hasAnyData, loading: aggregateLoading } =
     useAdminDashboardData(instructorIds, filters);
+
 
   // Client-side refinements: filter atRiskStudents and instructorPerformance by global filters + preset refinement
   const filteredAtRisk = useMemo(() => {
