@@ -1276,7 +1276,11 @@ export function LiveCopilotHero({
                 <div className="w-[420px] max-w-[55%] shrink-0 border border-neutral-200 rounded-xl bg-neutral-50/50 overflow-hidden flex flex-col">
                   <div className="px-3 py-2 bg-neutral-100/60 border-b border-neutral-200 flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-                      {effectiveFormat === 'mcq' ? 'Answer Options' : effectiveFormat === 'poll' ? 'Poll Choices' : 'Expected Answer'}
+                      {effectiveFormat === 'mcq' ? 'Answer Options'
+                        : effectiveFormat === 'poll' ? 'Poll Choices'
+                        : effectiveFormat === 'coding'
+                          ? (codingStyle === 'simple' ? 'Coding Check-in' : 'Coding Problem')
+                          : 'Expected Answer'}
                     </span>
                     <Button
                       variant="ghost"
@@ -1296,6 +1300,32 @@ export function LiveCopilotHero({
                           <div key={i} className="h-6 rounded-md bg-neutral-200/50 animate-pulse" />
                         ))}
                       </div>
+                    ) : effectiveFormat === 'coding' ? (
+                      codingStyle === 'simple' ? (
+                        <div className="space-y-1">
+                          <p className="text-[9px] text-neutral-400 uppercase tracking-wider">
+                            Reference answer ({(previewCodingPayload?.language as string) || 'python'})
+                          </p>
+                          <pre className="text-[11px] text-neutral-700 leading-relaxed font-mono whitespace-pre-wrap break-words bg-white border border-neutral-200 rounded-md p-2">
+{previewExpectedAnswer || 'Generating reference answer…'}
+                          </pre>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 text-[11px] text-neutral-700">
+                          {!!previewCodingPayload?.problemStatement && (
+                            <p className="leading-snug">{previewCodingPayload.problemStatement as string}</p>
+                          )}
+                          {!!previewCodingPayload?.functionSignature && (
+                            <pre className="font-mono text-[10px] bg-white border border-neutral-200 rounded-md p-2 whitespace-pre-wrap break-words">{previewCodingPayload.functionSignature as string}</pre>
+                          )}
+                          {!!previewCodingPayload?.starterCode && (
+                            <pre className="font-mono text-[10px] bg-white border border-neutral-200 rounded-md p-2 whitespace-pre-wrap break-words">{previewCodingPayload.starterCode as string}</pre>
+                          )}
+                          {!previewCodingPayload && (
+                            <p className="text-neutral-500 italic">Generating coding problem…</p>
+                          )}
+                        </div>
+                      )
                     ) : (effectiveFormat === 'mcq' || effectiveFormat === 'poll') ? (
                       <div className="space-y-1.5">
                         {(previewOptions.length > 0 ? previewOptions : DEFAULT_MCQ).map((opt) => (
