@@ -7,6 +7,7 @@ import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHand
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
+import GovernanceChips from "@/components/admin/GovernanceChips";
 import AggregateMetricsCard from "@/components/admin/AggregateMetricsCard";
 import UsageOverTimeChart from "@/components/admin/UsageOverTimeChart";
 import LearningInsightsCard from "@/components/admin/LearningInsightsCard";
