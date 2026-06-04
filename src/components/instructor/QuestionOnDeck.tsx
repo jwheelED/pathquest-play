@@ -426,6 +426,9 @@ export function QuestionOnDeck({
     format: OnDeckFormat,
     priorContext?: string,
   ) => {
+    const reqId = ++requestIdRef.current;
+    const isLatest = () => requestIdRef.current === reqId;
+
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
     setExpectedAnswer('');
@@ -446,6 +449,7 @@ export function QuestionOnDeck({
         const { data, error } = await supabase.functions.invoke('generate-coding-preview', {
           body: { ...body, style: codingStyle },
         });
+        if (!isLatest()) return;
         if (!error && data) {
           if (codingStyle === 'simple') {
             setExpectedAnswer(data.expected_answer || '');
@@ -489,6 +493,7 @@ export function QuestionOnDeck({
           : supabase.functions.invoke('generate-expected-answer', { body });
 
       const [bankRes, aiRes] = await Promise.all([bankPromise, aiPromise]);
+      if (!isLatest()) return;
 
       // 1) Prefer high-confidence bank match.
       const matchData: any = (bankRes as any)?.data;
@@ -537,7 +542,7 @@ export function QuestionOnDeck({
     } catch {
       // Silent — user can still edit manually
     } finally {
-      setIsGenerating(false);
+      if (isLatest()) setIsGenerating(false);
     }
   };
 
