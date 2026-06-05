@@ -869,8 +869,8 @@ export default function AdminDashboard() {
                     loading={aggregateLoading}
                   />
 
-                  {/* Export Reports */}
-                  <ExportReportsCard data={stats} />
+                  {/* Export Reports — uses reconciled org snapshot */}
+                  <ExportReportsCard snapshot={orgSnapshot} courseEngagement={courseEngagementExportRows} />
                 </>
               )}
             </div>
