@@ -8,16 +8,17 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, HeartHandshake, Search, BookOpen, Info, Download, Lock } from "lucide-react";
+import { AlertTriangle, HeartHandshake, Search, BookOpen, Info, Download, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export type SupportTier = "critical" | "high" | "medium";
 export type CaseStatus = "open" | "contacted" | "resolved";
+export type ViewerRole = "admin" | "advisor" | "instructor_of_record" | "support_staff";
 
 export interface SupportSignal {
-  label: string;     // e.g. "Inactive 9 days"
+  label: string;
   weight: number;
-  detail?: string;   // optional plain-text expansion
+  detail?: string;
 }
 
 export interface SupportCase {
@@ -35,19 +36,35 @@ interface Props {
   cases: SupportCase[];
   loading?: boolean;
   canViewIndividuals: boolean;
+  /** When set to "admin"/"dean" (default), names are masked by default with role-gated Reveal. */
+  viewerRole?: ViewerRole;
+  viewerId?: string;
 }
 
-const STORAGE_KEY = "edvana_support_case_status_v1";
+const STATUS_KEY = "edvana_support_case_status_v1";
+const REVEAL_LOG_KEY = "edvana_support_reveal_log_v1";
 
 function loadStatuses(): Record<string, CaseStatus> {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem(STATUS_KEY) || "{}"); } catch { return {}; }
 }
 function saveStatuses(s: Record<string, CaseStatus>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  localStorage.setItem(STATUS_KEY, JSON.stringify(s));
+}
+
+function logReveal(entry: { caseId: string; viewerId?: string; viewerRole: ViewerRole; ts: number }) {
+  // TODO(audit): replace with server-side audit table for production FERPA logging.
+  try {
+    const existing = JSON.parse(localStorage.getItem(REVEAL_LOG_KEY) || "[]");
+    existing.push(entry);
+    localStorage.setItem(REVEAL_LOG_KEY, JSON.stringify(existing.slice(-500)));
+  } catch { /* noop */ }
+}
+
+function maskName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "Student";
+  const initials = parts.map(p => p[0]?.toUpperCase() || "").join(".");
+  return `Student ${initials}.`;
 }
 
 const tierMeta: Record<SupportTier, { label: string; cls: string }> = {
@@ -56,16 +73,34 @@ const tierMeta: Record<SupportTier, { label: string; cls: string }> = {
   medium: { label: "Medium", cls: "bg-yellow-500 text-yellow-950" },
 };
 
-export default function SupportQueueTable({ cases, loading, canViewIndividuals }: Props) {
+export default function SupportQueueTable({
+  cases, loading, canViewIndividuals, viewerRole = "admin", viewerId,
+}: Props) {
   const [statuses, setStatuses] = useState<Record<string, CaseStatus>>(() => loadStatuses());
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("open");
 
   useEffect(() => { saveStatuses(statuses); }, [statuses]);
 
+  const canReveal = viewerRole !== "admin";
+  const namesMaskedByDefault = viewerRole === "admin";
+
   const setStatus = (id: string, status: CaseStatus) => {
     setStatuses((s) => ({ ...s, [id]: status }));
+  };
+
+  const toggleReveal = (id: string) => {
+    if (!canReveal) {
+      toast.error("Reveal requires advisor / instructor-of-record / support-staff role (FERPA).");
+      return;
+    }
+    setRevealed(r => {
+      const next = !r[id];
+      if (next) logReveal({ caseId: id, viewerId, viewerRole, ts: Date.now() });
+      return { ...r, [id]: next };
+    });
   };
 
   const filtered = useMemo(() => {
@@ -75,7 +110,10 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
       if (tierFilter !== "all" && c.tier !== tierFilter) return false;
       if (search) {
         const q = search.toLowerCase();
+        // search on masked id too so admins can still find by initials/course
+        const masked = maskName(c.studentName).toLowerCase();
         if (!c.studentName.toLowerCase().includes(q) &&
+            !masked.includes(q) &&
             !c.instructorName.toLowerCase().includes(q)) return false;
       }
       return true;
@@ -91,15 +129,20 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
 
   const handleExport = () => {
     const csv = [
-      ["Student", "Instructor", "Tier", "Why flagged", "Suggested action", "Status"].join(","),
-      ...filtered.map(c => [
-        `"${c.studentName}"`,
-        `"${c.instructorName}"`,
-        c.tier,
-        `"${c.signals.map(s => s.label).join("; ")}"`,
-        `"${c.suggestedAction}"`,
-        statuses[c.id] || "open",
-      ].join(",")),
+      ["Identity", "Course context", "Tier", "Why flagged", "Suggested action", "Status"].join(","),
+      ...filtered.map(c => {
+        const identity = namesMaskedByDefault && !revealed[c.id]
+          ? maskName(c.studentName)
+          : c.studentName;
+        return [
+          `"${identity}"`,
+          `"${c.instructorName}"`,
+          c.tier,
+          `"${c.signals.map(s => s.label).join("; ")}"`,
+          `"${c.suggestedAction}"`,
+          statuses[c.id] || "open",
+        ].join(",");
+      }),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -141,6 +184,12 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
             <CardDescription className="mt-1">
               A routing tool to get students help — not a risk-ranking engine. Every flag shows its
               full reason and a suggested next step.
+              {namesMaskedByDefault && (
+                <span className="block mt-1 text-xs">
+                  <Lock className="w-3 h-3 inline mr-1" />
+                  Identities masked for your role. Reveal is gated to advisors, instructors of record, and support staff.
+                </span>
+              )}
             </CardDescription>
           </div>
           <Button onClick={handleExport} variant="outline" size="sm" className="gap-2">
@@ -167,7 +216,7 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search student or instructor..."
+              placeholder={namesMaskedByDefault ? "Search initials or course..." : "Search student or instructor..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -214,7 +263,7 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Student</TableHead>
+                    <TableHead>{namesMaskedByDefault ? "Identity (masked)" : "Student"}</TableHead>
                     <TableHead>Tier</TableHead>
                     <TableHead>Why flagged</TableHead>
                     <TableHead>Suggested action</TableHead>
@@ -224,12 +273,40 @@ export default function SupportQueueTable({ cases, loading, canViewIndividuals }
                 <TableBody>
                   {filtered.map((c) => {
                     const status = statuses[c.id] || "open";
+                    const isRevealed = !namesMaskedByDefault || revealed[c.id];
+                    const displayName = isRevealed ? c.studentName : maskName(c.studentName);
                     return (
                       <TableRow key={c.id}>
                         <TableCell>
-                          <div className="font-medium">{c.studentName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            with {c.instructorName}
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="font-medium">{displayName}</div>
+                              {!namesMaskedByDefault && (
+                                <div className="text-xs text-muted-foreground">
+                                  with {c.instructorName}
+                                </div>
+                              )}
+                            </div>
+                            {namesMaskedByDefault && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    disabled={!canReveal}
+                                    onClick={() => toggleReveal(c.id)}
+                                  >
+                                    {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs text-xs">
+                                  {canReveal
+                                    ? (isRevealed ? "Hide identity" : "Reveal identity (logged for audit)")
+                                    : "Reveal requires advisor / instructor-of-record / support-staff role (FERPA)."}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
