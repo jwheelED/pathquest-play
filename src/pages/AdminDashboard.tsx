@@ -15,10 +15,20 @@ import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/compon
 import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
 import CourseEngagementHealthCard, { CourseEngagement, EngagementSignal } from "@/components/admin/CourseEngagementHealthCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
-import SupportQueueTable, { SupportCase, SupportTier, SupportSignal } from "@/components/admin/SupportQueueTable";
+import SupportQueueTable, { SupportCase, SupportTier, SupportSignal, ViewerRole } from "@/components/admin/SupportQueueTable";
 import CourseAtRiskRollup, { CourseRollupRow } from "@/components/admin/CourseAtRiskRollup";
 import GovernanceBanner from "@/components/admin/GovernanceBanner";
-import ExportReportsCard from "@/components/admin/ExportReportsCard";
+import ExportReportsCard, { OrgSnapshot, CourseEngagementExportRow } from "@/components/admin/ExportReportsCard";
+
+// Seed/demo names to filter before any individual data surfaces.
+const SEED_NAME_PATTERNS: RegExp[] = [
+  /^hello\s+students?$/i,
+  /^newstu\s*dash$/i,
+  /\btest\b/i,
+  /\bdemo\b/i,
+  /^unknown\s+student$/i,
+];
+const isSeedName = (name: string) => !name || SEED_NAME_PATTERNS.some(r => r.test(name.trim()));
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
