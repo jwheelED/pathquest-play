@@ -122,6 +122,64 @@ export default function AdminDashboard() {
     return confidenceIssues.filter((c) => c.confidentWrongCount >= ref.minConfidentWrong!);
   }, [confidenceIssues, activePreset]);
 
+  // ===== Single source of truth for org-wide engagement (Overview + PDF + CSV) =====
+  const periodLabel = useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 28);
+    const f = (d: Date) =>
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return `${f(start)} – ${f(end)}`;
+  }, []);
+
+  const orgSnapshot: OrgSnapshot = useMemo(() => {
+    const sessions = metrics.sessionsUsed ?? 0;
+    const usable = hasAnyData && sessions > 0;
+    return {
+      totalStudents: stats.totalStudents || null,
+      activeStudents: usable ? metrics.activeStudents7d : null,
+      totalInstructors: instructorIds.length || null,
+      totalSessions: usable ? sessions : null,
+      totalQuestions: null,
+      avgCompletionRate: usable ? stats.avgCompletionRate : null,
+      avgResponseRate: usable ? metrics.responseRate : null,
+      sessionsDelta: usable ? metrics.sessionsUsedDelta : null,
+      responseRateDelta: usable ? metrics.responseRateDelta : null,
+      hasUsableData: usable,
+      periodLabel,
+    };
+  }, [metrics, hasAnyData, stats, instructorIds.length, periodLabel]);
+
+  // dev-only invariant check: support cases imply active students
+  useEffect(() => {
+    if (import.meta.env.DEV && supportCases.length > 0 && orgSnapshot.activeStudents === 0) {
+      console.warn(
+        "[AdminDashboard] invariant: supportCases >0 but activeStudents=0 — data sources disagree.",
+        { supportCases: supportCases.length, snapshot: orgSnapshot },
+      );
+    }
+  }, [supportCases, orgSnapshot]);
+
+  // Map course engagement → export rows (gated, no instructor identities)
+  const courseEngagementExportRows: CourseEngagementExportRow[] = useMemo(() => {
+    const casesByInstructor = supportCases.reduce<Record<string, number>>((acc, c) => {
+      acc[c.instructorName] = (acc[c.instructorName] || 0) + 1;
+      return acc;
+    }, {});
+    return filteredCourseEngagement.map(c => ({
+      courseTitle: c.title,
+      sessionsInWindow: c.sessionsInWindow,
+      responseRateCurrent: c.responseRateCurrent || null,
+      responseRatePrior: c.responseRatePrior || null,
+      activeStudents: Math.round((c.sevenDayActiveRate / 100) * (c.studentCount || 0)),
+      openSupportCases: casesByInstructor[c.instructorName] || 0,
+    }));
+  }, [filteredCourseEngagement, supportCases]);
+
+  // ===== Viewer role resolution for FERPA-gated identity reveals =====
+  // Admin/dean = masked by default. Other roles (advisor / IoR / support_staff) can reveal.
+  const viewerRole: ViewerRole = "admin"; // TODO: read from user_roles when those enum values exist
+
   useEffect(() => {
     checkSession();
     
