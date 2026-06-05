@@ -21,17 +21,37 @@ import {
   MessageSquare,
   BarChart3,
   RefreshCw,
+  Code,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import type { PassiveQuestionCandidate } from '@/hooks/usePassiveQuestionDetection';
 
+export type OnDeckFormat = 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
+
+export interface OnDeckCodingPayload {
+  problemStatement?: string;
+  functionSignature?: string;
+  language?: string;
+  difficulty?: string;
+  constraints?: string[];
+  examples?: Array<{ input?: string; output?: string; explanation?: string }>;
+  hints?: string[];
+  starterCode?: string;
+  testCases?: Array<{ input?: string; expectedOutput?: string }>;
+  title?: string;
+  // For simple style: short reference answer used for lenient auto-grading
+  expected_answer?: string;
+}
+
 export interface OnDeckSendData {
   options?: string[];
   correctAnswer?: 'A' | 'B' | 'C' | 'D';
   expectedAnswer?: string;
-  type: 'multiple_choice' | 'short_answer' | 'poll';
+  type: OnDeckFormat;
   sourceBankItemId?: string;
+  codingStyle?: 'simple' | 'full';
+  codingPayload?: OnDeckCodingPayload;
 }
 
 interface QuestionOnDeckProps {
@@ -45,8 +65,10 @@ interface QuestionOnDeckProps {
   onRemoveFromHistory: (id: string) => void;
   isHeld: boolean;
   onToggleHold: () => void;
-  suggestedType?: 'multiple_choice' | 'short_answer' | 'poll';
-  formatPreference?: 'multiple_choice' | 'short_answer' | 'poll';
+  suggestedType?: OnDeckFormat;
+  formatPreference?: OnDeckFormat;
+  /** Sub-style when format is 'coding' */
+  codingStyle?: 'simple' | 'full';
   transcriptContext?: string;
   courseId?: string | null;
 }
@@ -108,43 +130,68 @@ function HistoryItem({
 function PreviewPanel({
   questionText,
   formatType,
+  codingStyle,
   options,
   correctAnswer,
   expectedAnswer,
+  codingPayload,
   isGenerating,
   onOptionsChange,
   onCorrectAnswerChange,
   onExpectedAnswerChange,
+  onCodingPayloadChange,
   onRegenerate,
 }: {
   questionText: string;
-  formatType: 'multiple_choice' | 'short_answer' | 'poll';
+  formatType: OnDeckFormat;
+  codingStyle: 'simple' | 'full';
   options: string[];
   correctAnswer: 'A' | 'B' | 'C' | 'D';
   expectedAnswer: string;
+  codingPayload: OnDeckCodingPayload;
   isGenerating: boolean;
   onOptionsChange: (opts: string[]) => void;
   onCorrectAnswerChange: (ans: 'A' | 'B' | 'C' | 'D') => void;
   onExpectedAnswerChange: (ans: string) => void;
+  onCodingPayloadChange: (p: OnDeckCodingPayload) => void;
   onRegenerate: () => void;
 }) {
   const isChoice = formatType === 'multiple_choice' || formatType === 'poll';
   const isPoll = formatType === 'poll';
+  const isCoding = formatType === 'coding';
+  const isFullCoding = isCoding && codingStyle === 'full';
+  const isSimpleCoding = isCoding && codingStyle === 'simple';
   const letters = ['A', 'B', 'C', 'D'] as const;
+
+  const headerLabel = isPoll
+    ? 'Poll'
+    : isChoice
+      ? 'MCQ options'
+      : isFullCoding
+        ? `Coding problem (${codingPayload.language || 'python'})`
+        : isSimpleCoding
+          ? `Coding check-in (${codingPayload.language || 'python'})`
+          : 'Expected answer';
+
+  const headerIcon = isCoding ? (
+    <Code className="h-3 w-3 text-muted-foreground" />
+  ) : isChoice ? (
+    isPoll ? <BarChart3 className="h-3 w-3 text-muted-foreground" /> : <ListChecks className="h-3 w-3 text-muted-foreground" />
+  ) : (
+    <MessageSquare className="h-3 w-3 text-muted-foreground" />
+  );
+
+  const updatePayload = (patch: Partial<OnDeckCodingPayload>) => {
+    onCodingPayloadChange({ ...codingPayload, ...patch });
+  };
 
   return (
     <div className="flex flex-col border border-border/60 rounded-xl bg-background overflow-hidden h-full">
       {/* Header */}
       <div className="px-3 py-2 bg-muted/40 border-b border-border/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
-          {isChoice ? (
-            isPoll ? <BarChart3 className="h-3 w-3 text-muted-foreground" /> : <ListChecks className="h-3 w-3 text-muted-foreground" />
-          ) : (
-            <MessageSquare className="h-3 w-3 text-muted-foreground" />
-          )}
-          <span className="text-[10px] text-muted-foreground font-medium">
-            {isPoll ? 'Poll' : isChoice ? 'MCQ options' : 'Expected answer'}
-          </span>
+          {headerIcon}
+          <span className="text-[10px] text-muted-foreground font-medium">{headerLabel}</span>
         </div>
         <Button
           variant="ghost"
@@ -159,10 +206,10 @@ function PreviewPanel({
       </div>
 
       {/* Body */}
-      <div className="px-3 py-2.5 flex-1 overflow-y-auto space-y-2">
+      <div className="px-3 py-2.5 flex-1 overflow-y-auto space-y-2 max-h-[420px]">
         {isGenerating ? (
           <div className="space-y-2 pt-1">
-            {[...Array(isChoice ? 4 : 2)].map((_, i) => (
+            {[...Array(isChoice ? 4 : isFullCoding ? 6 : 2)].map((_, i) => (
               <div key={i} className="h-7 rounded-md bg-muted/50 animate-pulse" />
             ))}
           </div>
@@ -199,13 +246,91 @@ function PreviewPanel({
               </div>
             ))}
             {!isPoll && (
-              <p className="text-[9px] text-muted-foreground pt-0.5">
-                ● = correct answer
-              </p>
+              <p className="text-[9px] text-muted-foreground pt-0.5">● = correct answer</p>
             )}
           </div>
+        ) : isSimpleCoding ? (
+          /* Simple coding check-in — short reference answer */
+          <div className="space-y-1">
+            <p className="text-[9px] text-muted-foreground">
+              Reference answer ({codingPayload.language || 'python'}) — used as a lenient grading reference
+            </p>
+            <Textarea
+              value={expectedAnswer}
+              onChange={(e) => onExpectedAnswerChange(e.target.value)}
+              className="text-[11px] min-h-[90px] resize-none font-mono"
+              placeholder="e.g. age = 21"
+            />
+          </div>
+        ) : isFullCoding ? (
+          /* Full coding problem — editable fields */
+          <div className="space-y-2.5">
+            <div className="space-y-1">
+              <p className="text-[9px] text-muted-foreground font-medium">Problem statement</p>
+              <Textarea
+                value={codingPayload.problemStatement ?? ''}
+                onChange={(e) => updatePayload({ problemStatement: e.target.value })}
+                className="text-[11px] min-h-[60px] resize-none"
+                placeholder="Describe the problem the student should solve…"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] text-muted-foreground font-medium">Function signature</p>
+              <Input
+                value={codingPayload.functionSignature ?? ''}
+                onChange={(e) => updatePayload({ functionSignature: e.target.value })}
+                className="text-[11px] h-7 font-mono"
+                placeholder="def solve(nums: list[int]) -> int:"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] text-muted-foreground font-medium">Starter code</p>
+              <Textarea
+                value={codingPayload.starterCode ?? ''}
+                onChange={(e) => updatePayload({ starterCode: e.target.value })}
+                className="text-[11px] min-h-[70px] resize-none font-mono"
+                placeholder="def solve(nums):\n    pass"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] text-muted-foreground font-medium">Examples (one per line, input → output)</p>
+              <Textarea
+                value={(codingPayload.examples || [])
+                  .map(ex => `${ex.input ?? ''} → ${ex.output ?? ''}`)
+                  .join('\n')}
+                onChange={(e) => {
+                  const parsed = e.target.value
+                    .split('\n')
+                    .map(line => {
+                      const [input, output] = line.split('→').map(s => s.trim());
+                      return { input: input || '', output: output || '' };
+                    })
+                    .filter(ex => ex.input || ex.output);
+                  updatePayload({ examples: parsed });
+                }}
+                className="text-[11px] min-h-[50px] resize-none font-mono"
+                placeholder="[1, 2, 3] → 6"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[9px] text-muted-foreground font-medium">Constraints (one per line)</p>
+              <Textarea
+                value={(codingPayload.constraints || []).join('\n')}
+                onChange={(e) =>
+                  updatePayload({
+                    constraints: e.target.value
+                      .split('\n')
+                      .map(s => s.trim())
+                      .filter(Boolean),
+                  })
+                }
+                className="text-[11px] min-h-[44px] resize-none"
+                placeholder="1 <= n <= 10^4"
+              />
+            </div>
+          </div>
         ) : (
-          /* Short answer / coding expected answer */
+          /* Short answer expected answer */
           <div className="space-y-1">
             <p className="text-[9px] text-muted-foreground">Expected answer (grading reference)</p>
             <Textarea
@@ -237,10 +362,11 @@ export function QuestionOnDeck({
   onToggleHold,
   suggestedType = 'multiple_choice',
   formatPreference,
+  codingStyle = 'simple',
   transcriptContext,
   courseId,
 }: QuestionOnDeckProps) {
-  const effectiveFormat = (formatPreference ?? suggestedType) as 'multiple_choice' | 'short_answer' | 'poll';
+  const effectiveFormat: OnDeckFormat = (formatPreference ?? suggestedType) as OnDeckFormat;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -250,23 +376,38 @@ export function QuestionOnDeck({
   const [mcqOptions, setMcqOptions] = useState(['', '', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [expectedAnswer, setExpectedAnswer] = useState('');
+  const [codingPayload, setCodingPayload] = useState<OnDeckCodingPayload>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [bankMatch, setBankMatch] = useState<{ id: string; title: string } | null>(null);
 
-  // Track which candidate text we last generated for to avoid duplicate calls
+  // Track (candidate text + format + coding style) so a late-arriving format
+  // change (e.g. profile preference loaded after the candidate was detected)
+  // re-runs generation instead of being skipped by the dedupe guard.
   const generatedForRef = useRef<string | null>(null);
+  // Monotonic request id — ensures a stale in-flight preview response cannot
+  // overwrite state belonging to a newer format selection (e.g. MCQ response
+  // arriving after we've already switched to Coding).
+  const requestIdRef = useRef(0);
 
   const hasCandidate = !!candidate;
   const hasHistory = candidateHistory.length > 0;
   const visibleHistory = showAllHistory ? candidateHistory : candidateHistory.slice(0, 3);
   const hiddenCount = candidateHistory.length - 3;
 
-  // Auto-generate when a new candidate appears
+  // Auto-generate when a new candidate appears OR when the resolved format
+  // changes for the current candidate. We REQUIRE formatPreference to be
+  // explicitly provided (loaded from profile) before generating — otherwise
+  // an early render with the default MCQ format would kick off an MCQ preview
+  // that races the real coding/short_answer preview.
   useEffect(() => {
-    if (!candidate || generatedForRef.current === candidate.text) return;
-    generatedForRef.current = candidate.text;
+    if (!candidate) return;
+    if (formatPreference === undefined || formatPreference === null) return;
+    const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
+    if (generatedForRef.current === key) return;
+    generatedForRef.current = key;
     generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
-  }, [candidate?.text, effectiveFormat]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidate?.text, effectiveFormat, codingStyle, formatPreference]);
 
   // Reset generated state when candidate is cleared
   useEffect(() => {
@@ -275,50 +416,26 @@ export function QuestionOnDeck({
       setMcqOptions(['', '', '', '']);
       setCorrectAnswer('A');
       setExpectedAnswer('');
+      setCodingPayload({});
       setBankMatch(null);
     }
   }, [candidate]);
 
-  const generatePreview = async (questionText: string, format: typeof effectiveFormat, priorContext?: string) => {
+  const generatePreview = async (
+    questionText: string,
+    format: OnDeckFormat,
+    priorContext?: string,
+  ) => {
+    const reqId = ++requestIdRef.current;
+    const isLatest = () => requestIdRef.current === reqId;
+
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
     setExpectedAnswer('');
+    setCodingPayload({});
     setBankMatch(null);
 
     try {
-      // 1) First try to match against the instructor's question bank.
-      try {
-        const { data: matchData } = await supabase.functions.invoke('match-bank-question', {
-          body: { question_text: questionText, course_id: courseId ?? null, format },
-        });
-        const m = matchData?.match;
-        if (m && m.question_content) {
-          const qc = m.question_content;
-          if (format === 'multiple_choice' || format === 'poll') {
-            const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
-            if (opts && opts.length === 4) {
-              setMcqOptions(opts);
-              const ca = qc.correctAnswer || qc.correct_answer;
-              if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
-                setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
-              }
-              setBankMatch({ id: m.id, title: m.title });
-              return; // skip AI generation
-            }
-          } else if (format === 'short_answer') {
-            const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
-            if (ea) {
-              setExpectedAnswer(String(ea));
-              setBankMatch({ id: m.id, title: m.title });
-              return;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Bank match lookup failed, falling back to AI', e);
-      }
-
-      // 2) Fall back to AI generation.
       const body: Record<string, unknown> = {
         question_text: questionText,
         source_transcript: transcriptContext,
@@ -327,24 +444,105 @@ export function QuestionOnDeck({
         body.prior_context = priorContext;
       }
 
-      if (format === 'multiple_choice' || format === 'poll') {
-        const { data, error } = await supabase.functions.invoke('generate-mcq-options', { body });
-        if (!error && data?.options?.length === 4) {
-          setMcqOptions(data.options);
-          if (data.correct_answer && format === 'multiple_choice') {
-            setCorrectAnswer(data.correct_answer);
+      // ─── Coding format ────────────────────────────────────────────────
+      if (format === 'coding') {
+        const { data, error } = await supabase.functions.invoke('generate-coding-preview', {
+          body: { ...body, style: codingStyle },
+        });
+        if (!isLatest()) return;
+        if (!error && data) {
+          if (codingStyle === 'simple') {
+            setExpectedAnswer(data.expected_answer || '');
+            setCodingPayload({
+              language: data.language,
+              expected_answer: data.expected_answer || '',
+            });
+          } else {
+            setCodingPayload({
+              title: data.title,
+              problemStatement: data.problemStatement,
+              functionSignature: data.functionSignature,
+              language: data.language,
+              difficulty: data.difficulty,
+              constraints: data.constraints || [],
+              examples: data.examples || [],
+              hints: data.hints || [],
+              starterCode: data.starterCode || '',
+              testCases: data.testCases || [],
+            });
+          }
+        } else if (error) {
+          console.warn('generate-coding-preview failed', error);
+        }
+        return;
+      }
+
+      // ─── Non-coding: bank match in parallel with AI generation ────────
+      const bankPromise = supabase.functions
+        .invoke('match-bank-question', {
+          body: { question_text: questionText, course_id: courseId ?? null, format },
+        })
+        .catch((e) => {
+          console.warn('Bank match lookup failed', e);
+          return { data: null } as { data: null };
+        });
+
+      const aiPromise =
+        format === 'multiple_choice' || format === 'poll'
+          ? supabase.functions.invoke('generate-mcq-options', { body })
+          : supabase.functions.invoke('generate-expected-answer', { body });
+
+      const [bankRes, aiRes] = await Promise.all([bankPromise, aiPromise]);
+      if (!isLatest()) return;
+
+      // 1) Prefer high-confidence bank match.
+      const matchData: any = (bankRes as any)?.data;
+      const m = matchData?.match;
+      const confidence: number = typeof matchData?.confidence === 'number' ? matchData.confidence : 0;
+      const isHighConfidenceBank =
+        m && m.question_content && (matchData?.source === 'exact_match' || confidence >= 0.8);
+
+      if (isHighConfidenceBank) {
+        const qc = m.question_content;
+        if (format === 'multiple_choice' || format === 'poll') {
+          const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+          if (opts && opts.length === 4) {
+            setMcqOptions(opts);
+            const ca = qc.correctAnswer || qc.correct_answer;
+            if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+              setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+            }
+            setBankMatch({ id: m.id, title: m.title });
+            return;
+          }
+        } else if (format === 'short_answer') {
+          const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+          if (ea) {
+            setExpectedAnswer(String(ea));
+            setBankMatch({ id: m.id, title: m.title });
+            return;
           }
         }
-      } else {
-        const { data, error } = await supabase.functions.invoke('generate-expected-answer', { body });
-        if (!error && data?.expected_answer) {
+      }
+
+      // 2) Fall back to the AI result we kicked off in parallel.
+      const { data, error } = aiRes as { data: any; error: any };
+      if (!error) {
+        if (format === 'multiple_choice' || format === 'poll') {
+          if (data?.options?.length === 4) {
+            setMcqOptions(data.options);
+            if (data.correct_answer && format === 'multiple_choice') {
+              setCorrectAnswer(data.correct_answer);
+            }
+          }
+        } else if (data?.expected_answer) {
           setExpectedAnswer(data.expected_answer);
         }
       }
     } catch {
       // Silent — user can still edit manually
     } finally {
-      setIsGenerating(false);
+      if (isLatest()) setIsGenerating(false);
     }
   };
 
@@ -370,19 +568,44 @@ export function QuestionOnDeck({
   // Build send data from current preview state and fire
   const fireSend = (questionText: string) => {
     const isChoice = effectiveFormat === 'multiple_choice' || effectiveFormat === 'poll';
+    const isCoding = effectiveFormat === 'coding';
     const hasOptions = mcqOptions.some(o => o.trim());
 
-    const data: OnDeckSendData = {
-      type: effectiveFormat,
-      ...(isChoice && hasOptions
-        ? { options: mcqOptions, correctAnswer: effectiveFormat === 'multiple_choice' ? correctAnswer : undefined }
-        : {}),
-      ...(!isChoice && expectedAnswer.trim() ? { expectedAnswer } : {}),
-      ...(bankMatch ? { sourceBankItemId: bankMatch.id } : {}),
-    };
+    let data: OnDeckSendData;
+    if (isCoding) {
+      const payload: OnDeckCodingPayload = codingStyle === 'simple'
+        ? { ...codingPayload, expected_answer: expectedAnswer }
+        : { ...codingPayload };
+      data = {
+        type: 'coding',
+        codingStyle,
+        codingPayload: payload,
+        ...(codingStyle === 'simple' && expectedAnswer.trim()
+          ? { expectedAnswer }
+          : {}),
+        ...(bankMatch ? { sourceBankItemId: bankMatch.id } : {}),
+      };
+    } else {
+      data = {
+        type: effectiveFormat,
+        ...(isChoice && hasOptions
+          ? { options: mcqOptions, correctAnswer: effectiveFormat === 'multiple_choice' ? correctAnswer : undefined }
+          : {}),
+        ...(!isChoice && expectedAnswer.trim() ? { expectedAnswer } : {}),
+        ...(bankMatch ? { sourceBankItemId: bankMatch.id } : {}),
+      };
+    }
 
     onSendNow(questionText, data);
   };
+
+  const formatBadgeLabel = effectiveFormat === 'multiple_choice'
+    ? 'MCQ'
+    : effectiveFormat === 'poll'
+      ? 'Poll'
+      : effectiveFormat === 'coding'
+        ? (codingStyle === 'simple' ? 'Coding (Check-in)' : 'Coding (Full)')
+        : 'Short Answer';
 
   return (
     <Card
@@ -437,7 +660,7 @@ export function QuestionOnDeck({
             )}
             {hasCandidate && (
               <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary">
-                {effectiveFormat === 'multiple_choice' ? 'MCQ' : effectiveFormat === 'poll' ? 'Poll' : 'Short Answer'}
+                {formatBadgeLabel}
               </Badge>
             )}
             {hasCandidate && bankMatch && (
@@ -539,13 +762,16 @@ export function QuestionOnDeck({
               <PreviewPanel
                 questionText={candidate.text}
                 formatType={effectiveFormat}
+                codingStyle={codingStyle}
                 options={mcqOptions}
                 correctAnswer={correctAnswer}
                 expectedAnswer={expectedAnswer}
+                codingPayload={codingPayload}
                 isGenerating={isGenerating}
                 onOptionsChange={setMcqOptions}
                 onCorrectAnswerChange={setCorrectAnswer}
                 onExpectedAnswerChange={setExpectedAnswer}
+                onCodingPayloadChange={setCodingPayload}
                 onRegenerate={() => {
                   generatedForRef.current = null;
                   generatePreview(candidate.text, effectiveFormat);

@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, Download, Search, TrendingDown, Clock, BookOpen } from "lucide-react";
+import { AlertTriangle, Download, Search, TrendingDown, Clock, BookOpen, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export interface AtRiskStudent {
   id: string;
@@ -88,11 +89,51 @@ export function calculateRiskScore(
   return { score, level, factors };
 }
 
+type SortKey = "name" | "instructorName" | "avgGrade" | "incompleteAssignments" | "riskLevel" | "riskScore";
+type SortDir = "asc" | "desc";
+
 export default function AtRiskStudentsTable({ students, loading }: AtRiskStudentsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [riskFilter, setRiskFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("riskScore");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const filteredStudents = students.filter((student) => {
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" || key === "instructorName" ? "asc" : "desc");
+    }
+  };
+
+  const riskLevelValue = (level: "critical" | "high" | "medium") => {
+    switch (level) {
+      case "critical": return 3;
+      case "high": return 2;
+      case "medium": return 1;
+    }
+  };
+
+  const sortedStudents = useMemo(() => {
+    const copy = [...students];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "name") {
+        cmp = a.name.localeCompare(b.name);
+      } else if (sortKey === "instructorName") {
+        cmp = a.instructorName.localeCompare(b.instructorName);
+      } else if (sortKey === "riskLevel") {
+        cmp = riskLevelValue(a.riskLevel) - riskLevelValue(b.riskLevel);
+      } else {
+        cmp = (a[sortKey] as number) - (b[sortKey] as number);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [students, sortKey, sortDir]);
+
+  const filteredStudents = sortedStudents.filter((student) => {
     const matchesSearch =
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -102,6 +143,35 @@ export default function AtRiskStudentsTable({ students, loading }: AtRiskStudent
 
     return matchesSearch && matchesRisk;
   });
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="w-3.5 h-3.5 text-primary" />
+      : <ArrowDown className="w-3.5 h-3.5 text-primary" />;
+  };
+
+  const SortableHead = ({
+    col,
+    label,
+    align = "left",
+  }: { col: SortKey; label: string; align?: "left" | "right" }) => (
+    <TableHead className={align === "right" ? "text-right" : ""}>
+      <button
+        type="button"
+        onClick={() => handleSort(col)}
+        className={cn(
+          "inline-flex items-center gap-1.5 hover:text-foreground transition-colors select-none",
+          align === "right" && "ml-auto",
+          sortKey === col && "text-foreground font-semibold"
+        )}
+        aria-label={`Sort by ${label}`}
+      >
+        {label}
+        <SortIcon col={col} />
+      </button>
+    </TableHead>
+  );
 
   const handleExport = () => {
     const csvContent = [
@@ -222,13 +292,13 @@ export default function AtRiskStudentsTable({ students, loading }: AtRiskStudent
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Instructor</TableHead>
-                  <TableHead className="text-right">Avg Grade</TableHead>
+                  <SortableHead col="name" label="Student" />
+                  <SortableHead col="instructorName" label="Instructor" />
+                  <SortableHead col="avgGrade" label="Avg Grade" align="right" />
                   <TableHead>Last Active</TableHead>
-                  <TableHead className="text-right">Incomplete</TableHead>
-                  <TableHead>Risk Level</TableHead>
-                  <TableHead>Risk Factors</TableHead>
+                  <SortableHead col="incompleteAssignments" label="Incomplete" align="right" />
+                  <SortableHead col="riskLevel" label="Risk Level" />
+                  <SortableHead col="riskScore" label="Risk Score" align="right" />
                 </TableRow>
               </TableHeader>
               <TableBody>

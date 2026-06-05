@@ -1,5 +1,5 @@
 import { useRef, useCallback, useState } from 'react';
-import { type PassiveQuestionCandidate } from './usePassiveQuestionDetection';
+import { type PassiveQuestionCandidate, hasInterrogativeTrigger } from './usePassiveQuestionDetection';
 
 // Re-use the same blocklists from passive detection
 const GREETING_PATTERNS = [
@@ -29,42 +29,56 @@ const RHETORICAL_BLOCKLIST = [
   'how are we doing', 'how are you doing', 'how is everyone doing',
 ];
 
-// Interrogative trigger patterns. Cover both classic WH-fronted questions AND
-// embedded/conversational forms ("tell me what...", "anyone know...", "could
-// someone explain...", "do you know..."). These match anywhere in the utterance,
-// not just at the start, so detection is far less brittle.
+// Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
+// MUST sit at the START of a clause — either the start of the buffer or
+// immediately after a hard sentence terminator / em-dash. A bare comma is
+// NOT a hard boundary: "…how they stain, how they interact, and how X…"
+// is a declarative enumeration, not three questions. The only comma path
+// that arms a WH-trigger is when the pre-comma clause is an explicit
+// PREMISE clause ("Given what we just said about X, why does Y…").
+const CLAUSE_START = '(?:^|[.?!;\\u2014\\u2013]\\s+|\\s[\\u2014\\u2013]\\s+)';
+// Discourse markers that can sit between a clause boundary and the real WH-word
+// ("…flattens out. So why does it stop…", "…okay, now what happens…").
+// They are stripped later by FILLER_PREFIXES / postProcess.
+const DISCOURSE_MARKERS = '(?:(?:so|now|and|but|well|okay|ok|or|then|also|and so|but so)\\s+)*';
+// Subordinators that introduce a premise clause preceding the interrogative
+// (e.g., "If a cell has X, what happens?"). Used both as a regex source for
+// the premise-comma trigger pattern AND by the premise-rescue logic in
+// getSliceAroundTrigger.
+const PREMISE_SUBORDINATOR_SOURCE =
+  'if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as|considering';
+const PREMISE_SUBORDINATORS = new RegExp(`^(${PREMISE_SUBORDINATOR_SOURCE})\\b`, 'i');
+// Premise-comma start: a hard sentence boundary (or buffer start), then a
+// subordinator-led clause, then a comma. Implemented as a lookbehind so the
+// match index lands on the WH-word — the premise is preserved in the buffer
+// and recovered by the premise-rescue logic in getSliceAroundTrigger.
+const PREMISE_COMMA_LOOKBEHIND =
+  `(?<=(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]{0,400}?,\\s+)`;
+const WH_WORDS = '(what|why|how|when|where|who|whom|whose|which)';
 const TRIGGER_PATTERNS = [
-  // Classic WH questions — broadened to fire on any following word.
-  // The semantic completion gate + rhetorical blocklists prevent false positives.
-  /\bwhat\s+\w+/i,
-  /\bwhy\s+\w+/i,
-  /\bhow\s+\w+/i,
-  /\bwhen\s+\w+/i,
-  /\bwhere\s+\w+/i,
-  /\bwho\s+\w+/i,
-  /\bwhich\s+\w+/i,
+  // Classic WH questions — hard clause-start anchored, optional discourse markers.
+  new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
+  // Premise-led WH questions — comma path only when the pre-comma clause
+  // starts with a subordinator ("Given…, why…" / "Considering…, how…").
+  new RegExp(`${PREMISE_COMMA_LOOKBEHIND}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
-  // "What if X?" / "What happens when X?" style
   /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
-  // Subject-aux inversion (yes/no & A-or-B questions). Aux must be followed by
-  // a pronoun/determiner/quantifier typical of question subjects to avoid
-  // matching declaratives like "There are two genes…".
-  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
-  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
-  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
-  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  // NOTE: "suppose that" is intentionally NOT a trigger — it's a PREMISE
+  // subordinator (handled below), not a question stem. The real question
+  // follows ("Suppose X, what would Y do?").
+  // Subject-aux inversion (yes/no & A-or-B questions) — clause-start anchored.
+  new RegExp(`${CLAUSE_START}(is|are|was|were|am)\\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(do|does|did)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(can|could|would|should|will|shall|may|might|must)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(has|have|had)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
 ];
 
-// Subordinators that introduce a premise clause preceding the interrogative
-// (e.g., "If a cell has X, what happens?"). When the chunk before the trigger
-// starts with one of these AND is within the same breath, we include it as
-// part of the question rather than demoting it to priorContext.
-const PREMISE_SUBORDINATORS = /^(if|when|whenever|suppose|supposing|given|assuming|provided|since|because|once|unless|although|though|while|as)\b/i;
+// (PREMISE_SUBORDINATORS is declared above alongside the trigger patterns so
+// the premise-comma WH regex can share its source.)
 
 // Topic-shift markers — when scanning back for context, stop at these.
 const TOPIC_SHIFT_MARKERS = [
@@ -229,6 +243,10 @@ function postProcess(text: string): string {
   if (!text) return '';
 
   let merged = text.trim();
+
+  // Strip leading punctuation/dashes left over from the slice split
+  // (e.g. "— which algorithm…", ", how did…").
+  merged = merged.replace(/^[\s.,;:!?\-\u2014\u2013]+/, '').trim();
 
   // Strip leading filler (multiple passes)
   merged = merged.replace(FILLER_PREFIXES, '').trim();
@@ -444,11 +462,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         const tailEndsWithComma = /,\s*$/.test(tail);
         const tailStartsWithSubordinator = PREMISE_SUBORDINATORS.test(tail);
 
-        if (tail && (tailEndsWithComma || tailStartsWithSubordinator)) {
-          // Move the tail to the front of question; keep earlier text as context.
+        // Only promote the prior clause into the question when it's an
+        // explicit subordinator-led premise (e.g. "If a cell has X, …").
+        // A bare trailing comma is NOT enough — that catches generic preambles
+        // like "…everything I said, why does this stop…" and produces run-ons.
+        if (tail && tailStartsWithSubordinator) {
           const newContext = (lastTerm >= 0 ? context.slice(0, lastTerm + 1) : '').trim();
-          // Ensure a comma separator between premise and trigger word.
-          const premise = tailEndsWithComma ? tail : `${tail.replace(/[,;:]+$/, '')},`;
+          const premise = tail.replace(/[,;:]+$/, '') + ',';
           question = `${premise} ${question}`.replace(/\s+/g, ' ').trim();
           context = newContext;
         }
@@ -563,6 +583,15 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         return;
       }
 
+      // Final trigger check on the cleaned question text — defends against
+      // declaratives where the buffer scan matched a subject-aux earlier in
+      // the segment but the slice produced a non-interrogative final string
+      // (e.g. "Today, we'll be talking about osmosis?").
+      if (!hasInterrogativeTrigger(question)) {
+        if (debug) console.log('🎯 [trigger-capture] blocked — no interrogative trigger in final question:', question);
+        return;
+      }
+
       // Light cleanup of priorContext: strip leading filler, cap at ~3000 chars.
       // Keep both head and tail when truncating so antecedents earlier in the
       // segment aren't lost (most pronoun referents live in the head).
@@ -628,11 +657,37 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       const hasQuestionMark = /\?\s*$/.test(text.trim());
       const hasSentenceEnd = /[.!?]\s*$/.test(text.trim());
 
-      // Fast path: explicit "?" → skip min-silence wait, finalize now.
+      // Fast path for "?" — but ONLY when we have evidence this is a real
+      // finished question, not Deepgram's intonation-driven "?" mid-sentence.
+      // Require both: (a) we've held long enough that this isn't the first
+      // chunk after arming, and (b) the buffer has a substantial question
+      // shape after the trigger (≥8 words). Otherwise fall through to the
+      // normal sentence-end path so the completeness gate can hold.
       if (hasQuestionMark && !isFinalizingRef.current) {
-        if (debug) console.log(`🎯 [trigger-capture] "?" sentence-end after ${heldFor}ms hold, fast-finalize`);
-        finalizeCapture(now, true);
-        return false;
+        const combinedBuffer = bufferRef.current.map(c => c.text).join(' ').trim();
+        const lowerBuffer = combinedBuffer.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+        let postTriggerWords = 0;
+        for (const pattern of TRIGGER_PATTERNS) {
+          const m = lowerBuffer.match(pattern);
+          if (m && m.index !== undefined) {
+            const after = lowerBuffer.slice(m.index + m[0].length).trim();
+            postTriggerWords = after.split(/\s+/).filter(Boolean).length;
+            break;
+          }
+        }
+        const strongShape = heldFor >= minHoldMs && postTriggerWords >= 8;
+
+        if (strongShape) {
+          if (debug) console.log(`🎯 [trigger-capture] "?" + strong shape (held=${heldFor}ms postTrigger=${postTriggerWords}w), fast-finalize`);
+          finalizeCapture(now, true);
+          return false;
+        }
+        if (debug) console.log(`🎯 [trigger-capture] "?" but weak shape (held=${heldFor}ms postTrigger=${postTriggerWords}w) — treating as normal sentence-end, gate may hold`);
+        if (heldFor >= minHoldMs) {
+          finalizeCapture(now);
+          return false;
+        }
+        return true;
       }
 
       if (hasSentenceEnd && heldFor >= minHoldMs && !isFinalizingRef.current) {

@@ -111,13 +111,29 @@ export const TRIGGER_PATTERNS = [
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
+  // NOTE: "suppose that" intentionally NOT a trigger — premise subordinator only.
 ];
 
+// Leading filler that may sit between the clause start and the WH-word
+// ("So why…", "And how…"). Stripped before trigger checks so an instructor
+// who introduces a question with a discourse marker still triggers detection.
+export const FILLER_PREFIXES = /^(so+|um+|uh+|well|okay so|okay|ok|now)[\s,]+/i;
+
+export function stripLeadingFiller(text: string): string {
+  let out = text.trim();
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(FILLER_PREFIXES, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
 // Permissive fallback: any interrogative-led sentence with a verb-shaped token
-// after it qualifies. Catches things like "What changed?" / "What broke?" /
-// "Why now?" that the specific patterns above miss. Rhetorical phrases are
-// still filtered out separately via the blocklist.
+// after it qualifies. Anchored to the START of the trimmed text so a mid-
+// sentence WH-word inside a declarative ("…and how dangerous components can
+// be…") does not falsely match. Rhetorical phrases are still filtered out
+// separately via the blocklist.
 export const FALLBACK_INTERROGATIVE_PATTERN =
   /^(what|why|how|when|where|who|whom|whose|which)\b\s+\S+/i;
 
@@ -125,8 +141,12 @@ export const FALLBACK_INTERROGATIVE_PATTERN =
 export const MIN_WORD_COUNT = 4;
 
 export function hasInterrogativeTrigger(text: string): boolean {
-  if (TRIGGER_PATTERNS.some((p) => p.test(text))) return true;
-  return FALLBACK_INTERROGATIVE_PATTERN.test(text.trim());
+  const stripped = stripLeadingFiller(text);
+  if (TRIGGER_PATTERNS.some((p) => p.test(text) || p.test(stripped))) return true;
+  return (
+    FALLBACK_INTERROGATIVE_PATTERN.test(text.trim()) ||
+    FALLBACK_INTERROGATIVE_PATTERN.test(stripped)
+  );
 }
 
 export function extractQuestions(text: string): string[] {

@@ -106,6 +106,44 @@ export type Database = {
           },
         ]
       }
+      admin_dashboard_presets: {
+        Row: {
+          admin_id: string
+          created_at: string
+          filters: Json
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          filters?: Json
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          filters?: Json
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_dashboard_presets_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_instructors: {
         Row: {
           admin_id: string
@@ -4235,6 +4273,7 @@ export type Database = {
           warning_triggered: boolean
         }[]
       }
+      admin_sync_org_members: { Args: never; Returns: Json }
       assign_oauth_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -4288,6 +4327,12 @@ export type Database = {
           total_questions_at_level: Json
         }[]
       }
+      get_admin_connected_instructors: {
+        Args: { _admin_id: string }
+        Returns: {
+          instructor_id: string
+        }[]
+      }
       get_current_usage: {
         Args: { p_instructor_id: string }
         Returns: {
@@ -4295,6 +4340,13 @@ export type Database = {
           minutes_used: number
           usage_percent: number
           warning_level: string
+        }[]
+      }
+      get_invited_org_names: {
+        Args: { _email: string }
+        Returns: {
+          org_id: string
+          org_name: string
         }[]
       }
       get_org_codes: {
