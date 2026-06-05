@@ -666,7 +666,7 @@ export default function AdminDashboard() {
 
         cases.push({
           id: studentId,
-          studentName: studentNameMap.get(studentId) || "Unknown Student",
+          studentName: studentName || "Unknown Student",
           instructorName,
           signals,
           tier,
