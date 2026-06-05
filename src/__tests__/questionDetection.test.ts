@@ -4,6 +4,7 @@ import {
   isRhetorical,
   wordCount,
   hasInterrogativeTrigger,
+  looksLikeMonologue,
 } from "@/hooks/usePassiveQuestionDetection";
 
 /**
@@ -181,6 +182,106 @@ describe("hasInterrogativeTrigger", () => {
   it("still requires more than just a bare interrogative word", () => {
     expect(hasInterrogativeTrigger("what")).toBe(false);
     expect(hasInterrogativeTrigger("why")).toBe(false);
+  });
+
+
+
+  it("rejects a mid-sentence WH-word inside a declarative paragraph", () => {
+    // Regression: previously `\\bhow\\s+\\w+` matched "how they" mid-paragraph.
+    expect(
+      hasInterrogativeTrigger(
+        "and how dangerous certain bacterial components can be"
+      )
+    ).toBe(false);
+    expect(
+      hasInterrogativeTrigger(
+        "before we go deeper, remember this phrase. gram positive is thick peptidoglycan"
+      )
+    ).toBe(false);
+  });
+
+  it("still matches a WH-word at the start of the string", () => {
+    expect(hasInterrogativeTrigger("How dangerous is this?")).toBe(true);
+  });
+
+  it("matches a WH-word right after a sentence terminator", () => {
+    expect(
+      hasInterrogativeTrigger("That covers cells. What happens to the electron?")
+    ).toBe(true);
+  });
+
+  it("does NOT match a bare premise clause starting with 'Suppose that'", () => {
+    // Regression: "Suppose that an array is already sorted" used to fire as a
+    // standalone question, burning the cooldown before the real question
+    // ("which search algorithm would you pick?") could be captured.
+    expect(
+      hasInterrogativeTrigger("Suppose that an array is already sorted")
+    ).toBe(false);
+    expect(
+      hasInterrogativeTrigger("Suppose that the temperature increases")
+    ).toBe(false);
+  });
+
+  it("still matches the real WH-question that follows a 'Suppose' premise after a sentence terminator", () => {
+    expect(
+      hasInterrogativeTrigger(
+        "Suppose that an array is already sorted. Which search algorithm would you pick?"
+      )
+    ).toBe(true);
+  });
+
+
+
+
+
+  it("matches WH-questions led by discourse fillers (So/Well/Now/Okay)", () => {
+    // Regression: instructors often introduce a question with "So why…".
+    // Previously the clause-start anchor rejected these because the WH-word
+    // wasn't the first token. Filler-strip restores reliable pickup.
+    expect(
+      hasInterrogativeTrigger("So why does it stop once equilibrium is reached?")
+    ).toBe(true);
+    expect(hasInterrogativeTrigger("Well, what does this mean?")).toBe(true);
+    expect(hasInterrogativeTrigger("Now how does osmosis work?")).toBe(true);
+    expect(hasInterrogativeTrigger("Okay, why is that?")).toBe(true);
+  });
+
+  it("does NOT treat declaratives ending in '?' as questions", () => {
+    // Regression: Deepgram occasionally appends "?" to a declarative based on
+    // rising intonation. These must not pass the trigger gate.
+    expect(
+      hasInterrogativeTrigger("Today, we'll be talking about osmosis?")
+    ).toBe(false);
+    expect(
+      hasInterrogativeTrigger(
+        "Osmosis moves water across a semipermeable membrane."
+      )
+    ).toBe(false);
+  });
+});
+
+describe("looksLikeMonologue", () => {
+  // Regression for the three false-positive captures shown in the screenshots:
+  // multi-sentence teaching prose ending in an intonation-driven "?".
+  it("flags the 'Is this. Both types of bacteria…' blob as monologue", () => {
+    expect(
+      looksLikeMonologue(
+        "Is this. Both types of bacteria have a cell membrane and a cell wall?"
+      )
+    ).toBe(true);
+  });
+
+  it("flags the 'How they stain… peptidoglycan?' blob as monologue", () => {
+    expect(
+      looksLikeMonologue(
+        "How they stain, how they interact with antibiotics, and how dangerous certain bacterial components can be. Before we go deeper, remember this phrase. Gram positive is thick peptidoglycan?"
+      )
+    ).toBe(true);
+  });
+
+  it("does not flag a normal single-sentence question", () => {
+    expect(looksLikeMonologue("What happens to the electron?")).toBe(false);
+    expect(looksLikeMonologue("How many protons are in a carbon atom?")).toBe(false);
   });
 });
 

@@ -56,12 +56,20 @@ export function useVersionCheck() {
   }, []);
 
   useEffect(() => {
-    // Listen for service worker updates and reload immediately
+    // Listen for service worker updates and notify (do NOT auto-reload —
+    // controllerchange fires when returning to the tab and would wipe state).
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!hasNotified.current) {
-          window.location.reload();
-        }
+        if (hasNotified.current) return;
+        hasNotified.current = true;
+        toast("Update Available", {
+          description: "A new version of Edvana is ready.",
+          duration: Infinity,
+          action: {
+            label: "Refresh",
+            onClick: () => window.location.reload(),
+          },
+        });
       });
     }
 

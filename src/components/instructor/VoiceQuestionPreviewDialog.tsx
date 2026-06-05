@@ -18,9 +18,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MathRenderer } from '@/components/ui/math-renderer';
 
+export interface CodingPreviewPayload {
+  problemStatement?: string;
+  functionSignature?: string;
+  language?: string;
+  difficulty?: string;
+  constraints?: string[];
+  examples?: Array<{ input?: string; output?: string; explanation?: string }>;
+  hints?: string[];
+  starterCode?: string;
+  testCases?: Array<{ input?: string; expectedOutput?: string }>;
+  title?: string;
+  // Simple-style fallback: short reference answer used for grading
+  expected_answer?: string;
+}
+
 export interface ExtractedVoiceQuestion {
   question_text: string;
-  suggested_type: 'short_answer' | 'multiple_choice' | 'poll';
+  suggested_type: 'short_answer' | 'multiple_choice' | 'poll' | 'coding' | 'coding_simple';
   // MCQ fields (pre-generated for editing)
   options?: string[];
   correct_answer?: 'A' | 'B' | 'C' | 'D';
@@ -29,7 +44,11 @@ export interface ExtractedVoiceQuestion {
   expected_answer?: string;
   // Source transcript for context display
   source_transcript?: string;
+  // Coding payload (full or simple). When present, the backend uses these
+  // fields directly instead of regenerating the coding problem.
+  coding_payload?: CodingPreviewPayload;
 }
+
 
 interface VoiceQuestionPreviewDialogProps {
   open: boolean;
@@ -121,7 +140,14 @@ export function VoiceQuestionPreviewDialog({
       // Strip any HTML tags as defense-in-depth (AI sometimes returns markup)
       const sanitizedText = extractedQuestion.question_text.replace(/<[^>]*>/g, '').trim();
       setQuestionText(sanitizedText);
-      setQuestionType(extractedQuestion.suggested_type);
+      // VoiceQuestionPreviewDialog only renders MCQ/Short Answer/Poll. Coding
+      // bypasses this modal (handled inline via QuestionOnDeck), so narrow the
+      // type back to the modal's supported set.
+      const modalType = (extractedQuestion.suggested_type === 'coding' || extractedQuestion.suggested_type === 'coding_simple')
+        ? 'short_answer'
+        : extractedQuestion.suggested_type;
+      setQuestionType(modalType as 'short_answer' | 'multiple_choice' | 'poll');
+
       
       // Initialize MCQ options from pre-generated data or reset
       if (extractedQuestion.options && extractedQuestion.options.length === 4) {

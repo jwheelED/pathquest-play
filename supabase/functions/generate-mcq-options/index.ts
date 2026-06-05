@@ -163,7 +163,7 @@ serve(async (req) => {
     // Build a labelled, role-explicit context block. Prior context (focused, recent teaching prose
     // captured at trigger time) is given highest priority for pronoun resolution; the broader
     // source_transcript tail is included as background lecture history.
-    const broadContext = (source_transcript || '').slice(-6000).trim();
+    const broadContext = (source_transcript || '').slice(-3000).trim();
     const focusedContext = (prior_context || '').trim();
     const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
 
@@ -314,8 +314,17 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
     // Deterministic validator — catch the most common failure mode (wrong letter
     // assigned to the correct text) before it ships to students.
     let verdict = validateAnswer(result, focusedContext, broadContext);
-    if (!verdict.ok) {
-      console.warn(`MCQ validator REJECTED first attempt: ${verdict.reason}. Retrying once with stronger model.`);
+    // Only escalate to Pro for STRUCTURAL failures. The "weakly supported by
+    // transcript" branch is a noisy heuristic on live ASR text and was the
+    // dominant cause of 10s+ stalls. Ship the Flash result with a warning
+    // instead of paying the Pro round-trip.
+    const isStructuralFailure = !verdict.ok && !!verdict.reason && (
+      verdict.reason.includes('does not map to an option') ||
+      verdict.reason.includes('citation not found in transcript') ||
+      verdict.reason.includes('does not overlap with its own citation')
+    );
+    if (!verdict.ok && isStructuralFailure) {
+      console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
       const retryResp = await callModel('google/gemini-2.5-pro', 'retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
@@ -335,6 +344,8 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
           }
         }
       }
+    } else if (!verdict.ok) {
+      console.warn(`MCQ validator soft-warning (no retry): ${verdict.reason}`);
     }
 
     const totalMs = Math.round(performance.now() - primaryStart);

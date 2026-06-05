@@ -80,7 +80,7 @@ interface LectureTranscriptionProps {
   onAutoQuestionToggleRef?: React.MutableRefObject<((enabled: boolean) => Promise<void>) | null>;
   onAutoQuestionEnabledChange?: (enabled: boolean) => void;
   // Refs for external control
-  onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => void) | null>;
+  onSendQuestionRef?: React.MutableRefObject<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => void) | null>;
   onPreviewQuestionRef?: React.MutableRefObject<((text: string) => void) | null>;
   onDismissQuestionRef?: React.MutableRefObject<(() => void) | null>;
   onStartRecordingRef?: React.MutableRefObject<(() => Promise<void>) | null>;
@@ -210,7 +210,9 @@ export const LectureTranscription = ({
   const [lastQuestionsAsked, setLastQuestionsAsked] = useState(0);
 
   // Instructor format preference (loaded from profile)
-  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll'>('multiple_choice');
+  const [questionFormatPreference, setQuestionFormatPreference] = useState<'multiple_choice' | 'short_answer' | 'poll' | 'coding' | null>(null);
+  const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
+
 
   // Question preview dialog state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -359,18 +361,19 @@ export const LectureTranscription = ({
   // Register external control refs
   useEffect(() => {
     if (onSendQuestionRef) {
-      onSendQuestionRef.current = (questionText: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string) => {
+      onSendQuestionRef.current = (questionText: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => {
         dismissPassiveCandidate();
-        // Normalize legacy 'mcq' alias to canonical 'multiple_choice' so downstream
-        // (preview dialog radio group + edge function) can match it.
+        // Normalize legacy 'mcq' alias to canonical 'multiple_choice'.
         const normalizedType = type === 'mcq' ? 'multiple_choice' : type;
         const finalType = normalizedType || questionFormatPreference || 'multiple_choice';
+        const isCodingType = finalType === 'coding' || finalType === 'coding_simple';
         const qData = {
           question_text: questionText,
           suggested_type: finalType as any,
           options: options?.length ? options : undefined,
           correct_answer: correctAnswer || undefined,
           expected_answer: expectedAnswer || undefined,
+          coding_payload: codingPayload,
         };
         pendingQuestionDataRef.current = {
           ...qData,
@@ -379,15 +382,11 @@ export const LectureTranscription = ({
           source: 'passive_detection',
         };
 
-        // If the caller (e.g. LiveCopilotHero inline preview) already collected the
-        // type AND the supporting data (options+correctAnswer for MCQ/poll, or
-        // expectedAnswer for short answer), skip the review modal and send directly.
-        // This is the same shortcut QuestionOnDeck uses and ensures the instructor's
-        // chosen format is honored end-to-end.
         const hasMCQReady = (finalType === 'multiple_choice') && options && options.length >= 2 && !!correctAnswer;
         const hasPollReady = (finalType === 'poll') && options && options.length >= 2;
-        const hasShortAnswerReady = (finalType === 'short_answer'); // expected_answer optional
-        const canBypassModal = !!normalizedType && (hasMCQReady || hasPollReady || hasShortAnswerReady);
+        const hasShortAnswerReady = (finalType === 'short_answer');
+        const hasCodingReady = isCodingType; // coding always bypasses the modal
+        const canBypassModal = !!normalizedType && (hasMCQReady || hasPollReady || hasShortAnswerReady || hasCodingReady);
 
         if (canBypassModal) {
           handleConfirmPreviewSend({
@@ -396,7 +395,8 @@ export const LectureTranscription = ({
             options: qData.options,
             correct_answer: qData.correct_answer as any,
             expected_answer: qData.expected_answer,
-          });
+            coding_payload: codingPayload,
+          } as any);
         } else {
           setPreviewQuestionData({ question_text: questionText, suggested_type: qData.suggested_type });
           setIsPreviewOpen(true);
@@ -628,7 +628,7 @@ export const LectureTranscription = ({
         // Fetch instructor's custom daily limit and auto-question settings
         const { data: profile } = await supabase
           .from("profiles")
-          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference")
+          .select("daily_question_limit, auto_question_enabled, auto_question_interval, auto_question_force_send, auto_question_strict_mode, question_preview_enabled, question_format_preference, coding_question_style")
           .eq("id", user.id)
           .single();
 
@@ -646,11 +646,15 @@ export const LectureTranscription = ({
           setStrictModeEnabled(profile.auto_question_strict_mode !== false);
           // Question preview setting - default to true
           setQuestionPreviewEnabled(profile.question_preview_enabled !== false);
-          // Format preference for question on deck preview
+          // Format preference for question on deck preview (supports 'coding' too)
           if (profile.question_format_preference) {
-            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+            setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+          }
+          if (profile.coding_question_style) {
+            setCodingStyle(profile.coding_question_style as 'simple' | 'full');
           }
         }
+
 
         // Fetch today's question count
         const today = new Date().toISOString().split("T")[0];
@@ -687,19 +691,46 @@ export const LectureTranscription = ({
       if (!user) return;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("question_format_preference")
+        .select("question_format_preference, coding_question_style")
         .eq("id", user.id)
         .single();
       if (profile?.question_format_preference) {
-        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll');
+        setQuestionFormatPreference(profile.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+      }
+      if (profile?.coding_question_style) {
+        setCodingStyle(profile.coding_question_style as 'simple' | 'full');
       }
     };
+
     const onFocus = () => refreshPreference();
+    const onVisibility = () => { if (document.visibilityState === 'visible') refreshPreference(); };
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // Realtime: react instantly if the instructor toggles preference elsewhere.
+    const channel = supabase
+      .channel(`profile-prefs-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        (payload: any) => {
+          const row = payload?.new;
+          if (!row) return;
+          if (row.question_format_preference) {
+            setQuestionFormatPreference(row.question_format_preference);
+          }
+          if (row.coding_question_style) {
+            setCodingStyle(row.coding_question_style);
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      supabase.removeChannel(channel);
     };
   }, [isRecording]);
 
@@ -1256,11 +1287,14 @@ export const LectureTranscription = ({
         correct_answer: editedQuestion.correct_answer,
         // Include expected answer for short answer questions
         expected_answer: editedQuestion.expected_answer,
+        // Pre-edited coding payload (from inline on-deck preview)
+        coding_payload: (editedQuestion as any).coding_payload ?? pendingQuestionDataRef.current?.coding_payload,
       };
-      
+
       console.log("📤 Sending question from preview:", questionData);
-      
+
       await handleQuestionSend(questionData);
+
       
       // Reset auto-question timer after send
       if (autoQuestionEnabled) {
@@ -1475,12 +1509,15 @@ export const LectureTranscription = ({
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // Pre-edited coding payload from on-deck inline preview
+            coding_payload: detectionData.coding_payload,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
             // Pass source transcript for voice-sent questions (to show students where question came from)
             source_transcript: sourceTranscript,
           },
         });
+
       });
 
       // Clear the stashed prior context — single-use per send attempt
@@ -4098,36 +4135,51 @@ export const LectureTranscription = ({
             isSending={isSendingQuestion}
             isHeld={onDeckHeld}
             onToggleHold={() => setOnDeckHeld(h => !h)}
-            formatPreference={questionFormatPreference}
+            formatPreference={questionFormatPreference ?? undefined}
+            codingStyle={codingStyle}
             transcriptContext={transcriptBufferRef.current}
             courseId={selectedCourseId}
             onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
+              // Map on-deck format → wire suggested_type. For coding, expand to
+              // 'coding_simple' or 'coding' based on the instructor's style.
+              const wireType = (() => {
+                if (!data) {
+                  return questionFormatPreference === 'coding'
+                    ? (codingStyle === 'simple' ? 'coding_simple' : 'coding')
+                    : (questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference);
+                }
+                if (data.type === 'coding') {
+                  return data.codingStyle === 'simple' ? 'coding_simple' : 'coding';
+                }
+                return data.type;
+              })();
+
               if (data) {
-                // Pre-generated data from inline preview — bypass modal
                 pendingQuestionDataRef.current = {
                   question_text: questionText,
-                  suggested_type: data.type,
+                  suggested_type: wireType as any,
                   confidence: 1.0,
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
+                  coding_payload: data.codingPayload,
                 };
                 handleConfirmPreviewSend({
                   question_text: questionText,
-                  suggested_type: data.type,
+                  suggested_type: wireType as any,
                   options: data.options,
                   correct_answer: data.correctAnswer,
                   expected_answer: data.expectedAnswer,
+                  coding_payload: data.codingPayload,
                 });
               } else {
-                // No pre-generated data — fall back to modal
                 setPreviewQuestionData({
                   question_text: questionText,
-                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  suggested_type: wireType as any,
                 });
                 pendingQuestionDataRef.current = {
                   question_text: questionText,
-                  suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                  suggested_type: wireType as any,
                   confidence: 1.0,
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
@@ -4136,13 +4188,17 @@ export const LectureTranscription = ({
               }
             }}
             onPreview={(questionText) => {
+              const previewType = questionFormatPreference === 'coding'
+                ? (codingStyle === 'simple' ? 'coding_simple' : 'coding')
+                : (questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference);
               setPreviewQuestionData({
                 question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                suggested_type: previewType as any,
               });
               pendingQuestionDataRef.current = {
                 question_text: questionText,
-                suggested_type: questionFormatPreference === 'poll' ? 'poll' : questionFormatPreference,
+                suggested_type: previewType as any,
+
                 confidence: 1.0,
                 extraction_method: 'passive_detection',
                 source: 'passive_detection',

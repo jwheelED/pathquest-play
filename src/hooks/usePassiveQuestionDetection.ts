@@ -1,26 +1,9 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
-import {
-  extractQuestions,
-  hasInterrogativeTrigger,
-  isRhetorical,
-  wordCount,
-  MIN_WORD_COUNT,
-  RHETORICAL_BLOCKLIST,
-  GREETING_PATTERNS,
-  TRIGGER_PATTERNS,
-} from '../../supabase/functions/_shared/questionDetection';
 
-// Re-export the canonical detection helpers so existing imports keep working
-// and tests can exercise them via the hook module path.
-export {
-  extractQuestions,
-  hasInterrogativeTrigger,
-  isRhetorical,
-  wordCount,
-  RHETORICAL_BLOCKLIST,
-  GREETING_PATTERNS,
-  TRIGGER_PATTERNS,
-};
+const MIN_WORD_COUNT = 4;
+// Real spoken questions are short. Anything longer is almost certainly a
+// monologue blob that Deepgram appended a "?" to based on intonation.
+const MAX_WORD_COUNT = 22;
 
 export interface PassiveQuestionCandidate {
   text: string;
@@ -52,7 +35,7 @@ interface UsePassiveQuestionDetectionOptions {
 }
 
 // Rhetorical / filler questions to ignore (normalized lowercase, no trailing ?)
-const RHETORICAL_BLOCKLIST = [
+export const RHETORICAL_BLOCKLIST = [
   'right',
   'okay',
   'ok',
@@ -129,7 +112,7 @@ const RHETORICAL_BLOCKLIST = [
 ];
 
 // Greeting patterns that should never be treated as audience checks
-const GREETING_PATTERNS = [
+export const GREETING_PATTERNS = [
   /^how('?s| is) everyone/i,
   /^how('?s| is) everybody/i,
   /^how('?s| are) (you|y'all|ya'll|yall) (all )?(doing|today|this|feeling)/i,
@@ -145,35 +128,73 @@ const GREETING_PATTERNS = [
   /^can (you|everyone|everybody) see (me|this|the screen|my screen)/i,
 ];
 
-// Interrogative trigger patterns — broadened to fire on any word following the
-// WH-word. Rhetorical/greeting blocklists + minWordCount continue to filter
-// out conversational filler.
-const TRIGGER_PATTERNS = [
-  /\bwhat\s+\w+/i,
-  /\bwhy\s+\w+/i,
-  /\bhow\s+\w+/i,
-  /\bwhen\s+\w+/i,
-  /\bwhere\s+\w+/i,
-  /\bwho\s+\w+/i,
-  /\bwhich\s+\w+/i,
+// Leading filler that may sit between the clause start and the WH-word
+// ("So why…", "And how…", "Well, what…"). Stripped before trigger checks
+// and from the displayed candidate text so the on-deck card reads cleanly.
+export const FILLER_PREFIXES = /^(so+|um+|uh+|well|okay so|okay|ok|now)[\s,]+/i;
+
+export function stripLeadingFiller(text: string): string {
+  let out = text.trim();
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(FILLER_PREFIXES, '').trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+// Interrogative trigger patterns. WH-words and yes/no-inversion auxiliaries
+// MUST sit at the START of a clause — either the start of the string or
+// immediately after a sentence/clause boundary (./!/?/;). This prevents
+// mid-sentence WH-words from a declarative paragraph ("…and how dangerous
+// certain components can be…") from triggering as questions.
+const CLAUSE_START = '(?:^|[.?!;]\\s+|^\\s*)';
+export const TRIGGER_PATTERNS = [
+  new RegExp(`${CLAUSE_START}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
-  /\bsuppose\s+that\b/i,
-  // Subject-aux inversion (yes/no & A-or-B questions)
-  /\b(is|are|was|were|am)\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\b/i,
-  /\b(do|does|did)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\b/i,
-  /\b(can|could|would|should|will|shall|may|might|must)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
-  /\b(has|have|had)\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\b/i,
+  // Imperative coding/asking-the-room patterns: "can you print hello world",
+  // "write a function that…", "create a variable named x". Deepgram often drops
+  // the terminal "?" on these so they wouldn't qualify via the WH-pattern alone.
+  new RegExp(
+    `${CLAUSE_START}(can|could|will|would)\\s+you\\s+(print|write|create|implement|build|define|declare|return|compute|calculate|solve|show|give|tell|explain|describe|demonstrate)\\b`,
+    'i'
+  ),
+  new RegExp(
+    `${CLAUSE_START}(please\\s+)?(write|print|create|implement|build|define|declare|return|compute|calculate|solve|show)\\s+(me\\s+)?(a|an|the|some)?\\s*\\S+`,
+    'i'
+  ),
+  // NOTE: "suppose that" intentionally NOT a trigger — premise subordinator only.
+  // Subject-aux inversion (yes/no & A-or-B questions) — also clause-start anchored
+  new RegExp(`${CLAUSE_START}(is|are|was|were|am)\\s+(it|this|that|these|those|there|he|she|they|we|you|i|any|all|both|either|neither|some|most|more|less|fewer|every|each|no|one|two|three)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(do|does|did)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(can|could|would|should|will|shall|may|might|must)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|some|most|every|each|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
+  new RegExp(`${CLAUSE_START}(has|have|had)\\s+(it|this|that|these|those|he|she|they|we|you|i|any|all|both|either|neither|anyone|anybody|someone|somebody|everyone|everybody)\\b`, 'i'),
 ];
 
-function hasInterrogativeTrigger(text: string): boolean {
-  return TRIGGER_PATTERNS.some(p => p.test(text));
+export function hasInterrogativeTrigger(text: string): boolean {
+  const stripped = stripLeadingFiller(text);
+  return TRIGGER_PATTERNS.some(p => p.test(text) || p.test(stripped));
 }
 
-function extractQuestions(text: string): string[] {
+
+/**
+ * Reject candidates that look like multi-sentence monologue blobs Deepgram
+ * mis-punctuated with a "?". A real spoken question is one clause.
+ */
+export function looksLikeMonologue(text: string): boolean {
+  // Drop the trailing terminal "?" before counting internal terminators.
+  const body = text.trim().replace(/[?？]+\s*$/, '');
+  // Count sentence terminators inside the body. >= 1 means we have multiple
+  // sentences glued together — that's monologue, not a single question.
+  const terminators = (body.match(/[.!]/g) || []).length;
+  return terminators >= 1;
+}
+
+export function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized.includes('?') && !normalized.includes('？')) return [];
 
@@ -196,7 +217,7 @@ function extractQuestions(text: string): string[] {
   return questions;
 }
 
-function isRhetorical(question: string): boolean {
+export function isRhetorical(question: string): boolean {
   const normalized = question
     .replace(/[?？]+$/, '')
     .trim()
@@ -221,7 +242,7 @@ function isRhetorical(question: string): boolean {
   return false;
 }
 
-function wordCount(text: string): number {
+export function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
@@ -234,8 +255,9 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     minWordCount = MIN_WORD_COUNT,
     autoDismissMs = 30000,
     lastQuestionSentTime = 0,
-    minTranscriptConfidence = 0.8,
+    minTranscriptConfidence = 0.55,
     trailingSilenceMs = 700,
+    maxPendingMs = 4000,
     debug = true,
   } = options;
 
@@ -398,6 +420,14 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         if (debug) console.log(`🔍 [passive] skipped "${q}" — too short (${wc} words < ${minWordCount})`);
         continue;
       }
+      if (wc > MAX_WORD_COUNT) {
+        if (debug) console.log(`🔍 [passive] skipped "${q.substring(0, 60)}…" — too long (${wc} words > ${MAX_WORD_COUNT}, likely monologue)`);
+        continue;
+      }
+      if (looksLikeMonologue(q)) {
+        if (debug) console.log(`🔍 [passive] skipped "${q.substring(0, 60)}…" — looks like monologue (multiple sentences)`);
+        continue;
+      }
       if (isRhetorical(q)) {
         if (debug) console.log(`🔍 [passive] skipped "${q}" — rhetorical`);
         continue;
@@ -409,10 +439,12 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         continue;
       }
 
-      console.log('🔍 Passive question candidate (pending trailing silence):', q);
+      const cleaned = stripLeadingFiller(q);
+      const displayed = cleaned.length > 0 ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1)) : q;
+      console.log('🔍 Passive question candidate (pending trailing silence):', displayed);
 
       const newCandidate: PassiveQuestionCandidate = {
-        text: q,
+        text: displayed,
         detectedAt: now,
         id: `pq-${++candidateIdCounter}`,
         priorContext: recentTranscript || undefined,
@@ -439,21 +471,45 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
   const acceptVettedCandidate = useCallback(
     (text: string, priorContext?: string) => {
       if (!enabled || !text) return;
+      // Final safety net — even though the trigger-capture hook applies its own
+      // gates, defend against monologue blobs and over-long captures slipping
+      // through (Deepgram intonation "?", run-on segments).
+      const wc = wordCount(text);
+      if (wc > MAX_WORD_COUNT) {
+        if (debug) console.log(`🛑 [passive] vetted candidate rejected — too long (${wc} words)`);
+        return;
+      }
+      if (looksLikeMonologue(text)) {
+        if (debug) console.log('🛑 [passive] vetted candidate rejected — looks like monologue');
+        return;
+      }
+      // Enforce interrogative trigger even on vetted candidates — defends against
+      // declaratives that Deepgram tagged with "?" based on rising intonation
+      // (e.g. "Today, we'll be talking about osmosis?").
+      if (!hasInterrogativeTrigger(text)) {
+        if (debug) console.log('🛑 [passive] vetted candidate rejected — no interrogative trigger:', text);
+        return;
+      }
+      const cleaned = stripLeadingFiller(text);
+      const displayed = cleaned.length > 0
+        ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1))
+        : text;
       const now = Date.now();
       const newCandidate: PassiveQuestionCandidate = {
-        text,
+        text: displayed,
         detectedAt: now,
         id: `tq-${++candidateIdCounter}`,
         priorContext: priorContext || undefined,
       };
-      if (debug) console.log('✅ [passive] accepted vetted candidate:', text);
+      if (debug) console.log('✅ [passive] accepted vetted candidate:', displayed);
       pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
       setPendingStartedAt(now);
 
       // Fast path: text already ends with "?" → promote immediately,
       // skip trailing-silence wait.
-      if (/\?\s*$/.test(text.trim())) {
+      if (/\?\s*$/.test(displayed.trim())) {
         if (debug) console.log('⚡ [passive] "?" detected → promote without silence wait');
         clearSilenceTimer();
         promotePending();

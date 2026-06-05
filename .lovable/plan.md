@@ -1,91 +1,53 @@
 
-# Fix: question detection + MCQ generation latency
+# Admin Dashboard FERPA + Metrics Fixes
 
-Two independent fixes — one frontend, one edge function. Both safe to ship together.
+Three gaps to close: Support Queue leaks names the banner promises to hide; numbers contradict across Overview / Support / PDF; the PDF export is too thin to present.
 
----
+## Gap 1 — Enforce the FERPA banner in Support Queue
 
-## Part 1 — Detection lag (~5-7s → ~2-3s)
+**File:** `src/components/admin/SupportQueueTable.tsx`, `src/pages/AdminDashboard.tsx`
 
-Current pipeline stacks these timers after the user finishes speaking:
-- `minSilenceMs` 1200ms (wait for silence)
-- `completionTimeoutMs` 3500ms (wait for more words)
-- optional `extensionMs` +1500ms
-- `trailingSilenceMs` 1200ms (pending → visible)
-= ~6s minimum, plus Deepgram's own ~1-2s final-chunk lag.
+- Pass an explicit `viewerRole` prop (`admin` | `advisor` | `instructor_of_record` | `support_staff`) from `AdminDashboard`. For admin/dean role, **names are masked by default** even when `canViewIndividuals` is true.
+- Render masked identity: initials + course context, e.g. `Student J.D. · Comp Sci`. Drop the "with {instructorName}" subline at admin level (Gap "smaller notes": instructor-by-proxy exposure).
+- Add a per-row **Reveal** action (eye icon) that:
+  - Is only enabled for advisor / instructor_of_record / support_staff roles. For pure admin, button is disabled with tooltip "Reveal requires advisor / instructor-of-record / support-staff role (FERPA)."
+  - When clicked by a permitted role, unmasks that single row and writes a local audit entry to `localStorage` key `edvana_support_reveal_log_v1` (`{caseId, viewerId, viewerRole, ts}`). Backend audit table is out of scope for v1; mark with a `TODO(audit)` comment.
+- Update the table header from "Student" → "Identity (masked)" when masked.
+- Filter out obvious seed/demo names (`Hello Students`, `newstu dash`, anything with "test"/"demo") at the data layer in `AdminDashboard.tsx` before building `supportCases`.
 
-Most of these timers exist to handle the **risk that the speaker hasn't finished yet**. That risk is near-zero when the finalized utterance already ends in `?` and passes the trigger + word-count gate. We add a fast path for that case.
+## Gap 2 — Reconcile metrics across Overview / Support / PDF
 
-### Changes
+**Files:** `src/pages/AdminDashboard.tsx`, `src/hooks/useAdminDashboardData.ts`, `src/components/admin/AggregateMetricsCard.tsx`, `src/components/admin/RetentionHealthCard.tsx`, `src/components/admin/ExportReportsCard.tsx`
 
-**`src/hooks/useQuestionTriggerCapture.ts`**
-- Add a helper `endsWithQuestionMark(text)` that checks the cleaned tail.
-- In the gate logic (around line 477 and 670-680), when the buffered candidate **ends with `?` AND passes the 6-word + trigger gate**, bypass `completionTimeoutMs` and `extensionMs` entirely — emit immediately on the next finalize.
-- Lower defaults for the "no question mark" path:
-  - `completionTimeoutMs`: 3500 → **2000**
-  - `extensionMs`: 1500 → **800**
-  - `minSilenceMs`: 1200 → **700**
+- Centralize the org snapshot in one `useMemo` (`orgSnapshot`) inside `AdminDashboard` that computes: `totalInstructors`, `totalSessions`, `activeStudents` (last 14d activity), `avgResponseRate`, `avgCompletionRate`, `supportCaseCount`. All cards + PDF + CSV read from this object. No card recomputes these independently.
+- **Empty-state rule:** if `totalSessions === 0` OR LMS not connected, surface `—` (not `0%`) for response rate, completion rate, active students. `AggregateMetricsCard` and `RetentionHealthCard` already have empty-state branches; expand them to honor a single `hasUsableData` flag from `orgSnapshot`.
+- Reconcile the contradiction by fixing the source: `totalSessions` should count completed live sessions over the period; if Support Queue shows N flagged students, `activeStudents` must be ≥ the distinct students behind those flags. Add an assertion-style log (`console.warn` in dev) when these invariants break, so future regressions are visible.
+- Ensure trend deltas ("+1 vs prior period") propagate to all primary metrics, not just Sessions Run.
 
-**`src/hooks/usePassiveQuestionDetection.ts`**
-- Same `endsWithQuestionMark` shortcut: skip `trailingSilenceMs` and promote pending → visible on the same tick.
-- Lower default `trailingSilenceMs`: 1200 → **700** for the non-`?` path.
+## Gap 3 — Make the PDF export presentable
 
-**`src/components/instructor/LectureTranscription.tsx`** (lines 261-284)
-- Update the hook call sites to match the new defaults (or drop the overrides so defaults apply).
+**File:** `src/components/admin/ExportReportsCard.tsx`
 
-Net effect: a clean utterance ending in "?" surfaces in ~0.5-1s after Deepgram's final; ambiguous (no `?`) utterances still get a ~2s safety window instead of ~5s.
+Reshape the PDF (and CSV) to a board-ready report:
 
----
+1. **Header block:** title, reporting period (e.g. "Period: May 6 – Jun 5, 2026"), generated date.
+2. **Governance line** below the title: "Aggregate, formative engagement data. Not an instructor evaluation. Behavioral signals only — no demographic or grade inputs."
+3. **Key engagement metrics** (from `orgSnapshot`, with `—` for empty states, not `0%`).
+4. **Course-level engagement summary** — replace any "Instructor Performance" section. Columns: Course, Sessions, Avg Response Rate, Active Students, Open Support Cases. Pulled from the same data feeding `CourseEngagementHealthCard` / `CourseAtRiskRollup`.
+5. **Trend snippet:** sessions and response-rate deltas vs prior period (sparkline as a small jsPDF line; if too complex, a 1-line "Sessions Run: 1 (+1 vs prior period)" block per metric).
+6. **Student-level rows:** gated identically to the screen. For admin/dean exports, masked initials only; for advisor/IoR/support-staff exports, full rows. Same rule applies to CSV.
+7. Drop the `ExportReportsCardProps.instructorPerformance` field from the typed interface and from call sites; rename existing usage to `courseEngagement`.
+8. Footer keeps page numbers + Edvana branding.
 
-## Part 2 — MCQ generation lag (~12-17s → ~4-6s)
+## Out of scope (v1)
 
-Logs prove the real cause is a **double Gemini Pro call**: the validator's token-overlap check rejects the first attempt because there are only ~229 chars of focused context, then we retry with Pro again. Two Pro calls = ~16s.
+- Server-side audit log table for Reveal actions (TODO comment + localStorage stub only).
+- Backend role enum for `support_role` (still inferred client-side from existing `user_roles` + props).
+- LMS connection state detection beyond the existing `hasUsableData` heuristic.
 
-```
-Context received — broad=229 chars, focused=229 chars
-MCQ validator REJECTED first attempt: ...weakly supported by transcript (score=0.13, best=0.40)
-MCQ retry also rejected: ...(score=0.13, best=0.50). Shipping retry result anyway.
-```
+## Technical notes
 
-The overlap heuristic is unreliable on short contexts — it's flagging answers that are actually correct.
-
-### Changes (single file: `supabase/functions/generate-mcq-options/index.ts`)
-
-1. **Use Flash as primary, escalate to Pro only on true failures.**
-   - Replace the `focusedContext.length > 80 ? 'gemini-2.5-pro' : 'gemini-3.5-flash'` rule with always `google/gemini-2.5-flash` on the first call.
-   - Flash is ~2-3s vs Pro's ~8-12s, and is more than capable for 4-option MCQs grounded in a short transcript.
-
-2. **Skip token-overlap validation when focused context is small/unreliable.**
-   - In `validateAnswer`, if `transcript.length < 400` AND no `citation` is provided, treat as `{ ok: true }` (we can't meaningfully validate). Right now we mis-reject in this regime.
-   - Keep the citation-based validation (when the model returns a citation, we still verify it appears in the transcript).
-
-3. **On retry, escalate to Pro once — not twice.**
-   - Current code already calls Pro on retry; with change #1 this becomes Flash → Pro (only when actually rejected), instead of Pro → Pro.
-   - Cap to one retry (already the case).
-
-4. **Lower `max_tokens` implicit ceiling** by leaving as-is (Gateway default is fine); don't add anything new here.
-
-Expected timing after fix: first Flash call ~2-4s, validator passes, ship → **~4-6s total**. On the rare bad output, Flash + Pro retry ≈ ~10s, still better than today's worst case.
-
-### Why not just remove the validator?
-
-It still catches the "wrong letter assigned to right text" failure mode when a citation is provided. Keeping it for that case; only short-context+no-citation gets the bypass.
-
----
-
-## Files touched
-
-- `src/hooks/useQuestionTriggerCapture.ts` — add `endsWithQuestionMark` fast path, lower default timers.
-- `src/hooks/usePassiveQuestionDetection.ts` — same fast path + lower `trailingSilenceMs`.
-- `src/components/instructor/LectureTranscription.tsx` — update override values (or remove) at lines 266, 280.
-- `supabase/functions/generate-mcq-options/index.ts` — Flash-first model selection, skip overlap validation when transcript < 400 chars and no citation.
-
-No DB, schema, or new env vars.
-
-## Verification
-
-1. Speak: "What is mitosis?" — should appear in Question on Deck within ~1-2s of finishing.
-2. Click Send — MCQ options should appear within ~4-6s.
-3. Check edge function logs: should see one `MCQ options generated successfully` per send, not preceded by `REJECTED` + `retry`.
-4. Speak a fragment that's not actually a question — confirm the longer (~2s) gate still suppresses it.
-
+- No DB migrations.
+- `viewerRole` resolution: read from `user_roles` already fetched in `AdminDashboard`; default to `admin` if the viewer has the admin role and no advisor/IoR/support role.
+- Seed-name filter is a simple regex list in a `SEED_NAME_PATTERNS` const so it's easy to extend.
+- All currency-of-truth metrics live in one `orgSnapshot` object passed into every card + the export.
