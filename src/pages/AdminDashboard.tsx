@@ -611,9 +611,11 @@ export default function AdminDashboard() {
 
         // seed-data hygiene: exclude unusable rows
         const instructorName = instructorMap.get(metrics.instructorId);
-        if (!instructorName || instructorName === "Unknown Instructor") return;
+        if (!instructorName || instructorName === "Unknown Instructor" || isSeedName(instructorName)) return;
         if (daysSinceActive === null) return;
         if (!HAS_ANY_LIFETIME(metrics)) return;
+        const studentName = studentNameMap.get(studentId) || "";
+        if (isSeedName(studentName)) return;
 
         if (daysSinceActive >= 7) inactiveCountAgg++;
 
