@@ -22,9 +22,10 @@ export default function CourseAtRiskRollup({ rows, loading }: Props) {
   return (
     <Card className="headspace-card">
       <CardHeader>
-        <CardTitle className="text-xl">Courses needing support</CardTitle>
+        <CardTitle className="text-xl">Where support is needed</CardTitle>
         <CardDescription>
-          Course-level rollup. Names of individual students are gated to staff with documented
+          Support signals grouped by instructor's students (course-level rollup arrives with
+          course enrollment). Names of individual students are gated to staff with documented
           legitimate educational interest.
         </CardDescription>
       </CardHeader>

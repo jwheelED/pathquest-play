@@ -12,7 +12,7 @@ import AggregateMetricsCard from "@/components/admin/AggregateMetricsCard";
 import UsageOverTimeChart from "@/components/admin/UsageOverTimeChart";
 import LearningInsightsCard from "@/components/admin/LearningInsightsCard";
 import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/components/admin/AtRiskStudentsTable";
-import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
+import { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
 import CourseEngagementHealthCard, { CourseEngagement, EngagementSignal } from "@/components/admin/CourseEngagementHealthCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
 import SupportQueueTable, { SupportCase, SupportTier, SupportSignal, ViewerRole } from "@/components/admin/SupportQueueTable";
@@ -34,6 +34,12 @@ import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
 import { useAdminFilters } from "@/hooks/useAdminFilters";
 import { SMART_PRESETS } from "@/lib/adminSmartPresets";
+import {
+  parseQuestionText,
+  truncateQuestionText,
+  MISCONCEPTION_MIN_RESPONSES,
+  MISCONCEPTION_MAX_CORRECT_RATE,
+} from "@/lib/misconceptions";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -94,11 +100,6 @@ export default function AdminDashboard() {
     }
     return list;
   }, [atRiskStudents, instructorPerformance, filters.instructorIds, activePreset]);
-
-  const filteredInstructorPerf = useMemo(() => {
-    if (filters.instructorIds.length === 0) return instructorPerformance;
-    return instructorPerformance.filter((i) => filters.instructorIds.includes(i.id));
-  }, [instructorPerformance, filters.instructorIds]);
 
   const filteredCourseEngagement = useMemo(() => {
     if (filters.instructorIds.length === 0) return courseEngagement;
@@ -178,7 +179,12 @@ export default function AdminDashboard() {
 
   // ===== Viewer role resolution for FERPA-gated identity reveals =====
   // Admin/dean = masked by default. Other roles (advisor / IoR / support_staff) can reveal.
-  const viewerRole: ViewerRole = "admin"; // TODO: read from user_roles when those enum values exist
+  // Resolved from user_roles in checkSession. Reveal-eligible staff roles
+  // (advisor / instructor_of_record / support_staff) do not yet exist in the
+  // app_role enum, so this currently resolves to "admin" (identities masked) —
+  // but the wiring is real, so adding those roles later flips reveal on without
+  // touching this component.
+  const [viewerRole, setViewerRole] = useState<ViewerRole>("admin");
 
   useEffect(() => {
     checkSession();
@@ -208,17 +214,29 @@ export default function AdminDashboard() {
     } else {
       setSession(data.session);
       
-      const { data: roleData } = await supabase
+      // Fetch all roles for this user so we can (a) gate access on "admin" and
+      // (b) resolve the FERPA reveal role. Reveal-eligible staff roles aren't in
+      // the app_role enum yet, so today this only ever resolves to "admin".
+      const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", data.session.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      
-      if (!roleData) {
+        .eq("user_id", data.session.user.id);
+
+      // Typed as string so it can also hold future reveal-eligible staff roles
+      // that aren't in the app_role enum yet.
+      const roleSet = new Set<string>((roles || []).map((r) => String(r.role)));
+
+      if (!roleSet.has("admin")) {
         toast.error("Access denied. Admin privileges required.");
         navigate("/");
+        return;
       }
+
+      // Map to the FERPA reveal role. Only non-admin staff roles may reveal
+      // individual identities; admins see masked names by default.
+      const revealEligible: ViewerRole[] = ["advisor", "instructor_of_record", "support_staff"];
+      const resolved = revealEligible.find((r) => roleSet.has(r));
+      setViewerRole(resolved ?? "admin");
     }
   };
 
@@ -398,6 +416,11 @@ export default function AdminDashboard() {
         const incompleteAssignments = metrics.total - metrics.completed;
         const streakBroken = lastActivityStat?.current_streak === 0 && (lastActivityStat?.longest_streak || 0) > 3;
 
+        // weakConcepts is intentionally 0: per-student comprehension can't be
+        // wired in yet. live_participants has no user_id (only a free-text
+        // nickname), so live_responses.is_correct cannot be reliably joined to a
+        // student identity. Comprehension is surfaced at the COURSE level instead
+        // (CourseEngagement.topMisconception). Do not read this 0 as an oversight.
         const { score, level, factors } = calculateRiskScore(
           avgGrade,
           daysSinceActive,
@@ -427,68 +450,21 @@ export default function AdminDashboard() {
       atRiskList.sort((a, b) => b.riskScore - a.riskScore);
       setAtRiskStudents(atRiskList);
 
-      const instructorStats = new Map<string, {
-        studentCount: number;
-        grades: number[];
-        atRiskCount: number;
-        activeCount: number;
-      }>();
-
-      fetchedInstructorIds.forEach(id => {
-        instructorStats.set(id, {
-          studentCount: 0,
-          grades: [],
-          atRiskCount: 0,
-          activeCount: 0,
-        });
-      });
-
-      studentRelations?.forEach(rel => {
-        const stats = instructorStats.get(rel.instructor_id);
-        if (stats) {
-          stats.studentCount++;
-          if (activeUserIds.has(rel.student_id)) {
-            stats.activeCount++;
-          }
-        }
-      });
-
-      studentMetrics.forEach((metrics, studentId) => {
-        const stats = instructorStats.get(metrics.instructorId);
-        if (stats && metrics.grades.length > 0) {
-          const avgGrade = metrics.grades.reduce((a, b) => a + b, 0) / metrics.grades.length;
-          stats.grades.push(avgGrade);
-        }
-      });
-
-      atRiskList.forEach(student => {
-        const instructorId = studentRelations?.find(r => r.student_id === student.id)?.instructor_id;
-        if (instructorId) {
-          const stats = instructorStats.get(instructorId);
-          if (stats) {
-            stats.atRiskCount++;
-          }
-        }
-      });
-
-      const instructorPerf: InstructorPerformance[] = fetchedInstructorIds.map(id => {
-        const stats = instructorStats.get(id)!;
-        const avgGrade = stats.grades.length > 0
-          ? stats.grades.reduce((a, b) => a + b, 0) / stats.grades.length
-          : 0;
-
-        return {
-          id,
-          name: instructorMap.get(id) || 'Unknown Instructor',
-          email: '',
-          studentCount: stats.studentCount,
-          avgClassGrade: avgGrade,
-          atRiskCount: stats.atRiskCount,
-          activeRate: stats.studentCount > 0
-            ? (stats.activeCount / stats.studentCount) * 100
-            : 0,
-        };
-      });
+      // Instructor id→name map only. The grade-based instructor scoreboard
+      // (avgClassGrade / "Needs Attention" ranking) was removed — it framed the
+      // dashboard as faculty evaluation, which the footer explicitly disavows.
+      // Other metric fields are zeroed to satisfy the type; the only consumers
+      // (instructor filter in filteredAtRisk / filteredCourseEngagement) read
+      // just id + name.
+      const instructorPerf: InstructorPerformance[] = fetchedInstructorIds.map(id => ({
+        id,
+        name: instructorMap.get(id) || 'Unknown Instructor',
+        email: '',
+        studentCount: 0,
+        avgClassGrade: 0,
+        atRiskCount: 0,
+        activeRate: 0,
+      }));
 
       setInstructorPerformance(instructorPerf);
 
@@ -513,10 +489,16 @@ export default function AdminDashboard() {
 
         const sessions = (sessionRows || []) as Array<{ id: string; course_id: string | null; instructor_id: string; created_at: string }>;
         const sessionIds = sessions.map(s => s.id);
+        const sessionToCourse = new Map<string, string>();
+        sessions.forEach(s => {
+          if (s.course_id) sessionToCourse.set(s.id, s.course_id);
+        });
 
         let participantsBySession = new Map<string, number>();
         let questionsBySession = new Map<string, number>();
         let responsesBySession = new Map<string, number>();
+        // Per-question correctness, used to surface each course's top misconception.
+        const questionStats = new Map<string, { correct: number; total: number; content: string; sessionId: string }>();
 
         if (sessionIds.length > 0) {
           const [{ data: partRows }, { data: qRows }] = await Promise.all([
@@ -524,7 +506,7 @@ export default function AdminDashboard() {
               .select("session_id")
               .in("session_id", sessionIds),
             (supabase.from("live_questions") as any)
-              .select("id, session_id")
+              .select("id, session_id, question_content")
               .in("session_id", sessionIds),
           ]);
 
@@ -533,23 +515,44 @@ export default function AdminDashboard() {
           });
 
           const questionToSession = new Map<string, string>();
-          ((qRows || []) as Array<{ id: string; session_id: string }>).forEach(q => {
+          ((qRows || []) as Array<{ id: string; session_id: string; question_content: unknown }>).forEach(q => {
             questionToSession.set(q.id, q.session_id);
             questionsBySession.set(q.session_id, (questionsBySession.get(q.session_id) || 0) + 1);
+            questionStats.set(q.id, {
+              correct: 0,
+              total: 0,
+              content: parseQuestionText(q.question_content),
+              sessionId: q.session_id,
+            });
           });
 
           const questionIds = Array.from(questionToSession.keys());
           if (questionIds.length > 0) {
             // Chunk if huge — usually fine in <=1000
             const { data: respRows } = await (supabase.from("live_responses") as any)
-              .select("question_id")
+              .select("question_id, is_correct")
               .in("question_id", questionIds);
-            ((respRows || []) as Array<{ question_id: string }>).forEach(r => {
+            ((respRows || []) as Array<{ question_id: string; is_correct: boolean | null }>).forEach(r => {
               const sid = questionToSession.get(r.question_id);
               if (sid) responsesBySession.set(sid, (responsesBySession.get(sid) || 0) + 1);
+              const qs = questionStats.get(r.question_id);
+              if (qs) {
+                qs.total++;
+                if (r.is_correct) qs.correct++;
+              }
             });
           }
         }
+
+        // Group question ids by course (course → its sessions → their questions).
+        const questionIdsByCourse = new Map<string, string[]>();
+        questionStats.forEach((qs, questionId) => {
+          const courseId = sessionToCourse.get(qs.sessionId);
+          if (!courseId) return;
+          const arr = questionIdsByCourse.get(courseId) || [];
+          arr.push(questionId);
+          questionIdsByCourse.set(courseId, arr);
+        });
 
         const sessionRate = (sid: string) => {
           const p = participantsBySession.get(sid) || 0;
@@ -620,6 +623,21 @@ export default function AdminDashboard() {
           });
           const avgGrade = grades.length > 0 ? grades.reduce((a, b) => a + b, 0) / grades.length : null;
 
+          // Top misconception for this course: the lowest-correct-rate question
+          // (among those with enough responses) below the misconception threshold.
+          // Mirrors the org-wide Learning Insights logic via shared helpers.
+          let topMisconception: string | null = null;
+          let lowestRate = Infinity;
+          (questionIdsByCourse.get(course.id) || []).forEach(qid => {
+            const qs = questionStats.get(qid);
+            if (!qs || qs.total < MISCONCEPTION_MIN_RESPONSES) return;
+            const rate = (qs.correct / qs.total) * 100;
+            if (rate < MISCONCEPTION_MAX_CORRECT_RATE && rate < lowestRate) {
+              lowestRate = rate;
+              topMisconception = truncateQuestionText(qs.content);
+            }
+          });
+
           return {
             id: course.id,
             title: course.title || "Untitled course",
@@ -633,6 +651,7 @@ export default function AdminDashboard() {
             signal,
             avgGrade,
             sessionsInWindow: csSessions.length,
+            topMisconception,
           };
         });
 
