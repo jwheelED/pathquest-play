@@ -979,6 +979,8 @@ export default function AdminDashboard() {
                 cases={supportCases}
                 loading={loading}
                 canViewIndividuals={true}
+                viewerRole={viewerRole}
+                viewerId={session?.user?.id}
               />
             </div>
           )}
