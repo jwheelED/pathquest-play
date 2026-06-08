@@ -510,7 +510,7 @@ export default function AdminDashboard() {
       try {
         const { data: courseRows } = await supabase
           .from("courses")
-          .select("id, title, instructor_id")
+          .select("id, title, instructor_id, course_code")
           .in("instructor_id", fetchedInstructorIds)
           .eq("is_active", true);
 
