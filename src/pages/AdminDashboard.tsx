@@ -661,10 +661,21 @@ export default function AdminDashboard() {
         ? ((activeStudents || 0) / totalStudents) * 100
         : 0;
 
+      // Period-windowed completion rate (last 28d) to reconcile with session-window metrics.
+      const PERIOD_DAYS = 28;
+      const periodCutoff = Date.now() - PERIOD_DAYS * 24 * 60 * 60 * 1000;
+      const windowedAssignments = (assignments || []).filter(
+        a => new Date(a.created_at).getTime() >= periodCutoff
+      );
+      const windowedCompletionRate = windowedAssignments.length > 0
+        ? (windowedAssignments.filter(a => a.completed).length / windowedAssignments.length) * 100
+        : 0;
+
       setStats({
         totalStudents: totalStudents || 0,
         activeStudents: activeStudents || 0,
         avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
+        windowedCompletionRate,
       });
 
       // ===== Behavioral support cases (FERPA-friendly, no demographics, no grades) =====
