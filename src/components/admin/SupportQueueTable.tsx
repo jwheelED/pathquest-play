@@ -10,6 +10,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertTriangle, HeartHandshake, Search, BookOpen, Info, Download, Lock, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export type SupportTier = "critical" | "high" | "medium";
 export type CaseStatus = "open" | "contacted" | "resolved";
@@ -52,12 +53,26 @@ function saveStatuses(s: Record<string, CaseStatus>) {
 }
 
 function logReveal(entry: { caseId: string; viewerId?: string; viewerRole: ViewerRole; ts: number }) {
-  // TODO(audit, migration-dependent): this localStorage log is NOT a real audit
-  // trail — it is per-browser and clearable by the user. Production FERPA
-  // logging requires a server-side `support_reveal_audit` table (case_id,
-  // viewer_id, viewer_role, revealed_at) with RLS, written via an insert here.
-  // Blocked until that migration is authored (supabase/migrations is read-only
-  // in this repo per CLAUDE.md).
+  // Server-side FERPA audit trail. The support_reveal_audit table is created by
+  // the staged migration in db/proposed/; until it is applied this insert fails
+  // (RLS/missing table) and we rely on the local fallback below. Cast via `as
+  // any` because the table isn't in the generated types yet — drop the cast once
+  // types.ts is regenerated post-migration.
+  if (entry.viewerId && entry.viewerRole !== "admin") {
+    void (supabase.from("support_reveal_audit") as any)
+      .insert({
+        case_id: entry.caseId,
+        viewer_id: entry.viewerId,
+        viewer_role: entry.viewerRole,
+      })
+      .then(({ error }: { error: unknown }) => {
+        // Dormant until the migration lands; ignore the expected error.
+        void error;
+      });
+  }
+
+  // Local fallback: per-browser, clearable — NOT a real audit trail. Kept only
+  // so reveals are still traceable in dev before the audit table exists.
   try {
     const existing = JSON.parse(localStorage.getItem(REVEAL_LOG_KEY) || "[]");
     existing.push(entry);
