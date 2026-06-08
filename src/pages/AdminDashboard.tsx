@@ -60,6 +60,7 @@ export default function AdminDashboard() {
     totalStudents: 0,
     activeStudents: 0,
     avgCompletionRate: 0,
+    windowedCompletionRate: 0,
   });
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [instructorPerformance, setInstructorPerformance] = useState<InstructorPerformance[]>([]);
