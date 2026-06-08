@@ -1,53 +1,76 @@
 
-# Admin Dashboard FERPA + Metrics Fixes
+# PDF/CSV Export Overhaul
 
-Three gaps to close: Support Queue leaks names the banner promises to hide; numbers contradict across Overview / Support / PDF; the PDF export is too thin to present.
+Fix five concrete problems in the leadership PDF: contradicting numbers, junk seed courses, duplicate course names, 33-row dump with no story, and 0-activity rows printing.
 
-## Gap 1 — Enforce the FERPA banner in Support Queue
+## 1. One source of truth, no contradictions
 
-**File:** `src/components/admin/SupportQueueTable.tsx`, `src/pages/AdminDashboard.tsx`
+**File:** `src/pages/AdminDashboard.tsx` (`orgSnapshot` memo)
 
-- Pass an explicit `viewerRole` prop (`admin` | `advisor` | `instructor_of_record` | `support_staff`) from `AdminDashboard`. For admin/dean role, **names are masked by default** even when `canViewIndividuals` is true.
-- Render masked identity: initials + course context, e.g. `Student J.D. · Comp Sci`. Drop the "with {instructorName}" subline at admin level (Gap "smaller notes": instructor-by-proxy exposure).
-- Add a per-row **Reveal** action (eye icon) that:
-  - Is only enabled for advisor / instructor_of_record / support_staff roles. For pure admin, button is disabled with tooltip "Reveal requires advisor / instructor-of-record / support-staff role (FERPA)."
-  - When clicked by a permitted role, unmasks that single row and writes a local audit entry to `localStorage` key `edvana_support_reveal_log_v1` (`{caseId, viewerId, viewerRole, ts}`). Backend audit table is out of scope for v1; mark with a `TODO(audit)` comment.
-- Update the table header from "Student" → "Identity (masked)" when masked.
-- Filter out obvious seed/demo names (`Hello Students`, `newstu dash`, anything with "test"/"demo") at the data layer in `AdminDashboard.tsx` before building `supportCases`.
+- Define a single `isPeriodActive` flag = `sessions > 0 && (activeStudents > 0 || totalResponses > 0)`.
+- If `!isPeriodActive`: set `avgResponseRate`, `avgCompletionRate`, `activeStudents` ALL to `null` (renders as `—`). Right now `avgCompletionRate` is pulled from lifetime `student_assignments` while response rate/active come from the period window — that's the 56% vs 0% contradiction. Recompute `avgCompletionRate` from assignments **within the period window** (`created_at >= rangeFrom`) so it lines up with sessions/active/response.
+- Add a derived `activeCourseCount` and `totalCourseCount` to `OrgSnapshot` so the PDF can say "2 of 33 courses active this period" instead of dumping all 33.
 
-## Gap 2 — Reconcile metrics across Overview / Support / PDF
+**File:** `src/hooks/useAdminDashboardData.ts`
 
-**Files:** `src/pages/AdminDashboard.tsx`, `src/hooks/useAdminDashboardData.ts`, `src/components/admin/AggregateMetricsCard.tsx`, `src/components/admin/RetentionHealthCard.tsx`, `src/components/admin/ExportReportsCard.tsx`
+- Return `totalResponses` and a period-scoped `completionRate` (from `student_assignments` filtered by `created_at` within window) so `AdminDashboard` doesn't mix lifetime and windowed numbers.
 
-- Centralize the org snapshot in one `useMemo` (`orgSnapshot`) inside `AdminDashboard` that computes: `totalInstructors`, `totalSessions`, `activeStudents` (last 14d activity), `avgResponseRate`, `avgCompletionRate`, `supportCaseCount`. All cards + PDF + CSV read from this object. No card recomputes these independently.
-- **Empty-state rule:** if `totalSessions === 0` OR LMS not connected, surface `—` (not `0%`) for response rate, completion rate, active students. `AggregateMetricsCard` and `RetentionHealthCard` already have empty-state branches; expand them to honor a single `hasUsableData` flag from `orgSnapshot`.
-- Reconcile the contradiction by fixing the source: `totalSessions` should count completed live sessions over the period; if Support Queue shows N flagged students, `activeStudents` must be ≥ the distinct students behind those flags. Add an assertion-style log (`console.warn` in dev) when these invariants break, so future regressions are visible.
-- Ensure trend deltas ("+1 vs prior period") propagate to all primary metrics, not just Sessions Run.
+## 2. Suppress empty course rows + disambiguate
 
-## Gap 3 — Make the PDF export presentable
+**File:** `src/pages/AdminDashboard.tsx` (`courseEngagementExportRows` memo)
 
-**File:** `src/components/admin/ExportReportsCard.tsx`
+- Filter out rows where `sessionsInWindow === 0 && activeStudents === 0 && openSupportCases === 0`.
+- Sort remaining rows by `sessionsInWindow` desc, then `activeStudents` desc.
+- Disambiguate duplicates: if multiple courses share the same `title`, append ` · {courseCode}` (or the last 4 chars of course id when no code) so "My Course" / "Cell Biology" rows are distinguishable. Pull `course_code` from the existing courses fetch.
+- Scrub seed/test courses with a `SEED_COURSE_PATTERNS` regex list (mirror of `SEED_NAME_PATTERNS`) covering: `^my course$`, `\btest(ing)?\b`, `\bdemo\b`, `^untitled`, `necessary eleven steps`, `detective fiction`. Apply before the export rows are built and also when computing `activeCourseCount` numerator.
 
-Reshape the PDF (and CSV) to a board-ready report:
+## 3. Narrative-first PDF layout
 
-1. **Header block:** title, reporting period (e.g. "Period: May 6 – Jun 5, 2026"), generated date.
-2. **Governance line** below the title: "Aggregate, formative engagement data. Not an instructor evaluation. Behavioral signals only — no demographic or grade inputs."
-3. **Key engagement metrics** (from `orgSnapshot`, with `—` for empty states, not `0%`).
-4. **Course-level engagement summary** — replace any "Instructor Performance" section. Columns: Course, Sessions, Avg Response Rate, Active Students, Open Support Cases. Pulled from the same data feeding `CourseEngagementHealthCard` / `CourseAtRiskRollup`.
-5. **Trend snippet:** sessions and response-rate deltas vs prior period (sparkline as a small jsPDF line; if too complex, a 1-line "Sessions Run: 1 (+1 vs prior period)" block per metric).
-6. **Student-level rows:** gated identically to the screen. For admin/dean exports, masked initials only; for advisor/IoR/support-staff exports, full rows. Same rule applies to CSV.
-7. Drop the `ExportReportsCardProps.instructorPerformance` field from the typed interface and from call sites; rename existing usage to `courseEngagement`.
-8. Footer keeps page numbers + Edvana branding.
+**File:** `src/components/admin/ExportReportsCard.tsx` (`exportToPDF`)
 
-## Out of scope (v1)
+Restructure the PDF into three sections:
 
-- Server-side audit log table for Reveal actions (TODO comment + localStorage stub only).
-- Backend role enum for `support_role` (still inferred client-side from existing `user_roles` + props).
-- LMS connection state detection beyond the existing `hasUsableData` heuristic.
+**Page 1 — Executive Summary (the story)**
+- Header + governance line (keep).
+- Hero KPI strip: `Active Courses` (e.g. "2 of 33"), `Sessions Run` (+Δ), `Response Rate` (or `—`), `Active Students (7d)`, `Open Support Cases`.
+- "Engagement trend" mini-block: response-rate delta line + sessions delta line (text only, no chart — keep current jsPDF simple).
+- "Top misconception themes" (top 3 from `misconceptions`, course-level only, no student names).
+- "Where engagement is rising / falling": top 3 courses by positive Δ response rate, bottom 3 by negative Δ (from `courseEngagement` deltas).
+
+**Page 2+ — Appendix: Course Detail**
+- Force `doc.addPage()` before this table.
+- Title: "Appendix A — Course-Level Engagement (active courses only)".
+- Sub-line: "Showing N of M total courses. Courses with zero sessions and zero activity in this period are omitted."
+- Table with disambiguated `Course` column, otherwise same columns as today (Sessions, Response Rate, Δ vs prior, Active Students, Open Support Cases).
+- If `activeCourseCount === 0`: skip the table entirely and print a single line: "No courses had sessions in this period."
+
+**Footer:** keep page numbers + "Aggregate engagement, not instructor evaluation".
+
+## 4. CSV mirrors the PDF rules
+
+**File:** `src/components/admin/ExportReportsCard.tsx` (`exportToCSV`)
+
+- Use the same filtered, disambiguated, sorted `courseEngagement` array.
+- Add the same "N of M active courses" summary row above the course table.
+- Empty rows still suppressed.
+
+## 5. Seed-data hygiene at the data layer
+
+**File:** `src/pages/AdminDashboard.tsx`
+
+- Add `SEED_COURSE_PATTERNS` next to `SEED_NAME_PATTERNS` and an `isSeedCourse(title)` helper.
+- Apply `isSeedCourse` filter to both `filteredCourseEngagement` (UI) and `courseEngagementExportRows` (export), so the dashboard and PDF stay consistent.
+- Leave the underlying `courses` table untouched (no DB migration) — purely a presentation filter so demo orgs keep working internally.
+
+## Out of scope
+
+- Real misconception clustering / "top themes" NLP — use existing `misconceptions` array (already course-tagged).
+- Section/term disambiguation beyond course code suffix.
+- Backend DB cleanup of seed courses.
 
 ## Technical notes
 
-- No DB migrations.
-- `viewerRole` resolution: read from `user_roles` already fetched in `AdminDashboard`; default to `admin` if the viewer has the admin role and no advisor/IoR/support role.
-- Seed-name filter is a simple regex list in a `SEED_NAME_PATTERNS` const so it's easy to extend.
-- All currency-of-truth metrics live in one `orgSnapshot` object passed into every card + the export.
+- No new dependencies; jsPDF + autoTable already imported.
+- `OrgSnapshot` interface gains: `activeCourseCount: number | null`, `totalCourseCount: number | null`, `topRising: {title:string; delta:number}[]`, `topFalling: {title:string; delta:number}[]`, `topMisconceptions: {text:string; correctRate:number; courseName?:string}[]`. All optional/nullable so existing callers stay valid.
+- Page-1 KPI strip rendered with `autoTable` in a 5-column single-row layout to avoid manual coordinate math.
+- All `0%` outputs continue routing through `fmtPct` so they render `—` when `null`.
