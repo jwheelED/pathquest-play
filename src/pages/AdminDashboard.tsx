@@ -148,23 +148,92 @@ export default function AdminDashboard() {
     return `${f(start)} – ${f(end)}`;
   }, []);
 
+  // Build deduplicated, scrubbed, sorted course engagement rows (single source for UI + export)
+  const courseEngagementExportRows: CourseEngagementExportRow[] = useMemo(() => {
+    const casesByInstructor = supportCases.reduce<Record<string, number>>((acc, c) => {
+      acc[c.instructorName] = (acc[c.instructorName] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Disambiguate duplicate titles
+    const titleCounts = new Map<string, number>();
+    filteredCourseEngagement.forEach(c => {
+      titleCounts.set(c.title, (titleCounts.get(c.title) || 0) + 1);
+    });
+    const disambig = (c: typeof filteredCourseEngagement[number]) => {
+      if ((titleCounts.get(c.title) || 0) <= 1) return c.title;
+      const suffix = c.courseCode || c.id.slice(-4).toUpperCase();
+      return `${c.title} · ${suffix}`;
+    };
+
+    const rows = filteredCourseEngagement.map(c => {
+      const activeStudents = Math.round((c.sevenDayActiveRate / 100) * (c.studentCount || 0));
+      return {
+        courseTitle: disambig(c),
+        sessionsInWindow: c.sessionsInWindow,
+        responseRateCurrent: c.responseRateCurrent || null,
+        responseRatePrior: c.responseRatePrior || null,
+        activeStudents,
+        openSupportCases: casesByInstructor[c.instructorName] || 0,
+      };
+    });
+
+    // Suppress fully-empty rows
+    const nonEmpty = rows.filter(
+      r => r.sessionsInWindow > 0 || r.activeStudents > 0 || r.openSupportCases > 0
+    );
+
+    // Sort by sessions desc, then active students desc
+    nonEmpty.sort((a, b) => (b.sessionsInWindow - a.sessionsInWindow) || (b.activeStudents - a.activeStudents));
+    return nonEmpty;
+  }, [filteredCourseEngagement, supportCases]);
+
   const orgSnapshot: OrgSnapshot = useMemo(() => {
     const sessions = metrics.sessionsUsed ?? 0;
-    const usable = hasAnyData && sessions > 0;
+    const activeStudents = metrics.activeStudents7d ?? 0;
+    // "Active" requires both sessions ran AND someone participated (responses or students active).
+    const isPeriodActive = hasAnyData && sessions > 0 && (activeStudents > 0 || courseEngagementExportRows.length > 0);
+
+    const totalCourseCount = filteredCourseEngagement.length;
+    const activeCourseCount = courseEngagementExportRows.length;
+
+    // Top rising / falling by Δ response rate
+    const withDelta = filteredCourseEngagement
+      .filter(c => c.sessionsInWindow > 0 && !isSeedCourse(c.title))
+      .map(c => ({
+        title: c.title,
+        delta: (c.responseRateCurrent || 0) - (c.responseRatePrior || 0),
+      }));
+    const topRising = [...withDelta].filter(c => c.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
+    const topFalling = [...withDelta].filter(c => c.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
+
+    const topMisconceptions = filteredMisconceptions.slice(0, 3).map(m => ({
+      text: m.questionText,
+      correctRate: m.correctRate,
+      courseName: m.courseName,
+    }));
+
     return {
       totalStudents: stats.totalStudents || null,
-      activeStudents: usable ? metrics.activeStudents7d : null,
+      activeStudents: isPeriodActive ? activeStudents : null,
       totalInstructors: instructorIds.length || null,
-      totalSessions: usable ? sessions : null,
+      totalSessions: isPeriodActive ? sessions : null,
       totalQuestions: null,
-      avgCompletionRate: usable ? stats.avgCompletionRate : null,
-      avgResponseRate: usable ? metrics.responseRate : null,
-      sessionsDelta: usable ? metrics.sessionsUsedDelta : null,
-      responseRateDelta: usable ? metrics.responseRateDelta : null,
-      hasUsableData: usable,
+      // Use period-windowed completion to match the session window — fixes 56% vs 0% contradiction.
+      avgCompletionRate: isPeriodActive ? stats.windowedCompletionRate : null,
+      avgResponseRate: isPeriodActive ? metrics.responseRate : null,
+      sessionsDelta: isPeriodActive ? metrics.sessionsUsedDelta : null,
+      responseRateDelta: isPeriodActive ? metrics.responseRateDelta : null,
+      activeCourseCount,
+      totalCourseCount,
+      topRising,
+      topFalling,
+      topMisconceptions,
+      openSupportCases: supportCases.length,
+      hasUsableData: isPeriodActive,
       periodLabel,
     };
-  }, [metrics, hasAnyData, stats, instructorIds.length, periodLabel]);
+  }, [metrics, hasAnyData, stats, instructorIds.length, periodLabel, filteredCourseEngagement, courseEngagementExportRows, filteredMisconceptions, supportCases.length]);
 
   // dev-only invariant check: support cases imply active students
   useEffect(() => {
@@ -175,22 +244,6 @@ export default function AdminDashboard() {
       );
     }
   }, [supportCases, orgSnapshot]);
-
-  // Map course engagement → export rows (gated, no instructor identities)
-  const courseEngagementExportRows: CourseEngagementExportRow[] = useMemo(() => {
-    const casesByInstructor = supportCases.reduce<Record<string, number>>((acc, c) => {
-      acc[c.instructorName] = (acc[c.instructorName] || 0) + 1;
-      return acc;
-    }, {});
-    return filteredCourseEngagement.map(c => ({
-      courseTitle: c.title,
-      sessionsInWindow: c.sessionsInWindow,
-      responseRateCurrent: c.responseRateCurrent || null,
-      responseRatePrior: c.responseRatePrior || null,
-      activeStudents: Math.round((c.sevenDayActiveRate / 100) * (c.studentCount || 0)),
-      openSupportCases: casesByInstructor[c.instructorName] || 0,
-    }));
-  }, [filteredCourseEngagement, supportCases]);
 
   // ===== Viewer role resolution for FERPA-gated identity reveals =====
   // Admin/dean = masked by default. Other roles (advisor / IoR / support_staff) can reveal.
