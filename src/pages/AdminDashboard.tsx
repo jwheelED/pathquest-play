@@ -114,13 +114,16 @@ export default function AdminDashboard() {
   }, [instructorPerformance, filters.instructorIds]);
 
   const filteredCourseEngagement = useMemo(() => {
-    if (filters.instructorIds.length === 0) return courseEngagement;
-    const allowedNames = new Set(
-      instructorPerformance
-        .filter((i) => filters.instructorIds.includes(i.id))
-        .map((i) => i.name),
-    );
-    return courseEngagement.filter((c) => allowedNames.has(c.instructorName));
+    let list = courseEngagement.filter(c => !isSeedCourse(c.title));
+    if (filters.instructorIds.length > 0) {
+      const allowedNames = new Set(
+        instructorPerformance
+          .filter((i) => filters.instructorIds.includes(i.id))
+          .map((i) => i.name),
+      );
+      list = list.filter((c) => allowedNames.has(c.instructorName));
+    }
+    return list;
   }, [courseEngagement, instructorPerformance, filters.instructorIds]);
 
   const filteredMisconceptions = useMemo(() => {
