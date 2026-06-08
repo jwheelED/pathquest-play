@@ -29,6 +29,18 @@ const SEED_NAME_PATTERNS: RegExp[] = [
   /^unknown\s+student$/i,
 ];
 const isSeedName = (name: string) => !name || SEED_NAME_PATTERNS.some(r => r.test(name.trim()));
+
+// Seed/demo course titles — hidden from leadership UI + exports.
+const SEED_COURSE_PATTERNS: RegExp[] = [
+  /^my\s+course$/i,
+  /\btest(ing)?\b/i,
+  /\bdemo\b/i,
+  /^untitled/i,
+  /necessary\s+eleven\s+steps/i,
+  /detective\s+fiction/i,
+  /^course\s*\d*$/i,
+];
+const isSeedCourse = (title: string) => !title || SEED_COURSE_PATTERNS.some(r => r.test(title.trim()));
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
