@@ -637,6 +637,7 @@ export default function AdminDashboard() {
           return {
             id: course.id,
             title: course.title || "Untitled course",
+            courseCode: (course as any).course_code || undefined,
             instructorName: instructorMap.get(course.instructor_id) || "Course team",
             studentCount,
             responseRateCurrent: current,
