@@ -20,7 +20,27 @@ import CourseAtRiskRollup, { CourseRollupRow } from "@/components/admin/CourseAt
 import GovernanceBanner from "@/components/admin/GovernanceBanner";
 import ExportReportsCard, { OrgSnapshot, CourseEngagementExportRow } from "@/components/admin/ExportReportsCard";
 
-import { isSeedName } from "@/lib/seedNames";
+// Seed/demo names to filter before any individual data surfaces.
+const SEED_NAME_PATTERNS: RegExp[] = [
+  /^hello\s+students?$/i,
+  /^newstu\s*dash$/i,
+  /\btest\b/i,
+  /\bdemo\b/i,
+  /^unknown\s+student$/i,
+];
+const isSeedName = (name: string) => !name || SEED_NAME_PATTERNS.some(r => r.test(name.trim()));
+
+// Seed/demo course titles — hidden from leadership UI + exports.
+const SEED_COURSE_PATTERNS: RegExp[] = [
+  /^my\s+course$/i,
+  /\btest(ing)?\b/i,
+  /\bdemo\b/i,
+  /^untitled/i,
+  /necessary\s+eleven\s+steps/i,
+  /detective\s+fiction/i,
+  /^course\s*\d*$/i,
+];
+const isSeedCourse = (title: string) => !title || SEED_COURSE_PATTERNS.some(r => r.test(title.trim()));
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
@@ -46,6 +66,7 @@ export default function AdminDashboard() {
     totalStudents: 0,
     activeStudents: 0,
     avgCompletionRate: 0,
+    windowedCompletionRate: 0,
   });
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [instructorPerformance, setInstructorPerformance] = useState<InstructorPerformance[]>([]);
@@ -94,13 +115,16 @@ export default function AdminDashboard() {
   }, [atRiskStudents, instructorPerformance, filters.instructorIds, activePreset]);
 
   const filteredCourseEngagement = useMemo(() => {
-    if (filters.instructorIds.length === 0) return courseEngagement;
-    const allowedNames = new Set(
-      instructorPerformance
-        .filter((i) => filters.instructorIds.includes(i.id))
-        .map((i) => i.name),
-    );
-    return courseEngagement.filter((c) => allowedNames.has(c.instructorName));
+    let list = courseEngagement.filter(c => !isSeedCourse(c.title));
+    if (filters.instructorIds.length > 0) {
+      const allowedNames = new Set(
+        instructorPerformance
+          .filter((i) => filters.instructorIds.includes(i.id))
+          .map((i) => i.name),
+      );
+      list = list.filter((c) => allowedNames.has(c.instructorName));
+    }
+    return list;
   }, [courseEngagement, instructorPerformance, filters.instructorIds]);
 
   const filteredMisconceptions = useMemo(() => {
@@ -125,23 +149,92 @@ export default function AdminDashboard() {
     return `${f(start)} – ${f(end)}`;
   }, []);
 
+  // Build deduplicated, scrubbed, sorted course engagement rows (single source for UI + export)
+  const courseEngagementExportRows: CourseEngagementExportRow[] = useMemo(() => {
+    const casesByInstructor = supportCases.reduce<Record<string, number>>((acc, c) => {
+      acc[c.instructorName] = (acc[c.instructorName] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Disambiguate duplicate titles
+    const titleCounts = new Map<string, number>();
+    filteredCourseEngagement.forEach(c => {
+      titleCounts.set(c.title, (titleCounts.get(c.title) || 0) + 1);
+    });
+    const disambig = (c: typeof filteredCourseEngagement[number]) => {
+      if ((titleCounts.get(c.title) || 0) <= 1) return c.title;
+      const suffix = c.courseCode || c.id.slice(-4).toUpperCase();
+      return `${c.title} · ${suffix}`;
+    };
+
+    const rows = filteredCourseEngagement.map(c => {
+      const activeStudents = Math.round((c.sevenDayActiveRate / 100) * (c.studentCount || 0));
+      return {
+        courseTitle: disambig(c),
+        sessionsInWindow: c.sessionsInWindow,
+        responseRateCurrent: c.responseRateCurrent || null,
+        responseRatePrior: c.responseRatePrior || null,
+        activeStudents,
+        openSupportCases: casesByInstructor[c.instructorName] || 0,
+      };
+    });
+
+    // Suppress fully-empty rows
+    const nonEmpty = rows.filter(
+      r => r.sessionsInWindow > 0 || r.activeStudents > 0 || r.openSupportCases > 0
+    );
+
+    // Sort by sessions desc, then active students desc
+    nonEmpty.sort((a, b) => (b.sessionsInWindow - a.sessionsInWindow) || (b.activeStudents - a.activeStudents));
+    return nonEmpty;
+  }, [filteredCourseEngagement, supportCases]);
+
   const orgSnapshot: OrgSnapshot = useMemo(() => {
     const sessions = metrics.sessionsUsed ?? 0;
-    const usable = hasAnyData && sessions > 0;
+    const activeStudents = metrics.activeStudents7d ?? 0;
+    // "Active" requires both sessions ran AND someone participated (responses or students active).
+    const isPeriodActive = hasAnyData && sessions > 0 && (activeStudents > 0 || courseEngagementExportRows.length > 0);
+
+    const totalCourseCount = filteredCourseEngagement.length;
+    const activeCourseCount = courseEngagementExportRows.length;
+
+    // Top rising / falling by Δ response rate
+    const withDelta = filteredCourseEngagement
+      .filter(c => c.sessionsInWindow > 0 && !isSeedCourse(c.title))
+      .map(c => ({
+        title: c.title,
+        delta: (c.responseRateCurrent || 0) - (c.responseRatePrior || 0),
+      }));
+    const topRising = [...withDelta].filter(c => c.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
+    const topFalling = [...withDelta].filter(c => c.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
+
+    const topMisconceptions = filteredMisconceptions.slice(0, 3).map(m => ({
+      text: m.questionText,
+      correctRate: m.correctRate,
+      courseName: m.courseName,
+    }));
+
     return {
       totalStudents: stats.totalStudents || null,
-      activeStudents: usable ? metrics.activeStudents7d : null,
+      activeStudents: isPeriodActive ? activeStudents : null,
       totalInstructors: instructorIds.length || null,
-      totalSessions: usable ? sessions : null,
+      totalSessions: isPeriodActive ? sessions : null,
       totalQuestions: null,
-      avgCompletionRate: usable ? stats.avgCompletionRate : null,
-      avgResponseRate: usable ? metrics.responseRate : null,
-      sessionsDelta: usable ? metrics.sessionsUsedDelta : null,
-      responseRateDelta: usable ? metrics.responseRateDelta : null,
-      hasUsableData: usable,
+      // Use period-windowed completion to match the session window — fixes 56% vs 0% contradiction.
+      avgCompletionRate: isPeriodActive ? stats.windowedCompletionRate : null,
+      avgResponseRate: isPeriodActive ? metrics.responseRate : null,
+      sessionsDelta: isPeriodActive ? metrics.sessionsUsedDelta : null,
+      responseRateDelta: isPeriodActive ? metrics.responseRateDelta : null,
+      activeCourseCount,
+      totalCourseCount,
+      topRising,
+      topFalling,
+      topMisconceptions,
+      openSupportCases: supportCases.length,
+      hasUsableData: isPeriodActive,
       periodLabel,
     };
-  }, [metrics, hasAnyData, stats, instructorIds.length, periodLabel]);
+  }, [metrics, hasAnyData, stats, instructorIds.length, periodLabel, filteredCourseEngagement, courseEngagementExportRows, filteredMisconceptions, supportCases.length]);
 
   // dev-only invariant check: support cases imply active students
   useEffect(() => {
@@ -152,22 +245,6 @@ export default function AdminDashboard() {
       );
     }
   }, [supportCases, orgSnapshot]);
-
-  // Map course engagement → export rows (gated, no instructor identities)
-  const courseEngagementExportRows: CourseEngagementExportRow[] = useMemo(() => {
-    const casesByInstructor = supportCases.reduce<Record<string, number>>((acc, c) => {
-      acc[c.instructorName] = (acc[c.instructorName] || 0) + 1;
-      return acc;
-    }, {});
-    return filteredCourseEngagement.map(c => ({
-      courseTitle: c.title,
-      sessionsInWindow: c.sessionsInWindow,
-      responseRateCurrent: c.responseRateCurrent || null,
-      responseRatePrior: c.responseRatePrior || null,
-      activeStudents: Math.round((c.sevenDayActiveRate / 100) * (c.studentCount || 0)),
-      openSupportCases: casesByInstructor[c.instructorName] || 0,
-    }));
-  }, [filteredCourseEngagement, supportCases]);
 
   // ===== Viewer role resolution for FERPA-gated identity reveals =====
   // Admin/dean = masked by default. Other roles (advisor / IoR / support_staff) can reveal.
@@ -271,6 +348,7 @@ export default function AdminDashboard() {
           totalStudents: 0,
           activeStudents: 0,
           avgCompletionRate: 0,
+          windowedCompletionRate: 0,
         });
         setAtRiskStudents([]);
         setInstructorPerformance([]);
@@ -464,7 +542,7 @@ export default function AdminDashboard() {
       try {
         const { data: courseRows } = await supabase
           .from("courses")
-          .select("id, title, instructor_id")
+          .select("id, title, instructor_id, course_code")
           .in("instructor_id", fetchedInstructorIds)
           .eq("is_active", true);
 
@@ -633,6 +711,7 @@ export default function AdminDashboard() {
           return {
             id: course.id,
             title: course.title || "Untitled course",
+            courseCode: (course as any).course_code || undefined,
             instructorName: instructorMap.get(course.instructor_id) || "Course team",
             studentCount,
             responseRateCurrent: current,
@@ -658,10 +737,21 @@ export default function AdminDashboard() {
         ? ((activeStudents || 0) / totalStudents) * 100
         : 0;
 
+      // Period-windowed completion rate (last 28d) to reconcile with session-window metrics.
+      const PERIOD_DAYS = 28;
+      const periodCutoff = Date.now() - PERIOD_DAYS * 24 * 60 * 60 * 1000;
+      const windowedAssignments = (assignments || []).filter(
+        a => new Date(a.created_at).getTime() >= periodCutoff
+      );
+      const windowedCompletionRate = windowedAssignments.length > 0
+        ? (windowedAssignments.filter(a => a.completed).length / windowedAssignments.length) * 100
+        : 0;
+
       setStats({
         totalStudents: totalStudents || 0,
         activeStudents: activeStudents || 0,
         avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
+        windowedCompletionRate,
       });
 
       // ===== Behavioral support cases (FERPA-friendly, no demographics, no grades) =====
