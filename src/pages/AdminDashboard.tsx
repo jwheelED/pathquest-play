@@ -206,16 +206,12 @@ export default function AdminDashboard() {
     } else {
       setSession(data.session);
       
-      // Fetch all roles for this user so we can (a) gate access on "admin" and
-      // (b) resolve the FERPA reveal role. Reveal-eligible staff roles aren't in
-      // the app_role enum yet, so today this only ever resolves to "admin".
+      // Gate access on the "admin" app_role.
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", data.session.user.id);
 
-      // Typed as string so it can also hold future reveal-eligible staff roles
-      // that aren't in the app_role enum yet.
       const roleSet = new Set<string>((roles || []).map((r) => String(r.role)));
 
       if (!roleSet.has("admin")) {
@@ -224,10 +220,19 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Map to the FERPA reveal role. Only non-admin staff roles may reveal
-      // individual identities; admins see masked names by default.
+      // Reveal-eligible staff roles live in user_staff_roles (separate from the
+      // app_role enum). Best-effort: that table is created by the staged
+      // migration in db/proposed/ and may not exist yet, in which case this
+      // resolves to no staff roles → viewerRole "admin" (identities stay masked).
+      const { data: staffRoles } = await (supabase.from("user_staff_roles") as any)
+        .select("role")
+        .eq("user_id", data.session.user.id);
+      const staffRoleSet = new Set<string>(
+        ((staffRoles as Array<{ role: string }> | null) || []).map((r) => String(r.role)),
+      );
+
       const revealEligible: ViewerRole[] = ["advisor", "instructor_of_record", "support_staff"];
-      const resolved = revealEligible.find((r) => roleSet.has(r));
+      const resolved = revealEligible.find((r) => staffRoleSet.has(r));
       setViewerRole(resolved ?? "admin");
     }
   };
