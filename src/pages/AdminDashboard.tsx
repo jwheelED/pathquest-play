@@ -20,15 +20,7 @@ import CourseAtRiskRollup, { CourseRollupRow } from "@/components/admin/CourseAt
 import GovernanceBanner from "@/components/admin/GovernanceBanner";
 import ExportReportsCard, { OrgSnapshot, CourseEngagementExportRow } from "@/components/admin/ExportReportsCard";
 
-// Seed/demo names to filter before any individual data surfaces.
-const SEED_NAME_PATTERNS: RegExp[] = [
-  /^hello\s+students?$/i,
-  /^newstu\s*dash$/i,
-  /\btest\b/i,
-  /\bdemo\b/i,
-  /^unknown\s+student$/i,
-];
-const isSeedName = (name: string) => !name || SEED_NAME_PATTERNS.some(r => r.test(name.trim()));
+import { isSeedName } from "@/lib/seedNames";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
