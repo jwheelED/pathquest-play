@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfWeek, subWeeks, format } from "date-fns";
+import {
+  parseQuestionText,
+  truncateQuestionText,
+  MISCONCEPTION_MIN_RESPONSES,
+  MISCONCEPTION_MAX_CORRECT_RATE,
+} from "@/lib/misconceptions";
 import type { AdminFilters } from "@/hooks/useAdminFilters";
 import { getDateRangeBounds } from "@/hooks/useAdminFilters";
 
@@ -298,16 +304,10 @@ export function useAdminDashboardData(
         { correct: number; total: number; content: string; sessionId: string }
       >();
       questions?.forEach((q) => {
-        const content =
-          typeof q.question_content === "object"
-            ? (q.question_content as any)?.question ||
-              (q.question_content as any)?.text ||
-              "Unknown question"
-            : String(q.question_content);
         questionStats.set(q.id, {
           correct: 0,
           total: 0,
-          content,
+          content: parseQuestionText(q.question_content),
           sessionId: q.session_id,
         });
       });
@@ -320,12 +320,11 @@ export function useAdminDashboardData(
 
       const misconceptionsList: MisconceptionItem[] = [];
       questionStats.forEach((stats) => {
-        if (stats.total >= 3) {
+        if (stats.total >= MISCONCEPTION_MIN_RESPONSES) {
           const correctRate = (stats.correct / stats.total) * 100;
-          if (correctRate < 50) {
+          if (correctRate < MISCONCEPTION_MAX_CORRECT_RATE) {
             misconceptionsList.push({
-              questionText:
-                stats.content.substring(0, 80) + (stats.content.length > 80 ? "..." : ""),
+              questionText: truncateQuestionText(stats.content),
               correctRate: Math.round(correctRate),
               totalResponses: stats.total,
               courseName: courseBySession.get(stats.sessionId) || undefined,
@@ -354,8 +353,7 @@ export function useAdminDashboardData(
         const stats = questionStats.get(qid);
         if (stats && count >= 2) {
           confidenceIssuesList.push({
-            questionText:
-              stats.content.substring(0, 80) + (stats.content.length > 80 ? "..." : ""),
+            questionText: truncateQuestionText(stats.content),
             confidentWrongCount: count,
             courseName: courseBySession.get(stats.sessionId) || undefined,
           });
