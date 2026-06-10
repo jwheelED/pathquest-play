@@ -25,6 +25,12 @@ export interface OrgSnapshot {
   avgResponseRate: number | null;
   sessionsDelta?: number | null;
   responseRateDelta?: number | null;
+  activeCourseCount?: number | null;
+  totalCourseCount?: number | null;
+  topRising?: { title: string; delta: number }[];
+  topFalling?: { title: string; delta: number }[];
+  topMisconceptions?: { text: string; correctRate: number; courseName?: string }[];
+  openSupportCases?: number;
   hasUsableData: boolean;
   periodLabel: string;
 }
@@ -58,7 +64,11 @@ export default function ExportReportsCard({ snapshot, courseEngagement = [] }: E
         year: "numeric", month: "long", day: "numeric",
       });
 
-      // Header
+      const activeCourses = snapshot.activeCourseCount ?? 0;
+      const totalCourses = snapshot.totalCourseCount ?? courseEngagement.length;
+      const openCases = snapshot.openSupportCases ?? 0;
+
+      // ===== Page 1 — Executive Summary =====
       doc.setFontSize(22);
       doc.setTextColor(40, 40, 40);
       doc.text("Edvana Leadership Report", pageWidth / 2, 22, { align: "center" });
@@ -68,7 +78,6 @@ export default function ExportReportsCard({ snapshot, courseEngagement = [] }: E
       doc.text(`Period: ${snapshot.periodLabel}`, pageWidth / 2, 30, { align: "center" });
       doc.text(`Generated ${today}`, pageWidth / 2, 36, { align: "center" });
 
-      // Governance line
       doc.setFontSize(9);
       doc.setTextColor(110, 110, 110);
       const govLines = doc.splitTextToSize(GOVERNANCE_LINE, pageWidth - 40);
@@ -77,50 +86,124 @@ export default function ExportReportsCard({ snapshot, courseEngagement = [] }: E
       doc.setDrawColor(220, 220, 220);
       doc.line(20, 54, pageWidth - 20, 54);
 
-      // Key engagement metrics
+      // Executive KPI strip
       doc.setFontSize(14);
       doc.setTextColor(40, 40, 40);
-      doc.text("Key Engagement Metrics", 20, 64);
-
-      const metricsBody: string[][] = [
-        ["Student Response Rate", `${fmtPct(snapshot.avgResponseRate)}${fmtDelta(snapshot.responseRateDelta, "pp")}`],
-        ["Active Students (7d)", fmtNum(snapshot.activeStudents)],
-        ["Sessions Run", `${fmtNum(snapshot.totalSessions)}${fmtDelta(snapshot.sessionsDelta)}`],
-        ["Avg Completion Rate", fmtPct(snapshot.avgCompletionRate)],
-        ["Total Instructors", fmtNum(snapshot.totalInstructors)],
-        ["Total Students", fmtNum(snapshot.totalStudents)],
-      ];
+      doc.text("Executive Summary", 20, 64);
 
       autoTable(doc, {
         startY: 68,
-        head: [["Metric", "Value"]],
-        body: metricsBody,
-        theme: "striped",
-        headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [240, 250, 246] },
+        head: [["Active Courses", "Sessions Run", "Response Rate", "Active Students (7d)", "Open Support Cases"]],
+        body: [[
+          `${activeCourses} of ${totalCourses}`,
+          `${fmtNum(snapshot.totalSessions)}${fmtDelta(snapshot.sessionsDelta)}`,
+          `${fmtPct(snapshot.avgResponseRate)}${fmtDelta(snapshot.responseRateDelta, "pp")}`,
+          fmtNum(snapshot.activeStudents),
+          String(openCases),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 10, halign: "center" },
         margin: { left: 20, right: 20 },
       });
 
+      let cursorY = (doc as any).lastAutoTable.finalY + 8;
+
       if (!snapshot.hasUsableData) {
-        const y = (doc as any).lastAutoTable.finalY + 10;
         doc.setFontSize(10);
         doc.setTextColor(180, 80, 0);
-        doc.text(
-          "No session data has been collected for this period yet. Connect your LMS to populate engagement metrics.",
-          20, y, { maxWidth: pageWidth - 40 },
-        );
+        const msg = "No session activity in this period. Engagement metrics will populate once sessions run and participants respond.";
+        const lines = doc.splitTextToSize(msg, pageWidth - 40);
+        doc.text(lines, 20, cursorY);
+        cursorY += lines.length * 5 + 4;
       }
 
-      // Course-level engagement summary
-      if (courseEngagement.length > 0) {
-        const startY = (doc as any).lastAutoTable.finalY + (snapshot.hasUsableData ? 12 : 22);
+      // Engagement trend block
+      doc.setFontSize(12);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Engagement Trend", 20, cursorY + 4);
+      cursorY += 8;
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      const trendLines = [
+        `Sessions Run: ${fmtNum(snapshot.totalSessions)}${fmtDelta(snapshot.sessionsDelta)}`,
+        `Response Rate: ${fmtPct(snapshot.avgResponseRate)}${fmtDelta(snapshot.responseRateDelta, "pp")}`,
+        `Avg Completion: ${fmtPct(snapshot.avgCompletionRate)}`,
+      ];
+      trendLines.forEach((line, i) => {
+        doc.text(`• ${line}`, 24, cursorY + 5 + i * 5);
+      });
+      cursorY += 5 + trendLines.length * 5 + 6;
 
-        doc.setFontSize(14);
+      // Where engagement is moving
+      const rising = snapshot.topRising || [];
+      const falling = snapshot.topFalling || [];
+      if (rising.length || falling.length) {
+        doc.setFontSize(12);
         doc.setTextColor(40, 40, 40);
-        doc.text("Course-Level Engagement Summary", 20, startY);
-
+        doc.text("Where Engagement is Moving", 20, cursorY);
+        cursorY += 4;
         autoTable(doc, {
-          startY: startY + 4,
+          startY: cursorY,
+          head: [["Rising (Δ response rate)", "Falling (Δ response rate)"]],
+          body: [[
+            rising.length
+              ? rising.map(r => `↑ ${r.title}  (+${Math.round(r.delta)}pp)`).join("\n")
+              : "No rising courses this period.",
+            falling.length
+              ? falling.map(r => `↓ ${r.title}  (${Math.round(r.delta)}pp)`).join("\n")
+              : "No falling courses this period.",
+          ]],
+          theme: "striped",
+          headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold", fontSize: 9 },
+          bodyStyles: { fontSize: 9, valign: "top" },
+          margin: { left: 20, right: 20 },
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // Top misconception themes
+      const misconceptions = snapshot.topMisconceptions || [];
+      if (misconceptions.length) {
+        doc.setFontSize(12);
+        doc.setTextColor(40, 40, 40);
+        doc.text("Top Misconception Themes", 20, cursorY);
+        cursorY += 4;
+        autoTable(doc, {
+          startY: cursorY,
+          head: [["Question / Topic", "Course", "Correct Rate"]],
+          body: misconceptions.map(m => [
+            m.text,
+            m.courseName || "—",
+            fmtPct(m.correctRate),
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: "bold", fontSize: 9 },
+          bodyStyles: { fontSize: 9 },
+          margin: { left: 20, right: 20 },
+        });
+      }
+
+      // ===== Page 2+ — Appendix A: Course Detail =====
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Appendix A — Course-Level Engagement", 20, 22);
+
+      doc.setFontSize(9);
+      doc.setTextColor(110, 110, 110);
+      const appendixNote = totalCourses > 0
+        ? `Showing ${activeCourses} of ${totalCourses} total courses. Courses with zero sessions and zero activity in this period are omitted.`
+        : "No courses found for this organization.";
+      doc.text(doc.splitTextToSize(appendixNote, pageWidth - 40), 20, 30);
+
+      if (courseEngagement.length === 0) {
+        doc.setFontSize(11);
+        doc.setTextColor(120, 120, 120);
+        doc.text("No courses had sessions in this period.", 20, 44);
+      } else {
+        autoTable(doc, {
+          startY: 38,
           head: [["Course", "Sessions", "Response Rate", "Δ vs prior", "Active Students", "Open Support Cases"]],
           body: courseEngagement.map(c => {
             const delta = c.responseRateCurrent !== null && c.responseRatePrior !== null
@@ -130,7 +213,7 @@ export default function ExportReportsCard({ snapshot, courseEngagement = [] }: E
               c.courseTitle,
               String(c.sessionsInWindow),
               fmtPct(c.responseRateCurrent),
-              delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta}pp`,
+              delta === null ? "—" : `${delta > 0 ? "+" : ""}${Math.round(delta)}pp`,
               String(c.activeStudents),
               String(c.openSupportCases),
             ];
@@ -170,34 +253,60 @@ export default function ExportReportsCard({ snapshot, courseEngagement = [] }: E
   const exportToCSV = () => {
     setLoading("csv");
     try {
+      const activeCourses = snapshot.activeCourseCount ?? 0;
+      const totalCourses = snapshot.totalCourseCount ?? courseEngagement.length;
+
       const rows: string[][] = [
         ["Edvana Leadership Report"],
         [`Period: ${snapshot.periodLabel}`],
         [`Generated: ${new Date().toLocaleDateString()}`],
         [GOVERNANCE_LINE],
         [],
-        ["Key Engagement Metrics"],
+        ["Executive Summary"],
         ["Metric", "Value"],
-        ["Student Response Rate", fmtPct(snapshot.avgResponseRate)],
-        ["Active Students (7d)", fmtNum(snapshot.activeStudents)],
+        ["Active Courses", `${activeCourses} of ${totalCourses}`],
         ["Sessions Run", fmtNum(snapshot.totalSessions)],
+        ["Response Rate", fmtPct(snapshot.avgResponseRate)],
+        ["Active Students (7d)", fmtNum(snapshot.activeStudents)],
         ["Avg Completion Rate", fmtPct(snapshot.avgCompletionRate)],
-        ["Total Instructors", fmtNum(snapshot.totalInstructors)],
-        ["Total Students", fmtNum(snapshot.totalStudents)],
+        ["Open Support Cases", String(snapshot.openSupportCases ?? 0)],
       ];
 
+      const rising = snapshot.topRising || [];
+      const falling = snapshot.topFalling || [];
+      if (rising.length || falling.length) {
+        rows.push([], ["Where Engagement is Moving"]);
+        rows.push(["Direction", "Course", "Δ pp"]);
+        rising.forEach(r => rows.push(["Rising", r.title, `+${Math.round(r.delta)}`]));
+        falling.forEach(r => rows.push(["Falling", r.title, String(Math.round(r.delta))]));
+      }
+
+      const misconceptions = snapshot.topMisconceptions || [];
+      if (misconceptions.length) {
+        rows.push([], ["Top Misconception Themes"]);
+        rows.push(["Question / Topic", "Course", "Correct Rate"]);
+        misconceptions.forEach(m => rows.push([m.text, m.courseName || "", fmtPct(m.correctRate)]));
+      }
+
+      rows.push([], ["Appendix A — Course-Level Engagement"]);
+      rows.push([`Showing ${activeCourses} of ${totalCourses} total courses. Empty rows omitted.`]);
       if (courseEngagement.length > 0) {
-        rows.push([], ["Course-Level Engagement Summary"]);
-        rows.push(["Course", "Sessions", "Response Rate", "Active Students", "Open Support Cases"]);
+        rows.push(["Course", "Sessions", "Response Rate", "Δ vs prior (pp)", "Active Students", "Open Support Cases"]);
         courseEngagement.forEach(c => {
+          const delta = c.responseRateCurrent !== null && c.responseRatePrior !== null
+            ? Math.round(c.responseRateCurrent - c.responseRatePrior)
+            : null;
           rows.push([
             c.courseTitle,
             String(c.sessionsInWindow),
             fmtPct(c.responseRateCurrent),
+            delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta}`,
             String(c.activeStudents),
             String(c.openSupportCases),
           ]);
         });
+      } else {
+        rows.push(["No courses had sessions in this period."]);
       }
 
       const csvContent = rows.map(row =>
@@ -266,10 +375,10 @@ export default function ExportReportsCard({ snapshot, courseEngagement = [] }: E
         <div className="pt-4 border-t">
           <h4 className="font-semibold mb-2 text-sm">Report Includes:</h4>
           <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>• Reporting period &amp; governance disclosure</li>
-            <li>• Key engagement metrics with trend deltas</li>
-            <li>• Course-level engagement summary</li>
-            <li>• Empty-state handling (— instead of misleading 0%)</li>
+            <li>• Page 1 — Executive summary, trend, rising/falling courses, top misconceptions</li>
+            <li>• Appendix A — Course-level detail (active courses only, deduplicated)</li>
+            <li>• Governance disclosure and reporting period</li>
+            <li>• Empty rows suppressed; "—" shown when no data instead of misleading 0%</li>
           </ul>
           <p className="text-xs text-muted-foreground mt-3 italic">
             Student-level rows are excluded from leadership exports. Advisors and instructors of record

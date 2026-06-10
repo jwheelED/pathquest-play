@@ -18,6 +18,7 @@ export type EngagementSignal = "dropping" | "softening" | "steady" | "strong";
 export interface CourseEngagement {
   id: string;
   title: string;
+  courseCode?: string;
   instructorName: string;
   studentCount: number;
   responseRateCurrent: number;        // %
