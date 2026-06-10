@@ -52,7 +52,12 @@ function saveStatuses(s: Record<string, CaseStatus>) {
 }
 
 function logReveal(entry: { caseId: string; viewerId?: string; viewerRole: ViewerRole; ts: number }) {
-  // TODO(audit): replace with server-side audit table for production FERPA logging.
+  // TODO(audit, migration-dependent): this localStorage log is NOT a real audit
+  // trail — it is per-browser and clearable by the user. Production FERPA
+  // logging requires a server-side `support_reveal_audit` table (case_id,
+  // viewer_id, viewer_role, revealed_at) with RLS, written via an insert here.
+  // Blocked until that migration is authored (supabase/migrations is read-only
+  // in this repo per CLAUDE.md).
   try {
     const existing = JSON.parse(localStorage.getItem(REVEAL_LOG_KEY) || "[]");
     existing.push(entry);

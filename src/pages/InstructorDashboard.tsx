@@ -7,7 +7,6 @@ import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, User
 import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
 import { CommandStripHero } from "@/components/instructor/CommandStripHero";
 import { toast } from "sonner";
-import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { LiveStatusSection } from "@/components/instructor/LiveStatusSection";
@@ -45,16 +44,9 @@ import { SessionReadiness } from "@/components/instructor/SessionReadiness";
 import { LastLiveSignal } from "@/components/instructor/LastLiveSignal";
 import { LiveToolsSection } from "@/components/instructor/LiveToolsSection";
 import { LiveResponsesEmpty } from "@/components/instructor/LiveResponsesEmpty";
-
-interface Student {
-  id: string;
-  name: string;
-  current_streak: number;
-  completedLessons: number;
-  totalLessons: number;
-  averageMasteryAttempts?: number;
-  average_grade?: number;
-}
+import { useQueryClient } from "@tanstack/react-query";
+import { useStudentRoster, rosterQueryKey } from "@/hooks/useStudentRoster";
+import { useStudentDetail } from "@/hooks/useStudentDetail";
 
 type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "summaries" | "settings";
 
@@ -73,7 +65,6 @@ export default function InstructorDashboard() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [instructorCode, setInstructorCode] = useState<string>("");
-  const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -102,9 +93,22 @@ export default function InstructorDashboard() {
   const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
   const onAutoQuestionIntervalChangeRef = useRef<((minutes: number) => void) | null>(null);
   const onAutoQuestionToggleRef = useRef<((enabled: boolean) => Promise<void>) | null>(null);
-  const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
-  
+
+  // Roster + per-student detail for the Students tab. Roster derives
+  // participation/comprehension signals (lib/studentSignals); detail lazily
+  // loads the question-by-question responses and activity feed.
+  const queryClient = useQueryClient();
+  const rosterQuery = useStudentRoster(currentUser?.id ?? null, selectedCourseId ?? null);
+  const rosterStudents = rosterQuery.data?.students ?? [];
+  const courseVideos = rosterQuery.data?.videos ?? [];
+  const studentDetailQuery = useStudentDetail(
+    selectedStudentId,
+    currentUser?.id ?? null,
+    selectedCourseId ?? null,
+    courseVideos,
+  );
+
   const professorType = instructorProfile?.professor_type;
 
   // Stream live transcript chunks to enrolled students (realtime + persistence)
@@ -200,13 +204,6 @@ export default function InstructorDashboard() {
     return () => clearInterval(interval);
   }, [activeSession?.id]);
   
-  // Refetch students when course changes
-  useEffect(() => {
-    if (currentUser && selectedCourseId) {
-      fetchStudents();
-    }
-  }, [selectedCourseId, currentUser]);
-  
   useEffect(() => {
     const lastReminderDate = localStorage.getItem('lastCourseMaterialsReminder');
     const today = new Date().toDateString();
@@ -223,6 +220,14 @@ export default function InstructorDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Roster freshness: invalidate the TanStack key and let query dedup
+      // absorb event bursts. The old unfiltered user_stats subscription
+      // (refetch on ANY student's XP change org-wide) was removed along with
+      // the gamification display.
+      const invalidateRoster = () => {
+        queryClient.invalidateQueries({ queryKey: ["student-roster"] });
+      };
+
       const channel = supabase
         .channel('instructor-realtime-updates')
         .on(
@@ -233,9 +238,8 @@ export default function InstructorDashboard() {
             table: 'instructor_students',
             filter: `instructor_id=eq.${user.id}`
           },
-          (payload) => {
-            console.log('👥 New student joined:', payload);
-            fetchStudents();
+          () => {
+            invalidateRoster();
             toast.success('New student joined the class!', { duration: 3000 });
           }
         )
@@ -247,31 +251,8 @@ export default function InstructorDashboard() {
             table: 'student_assignments',
             filter: `instructor_id=eq.${user.id}`
           },
-          (payload) => {
-            console.log('📋 Assignment update:', payload);
-            if (fetchDebounceTimer.current) {
-              clearTimeout(fetchDebounceTimer.current);
-            }
-            fetchDebounceTimer.current = setTimeout(() => {
-              fetchStudents();
-            }, 500);
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'user_stats'
-          },
-          (payload) => {
-            console.log('📊 Student stats updated:', payload);
-            if (fetchDebounceTimer.current) {
-              clearTimeout(fetchDebounceTimer.current);
-            }
-            fetchDebounceTimer.current = setTimeout(() => {
-              fetchStudents();
-            }, 500);
+          () => {
+            invalidateRoster();
           }
         )
         .subscribe((status) => {
@@ -346,105 +327,7 @@ export default function InstructorDashboard() {
 
     setCurrentUser(session.user);
     setInstructorCode(profile.instructor_code || "");
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      if (!selectedCourseId) {
-        setStudents([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data: studentLinks } = await supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id)
-        .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
-        .limit(100);
-
-      if (!studentLinks || studentLinks.length === 0) {
-        setStudents([]);
-        setLoading(false);
-        return;
-      }
-
-      const studentIds = studentLinks.map(link => link.student_id);
-
-      const [profilesData, statsData, progressData, masteryData, gradesData] = await Promise.all([
-        supabase.from("profiles").select("id, full_name").in("id", studentIds),
-        supabase.from("user_stats").select("*").in("user_id", studentIds),
-        supabase.from("lesson_progress").select("user_id, completed").in("user_id", studentIds),
-        supabase.from("lesson_mastery").select("user_id, attempt_count, is_mastered").in("user_id", studentIds),
-        supabase
-          .from("student_assignments")
-          .select("student_id, grade")
-          .eq("assignment_type", "lecture_checkin")
-          .eq("instructor_id", user.id)
-          .eq("course_id", selectedCourseId)
-          .in("student_id", studentIds),
-      ]);
-
-      const statsMap = new Map(statsData.data?.map(s => [s.user_id, s]));
-      const progressMap = new Map<string, number>();
-      const masteryMap = new Map<string, { total: number; sum: number }>();
-      const gradesMap = new Map<string, number[]>();
-
-      progressData.data?.forEach(p => {
-        if (p.completed) {
-          progressMap.set(p.user_id, (progressMap.get(p.user_id) || 0) + 1);
-        }
-      });
-
-      masteryData.data?.forEach(m => {
-        if (m.is_mastered) {
-          const existing = masteryMap.get(m.user_id) || { total: 0, sum: 0 };
-          masteryMap.set(m.user_id, {
-            total: existing.total + 1,
-            sum: existing.sum + m.attempt_count
-          });
-        }
-      });
-
-      gradesData.data?.forEach(g => {
-        if (g.grade !== null) {
-          const existing = gradesMap.get(g.student_id) || [];
-          existing.push(Number(g.grade));
-          gradesMap.set(g.student_id, existing);
-        }
-      });
-
-      const profileRows = profilesData.data || [];
-      const combinedStudents = profileRows.map((profile) => {
-        const stats = statsMap.get(profile.id);
-        const completedLessons = progressMap.get(profile.id) || 0;
-        const mastery = masteryMap.get(profile.id);
-        const avgMasteryAttempts = mastery ? mastery.sum / mastery.total : undefined;
-        const grades = gradesMap.get(profile.id) || [];
-        const average_grade =
-          grades.length > 0 ? grades.reduce((sum, g) => sum + g, 0) / grades.length : undefined;
-
-        return {
-          id: profile.id,
-          name: profile.full_name || "Student",
-          current_streak: stats?.current_streak || 0,
-          completedLessons,
-          totalLessons: 10,
-          averageMasteryAttempts: avgMasteryAttempts,
-          average_grade,
-        };
-      });
-
-      setStudents(combinedStudents);
-    } catch (error) {
-      logger.error("Error fetching students:", error);
-      toast.error("Failed to load students");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   const handleLogout = async () => {
@@ -454,82 +337,10 @@ export default function InstructorDashboard() {
     navigate("/instructor/auth");
   };
 
-  const handleStudentClick = async (studentId: string) => {
+  // Selecting a row opens the detail panel; the response-drilldown dialog
+  // opens only via the panel's "View all responses" button.
+  const handleStudentClick = (studentId: string) => {
     setSelectedStudentId(studentId);
-    setDialogOpen(true);
-  };
-
-
-  const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
-
-  useEffect(() => {
-    if (selectedStudentId && dialogOpen) {
-      fetchStudentDetail(selectedStudentId);
-    }
-  }, [selectedStudentId, dialogOpen]);
-
-  const fetchStudentDetail = async (studentId: string) => {
-    const student = students.find(s => s.id === studentId);
-    if (!student) return;
-
-    try {
-      const { data: attempts } = await supabase
-        .from("problem_attempts")
-        .select(`
-          *,
-          stem_problems(problem_text)
-        `)
-        .eq("user_id", studentId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      const { data: lessonActivity } = await supabase
-        .from("lesson_progress")
-        .select(`
-          *,
-          lessons(title)
-        `)
-        .eq("user_id", studentId)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      const { data: achievementActivity } = await supabase
-        .from("user_achievements")
-        .select(`
-          *,
-          achievements(name)
-        `)
-        .eq("user_id", studentId)
-        .order("earned_at", { ascending: false })
-        .limit(5);
-
-      const recentActivity = [
-        ...(lessonActivity?.map(l => ({
-          type: "Lesson Completed",
-          description: (l as any).lessons?.title || "Unknown lesson",
-          date: l.created_at || new Date().toISOString(),
-        })) || []),
-        ...(achievementActivity?.map(a => ({
-          type: "Achievement Unlocked",
-          description: (a as any).achievements?.name || "Unknown achievement",
-          date: a.earned_at,
-        })) || []),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
-
-      setSelectedStudentDetail({
-        ...student,
-        problemAttempts: attempts?.map(a => ({
-          problem_text: (a as any).stem_problems?.problem_text || "Unknown problem",
-          is_correct: a.is_correct,
-          time_spent_seconds: a.time_spent_seconds || 0,
-          created_at: a.created_at,
-        })) || [],
-        recentActivity,
-      });
-    } catch (error) {
-      logger.error("Error fetching student details:", error);
-      toast.error("Failed to load student details");
-    }
   };
 
   if (loading) {
@@ -729,13 +540,19 @@ export default function InstructorDashboard() {
       case "students":
         return (
           <StudentRosterPanel
-            students={students}
-            onStudentClick={handleStudentClick}
-            onRefresh={fetchStudents}
-            instructorId={currentUser?.id || ""}
-            selectedStudentDetail={selectedStudentDetail}
+            students={rosterStudents}
             selectedStudentId={selectedStudentId}
-            loading={loading}
+            onStudentClick={handleStudentClick}
+            onRefresh={() =>
+              queryClient.invalidateQueries({
+                queryKey: rosterQueryKey(currentUser?.id ?? null, selectedCourseId ?? null),
+              })
+            }
+            instructorId={currentUser?.id || ""}
+            detail={studentDetailQuery.data ?? null}
+            detailLoading={studentDetailQuery.isLoading}
+            onOpenResponses={() => setDialogOpen(true)}
+            loading={rosterQuery.isLoading}
           />
         );
 
@@ -870,12 +687,13 @@ export default function InstructorDashboard() {
         </main>
       </div>
 
-      {/* Student Detail Dialog */}
-      {selectedStudentDetail && (
+      {/* Per-question response drilldown */}
+      {selectedStudentId && (
         <StudentDetailDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          student={selectedStudentDetail}
+          studentName={rosterStudents.find(s => s.id === selectedStudentId)?.name || "Student"}
+          groups={studentDetailQuery.data?.responsesByVideo ?? []}
         />
       )}
     </DashboardShell>
