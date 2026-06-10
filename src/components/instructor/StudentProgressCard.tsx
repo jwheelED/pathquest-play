@@ -143,36 +143,9 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
     }
   };
 
-  const handleStudentClick = async (studentId: string) => {
-    try {
-      const { data: stats } = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', studentId)
-        .single();
-
-      const { data: progress } = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', studentId);
-
-      const { data: user } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', studentId)
-        .single();
-
-      const { data: attempts } = await supabase
-        .from('problem_attempts')
-        .select('*, stem_problems(problem_text)')
-        .eq('user_id', studentId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      setSelectedStudentName(user?.name || 'Unknown');
-    } catch (error) {
-      console.error('Error fetching student details:', error);
-    }
+  const handleStudentClick = (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    setSelectedStudentName(student?.name || 'Unknown');
   };
 
   return (
