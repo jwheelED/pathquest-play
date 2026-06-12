@@ -181,7 +181,18 @@ export default function InstructorSettings() {
             <BillingSettings />
           </div>
         );
+      case "security":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Security</h2>
+              <p className="text-sm text-muted-foreground mt-1">Manage your password and account security.</p>
+            </div>
+            <ChangePasswordSettings />
+          </div>
+        );
       default:
+
         return null;
     }
   };
