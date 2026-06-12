@@ -29,7 +29,9 @@ const TABS = [
 
 const ACCOUNT_TABS = [
   { key: "billing", label: "Plan & Billing", icon: CreditCard },
+  { key: "security", label: "Security", icon: Lock },
 ] as const;
+
 
 type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
 
