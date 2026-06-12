@@ -10,6 +10,8 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
+import { ChangePasswordSettings } from "@/components/instructor/ChangePasswordSettings";
+
 
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
 
