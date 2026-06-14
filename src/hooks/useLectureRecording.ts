@@ -1175,7 +1175,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     trackRecordingEnded(recordingDuration);
     
     toast({ title: 'Recording stopped' });
-  }, [broadcast, toast, stopDeepgramStreaming, recordingDuration]);
+  }, [broadcast, toast, stopDeepgramStreaming, recordingDuration, resetRecordingState]);
 
   // Manual question send
   const handleManualQuestionSend = useCallback(async () => {
