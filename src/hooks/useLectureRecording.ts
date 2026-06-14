@@ -1184,6 +1184,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     try {
       setIsSendingQuestion(true);
 
+      // Brief flush delay so a question spoken immediately before the button
+      // press has time to land in the transcript buffer from Deepgram.
+      await new Promise((r) => setTimeout(r, 250));
+
       const hasTranscript = transcriptBufferRef.current && transcriptBufferRef.current.length >= 20;
       const hasSlideContext = slideContextRef.current && slideContextRef.current.length >= 20;
 
