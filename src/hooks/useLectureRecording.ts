@@ -1077,15 +1077,31 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, []);
 
+  // Full reset of all per-recording state — call on start AND stop so a fresh
+  // recording never inherits buffers, candidates, or cooldowns from the previous one.
+  const resetRecordingState = useCallback(() => {
+    setTranscriptChunks([]);
+    setLastTranscript('');
+    transcriptBufferRef.current = '';
+    intervalTranscriptRef.current = '';
+    intervalTranscriptSnapshotRef.current = '';
+    transcriptChunkCountRef.current = 0;
+    recordingCycleCountRef.current = 0;
+    directVoiceLastDetectedRef.current = '';
+    directVoiceLastTimeRef.current = 0;
+    lastMissToastTimeRef.current = 0;
+    setFailureCount(0);
+    resetTriggerCapture?.();
+    resetPassiveDetection?.();
+    resetVoiceCommandCooldown?.();
+  }, [resetTriggerCapture, resetPassiveDetection, resetVoiceCommandCooldown]);
+
   // Start recording
   const startRecording = useCallback(async () => {
     try {
       isRecordingRef.current = true;
       setIsRecording(true);
-      setTranscriptChunks([]);
-      transcriptBufferRef.current = '';
-      intervalTranscriptRef.current = '';
-      setFailureCount(0);
+      resetRecordingState();
 
       console.log('🌊 Using Deepgram WebSocket streaming via Fly.io proxy');
       await startDeepgramStreaming();
