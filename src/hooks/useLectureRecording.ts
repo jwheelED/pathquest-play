@@ -994,10 +994,32 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
-          // Trigger-based question capture only — interrogative trigger phrases.
-          // Bare question marks no longer fall back to passive detection
-          // (too many rhetorical asides were slipping through).
+          // Trigger-based question capture — interrogative trigger phrases.
+          const wasCapturingBefore = isTriggerCapturing;
           feedTriggerChunk(cleanText, Date.now());
+
+          // Fallback: if the chunk clearly ends with "?" and the trigger
+          // pipeline did not arm, route through passive detection so we
+          // don't silently drop natural-sounding questions.
+          const endsWithQuestion = /\?\s*$/.test(cleanText.trim());
+          const hasWhWord = /\b(what|why|how|when|where|who|whom|whose|which)\b/i.test(cleanText);
+          const triggerArmed = isTriggerCapturing || wasCapturingBefore;
+
+          if (endsWithQuestion && !triggerArmed) {
+            console.log('🛟 Fallback: routing "?"-ending chunk to passive detection');
+            checkPassiveQuestion(cleanText, intervalTranscriptRef.current);
+          } else if ((endsWithQuestion || hasWhWord) && !triggerArmed) {
+            // Visible miss signal — debounced to once per 30s
+            const now = Date.now();
+            if (now - lastMissToastTimeRef.current > 30000) {
+              lastMissToastTimeRef.current = now;
+              console.log('⚠️ Question-like utterance not captured:', cleanText);
+              toast({
+                title: 'Heard a question but couldn\'t capture it',
+                description: 'Tap "Send Question" to use the last few seconds of speech.',
+              });
+            }
+          }
 
           // Notify passive detection that the instructor is still speaking — resets
           // the trailing-silence timer on any pending candidate.
