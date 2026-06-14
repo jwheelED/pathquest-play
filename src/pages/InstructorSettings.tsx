@@ -10,7 +10,6 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
-import { ChangePasswordSettings } from "@/components/instructor/ChangePasswordSettings";
 
 
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
@@ -29,7 +28,6 @@ const TABS = [
 
 const ACCOUNT_TABS = [
   { key: "billing", label: "Plan & Billing", icon: CreditCard },
-  { key: "security", label: "Security", icon: Lock },
 ] as const;
 
 
@@ -182,15 +180,7 @@ export default function InstructorSettings() {
           </div>
         );
       case "security":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Security</h2>
-              <p className="text-sm text-muted-foreground mt-1">Manage your password and account security.</p>
-            </div>
-            <ChangePasswordSettings />
-          </div>
-        );
+        return null;
       default:
 
         return null;
