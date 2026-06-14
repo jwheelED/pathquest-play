@@ -1125,7 +1125,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         variant: 'destructive',
       });
     }
-  }, [startDeepgramStreaming, broadcast, toast]);
+  }, [startDeepgramStreaming, broadcast, toast, resetRecordingState]);
 
   // Stop recording - cleans up both modes
   const stopRecording = useCallback(() => {
@@ -1139,8 +1139,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
 
     if (mediaRecorderRef.current) {
+      // Unbind handlers BEFORE stopping so any late-arriving chunk from this
+      // session can't be processed after we've torn down state.
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
       if (mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
+        try { mediaRecorderRef.current.stop(); } catch { /* noop */ }
       }
       mediaRecorderRef.current = null;
     }
@@ -1160,6 +1164,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     if (reliableTimerRef.current) {
       reliableTimerRef.current.stop();
     }
+
+    // Clear all per-recording state so the next start begins clean
+    resetRecordingState();
+
 
     broadcast('recording_status', { isRecording: false });
     
