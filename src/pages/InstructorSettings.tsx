@@ -179,8 +179,6 @@ export default function InstructorSettings() {
             <BillingSettings />
           </div>
         );
-      case "security":
-        return null;
       default:
 
         return null;
