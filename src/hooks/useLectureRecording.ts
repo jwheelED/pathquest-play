@@ -255,6 +255,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Direct voice command detection refs (independent of state-based detection)
   const directVoiceLastDetectedRef = useRef<string>('');
   const directVoiceLastTimeRef = useRef<number>(0);
+  // Debounced toast when we hear a question-like utterance but capture failed
+  const lastMissToastTimeRef = useRef<number>(0);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
 
   // Keep refs updated when state changes (avoids stale closures in timer callbacks)
