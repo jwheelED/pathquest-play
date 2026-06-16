@@ -1,37 +1,37 @@
+## Why this is happening
 
-## Problem
+The transcript is being captured correctly — the screenshot proves Deepgram heard: “Who wrote the Emancipation Proclamation?”
 
-1. **Leftover chunks after restart.** `stopRecording` / `startRecording` reset some refs but never call `resetTriggerCapture()` or `resetPassiveDetection()`. The trigger-capture hook keeps a rolling `bufferRef` of transcript chunks that survives across recordings, so the next session starts "contaminated" with chunks from the previous one (visible as stale transcript display + ghost question candidates). A few other refs also leak: `lastTranscript`, `transcriptChunkCountRef`, `intervalTranscriptSnapshotRef`, and the direct voice-command cooldown refs.
-2. **Unreliable question capture.** Today the only path that auto-detects spoken questions is the strict interrogative-trigger pipeline in `useQuestionTriggerCapture`. If Deepgram's final transcript chunks the question in an awkward way, or the WH/aux trigger fails the "clause-start" anchor, the question is silently dropped — the instructor has no signal that it was missed.
+The drop happens after transcription, in the candidate promotion path:
 
-## Fix
+1. The trigger detector requires at least 6 complete words before it accepts a captured question.
+2. This question is only 5 words: “Who wrote the Emancipation Proclamation?”
+3. The passive fallback also uses a 6-word minimum in the live recording flow.
+4. In the slide presenter/live copilot UI, trigger-captured questions correctly bypass the narrow passive allow-list. But the `useLectureRecording` hook still routes trigger-captured questions back through `checkPassiveQuestion`, which re-applies stricter filters and can drop valid natural questions.
 
-### A. Full reset on stop and on start (`src/hooks/useLectureRecording.ts`)
+So the system hears the question, displays it as the last chunk, but never promotes it to “Question on Deck.”
 
-Create one helper `resetRecordingState()` and call it from both `startRecording` (before connecting) and `stopRecording` (after disconnecting Deepgram). It clears:
+## Plan
 
-- `transcriptChunks` state and `lastTranscript` state
-- `transcriptBufferRef`, `intervalTranscriptRef`, `intervalTranscriptSnapshotRef`
-- `transcriptChunkCountRef`, `recordingCycleCountRef`, `failureCount`
-- `directVoiceLastDetectedRef`, `directVoiceLastTimeRef`
-- `resetTriggerCapture()` and `resetPassiveDetection()` (hook-internal buffers)
-- `resetVoiceCommandCooldown()`
+1. **Allow short, valid WH questions**
+   - Lower the minimum complete question length from 6 to 5 in the live capture configuration.
+   - Keep the global safety floor at 4 words, so filler like “Any questions?” still remains blocked by the rhetorical filters.
 
-Also harden `stopRecording` so the `MediaRecorder` `ondataavailable` / `onstop` handlers are unbound before nulling the ref, preventing a late-arriving chunk from the previous session being processed after stop.
+2. **Use the vetted candidate path in `useLectureRecording`**
+   - Pull `acceptVettedCandidate` from `usePassiveQuestionDetection`.
+   - Route trigger-captured questions to `acceptVettedCandidate(...)` instead of `checkPassiveQuestion(...)`, matching the newer `LectureTranscription` implementation.
+   - This avoids re-dropping questions that the trigger capture hook already validated.
 
-### B. Reliability improvements
+3. **Make the question-mark fallback immediate for obvious questions**
+   - For chunks ending in `?`, send them through the vetted candidate path when they have a valid interrogative trigger and meet the 5-word threshold.
+   - This makes “Who wrote the Emancipation Proclamation?” show up immediately instead of waiting on silence logic.
 
-1. **Re-enable a guarded question-mark fallback.** In the Deepgram `onTranscript` callback, after `feedTriggerChunk(...)`, if the chunk ends with `?` AND the trigger pipeline did not arm a pending capture within ~1.5s, route the chunk through `checkPassiveQuestion(cleanText, intervalTranscriptRef.current)`. The existing rhetorical/greeting blocklist in passive detection still filters out "right?", "make sense?", etc.
-2. **Visible miss signal.** When a chunk contains a `?` or a WH-word but is rejected by the trigger/passive pipelines, log a single console line and (debounced to once per 30s) show a subtle non-destructive toast: "Heard a question but couldn't capture it — tap Send Question to use the last 15s." This makes the failure mode discoverable instead of silent.
-3. **Lower friction on the manual fallback.** `handleManualQuestionSend` already exists; ensure the button reads `transcriptBufferRef.current` AFTER a 250ms flush so a question spoken immediately before pressing the button is included.
+4. **Add regression coverage**
+   - Add/update tests to prove “Who wrote the Emancipation Proclamation?” is accepted.
+   - Include a guard that “Any questions?” / audience-check filler is still rejected.
 
-### C. Verification
+## Files to change
 
-- Start recording, say a question, press Stop, press Start: confirm `transcriptChunks` is empty and no ghost candidate appears (check console for `🎯 Trigger capture emitted question` — should not fire from old buffer).
-- Speak three different question phrasings ("What happens when…", "How does X compare to Y?", "Is this the same as…?") and confirm each produces either a captured candidate or the new "couldn't capture" toast — never silent.
-- Build passes.
-
-## Technical notes
-
-- All changes are confined to `src/hooks/useLectureRecording.ts`. `useQuestionTriggerCapture` and `usePassiveQuestionDetection` already expose the reset functions and `checkUtterance`; no edits needed there.
-- No schema, edge function, or backend changes.
+- `src/hooks/useLectureRecording.ts`
+- `src/hooks/usePassiveQuestionDetection.ts` or hook configuration only, depending on the smallest safe change
+- `src/__tests__/useQuestionTriggerCapture.test.ts` and/or `src/__tests__/usePassiveQuestionDetection.test.ts`

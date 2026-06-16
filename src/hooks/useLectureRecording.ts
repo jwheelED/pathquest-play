@@ -208,13 +208,14 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     pendingStartedAt: passivePendingStartedAt,
     trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    acceptVettedCandidate: acceptVettedPassiveCandidate,
     notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 8000,
-    minWordCount: 6,
+    minWordCount: 5, // Allow short natural WH questions like "Who wrote the Emancipation Proclamation?"
     minTranscriptConfidence: 0.8,
     trailingSilenceMs: 1200,
     autoDismissMs: 60000,
@@ -234,19 +235,21 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     bufferWindowMs: 60000,
     lookbackMs: 30000,
     maxBufferChars: 8000,
+    minCompleteWords: 5, // Allow short natural WH questions
   });
 
-  // Route trigger-captured questions into the same passive candidate pipeline
+  // Route trigger-captured questions directly into the passive candidate pipeline.
+  // Use acceptVettedCandidate (not checkPassiveQuestion) — the trigger-capture
+  // hook has already vetted the question, and re-running passive filters here
+  // was silently dropping valid short questions.
   useEffect(() => {
     setTriggerCaptureComplete((candidate) => {
       console.log('🎯 Trigger capture emitted question:', candidate.text);
-      // Reset passive detection cooldown so it doesn't block follow-up retries
       resetPassiveDetection?.();
-      // Prefer the trigger capture's own prior context; fall back to rolling buffer
       const priorContext = candidate.priorContext || intervalTranscriptRef.current;
-      checkPassiveQuestion(candidate.text, priorContext);
+      acceptVettedPassiveCandidate(candidate.text, priorContext);
     });
-  }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
+  }, [setTriggerCaptureComplete, acceptVettedPassiveCandidate, resetPassiveDetection]);
 
 
   // Deepgram streaming refs for real-time transcription
@@ -999,15 +1002,16 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
           feedTriggerChunk(cleanText, Date.now());
 
           // Fallback: if the chunk clearly ends with "?" and the trigger
-          // pipeline did not arm, route through passive detection so we
-          // don't silently drop natural-sounding questions.
+          // pipeline did not arm, route through the vetted-candidate path so
+          // we don't silently drop natural-sounding questions like
+          // "Who wrote the Emancipation Proclamation?"
           const endsWithQuestion = /\?\s*$/.test(cleanText.trim());
           const hasWhWord = /\b(what|why|how|when|where|who|whom|whose|which)\b/i.test(cleanText);
           const triggerArmed = isTriggerCapturing || wasCapturingBefore;
 
           if (endsWithQuestion && !triggerArmed) {
-            console.log('🛟 Fallback: routing "?"-ending chunk to passive detection');
-            checkPassiveQuestion(cleanText, intervalTranscriptRef.current);
+            console.log('🛟 Fallback: routing "?"-ending chunk to vetted candidate path');
+            acceptVettedPassiveCandidate(cleanText, intervalTranscriptRef.current);
           } else if ((endsWithQuestion || hasWhWord) && !triggerArmed) {
             // Visible miss signal — debounced to once per 30s
             const now = Date.now();
