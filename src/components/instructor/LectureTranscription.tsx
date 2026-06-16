@@ -263,7 +263,7 @@ export const LectureTranscription = ({
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 1500,
-    minWordCount: 6,
+    minWordCount: 5,
     minTranscriptConfidence: 0.8,
     // trailingSilenceMs: use hook default (700ms); "?" fast-path promotes instantly
     autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
