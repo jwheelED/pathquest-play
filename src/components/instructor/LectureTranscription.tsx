@@ -283,6 +283,7 @@ export const LectureTranscription = ({
     bufferWindowMs: 60000,
     lookbackMs: 30000,
     maxBufferChars: 8000,
+    minCompleteWords: 5, // Allow short natural WH questions
   });
 
   // Stash priorContext from the trigger capture so the send path can prefer it over the generic transcript tail
