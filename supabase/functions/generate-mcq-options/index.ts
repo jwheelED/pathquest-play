@@ -232,7 +232,7 @@ Rules (apply in order):
                 description: 'Brief explanation of why the correct answer is correct'
               }
             },
-            required: ['options', 'correct_answer', 'citation'],
+            required: ['options', 'correct_answer'],
             additionalProperties: false
           }
         }
