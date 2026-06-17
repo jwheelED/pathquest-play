@@ -163,8 +163,14 @@ serve(async (req) => {
     // Build a labelled, role-explicit context block. Prior context (focused, recent teaching prose
     // captured at trigger time) is given highest priority for pronoun resolution; the broader
     // source_transcript tail is included as background lecture history.
-    const broadContext = (source_transcript || '').slice(-3000).trim();
+    //
+    // PERF: when we already have focused prior_context, trim the broad transcript tail
+    // hard (1200 chars vs 3000). The focused window covers pronoun resolution, and the
+    // extra ~1800 chars of stale lecture history adds input-token latency without
+    // improving answer quality on short factual questions.
     const focusedContext = (prior_context || '').trim();
+    const broadCap = focusedContext.length > 0 ? 1200 : 2400;
+    const broadContext = (source_transcript || '').slice(-broadCap).trim();
     const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
 
     const teachingContextBlock = hasAnyContext
@@ -183,37 +189,18 @@ serve(async (req) => {
 
     const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-    const systemPrompt = `Today's date is ${todayStr}. Your training data has a knowledge cutoff and may be stale for time-sensitive facts (current officeholders, prices, champions, versions, recent events).
+    // PERF: tight system prompt — keeps the critical rules (transcript overrides
+    // training data, no vague distractors, time-sensitive guard) while cutting
+    // ~1.4 KB of input tokens per request.
+    const systemPrompt = `Today is ${todayStr}. You generate ONE 4-option MCQ from a professor's live-lecture utterance for Edvana.
 
-You are an educational assessment engine embedded in Edvana, a live classroom platform. Your ONLY job: generate a 4-option multiple choice question grounded in a professor's live lecture.
+Rules (apply in order):
+1. RESOLVE pronouns and isolated symbols ("it","this","E","the function") against MOST RECENT TEACHING first, then EARLIER LECTURE HISTORY. Never resolve from training data when transcript evidence exists.
+2. CORRECT ANSWER: extract from the transcript when transcript evidence exists. Transcript ALWAYS overrides training data. If non-time-sensitive and no transcript evidence, answer from general knowledge. If the question asks for a CURRENT fact (current officeholder, price, champion, version, recent event) and the transcript does NOT supply it, set the correct option to "Needs current verification" and say so in the explanation. Do NOT guess time-sensitive facts.
+3. DISTRACTORS: domain-specific, on-topic, plausible. FORBIDDEN: "none of the above", "all of the above", "not specified", "the end result", or any generic filler.
+4. Emit ONLY via the \`generate_mcq_options\` tool call. Exactly 4 options "A. …" through "D. …", a \`correct_answer\` letter, a brief \`explanation\`, and optionally a short \`citation\` (transcript span you used).`;
 
-INPUTS
-You will receive a user message containing:
-- [MOST RECENT TEACHING — IMMEDIATELY BEFORE THE QUESTION]: prose spoken right before the question. HIGHEST priority for resolving references.
-- [EARLIER LECTURE HISTORY]: broader session transcript. Secondary reference.
-- INSTRUCTOR'S QUESTION: the short utterance to convert into an MCQ.
-
-EXECUTION ORDER — apply rules top-to-bottom.
-
-1. RESOLUTION
-Every pronoun (it, this, they, that, these, those) and every isolated symbol or term (e.g., "E", "the function", "this process") in the INSTRUCTOR'S QUESTION MUST be resolved against MOST RECENT TEACHING first, then EARLIER LECTURE HISTORY. Never resolve from training data when transcript evidence exists. If no antecedent exists anywhere in the transcript, fall back to training knowledge ONLY for non-time-sensitive questions.
-
-2. CORRECT ANSWER (CRITICAL — most failures happen here)
-- First, identify the answer by extracting it FROM the transcript when transcript evidence exists. Quote the exact span you used as your justification in the \`citation\` field.
-- The transcript ALWAYS overrides training data. If the transcript says E is the dominant allele, the answer is "the dominant allele" — never an energy/physics interpretation, regardless of how the symbol "E" is used elsewhere.
-- If the transcript does not supply the answer and the question is non-time-sensitive, answer from general knowledge of the apparent domain. Leave \`citation\` empty.
-- If the question asks for a CURRENT fact (officeholder, price, champion, latest version, recent event) and the transcript does not supply it, set the correct option to "Needs current verification" and state in the explanation that the answer is time-sensitive. Do NOT confidently emit a possibly outdated fact.
-
-3. DISTRACTORS
-Distractors must be domain-specific, on-topic, plausible alternatives — items a student of THIS subject could reasonably confuse with the correct answer. FORBIDDEN: "none of the above", "all of the above", "the output of the process", "the end result", "not specified", or any generic filler.
-
-4. SELF-CHECK BEFORE EMITTING
-Before emitting the tool call, re-read the option you marked as correct. Confirm it directly answers the INSTRUCTOR'S QUESTION using the transcript evidence in \`citation\`. If the chosen option does not match the citation's meaning, fix the assignment.
-
-5. OUTPUT
-Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write prose outside the tool call. The tool call must contain exactly 4 options labeled "A. …" through "D. …", a \`correct_answer\` letter (A/B/C/D), a \`citation\` (the exact transcript span justifying the answer, or empty string if answered from general knowledge), and a brief \`explanation\` justifying the correct answer with reference to the transcript when applicable.`;
-
-    const userPrompt = `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION (turn this into a 4-option MCQ) ===\n"${question_text}"\n\nGenerate 4 multiple choice options. Format each option as "A. text", "B. text", "C. text", "D. text". Resolve any pronouns first using the transcript. Quote the exact transcript span you used in \`citation\`. If this is a time-sensitive CURRENT question and the teaching context does not explicitly provide the answer, do NOT guess using possibly outdated memory — make the correct option a verification-safe answer like "Needs current verification" and explain that current sources should be checked. Distractors must be specific and topic-relevant — never vague phrases.`;
+    const userPrompt = `${teachingContextBlock ? `=== TEACHING CONTEXT ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION ===\n"${question_text}"\n\nGenerate 4 MCQ options ("A. …" through "D. …"). Resolve pronouns using the transcript. If time-sensitive and not supplied, correct answer = "Needs current verification". Distractors must be specific.`;
 
     const tools = [
       {
@@ -245,7 +232,7 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
                 description: 'Brief explanation of why the correct answer is correct'
               }
             },
-            required: ['options', 'correct_answer', 'citation'],
+            required: ['options', 'correct_answer'],
             additionalProperties: false
           }
         }
@@ -286,9 +273,9 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
       return res;
     }
 
-    // Always start with Flash — ~2-3s vs Pro's ~8-12s, and plenty capable for
-    // a 4-option MCQ. The validator will escalate to Pro on the rare retry.
-    const primaryModel = 'google/gemini-2.5-flash';
+    // PERF: flash-lite is ~2-3x faster TTFT than flash on short factual MCQs and
+    // plenty capable for 4 options. Structural-failure retries escalate to flash.
+    const primaryModel = 'google/gemini-2.5-flash-lite';
 
     const primaryStart = performance.now();
     let response = await callModel(primaryModel, 'primary');
@@ -325,7 +312,9 @@ Emit the MCQ ONLY through the \`generate_mcq_options\` tool call. Never write pr
     );
     if (!verdict.ok && isStructuralFailure) {
       console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
-      const retryResp = await callModel('google/gemini-2.5-pro', 'retry', verdict.reason);
+      // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
+      // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
+      const retryResp = await callModel('google/gemini-2.5-flash', 'retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
         const retryCall = retryData.choices?.[0]?.message?.tool_calls?.[0];

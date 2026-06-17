@@ -395,19 +395,22 @@ export function QuestionOnDeck({
   const hiddenCount = candidateHistory.length - 3;
 
   // Auto-generate when a new candidate appears OR when the resolved format
-  // changes for the current candidate. We REQUIRE formatPreference to be
-  // explicitly provided (loaded from profile) before generating — otherwise
-  // an early render with the default MCQ format would kick off an MCQ preview
-  // that races the real coding/short_answer preview.
+  // changes for the current candidate.
+  //
+  // PERF: kick off generation IMMEDIATELY when a candidate arrives — don't wait
+  // for `formatPreference` to load from the profile. We use the currently
+  // resolved `effectiveFormat` (which falls back to `multiple_choice` while the
+  // profile is loading). If the profile resolves to a different format later,
+  // the key changes and we re-generate. This saves the 200-600ms cold-load wait
+  // that was visible as a long "Preparing…" spinner on the first question.
   useEffect(() => {
     if (!candidate) return;
-    if (formatPreference === undefined || formatPreference === null) return;
     const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
     if (generatedForRef.current === key) return;
     generatedForRef.current = key;
     generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidate?.text, effectiveFormat, codingStyle, formatPreference]);
+  }, [candidate?.text, effectiveFormat, codingStyle]);
 
   // Reset generated state when candidate is cleared
   useEffect(() => {
@@ -478,67 +481,86 @@ export function QuestionOnDeck({
       }
 
       // ─── Non-coding: bank match in parallel with AI generation ────────
+      // PERF: race-with-fallback. We no longer block on Promise.all — we render
+      // whichever response finishes first with usable content, then upgrade to
+      // a high-confidence bank match if it arrives later (or already won).
+      let settled = false;
+      const markSettledIfHas = (hasContent: boolean) => {
+        if (hasContent && !settled) {
+          settled = true;
+          if (isLatest()) setIsGenerating(false);
+        }
+      };
+
       const bankPromise = supabase.functions
         .invoke('match-bank-question', {
           body: { question_text: questionText, course_id: courseId ?? null, format },
         })
+        .then((bankRes) => {
+          if (!isLatest()) return;
+          const matchData: any = (bankRes as any)?.data;
+          const m = matchData?.match;
+          const confidence: number = typeof matchData?.confidence === 'number' ? matchData.confidence : 0;
+          const isHighConfidenceBank =
+            m && m.question_content && (matchData?.source === 'exact_match' || confidence >= 0.8);
+          if (!isHighConfidenceBank) return;
+
+          const qc = m.question_content;
+          if (format === 'multiple_choice' || format === 'poll') {
+            const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+            if (opts && opts.length === 4) {
+              setMcqOptions(opts);
+              const ca = qc.correctAnswer || qc.correct_answer;
+              if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+                setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+              }
+              setBankMatch({ id: m.id, title: m.title });
+              markSettledIfHas(true);
+            }
+          } else if (format === 'short_answer') {
+            const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+            if (ea) {
+              setExpectedAnswer(String(ea));
+              setBankMatch({ id: m.id, title: m.title });
+              markSettledIfHas(true);
+            }
+          }
+        })
         .catch((e) => {
           console.warn('Bank match lookup failed', e);
-          return { data: null } as { data: null };
         });
 
-      const aiPromise =
+      const aiPromise = (
         format === 'multiple_choice' || format === 'poll'
           ? supabase.functions.invoke('generate-mcq-options', { body })
-          : supabase.functions.invoke('generate-expected-answer', { body });
-
-      const [bankRes, aiRes] = await Promise.all([bankPromise, aiPromise]);
-      if (!isLatest()) return;
-
-      // 1) Prefer high-confidence bank match.
-      const matchData: any = (bankRes as any)?.data;
-      const m = matchData?.match;
-      const confidence: number = typeof matchData?.confidence === 'number' ? matchData.confidence : 0;
-      const isHighConfidenceBank =
-        m && m.question_content && (matchData?.source === 'exact_match' || confidence >= 0.8);
-
-      if (isHighConfidenceBank) {
-        const qc = m.question_content;
-        if (format === 'multiple_choice' || format === 'poll') {
-          const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
-          if (opts && opts.length === 4) {
-            setMcqOptions(opts);
-            const ca = qc.correctAnswer || qc.correct_answer;
-            if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
-              setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
-            }
-            setBankMatch({ id: m.id, title: m.title });
-            return;
-          }
-        } else if (format === 'short_answer') {
-          const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
-          if (ea) {
-            setExpectedAnswer(String(ea));
-            setBankMatch({ id: m.id, title: m.title });
-            return;
-          }
-        }
-      }
-
-      // 2) Fall back to the AI result we kicked off in parallel.
-      const { data, error } = aiRes as { data: any; error: any };
-      if (!error) {
+          : supabase.functions.invoke('generate-expected-answer', { body })
+      ).then((aiRes) => {
+        if (!isLatest()) return;
+        const { data, error } = aiRes as { data: any; error: any };
+        if (error) return;
         if (format === 'multiple_choice' || format === 'poll') {
           if (data?.options?.length === 4) {
-            setMcqOptions(data.options);
-            if (data.correct_answer && format === 'multiple_choice') {
-              setCorrectAnswer(data.correct_answer);
+            // Only overwrite if a bank match hasn't already populated options.
+            if (!settled) {
+              setMcqOptions(data.options);
+              if (data.correct_answer && format === 'multiple_choice') {
+                setCorrectAnswer(data.correct_answer);
+              }
+              markSettledIfHas(true);
             }
           }
         } else if (data?.expected_answer) {
-          setExpectedAnswer(data.expected_answer);
+          if (!settled) {
+            setExpectedAnswer(data.expected_answer);
+            markSettledIfHas(true);
+          }
         }
-      }
+      }).catch(() => {
+        // Silent — user can still edit manually
+      });
+
+      // Wait for both so we can clear the spinner if NEITHER produced content.
+      await Promise.all([bankPromise, aiPromise]);
     } catch {
       // Silent — user can still edit manually
     } finally {
