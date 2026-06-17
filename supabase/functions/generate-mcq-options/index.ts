@@ -273,9 +273,9 @@ Rules (apply in order):
       return res;
     }
 
-    // Always start with Flash — ~2-3s vs Pro's ~8-12s, and plenty capable for
-    // a 4-option MCQ. The validator will escalate to Pro on the rare retry.
-    const primaryModel = 'google/gemini-2.5-flash';
+    // PERF: flash-lite is ~2-3x faster TTFT than flash on short factual MCQs and
+    // plenty capable for 4 options. Structural-failure retries escalate to flash.
+    const primaryModel = 'google/gemini-2.5-flash-lite';
 
     const primaryStart = performance.now();
     let response = await callModel(primaryModel, 'primary');
