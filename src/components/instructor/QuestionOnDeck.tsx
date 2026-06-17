@@ -395,19 +395,22 @@ export function QuestionOnDeck({
   const hiddenCount = candidateHistory.length - 3;
 
   // Auto-generate when a new candidate appears OR when the resolved format
-  // changes for the current candidate. We REQUIRE formatPreference to be
-  // explicitly provided (loaded from profile) before generating — otherwise
-  // an early render with the default MCQ format would kick off an MCQ preview
-  // that races the real coding/short_answer preview.
+  // changes for the current candidate.
+  //
+  // PERF: kick off generation IMMEDIATELY when a candidate arrives — don't wait
+  // for `formatPreference` to load from the profile. We use the currently
+  // resolved `effectiveFormat` (which falls back to `multiple_choice` while the
+  // profile is loading). If the profile resolves to a different format later,
+  // the key changes and we re-generate. This saves the 200-600ms cold-load wait
+  // that was visible as a long "Preparing…" spinner on the first question.
   useEffect(() => {
     if (!candidate) return;
-    if (formatPreference === undefined || formatPreference === null) return;
     const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
     if (generatedForRef.current === key) return;
     generatedForRef.current = key;
     generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidate?.text, effectiveFormat, codingStyle, formatPreference]);
+  }, [candidate?.text, effectiveFormat, codingStyle]);
 
   // Reset generated state when candidate is cleared
   useEffect(() => {
