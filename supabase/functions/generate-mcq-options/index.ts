@@ -312,7 +312,9 @@ Rules (apply in order):
     );
     if (!verdict.ok && isStructuralFailure) {
       console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
-      const retryResp = await callModel('google/gemini-2.5-pro', 'retry', verdict.reason);
+      // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
+      // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
+      const retryResp = await callModel('google/gemini-2.5-flash', 'retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
         const retryCall = retryData.choices?.[0]?.message?.tool_calls?.[0];
