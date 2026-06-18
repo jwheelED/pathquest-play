@@ -149,8 +149,14 @@ export function stripLeadingFiller(text: string): string {
 // mid-sentence WH-words from a declarative paragraph ("…and how dangerous
 // certain components can be…") from triggering as questions.
 const CLAUSE_START = '(?:^|[.?!;]\\s+|^\\s*)';
+const WH_WORDS_P = '(what|why|how|when|where|who|whom|whose|which)';
+const INVERSION_AUX_P = '(do|does|did|is|are|was|were|am|can|could|would|should|will|shall|may|might|must|has|have|had)';
 export const TRIGGER_PATTERNS = [
-  new RegExp(`${CLAUSE_START}(what|why|how|when|where|who|whom|whose|which)\\b\\s+\\S+`, 'i'),
+  new RegExp(`${CLAUSE_START}${WH_WORDS_P}\\b\\s+\\S+`, 'i'),
+  // Cross-chunk premise/WH: ", what advantage does that give it?" — only
+  // when WH is followed by an inverted auxiliary within ~4 tokens, which
+  // distinguishes a real question from a declarative enumeration.
+  new RegExp(`,\\s+${WH_WORDS_P}\\b(?:\\s+\\S+){1,4}\\s+${INVERSION_AUX_P}\\b`, 'i'),
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
