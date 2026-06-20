@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -210,6 +212,34 @@ serve(async (req) => {
   }
 
   try {
+    // ── Auth: require instructor JWT to prevent anonymous AI cost abuse ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: isInstructor } = await adminClient.rpc("has_role", {
+      _user_id: claimsData.claims.sub,
+      _role: "instructor",
+    });
+    if (!isInstructor) {
+      return new Response(JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -304,13 +334,31 @@ serve(async (req) => {
       ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
       : "";
 
+    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
+
     // Build difficulty instructions
     let difficultyInstructions = "";
     const diffLevel = (difficulty_preference || "medium").toLowerCase();
     if (diffLevel === "easy") {
       difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the content.`;
     } else if (diffLevel === "hard") {
-      difficultyInstructions = `\nDIFFICULTY LEVEL: HARD - Generate a challenging question requiring analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.`;
+      difficultyInstructions = `
+DIFFICULTY LEVEL: HARD
+
+Question Stem Requirements:
+- Ask students to APPLY, ANALYZE, or EVALUATE — never just recall a definition.
+- Prefer "What would happen if...", "Why does X lead to Y rather than Z?", "Compare X and Y in the context of...", or "Which of these scenarios demonstrates [concept]?"
+- Require connecting TWO or more concepts from the ${groundingSource}.
+- Avoid questions answerable by someone who only memorized a glossary.
+- Frame questions around cause-effect reasoning, edge cases, predicting outcomes, or identifying exceptions.
+
+MCQ Distractor Requirements (when format is multiple_choice):
+- Each distractor must represent a SPECIFIC misconception or common student error.
+- Distractors should be plausible to someone who partially understands the material.
+- Match the length, detail, and grammatical structure of the correct answer.
+- NEVER use "All of the above", "None of the above", or vague fillers like "Not specified in lecture".
+- At least one distractor should be a "near-miss" — correct logic but wrong conclusion, or right concept applied to the wrong context.
+- At least one distractor should reflect a common confusion between similar terms or concepts from the ${groundingSource}.`;
     } else {
       difficultyInstructions = `\nDIFFICULTY LEVEL: MEDIUM - Generate a moderate question requiring understanding and application of concepts. Students should need to think about the content, not just recall it.`;
     }
@@ -326,8 +374,6 @@ serve(async (req) => {
     } else {
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
-
-    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
 
     const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from ${groundingSource}.
 
@@ -400,24 +446,16 @@ Generate ONE focused question that tests understanding of the most important con
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
+      const response = await callClaude({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: diffLevel === "hard" ? 0.5 : 0.7,
+        response_format: { type: "json_object" },
       });
 
+      // (kept for parity with previous timeout cleanup)
       clearTimeout(timeoutId);
 
       if (!response.ok) {

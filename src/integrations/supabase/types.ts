@@ -106,6 +106,44 @@ export type Database = {
           },
         ]
       }
+      admin_dashboard_presets: {
+        Row: {
+          admin_id: string
+          created_at: string
+          filters: Json
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          filters?: Json
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          filters?: Json
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_dashboard_presets_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_instructors: {
         Row: {
           admin_id: string
@@ -1728,6 +1766,47 @@ export type Database = {
             columns: ["question_id"]
             isOneToOne: false
             referencedRelation: "live_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_session_transcripts: {
+        Row: {
+          chunk_index: number
+          course_id: string | null
+          created_at: string
+          id: string
+          instructor_id: string
+          org_id: string | null
+          session_id: string
+          text: string
+        }
+        Insert: {
+          chunk_index: number
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          session_id: string
+          text: string
+        }
+        Update: {
+          chunk_index?: number
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          session_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_transcripts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -4194,6 +4273,7 @@ export type Database = {
           warning_triggered: boolean
         }[]
       }
+      admin_sync_org_members: { Args: never; Returns: Json }
       assign_oauth_role: {
         Args: {
           p_role: Database["public"]["Enums"]["app_role"]
@@ -4247,6 +4327,12 @@ export type Database = {
           total_questions_at_level: Json
         }[]
       }
+      get_admin_connected_instructors: {
+        Args: { _admin_id: string }
+        Returns: {
+          instructor_id: string
+        }[]
+      }
       get_current_usage: {
         Args: { p_instructor_id: string }
         Returns: {
@@ -4254,6 +4340,20 @@ export type Database = {
           minutes_used: number
           usage_percent: number
           warning_level: string
+        }[]
+      }
+      get_invited_org_names: {
+        Args: { _email: string }
+        Returns: {
+          org_id: string
+          org_name: string
+        }[]
+      }
+      get_org_codes: {
+        Args: { _org_id: string }
+        Returns: {
+          admin_code: string
+          instructor_invite_code: string
         }[]
       }
       get_problem_answer: {

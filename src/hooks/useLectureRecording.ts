@@ -8,6 +8,7 @@ import { playNotificationSound } from '@/lib/audioNotification';
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
+import { useQuestionTriggerCapture } from '@/hooks/useQuestionTriggerCapture';
 
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
@@ -203,16 +204,49 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    pendingCandidate: passivePendingCandidate,
+    pendingStartedAt: passivePendingStartedAt,
+    trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 8000,
-    minWordCount: 5,
+    minWordCount: 6,
+    minTranscriptConfidence: 0.8,
+    trailingSilenceMs: 1200,
     autoDismissMs: 60000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
+
+  // Trigger-based question capture — buffers multi-chunk questions
+  const {
+    feedChunk: feedTriggerChunk,
+    isCapturing: isTriggerCapturing,
+    resetCapture: resetTriggerCapture,
+    setOnCaptureComplete: setTriggerCaptureComplete,
+  } = useQuestionTriggerCapture({
+    cooldownMs: 12000,
+    silenceGapMs: 2500,
+    minSilenceMs: 1200,
+    bufferWindowMs: 60000,
+    lookbackMs: 30000,
+    maxBufferChars: 8000,
+  });
+
+  // Route trigger-captured questions into the same passive candidate pipeline
+  useEffect(() => {
+    setTriggerCaptureComplete((candidate) => {
+      console.log('🎯 Trigger capture emitted question:', candidate.text);
+      // Reset passive detection cooldown so it doesn't block follow-up retries
+      resetPassiveDetection?.();
+      // Prefer the trigger capture's own prior context; fall back to rolling buffer
+      const priorContext = candidate.priorContext || intervalTranscriptRef.current;
+      checkPassiveQuestion(candidate.text, priorContext);
+    });
+  }, [setTriggerCaptureComplete, checkPassiveQuestion, resetPassiveDetection]);
 
 
   // Deepgram streaming refs for real-time transcription
@@ -958,8 +992,14 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
-          // Passive question detection — check final utterances for ?
-          checkPassiveQuestion(cleanText);
+          // Trigger-based question capture only — interrogative trigger phrases.
+          // Bare question marks no longer fall back to passive detection
+          // (too many rhetorical asides were slipping through).
+          feedTriggerChunk(cleanText, Date.now());
+
+          // Notify passive detection that the instructor is still speaking — resets
+          // the trailing-silence timer on any pending candidate.
+          notifyPassiveSpeech();
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 
@@ -1369,6 +1409,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
     // Passive question detection
     passiveCandidate,
+    passivePendingCandidate,
+    passivePendingStartedAt,
+    passiveTrailingSilenceMs,
     passiveDetectionEnabled,
     setPassiveDetectionEnabled,
     dismissPassiveCandidate,

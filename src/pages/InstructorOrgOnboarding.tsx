@@ -147,13 +147,10 @@ export default function InstructorOrgOnboarding() {
                 </ul>
               </div>
 
-              <div className="pt-2 space-y-2">
+              <div className="pt-2">
                 <Button onClick={handleContinue} className="w-full">
-                  Continue Without Organization <ArrowRight className="w-4 h-4 ml-2" />
+                  Continue <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  You can connect to an organization later from your dashboard
-                </p>
               </div>
             </div>
           )}

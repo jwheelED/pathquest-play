@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +47,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text } = await req.json();
+    const { question_text, source_transcript, prior_context } = await req.json();
 
     if (!question_text || question_text.trim() === '') {
       return new Response(
@@ -60,48 +61,70 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log('Generating expected answer for question:', question_text.substring(0, 100));
+    const broadContext = (source_transcript || '').slice(-6000).trim();
+    const focusedContext = (prior_context || '').trim();
+    const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert educator. Generate a concise, ideal answer for the given question. This answer will be used as a grading reference for student responses. Keep it clear, accurate, and comprehensive but not overly long.`
-          },
-          {
-            role: 'user',
-            content: `Generate the expected/ideal answer for this question:\n\n${question_text}`
-          }
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'generate_expected_answer',
-              description: 'Generate an expected/ideal answer for a short answer question',
-              parameters: {
-                type: 'object',
-                properties: {
-                  expected_answer: {
-                    type: 'string',
-                    description: 'The ideal/expected answer that will be used as a grading reference'
-                  }
-                },
-                required: ['expected_answer'],
-                additionalProperties: false
-              }
+    const teachingContextBlock = hasAnyContext
+      ? [
+          focusedContext
+            ? `[MOST RECENT TEACHING — IMMEDIATELY BEFORE THE QUESTION]\n"${focusedContext}"`
+            : '',
+          broadContext
+            ? `[EARLIER LECTURE HISTORY]\n"${broadContext}"`
+            : '',
+        ].filter(Boolean).join('\n\n')
+      : '';
+
+    console.log('Generating expected answer for question:', question_text.substring(0, 100));
+    console.log(`Context received — broad=${broadContext.length} chars, focused=${focusedContext.length} chars`);
+
+    const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const response = await callClaude({
+      messages: [
+        {
+          role: 'system',
+          content: `Today's date is ${todayStr}. Your training data has a cutoff and may be out of date for time-sensitive facts (current officeholders, recent events, current prices, latest versions, sports champions, etc.). If the question asks about something that may have changed since your training cutoff, you MUST acknowledge uncertainty in the answer (e.g. "As of my last training data, X — please verify against current sources") rather than confidently asserting an outdated fact. When the teaching context provides the answer, ALWAYS prefer it over your own knowledge.
+
+You are an expert educator generating an ideal answer used as a grading reference. The answer must be SPECIFIC and FACTUALLY CORRECT — never vague.
+
+CRITICAL: Instructor questions are often SHORT and contain pronouns ("it", "this", "they", "that") that refer back to topics discussed earlier. You MUST resolve these pronouns using the TEACHING CONTEXT before answering.
+
+EXAMPLE:
+  Teaching context: "the mitochondria converts glucose into energy"
+  Instructor's question: "what does it produce?"
+  → Resolved: "What does the mitochondria produce?"
+  → Expected answer: "ATP (adenosine triphosphate) — the energy currency of the cell."
+
+If the teaching context explicitly states or implies the answer, quote/paraphrase it directly. Only fall back to general world knowledge if the lecture context truly does not address the question.`
+        },
+        {
+          role: 'user',
+          content: `${teachingContextBlock ? `=== TEACHING CONTEXT (background — earlier in the lecture) ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION ===\n"${question_text}"\n\nGenerate the ideal expected answer. Resolve any pronouns in the question using the teaching context first. The answer should be clear, specific, and factually correct so it can serve as a reliable grading reference.`
+        }
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'generate_expected_answer',
+            description: 'Generate an expected/ideal answer for a short answer question',
+            parameters: {
+              type: 'object',
+              properties: {
+                expected_answer: {
+                  type: 'string',
+                  description: 'The ideal/expected answer that will be used as a grading reference'
+                }
+              },
+              required: ['expected_answer'],
+              additionalProperties: false
             }
           }
-        ],
-        tool_choice: { type: 'function', function: { name: 'generate_expected_answer' } }
-      }),
+        }
+      ],
+      tool_choice: { type: 'function', function: { name: 'generate_expected_answer' } }
     });
 
     if (!response.ok) {

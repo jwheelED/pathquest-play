@@ -168,6 +168,44 @@ export default {
           "0%, 100%": { textShadow: "0 0 10px hsl(25 100% 50% / 0.6), 0 0 25px hsl(0 100% 50% / 0.4)" },
           "50%": { textShadow: "0 0 25px hsl(25 100% 50% / 0.8), 0 0 40px hsl(0 100% 50% / 0.6)" },
         },
+        // Edvana celebration
+        "edvana-pulse-1": {
+          "0%": { transform: "translate(-50%, -50%) scale(0.4)", opacity: "0.85" },
+          "100%": { transform: "translate(-50%, -50%) scale(1.8)", opacity: "0" },
+        },
+        "edvana-pulse-2": {
+          "0%": { transform: "translate(-50%, -50%) scale(0.4)", opacity: "0.6" },
+          "100%": { transform: "translate(-50%, -50%) scale(2.2)", opacity: "0" },
+        },
+        "edvana-pulse-3": {
+          "0%": { transform: "translate(-50%, -50%) scale(0.5)", opacity: "0.5" },
+          "100%": { transform: "translate(-50%, -50%) scale(2.6)", opacity: "0" },
+        },
+        "edvana-rise": {
+          "0%": { transform: "translateY(14px) scale(0.85)", opacity: "0" },
+          "55%": { transform: "translateY(-4px) scale(1.04)", opacity: "1" },
+          "100%": { transform: "translateY(0) scale(1)", opacity: "1" },
+        },
+        "edvana-spin-soft": {
+          "0%, 100%": { transform: "rotate(0deg) scale(1)" },
+          "50%": { transform: "rotate(8deg) scale(1.05)" },
+        },
+        "edvana-breath": {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.85" },
+          "50%": { transform: "scale(1.04)", opacity: "1" },
+        },
+        "edvana-spark-1": {
+          "0%": { transform: "translate(-50%, -50%) translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { transform: "translate(-50%, -50%) translate(120px, -90px) scale(0)", opacity: "0" },
+        },
+        "edvana-spark-2": {
+          "0%": { transform: "translate(-50%, -50%) translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { transform: "translate(-50%, -50%) translate(-110px, -70px) scale(0)", opacity: "0" },
+        },
+        "edvana-spark-3": {
+          "0%": { transform: "translate(-50%, -50%) translate(0, 0) scale(1)", opacity: "1" },
+          "100%": { transform: "translate(-50%, -50%) translate(60px, 110px) scale(0)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -187,6 +225,16 @@ export default {
         "xp-complete": "xp-complete 0.4s ease-out",
         "text-glow-gold": "text-glow-gold 1.5s ease-in-out infinite",
         "text-glow-fire": "text-glow-fire 1.2s ease-in-out infinite",
+        // Edvana celebration
+        "edvana-pulse-1": "edvana-pulse-1 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "edvana-pulse-2": "edvana-pulse-2 1.7s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "edvana-pulse-3": "edvana-pulse-3 2s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "edvana-rise": "edvana-rise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        "edvana-spin-soft": "edvana-spin-soft 1.6s ease-in-out",
+        "edvana-breath": "edvana-breath 1.6s ease-in-out infinite",
+        "edvana-spark-1": "edvana-spark-1 1.2s ease-out forwards",
+        "edvana-spark-2": "edvana-spark-2 1.4s ease-out 0.1s forwards",
+        "edvana-spark-3": "edvana-spark-3 1.3s ease-out 0.15s forwards",
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",

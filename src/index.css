@@ -50,8 +50,8 @@
     --accent: 160 40% 92%;
     --accent-foreground: 220 25% 15%;
 
-    --border: 200 25% 88%;
-    --input: 200 25% 88%;
+    --border: 200 15% 58%;
+    --input: 200 15% 58%;
     --ring: 160 84% 39%;
 
     --radius: 1.5rem;
@@ -111,7 +111,7 @@
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 200 30% 95%;
     --sidebar-accent-foreground: 220 25% 15%;
-    --sidebar-border: 200 25% 90%;
+    --sidebar-border: 200 15% 62%;
     --sidebar-ring: 160 84% 39%;
   }
 
@@ -156,8 +156,8 @@
     --destructive: 0 84% 65%;
     --destructive-foreground: 220 30% 8%;
 
-    --border: 220 20% 22%;
-    --input: 220 20% 22%;
+    --border: 220 15% 45%;
+    --input: 220 15% 45%;
     --ring: 160 70% 45%;
 
     /* Headspace dark colors - Emerald & Sky Blue */
@@ -174,7 +174,7 @@
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 20% 18%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 220 20% 22%;
+    --sidebar-border: 220 15% 45%;
     --sidebar-ring: 160 70% 45%;
   }
   
@@ -216,15 +216,21 @@
     @apply bg-card/95 backdrop-blur-2xl border border-border/80;
   }
 
-  /* Headspace-style card */
+  /* Headspace-style card - Updated for premium feel */
   .headspace-card {
-    @apply bg-card rounded-3xl border-0 shadow-lg transition-all duration-300;
-    box-shadow: 0 4px 20px -4px hsl(220 25% 15% / 0.08);
+    @apply bg-white rounded-2xl transition-all duration-200;
+    border: 1px solid hsl(220 15% 91%);
+    box-shadow: 0 1px 3px 0 hsl(220 20% 10% / 0.03), 0 1px 2px -1px hsl(220 20% 10% / 0.03);
   }
 
   .headspace-card:hover {
-    box-shadow: 0 8px 30px -6px hsl(220 25% 15% / 0.12);
-    transform: translateY(-2px);
+    box-shadow: 0 4px 12px -2px hsl(220 20% 10% / 0.06), 0 2px 4px -2px hsl(220 20% 10% / 0.03);
+  }
+
+  .dark .headspace-card {
+    @apply bg-card;
+    border-color: hsl(220 20% 22%);
+    box-shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.2);
   }
 
   /* Bento card styles - Updated for Headspace */
@@ -237,9 +243,9 @@
     transform: translateY(-1px);
   }
 
-  /* Headspace background */
+  /* Headspace background - Premium neutral */
   .headspace-bg {
-    background: linear-gradient(180deg, hsl(199 85% 82%), hsl(199 80% 90%));
+    background: hsl(40 20% 97%);
   }
 
   .dark .headspace-bg {
@@ -631,14 +637,161 @@
   transform: scale(1.05);
 }
 
-/* Mastery Background - Dark optimized */
+/* Mastery Background - Premium Command Center */
 .mastery-bg {
   @apply min-h-screen;
-  background: linear-gradient(180deg, hsl(199 85% 82%), hsl(199 80% 90%));
+  background: hsl(40 20% 97%);
 }
 
-  .dark .mastery-bg {
+.dark .mastery-bg {
   background: linear-gradient(180deg, hsl(220 30% 6%), hsl(220 28% 10%));
+}
+
+/* ============================================
+   COMMAND CENTER - Premium Dashboard Design
+   ============================================ */
+
+/* Premium card system */
+.command-card {
+  @apply bg-white rounded-2xl transition-all duration-200;
+  border: 1px solid hsl(220 15% 91%);
+  box-shadow: 0 1px 3px 0 hsl(220 20% 10% / 0.03), 0 1px 2px -1px hsl(220 20% 10% / 0.03);
+}
+
+.command-card:hover {
+  box-shadow: 0 4px 12px -2px hsl(220 20% 10% / 0.06), 0 2px 4px -2px hsl(220 20% 10% / 0.03);
+}
+
+.dark .command-card {
+  @apply bg-card;
+  border-color: hsl(220 20% 22%);
+  box-shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.2);
+}
+
+/* Command strip hero */
+.command-hero {
+  @apply bg-white rounded-2xl;
+  border: 1px solid hsl(220 15% 91%);
+  box-shadow: 0 2px 8px -2px hsl(220 20% 10% / 0.05), 0 4px 16px -4px hsl(220 20% 10% / 0.04);
+}
+
+.dark .command-hero {
+  @apply bg-card;
+  border-color: hsl(220 20% 22%);
+}
+
+/* Signal card - for live understanding health */
+.signal-card {
+  @apply bg-white rounded-xl transition-all duration-200;
+  border: 1px solid hsl(220 15% 92%);
+  box-shadow: 0 1px 2px 0 hsl(220 20% 10% / 0.02);
+}
+
+.signal-card:hover {
+  border-color: hsl(220 15% 88%);
+  box-shadow: 0 2px 8px -2px hsl(220 20% 10% / 0.05);
+}
+
+.dark .signal-card {
+  @apply bg-card;
+  border-color: hsl(220 20% 22%);
+}
+
+/* Premium section eyebrow */
+.section-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: hsl(160 50% 38%);
+}
+
+/* Premium section headline */
+.section-headline {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: hsl(220 20% 18%);
+}
+
+.dark .section-headline {
+  color: hsl(0 0% 95%);
+}
+
+/* Charcoal text palette */
+.text-charcoal {
+  color: hsl(220 20% 18%);
+}
+
+.text-charcoal-muted {
+  color: hsl(220 12% 45%);
+}
+
+.text-charcoal-subtle {
+  color: hsl(220 10% 55%);
+}
+
+.dark .text-charcoal {
+  color: hsl(0 0% 95%);
+}
+
+.dark .text-charcoal-muted {
+  color: hsl(220 10% 65%);
+}
+
+.dark .text-charcoal-subtle {
+  color: hsl(220 8% 55%);
+}
+
+/* Live badge pulse */
+@keyframes live-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.live-badge {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+/* Dark mode for live badge */
+.dark .live-badge {
+  background-color: hsl(160 30% 20%);
+  color: hsl(160 60% 70%);
+  border-color: hsl(160 40% 30%);
+}
+
+/* Dark mode for signal card */
+.dark .signal-card:hover {
+  border-color: hsl(220 20% 28%);
+}
+
+/* Teal/Emerald accent system */
+.accent-teal {
+  color: hsl(160 50% 38%);
+}
+
+.accent-teal-bg {
+  background-color: hsl(160 45% 96%);
+}
+
+.accent-teal-border {
+  border-color: hsl(160 40% 88%);
+}
+
+.dark .accent-teal {
+  color: hsl(160 55% 55%);
+}
+
+.dark .accent-teal-bg {
+  background-color: hsl(160 30% 15%);
+}
+
+.dark .accent-teal-border {
+  border-color: hsl(160 30% 25%);
 }
 
 /* ============================================

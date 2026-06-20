@@ -32,7 +32,8 @@ export function PendingOrgInvites() {
       const { data, error } = await supabase
         .from("instructor_invites")
         .select("id, org_id, email, status, created_at")
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .eq("email", user.email.toLowerCase());
 
       if (error) throw error;
       if (!data || data.length === 0) {
@@ -41,19 +42,22 @@ export function PendingOrgInvites() {
         return;
       }
 
-      // Fetch org names
-      const orgIds = [...new Set(data.map(i => i.org_id))];
-      const { data: orgs } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .in("id", orgIds);
+      // Resolve org names via SECURITY DEFINER RPC — instructors don't yet
+      // belong to the org, so a direct SELECT on organizations is blocked by RLS.
+      const { data: orgRows } = await supabase.rpc("get_invited_org_names", {
+        _email: user.email,
+      });
 
-      const orgMap = new Map(orgs?.map(o => [o.id, o.name]) || []);
+      const orgMap = new Map(
+        (orgRows || []).map((o: { org_id: string; org_name: string }) => [o.org_id, o.org_name])
+      );
 
-      setInvites(data.map(i => ({
-        ...i,
-        org_name: orgMap.get(i.org_id) || "Unknown Organization",
-      })));
+      // Drop invites we can't name rather than showing "Unknown Organization".
+      const named = data
+        .map(i => ({ ...i, org_name: orgMap.get(i.org_id) }))
+        .filter((i): i is Invite & { org_name: string } => Boolean(i.org_name));
+
+      setInvites(named);
     } catch (error) {
       console.error("Error fetching invites:", error);
     } finally {
@@ -83,30 +87,22 @@ export function PendingOrgInvites() {
 
       if (profileError) throw profileError;
 
-      // Find an admin from this org and create connection
-      const { data: adminProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", invite.org_id)
-        .limit(10);
+      // Connect this instructor to EVERY admin in the org so all admins see them.
+      const { data: orgAdmins } = await supabase
+        .from("user_roles")
+        .select("user_id, profiles!inner(org_id)")
+        .eq("role", "admin")
+        .eq("profiles.org_id", invite.org_id);
 
-      if (adminProfile) {
-        for (const profile of adminProfile) {
-          const { data: isAdmin } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", profile.id)
-            .eq("role", "admin")
-            .maybeSingle();
-
-          if (isAdmin) {
-            await supabase
-              .from("admin_instructors")
-              .insert({ admin_id: profile.id, instructor_id: user.id, org_id: invite.org_id })
-              .select();
-            break;
-          }
-        }
+      if (orgAdmins && orgAdmins.length > 0) {
+        await supabase.from("admin_instructors").upsert(
+          orgAdmins.map((a: any) => ({
+            admin_id: a.user_id,
+            instructor_id: user.id,
+            org_id: invite.org_id,
+          })),
+          { onConflict: "admin_id,instructor_id", ignoreDuplicates: true }
+        );
       }
 
       setInvites(prev => prev.filter(i => i.id !== invite.id));

@@ -1,9 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { HelmetProvider } from 'react-helmet-async'
 import posthog from 'posthog-js'
 import * as Sentry from "@sentry/react";
 import './index.css'
 import App from './App.tsx'
+
 
 // 1. Initialize PostHog (global instance — no React provider needed)
 posthog.init('phc_vRUtKXaLgYpSzc9H4jOmN2fsc72gn39wsRDx0IZspxq', {
@@ -34,6 +36,8 @@ Sentry.init({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <HelmetProvider>
+      <App />
+    </HelmetProvider>
   </StrictMode>
 )

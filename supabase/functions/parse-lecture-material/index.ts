@@ -169,6 +169,26 @@ serve(async (req) => {
   }
 
   try {
+    // ── Auth: require authenticated user ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const userId = claimsData.claims.sub as string;
+
     const { filePath, saveToDb } = await req.json();
 
     if (!filePath || typeof filePath !== "string") {
@@ -178,10 +198,26 @@ serve(async (req) => {
       );
     }
 
+    // Enforce ownership: lecture-materials paths are stored as `${user_id}/...`
+    const firstSegment = filePath.split("/")[0];
+    if (firstSegment !== userId) {
+      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+      const { data: isInstructor } = await supabaseAdmin.rpc("has_role", {
+        _user_id: userId,
+        _role: "instructor",
+      });
+      // Only allow instructors to access files they own; deny everything else.
+      if (!isInstructor) {
+        return new Response(JSON.stringify({ error: "Forbidden" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      // Even instructors must own the path
+      return new Response(JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     console.log("📄 Parsing material:", filePath);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Download the file from storage

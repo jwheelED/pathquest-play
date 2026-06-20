@@ -1,7 +1,12 @@
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Invariants enforced by src/lib/__tests__/validation.test.ts and
+// src/components/__tests__/ProtectedRoute.test.tsx.
+// Before editing: read CRITICAL_PATHS.md §1. After editing: run `bun run test:auth`.
 "use client";
 
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { studentSignUpSchema, signInSchema } from "@/lib/validation";
@@ -21,6 +26,7 @@ export default function AuthPage() {
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isHandlingAuthRef = useRef(false);
+  const hasResolvedRef = useRef(false);
 
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(window.location.search);
@@ -44,24 +50,45 @@ export default function AuthPage() {
     } else {
       setSuccess("Password updated successfully!");
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();
     }
   };
 
-  // Helper to navigate user to the correct dashboard based on their role
+  // Helper to navigate user to the correct dashboard based on their role + onboarding state
   const navigateByRole = async (userId: string) => {
     // Check roles in order of priority: admin > instructor > student
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: userId, _role: 'admin' });
     if (isAdmin) {
-      navigate("/admin/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.org_id && profile?.onboarded) {
+        navigate("/admin/dashboard");
+      } else {
+        navigate("/admin/onboarding");
+      }
       return;
     }
 
     const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: userId, _role: 'instructor' });
     if (isInstructor) {
-      navigate("/instructor/dashboard");
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, onboarded')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile?.onboarded === true) {
+        navigate("/instructor/dashboard");
+      } else if (!profile?.org_id) {
+        navigate("/instructor/onboarding");
+      } else {
+        navigate("/instructor/onboarding");
+      }
       return;
     }
 
@@ -80,116 +107,114 @@ export default function AuthPage() {
     setSuccess("");
     isHandlingAuthRef.current = true;
 
-    if (isSignUp) {
-      // Validate student signup inputs
-      const validationResult = studentSignUpSchema.safeParse({
-        email: email.trim(),
-        password,
-        name: name.trim(),
-        instructorCode: '' // Not collected during auth
-      });
+    try {
+      if (isSignUp) {
+        // Validate student signup inputs
+        const validationResult = studentSignUpSchema.safeParse({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          instructorCode: '' // Not collected during auth
+        });
 
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        setError(firstError.message);
-        toast.error(firstError.message);
-        return;
-      }
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          setError(firstError.message);
+          toast.error(firstError.message);
+          return;
+        }
 
-      const validData = validationResult.data;
+        const validData = validationResult.data;
 
-      const { data, error } = await supabase.auth.signUp({
-        email: validData.email,
-        password: validData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
-          data: {
-            full_name: validData.name
+        const { data, error } = await supabase.auth.signUp({
+          email: validData.email,
+          password: validData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`,
+            data: {
+              full_name: validData.name
+            }
           }
-        }
-      });
-
-      if (error) {
-        // Check if user already exists
-        if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
-          setError('This email is already registered. Please sign in instead.');
-          toast.error('This email is already registered. Please sign in instead.');
-        } else {
-          setError(error.message);
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      const user = data.user;
-      if (user) {
-        // Create user profile with onboarded set to true
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: user.id,
-          full_name: validData.name,
-          onboarded: true, // Student is onboarded immediately
         });
 
-        // Create user stats for gamification (no org_id initially)
-        const { error: statsError } = await supabase.from("user_stats").insert({
-          user_id: user.id,
-          org_id: null,
-        });
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
+        if (error) {
+          // Check if user already exists
+          if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('user already exists')) {
+            setError('This email is already registered. Please sign in instead.');
+            toast.error('This email is already registered. Please sign in instead.');
+          } else {
+            setError(error.message);
+            toast.error(error.message);
+          }
+          return;
         }
-        if (statsError) {
-          console.error("Stats creation error:", statsError);
-        }
-        
-        setSuccess("Account created! Please check your email to confirm your account.");
-        toast.success("Account created! Check your email to confirm before signing in.");
-        setIsSignUp(false); // Switch to sign-in mode
-      }
-    } else {
-      // Validate sign-in inputs
-      const validationResult = signInSchema.safeParse({
-        email: email.trim(),
-        password
-      });
 
-      if (!validationResult.success) {
-        const firstError = validationResult.error.errors[0];
-        setError(firstError.message);
-        toast.error(firstError.message);
-        return;
-      }
+        const user = data.user;
+        if (user) {
+          // Profile is created by the handle_new_user trigger (with onboarded=true
+          // from user_metadata). Do NOT upsert from the client — it races with the
+          // trigger and overwrites trigger-managed fields.
 
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: validationResult.data.email, 
-        password: validationResult.data.password 
-      });
+          // user_stats may also be created by the trigger; use upsert to avoid 23505 collisions.
+          const { error: statsError } = await supabase
+            .from("user_stats")
+            .upsert({ user_id: user.id, org_id: null }, { onConflict: "user_id", ignoreDuplicates: true });
+          if (statsError) {
+            console.error("Stats creation error:", statsError);
+          }
 
-      if (error) {
-        // Check for email not confirmed error
-        if (error.message.toLowerCase().includes('email not confirmed') || 
-            error.message.toLowerCase().includes('verify your email')) {
-          setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-          toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
-        } else if (error.message.toLowerCase().includes('invalid login credentials')) {
-          // Could be wrong password OR unconfirmed email
-          setError('Invalid email or password. If you just signed up, please confirm your email first.');
-          toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
-        } else {
-          setError(error.message);
-          toast.error(error.message);
+          setSuccess("Account created! Please check your email to confirm your account.");
+          toast.success("Account created! Check your email to confirm before signing in.");
+          setIsSignUp(false); // Switch to sign-in mode
         }
       } else {
-        setSuccess("Signed in successfully!");
-        // If there's a redirect (e.g. from live session), go there
-        if (redirectTo) {
-          navigate(redirectTo);
+        // Validate sign-in inputs
+        const validationResult = signInSchema.safeParse({
+          email: email.trim(),
+          password
+        });
+
+        if (!validationResult.success) {
+          const firstError = validationResult.error.errors[0];
+          setError(firstError.message);
+          toast.error(firstError.message);
+          return;
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email: validationResult.data.email, 
+          password: validationResult.data.password 
+        });
+
+        if (error) {
+          // Check for email not confirmed error
+          if (error.message.toLowerCase().includes('email not confirmed') || 
+              error.message.toLowerCase().includes('verify your email')) {
+            setError('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+            toast.error('Please confirm your email before signing in. Check your inbox for the confirmation link.');
+          } else if (error.message.toLowerCase().includes('invalid login credentials')) {
+            // Could be wrong password OR unconfirmed email
+            setError('Invalid email or password. If you just signed up, please confirm your email first.');
+            toast.error('Invalid email or password. If you just signed up, please confirm your email first.');
+          } else {
+            setError(error.message);
+            toast.error(error.message);
+          }
         } else {
-          // Navigate based on user role
-          await navigateByRole(data.user.id);
+          setSuccess("Signed in successfully!");
+          // If there's a redirect (e.g. from live session), go there
+          if (redirectTo) {
+            navigate(redirectTo);
+          } else {
+            // Navigate based on user role
+            await navigateByRole(data.user.id);
+          }
         }
       }
+    } finally {
+      // Hold the lock briefly so the async SIGNED_IN listener (which fires after
+      // signInWithPassword resolves) sees it as still set and skips a duplicate navigate.
+      setTimeout(() => { isHandlingAuthRef.current = false; }, 1500);
     }
   };
 
@@ -265,34 +290,41 @@ export default function AuthPage() {
           return;
         }
 
+        // Single-resolve guard: an OAuth callback can produce both INITIAL_SESSION
+        // and SIGNED_IN; without this, initializeUser + navigateByRole runs twice.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
+
         const initializeUser = async () => {
-          // Ensure profile exists with onboarded true
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("id, onboarded")
-            .eq("id", session.user.id)
-            .maybeSingle();
+          // Only auto-provision/onboard student-role users here. Instructors and
+          // admins have their own onboarding flows and must not be marked onboarded
+          // by this generic path (would skip /instructor/onboarding etc.).
+          const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' });
+          const { data: isInstructor } = await supabase.rpc('has_role', { _user_id: session.user.id, _role: 'instructor' });
+          const isStudent = !isAdmin && !isInstructor;
 
-          if (!profile) {
-            // Create profile for OAuth users
-            await supabase.from("profiles").upsert({
-              id: session.user.id,
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
-              onboarded: true,
-            });
+          if (isStudent) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("id, onboarded")
+              .eq("id", session.user.id)
+              .maybeSingle();
 
-            // Create user stats
-            await supabase.from("user_stats").insert({
-              user_id: session.user.id,
-              org_id: null,
-            }).then(() => {
-              // Errors are OK here - record might already exist
-            });
-          } else if (!profile.onboarded) {
-            await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+            if (!profile) {
+              await supabase.from("profiles").upsert({
+                id: session.user.id,
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "Student",
+                onboarded: true,
+              });
+
+              await supabase
+                .from("user_stats")
+                .upsert({ user_id: session.user.id, org_id: null }, { onConflict: "user_id", ignoreDuplicates: true });
+            } else if (!profile.onboarded) {
+              await supabase.from("profiles").update({ onboarded: true }).eq("id", session.user.id);
+            }
           }
 
-          // Navigate based on user role
           await navigateByRole(session.user.id);
         };
 
@@ -306,6 +338,15 @@ export default function AuthPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12" style={{ background: 'hsl(210, 20%, 98%)' }}>
+      <Helmet>
+        <title>Sign in to Edvana — student & instructor login</title>
+        <meta name="description" content="Sign in or create your Edvana account to join live sessions, run AI check-ins, and track learning progress in real time." />
+        <link rel="canonical" href="https://edvana.dev/auth" />
+        <meta property="og:title" content="Sign in to Edvana" />
+        <meta property="og:description" content="Access your Edvana account to join live sessions and track learning." />
+        <meta property="og:url" content="https://edvana.dev/auth" />
+      </Helmet>
+      <h1 className="sr-only">Sign in to Edvana</h1>
       {/* Ambient glows */}
       <div className="absolute top-[-15%] right-[25%] w-[450px] h-[450px] rounded-full opacity-[0.05] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 84%, 42%), transparent 70%)' }} />
       <div className="absolute bottom-[-10%] left-[30%] w-[350px] h-[350px] rounded-full opacity-[0.035] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(199, 89%, 60%), transparent 70%)' }} />
@@ -365,9 +406,44 @@ export default function AuthPage() {
               {/* Header */}
               <div className="text-center pb-1">
                 <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                  {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Sign in to your account"}
+                  {isResetMode ? "Reset your password" : isSignUp ? "Create an account" : "Welcome back"}
                 </h2>
+                {!isResetMode && (
+                  <p className="text-[13px] text-muted-foreground/70 mt-1.5">
+                    {isSignUp ? "Sign up to start learning" : "Sign in to continue"}
+                  </p>
+                )}
               </div>
+
+              {/* Prominent Sign In / Sign Up tab toggle */}
+              {!isResetMode && (
+                <div role="tablist" aria-label="Authentication mode" className="grid grid-cols-2 gap-1 p-1 bg-muted/50 border border-border/50 rounded-[10px]">
+                  <button
+                    role="tab"
+                    aria-selected={!isSignUp}
+                    onClick={() => { setIsSignUp(false); setError(""); setSuccess(""); }}
+                    className={`h-9 rounded-[7px] text-[13px] font-semibold transition-all ${
+                      !isSignUp
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={isSignUp}
+                    onClick={() => { setIsSignUp(true); setError(""); setSuccess(""); }}
+                    className={`h-9 rounded-[7px] text-[13px] font-semibold transition-all ${
+                      isSignUp
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Create account
+                  </button>
+                </div>
+              )}
 
               {error && <div role="alert" className="text-destructive text-[13px] leading-snug">{error}</div>}
               {success && <div role="status" className="text-primary text-[13px] leading-snug">{success}</div>}
@@ -471,15 +547,6 @@ export default function AuthPage() {
                     Continue with Google
                   </button>
 
-                  <p className="text-[13px] text-center text-muted-foreground/70 pt-1">
-                    {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-                    <button
-                      onClick={() => setIsSignUp(!isSignUp)}
-                      className="text-primary/80 hover:text-primary hover:underline font-medium transition-colors"
-                    >
-                      {isSignUp ? "Sign In" : "Sign Up"}
-                    </button>
-                  </p>
                 </>
               )}
 

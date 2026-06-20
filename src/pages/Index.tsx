@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { Menu, X, ChevronDown } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
+
 
 const NAV_ITEMS = ["Product", "How It Works", "Use Cases", "Results", "Demo"];
 
@@ -103,6 +105,14 @@ const Index = () => {
 
   return (
     <div className="landing-page min-h-screen">
+      <Helmet>
+        <title>Edvana — Live Understanding Copilot for instructors</title>
+        <meta name="description" content="Edvana captures every lecture, asks AI-generated check-ins in real time, and shows instructors who's keeping up — so no student falls behind." />
+        <link rel="canonical" href="https://edvana.dev/" />
+        <meta property="og:title" content="Edvana — Live Understanding Copilot for instructors" />
+        <meta property="og:description" content="Capture lectures, run AI check-ins, and see who's keeping up — live." />
+        <meta property="og:url" content="https://edvana.dev/" />
+      </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
       <header
         className="sticky top-0 z-50 backdrop-blur-xl"
@@ -119,8 +129,12 @@ const Index = () => {
           >
             <img
               src={edvanaLogo}
-              alt="Edvana"
-              className="h-7 transition-transform hover:scale-105"
+              alt="Edvana - Live Understanding Copilot"
+              width={140}
+              height={28}
+              fetchPriority="high"
+              decoding="async"
+              className="h-7 w-auto transition-transform hover:scale-105"
             />
           </div>
 
@@ -1089,7 +1103,8 @@ const Index = () => {
               </h4>
               <ul className="space-y-2.5">
                 {[
-                  { label: "About", action: () => scrollToSection("hero") },
+                  { label: "About", action: () => navigate("/accessibility") },
+                  { label: "Accessibility", action: () => navigate("/accessibility") },
                   { label: "Contact", action: handleContact },
                   { label: "Privacy", action: () => navigate("/privacy") },
                   { label: "Terms", action: () => navigate("/terms") },
