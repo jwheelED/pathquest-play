@@ -2,6 +2,11 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { callClaude } from "../_shared/anthropic.ts";
+import { summarizeDelivery } from "../_shared/deliveryVerification.ts";
+import { initSentry, capturePartialDelivery } from "../_shared/sentry.ts";
+
+// Initialize Sentry once at cold start (no-op unless SENTRY_DSN is set).
+initSentry();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1163,7 +1168,6 @@ serve(async (req) => {
     const batchEndTime = Date.now();
     const batchTime = batchEndTime - batchStartTime;
     const processingTime = batchEndTime - startTime;
-    const wasSuccessful = successCount > 0;
 
     // Performance logging: Complete breakdown
     console.log(`⏱️ Performance breakdown:
@@ -1174,7 +1178,60 @@ serve(async (req) => {
 
     console.log(`✅ Questions sent: ${successCount}/${studentIds.length} students in ${processingTime}ms`);
 
-    // Log to question_send_logs for monitoring
+    // CRITICAL: Verify delivery across the ENTIRE cohort (not just the first
+    // 10). Every row we just inserted carries this idempotency_key, so one query
+    // tells us exactly who landed. (Caveat: idempotency_key still lives in the
+    // `content` JSON — see BE-AP-5 — so `.contains` is unindexed; acceptable
+    // until that key is promoted to its own column.)
+    let verified = {
+      expected: studentIds.length,
+      delivered: successCount,
+      missing: [] as string[],
+      complete: failedStudents.length === 0,
+    };
+
+    const { data: deliveredRows, error: deliveryError } = await supabase
+      .from("student_assignments")
+      .select("student_id")
+      .eq("instructor_id", user.id)
+      .contains("content", { idempotency_key: idempotencyKey });
+
+    if (deliveryError) {
+      console.error("❌ Delivery verification query failed:", deliveryError);
+    } else {
+      verified = summarizeDelivery(
+        studentIds,
+        (deliveredRows ?? []).map((r) => r.student_id),
+      );
+      console.log(
+        `🔍 Delivery verified: ${verified.delivered}/${verified.expected} students` +
+          (verified.complete ? " ✅" : ` ⚠️ ${verified.missing.length} missing`),
+      );
+
+      if (!verified.complete) {
+        const missingSample = verified.missing.slice(0, 20);
+        // Structured so it's greppable in logs even without Sentry.
+        console.error("⚠️ partial_failure — students missing their assignment:", {
+          instructor_id: user.id,
+          idempotency_key: idempotencyKey,
+          expected: verified.expected,
+          delivered: verified.delivered,
+          missing_count: verified.missing.length,
+          missing_sample: missingSample,
+        });
+        capturePartialDelivery({
+          instructor_id: user.id,
+          idempotency_key: idempotencyKey,
+          expected: verified.expected,
+          delivered: verified.delivered,
+          missing_count: verified.missing.length,
+          missing_sample: missingSample,
+          session_code: liveSession?.session_code ?? null,
+        });
+      }
+    }
+
+    // Log to question_send_logs for monitoring — using the VERIFIED counts.
     try {
       // Convert question_text to string for logging if it's an object
       const questionTextForLog =
@@ -1187,46 +1244,18 @@ serve(async (req) => {
         question_text: questionTextForLog,
         question_type: finalType,
         source: source,
-        success: wasSuccessful,
-        error_message: failedStudents.length > 0 ? `${failedStudents.length} students failed` : null,
-        error_type: failedStudents.length > 0 ? "partial_failure" : null,
-        student_count: studentIds.length,
-        successful_sends: successCount,
-        failed_sends: failedStudents.length,
+        success: verified.delivered > 0,
+        error_message: verified.complete ? null : `${verified.missing.length} students missing their assignment`,
+        error_type: verified.complete ? null : "partial_failure",
+        student_count: verified.expected,
+        successful_sends: verified.delivered,
+        failed_sends: verified.missing.length,
         batch_count: batches.length,
         processing_time_ms: processingTime,
       });
     } catch (logError) {
       console.error("Failed to log question send:", logError);
       // Don't fail the request if logging fails
-    }
-
-    // CRITICAL: Verify delivery immediately after sending
-    console.log("🔍 Verifying delivery for students:", studentIds.slice(0, 3), "...");
-    const { data: deliveryCheck, error: deliveryError } = await supabase
-      .from("student_assignments")
-      .select("id, student_id")
-      .eq("instructor_id", user.id)
-      .contains("content", { idempotency_key: idempotencyKey })
-      .in("student_id", studentIds.slice(0, 10)); // Check first 10 students
-
-    if (deliveryError) {
-      console.error("❌ Delivery verification failed:", deliveryError);
-    } else {
-      console.log("✅ Delivery verified:", {
-        expected: Math.min(10, studentIds.length),
-        actual: deliveryCheck?.length || 0,
-        student_ids: deliveryCheck?.map((d) => d.student_id).slice(0, 5),
-      });
-
-      // Log any discrepancies
-      if (deliveryCheck && deliveryCheck.length < Math.min(10, studentIds.length)) {
-        console.warn("⚠️ Delivery mismatch:", {
-          expected_students: studentIds.slice(0, 10),
-          delivered_to: deliveryCheck.map((d) => d.student_id),
-          missing_count: Math.min(10, studentIds.length) - deliveryCheck.length,
-        });
-      }
     }
 
     // Broadcast notification via Supabase Realtime for instant delivery
