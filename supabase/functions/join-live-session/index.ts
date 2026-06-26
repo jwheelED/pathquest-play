@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { checkJoinRateLimit, type RateState } from "../_shared/joinRateLimit.ts";
+import { createLogger } from "../_shared/log.ts";
+import { initSentry } from "../_shared/sentry.ts";
+
+// Initialize Sentry once at cold start (no-op unless SENTRY_DSN is set).
+initSentry();
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,15 +39,21 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const startedAt = Date.now();
+  const clientIP = getClientIP(req);
+  // Request-scoped structured logger. Every line carries this request_id so a
+  // single join can be traced end-to-end (BE-AP-13). Never log the nickname or
+  // other potentially-sensitive content.
+  const log = createLogger({ operation: 'join-live-session', client_ip: clientIP });
+
   try {
     // 1) Rate-limit by IP before doing any DB work.
-    const clientIP = getClientIP(req);
     const rate = checkJoinRateLimit(joinRateStore, clientIP, Date.now(), {
       maxPerWindow: MAX_JOINS_PER_IP,
       windowMs: JOIN_WINDOW_MS,
     });
     if (!rate.allowed) {
-      console.warn(`⛔ Join rate limit exceeded for IP: ${clientIP}`);
+      log.warn('join rate limit exceeded', { error_category: 'rate_limited', success: false });
       return new Response(
         JSON.stringify({ error: 'Too many join attempts. Please wait a moment and try again.' }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,6 +67,7 @@ Deno.serve(async (req) => {
     const { sessionCode, nickname } = await req.json();
 
     if (!sessionCode || !nickname || !nickname.trim()) {
+      log.info('join rejected: missing fields', { error_category: 'bad_request', success: false });
       return new Response(
         JSON.stringify({ error: 'sessionCode and nickname are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -75,7 +87,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (sessionError) {
-      console.error('Error finding session:', sessionError);
+      log.error('session lookup failed', { error_category: 'db_session_lookup', success: false });
       return new Response(
         JSON.stringify({ error: 'Failed to find session' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -83,16 +95,21 @@ Deno.serve(async (req) => {
     }
 
     if (!session) {
+      log.info('join rejected: session not found', { error_category: 'not_found', success: false });
       return new Response(
         JSON.stringify({ error: 'Session not found. Check the code and try again.' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Bind the session id so the rest of this flow is correlated to it.
+    const slog = log.child({ session_id: session.id });
+
     // Honor both the explicit active flag and the expiry timestamp so a stale
     // code can't be used after the session window closes (expiring codes).
     const expired = session.ends_at ? new Date(session.ends_at).getTime() < Date.now() : false;
     if (!session.is_active || expired) {
+      slog.info('join rejected: session ended', { error_category: 'session_ended', expired, success: false });
       return new Response(
         JSON.stringify({ error: 'This session has ended.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -107,7 +124,7 @@ Deno.serve(async (req) => {
       .eq('session_id', session.id);
 
     if (!countError && (count ?? 0) >= MAX_PARTICIPANTS_PER_SESSION) {
-      console.warn(`⛔ Session ${session.id} at capacity (${count}) — rejecting join from ${clientIP}`);
+      slog.warn('join rejected: session at capacity', { error_category: 'session_full', count, success: false });
       return new Response(
         JSON.stringify({ error: 'This session is full.' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -125,19 +142,28 @@ Deno.serve(async (req) => {
       .single();
 
     if (insertError) {
-      console.error('Error inserting participant:', insertError);
+      slog.error('participant insert failed', { error_category: 'db_insert', success: false });
       return new Response(
         JSON.stringify({ error: 'Failed to join session' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    slog.info('participant joined', {
+      participant_id: participant.id,
+      duration_ms: Date.now() - startedAt,
+      success: true,
+    });
     return new Response(
       JSON.stringify({ participant }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Unexpected error:', error);
+    log.error('unexpected error', {
+      error_category: 'unexpected',
+      error: error instanceof Error ? error.message : String(error),
+      success: false,
+    });
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

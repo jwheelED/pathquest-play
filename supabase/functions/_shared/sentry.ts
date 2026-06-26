@@ -20,18 +20,27 @@ export function initSentry(): void {
 }
 
 /**
- * Report a partial question-delivery (some students in the cohort never got a
- * row). `ctx` should carry enough to find the delivery (instructor, idempotency
- * key, counts) but MUST NOT include student answers or other sensitive content.
+ * Forward a message to Sentry. Guarded on `SENTRY_DSN` and wrapped so alerting
+ * can never throw into the request path. `ctx` MUST NOT include student answers
+ * or other sensitive content. Used by `_shared/log.ts` for warn/error lines.
  */
-export function capturePartialDelivery(ctx: Record<string, unknown>): void {
+export function captureMessage(
+  message: string,
+  level: "warning" | "error" = "error",
+  ctx?: Record<string, unknown>,
+): void {
   if (!Deno.env.get("SENTRY_DSN")) return;
   try {
-    Sentry.captureMessage("question delivery partial_failure", {
-      level: "error",
-      extra: ctx,
-    });
+    Sentry.captureMessage(message, { level, extra: ctx });
   } catch (_) {
     // Swallow — alerting is best-effort.
   }
+}
+
+/**
+ * Report a partial question-delivery (some students in the cohort never got a
+ * row). Thin wrapper over {@link captureMessage} kept for call-site clarity.
+ */
+export function capturePartialDelivery(ctx: Record<string, unknown>): void {
+  captureMessage("question delivery partial_failure", "error", ctx);
 }

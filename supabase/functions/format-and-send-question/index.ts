@@ -3,7 +3,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { callClaude } from "../_shared/anthropic.ts";
 import { summarizeDelivery } from "../_shared/deliveryVerification.ts";
-import { initSentry, capturePartialDelivery } from "../_shared/sentry.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { createLogger } from "../_shared/log.ts";
 
 // Initialize Sentry once at cold start (no-op unless SENTRY_DSN is set).
 initSentry();
@@ -1190,6 +1191,14 @@ serve(async (req) => {
       complete: failedStudents.length === 0,
     };
 
+    // Request-scoped structured logger — correlates the delivery outcome by
+    // request_id (BE-AP-13). warn/error lines auto-forward to Sentry.
+    const log = createLogger({
+      operation: "format-and-send-question",
+      instructor_id: user.id,
+      session_id: liveSession?.id,
+    });
+
     const { data: deliveredRows, error: deliveryError } = await supabase
       .from("student_assignments")
       .select("student_id")
@@ -1197,36 +1206,34 @@ serve(async (req) => {
       .contains("content", { idempotency_key: idempotencyKey });
 
     if (deliveryError) {
-      console.error("❌ Delivery verification query failed:", deliveryError);
+      log.error("delivery verification query failed", {
+        error_category: "db_verification",
+        idempotency_key: idempotencyKey,
+      });
     } else {
       verified = summarizeDelivery(
         studentIds,
         (deliveredRows ?? []).map((r) => r.student_id),
       );
-      console.log(
-        `🔍 Delivery verified: ${verified.delivered}/${verified.expected} students` +
-          (verified.complete ? " ✅" : ` ⚠️ ${verified.missing.length} missing`),
-      );
 
-      if (!verified.complete) {
-        const missingSample = verified.missing.slice(0, 20);
-        // Structured so it's greppable in logs even without Sentry.
-        console.error("⚠️ partial_failure — students missing their assignment:", {
-          instructor_id: user.id,
+      if (verified.complete) {
+        log.info("delivery verified", {
           idempotency_key: idempotencyKey,
           expected: verified.expected,
           delivered: verified.delivered,
-          missing_count: verified.missing.length,
-          missing_sample: missingSample,
+          success: true,
         });
-        capturePartialDelivery({
-          instructor_id: user.id,
+      } else {
+        // Single call logs structured JSON AND forwards to Sentry as an error.
+        log.error("question delivery partial_failure", {
+          error_category: "partial_failure",
           idempotency_key: idempotencyKey,
           expected: verified.expected,
           delivered: verified.delivered,
           missing_count: verified.missing.length,
-          missing_sample: missingSample,
+          missing_sample: verified.missing.slice(0, 20),
           session_code: liveSession?.session_code ?? null,
+          success: false,
         });
       }
     }
