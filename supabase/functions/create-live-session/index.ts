@@ -36,14 +36,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { title, courseId } = await req.json();
-
-    if (!title || !courseId) {
-      return new Response(
-        JSON.stringify({ error: 'title and courseId are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Both `title` and `courseId` are optional. The "Start Live Class" flow
+    // supplies both; the auto-created recording session (InstructorDashboard)
+    // has no course context and relies on the defaults below. Routing every
+    // creation path through this function guarantees a `session_code` (so
+    // anonymous students can always join) plus server-side validation.
+    const body = await req.json().catch(() => ({}));
+    const rawTitle = typeof body?.title === 'string' ? body.title.trim() : '';
+    const title = rawTitle || 'Recording session';
+    const courseId = body?.courseId ?? null;
 
     // Use service role client for insert
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
