@@ -1,4 +1,5 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
+import { trackQuestionDetectionDrop } from '@/lib/posthogTracking';
 
 const MIN_WORD_COUNT = 4;
 // Real spoken questions are short. Anything longer is almost certainly a
@@ -196,8 +197,14 @@ export function looksLikeMonologue(text: string): boolean {
 
 export function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized.includes('?') && !normalized.includes('？')) return [];
+  if (!normalized) return [];
 
+  // We deliberately do NOT gate on a literal "?" anymore. Deepgram's
+  // punctuation is intonation-driven and routinely omits the mark on short
+  // spoken questions ("what's mitosis", "how many bones in the hand"). A
+  // sentence qualifies if it carries an explicit "?"/"？" OR is phrased as a
+  // question (hasInterrogativeTrigger). checkUtterance still re-applies the
+  // rhetorical / monologue / trigger gates below.
   const sentences = normalized.split(/[.!;:]\s+/);
 
   const questions: string[] = [];
@@ -211,6 +218,10 @@ export function extractQuestions(text: string): string[] {
       } else {
         questions.push(trimmed);
       }
+    } else if (hasInterrogativeTrigger(trimmed)) {
+      // No literal "?" but interrogative phrasing — strip any trailing
+      // sentence terminator the split left on the final clause and accept it.
+      questions.push(trimmed.replace(/[.!;:]+$/, '').trim());
     }
   }
 
@@ -407,6 +418,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     // Confidence floor — reject low-confidence Deepgram output
     if (typeof confidence === 'number' && confidence < minTranscriptConfidence) {
       if (debug) console.log(`🔍 [passive] skipped — low confidence (${confidence.toFixed(2)} < ${minTranscriptConfidence})`);
+      trackQuestionDetectionDrop('low_confidence', { text, confidence });
       return;
     }
 
@@ -418,24 +430,29 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       const wc = wordCount(q);
       if (wc < minWordCount) {
         if (debug) console.log(`🔍 [passive] skipped "${q}" — too short (${wc} words < ${minWordCount})`);
+        trackQuestionDetectionDrop('min_word_count', { text: q, wordCount: wc });
         continue;
       }
       if (wc > MAX_WORD_COUNT) {
         if (debug) console.log(`🔍 [passive] skipped "${q.substring(0, 60)}…" — too long (${wc} words > ${MAX_WORD_COUNT}, likely monologue)`);
+        trackQuestionDetectionDrop('max_word_count', { text: q, wordCount: wc });
         continue;
       }
       if (looksLikeMonologue(q)) {
         if (debug) console.log(`🔍 [passive] skipped "${q.substring(0, 60)}…" — looks like monologue (multiple sentences)`);
+        trackQuestionDetectionDrop('monologue', { text: q, wordCount: wc });
         continue;
       }
       if (isRhetorical(q)) {
         if (debug) console.log(`🔍 [passive] skipped "${q}" — rhetorical`);
+        trackQuestionDetectionDrop('rhetorical', { text: q, wordCount: wc });
         continue;
       }
       // Stricter trigger requirement — must contain a real interrogative pattern,
       // not just a "?" Deepgram guessed from intonation.
       if (!hasInterrogativeTrigger(q)) {
         if (debug) console.log(`🔍 [passive] skipped "${q}" — no interrogative trigger`);
+        trackQuestionDetectionDrop('no_interrogative_trigger', { text: q, wordCount: wc });
         continue;
       }
 

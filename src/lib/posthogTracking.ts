@@ -68,6 +68,39 @@ export const trackClassJoined = (instructorId: string, courseId?: string) => {
   });
 };
 
+// ============= Question Detection Telemetry =============
+
+/** Detection filters that can discard a live question candidate. */
+export type QuestionDetectionFilter =
+  | 'low_confidence'
+  | 'min_word_count'
+  | 'max_word_count'
+  | 'monologue'
+  | 'rhetorical'
+  | 'no_interrogative_trigger';
+
+/**
+ * Fired whenever a live question candidate is discarded by a detection filter.
+ * `filter` identifies which gate dropped it so detection thresholds can be
+ * tuned against real classroom data instead of guesswork (audit FE-AP-2).
+ */
+export const trackQuestionDetectionDrop = (
+  filter: QuestionDetectionFilter,
+  details?: { text?: string; wordCount?: number; confidence?: number },
+) => {
+  try {
+    posthog.capture('question_detection_drop', {
+      filter,
+      // Instructor speech (not student PII); truncate to keep events lean.
+      text_snippet: details?.text?.slice(0, 80),
+      word_count: details?.wordCount,
+      confidence: details?.confidence,
+    });
+  } catch {
+    // Telemetry must never break the detection path.
+  }
+};
+
 // ============= Error Tracking =============
 
 export const trackError = (error: Error, context?: Record<string, any>) => {
