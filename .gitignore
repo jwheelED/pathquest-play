@@ -59,4 +59,5 @@ venv/
 **/*.tar.gz
 **/*.tar
 **/*.tgz
-EOF
+EOFbackup_data.sql
+supabase/.temp/
