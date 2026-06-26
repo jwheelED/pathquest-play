@@ -151,8 +151,14 @@ export function hasInterrogativeTrigger(text: string): boolean {
 
 export function extractQuestions(text: string): string[] {
   const normalized = text.replace(/\s+/g, ' ').trim();
-  if (!normalized.includes('?') && !normalized.includes('？')) return [];
+  if (!normalized) return [];
 
+  // We deliberately do NOT gate on a literal "?" anymore. Deepgram's
+  // punctuation is intonation-driven and routinely omits the mark on short
+  // spoken questions ("what's mitosis", "how many bones in the hand"). A
+  // sentence qualifies if it carries an explicit "?"/"？" OR is phrased as a
+  // question (hasInterrogativeTrigger). Callers still re-apply the rhetorical /
+  // monologue / trigger gates downstream.
   const sentences = normalized.split(/[.!;:]\s+/);
   const questions: string[] = [];
 
@@ -166,6 +172,10 @@ export function extractQuestions(text: string): string[] {
       } else {
         questions.push(trimmed);
       }
+    } else if (hasInterrogativeTrigger(trimmed)) {
+      // No literal "?" but interrogative phrasing — strip any trailing
+      // sentence terminator the split left on the final clause and accept it.
+      questions.push(trimmed.replace(/[.!;:]+$/, '').trim());
     }
   }
 
