@@ -44,7 +44,7 @@ Important caveats that apply to every "Done" below:
 | EV-009 | Idempotency for question delivery | P0 | **Not Started** | idempotency_key still in `content` JSON, no unique index | Not Run |
 | EV-010 | Verify whole class + retry | P0 | **Partial** | `43bbda4` — full-cohort `summarizeDelivery`, verified counts, partial_failure alert; **durable retry / DLQ not built** | Not Run |
 | EV-011 | Load/reconnect/failure harness | P0 | **Partial** | `scripts/simulate-classroom.ts` (deliver/count/latency); **no reconnect/late-join/dup-tap/AI-failure; not run; not a CI job** | Not Run |
-| EV-012 | Characterization tests + CI gate | P0 | **Partial** | **CI gate added this PR** (`.github/workflows/ci.yml`); pure-helper + detection unit tests exist; **edge-function characterization tests pending; branch protection must be enabled** | Not Run |
+| EV-012 | Characterization tests + CI gate | P0 | **Done\*** | CI gate `.github/workflows/ci.yml` + characterization tests for `join-live-session` / `create-live-session` / `submit-live-response` (handlers extracted behind thin shells; `supabase/functions/__tests__/`, 180 tests total). **\*Enable branch protection** on `main` to make the gate actually block merge | Not Run |
 | EV-013 | Join rate-limit / cap / identity | P1 | **Done** | `54fab16` — `join-live-session` + `_shared/joinRateLimit.ts`; unit tests | Not Run (stress test pending) |
 | EV-014 | Structured logging + correlation | P1 | **Done** | `a102c50` — `_shared/log.ts` + `join-live-session`, `format-and-send-question`; broad 33-fn rollout pending | Not Run |
 | EV-015 | Incremental realtime, polling fallback | P1 | **Not Started** | — | Not Run |

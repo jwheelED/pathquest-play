@@ -70,11 +70,17 @@ jobs:
         with:
           deno-version: v2.x
 
-      # Scope to the pure shared modules with no external imports. log.ts and
-      # sentry.ts pull `npm:@sentry/deno`, which `deno check` can't resolve
+      # Scope to the pure modules with no external imports (shared helpers +
+      # the extracted edge-function handlers). The index.ts shells and log.ts /
+      # sentry.ts pull remote/`npm:` imports that `deno check` can't resolve
       # without a node_modules/deno.json setup — left out to keep this green.
-      - name: Type-check pure shared edge modules
+      - name: Type-check pure shared + handler modules
         run: >-
           deno check
           supabase/functions/_shared/deliveryVerification.ts
           supabase/functions/_shared/joinRateLimit.ts
+          supabase/functions/_shared/handlerTypes.ts
+          supabase/functions/join-live-session/handler.ts
+          supabase/functions/create-live-session/handler.ts
+          supabase/functions/submit-live-response/handler.ts
+          supabase/functions/submit-live-response/grading.ts
