@@ -18,6 +18,7 @@ import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Progress } from "@/components/ui/progress";
+import { distinctStudentCount, studentCompletion } from "@/lib/lectureCheckInMetrics";
 
 interface Assignment {
   id: string;
@@ -864,7 +865,7 @@ export const LectureCheckInResults = () => {
 
       await recalculateGradesForQuestion(group.assignments, questionIdx, updatedQuestions);
 
-      toast.success(`Answer overridden! Grades recalculated for ${group.assignments.length} student(s).`);
+      toast.success(`Answer overridden! Grades recalculated for ${distinctStudentCount(group.assignments)} student(s).`);
       
       // Refresh results
       await fetchResults();
@@ -916,7 +917,7 @@ export const LectureCheckInResults = () => {
         doc.text(`Check-In: ${checkInDate}`, 20, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
-        doc.text(`${group.assignments.length} student(s)`, 20, yPosition + 6);
+        doc.text(`${distinctStudentCount(group.assignments)} student(s)`, 20, yPosition + 6);
         yPosition += 15;
 
         // Questions section
@@ -1299,7 +1300,7 @@ export const LectureCheckInResults = () => {
                   <div className="flex items-center gap-3 flex-wrap">
                     <Badge variant="outline">{formatRelativeTime(group.timestamp)}</Badge>
                     <Badge className="text-xs bg-emerald-600 text-white border-0 hover:bg-emerald-600">{group.questions.length} question{group.questions.length !== 1 ? 's' : ''}</Badge>
-                    <span className="text-sm text-muted-foreground">{group.assignments.length} student(s)</span>
+                    <span className="text-sm text-muted-foreground">{distinctStudentCount(group.assignments)} student(s)</span>
                     {(() => {
                       const groupPercentages: number[] = [];
                       group.questions.forEach((q, qi) => {
@@ -1316,17 +1317,22 @@ export const LectureCheckInResults = () => {
                     })()}
                   </div>
                   <div className="flex items-center gap-3">
-                    {group.assignments.filter((a) => a.completed).length === group.assignments.length ? (
-                      <Badge variant="outline" className="gap-1 border-slate-300 text-slate-600">
-                        <CheckCircle className="h-3 w-3" />
-                        All Complete
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 border-slate-300 text-slate-600">
-                        <Clock className="h-3 w-3" />
-                        {group.assignments.filter((a) => a.completed).length}/{group.assignments.length} Complete
-                      </Badge>
-                    )}
+                    {(() => {
+                      // A student is "complete" only when every question they were
+                      // sent is answered; denominator is distinct students.
+                      const { complete, total } = studentCompletion(group.assignments);
+                      return complete === total && total > 0 ? (
+                        <Badge variant="outline" className="gap-1 border-slate-300 text-slate-600">
+                          <CheckCircle className="h-3 w-3" />
+                          All Complete
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 border-slate-300 text-slate-600">
+                          <Clock className="h-3 w-3" />
+                          {complete}/{total} Complete
+                        </Badge>
+                      );
+                    })()}
                     <AlertDialog>
                       <AlertDialogTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
@@ -1337,7 +1343,7 @@ export const LectureCheckInResults = () => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Check-In?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will permanently remove this check-in for all {group.assignments.length} student(s). This action cannot be undone.
+                            This will permanently remove this check-in for all {distinctStudentCount(group.assignments)} student(s). This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -2041,7 +2047,7 @@ export const LectureCheckInResults = () => {
                     </div>
                     <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                       <p className="text-sm text-amber-900 dark:text-amber-200">
-                        <strong>Impact:</strong> This will affect {selectedOverride.group.assignments.length} student(s). 
+                        <strong>Impact:</strong> This will affect {distinctStudentCount(selectedOverride.group.assignments)} student(s). 
                         Grades will be automatically recalculated based on the new correct answer.
                       </p>
                     </div>
