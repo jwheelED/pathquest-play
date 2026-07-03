@@ -16,8 +16,37 @@ import {
  * transcript fragments from the diagnostic docs so regressions surface fast.
  */
 describe("extractQuestions", () => {
-  it("returns [] when no question mark is present", () => {
+  it("returns [] for a declarative with no interrogative phrasing", () => {
     expect(extractQuestions("This is a declarative sentence.")).toEqual([]);
+  });
+
+  // FE-AP-1: Deepgram drops the "?" on short/intonation-driven questions.
+  // Detection must rely on interrogative phrasing, not punctuation.
+  it("extracts a punctuation-free question (interrogative phrasing)", () => {
+    expect(extractQuestions("What is mitosis")).toEqual(["What is mitosis"]);
+  });
+
+  it("extracts a punctuation-free question even with a trailing period", () => {
+    expect(extractQuestions("How many bones are in the hand.")).toEqual([
+      "How many bones are in the hand",
+    ]);
+  });
+
+  it("extracts a punctuation-free question buried after a declarative", () => {
+    const out = extractQuestions(
+      "Today we covered the skeleton. How many bones are in the hand",
+    );
+    expect(out).toEqual(["How many bones are in the hand"]);
+  });
+
+  it("does NOT extract a WH-led declarative with no question phrasing", () => {
+    // "and how dangerous … can be" is mid-sentence (no clause-start trigger),
+    // so a punctuation-free monologue must still yield nothing.
+    expect(
+      extractQuestions(
+        "We'll look at how they stain and how dangerous certain components can be.",
+      ),
+    ).toEqual([]);
   });
 
   it("extracts a single question from a single sentence", () => {

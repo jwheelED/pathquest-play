@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { handleCreate } from "./handler.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,89 +12,30 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate instructor auth via JWT
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Create a client with the user's JWT to get user identity
-    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
+    const admin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Auth resolver: validate the JWT via a user-scoped client.
+    const getUser = async (authHeader: string): Promise<{ id: string } | null> => {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error } = await userClient.auth.getUser();
+      return error || !user ? null : { id: user.id };
+    };
+
+    const authHeader = req.headers.get('Authorization');
+    const body = await req.json().catch(() => ({}));
+
+    const { status, body: respBody } = await handleCreate({ body, authHeader }, { admin, getUser });
+
+    return new Response(JSON.stringify(respBody), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { title, courseId } = await req.json();
-
-    if (!title || !courseId) {
-      return new Response(
-        JSON.stringify({ error: 'title and courseId are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Use service role client for insert
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Generate unique 6-digit numeric session code
-    let sessionCode: string;
-    let attempts = 0;
-    do {
-      sessionCode = String(Math.floor(100000 + Math.random() * 900000));
-      const { data: existing } = await adminClient
-        .from('live_sessions')
-        .select('id')
-        .eq('session_code', sessionCode)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (!existing) break;
-      attempts++;
-    } while (attempts < 10);
-
-    if (attempts >= 10) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to generate unique session code' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { data: session, error: insertError } = await adminClient
-      .from('live_sessions')
-      .insert({
-        title,
-        session_code: sessionCode,
-        instructor_id: user.id,
-        course_id: courseId,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Error creating session:', insertError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create session' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ session }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(

@@ -130,23 +130,19 @@ export default function InstructorDashboard() {
     const ensureSession = async () => {
       if (!isListening || liveSessionId || !currentUser?.id) return;
       try {
-        const { data, error } = await (supabase
-          .from("live_sessions") as any)
-          .insert({
-            instructor_id: currentUser.id,
-            course_id: selectedCourseId ?? null,
-            title: "Recording session",
-            is_active: true,
-          })
-          .select("id")
-          .single();
+        // Route through the canonical edge function (same as LiveSessionControls
+        // / CommandStripHero) so the recording session gets a real session_code
+        // and server-side validation instead of a bare client insert.
+        const { data, error } = await supabase.functions.invoke("create-live-session", {
+          body: { title: "Recording session", courseId: selectedCourseId ?? undefined },
+        });
         if (cancelled) return;
-        if (error || !data?.id) {
+        if (error || !data?.session?.id) {
           console.warn("Failed to auto-create live session for recording", error);
           return;
         }
-        autoCreatedSessionRef.current = data.id;
-        setLiveSessionId(data.id);
+        autoCreatedSessionRef.current = data.session.id;
+        setLiveSessionId(data.session.id);
       } catch (err) {
         console.warn("Auto live_session creation threw", err);
       }
@@ -164,10 +160,11 @@ export default function InstructorDashboard() {
     const id = autoCreatedSessionRef.current;
     if (!id) return;
     autoCreatedSessionRef.current = null;
-    (supabase.from("live_sessions") as any)
+    supabase
+      .from("live_sessions")
       .update({ is_active: false })
       .eq("id", id)
-      .then(({ error }: any) => {
+      .then(({ error }) => {
         if (error) console.warn("Failed to close auto live session", error);
       });
     setLiveSessionId((curr) => (curr === id ? null : curr));
