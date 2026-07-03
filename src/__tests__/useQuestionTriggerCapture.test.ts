@@ -79,12 +79,12 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
     });
     expect(captured.length).toBe(1);
     expect(captured[0].text).toBe(
-      "Supposing that the array is already sorted, Which search algorithm would you pick, and how does its complexity compare to a linear scan?",
+      "Supposing that the array is already sorted, which search algorithm would you pick, and how does its complexity compare to a linear scan?",
     );
   });
 
   it("does not re-arm from an older question that is still in the rolling buffer", () => {
-    const { result, captured } = setup({ cooldownMs: 12000 });
+    const { result, captured } = setup({ cooldownMs: 12000, minCompleteWords: 4 });
     act(() => {
       result.current.feedChunk("What determines runtime complexity?", 1000);
     });
