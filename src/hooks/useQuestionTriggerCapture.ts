@@ -55,12 +55,24 @@ const PREMISE_SUBORDINATORS = new RegExp(`^(${PREMISE_SUBORDINATOR_SOURCE})\\b`,
 const PREMISE_COMMA_LOOKBEHIND =
   `(?<=(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]{0,400}?,\\s+)`;
 const WH_WORDS = '(what|why|how|when|where|who|whom|whose|which)';
+// Inverted auxiliaries that confirm a true interrogative clause shape
+// (e.g. "what advantage DOES…", "why ARE these…", "how CAN we…").
+const INVERSION_AUX = '(do|does|did|is|are|was|were|am|can|could|would|should|will|shall|may|might|must|has|have|had)';
 const TRIGGER_PATTERNS = [
   // Classic WH questions — hard clause-start anchored, optional discourse markers.
   new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Premise-led WH questions — comma path only when the pre-comma clause
   // starts with a subordinator ("Given…, why…" / "Considering…, how…").
   new RegExp(`${PREMISE_COMMA_LOOKBEHIND}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
+  // Comma-WH with subject-aux inversion — catches cross-chunk premise/WH
+  // splits like "…ratio, what advantage does that give it?" even when the
+  // pre-comma clause doesn't sit at a hard sentence boundary in the buffer
+  // (very common: Deepgram rarely emits a "." before a premise clause).
+  // Requires an inverted auxiliary (does/is/are/can/…) within the next
+  // ~4 tokens after the WH-word, which reliably distinguishes a real
+  // question from a declarative enumeration ("…how they stain, how they
+  // interact, and how X…" has no inverted aux after the WH).
+  new RegExp(`,\\s+${DISCOURSE_MARKERS}${WH_WORDS}\\b(?:\\s+\\S+){1,4}\\s+${INVERSION_AUX}\\b`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,

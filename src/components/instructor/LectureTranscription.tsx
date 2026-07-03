@@ -263,7 +263,7 @@ export const LectureTranscription = ({
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 1500,
-    minWordCount: 6,
+    minWordCount: 5,
     minTranscriptConfidence: 0.8,
     // trailingSilenceMs: use hook default (700ms); "?" fast-path promotes instantly
     autoDismissMs: 60000, // Keep on deck longer (60s) since it's persistent now
@@ -283,6 +283,7 @@ export const LectureTranscription = ({
     bufferWindowMs: 60000,
     lookbackMs: 30000,
     maxBufferChars: 8000,
+    minCompleteWords: 5, // Allow short natural WH questions
   });
 
   // Stash priorContext from the trigger capture so the send path can prefer it over the generic transcript tail

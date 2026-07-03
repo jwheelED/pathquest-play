@@ -1,76 +1,44 @@
+# Speed up MCQ "Preparing…" on Question on Deck
 
-# PDF/CSV Export Overhaul
+## What's slow today
 
-Fix five concrete problems in the leadership PDF: contradicting numbers, junk seed courses, duplicate course names, 33-row dump with no story, and 0-activity rows printing.
+When a question is detected, `QuestionOnDeck` calls `generate-mcq-options`, which in turn calls Gemini 2.5 Flash via the Lovable AI Gateway with a forced tool call. End-to-end this is typically 2–4s but spikes to 6–10s+ because:
 
-## 1. One source of truth, no contradictions
+1. The model is forced to emit a structured tool call that includes a long `citation` field (extra output tokens = more latency).
+2. The system prompt is ~2 KB of instructions and the user prompt includes up to 3 000 chars of transcript tail every time, even for tiny questions like "Who wrote the Emancipation Proclamation?".
+3. We block until the full MCQ JSON is parsed — there's no streaming or progressive reveal.
+4. `match-bank-question` runs in parallel (good) but the UI still waits for whichever finishes last because `Promise.all` is used instead of "first useful response wins".
+5. Generation only starts after `formatPreference` is loaded from the profile — for fresh sessions that adds a noticeable delay before we even hit the model.
 
-**File:** `src/pages/AdminDashboard.tsx` (`orgSnapshot` memo)
+## Plan
 
-- Define a single `isPeriodActive` flag = `sessions > 0 && (activeStudents > 0 || totalResponses > 0)`.
-- If `!isPeriodActive`: set `avgResponseRate`, `avgCompletionRate`, `activeStudents` ALL to `null` (renders as `—`). Right now `avgCompletionRate` is pulled from lifetime `student_assignments` while response rate/active come from the period window — that's the 56% vs 0% contradiction. Recompute `avgCompletionRate` from assignments **within the period window** (`created_at >= rangeFrom`) so it lines up with sessions/active/response.
-- Add a derived `activeCourseCount` and `totalCourseCount` to `OrgSnapshot` so the PDF can say "2 of 33 courses active this period" instead of dumping all 33.
+### 1. Use a faster model + smaller payload in `generate-mcq-options`
+- Switch the primary model to `google/gemini-2.5-flash-lite` (keep `gemini-2.5-flash` as the structural-retry model instead of Pro). Flash-lite TTFT on a 4-option MCQ is ~600–900 ms vs Flash's 2–3 s.
+- Trim `source_transcript` from the last 3 000 chars to the last 1 200 chars when `prior_context` is present (focused context already covers pronoun resolution; the long tail is mostly dead weight).
+- Make `citation` optional in the tool schema and drop it from `required`. The validator already tolerates missing citations and falls back to token-overlap scoring.
+- Shorten the system prompt — collapse rules 1–5 into a tight ~600-char version while keeping the "transcript overrides training data" and "no vague distractors" rules.
 
-**File:** `src/hooks/useAdminDashboardData.ts`
+### 2. Stream MCQ options into the UI
+- Add a streaming branch to `generate-mcq-options` that emits an SSE-style `text/event-stream` of `{ option_index, text }` events as soon as the model produces each option, followed by a final `{ correct_answer, explanation }` event.
+- Update `QuestionOnDeck.generatePreview` to consume the stream via `fetch` (not `supabase.functions.invoke`) so each option fills its skeleton row the moment it arrives, and "Preparing…" flips to "Ready" as soon as the correct-answer event lands.
 
-- Return `totalResponses` and a period-scoped `completionRate` (from `student_assignments` filtered by `created_at` within window) so `AdminDashboard` doesn't mix lifetime and windowed numbers.
+### 3. Don't block on bank match
+- Replace `Promise.all([bankPromise, aiPromise])` with a "race-with-fallback" pattern: render AI options as soon as they stream in; if a high-confidence bank match arrives first or while streaming, swap to it and cancel the stream via `AbortController`. This guarantees the deck never waits on the slower of the two.
 
-## 2. Suppress empty course rows + disambiguate
+### 4. Start generation as soon as the candidate is detected
+- In `QuestionOnDeck`, kick off `generatePreview` with the last-known/default format the instant `candidate` appears, and re-run only if `formatPreference` resolves to something different by the time it loads. Today we wait for `formatPreference !== undefined`, which adds 200–600 ms on cold loads.
 
-**File:** `src/pages/AdminDashboard.tsx` (`courseEngagementExportRows` memo)
+### 5. Observability
+- Keep the existing `mcq.llm_call` / `mcq.complete` JSON logs, and add `mcq.first_option_ms` so we can confirm the streaming win in the Functions dashboard.
 
-- Filter out rows where `sessionsInWindow === 0 && activeStudents === 0 && openSupportCases === 0`.
-- Sort remaining rows by `sessionsInWindow` desc, then `activeStudents` desc.
-- Disambiguate duplicates: if multiple courses share the same `title`, append ` · {courseCode}` (or the last 4 chars of course id when no code) so "My Course" / "Cell Biology" rows are distinguishable. Pull `course_code` from the existing courses fetch.
-- Scrub seed/test courses with a `SEED_COURSE_PATTERNS` regex list (mirror of `SEED_NAME_PATTERNS`) covering: `^my course$`, `\btest(ing)?\b`, `\bdemo\b`, `^untitled`, `necessary eleven steps`, `detective fiction`. Apply before the export rows are built and also when computing `activeCourseCount` numerator.
+## Files to change
 
-## 3. Narrative-first PDF layout
-
-**File:** `src/components/admin/ExportReportsCard.tsx` (`exportToPDF`)
-
-Restructure the PDF into three sections:
-
-**Page 1 — Executive Summary (the story)**
-- Header + governance line (keep).
-- Hero KPI strip: `Active Courses` (e.g. "2 of 33"), `Sessions Run` (+Δ), `Response Rate` (or `—`), `Active Students (7d)`, `Open Support Cases`.
-- "Engagement trend" mini-block: response-rate delta line + sessions delta line (text only, no chart — keep current jsPDF simple).
-- "Top misconception themes" (top 3 from `misconceptions`, course-level only, no student names).
-- "Where engagement is rising / falling": top 3 courses by positive Δ response rate, bottom 3 by negative Δ (from `courseEngagement` deltas).
-
-**Page 2+ — Appendix: Course Detail**
-- Force `doc.addPage()` before this table.
-- Title: "Appendix A — Course-Level Engagement (active courses only)".
-- Sub-line: "Showing N of M total courses. Courses with zero sessions and zero activity in this period are omitted."
-- Table with disambiguated `Course` column, otherwise same columns as today (Sessions, Response Rate, Δ vs prior, Active Students, Open Support Cases).
-- If `activeCourseCount === 0`: skip the table entirely and print a single line: "No courses had sessions in this period."
-
-**Footer:** keep page numbers + "Aggregate engagement, not instructor evaluation".
-
-## 4. CSV mirrors the PDF rules
-
-**File:** `src/components/admin/ExportReportsCard.tsx` (`exportToCSV`)
-
-- Use the same filtered, disambiguated, sorted `courseEngagement` array.
-- Add the same "N of M active courses" summary row above the course table.
-- Empty rows still suppressed.
-
-## 5. Seed-data hygiene at the data layer
-
-**File:** `src/pages/AdminDashboard.tsx`
-
-- Add `SEED_COURSE_PATTERNS` next to `SEED_NAME_PATTERNS` and an `isSeedCourse(title)` helper.
-- Apply `isSeedCourse` filter to both `filteredCourseEngagement` (UI) and `courseEngagementExportRows` (export), so the dashboard and PDF stay consistent.
-- Leave the underlying `courses` table untouched (no DB migration) — purely a presentation filter so demo orgs keep working internally.
+- `supabase/functions/generate-mcq-options/index.ts` — model swap, prompt trim, optional citation, streaming branch, new timing log.
+- `src/components/instructor/QuestionOnDeck.tsx` — streaming consumer, race-with-fallback bank match, earlier kickoff.
+- `src/components/instructor/LiveCopilotHero.tsx` — same streaming consumer for the hero preview path (parity).
 
 ## Out of scope
 
-- Real misconception clustering / "top themes" NLP — use existing `misconceptions` array (already course-tagged).
-- Section/term disambiguation beyond course code suffix.
-- Backend DB cleanup of seed courses.
-
-## Technical notes
-
-- No new dependencies; jsPDF + autoTable already imported.
-- `OrgSnapshot` interface gains: `activeCourseCount: number | null`, `totalCourseCount: number | null`, `topRising: {title:string; delta:number}[]`, `topFalling: {title:string; delta:number}[]`, `topMisconceptions: {text:string; correctRate:number; courseName?:string}[]`. All optional/nullable so existing callers stay valid.
-- Page-1 KPI strip rendered with `autoTable` in a 5-column single-row layout to avoid manual coordinate math.
-- All `0%` outputs continue routing through `fmtPct` so they render `—` when `null`.
+- Changing detection or trigger-capture logic.
+- Changing the Coding or Short Answer preview paths (they already render incrementally).
+- Switching providers away from the Lovable AI Gateway.

@@ -14,7 +14,7 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  function setup() {
+  function setup(overrides: Record<string, unknown> = {}) {
     const captured: PassiveQuestionCandidate[] = [];
     const { result } = renderHook(() =>
       useQuestionTriggerCapture({
@@ -26,6 +26,7 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
         maxExtensions: 1,
         softCompleteMs: 300,
         debug: false,
+        ...overrides,
       }),
     );
     act(() => {
@@ -33,6 +34,19 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
     });
     return { result, captured };
   }
+
+  it("captures short natural WH questions like 'Who wrote the Emancipation Proclamation?'", () => {
+    const { result, captured } = setup({ minCompleteWords: 5 });
+    act(() => {
+      result.current.feedChunk("Who wrote the Emancipation Proclamation?", 1000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+    expect(captured[0].text.toLowerCase()).toContain("emancipation proclamation");
+  });
+
 
   it("arms and finalizes on em-dash + WH-question", () => {
     const { result, captured } = setup();
