@@ -241,10 +241,41 @@ interface BufferChunk {
   timestamp: number;
 }
 
+interface TriggerMatch {
+  index: number;
+  text: string;
+}
+
 let triggerIdCounter = 0;
 
 function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
+}
+
+function findFirstTriggerMatch(text: string): TriggerMatch | null {
+  const lower = text.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+  for (const pattern of TRIGGER_PATTERNS) {
+    const match = lower.match(pattern);
+    if (match && match.index !== undefined) {
+      return { index: match.index, text: match[0] };
+    }
+  }
+  return null;
+}
+
+function getRecentSpeechSegment(chunks: BufferChunk[], now: number): string {
+  const recent: BufferChunk[] = [];
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const chunk = chunks[i];
+    if (now - chunk.timestamp > CHUNK_GAP_BOUNDARY_MS) break;
+    if (recent.length > 0) {
+      const nextNewer = recent[0];
+      if (nextNewer.timestamp - chunk.timestamp > CHUNK_GAP_BOUNDARY_MS) break;
+    }
+    recent.unshift(chunk);
+    if (recent.length >= 5) break;
+  }
+  return recent.map(c => c.text).join(' ').trim();
 }
 
 /**
@@ -381,33 +412,12 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     const combined = relevantChunks.map(c => c.text).join(' ').trim();
     const lower = combined.toLowerCase();
 
-    // 1. Find position of trigger pattern in the combined text.
-    let triggerPos = -1;
-    for (const pattern of TRIGGER_PATTERNS) {
-      const m = lower.match(pattern);
-      if (m && m.index !== undefined) {
-        triggerPos = m.index;
-        break;
-      }
-    }
-
-    // 2. Map character position → chunk index (approximate, +1 per join space).
-    const chunkBoundaries: Array<{ end: number; idx: number }> = [];
-    let runningLen = 0;
-    relevantChunks.forEach((c, idx) => {
-      runningLen += (idx === 0 ? 0 : 1) + c.text.length;
-      chunkBoundaries.push({ end: runningLen, idx });
-    });
-
-    let triggerChunkIdx = relevantChunks.length - 1;
-    if (triggerPos >= 0) {
-      for (const b of chunkBoundaries) {
-        if (b.end >= triggerPos) {
-          triggerChunkIdx = b.idx;
-          break;
-        }
-      }
-    }
+    // 1. Anchor slicing to the chunk that actually armed capture instead of
+    // re-scanning the entire 45s lookback. Re-scanning the full buffer can match
+    // an old WH phrase still inside the rolling window, then append the current
+    // premise to the end of the question.
+    let triggerChunkIdx = relevantChunks.findIndex(c => c.timestamp >= triggerTs);
+    if (triggerChunkIdx < 0) triggerChunkIdx = relevantChunks.length - 1;
 
     // 3. Walk back from the trigger chunk to find the topic-segment start:
     //    stop at a chunk gap > CHUNK_GAP_BOUNDARY_MS or at a topic-shift marker.
@@ -434,16 +444,10 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     let question = triggerOnwardText;
     let triggerChunkPrefix = '';
 
-    if (triggerPos >= 0) {
-      const lowerOnward = triggerOnwardText.toLowerCase();
-      for (const pattern of TRIGGER_PATTERNS) {
-        const m = lowerOnward.match(pattern);
-        if (m && m.index !== undefined) {
-          triggerChunkPrefix = triggerOnwardText.substring(0, m.index).trim();
-          question = triggerOnwardText.substring(m.index).trim();
-          break;
-        }
-      }
+    const triggerMatch = findFirstTriggerMatch(triggerOnwardText);
+    if (triggerMatch) {
+      triggerChunkPrefix = triggerOnwardText.substring(0, triggerMatch.index).trim();
+      question = triggerOnwardText.substring(triggerMatch.index).trim();
     }
 
     const contextParts = [contextChunks.map(c => c.text).join(' ').trim(), triggerChunkPrefix]
@@ -691,8 +695,8 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       // shape after the trigger (≥8 words). Otherwise fall through to the
       // normal sentence-end path so the completeness gate can hold.
       if (hasQuestionMark && !isFinalizingRef.current) {
-        const combinedBuffer = bufferRef.current.map(c => c.text).join(' ').trim();
-        const lowerBuffer = combinedBuffer.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+        const recentBuffer = getRecentSpeechSegment(bufferRef.current, now);
+        const lowerBuffer = recentBuffer.toLowerCase().replace(FILLER_PREFIXES, '').trim();
         let postTriggerWords = 0;
         for (const pattern of TRIGGER_PATTERNS) {
           const m = lowerBuffer.match(pattern);
@@ -736,14 +740,14 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       return false;
     }
 
-    // Scan combined buffer for trigger
-    const combined = bufferRef.current.map(c => c.text).join(' ').trim();
-    const lower = combined.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+    // Scan only the current breath/short tail, not the full rolling buffer.
+    // Old questions can remain in the buffer for context, but they must not
+    // re-arm capture when the instructor starts a new non-question premise.
+    const recentSegment = getRecentSpeechSegment(bufferRef.current, now);
+    const triggerMatch = findFirstTriggerMatch(recentSegment);
 
-    for (const pattern of TRIGGER_PATTERNS) {
-      const match = lower.match(pattern);
-      if (match && match.index !== undefined) {
-        const triggerWord = match[0];
+    if (triggerMatch) {
+        const triggerWord = triggerMatch.text;
 
         // Arm the trigger — do NOT set cooldown yet (only on successful pass)
         lastTriggerTimeRef.current = now;
@@ -756,8 +760,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         setIsCapturing(true);
 
         if (debug) {
-          const totalChars = combined.length;
-          console.log(`🎯 [trigger-armed] word="${triggerWord}" bufferChars=${totalChars}`);
+          console.log(`🎯 [trigger-armed] word="${triggerWord}" bufferChars=${recentSegment.length}`);
         }
 
         // Schedule completion
@@ -768,7 +771,6 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         }, completionTimeoutMs);
 
         return true;
-      }
     }
 
     return false;
