@@ -86,7 +86,7 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
   it("does not re-arm from an older question that is still in the rolling buffer", () => {
     const { result, captured } = setup({ cooldownMs: 12000, minCompleteWords: 4 });
     act(() => {
-      result.current.feedChunk("What determines runtime complexity?", 1000);
+      result.current.feedChunk("What determines the runtime complexity?", 1000);
     });
     act(() => {
       vi.advanceTimersByTime(2000);
