@@ -410,7 +410,6 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     if (relevantChunks.length === 0) return { question: '', context: '' };
 
     const combined = relevantChunks.map(c => c.text).join(' ').trim();
-    const lower = combined.toLowerCase();
 
     // 1. Anchor slicing to the chunk that actually armed capture instead of
     // re-scanning the entire 45s lookback. Re-scanning the full buffer can match
