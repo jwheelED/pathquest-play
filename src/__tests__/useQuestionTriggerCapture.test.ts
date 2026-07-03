@@ -63,6 +63,46 @@ describe("useQuestionTriggerCapture — premise-led questions", () => {
     expect(captured[0].text.toLowerCase()).toContain("which search algorithm");
   });
 
+  it("captures a premise-led question split across Deepgram chunks without appending the premise to the end", () => {
+    const { result, captured } = setup();
+    act(() => {
+      result.current.feedChunk("Supposing that the array is already sorted,", 1000);
+    });
+    act(() => {
+      result.current.feedChunk(
+        "which search algorithm would you pick, and how does its complexity compare to a linear scan?",
+        2000,
+      );
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+    expect(captured[0].text).toBe(
+      "Supposing that the array is already sorted, which search algorithm would you pick, and how does its complexity compare to a linear scan?",
+    );
+  });
+
+  it("does not re-arm from an older question that is still in the rolling buffer", () => {
+    const { result, captured } = setup({ cooldownMs: 12000, minCompleteWords: 4 });
+    act(() => {
+      result.current.feedChunk("What determines the runtime complexity?", 1000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+
+    act(() => {
+      vi.advanceTimersByTime(13000);
+      result.current.feedChunk("Supposing that the array is already sorted,", 16000);
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(captured.length).toBe(1);
+  });
+
   it("arms and finalizes on comma + WH-question after a 'Considering…' premise", () => {
     const { result, captured } = setup();
     act(() => {
