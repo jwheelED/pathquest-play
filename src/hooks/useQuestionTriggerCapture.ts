@@ -631,7 +631,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       }
 
       const candidate: PassiveQuestionCandidate = {
-        text: question,
+        text: finalQuestion,
         detectedAt: Date.now(),
         id: `tq-${++triggerIdCounter}`,
         priorContext: priorContext || undefined,
@@ -640,7 +640,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       // Set post-success cooldown ONLY now (after pass)
       lastSuccessTimeRef.current = Date.now();
 
-      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed) priorCtx=${priorContext.length}chars:`, question);
+      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed) priorCtx=${priorContext.length}chars:`, finalQuestion);
       onCaptureCompleteRef.current?.(candidate);
     } finally {
       isFinalizingRef.current = false;
