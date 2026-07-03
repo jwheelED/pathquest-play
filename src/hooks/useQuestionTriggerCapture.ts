@@ -253,7 +253,7 @@ function wordCount(text: string): number {
 }
 
 function findFirstTriggerMatch(text: string): TriggerMatch | null {
-  const lower = text.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+  const lower = text.toLowerCase();
   for (const pattern of TRIGGER_PATTERNS) {
     const match = lower.match(pattern);
     if (match && match.index !== undefined) {
@@ -739,11 +739,10 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       return false;
     }
 
-    // Scan only the current breath/short tail, not the full rolling buffer.
-    // Old questions can remain in the buffer for context, but they must not
-    // re-arm capture when the instructor starts a new non-question premise.
-    const recentSegment = getRecentSpeechSegment(bufferRef.current, now);
-    const triggerMatch = findFirstTriggerMatch(recentSegment);
+    // Scan only the newly-arrived chunk. Old questions can remain in the
+    // rolling buffer for context, but they must not re-arm capture when the
+    // instructor starts a new non-question premise.
+    const triggerMatch = findFirstTriggerMatch(text);
 
     if (triggerMatch) {
         const triggerWord = triggerMatch.text;
@@ -759,7 +758,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         setIsCapturing(true);
 
         if (debug) {
-          console.log(`🎯 [trigger-armed] word="${triggerWord}" bufferChars=${recentSegment.length}`);
+          console.log(`🎯 [trigger-armed] word="${triggerWord}" chunkChars=${text.length}`);
         }
 
         // Schedule completion
