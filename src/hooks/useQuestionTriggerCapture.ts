@@ -599,7 +599,22 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       // declaratives where the buffer scan matched a subject-aux earlier in
       // the segment but the slice produced a non-interrogative final string
       // (e.g. "Today, we'll be talking about osmosis?").
-      if (!hasInterrogativeTrigger(question)) {
+      let finalQuestion = question;
+      if (!hasInterrogativeTrigger(finalQuestion)) {
+        // Rescue: the slice may start mid-clause because Deepgram split the
+        // sentence at an awkward point (e.g. "area to volume ratio, what
+        // advantage does that give the cell?"). Try slicing from the last
+        // WH-word onward and re-check.
+        const whMatch = finalQuestion.match(/[,;:\-—]\s*(what|why|how|when|where|who|whom|whose|which)\b[\s\S]*$/i);
+        if (whMatch && whMatch.index !== undefined) {
+          const rescued = finalQuestion.slice(whMatch.index).replace(/^[,;:\-—\s]+/, '').trim();
+          if (hasInterrogativeTrigger(rescued) && wordCount(rescued) >= 5) {
+            if (debug) console.log('🎯 [trigger-rescue] sliced to WH-clause:', rescued);
+            finalQuestion = rescued;
+          }
+        }
+      }
+      if (!hasInterrogativeTrigger(finalQuestion)) {
         if (debug) console.log('🎯 [trigger-capture] blocked — no interrogative trigger in final question:', question);
         return;
       }
