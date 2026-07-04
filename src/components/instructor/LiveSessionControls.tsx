@@ -196,6 +196,30 @@ export const LiveSessionControls = ({
       return;
     }
 
+    // Meter the elapsed lecture time against the instructor's monthly hour
+    // allowance. add_lecture_minutes upserts the current usage_month row and
+    // returns the running total + warning level (75% / 100%).
+    try {
+      const elapsedMs = Date.now() - new Date(activeSession.created_at).getTime();
+      const minutes = Math.max(1, Math.round(elapsedMs / 60000));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: usage } = await supabase.rpc("add_lecture_minutes", {
+          p_instructor_id: user.id,
+          p_minutes: minutes,
+        });
+        const row = Array.isArray(usage) ? usage[0] : usage;
+        if (row?.warning_level === "limit_reached") {
+          toast.warning("You've reached your monthly lecture-hour limit. Upgrade to keep running sessions.");
+        } else if (row?.warning_level === "warning_75") {
+          toast.info("You've used 75% of your monthly lecture hours.");
+        }
+      }
+    } catch (meterError) {
+      // Metering must never block ending a session.
+      console.error("Failed to record lecture minutes:", meterError);
+    }
+
     // Track session end in PostHog
     trackSessionEnded(activeSession.session_code, participantCount);
 

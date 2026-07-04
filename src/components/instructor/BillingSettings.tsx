@@ -195,7 +195,7 @@ export function BillingSettings() {
               )}
               {currentTier === 'free' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Limited to 1 course and 60 min of lecture time per week
+                  3 hours of live lecture time per month, resets monthly
                 </p>
               )}
             </div>
@@ -238,10 +238,10 @@ export function BillingSettings() {
                     <div>
                       <h4 className="font-semibold flex items-center gap-2">
                         {tier.display_name}
-                        {tier.name === 'instructor' && (
+                        {tier.name === 'starter' && (
                           <Sparkles className="h-4 w-4 text-amber-500" />
                         )}
-                        {tier.name === 'institutional' && (
+                        {tier.name === 'pro' && (
                           <Crown className="h-4 w-4 text-primary" />
                         )}
                       </h4>
@@ -282,7 +282,7 @@ export function BillingSettings() {
                       <>
                         <li className="flex items-center gap-2 text-sm">
                           <CheckCircle className="h-4 w-4 text-green-500" />
-                          {tier.name === 'free' ? '60 min lecture time/week' : 'Unlimited students'}
+                          {tier.name === 'free' ? '3 hours lecture time/month' : 'Unlimited students'}
                         </li>
                         <li className="flex items-center gap-2 text-sm">
                           <CheckCircle className="h-4 w-4 text-green-500" />
