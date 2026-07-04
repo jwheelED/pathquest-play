@@ -259,8 +259,8 @@ export const StudentRosterPanel = ({
                 className="w-full px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border-t border-border"
               >
                 {showSeeds
-                  ? "Hide test students"
-                  : `Show ${seedCount} hidden test student${seedCount === 1 ? "" : "s"}`}
+                  ? "Hide inactive students"
+                  : `Show ${seedCount} hidden inactive student${seedCount === 1 ? "" : "s"}`}
               </button>
             )}
           </ScrollArea>

@@ -11,6 +11,7 @@ import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSe
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
 
+
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -28,6 +29,7 @@ const TABS = [
 const ACCOUNT_TABS = [
   { key: "billing", label: "Plan & Billing", icon: CreditCard },
 ] as const;
+
 
 type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
 
@@ -178,6 +180,7 @@ export default function InstructorSettings() {
           </div>
         );
       default:
+
         return null;
     }
   };

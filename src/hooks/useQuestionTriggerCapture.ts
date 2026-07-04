@@ -55,12 +55,24 @@ const PREMISE_SUBORDINATORS = new RegExp(`^(${PREMISE_SUBORDINATOR_SOURCE})\\b`,
 const PREMISE_COMMA_LOOKBEHIND =
   `(?<=(?:^|[.?!;]\\s+)(?:${PREMISE_SUBORDINATOR_SOURCE})\\b[^.?!;]{0,400}?,\\s+)`;
 const WH_WORDS = '(what|why|how|when|where|who|whom|whose|which)';
+// Inverted auxiliaries that confirm a true interrogative clause shape
+// (e.g. "what advantage DOES…", "why ARE these…", "how CAN we…").
+const INVERSION_AUX = '(do|does|did|is|are|was|were|am|can|could|would|should|will|shall|may|might|must|has|have|had)';
 const TRIGGER_PATTERNS = [
   // Classic WH questions — hard clause-start anchored, optional discourse markers.
   new RegExp(`${CLAUSE_START}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
   // Premise-led WH questions — comma path only when the pre-comma clause
   // starts with a subordinator ("Given…, why…" / "Considering…, how…").
   new RegExp(`${PREMISE_COMMA_LOOKBEHIND}${DISCOURSE_MARKERS}${WH_WORDS}\\b\\s+\\S+`, 'i'),
+  // Comma-WH with subject-aux inversion — catches cross-chunk premise/WH
+  // splits like "…ratio, what advantage does that give it?" even when the
+  // pre-comma clause doesn't sit at a hard sentence boundary in the buffer
+  // (very common: Deepgram rarely emits a "." before a premise clause).
+  // Requires an inverted auxiliary (does/is/are/can/…) within the next
+  // ~4 tokens after the WH-word, which reliably distinguishes a real
+  // question from a declarative enumeration ("…how they stain, how they
+  // interact, and how X…" has no inverted aux after the WH).
+  new RegExp(`,\\s+${DISCOURSE_MARKERS}${WH_WORDS}\\b(?:\\s+\\S+){1,4}\\s+${INVERSION_AUX}\\b`, 'i'),
   // Embedded / conversational interrogatives
   /\btell\s+me\s+(what|why|how|when|where|who|which|about|if)\b/i,
   /\b(anyone|anybody|someone|somebody)\s+(know|tell|explain|guess|say|remember|recall)\b/i,
@@ -229,10 +241,41 @@ interface BufferChunk {
   timestamp: number;
 }
 
+interface TriggerMatch {
+  index: number;
+  text: string;
+}
+
 let triggerIdCounter = 0;
 
 function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
+}
+
+function findFirstTriggerMatch(text: string): TriggerMatch | null {
+  const lower = text.toLowerCase();
+  for (const pattern of TRIGGER_PATTERNS) {
+    const match = lower.match(pattern);
+    if (match && match.index !== undefined) {
+      return { index: match.index, text: match[0] };
+    }
+  }
+  return null;
+}
+
+function getRecentSpeechSegment(chunks: BufferChunk[], now: number): string {
+  const recent: BufferChunk[] = [];
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const chunk = chunks[i];
+    if (now - chunk.timestamp > CHUNK_GAP_BOUNDARY_MS) break;
+    if (recent.length > 0) {
+      const nextNewer = recent[0];
+      if (nextNewer.timestamp - chunk.timestamp > CHUNK_GAP_BOUNDARY_MS) break;
+    }
+    recent.unshift(chunk);
+    if (recent.length >= 5) break;
+  }
+  return recent.map(c => c.text).join(' ').trim();
 }
 
 /**
@@ -367,35 +410,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     if (relevantChunks.length === 0) return { question: '', context: '' };
 
     const combined = relevantChunks.map(c => c.text).join(' ').trim();
-    const lower = combined.toLowerCase();
 
-    // 1. Find position of trigger pattern in the combined text.
-    let triggerPos = -1;
-    for (const pattern of TRIGGER_PATTERNS) {
-      const m = lower.match(pattern);
-      if (m && m.index !== undefined) {
-        triggerPos = m.index;
-        break;
-      }
-    }
-
-    // 2. Map character position → chunk index (approximate, +1 per join space).
-    const chunkBoundaries: Array<{ end: number; idx: number }> = [];
-    let runningLen = 0;
-    relevantChunks.forEach((c, idx) => {
-      runningLen += (idx === 0 ? 0 : 1) + c.text.length;
-      chunkBoundaries.push({ end: runningLen, idx });
-    });
-
-    let triggerChunkIdx = relevantChunks.length - 1;
-    if (triggerPos >= 0) {
-      for (const b of chunkBoundaries) {
-        if (b.end >= triggerPos) {
-          triggerChunkIdx = b.idx;
-          break;
-        }
-      }
-    }
+    // 1. Anchor slicing to the chunk that actually armed capture instead of
+    // re-scanning the entire 45s lookback. Re-scanning the full buffer can match
+    // an old WH phrase still inside the rolling window, then append the current
+    // premise to the end of the question.
+    let triggerChunkIdx = relevantChunks.findIndex(c => c.timestamp >= triggerTs);
+    if (triggerChunkIdx < 0) triggerChunkIdx = relevantChunks.length - 1;
 
     // 3. Walk back from the trigger chunk to find the topic-segment start:
     //    stop at a chunk gap > CHUNK_GAP_BOUNDARY_MS or at a topic-shift marker.
@@ -422,16 +443,10 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
     let question = triggerOnwardText;
     let triggerChunkPrefix = '';
 
-    if (triggerPos >= 0) {
-      const lowerOnward = triggerOnwardText.toLowerCase();
-      for (const pattern of TRIGGER_PATTERNS) {
-        const m = lowerOnward.match(pattern);
-        if (m && m.index !== undefined) {
-          triggerChunkPrefix = triggerOnwardText.substring(0, m.index).trim();
-          question = triggerOnwardText.substring(m.index).trim();
-          break;
-        }
-      }
+    const triggerMatch = findFirstTriggerMatch(triggerOnwardText);
+    if (triggerMatch) {
+      triggerChunkPrefix = triggerOnwardText.substring(0, triggerMatch.index).trim();
+      question = triggerOnwardText.substring(triggerMatch.index).trim();
     }
 
     const contextParts = [contextChunks.map(c => c.text).join(' ').trim(), triggerChunkPrefix]
@@ -587,7 +602,22 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       // declaratives where the buffer scan matched a subject-aux earlier in
       // the segment but the slice produced a non-interrogative final string
       // (e.g. "Today, we'll be talking about osmosis?").
-      if (!hasInterrogativeTrigger(question)) {
+      let finalQuestion = question;
+      if (!hasInterrogativeTrigger(finalQuestion)) {
+        // Rescue: the slice may start mid-clause because Deepgram split the
+        // sentence at an awkward point (e.g. "area to volume ratio, what
+        // advantage does that give the cell?"). Try slicing from the last
+        // WH-word onward and re-check.
+        const whMatch = finalQuestion.match(/[,;:\-—]\s*(what|why|how|when|where|who|whom|whose|which)\b[\s\S]*$/i);
+        if (whMatch && whMatch.index !== undefined) {
+          const rescued = finalQuestion.slice(whMatch.index).replace(/^[,;:\-—\s]+/, '').trim();
+          if (hasInterrogativeTrigger(rescued) && wordCount(rescued) >= 5) {
+            if (debug) console.log('🎯 [trigger-rescue] sliced to WH-clause:', rescued);
+            finalQuestion = rescued;
+          }
+        }
+      }
+      if (!hasInterrogativeTrigger(finalQuestion)) {
         if (debug) console.log('🎯 [trigger-capture] blocked — no interrogative trigger in final question:', question);
         return;
       }
@@ -604,7 +634,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       }
 
       const candidate: PassiveQuestionCandidate = {
-        text: question,
+        text: finalQuestion,
         detectedAt: Date.now(),
         id: `tq-${++triggerIdCounter}`,
         priorContext: priorContext || undefined,
@@ -613,7 +643,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       // Set post-success cooldown ONLY now (after pass)
       lastSuccessTimeRef.current = Date.now();
 
-      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed) priorCtx=${priorContext.length}chars:`, question);
+      if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed) priorCtx=${priorContext.length}chars:`, finalQuestion);
       onCaptureCompleteRef.current?.(candidate);
     } finally {
       isFinalizingRef.current = false;
@@ -664,8 +694,8 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       // shape after the trigger (≥8 words). Otherwise fall through to the
       // normal sentence-end path so the completeness gate can hold.
       if (hasQuestionMark && !isFinalizingRef.current) {
-        const combinedBuffer = bufferRef.current.map(c => c.text).join(' ').trim();
-        const lowerBuffer = combinedBuffer.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+        const recentBuffer = getRecentSpeechSegment(bufferRef.current, now);
+        const lowerBuffer = recentBuffer.toLowerCase().replace(FILLER_PREFIXES, '').trim();
         let postTriggerWords = 0;
         for (const pattern of TRIGGER_PATTERNS) {
           const m = lowerBuffer.match(pattern);
@@ -709,14 +739,13 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       return false;
     }
 
-    // Scan combined buffer for trigger
-    const combined = bufferRef.current.map(c => c.text).join(' ').trim();
-    const lower = combined.toLowerCase().replace(FILLER_PREFIXES, '').trim();
+    // Scan only the newly-arrived chunk. Old questions can remain in the
+    // rolling buffer for context, but they must not re-arm capture when the
+    // instructor starts a new non-question premise.
+    const triggerMatch = findFirstTriggerMatch(text);
 
-    for (const pattern of TRIGGER_PATTERNS) {
-      const match = lower.match(pattern);
-      if (match && match.index !== undefined) {
-        const triggerWord = match[0];
+    if (triggerMatch) {
+        const triggerWord = triggerMatch.text;
 
         // Arm the trigger — do NOT set cooldown yet (only on successful pass)
         lastTriggerTimeRef.current = now;
@@ -729,8 +758,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         setIsCapturing(true);
 
         if (debug) {
-          const totalChars = combined.length;
-          console.log(`🎯 [trigger-armed] word="${triggerWord}" bufferChars=${totalChars}`);
+          console.log(`🎯 [trigger-armed] word="${triggerWord}" chunkChars=${text.length}`);
         }
 
         // Schedule completion
@@ -741,7 +769,6 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
         }, completionTimeoutMs);
 
         return true;
-      }
     }
 
     return false;
