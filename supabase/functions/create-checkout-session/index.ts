@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const { tierName, successUrl, cancelUrl } = await req.json();
+    console.log(`[create-checkout-session] tier=${tierName} user=${user.id}`);
     if (!tierName || !successUrl || !cancelUrl) {
       return jsonResponse(
         { error: "tierName, successUrl and cancelUrl are required" },
