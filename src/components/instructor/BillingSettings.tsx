@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle, Info, Building2, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { BILLING_ENFORCEMENT_ENABLED } from "@/lib/billingConfig";
 
