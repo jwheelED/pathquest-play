@@ -251,37 +251,37 @@ export function BillingSettings() {
                       : 'border-border hover:border-primary/50'
                   } transition-colors`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold flex items-center gap-2">
-                        {tier.display_name}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold flex items-center gap-2 flex-wrap">
+                        <span className="break-words">{tier.display_name}</span>
                         {tier.name === 'starter' && (
-                          <Sparkles className="h-4 w-4 text-amber-500" />
+                          <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
                         )}
                         {tier.name === 'pro' && (
-                          <Crown className="h-4 w-4 text-primary" />
+                          <Crown className="h-4 w-4 text-primary shrink-0" />
                         )}
                       </h4>
                       <p className="text-2xl font-bold mt-1 break-words">
                         {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
                         {!isFreeTier && tier.price_suffix && (
-                          <span className="text-sm font-normal text-muted-foreground">
+                          <span className="text-sm font-normal text-muted-foreground break-words">
                             {tier.price_suffix}
                           </span>
                         )}
                       </p>
                       {tier.pricing_model === 'per_seat' && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-1 break-words">
                           Billed based on active student count
                         </p>
                       )}
                     </div>
                     {isCurrentTier ? (
-                      <Badge variant="secondary" className="bg-primary text-primary-foreground">
+                      <Badge variant="secondary" className="bg-primary text-primary-foreground shrink-0">
                         Current
                       </Badge>
                     ) : isPopular ? (
-                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
                         Popular
                       </Badge>
                     ) : null}
