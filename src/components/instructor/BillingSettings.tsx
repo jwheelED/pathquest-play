@@ -236,18 +236,18 @@ export function BillingSettings() {
           <p className="text-sm text-muted-foreground mb-4">
             Change or cancel anytime. Paid plans are billed monthly.
           </p>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 2xl:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
             {tiers.map((tier) => {
               const isCurrentTier = tier.name === currentTier;
               const isFreeTier = tier.name === 'free';
               const isPopular = tier.name === 'starter';
-              
+
               return (
                 <div
                   key={tier.id}
                   className={`rounded-lg border p-4 ${
-                    isCurrentTier 
-                      ? 'border-primary bg-primary/5' 
+                    isCurrentTier
+                      ? 'border-primary bg-primary/5'
                       : 'border-border hover:border-primary/50'
                   } transition-colors`}
                 >
@@ -262,10 +262,10 @@ export function BillingSettings() {
                           <Crown className="h-4 w-4 text-primary shrink-0" />
                         )}
                       </h4>
-                      <p className="text-2xl font-bold mt-1 break-words">
+                      <p className="text-2xl font-bold mt-1 truncate">
                         {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
                         {!isFreeTier && tier.price_suffix && (
-                          <span className="text-sm font-normal text-muted-foreground break-words">
+                          <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
                             {tier.price_suffix}
                           </span>
                         )}
@@ -294,25 +294,25 @@ export function BillingSettings() {
                   )}
 
                   <ul className="space-y-2 mb-4">
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      {tier.name === 'free' ? '3 hours lecture time/month' : 'Unlimited students'}
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span className="break-words">{tier.name === 'free' ? '3 hours lecture time/month' : 'Unlimited students'}</span>
                     </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span className="break-words">{tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}</span>
                     </li>
                     {tier.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        {String(feature)}
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                        <span className="break-words">{String(feature)}</span>
                       </li>
                     ))}
                   </ul>
 
                   {!isCurrentTier && !isFreeTier && (
-                    <Button 
-                      className="w-full"
+                    <Button
+                      className="w-full whitespace-normal h-auto min-h-10"
                       onClick={() => handleUpgrade(tier.name)}
                       disabled={upgrading === tier.name}
                     >
@@ -323,7 +323,7 @@ export function BillingSettings() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="h-4 w-4 mr-2" />
+                          <Sparkles className="h-4 w-4 mr-2 shrink-0" />
                           Upgrade to {tier.display_name}
                         </>
                       )}
@@ -331,7 +331,7 @@ export function BillingSettings() {
                   )}
                   {isCurrentTier && (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                       Your current plan
                     </div>
                   )}
