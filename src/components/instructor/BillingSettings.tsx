@@ -46,10 +46,13 @@ export function BillingSettings() {
       if (!user) return;
 
       // Fetch available tiers
+      // Instructor billing page shows only the monthly instructor tiers.
+      // Institutional (annual, org-scoped) tiers are managed separately.
       const { data: tiersData, error: tiersError } = await supabase
         .from('subscription_tiers')
         .select('*')
         .eq('is_active', true)
+        .eq('billing_period', 'month')
         .order('sort_order');
 
       if (tiersError) throw tiersError;

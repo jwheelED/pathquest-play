@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
 import { BILLING_ENFORCEMENT_ENABLED } from "@/lib/billingConfig";
+import { recordOrgLectureMinutes } from "@/lib/billingRpc";
 
 interface LiveSession {
   id: string;
@@ -209,6 +210,9 @@ export const LiveSessionControls = ({
           p_instructor_id: user.id,
           p_minutes: minutes,
         });
+        // Also draw down the org's shared hour pool (no-op unless the org is an
+        // institutional customer). Tracking only — overage is billed manually.
+        await recordOrgLectureMinutes(user.id, minutes);
         // Usage is recorded above regardless, but hour-limit warnings only
         // surface once billing enforcement is turned on. See billingConfig.
         if (BILLING_ENFORCEMENT_ENABLED) {
