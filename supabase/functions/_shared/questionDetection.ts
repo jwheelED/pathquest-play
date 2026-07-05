@@ -111,6 +111,10 @@ export const TRIGGER_PATTERNS = [
   /\b(can|could|would)\s+(someone|anyone|anybody|somebody)\s+(tell|explain|describe|say|name|identify|guess)\b/i,
   /\bdo\s+you\s+(know|think|see|understand|remember|recall|recognize)\b/i,
   /\bwhat\s+would\s+happen\b/i,
+  // WH-noun + auxiliary inversion: "what advantage does that give…",
+  // "which mechanism would explain…", "what property makes it…". The <noun>
+  // slot is any single word (adj/noun) followed by a subject-aux inversion.
+  /\b(what|which)\s+\w+\s+(do|does|did|is|are|was|were|would|could|should|will|might|can|makes|gives|causes|explains|means|allows|enables)\b/i,
   // NOTE: "suppose that" intentionally NOT a trigger — premise subordinator only.
 ];
 
