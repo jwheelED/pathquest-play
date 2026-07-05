@@ -74,11 +74,26 @@ serve(async (req) => {
 
     const instructorOrgId = instructorProfile?.org_id || null;
 
-    // Format content based on question type - handle nested structure from dialog
+    // Format content based on question type - use type-aware data resolution
+    // The dialog wraps data in mcq/short_answer/coding keys matching the questionType
     let formattedQuestion: any;
     
-    // The extractedQuestion comes from the dialog which wraps data in mcq/short_answer/coding keys
-    const questionData = extractedQuestion.mcq || extractedQuestion.short_answer || extractedQuestion.coding || extractedQuestion;
+    // CRITICAL: Resolve data using the questionType to avoid type mismatch
+    // Previously used: extractedQuestion.mcq || extractedQuestion.short_answer || ...
+    // which could pick the wrong key if multiple were present
+    let questionData: any;
+    if (questionType === "mcq" && extractedQuestion.mcq) {
+      questionData = extractedQuestion.mcq;
+    } else if (questionType === "short_answer" && extractedQuestion.short_answer) {
+      questionData = extractedQuestion.short_answer;
+    } else if (questionType === "coding" && extractedQuestion.coding) {
+      questionData = extractedQuestion.coding;
+    } else {
+      // Fallback: use the raw object (for non-dialog sources)
+      questionData = extractedQuestion.mcq || extractedQuestion.short_answer || extractedQuestion.coding || extractedQuestion;
+    }
+
+    console.log(`📋 Resolved questionData for type=${questionType}, keys in extractedQuestion: ${Object.keys(extractedQuestion).join(', ')}`);
 
     if (questionType === "mcq") {
       formattedQuestion = {
@@ -111,6 +126,8 @@ serve(async (req) => {
         gradingMode: "manual_grade",
       };
     }
+
+    console.log(`✅ Formatted question type=${formattedQuestion?.type}, isPoll=${isPollMode}`);
 
     const questionContent = {
       type: isPollMode ? "poll" : "quiz",
@@ -148,7 +165,6 @@ serve(async (req) => {
       .select("id, session_code")
       .eq("instructor_id", user.id)
       .eq("is_active", true)
-      .gt("ends_at", new Date().toISOString())
       .order("created_at", { ascending: false })
       .limit(1)
       .single();

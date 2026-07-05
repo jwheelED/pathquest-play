@@ -1,124 +1,130 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Search, Users, RefreshCw, Target, Flame, BookOpen,
-  CheckCircle2, XCircle, ArrowUpDown, Filter, UserCheck
+  Search, Users, RefreshCw, ArrowUpDown, Filter, UserCheck,
+  ClipboardCheck, Video, Brain, MessageSquareText, Eye,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { AcademicIntegrityInsights } from "./AcademicIntegrityInsights";
+import { StudentAttentionSignals } from "./StudentAttentionSignals";
 import { cn } from "@/lib/utils";
+import { compareByAttention, type RosterStudent, type StudentStatus } from "@/lib/studentSignals";
+import type { StudentDetailData } from "@/hooks/useStudentDetail";
 
-interface Student {
-  id: string;
-  name: string;
-  current_streak: number;
-  completedLessons: number;
-  totalLessons: number;
-  averageMasteryAttempts?: number;
-  average_grade?: number;
-}
-
-interface StudentDetail {
-  id: string;
-  name: string;
-  level?: number;
-  experience_points?: number;
-  current_streak: number;
-  completedLessons: number;
-  totalLessons: number;
-  problemAttempts: Array<{
-    problem_text: string;
-    is_correct: boolean;
-    time_spent_seconds: number;
-    created_at: string;
-  }>;
-  recentActivity: Array<{
-    type: string;
-    description: string;
-    date: string;
-  }>;
-}
-
-type SortOption = "name-asc" | "name-desc" | "grade-high" | "grade-low";
-type FilterOption = "all" | "has-grades" | "no-grades";
+type SortOption = "attention" | "last-active" | "checkin-high" | "checkin-low" | "name-asc" | "name-desc";
+type FilterOption = "all" | "needs-attention" | "quiet" | "new";
 
 interface StudentRosterPanelProps {
-  students: Student[];
+  students: RosterStudent[];
+  selectedStudentId: string | null;
   onStudentClick: (studentId: string) => void;
   onRefresh: () => void;
   instructorId: string;
-  selectedStudentDetail: StudentDetail | null;
-  selectedStudentId: string | null;
+  detail: StudentDetailData | null;
+  detailLoading: boolean;
+  onOpenResponses: () => void;
   loading?: boolean;
+}
+
+const statusMeta: Record<StudentStatus, { label: string; cls: string }> = {
+  "needs-attention": { label: "Needs attention", cls: "bg-destructive/10 text-destructive border-destructive/30" },
+  quiet: { label: "Quiet ≥7d", cls: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
+  "on-track": { label: "On track", cls: "bg-primary/10 text-primary border-primary/30" },
+  new: { label: "New — no data", cls: "bg-muted text-muted-foreground border-border" },
+};
+
+function StatusChip({ status }: { status: StudentStatus }) {
+  const meta = statusMeta[status];
+  return (
+    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 font-medium shrink-0", meta.cls)}>
+      {meta.label}
+    </Badge>
+  );
+}
+
+const initials = (name: string) =>
+  name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+
+/** Secondary line under a roster name: only segments with real data. */
+function summaryLine(s: RosterStudent): string {
+  const parts: string[] = [];
+  if (s.lastActiveAt) parts.push(`Last active ${formatDistanceToNow(new Date(s.lastActiveAt), { addSuffix: true })}`);
+  if (s.checkIns) parts.push(`Check-ins ${s.checkIns.avg}% (${s.checkIns.n})`);
+  if (s.videos.published > 0 && s.videos.started > 0) parts.push(`Videos ${s.videos.completed}/${s.videos.published}`);
+  return parts.join(" · ");
 }
 
 export const StudentRosterPanel = ({
   students,
+  selectedStudentId,
   onStudentClick,
   onRefresh,
   instructorId,
-  selectedStudentDetail,
-  selectedStudentId,
+  detail,
+  detailLoading,
+  onOpenResponses,
   loading,
 }: StudentRosterPanelProps) => {
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption>("name-asc");
+  const [sort, setSort] = useState<SortOption>("attention");
   const [filter, setFilter] = useState<FilterOption>("all");
+  const [showSeeds, setShowSeeds] = useState(false);
 
-  const filteredStudents = useMemo(() => {
-    let list = [...students];
+  const seedCount = useMemo(() => students.filter(s => s.isSeed).length, [students]);
 
-    // Search
+  const visibleStudents = useMemo(() => {
+    let list = students.filter(s => showSeeds || !s.isSeed);
+
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((s) => s.name.toLowerCase().includes(q));
+      list = list.filter(s => s.name.toLowerCase().includes(q));
     }
 
-    // Filter
-    if (filter === "has-grades") list = list.filter((s) => s.average_grade != null);
-    if (filter === "no-grades") list = list.filter((s) => s.average_grade == null);
+    if (filter !== "all") list = list.filter(s => s.status === filter);
 
-    // Sort
+    const byLastActive = (a: RosterStudent, b: RosterStudent) => {
+      const ta = a.lastActiveAt ? new Date(a.lastActiveAt).getTime() : 0;
+      const tb = b.lastActiveAt ? new Date(b.lastActiveAt).getTime() : 0;
+      return tb - ta;
+    };
+
     switch (sort) {
+      case "attention":
+        list.sort(compareByAttention);
+        break;
+      case "last-active":
+        list.sort(byLastActive);
+        break;
+      case "checkin-high":
+        list.sort((a, b) => (b.checkIns?.avg ?? -1) - (a.checkIns?.avg ?? -1));
+        break;
+      case "checkin-low":
+        list.sort((a, b) => (a.checkIns?.avg ?? 999) - (b.checkIns?.avg ?? 999));
+        break;
       case "name-asc":
         list.sort((a, b) => a.name.localeCompare(b.name));
         break;
       case "name-desc":
         list.sort((a, b) => b.name.localeCompare(a.name));
         break;
-      case "grade-high":
-        list.sort((a, b) => (b.average_grade ?? -1) - (a.average_grade ?? -1));
-        break;
-      case "grade-low":
-        list.sort((a, b) => (a.average_grade ?? 999) - (b.average_grade ?? 999));
-        break;
     }
 
     return list;
-  }, [students, search, sort, filter]);
+  }, [students, search, sort, filter, showSeeds]);
 
-  const initials = (name: string) =>
-    name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const selected = useMemo(
+    () => students.find(s => s.id === selectedStudentId) || null,
+    [students, selectedStudentId],
+  );
 
-  const gradeColor = (grade?: number) => {
-    if (grade == null) return "";
-    if (grade >= 80) return "text-primary";
-    if (grade >= 60) return "text-orange-600 dark:text-orange-400";
-    return "text-destructive";
-  };
+  const visibleEnrolledCount = students.filter(s => !s.isSeed).length;
 
   return (
     <div className="space-y-6">
@@ -130,12 +136,15 @@ export const StudentRosterPanel = ({
             Students
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            View enrollment, participation, and student activity for this course.
+            Participation, comprehension, and who needs your attention in this course.
           </p>
         </div>
         <Badge variant="secondary" className="self-start sm:self-auto text-sm px-3 py-1">
           <UserCheck className="h-3.5 w-3.5 mr-1.5" />
-          {students.length} enrolled
+          {visibleEnrolledCount} enrolled
+          {seedCount > 0 && !showSeeds && (
+            <span className="ml-1 text-muted-foreground">(+{seedCount} test)</span>
+          )}
         </Badge>
       </div>
 
@@ -151,26 +160,29 @@ export const StudentRosterPanel = ({
           />
         </div>
         <Select value={sort} onValueChange={(v) => setSort(v as SortOption)}>
-          <SelectTrigger className="w-full sm:w-[180px] rounded-xl">
+          <SelectTrigger className="w-full sm:w-[190px] rounded-xl">
             <ArrowUpDown className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="attention">Needs attention first</SelectItem>
+            <SelectItem value="last-active">Recently active</SelectItem>
+            <SelectItem value="checkin-low">Check-in avg ↑</SelectItem>
+            <SelectItem value="checkin-high">Check-in avg ↓</SelectItem>
             <SelectItem value="name-asc">Name A → Z</SelectItem>
             <SelectItem value="name-desc">Name Z → A</SelectItem>
-            <SelectItem value="grade-high">Grade ↓</SelectItem>
-            <SelectItem value="grade-low">Grade ↑</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filter} onValueChange={(v) => setFilter(v as FilterOption)}>
-          <SelectTrigger className="w-full sm:w-[160px] rounded-xl">
+          <SelectTrigger className="w-full sm:w-[170px] rounded-xl">
             <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Students</SelectItem>
-            <SelectItem value="has-grades">Has Grades</SelectItem>
-            <SelectItem value="no-grades">No Grades</SelectItem>
+            <SelectItem value="all">All students</SelectItem>
+            <SelectItem value="needs-attention">Needs attention</SelectItem>
+            <SelectItem value="quiet">Quiet</SelectItem>
+            <SelectItem value="new">New — no data</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" size="icon" onClick={onRefresh} className="rounded-xl shrink-0">
@@ -187,15 +199,20 @@ export const StudentRosterPanel = ({
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm p-8">
                 Loading students…
               </div>
-            ) : filteredStudents.length === 0 ? (
+            ) : visibleStudents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm p-8 gap-2">
                 <Users className="h-8 w-8 opacity-40" />
-                {search ? "No students match your search." : "No students enrolled yet."}
+                {search
+                  ? "No students match your search."
+                  : filter !== "all"
+                    ? "No students match this filter."
+                    : "No students enrolled yet."}
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {filteredStudents.map((student) => {
+                {visibleStudents.map((student) => {
                   const isSelected = selectedStudentId === student.id;
+                  const line = summaryLine(student);
                   return (
                     <button
                       key={student.id}
@@ -218,37 +235,40 @@ export const StudentRosterPanel = ({
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className={cn(
-                          "text-sm truncate",
-                          isSelected ? "font-semibold text-foreground" : "font-medium text-foreground"
-                        )}>
-                          {student.name}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {student.average_grade != null && (
-                            <span className={cn("text-xs font-semibold", gradeColor(student.average_grade))}>
-                              {Math.round(student.average_grade)}%
-                            </span>
-                          )}
-                          {student.current_streak > 0 && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                              <Flame className="h-3 w-3 text-orange-500" />
-                              {student.current_streak}d
-                            </span>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <p className={cn(
+                            "text-sm truncate",
+                            isSelected ? "font-semibold text-foreground" : "font-medium text-foreground"
+                          )}>
+                            {student.name}
+                          </p>
+                          <StatusChip status={student.status} />
                         </div>
+                        {line && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{line}</p>
+                        )}
                       </div>
                     </button>
                   );
                 })}
               </div>
             )}
+            {!loading && seedCount > 0 && (
+              <button
+                onClick={() => setShowSeeds(v => !v)}
+                className="w-full px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border-t border-border"
+              >
+                {showSeeds
+                  ? "Hide inactive students"
+                  : `Show ${seedCount} hidden inactive student${seedCount === 1 ? "" : "s"}`}
+              </button>
+            )}
           </ScrollArea>
         </Card>
 
         {/* Detail Panel */}
         <Card className="lg:col-span-3 headspace-card overflow-hidden">
-          {!selectedStudentDetail ? (
+          {!selected ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 gap-3 min-h-[300px]">
               <Users className="h-10 w-10 opacity-30" />
               <p className="text-sm">Select a student to view details</p>
@@ -260,106 +280,129 @@ export const StudentRosterPanel = ({
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
                     <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
-                      {initials(selectedStudentDetail.name)}
+                      {initials(selected.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">{selectedStudentDetail.name}</h3>
-                    <p className="text-xs text-muted-foreground">Student details &amp; activity</p>
-                  </div>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-muted/50 p-3 text-center">
-                    <Target className="h-4 w-4 mx-auto text-primary mb-1" />
-                    <p className="text-xl font-bold text-foreground">{selectedStudentDetail.level ?? "—"}</p>
-                    <p className="text-[11px] text-muted-foreground">Level</p>
-                  </div>
-                  <div className="rounded-xl bg-muted/50 p-3 text-center">
-                    <Flame className="h-4 w-4 mx-auto text-orange-500 mb-1" />
-                    <p className="text-xl font-bold text-foreground">{selectedStudentDetail.current_streak}d</p>
-                    <p className="text-[11px] text-muted-foreground">Streak</p>
-                  </div>
-                  <div className="rounded-xl bg-muted/50 p-3 text-center">
-                    <BookOpen className="h-4 w-4 mx-auto text-secondary mb-1" />
-                    <p className="text-xl font-bold text-foreground">
-                      {selectedStudentDetail.completedLessons}/{selectedStudentDetail.totalLessons}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-foreground truncate">{selected.name}</h3>
+                      <StatusChip status={selected.status} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {selected.lastActiveAt
+                        ? `Last active ${formatDistanceToNow(new Date(selected.lastActiveAt), { addSuffix: true })}`
+                        : "No activity recorded yet"}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">Lessons</p>
                   </div>
                 </div>
 
-                {/* Progress Bar */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Lesson progress</span>
-                    <span className="font-semibold text-foreground">
-                      {selectedStudentDetail.totalLessons > 0
-                        ? Math.round((selectedStudentDetail.completedLessons / selectedStudentDetail.totalLessons) * 100)
-                        : 0}%
-                    </span>
+                {/* Why flagged + suggested action */}
+                <StudentAttentionSignals
+                  signals={selected.signals}
+                  suggestedAction={selected.suggestedAction}
+                  status={selected.status}
+                />
+
+                {/* Stat Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-muted/50 p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <ClipboardCheck className="h-3.5 w-3.5 text-primary" />
+                      <p className="text-[11px] font-medium text-muted-foreground">Check-in average</p>
+                    </div>
+                    {selected.checkIns ? (
+                      <>
+                        <p className="text-xl font-bold text-foreground">{selected.checkIns.avg}%</p>
+                        <p className="text-[11px] text-muted-foreground">across {selected.checkIns.n} check-in{selected.checkIns.n === 1 ? "" : "s"}</p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No check-ins yet — appears after their first lecture or live session.
+                      </p>
+                    )}
                   </div>
-                  <Progress
-                    value={
-                      selectedStudentDetail.totalLessons > 0
-                        ? (selectedStudentDetail.completedLessons / selectedStudentDetail.totalLessons) * 100
-                        : 0
-                    }
-                    className="h-2"
-                  />
+                  <div className="rounded-xl bg-muted/50 p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Video className="h-3.5 w-3.5 text-secondary" />
+                      <p className="text-[11px] font-medium text-muted-foreground">Lecture videos</p>
+                    </div>
+                    {selected.videos.published === 0 ? (
+                      <p className="text-xs text-muted-foreground">No published videos in this course yet.</p>
+                    ) : selected.videos.started === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Hasn't started any of the {selected.videos.published} assigned video{selected.videos.published === 1 ? "" : "s"}.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-xl font-bold text-foreground">
+                          {selected.videos.completed}/{selected.videos.published}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          completed · {selected.videos.started} started
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <div className="rounded-xl bg-muted/50 p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Brain className="h-3.5 w-3.5 text-primary" />
+                      <p className="text-[11px] font-medium text-muted-foreground">Comprehension</p>
+                    </div>
+                    {selected.comprehension ? (
+                      <>
+                        <p className="text-xl font-bold text-foreground">{selected.comprehension.correctRate}%</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          correct ({selected.comprehension.n} response{selected.comprehension.n === 1 ? "" : "s"})
+                        </p>
+                        {selected.confidentWrongCount > 0 && (
+                          <Badge variant="outline" className="mt-1.5 text-[10px] px-1.5 py-0 bg-destructive/10 text-destructive border-destructive/30">
+                            {selected.confidentWrongCount} confident-but-wrong
+                          </Badge>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No question responses yet.</p>
+                    )}
+                  </div>
                 </div>
 
                 <Separator />
 
-                {/* Tabbed Content */}
-                <Tabs defaultValue="activity" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="activity">Activity</TabsTrigger>
-                    <TabsTrigger value="attempts">Attempts</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="activity" className="space-y-2 mt-3">
-                    {selectedStudentDetail.recentActivity.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">No recent activity.</p>
-                    ) : (
-                      selectedStudentDetail.recentActivity.map((a, i) => (
-                        <div key={i} className="flex justify-between items-start rounded-lg bg-muted/30 px-3 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-foreground">{a.type}</p>
-                            <p className="text-xs text-muted-foreground truncate">{a.description}</p>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
-                            {new Date(a.date).toLocaleDateString()}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="attempts" className="space-y-2 mt-3">
-                    {selectedStudentDetail.problemAttempts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">No problem attempts yet.</p>
-                    ) : (
-                      selectedStudentDetail.problemAttempts.map((att, i) => (
-                        <div key={i} className="flex items-start gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5">
-                          {att.is_correct ? (
-                            <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium text-foreground truncate">{att.problem_text}</p>
-                            <div className="flex gap-3 mt-1 text-[10px] text-muted-foreground">
-                              <span>{Math.floor(att.time_spent_seconds / 60)}m {att.time_spent_seconds % 60}s</span>
-                              <span>{new Date(att.created_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </TabsContent>
-                </Tabs>
+                {/* Recent activity */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">Recent activity</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl h-7 text-xs"
+                      disabled={!detail || detail.totalResponses === 0}
+                      onClick={onOpenResponses}
+                    >
+                      <Eye className="h-3.5 w-3.5 mr-1.5" />
+                      View all responses{detail && detail.totalResponses > 0 ? ` (${detail.totalResponses})` : ""}
+                    </Button>
+                  </div>
+                  {detailLoading ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Loading activity…</p>
+                  ) : !detail || detail.recentActivity.length === 0 ? (
+                    <div className="flex flex-col items-center text-center py-6 gap-1.5">
+                      <MessageSquareText className="h-6 w-6 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">
+                        No activity yet — appears once they open a check-in or start a lecture video.
+                      </p>
+                    </div>
+                  ) : (
+                    detail.recentActivity.map((a, i) => (
+                      <div key={i} className="flex justify-between items-start rounded-lg bg-muted/30 px-3 py-2.5">
+                        <p className="text-xs text-foreground min-w-0 truncate">{a.description}</p>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
+                          {formatDistanceToNow(new Date(a.date), { addSuffix: true })}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </ScrollArea>
           )}

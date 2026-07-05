@@ -1,10 +1,17 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { callClaude } from "../_shared/anthropic.ts";
+import { summarizeDelivery } from "../_shared/deliveryVerification.ts";
+import { initSentry } from "../_shared/sentry.ts";
+import { createLogger } from "../_shared/log.ts";
+
+// Initialize Sentry once at cold start (no-op unless SENTRY_DSN is set).
+initSentry();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -88,18 +95,37 @@ Write all math as plain readable text using Unicode:
 - Multiplication: · or juxtapose
 - Apply to question AND all answer options`;
 
-  const prompt = `The professor asked: "${questionText}"
+  const todayStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
-Context from lecture: "${context}"${courseInfo}${mathGuidance}
+  const prompt = `Today's date is ${todayStr}.
 
-GROUNDING RULES:
-- All options and distractors MUST relate to the lecture content provided above, NOT general knowledge.
-- Do NOT introduce concepts, terms, or topics that were not mentioned in the lecture context.
-- Every option should be plausible based on what was actually taught.
+=== TEACHING CONTEXT (everything the instructor has said recently — may include EARLIER LECTURE HISTORY and MOST RECENT TEACHING sections) ===
+"${context}"
+
+=== INSTRUCTOR'S QUESTION (what to turn into a check-in) ===
+"${questionText}"
+
+INSTRUCTIONS:
+- The TEACHING CONTEXT is the running transcript of what the instructor has been saying. It may span 60+ seconds of speech and contain multiple topics.
+- The INSTRUCTOR'S QUESTION is the short prompt the instructor just asked the class. It is often vague and contains pronouns ("it", "this", "they", "that") whose antecedents appear EARLIER in the teaching context — sometimes many sentences back.
+- BEFORE generating the MCQ, scan the ENTIRE teaching context (not just the last sentence) to find what the pronouns refer to. Look at concrete nouns, named concepts, and the most prominent subject discussed.
+  Example: question "what does it produce?" + context "...we covered the cell. The mitochondria converts glucose into energy. Now class..."
+           → "it" = the mitochondria → resolved question: "What does the mitochondria produce?"
+- Generate the check-in based on the RESOLVED, fully-specified question, grounded in the teaching context.
+- If after scanning the full context the pronoun still has no clear antecedent, base the question on the MOST PROMINENT concept in the teaching context.
+${courseInfo}${mathGuidance}
+
+ANSWER RULES:
+- If the lecture context explicitly provides the answer, use it.
+- If the question is time-sensitive and asks for a CURRENT fact not explicitly given in the lecture, do NOT confidently answer from possibly outdated model memory.
+- For those CURRENT questions, make the correct answer a verification-safe option such as "Needs current verification" and explain that current sources should be checked.
+- Never confidently provide a possibly outdated officeholder, champion, price, or other current status.
+- Use the lecture context to craft relevant, plausible distractors when available.
+- Never generate an option like "was not mentioned in the lecture" or similar non-answers.
 
 Generate a multiple choice question with 4 options:
 - One correct answer
-- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""} and typical calculation errors
+- Three plausible distractors based on common misconceptions${courseContext?.title ? ` in ${courseContext.title}` : ""} and typical errors
 - IMPORTANT: Randomize which option (A, B, C, or D) is correct - don't always make A correct
 - Match the difficulty to what was just taught
 - Keep it concise and clear
@@ -110,7 +136,7 @@ Each distractor should represent a specific type of error a student might make.
 
 Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text":
 {
-  "question": "the question text (use plain Unicode math, no LaTeX)",
+  "question": "the resolved question text (use plain Unicode math, no LaTeX)",
   "options": ["A. first option text", "B. second option text", "C. third option text", "D. fourth option text"],
   "correctAnswer": "A" | "B" | "C" | "D",
   "explanation": "Why this is correct and explain what mistakes lead to each wrong answer"
@@ -121,26 +147,17 @@ Return JSON with options formatted as "A. text", "B. text", "C. text", "D. text"
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an educational AI that creates high-quality multiple choice questions grounded strictly in the provided lecture content. You MUST NOT use general knowledge or introduce topics not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-      signal: controller.signal,
+    const response = await callClaude({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an educational AI that creates high-quality multiple choice questions. If a question asks for a CURRENT time-sensitive fact that is not explicitly provided in the lecture context, do NOT guess from stale memory. Use a verification-safe correct answer instead and explain that current sources should be checked. Return ONLY valid JSON, no markdown formatting.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
     clearTimeout(timeoutId);
@@ -203,10 +220,17 @@ const generateCodingQuestion = async (
 
   const prompt = `Based on the lecture content, create a LeetCode-style coding problem.
 
-PROFESSOR'S QUESTION/TOPIC: "${questionText}"
+=== TEACHING CONTEXT (background — earlier in the lecture) ===
+"${context}"
 
-LECTURE CONTEXT:
-"${context}"${courseInfo}
+=== INSTRUCTOR'S QUESTION/TOPIC (what to turn into a check-in) ===
+"${questionText}"${courseInfo}
+
+INSTRUCTIONS:
+- The TEACHING CONTEXT is background information the instructor already covered.
+- The INSTRUCTOR'S QUESTION/TOPIC is the short prompt the instructor just asked.
+- Resolve any pronouns (it, this, they, that) in the question using the teaching context BEFORE generating the problem.
+- Generate the coding challenge based on the RESOLVED question, grounded strictly in the teaching context.
 
 Generate a professional coding challenge with this EXACT JSON structure:
 
@@ -253,33 +277,24 @@ CRITICAL REQUIREMENTS:
 5. Include 2-3 hints that reference lecture concepts
 6. Starter code should match the detected language syntax
 7. Problem should be solvable based on lecture content
-8. GROUNDING: The problem MUST be based on concepts from the lecture context above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
+8. GROUNDING: The problem MUST be based on concepts from the TEACHING CONTEXT above. Do NOT introduce algorithms, data structures, or topics not discussed in the lecture.`;
 
   // Add timeout handling (30 seconds)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: { type: "json_object" },
-      }),
-      signal: controller.signal,
+    const response = await callClaude({
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an educational AI that creates coding challenges grounded strictly in the provided lecture content. You MUST NOT introduce algorithms, data structures, or concepts not discussed in the lecture. Return ONLY valid JSON, no markdown formatting.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      response_format: { type: "json_object" },
     });
 
     clearTimeout(timeoutId);
@@ -466,6 +481,7 @@ serve(async (req) => {
       question_text,
       suggested_type,
       context,
+      prior_context = null, // Optional focused teaching prose from trigger pipeline (preferred when present)
       source = "manual_button",
       use_answer_key = false,
       course_context = null,
@@ -475,7 +491,36 @@ serve(async (req) => {
       explanation = null,
       course_id = null,
       source_transcript = null, // Raw transcript to display with question
+      coding_payload = null, // Pre-generated/edited coding question from on-deck preview
     } = await req.json();
+
+    // Normalize coding_payload (may arrive as {style:'simple'|'full', ...fields})
+    const hasCodingPayload = coding_payload && typeof coding_payload === "object";
+    const codingPayloadStyle = hasCodingPayload
+      ? (coding_payload.style === "full" ? "full" : coding_payload.style === "simple" ? "simple" : null)
+      : null;
+
+    // ALWAYS combine the broad transcript tail (context) with the focused trigger prior_context.
+    // The broad tail provides earlier-lecture history needed to resolve vague references like
+    // "what does it produce?" to antecedents mentioned 15-60s ago. The focused prior_context
+    // (when present) highlights the teaching prose immediately before the question.
+    // Sending BOTH gives Gemini the richest possible window for pronoun resolution.
+    const broadContext: string = typeof context === "string" ? context : "";
+    const focusedContext: string = typeof prior_context === "string" ? prior_context.trim() : "";
+
+    let effectiveContext: string;
+    if (focusedContext && broadContext) {
+      // Combine: broad history first, then focused recent prose (highlighted as most recent)
+      effectiveContext =
+        `[EARLIER LECTURE HISTORY]\n${broadContext}\n\n[MOST RECENT TEACHING — IMMEDIATELY BEFORE THE QUESTION]\n${focusedContext}`;
+    } else if (focusedContext) {
+      effectiveContext = focusedContext;
+    } else {
+      effectiveContext = broadContext;
+    }
+    console.log(
+      `📥 Context assembled: broad=${broadContext.length} chars, focused=${focusedContext.length} chars, total=${effectiveContext.length} chars`
+    );
 
     // Fetch instructor's question format preference and auto-grading settings
     const { data: profileData } = await supabase
@@ -505,20 +550,42 @@ serve(async (req) => {
       return "manual_grade";
     };
 
+    // Normalize suggested_type aliases so downstream logic is consistent.
+    // The ReviewModal sends 'mcq' and 'poll'; the edge function uses 'multiple_choice'.
+    const normalizeSuggestedType = (t: string | undefined | null): string | undefined => {
+      if (!t) return undefined;
+      if (t === 'mcq') return 'multiple_choice';
+      return t;
+    };
+    const normalizedSuggestedType = normalizeSuggestedType(suggested_type);
+
     // Determine final question type with smart priority:
     // 1. If pre-generated options provided (from preview dialog editing), respect the suggested_type
     // 2. If instructor prefers coding, use their coding style preference (simple vs full)
     // 3. Otherwise, use instructor's preference from settings
     // This ensures preview dialog overrides work, voice commands respect settings, and coding style is handled
-    const hasPreGeneratedOptions = options && Array.isArray(options) && options.length === 4 && correct_answer;
+    //
+    // For MCQ: require options with a correct_answer.
+    // For poll: require options (no correct_answer needed).
+    const hasMCQOptions = options && Array.isArray(options) && options.length >= 2 && correct_answer;
+    const hasPollOptions = options && Array.isArray(options) && options.length >= 2;
+    const hasPreGeneratedOptions = normalizedSuggestedType === 'poll' ? hasPollOptions : hasMCQOptions;
 
     let finalType: string;
 
-    if (hasPreGeneratedOptions && suggested_type) {
+    if (hasCodingPayload && codingPayloadStyle) {
+      // Instructor pre-generated/edited coding question from on-deck preview - respect it
+      finalType = codingPayloadStyle === "simple" ? "coding_simple" : "coding";
+      console.log(`🔧 Using pre-edited coding payload, type: ${finalType}`);
+    } else if (hasPreGeneratedOptions && normalizedSuggestedType) {
       // Preview dialog with edited options - respect user's explicit choice
-      finalType = suggested_type;
+      finalType = normalizedSuggestedType;
       console.log(`📝 Using preview dialog type: ${finalType}`);
-    } else if (suggested_type === 'short_answer' && (expected_answer || !hasPreGeneratedOptions)) {
+    } else if (normalizedSuggestedType === 'poll' && hasPollOptions) {
+      // Poll with pre-generated options but no correct_answer (polls are ungraded)
+      finalType = 'poll';
+      console.log(`📝 Using poll type from preview dialog`);
+    } else if (normalizedSuggestedType === 'short_answer' && (expected_answer || !hasPreGeneratedOptions)) {
       // Instructor explicitly chose short answer in preview dialog - respect it
       // Don't override with instructor's default preference
       finalType = 'short_answer';
@@ -681,7 +748,45 @@ serve(async (req) => {
     if (finalType === "coding" || finalType === "coding_simple") {
       const isSimpleCoding = finalType === "coding_simple";
 
-      if (isSimpleCoding) {
+      if (hasCodingPayload && isSimpleCoding) {
+        // Pre-generated simple check-in from on-deck preview - use as-is
+        console.log("📝 Using pre-generated simple coding payload");
+        formattedQuestion = {
+          question:
+            typeof question_text === "string"
+              ? question_text
+              : (question_text?.question_text || String(question_text)),
+          type: "coding_simple",
+          language: coding_payload.language || "python",
+          difficulty: "Easy",
+          functionSignature: "",
+          constraints: [],
+          examples: [],
+          hints: ["Focus on demonstrating the concept - minor syntax errors are okay!"],
+          starterCode: "",
+          testCases: [],
+          expectedAnswer: coding_payload.expected_answer || expected_answer || "",
+          gradingMode: "auto_grade", // simple check-ins always auto-grade
+        };
+      } else if (hasCodingPayload && !isSimpleCoding) {
+        // Pre-generated full LeetCode-style payload from on-deck preview
+        console.log("📝 Using pre-generated full coding payload");
+        formattedQuestion = {
+          title: coding_payload.title || (typeof question_text === "string" ? question_text : ""),
+          question: coding_payload.problemStatement || (typeof question_text === "string" ? question_text : ""),
+          type: "coding",
+          language: coding_payload.language || "python",
+          difficulty: coding_payload.difficulty || "Medium",
+          functionSignature: coding_payload.functionSignature || "",
+          constraints: coding_payload.constraints || [],
+          examples: coding_payload.examples || [],
+          hints: coding_payload.hints || [],
+          starterCode: coding_payload.starterCode || "",
+          testCases: coding_payload.testCases || [],
+          expectedAnswer: "",
+          gradingMode: autoGradePrefs.coding ? "auto_grade" : "manual_grade",
+        };
+      } else if (isSimpleCoding) {
         // Simple coding check-in - minimal structure, just show mini IDE with the question
         console.log("📝 Creating simple coding check-in (mini IDE)");
         formattedQuestion = {
@@ -728,7 +833,7 @@ serve(async (req) => {
         // Fallback: Generate structured problem from simple question text
         const codingProblem = await generateCodingQuestion(
           typeof question_text === "string" ? question_text : JSON.stringify(question_text),
-          context || "",
+          effectiveContext,
           course_context,
         );
         formattedQuestion = {
@@ -764,19 +869,27 @@ serve(async (req) => {
       } else if (options && Array.isArray(options) && options.length === 4 && correct_answer) {
         // Use pre-generated options from preview dialog (allows instructor editing)
         console.log("📝 Using pre-generated MCQ options from preview dialog");
+        // Normalize options to have letter prefixes so student UI grades correctly
+        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        const normalizedOptions = options.map((opt: string, i: number) => {
+          const trimmed = opt.trim();
+          // Already has a letter prefix like "A. text" or "A) text"
+          if (/^[A-D][\).\-\s]/i.test(trimmed)) return trimmed;
+          return `${MCQ_LETTERS[i]}. ${trimmed}`;
+        });
         formattedQuestion = {
           question: question_text,
           type: "multiple_choice",
-          options: options,
+          options: normalizedOptions,
           correctAnswer: correct_answer,
           explanation: explanation || "",
           source: "preview_edited",
-          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
+          gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade",
         };
       } else {
         // Fallback: generate with AI
         console.log("🤖 Generating MCQ options with AI");
-        const mcq = await generateMCQ(question_text, context || "", course_context);
+        const mcq = await generateMCQ(question_text, effectiveContext, course_context);
         formattedQuestion = {
           question: mcq.question,
           type: "multiple_choice",
@@ -786,13 +899,38 @@ serve(async (req) => {
           gradingMode: autoGradePrefs.mcq ? "auto_grade" : "manual_grade", // FIXED: Add gradingMode
         };
       }
+    } else if (finalType === "poll") {
+      // Poll format - collect responses without grading
+      if (options && Array.isArray(options) && options.length >= 2) {
+        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        const normalizedOptions = options.map((opt: string, i: number) => {
+          const trimmed = opt.trim();
+          if (/^[A-D][\).\-\s]/i.test(trimmed)) return trimmed;
+          return `${MCQ_LETTERS[i]}. ${trimmed}`;
+        });
+        formattedQuestion = {
+          question: question_text,
+          type: "poll",
+          options: normalizedOptions,
+          gradingMode: "ungraded",
+        };
+      } else {
+        // Generate poll options with AI
+        const mcq = await generateMCQ(question_text, effectiveContext, course_context);
+        formattedQuestion = {
+          question: mcq.question,
+          type: "poll",
+          options: mcq.options,
+          gradingMode: "ungraded",
+        };
+      }
     } else {
       // Short answer format - use AI grading if auto-grade enabled AND expected answer available
       formattedQuestion = {
         question: question_text,
         type: "short_answer",
         expectedAnswer: expected_answer || "",
-        gradingMode: autoGradePrefs.short_answer && expected_answer ? "auto_grade" : "manual_grade", // FIXED: Check auto-grade pref
+        gradingMode: autoGradePrefs.short_answer && expected_answer ? "auto_grade" : "manual_grade",
       };
     }
 
@@ -1031,7 +1169,6 @@ serve(async (req) => {
     const batchEndTime = Date.now();
     const batchTime = batchEndTime - batchStartTime;
     const processingTime = batchEndTime - startTime;
-    const wasSuccessful = successCount > 0;
 
     // Performance logging: Complete breakdown
     console.log(`⏱️ Performance breakdown:
@@ -1042,7 +1179,66 @@ serve(async (req) => {
 
     console.log(`✅ Questions sent: ${successCount}/${studentIds.length} students in ${processingTime}ms`);
 
-    // Log to question_send_logs for monitoring
+    // CRITICAL: Verify delivery across the ENTIRE cohort (not just the first
+    // 10). Every row we just inserted carries this idempotency_key, so one query
+    // tells us exactly who landed. (Caveat: idempotency_key still lives in the
+    // `content` JSON — see BE-AP-5 — so `.contains` is unindexed; acceptable
+    // until that key is promoted to its own column.)
+    let verified = {
+      expected: studentIds.length,
+      delivered: successCount,
+      missing: [] as string[],
+      complete: failedStudents.length === 0,
+    };
+
+    // Request-scoped structured logger — correlates the delivery outcome by
+    // request_id (BE-AP-13). warn/error lines auto-forward to Sentry.
+    const log = createLogger({
+      operation: "format-and-send-question",
+      instructor_id: user.id,
+      session_id: liveSession?.id,
+    });
+
+    const { data: deliveredRows, error: deliveryError } = await supabase
+      .from("student_assignments")
+      .select("student_id")
+      .eq("instructor_id", user.id)
+      .contains("content", { idempotency_key: idempotencyKey });
+
+    if (deliveryError) {
+      log.error("delivery verification query failed", {
+        error_category: "db_verification",
+        idempotency_key: idempotencyKey,
+      });
+    } else {
+      verified = summarizeDelivery(
+        studentIds,
+        (deliveredRows ?? []).map((r) => r.student_id),
+      );
+
+      if (verified.complete) {
+        log.info("delivery verified", {
+          idempotency_key: idempotencyKey,
+          expected: verified.expected,
+          delivered: verified.delivered,
+          success: true,
+        });
+      } else {
+        // Single call logs structured JSON AND forwards to Sentry as an error.
+        log.error("question delivery partial_failure", {
+          error_category: "partial_failure",
+          idempotency_key: idempotencyKey,
+          expected: verified.expected,
+          delivered: verified.delivered,
+          missing_count: verified.missing.length,
+          missing_sample: verified.missing.slice(0, 20),
+          session_code: liveSession?.session_code ?? null,
+          success: false,
+        });
+      }
+    }
+
+    // Log to question_send_logs for monitoring — using the VERIFIED counts.
     try {
       // Convert question_text to string for logging if it's an object
       const questionTextForLog =
@@ -1055,46 +1251,18 @@ serve(async (req) => {
         question_text: questionTextForLog,
         question_type: finalType,
         source: source,
-        success: wasSuccessful,
-        error_message: failedStudents.length > 0 ? `${failedStudents.length} students failed` : null,
-        error_type: failedStudents.length > 0 ? "partial_failure" : null,
-        student_count: studentIds.length,
-        successful_sends: successCount,
-        failed_sends: failedStudents.length,
+        success: verified.delivered > 0,
+        error_message: verified.complete ? null : `${verified.missing.length} students missing their assignment`,
+        error_type: verified.complete ? null : "partial_failure",
+        student_count: verified.expected,
+        successful_sends: verified.delivered,
+        failed_sends: verified.missing.length,
         batch_count: batches.length,
         processing_time_ms: processingTime,
       });
     } catch (logError) {
       console.error("Failed to log question send:", logError);
       // Don't fail the request if logging fails
-    }
-
-    // CRITICAL: Verify delivery immediately after sending
-    console.log("🔍 Verifying delivery for students:", studentIds.slice(0, 3), "...");
-    const { data: deliveryCheck, error: deliveryError } = await supabase
-      .from("student_assignments")
-      .select("id, student_id")
-      .eq("instructor_id", user.id)
-      .contains("content", { idempotency_key: idempotencyKey })
-      .in("student_id", studentIds.slice(0, 10)); // Check first 10 students
-
-    if (deliveryError) {
-      console.error("❌ Delivery verification failed:", deliveryError);
-    } else {
-      console.log("✅ Delivery verified:", {
-        expected: Math.min(10, studentIds.length),
-        actual: deliveryCheck?.length || 0,
-        student_ids: deliveryCheck?.map((d) => d.student_id).slice(0, 5),
-      });
-
-      // Log any discrepancies
-      if (deliveryCheck && deliveryCheck.length < Math.min(10, studentIds.length)) {
-        console.warn("⚠️ Delivery mismatch:", {
-          expected_students: studentIds.slice(0, 10),
-          delivered_to: deliveryCheck.map((d) => d.student_id),
-          missing_count: Math.min(10, studentIds.length) - deliveryCheck.length,
-        });
-      }
     }
 
     // Broadcast notification via Supabase Realtime for instant delivery

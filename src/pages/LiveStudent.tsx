@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, CheckCircle2, XCircle, AlertCircle, Zap } from "lucide-react";
+import { useAnnouncer } from "@/components/accessibility";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -12,11 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfidenceSelector, ConfidenceLevel } from "@/components/student/ConfidenceSelector";
 import { AnimatedXPDisplay } from "@/components/student/AnimatedXPDisplay";
 import { AIGradeDisplay } from "@/components/student/AIGradeDisplay";
+import { LiveTranscriptPanel } from "@/components/student/LiveTranscriptPanel";
 import ReactMarkdown from "react-markdown";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { submitWithOfflineSupport } from "@/lib/offlineSubmit";
 import { CodeEditor } from "@/components/ui/code-editor";
 import { trackQuestionAnswered } from "@/lib/posthogTracking";
+import { EdvanaAnswerCelebration } from "@/components/student/EdvanaAnswerCelebration";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface Question {
@@ -36,6 +39,7 @@ const BASE_REWARD = 10; // Base XP for live questions
 const LiveStudent = () => {
   const { sessionCode } = useParams();
   const navigate = useNavigate();
+  const { announce } = useAnnouncer();
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string>("");
   const [codeAnswer, setCodeAnswer] = useState<string>("");
@@ -62,11 +66,22 @@ const LiveStudent = () => {
   const [sessionTotalXP, setSessionTotalXP] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [showXPPulse, setShowXPPulse] = useState(false);
+  const [celebrationTrigger, setCelebrationTrigger] = useState<number | null>(null);
+  const [celebrationCorrect, setCelebrationCorrect] = useState(false);
 
   // AI Explanation state
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanation, setExplanation] = useState<string>("");
   const [loadingExplanation, setLoadingExplanation] = useState(false);
+
+  // WCAG 3.3.1 / 3.3.3 — programmatically identifiable submit errors
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // WCAG 2.2.1 — Timing Adjustable
+  // NOTE: Live questions intentionally have NO per-question countdown on the
+  // student side. The instructor controls when answers are released, and
+  // students can take as long as they need to submit. This satisfies 2.2.1
+  // by removing the time limit entirely (the strongest form of compliance).
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -91,10 +106,28 @@ const LiveStudent = () => {
     setConfidenceMultiplier(1);
     setPointsEarned(0);
     setGradePending(false); // Reset pending state
+    setSubmitError(null);
     // Reset explanation state
     setShowExplanation(false);
     setExplanation("");
+    // A11y: announce new question to screen readers (assertive — replaces prior)
+    if (currentQuestion?.question_content?.question) {
+      const qType = currentQuestion.question_content.type === "multiple_choice"
+        ? "Multiple choice question"
+        : currentQuestion.question_content.type === "short_answer"
+          ? "Short answer question"
+          : "Coding question";
+      announce(`New ${qType}: ${currentQuestion.question_content.question}`, "assertive");
+    }
   }, [currentQuestion?.id]);
+
+  // A11y: announce grading result
+  useEffect(() => {
+    if (!hasAnswered) return;
+    if (isCorrect === true) announce("Correct answer.", "assertive");
+    else if (isCorrect === false) announce(`Incorrect. Correct answer was ${currentQuestion?.question_content?.correctAnswer ?? "shown above"}.`, "assertive");
+    else announce("Answer submitted.", "polite");
+  }, [hasAnswered, isCorrect]);
 
   // Session ID resolved from session_code for realtime subscription
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -266,21 +299,31 @@ const LiveStudent = () => {
   };
 
   // Extract just the letter from MCQ answer for reliable server-side comparison
+  // NOTE: Removed dangerous first-char fallback that misinterpreted words like "Bones" as "B"
   const extractMCQLetter = (answer: string): string => {
+    const trimmed = answer.trim();
     // If already just a letter, return it
-    if (/^[A-Da-d]$/.test(answer.trim())) {
-      return answer.trim().toUpperCase();
+    if (/^[A-Da-d]$/.test(trimmed)) {
+      return trimmed.toUpperCase();
     }
-    // Extract letter from "B) 206 bones", "B. Answer", etc.
-    const letterMatch = answer.match(/^([A-Da-d])[\).\-\s]/);
+    // Extract letter from explicit prefix formats: "B) 206 bones", "B. Answer", "B - text"
+    const letterMatch = trimmed.match(/^([A-Da-d])[\).\-\s]/);
     if (letterMatch) {
       return letterMatch[1].toUpperCase();
     }
-    // Fallback: return first character if A-D
-    if (/^[A-Da-d]/i.test(answer.trim())) {
-      return answer.trim().charAt(0).toUpperCase();
+    // Match against current question options to find the letter
+    if (currentQuestion?.question_content?.options) {
+      const options = currentQuestion.question_content.options as string[];
+      const letters = ['A', 'B', 'C', 'D'];
+      for (let i = 0; i < options.length && i < 4; i++) {
+        const optText = options[i].replace(/^[A-Da-d][\).\-\s]+\s*/i, '').trim();
+        if (trimmed.toLowerCase() === options[i].toLowerCase() || 
+            trimmed.toLowerCase() === optText.toLowerCase()) {
+          return letters[i];
+        }
+      }
     }
-    return answer; // Return original if no pattern matches
+    return trimmed; // Return original if no pattern matches
   };
 
   const handleSubmitWithConfidence = async (level: ConfidenceLevel, multiplier: number) => {
@@ -349,6 +392,8 @@ const LiveStudent = () => {
           responseTimeMs
         );
         
+        setCelebrationCorrect(!!responseData.isCorrect);
+        setCelebrationTrigger(Date.now());
         if (responseData.isCorrect) {
           toast.success(`Correct! +${responseData.pointsEarned} XP 🎉`);
         } else {
@@ -382,6 +427,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your answer. Check your connection and try again.");
         toast.error("Failed to submit answer");
       }
     } finally {
@@ -504,6 +550,8 @@ const LiveStudent = () => {
           toast.info("Answer submitted! Your instructor will review it soon. ⏱️");
         } else if (responseData.aiGrade !== null) {
           const gradeText = `${responseData.aiGrade}%`;
+          setCelebrationCorrect(responseData.aiGrade >= 70);
+          setCelebrationTrigger(Date.now());
           if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
           } else if (responseData.aiGrade >= 50) {
@@ -526,6 +574,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your answer. Check your connection and try again.");
         toast.error("Failed to submit answer");
       }
     } finally {
@@ -614,6 +663,8 @@ const LiveStudent = () => {
         
         if (responseData.aiGrade !== null) {
           const gradeText = `${responseData.aiGrade}%`;
+          setCelebrationCorrect(responseData.aiGrade >= 70);
+          setCelebrationTrigger(Date.now());
           if (responseData.aiGrade >= 70) {
             toast.success(`Great work! Score: ${gradeText} 🎉`);
           } else if (responseData.aiGrade >= 50) {
@@ -636,6 +687,7 @@ const LiveStudent = () => {
         answeredQuestionsRef.current.add(currentQuestion.id);
         setHasAnswered(true);
       } else {
+        setSubmitError("We couldn't submit your code. Check your connection and try again.");
         toast.error("Failed to submit code. Please try again.");
       }
     } finally {
@@ -645,49 +697,64 @@ const LiveStudent = () => {
 
   if (!currentQuestion) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <main id="main-content" aria-label="Live session" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
             <div className="text-center space-y-2">
               <p className="text-xl font-semibold">Welcome, {nickname}!</p>
-              <p className="text-muted-foreground">Waiting for the instructor to send a question...</p>
+              <p className="text-muted-foreground" role="status" aria-live="polite">
+                Waiting for the instructor to send a question...
+              </p>
             </div>
           </CardContent>
         </Card>
-      </div>
+        <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-2xl z-30 pointer-events-auto">
+          <LiveTranscriptPanel sessionId={sessionId} />
+        </div>
+      </main>
     );
   }
 
   // Safeguard: ensure question_content exists before rendering
   if (!currentQuestion?.question_content) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+      <main id="main-content" aria-label="Live session" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="flex flex-col items-center justify-center p-12 space-y-4">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-muted-foreground">Loading question...</p>
+            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
+            <p className="text-muted-foreground" role="status" aria-live="polite">Loading question...</p>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   const isMCQ = currentQuestion.question_content.type === "multiple_choice";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+    <main id="main-content" aria-label="Live session question" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 relative">
+      <EdvanaAnswerCelebration
+        trigger={celebrationTrigger}
+        isCorrect={celebrationCorrect}
+        multiplier={confidenceMultiplier}
+      />
       {/* Session XP Tracker - Fixed top right */}
       {questionsAnswered > 0 && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-card border border-border shadow-lg transition-all duration-300 ${showXPPulse ? 'scale-110 ring-2 ring-primary/50' : 'scale-100'}`}>
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label={`Session score: ${sessionTotalXP} XP, ${questionsAnswered} question${questionsAnswered !== 1 ? 's' : ''} answered`}
+          className={`fixed top-2 right-2 sm:top-4 sm:right-4 z-50 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full bg-card border border-border shadow-lg max-w-[calc(100vw-1rem)] motion-safe:transition-all motion-safe:duration-300 ${showXPPulse ? 'motion-safe:scale-110 ring-2 ring-primary/50' : 'scale-100'}`}
+        >
           <div className="flex items-center gap-1.5">
-            <Zap className="w-5 h-5 text-primary fill-primary" />
+            <Zap className="w-5 h-5 text-primary fill-primary" aria-hidden="true" />
             <span className="text-lg font-bold text-foreground">
               {sessionTotalXP > 0 ? '+' : ''}{sessionTotalXP}
             </span>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">XP</span>
           </div>
-          <div className="w-px h-5 bg-border" />
+          <div className="w-px h-5 bg-border" aria-hidden="true" />
           <span className="text-xs text-muted-foreground">
             {questionsAnswered} Q{questionsAnswered !== 1 ? 's' : ''}
           </span>
@@ -754,14 +821,25 @@ const LiveStudent = () => {
               {/* Short answer (no confidence betting) */}
               {currentQuestion.question_content.type === "short_answer" && (
                 <>
+                  <Label htmlFor="short-answer-input" className="sr-only">
+                    Your short answer
+                  </Label>
                   <Textarea
+                    id="short-answer-input"
                     value={selectedAnswer}
-                    onChange={(e) => setSelectedAnswer(e.target.value)}
+                    onChange={(e) => { setSelectedAnswer(e.target.value); if (submitError) setSubmitError(null); }}
                     onFocus={() => setIsTyping(true)}
                     onBlur={() => setIsTyping(false)}
                     placeholder="Type your answer here..."
                     className="min-h-[120px]"
+                    aria-invalid={!!submitError}
+                    aria-describedby={submitError ? "submit-error" : undefined}
                   />
+                  {submitError && (
+                    <p id="submit-error" role="alert" className="text-sm font-medium text-destructive">
+                      {submitError}
+                    </p>
+                  )}
                   <Button 
                     onClick={handleSubmit} 
                     className="w-full" 
@@ -832,6 +910,14 @@ const LiveStudent = () => {
                       simpleMode={currentQuestion.question_content.type === "coding_simple"}
                     />
                   </div>
+
+                  {submitError && (
+                    <p id="submit-error" role="alert" className="text-sm font-medium text-destructive">
+                      {submitError}
+                    </p>
+                  )}
+
+
                   
                   <Button 
                     onClick={handleCodingSubmit} 
@@ -1031,7 +1117,10 @@ const LiveStudent = () => {
         </CardContent>
       </Card>
       </div>
-    </div>
+      <div className="fixed bottom-4 left-4 right-4 mx-auto max-w-2xl z-30 pointer-events-auto">
+        <LiveTranscriptPanel sessionId={sessionId} />
+      </div>
+    </main>
   );
 };
 

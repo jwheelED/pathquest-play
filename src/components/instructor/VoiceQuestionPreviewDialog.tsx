@@ -18,9 +18,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MathRenderer } from '@/components/ui/math-renderer';
 
+export interface CodingPreviewPayload {
+  problemStatement?: string;
+  functionSignature?: string;
+  language?: string;
+  difficulty?: string;
+  constraints?: string[];
+  examples?: Array<{ input?: string; output?: string; explanation?: string }>;
+  hints?: string[];
+  starterCode?: string;
+  testCases?: Array<{ input?: string; expectedOutput?: string }>;
+  title?: string;
+  // Simple-style fallback: short reference answer used for grading
+  expected_answer?: string;
+}
+
 export interface ExtractedVoiceQuestion {
   question_text: string;
-  suggested_type: 'short_answer' | 'multiple_choice' | 'poll';
+  suggested_type: 'short_answer' | 'multiple_choice' | 'poll' | 'coding' | 'coding_simple';
   // MCQ fields (pre-generated for editing)
   options?: string[];
   correct_answer?: 'A' | 'B' | 'C' | 'D';
@@ -29,7 +44,11 @@ export interface ExtractedVoiceQuestion {
   expected_answer?: string;
   // Source transcript for context display
   source_transcript?: string;
+  // Coding payload (full or simple). When present, the backend uses these
+  // fields directly instead of regenerating the coding problem.
+  coding_payload?: CodingPreviewPayload;
 }
+
 
 interface VoiceQuestionPreviewDialogProps {
   open: boolean;
@@ -38,6 +57,7 @@ interface VoiceQuestionPreviewDialogProps {
   onConfirmSend: (editedQuestion: ExtractedVoiceQuestion) => void;
   isSending: boolean;
   sourceTranscript?: string;
+  courseId?: string | null;
 }
 
 export function VoiceQuestionPreviewDialog({
@@ -47,6 +67,7 @@ export function VoiceQuestionPreviewDialog({
   onConfirmSend,
   isSending,
   sourceTranscript,
+  courseId,
 }: VoiceQuestionPreviewDialogProps) {
   const { toast } = useToast();
   const [questionText, setQuestionText] = useState('');
@@ -57,6 +78,61 @@ export function VoiceQuestionPreviewDialog({
   const [expectedAnswer, setExpectedAnswer] = useState('');
   const [isGeneratingExpectedAnswer, setIsGeneratingExpectedAnswer] = useState(false);
   const [showMathPreview, setShowMathPreview] = useState(false);
+  const [bankMatch, setBankMatch] = useState<{ id: string; title: string; source: string } | null>(null);
+
+  // Reset bank match indicator when the question changes
+  useEffect(() => {
+    setBankMatch(null);
+  }, [extractedQuestion?.question_text]);
+
+  /**
+   * Look up an exact/semantic match in the instructor's question bank for the
+   * given format. Returns true if a match was found and applied to local state
+   * (caller should then skip AI generation).
+   */
+  const tryApplyBankMatch = async (
+    format: 'multiple_choice' | 'poll' | 'short_answer'
+  ): Promise<boolean> => {
+    try {
+      const { data: matchData } = await supabase.functions.invoke('match-bank-question', {
+        body: { question_text: questionText, course_id: courseId ?? null, format },
+      });
+      const m = matchData?.match;
+      if (!m || !m.question_content) return false;
+      const qc = m.question_content;
+
+      if (format === 'multiple_choice' || format === 'poll') {
+        const opts: string[] | undefined = Array.isArray(qc.options) ? qc.options : undefined;
+        if (opts && opts.length === 4) {
+          setMcqOptions(opts);
+          const ca = qc.correctAnswer || qc.correct_answer;
+          if (ca && ['A', 'B', 'C', 'D'].includes(ca) && format === 'multiple_choice') {
+            setCorrectAnswer(ca as 'A' | 'B' | 'C' | 'D');
+          }
+          setBankMatch({ id: m.id, title: m.title, source: matchData?.source || 'match' });
+          toast({
+            title: 'Matched from Question Bank',
+            description: `Using "${m.title}" instead of generating new options.`,
+          });
+          return true;
+        }
+      } else if (format === 'short_answer') {
+        const ea = qc.expectedAnswer || qc.expected_answer || qc.finalAnswer;
+        if (ea) {
+          setExpectedAnswer(String(ea));
+          setBankMatch({ id: m.id, title: m.title, source: matchData?.source || 'match' });
+          toast({
+            title: 'Matched from Question Bank',
+            description: `Using expected answer from "${m.title}".`,
+          });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Bank match lookup failed, falling back to AI', e);
+    }
+    return false;
+  };
 
   // Initialize state when extracted question changes
   useEffect(() => {
@@ -64,7 +140,14 @@ export function VoiceQuestionPreviewDialog({
       // Strip any HTML tags as defense-in-depth (AI sometimes returns markup)
       const sanitizedText = extractedQuestion.question_text.replace(/<[^>]*>/g, '').trim();
       setQuestionText(sanitizedText);
-      setQuestionType(extractedQuestion.suggested_type);
+      // VoiceQuestionPreviewDialog only renders MCQ/Short Answer/Poll. Coding
+      // bypasses this modal (handled inline via QuestionOnDeck), so narrow the
+      // type back to the modal's supported set.
+      const modalType = (extractedQuestion.suggested_type === 'coding' || extractedQuestion.suggested_type === 'coding_simple')
+        ? 'short_answer'
+        : extractedQuestion.suggested_type;
+      setQuestionType(modalType as 'short_answer' | 'multiple_choice' | 'poll');
+
       
       // Initialize MCQ options from pre-generated data or reset
       if (extractedQuestion.options && extractedQuestion.options.length === 4) {
@@ -153,9 +236,14 @@ export function VoiceQuestionPreviewDialog({
 
     setIsGeneratingExpectedAnswer(true);
     try {
+      // First try the question bank for an exact/semantic match
+      const bankHit = await tryApplyBankMatch('short_answer');
+      if (bankHit) return;
+
       const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -191,6 +279,7 @@ export function VoiceQuestionPreviewDialog({
       const { data, error } = await supabase.functions.invoke('generate-expected-answer', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -223,10 +312,16 @@ export function VoiceQuestionPreviewDialog({
     setIsGeneratingOptions(true);
     try {
       console.log('🔄 Auto-generating MCQ options for:', questionText.substring(0, 50));
-      
+
+      // First try the question bank for an exact/semantic match (MCQ + poll share opts)
+      const fmt = questionType === 'poll' ? 'poll' : 'multiple_choice';
+      const bankHit = await tryApplyBankMatch(fmt);
+      if (bankHit) return;
+
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -277,6 +372,7 @@ export function VoiceQuestionPreviewDialog({
       const { data, error } = await supabase.functions.invoke('generate-mcq-options', {
         body: {
           question_text: questionText,
+          source_transcript: sourceTranscript || extractedQuestion?.source_transcript,
         },
       });
 
@@ -346,7 +442,7 @@ export function VoiceQuestionPreviewDialog({
 
   const getTypeLabel = () => {
     if (questionType === 'multiple_choice') return 'Multiple Choice';
-    if (questionType === 'poll') return 'Poll (Ungraded)';
+    if (questionType === 'poll') return 'Poll';
     return 'Short Answer';
   };
 
@@ -374,6 +470,17 @@ export function VoiceQuestionPreviewDialog({
               <div className="p-3 bg-muted/40 rounded-lg border border-border/50 text-sm text-muted-foreground leading-relaxed max-h-32 overflow-y-auto">
                 <p className="italic">"...{sourceTranscript.trim()}..."</p>
               </div>
+            </div>
+          )}
+
+          {/* Bank match indicator */}
+          {bankMatch && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>
+                Matched from Question Bank: <span className="font-semibold">{bankMatch.title}</span>
+                <span className="text-xs text-emerald-700 ml-1">({bankMatch.source})</span>
+              </span>
             </div>
           )}
 
@@ -415,7 +522,7 @@ export function VoiceQuestionPreviewDialog({
                 <RadioGroupItem value="poll" id="poll" />
                 <Label htmlFor="poll" className="flex items-center gap-1 cursor-pointer">
                   <BarChart3 className="h-4 w-4" />
-                  Poll (Ungraded)
+                  Poll
                 </Label>
               </div>
             </RadioGroup>

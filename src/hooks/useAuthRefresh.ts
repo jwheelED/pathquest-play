@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const TOKEN_REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
 const SESSION_CHECK_INTERVAL = 30 * 1000; // 30 seconds
+let refreshInFlight: Promise<void> | null = null;
 
 export const useAuthRefresh = (isActive: boolean = true) => {
   const { toast } = useToast();
@@ -32,7 +33,16 @@ export const useAuthRefresh = (isActive: boolean = true) => {
     }
 
     const refreshToken = async () => {
+      if (refreshInFlight) return refreshInFlight;
+
+      refreshInFlight = (async () => {
       try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!currentSession) return;
+
+        const expiresAtMs = (currentSession.expires_at ?? 0) * 1000;
+        if (expiresAtMs - Date.now() > TOKEN_REFRESH_INTERVAL) return;
+
         const { data: { session }, error } = await supabase.auth.refreshSession();
         
         if (error) {
@@ -51,7 +61,12 @@ export const useAuthRefresh = (isActive: boolean = true) => {
         }
       } catch (error) {
         console.error('Token refresh error:', error);
+      } finally {
+        refreshInFlight = null;
       }
+      })();
+
+      return refreshInFlight;
     };
 
     const checkSession = async () => {
@@ -72,7 +87,7 @@ export const useAuthRefresh = (isActive: boolean = true) => {
       }
     };
 
-    refreshToken();
+    checkSession();
 
     refreshIntervalRef.current = setInterval(refreshToken, TOKEN_REFRESH_INTERVAL);
     checkIntervalRef.current = setInterval(checkSession, SESSION_CHECK_INTERVAL);

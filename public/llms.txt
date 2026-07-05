@@ -1,0 +1,16 @@
+# Edvana
+
+> Edvana is a live lecture capture and classroom engagement platform. Real-time transcription, AI-generated check-in questions, confidence-based learning, and post-session analytics for higher education and corporate training.
+
+## Pages
+
+- [Home](/): Product overview, features, and pricing for instructors and institutions.
+- [Learn more](/learn-more): Expanded walkthrough of the instructor and student experience.
+- [Corporate Events](/corporate/events): Edvana for conferences, summits, and corporate events.
+- [Corporate Enterprise](/corporate/enterprise): Enterprise training and L&D positioning.
+- [Booth Flyer](/flyer): One-page printable overview of the platform.
+
+## Optional
+
+- [Privacy Policy](/privacy): How Edvana collects, uses, and protects user data.
+- [Accessibility Statement](/accessibility): Edvana's accessibility commitments and standards.

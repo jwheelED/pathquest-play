@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code, BookOpen, Presentation, Video, Radio, Copy, LayoutDashboard, Users, FileText, Library, Settings, Award } from "lucide-react";
 import { PendingOrgInvites } from "@/components/instructor/PendingOrgInvites";
-import { SessionReadyModule } from "@/components/instructor/SessionReadyModule";
+import { CommandStripHero } from "@/components/instructor/CommandStripHero";
 import { toast } from "sonner";
-import { logger } from "@/lib/logger";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { QuickActions } from "@/components/dashboard/QuickActions";
-import { LastSessionSummary } from "@/components/instructor/LastSessionSummary";
-import { QuickMetricsGrid } from "@/components/instructor/QuickMetricsGrid";
+import { LiveStatusSection } from "@/components/instructor/LiveStatusSection";
+import { LastSessionCard } from "@/components/instructor/LastSessionCard";
+import { LiveUnderstandingHealth } from "@/components/instructor/LiveUnderstandingHealth";
+import { RecentUnderstandingPatterns } from "@/components/instructor/RecentUnderstandingPatterns";
+import { RecentSessionsList } from "@/components/instructor/RecentSessionsList";
+import { AccountSnapshot } from "@/components/instructor/AccountSnapshot";
 import { CheckInPreview } from "@/components/instructor/CheckInPreview";
-import { RecentSessionsTable } from "@/components/instructor/RecentSessionsTable";
 import { CourseSelector } from "@/components/instructor/CourseSelector";
 import StudentDetailDialog from "@/components/instructor/StudentDetailDialog";
 import { StudentRosterPanel } from "@/components/instructor/StudentRosterPanel";
@@ -33,17 +35,18 @@ import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { useLiveTranscriptBroadcast } from "@/hooks/useLiveTranscriptBroadcast";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
-
-interface Student {
-  id: string;
-  name: string;
-  current_streak: number;
-  completedLessons: number;
-  totalLessons: number;
-  averageMasteryAttempts?: number;
-  average_grade?: number;
-}
+import { LiveSessionStrip } from "@/components/instructor/LiveSessionStrip";
+import { LiveCopilotHero } from "@/components/instructor/LiveCopilotHero";
+import { HowItWorksSection } from "@/components/instructor/HowItWorksSection";
+import { SessionReadiness } from "@/components/instructor/SessionReadiness";
+import { LastLiveSignal } from "@/components/instructor/LastLiveSignal";
+import { LiveToolsSection } from "@/components/instructor/LiveToolsSection";
+import { LiveResponsesEmpty } from "@/components/instructor/LiveResponsesEmpty";
+import { useQueryClient } from "@tanstack/react-query";
+import { useStudentRoster, rosterQueryKey } from "@/hooks/useStudentRoster";
+import { useStudentDetail } from "@/hooks/useStudentDetail";
 
 type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "question-bank" | "summaries" | "settings";
 
@@ -62,7 +65,6 @@ export default function InstructorDashboard() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [instructorCode, setInstructorCode] = useState<string>("");
-  const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -71,21 +73,133 @@ export default function InstructorDashboard() {
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
-  const fetchDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [autoQuestionEnabled, setAutoQuestionEnabled] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
+  const [micConnected, setMicConnected] = useState(true);
+  const [hasCheckIns, setHasCheckIns] = useState(false);
+  // Transcription state from LectureTranscription
+  const [transcriptChunks, setTranscriptChunks] = useState<string[]>([]);
+  const [currentTranscript, setCurrentTranscript] = useState("");
+  const [questionCandidate, setQuestionCandidate] = useState<any>(null);
+  const [isSendingQuestion, setIsSendingQuestion] = useState(false);
+  const [isQuestionHeld, setIsQuestionHeld] = useState(false);
+  const [autoQuestionState, setAutoQuestionState] = useState({ intervalMinutes: 15, nextQuestionIn: 0, isSending: false });
+  // Refs for callbacks
+  const onSendQuestionRef = useRef<((text: string, type?: string, options?: string[], correctAnswer?: string, expectedAnswer?: string, codingPayload?: Record<string, unknown>) => void) | null>(null);
+  const onPreviewQuestionRef = useRef<((text: string) => void) | null>(null);
+  const onDismissQuestionRef = useRef<(() => void) | null>(null);
+  const onStartRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const onStopRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const onAutoQuestionIntervalChangeRef = useRef<((minutes: number) => void) | null>(null);
+  const onAutoQuestionToggleRef = useRef<((enabled: boolean) => Promise<void>) | null>(null);
   const { selectedCourseId, selectedCourse } = useCourseContext();
-  
+
+  // Roster + per-student detail for the Students tab. Roster derives
+  // participation/comprehension signals (lib/studentSignals); detail lazily
+  // loads the question-by-question responses and activity feed.
+  const queryClient = useQueryClient();
+  const rosterQuery = useStudentRoster(currentUser?.id ?? null, selectedCourseId ?? null);
+  const rosterStudents = rosterQuery.data?.students ?? [];
+  const courseVideos = rosterQuery.data?.videos ?? [];
+  const studentDetailQuery = useStudentDetail(
+    selectedStudentId,
+    currentUser?.id ?? null,
+    selectedCourseId ?? null,
+    courseVideos,
+  );
+
   const professorType = instructorProfile?.professor_type;
+
+  // Stream live transcript chunks to enrolled students (realtime + persistence)
+  useLiveTranscriptBroadcast({
+    sessionId: liveSessionId,
+    instructorId: currentUser?.id ?? null,
+    courseId: selectedCourseId ?? null,
+    chunks: transcriptChunks,
+    enabled: isListening && !!liveSessionId,
+  });
+
+  // Auto-create a lightweight live_session whenever the instructor starts
+  // recording (even without explicitly opening a live class). This lets
+  // enrolled students see the live transcript from their class dashboard the
+  // moment "Start Recording" is pressed.
+  const autoCreatedSessionRef = useRef<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const ensureSession = async () => {
+      if (!isListening || liveSessionId || !currentUser?.id) return;
+      try {
+        // Route through the canonical edge function (same as LiveSessionControls
+        // / CommandStripHero) so the recording session gets a real session_code
+        // and server-side validation instead of a bare client insert.
+        const { data, error } = await supabase.functions.invoke("create-live-session", {
+          body: { title: "Recording session", courseId: selectedCourseId ?? undefined },
+        });
+        if (cancelled) return;
+        if (error || !data?.session?.id) {
+          console.warn("Failed to auto-create live session for recording", error);
+          return;
+        }
+        autoCreatedSessionRef.current = data.session.id;
+        setLiveSessionId(data.session.id);
+      } catch (err) {
+        console.warn("Auto live_session creation threw", err);
+      }
+    };
+    ensureSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [isListening, liveSessionId, currentUser?.id, selectedCourseId]);
+
+  // When recording stops, close out any session we auto-created so the
+  // "Live now" indicator disappears from the student dashboard.
+  useEffect(() => {
+    if (isListening) return;
+    const id = autoCreatedSessionRef.current;
+    if (!id) return;
+    autoCreatedSessionRef.current = null;
+    supabase
+      .from("live_sessions")
+      .update({ is_active: false })
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) console.warn("Failed to close auto live session", error);
+      });
+    setLiveSessionId((curr) => (curr === id ? null : curr));
+  }, [isListening]);
+
 
   useEffect(() => {
     checkAuth();
   }, []);
-  
-  // Refetch students when course changes
+
+  // Fetch participant count when active session changes
   useEffect(() => {
-    if (currentUser && selectedCourseId) {
-      fetchStudents();
+    if (!activeSession?.id) {
+      setParticipantCount(0);
+      return;
     }
-  }, [selectedCourseId, currentUser]);
+
+    const fetchParticipantCount = async () => {
+      const { count, error } = await supabase
+        .from("live_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", activeSession.id);
+      
+      if (!error) {
+        setParticipantCount(count || 0);
+      }
+    };
+
+    fetchParticipantCount();
+    
+    // Poll every 5 seconds
+    const interval = setInterval(fetchParticipantCount, 5000);
+    
+    return () => clearInterval(interval);
+  }, [activeSession?.id]);
   
   useEffect(() => {
     const lastReminderDate = localStorage.getItem('lastCourseMaterialsReminder');
@@ -103,6 +217,14 @@ export default function InstructorDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Roster freshness: invalidate the TanStack key and let query dedup
+      // absorb event bursts. The old unfiltered user_stats subscription
+      // (refetch on ANY student's XP change org-wide) was removed along with
+      // the gamification display.
+      const invalidateRoster = () => {
+        queryClient.invalidateQueries({ queryKey: ["student-roster"] });
+      };
+
       const channel = supabase
         .channel('instructor-realtime-updates')
         .on(
@@ -113,9 +235,8 @@ export default function InstructorDashboard() {
             table: 'instructor_students',
             filter: `instructor_id=eq.${user.id}`
           },
-          (payload) => {
-            console.log('👥 New student joined:', payload);
-            fetchStudents();
+          () => {
+            invalidateRoster();
             toast.success('New student joined the class!', { duration: 3000 });
           }
         )
@@ -127,31 +248,8 @@ export default function InstructorDashboard() {
             table: 'student_assignments',
             filter: `instructor_id=eq.${user.id}`
           },
-          (payload) => {
-            console.log('📋 Assignment update:', payload);
-            if (fetchDebounceTimer.current) {
-              clearTimeout(fetchDebounceTimer.current);
-            }
-            fetchDebounceTimer.current = setTimeout(() => {
-              fetchStudents();
-            }, 500);
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'user_stats'
-          },
-          (payload) => {
-            console.log('📊 Student stats updated:', payload);
-            if (fetchDebounceTimer.current) {
-              clearTimeout(fetchDebounceTimer.current);
-            }
-            fetchDebounceTimer.current = setTimeout(() => {
-              fetchStudents();
-            }, 500);
+          () => {
+            invalidateRoster();
           }
         )
         .subscribe((status) => {
@@ -195,7 +293,7 @@ export default function InstructorDashboard() {
     
     const { data: profile } = await supabase
       .from("profiles")
-      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name")
+      .select("instructor_code, course_title, course_schedule, course_topics, onboarded, professor_type, full_name, question_format_preference, coding_question_style")
       .eq("id", session.user.id)
       .single();
     
@@ -207,114 +305,26 @@ export default function InstructorDashboard() {
       return;
     }
 
-    if (!profile?.course_title || !profile.course_schedule || 
-        !profile.course_topics || profile.course_topics.length === 0) {
-      toast.warning("⚠️ Your course details are incomplete. Please update them in onboarding.", {
-        duration: 5000,
-      });
+    // Check the courses table (source of truth) instead of legacy profile fields.
+    // Legacy accounts may have onboarded=true but no course row yet — send them
+    // back to onboarding to create their first course rather than stranding them
+    // on a dashboard with no course context.
+    const { data: existingCourses } = await supabase
+      .from("courses")
+      .select("id")
+      .eq("instructor_id", session.user.id)
+      .eq("is_active", true)
+      .limit(1);
+
+    if (!existingCourses || existingCourses.length === 0) {
+      toast.info("Let's finish setting up your first course.");
+      navigate("/instructor/onboarding");
+      return;
     }
 
     setCurrentUser(session.user);
     setInstructorCode(profile.instructor_code || "");
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      if (!selectedCourseId) {
-        setStudents([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data: studentLinks } = await supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id)
-        .or(`course_id.eq.${selectedCourseId},course_id.is.null`)
-        .limit(100);
-
-      if (!studentLinks || studentLinks.length === 0) {
-        setStudents([]);
-        setLoading(false);
-        return;
-      }
-
-      const studentIds = studentLinks.map(link => link.student_id);
-
-      const [profilesData, statsData, progressData, masteryData, gradesData] = await Promise.all([
-        supabase.from("profiles").select("id, full_name").in("id", studentIds),
-        supabase.from("user_stats").select("*").in("user_id", studentIds),
-        supabase.from("lesson_progress").select("user_id, completed").in("user_id", studentIds),
-        supabase.from("lesson_mastery").select("user_id, attempt_count, is_mastered").in("user_id", studentIds),
-        supabase
-          .from("student_assignments")
-          .select("student_id, grade")
-          .eq("assignment_type", "lecture_checkin")
-          .eq("instructor_id", user.id)
-          .eq("course_id", selectedCourseId)
-          .in("student_id", studentIds),
-      ]);
-
-      const statsMap = new Map(statsData.data?.map(s => [s.user_id, s]));
-      const progressMap = new Map<string, number>();
-      const masteryMap = new Map<string, { total: number; sum: number }>();
-      const gradesMap = new Map<string, number[]>();
-
-      progressData.data?.forEach(p => {
-        if (p.completed) {
-          progressMap.set(p.user_id, (progressMap.get(p.user_id) || 0) + 1);
-        }
-      });
-
-      masteryData.data?.forEach(m => {
-        if (m.is_mastered) {
-          const existing = masteryMap.get(m.user_id) || { total: 0, sum: 0 };
-          masteryMap.set(m.user_id, {
-            total: existing.total + 1,
-            sum: existing.sum + m.attempt_count
-          });
-        }
-      });
-
-      gradesData.data?.forEach(g => {
-        if (g.grade !== null) {
-          const existing = gradesMap.get(g.student_id) || [];
-          existing.push(Number(g.grade));
-          gradesMap.set(g.student_id, existing);
-        }
-      });
-
-      const profileRows = profilesData.data || [];
-      const combinedStudents = profileRows.map((profile) => {
-        const stats = statsMap.get(profile.id);
-        const completedLessons = progressMap.get(profile.id) || 0;
-        const mastery = masteryMap.get(profile.id);
-        const avgMasteryAttempts = mastery ? mastery.sum / mastery.total : undefined;
-        const grades = gradesMap.get(profile.id) || [];
-        const average_grade =
-          grades.length > 0 ? grades.reduce((sum, g) => sum + g, 0) / grades.length : undefined;
-
-        return {
-          id: profile.id,
-          name: profile.full_name || "Student",
-          current_streak: stats?.current_streak || 0,
-          completedLessons,
-          totalLessons: 10,
-          averageMasteryAttempts: avgMasteryAttempts,
-          average_grade,
-        };
-      });
-
-      setStudents(combinedStudents);
-    } catch (error) {
-      logger.error("Error fetching students:", error);
-      toast.error("Failed to load students");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(false);
   };
 
   const handleLogout = async () => {
@@ -324,82 +334,10 @@ export default function InstructorDashboard() {
     navigate("/instructor/auth");
   };
 
-  const handleStudentClick = async (studentId: string) => {
+  // Selecting a row opens the detail panel; the response-drilldown dialog
+  // opens only via the panel's "View all responses" button.
+  const handleStudentClick = (studentId: string) => {
     setSelectedStudentId(studentId);
-    setDialogOpen(true);
-  };
-
-
-  const [selectedStudentDetail, setSelectedStudentDetail] = useState<any>(null);
-
-  useEffect(() => {
-    if (selectedStudentId && dialogOpen) {
-      fetchStudentDetail(selectedStudentId);
-    }
-  }, [selectedStudentId, dialogOpen]);
-
-  const fetchStudentDetail = async (studentId: string) => {
-    const student = students.find(s => s.id === studentId);
-    if (!student) return;
-
-    try {
-      const { data: attempts } = await supabase
-        .from("problem_attempts")
-        .select(`
-          *,
-          stem_problems(problem_text)
-        `)
-        .eq("user_id", studentId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      const { data: lessonActivity } = await supabase
-        .from("lesson_progress")
-        .select(`
-          *,
-          lessons(title)
-        `)
-        .eq("user_id", studentId)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      const { data: achievementActivity } = await supabase
-        .from("user_achievements")
-        .select(`
-          *,
-          achievements(name)
-        `)
-        .eq("user_id", studentId)
-        .order("earned_at", { ascending: false })
-        .limit(5);
-
-      const recentActivity = [
-        ...(lessonActivity?.map(l => ({
-          type: "Lesson Completed",
-          description: (l as any).lessons?.title || "Unknown lesson",
-          date: l.created_at || new Date().toISOString(),
-        })) || []),
-        ...(achievementActivity?.map(a => ({
-          type: "Achievement Unlocked",
-          description: (a as any).achievements?.name || "Unknown achievement",
-          date: a.earned_at,
-        })) || []),
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
-
-      setSelectedStudentDetail({
-        ...student,
-        problemAttempts: attempts?.map(a => ({
-          problem_text: (a as any).stem_problems?.problem_text || "Unknown problem",
-          is_correct: a.is_correct,
-          time_spent_seconds: a.time_spent_seconds || 0,
-          created_at: a.created_at,
-        })) || [],
-        recentActivity,
-      });
-    } catch (error) {
-      logger.error("Error fetching student details:", error);
-      toast.error("Failed to load student details");
-    }
   };
 
   if (loading) {
@@ -428,71 +366,148 @@ export default function InstructorDashboard() {
     switch (activeTab) {
       case "overview":
         return (
-          <div className="space-y-6">
+          <div className="space-y-10">
+            {/* Pending Invites - Top priority notification */}
             <PendingOrgInvites />
-            <SessionReadyModule
-              activeSession={activeSession}
-              onStartLive={() => setActiveTab("live")}
-              onPresentSlides={() => navigate("/instructor/slides")}
-            />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <LastSessionSummary onNavigate={(tab) => setActiveTab(tab as TabValue)} />
-              <QuickMetricsGrid />
-            </div>
+            
+            {/* ===== PRIMARY SECTION: Command Strip Hero ===== */}
+            <section>
+              <CommandStripHero
+                activeSession={activeSession}
+                onStartLive={() => setActiveTab("live")}
+                onPresentSlides={() => navigate("/instructor/slides")}
+                onSessionChange={setLiveSessionId}
+                setActiveSession={setActiveSession}
+              />
+            </section>
+            
+            {/* ===== SECONDARY SECTION: Live Status + Last Session ===== */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <LiveStatusSection 
+                onStartLive={() => setActiveTab("live")}
+                onViewSummary={() => setActiveTab("summaries")}
+              />
+              <LastSessionCard onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+            </section>
+            
+            {/* ===== TERTIARY SECTION: Live Understanding Health ===== */}
+            <section>
+              <LiveUnderstandingHealth />
+            </section>
+            
+            {/* ===== TERTIARY SECTION: Recent Understanding Patterns ===== */}
+            <section>
+              <RecentUnderstandingPatterns 
+                onViewPatterns={() => setActiveTab("live")}
+              />
+            </section>
+            
+            {/* Check-in Preview (only shows when session active) */}
             <CheckInPreview
               activeSessionId={activeSession?.id}
               onNavigate={(tab) => setActiveTab(tab as TabValue)}
             />
-            <RecentSessionsTable onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+            
+            {/* ===== LOWER PRIORITY: Recent Sessions ===== */}
+            <section className="pt-2">
+              <RecentSessionsList onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+            </section>
+            
+            {/* ===== LOWEST PRIORITY: Account Snapshot + Quick Actions ===== */}
+            <section className="border-t border-slate-100 pt-8 mt-4">
+              <AccountSnapshot 
+                onNavigate={(tab) => setActiveTab(tab as TabValue)}
+                onStartLive={() => setActiveTab("live")}
+                onPresentSlides={() => navigate("/instructor/slides")}
+              />
+            </section>
           </div>
         );
 
       case "live":
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* LiveSessionControls is rendered outside switch to persist - shown here */}
-              <Card className="headspace-card border-primary/20 bg-gradient-to-br from-primary/5 to-transparent h-fit">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Presentation className="h-5 w-5 text-primary" />
-                    Slide Presenter
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                    Present slides with integrated live lecture tools
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button 
-                    onClick={() => navigate('/instructor/slides')}
-                    className="w-full rounded-xl"
-                  >
-                    Open Slide Presenter
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            {/* ===== SESSION CONTROLS: Start/manage live session ===== */}
+            <section>
+              <CommandStripHero
+                activeSession={activeSession}
+                onStartLive={() => {}}
+                onPresentSlides={() => navigate("/instructor/slides")}
+                onSessionChange={setLiveSessionId}
+                setActiveSession={setActiveSession}
+              />
+            </section>
 
-            {/* LectureTranscription is now rendered outside tabs to persist recording */}
-            
-            {/* Live session responses - only shown when a live session is active */}
-            {activeSession?.id && (
-              <div className="min-w-0">
-                <LiveSessionResults sessionId={activeSession.id} />
-              </div>
+            {/* ===== LIVE COPILOT HERO: Main action center ===== */}
+            <section>
+              <LiveCopilotHero
+                isListening={isListening}
+                autoQuestionEnabled={autoQuestionEnabled}
+                onStartListening={() => onStartRecordingRef.current?.()}
+                onStopListening={() => onStopRecordingRef.current?.()}
+                onToggleAutoQuestion={(enabled) => onAutoQuestionToggleRef.current?.(enabled)}
+                participantCount={participantCount}
+                transcriptChunks={transcriptChunks}
+                currentTranscript={currentTranscript}
+                questionCandidate={questionCandidate}
+                isSendingQuestion={isSendingQuestion}
+                onSendQuestion={(text, type, options, correctAnswer, expectedAnswer, codingPayload) => onSendQuestionRef.current?.(text, type, options, correctAnswer, expectedAnswer, codingPayload)}
+                onPreviewQuestion={(text) => onPreviewQuestionRef.current?.(text)}
+                onDismissQuestion={() => onDismissQuestionRef.current?.()}
+                isQuestionHeld={isQuestionHeld}
+                onToggleQuestionHold={() => setIsQuestionHeld(h => !h)}
+                onViewLiveResponses={() => setActiveTab("live")}
+                formatPreference={instructorProfile?.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding' | undefined}
+                codingStyle={(instructorProfile?.coding_question_style as 'simple' | 'full' | undefined) ?? 'simple'}
+                intervalMinutes={autoQuestionState.intervalMinutes}
+                nextQuestionIn={autoQuestionState.nextQuestionIn}
+                onIntervalChange={(minutes) => onAutoQuestionIntervalChangeRef.current?.(minutes)}
+                courseId={selectedCourseId}
+              />
+            </section>
+
+            {/* ===== HOW IT WORKS: Educational section (hide when listening) ===== */}
+            {!isListening && (
+              <section>
+                <HowItWorksSection />
+              </section>
             )}
 
-            <div className="min-w-0">
-              <LectureCheckInResults />
-            </div>
+            {/* ===== SESSION READINESS: Pre-flight indicators ===== */}
+            {!isListening && (
+              <section>
+                <SessionReadiness
+                  isLive={!!activeSession?.is_active}
+                  micConnected={micConnected}
+                  participantCount={participantCount}
+                  autoQuestionEnabled={autoQuestionEnabled}
+                />
+              </section>
+            )}
 
-            <div className="min-w-0">
+            {/* ===== LOWER PRIORITY: Live Responses + Tools ===== */}
+            {!isListening && (
+              <section>
+                <LiveToolsSection onNavigate={(tab) => setActiveTab(tab as TabValue)} />
+              </section>
+            )}
+
+            {/* ===== CHECK-IN RESULTS: Always visible at bottom ===== */}
+            <section>
+              <LiveResponsesEmpty hasActiveSession={!!activeSession?.id} activeSessionId={activeSession?.id} />
+            </section>
+
+            {/* ===== LAST LIVE SIGNAL: Below primary surface ===== */}
+            {!isListening && (
+              <section>
+                <LastLiveSignal onViewSummary={() => setActiveTab("summaries")} />
+              </section>
+            )}
+
+            {/* ===== PAST LIVE SESSIONS: Session history with student answers ===== */}
+            <section>
               <PastLiveSessions />
-            </div>
-
-            <div className="min-w-0">
-              <AnswerReleaseCard instructorId={currentUser?.id || ""} />
-            </div>
+            </section>
           </div>
         );
 
@@ -522,13 +537,19 @@ export default function InstructorDashboard() {
       case "students":
         return (
           <StudentRosterPanel
-            students={students}
-            onStudentClick={handleStudentClick}
-            onRefresh={fetchStudents}
-            instructorId={currentUser?.id || ""}
-            selectedStudentDetail={selectedStudentDetail}
+            students={rosterStudents}
             selectedStudentId={selectedStudentId}
-            loading={loading}
+            onStudentClick={handleStudentClick}
+            onRefresh={() =>
+              queryClient.invalidateQueries({
+                queryKey: rosterQueryKey(currentUser?.id ?? null, selectedCourseId ?? null),
+              })
+            }
+            instructorId={currentUser?.id || ""}
+            detail={studentDetailQuery.data ?? null}
+            detailLoading={studentDetailQuery.isLoading}
+            onOpenResponses={() => setDialogOpen(true)}
+            loading={rosterQuery.isLoading}
           />
         );
 
@@ -622,34 +643,54 @@ export default function InstructorDashboard() {
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-          {/* Always mount LiveSessionControls to persist session state across tabs */}
+          {/* LiveSessionControls - Hidden but persists session state */}
           {currentUser && (
-            <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <LiveSessionControls 
-                  onSessionChange={setLiveSessionId} 
-                  activeSession={activeSession}
-                  setActiveSession={setActiveSession}
-                />
-              </div>
+            <div className="hidden">
+              <LiveSessionControls 
+                onSessionChange={setLiveSessionId} 
+                activeSession={activeSession}
+                setActiveSession={setActiveSession}
+              />
             </div>
           )}
           
-          {/* Always mount LectureTranscription to persist recording across tabs */}
-          <div className={cn("min-w-0 mb-6", activeTab !== "live" && "hidden")}>
-            <LectureTranscription onQuestionGenerated={() => {}} />
+          {/* LectureTranscription - Hidden but persists recording state & exposes callbacks */}
+          <div className="hidden">
+            <LectureTranscription
+              onQuestionGenerated={() => {}}
+              onRecordingChange={setIsListening}
+              onTranscriptChange={(chunks, current) => {
+                setTranscriptChunks(chunks);
+                setCurrentTranscript(current);
+              }}
+              onQuestionCandidateChange={setQuestionCandidate}
+              onSendingChange={setIsSendingQuestion}
+              onAutoQuestionStateChange={setAutoQuestionState}
+              onAutoQuestionIntervalChangeRef={onAutoQuestionIntervalChangeRef}
+              onAutoQuestionToggleRef={onAutoQuestionToggleRef}
+              onAutoQuestionEnabledChange={setAutoQuestionEnabled}
+              onSendQuestionRef={onSendQuestionRef}
+              onPreviewQuestionRef={onPreviewQuestionRef}
+              onDismissQuestionRef={onDismissQuestionRef}
+              onStartRecordingRef={onStartRecordingRef}
+              onStopRecordingRef={onStopRecordingRef}
+              suppressInternalDialogs={true}
+            />
           </div>
           
           {renderTabContent()}
+
+          {/* LectureTranscription is now rendered inline within the live tab */}
         </main>
       </div>
 
-      {/* Student Detail Dialog */}
-      {selectedStudentDetail && (
+      {/* Per-question response drilldown */}
+      {selectedStudentId && (
         <StudentDetailDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
-          student={selectedStudentDetail}
+          studentName={rosterStudents.find(s => s.id === selectedStudentId)?.name || "Student"}
+          groups={studentDetailQuery.data?.responsesByVideo ?? []}
         />
       )}
     </DashboardShell>

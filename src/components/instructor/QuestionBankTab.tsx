@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Search, Library, Loader2, FileUp, Zap, BookOpen } from "lucide-react";
+import { Plus, Search, Library, Loader2, FileUp, Zap, BookOpen, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
@@ -34,6 +34,7 @@ import {
   type BankQuestion 
 } from "./question-bank";
 import { QuestionPreviewPanel } from "./question-bank/QuestionPreviewPanel";
+import { QuestionBankResults } from "./QuestionBankResults";
 
 interface QuestionBankTabProps {
   professorType: string | null;
@@ -46,6 +47,7 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [mode, setMode] = useState<"prep" | "live">("prep");
+  const [view, setView] = useState<"bank" | "results">("bank");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   
   // Dialog states
@@ -214,6 +216,18 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
                 <h2 className="text-lg font-semibold text-foreground">Question Bank</h2>
               </div>
               <div className="flex items-center gap-2">
+                <Tabs value={view} onValueChange={(v) => setView(v as "bank" | "results")}>
+                  <TabsList className="h-9">
+                    <TabsTrigger value="bank" className="text-xs px-3 gap-1.5">
+                      <Library className="w-3.5 h-3.5" />
+                      Bank
+                    </TabsTrigger>
+                    <TabsTrigger value="results" className="text-xs px-3 gap-1.5">
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      Results
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 <Button variant="outline" size="sm" onClick={() => setShowUploadFlow(true)}>
                   <FileUp className="w-4 h-4 mr-1.5" />
                   Upload Slides
@@ -225,165 +239,173 @@ export function QuestionBankTab({ professorType }: QuestionBankTabProps) {
               </div>
             </div>
 
-            {/* Row 2: Mode tabs + search + filter */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              <Tabs value={mode} onValueChange={(v) => setMode(v as "prep" | "live")} className="shrink-0">
-                <TabsList className="h-9">
-                  <TabsTrigger value="prep" className="text-xs px-3 gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    Prep
-                  </TabsTrigger>
-                  <TabsTrigger value="live" className="text-xs px-3 gap-1.5">
-                    <Zap className="w-3.5 h-3.5" />
-                    Live Push
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search questions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9"
-                />
-              </div>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px] h-9">
-                  <SelectValue placeholder="Filter type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {view === "bank" && (
+              <>
+                {/* Row 2: Mode tabs + search + filter */}
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                  <Tabs value={mode} onValueChange={(v) => setMode(v as "prep" | "live")} className="shrink-0">
+                    <TabsList className="h-9">
+                      <TabsTrigger value="prep" className="text-xs px-3 gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Prep
+                      </TabsTrigger>
+                      <TabsTrigger value="live" className="text-xs px-3 gap-1.5">
+                        <Zap className="w-3.5 h-3.5" />
+                        Live Push
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search questions..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="Filter type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTypes.map(type => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Row 3: Stats */}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{totalCount} question{totalCount !== 1 ? "s" : ""}</span>
-              <span>·</span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary" />
-                {readyCount} ready
-              </span>
-              <span>·</span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-secondary" />
-                {pushedCount} pushed
-              </span>
-            </div>
+                {/* Row 3: Stats */}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{totalCount} question{totalCount !== 1 ? "s" : ""}</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                    {readyCount} ready
+                  </span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-secondary" />
+                    {pushedCount} pushed
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: Question List (2/3) */}
-        <div className="lg:col-span-2 space-y-3">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : manualQuestions.length === 0 && sourceGroups.length === 0 ? (
-            <Card className="headspace-card">
-              <CardContent className="text-center py-12">
-                <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                <h3 className="font-medium text-muted-foreground mb-1">
-                  {questions.length === 0 ? "No questions yet" : "No matching questions"}
-                </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {questions.length === 0 
-                    ? "Create your first question or upload slides to get started" 
-                    : "Try adjusting your search or filters"
-                  }
-                </p>
-                {questions.length === 0 && (
-                  <div className="flex gap-2 justify-center">
-                    <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
-                      <FileUp className="w-4 h-4 mr-2" />
-                      Upload Slides
-                    </Button>
-                    <Button onClick={() => setCreateDialogOpen(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Question
-                    </Button>
+      {view === "results" ? (
+        <QuestionBankResults />
+      ) : (
+        /* Two-column layout */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Left: Question List (2/3) */}
+          <div className="lg:col-span-2 space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : manualQuestions.length === 0 && sourceGroups.length === 0 ? (
+              <Card className="headspace-card">
+                <CardContent className="text-center py-12">
+                  <Library className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+                  <h3 className="font-medium text-muted-foreground mb-1">
+                    {questions.length === 0 ? "No questions yet" : "No matching questions"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {questions.length === 0 
+                      ? "Create your first question or upload slides to get started" 
+                      : "Try adjusting your search or filters"
+                    }
+                  </p>
+                  {questions.length === 0 && (
+                    <div className="flex gap-2 justify-center">
+                      <Button variant="outline" onClick={() => setShowUploadFlow(true)}>
+                        <FileUp className="w-4 h-4 mr-2" />
+                        Upload Slides
+                      </Button>
+                      <Button onClick={() => setCreateDialogOpen(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Question
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Manual questions */}
+                {manualQuestions.length > 0 && (
+                  <div className="space-y-2">
+                    {manualQuestions.map(question => (
+                      <QuestionBankCard
+                        key={question.id}
+                        question={question}
+                        mode={mode}
+                        selected={selectedQuestionId === question.id}
+                        onSelect={(q) => setSelectedQuestionId(q.id)}
+                        onEdit={(q) => {
+                          setEditQuestion(q);
+                          setCreateDialogOpen(true);
+                        }}
+                        onDelete={(q) => setDeleteQuestion(q)}
+                        onPush={(q) => setPushQuestion(q)}
+                      />
+                    ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Manual questions */}
-              {manualQuestions.length > 0 && (
-                <div className="space-y-2">
-                  {manualQuestions.map(question => (
-                    <QuestionBankCard
-                      key={question.id}
-                      question={question}
-                      mode={mode}
-                      selected={selectedQuestionId === question.id}
-                      onSelect={(q) => setSelectedQuestionId(q.id)}
-                      onEdit={(q) => {
-                        setEditQuestion(q);
-                        setCreateDialogOpen(true);
-                      }}
-                      onDelete={(q) => setDeleteQuestion(q)}
-                      onPush={(q) => setPushQuestion(q)}
-                    />
-                  ))}
-                </div>
-              )}
 
-              {/* Source material groups */}
-              {sourceGroups.length > 0 && (
-                <div className="space-y-3">
-                  {manualQuestions.length > 0 && (
-                    <h3 className="text-sm font-medium text-muted-foreground px-1 pt-2">
-                      From Uploaded Slides
-                    </h3>
-                  )}
-                  {sourceGroups.map(group => (
-                    <SourceMaterialCard
-                      key={group.id}
-                      sourceId={group.id}
-                      sourceTitle={group.title}
-                      questions={group.questions}
-                      mode={mode}
-                      selectedQuestionId={selectedQuestionId}
-                      onSelect={(q) => setSelectedQuestionId(q.id)}
-                      onEdit={(q) => {
-                        setEditQuestion(q);
-                        setCreateDialogOpen(true);
-                      }}
-                      onDelete={(q) => setDeleteQuestion(q)}
-                      onPush={(q) => setPushQuestion(q)}
-                      onDeleteAll={(id) => setDeleteSourceId(id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                {/* Source material groups */}
+                {sourceGroups.length > 0 && (
+                  <div className="space-y-3">
+                    {manualQuestions.length > 0 && (
+                      <h3 className="text-sm font-medium text-muted-foreground px-1 pt-2">
+                        From Uploaded Slides
+                      </h3>
+                    )}
+                    {sourceGroups.map(group => (
+                      <SourceMaterialCard
+                        key={group.id}
+                        sourceId={group.id}
+                        sourceTitle={group.title}
+                        questions={group.questions}
+                        mode={mode}
+                        selectedQuestionId={selectedQuestionId}
+                        onSelect={(q) => setSelectedQuestionId(q.id)}
+                        onEdit={(q) => {
+                          setEditQuestion(q);
+                          setCreateDialogOpen(true);
+                        }}
+                        onDelete={(q) => setDeleteQuestion(q)}
+                        onPush={(q) => setPushQuestion(q)}
+                        onDeleteAll={(id) => setDeleteSourceId(id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
-        {/* Right: Preview Panel (1/3) */}
-        <div className="hidden lg:block">
-          <div className="sticky top-4">
-            <QuestionPreviewPanel
-              question={selectedQuestion}
-              onPush={(q) => setPushQuestion(q)}
-              onEdit={(q) => {
-                setEditQuestion(q);
-                setCreateDialogOpen(true);
-              }}
-            />
+          {/* Right: Preview Panel (1/3) */}
+          <div className="hidden lg:block">
+            <div className="sticky top-4">
+              <QuestionPreviewPanel
+                question={selectedQuestion}
+                onPush={(q) => setPushQuestion(q)}
+                onEdit={(q) => {
+                  setEditQuestion(q);
+                  setCreateDialogOpen(true);
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Dialogs (unchanged) */}
       <CreateQuestionDialog

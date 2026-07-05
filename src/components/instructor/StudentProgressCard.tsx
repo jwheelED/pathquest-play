@@ -17,7 +17,7 @@ interface StudentStats {
 
 export const StudentProgressCard = ({ instructorId }: { instructorId: string }) => {
   const [students, setStudents] = useState<(StudentStats & { id: string })[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
   const { selectedCourseId } = useCourseContext();
 
   useEffect(() => {
@@ -143,51 +143,9 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
     }
   };
 
-  const handleStudentClick = async (studentId: string) => {
-    try {
-      const { data: stats } = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', studentId)
-        .single();
-
-      const { data: progress } = await supabase
-        .from('lesson_progress')
-        .select('*')
-        .eq('user_id', studentId);
-
-      const { data: user } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', studentId)
-        .single();
-
-      const { data: attempts } = await supabase
-        .from('problem_attempts')
-        .select('*, stem_problems(problem_text)')
-        .eq('user_id', studentId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      setSelectedStudent({
-        id: studentId,
-        name: user?.name || 'Unknown',
-        level: stats?.level || 1,
-        experience_points: stats?.experience_points || 0,
-        current_streak: stats?.current_streak || 0,
-        completedLessons: progress?.length || 0,
-        totalLessons: 100,
-        problemAttempts: attempts?.map(a => ({
-          problem_text: (a.stem_problems as any)?.problem_text || '',
-          is_correct: a.is_correct,
-          time_spent_seconds: a.time_spent_seconds || 0,
-          created_at: a.created_at
-        })) || [],
-        recentActivity: []
-      });
-    } catch (error) {
-      console.error('Error fetching student details:', error);
-    }
+  const handleStudentClick = (studentId: string) => {
+    const student = students.find(s => s.id === studentId);
+    setSelectedStudentName(student?.name || 'Unknown');
   };
 
   return (
@@ -230,11 +188,12 @@ export const StudentProgressCard = ({ instructorId }: { instructorId: string }) 
           ))}
         </CardContent>
       </Card>
-      {selectedStudent && (
+      {selectedStudentName && (
         <StudentDetailDialog
-          student={selectedStudent}
-          open={!!selectedStudent}
-          onOpenChange={(open) => !open && setSelectedStudent(null)}
+          studentName={selectedStudentName}
+          groups={[]}
+          open={!!selectedStudentName}
+          onOpenChange={(open) => !open && setSelectedStudentName(null)}
         />
       )}
     </>

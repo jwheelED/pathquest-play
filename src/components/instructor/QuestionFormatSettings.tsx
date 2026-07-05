@@ -12,7 +12,7 @@ interface QuestionFormatSettingsProps {
 }
 
 export const QuestionFormatSettings = ({ instructorId, professorType }: QuestionFormatSettingsProps) => {
-  const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding'>('multiple_choice');
+  const [format, setFormat] = useState<'multiple_choice' | 'short_answer' | 'coding' | 'poll'>('multiple_choice');
   const [codingStyle, setCodingStyle] = useState<'simple' | 'full'>('simple');
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -45,7 +45,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
   };
 
   const handleFormatChange = async (value: string) => {
-    const newFormat = value as 'multiple_choice' | 'short_answer' | 'coding';
+    const newFormat = value as 'multiple_choice' | 'short_answer' | 'coding' | 'poll';
     setFormat(newFormat);
 
     try {
@@ -66,7 +66,7 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
 
       toast({
         title: "✅ Preference saved",
-        description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : 'Coding'}`,
+        description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : newFormat === 'poll' ? 'Poll' : 'Coding'}`,
       });
     } catch (error: any) {
       console.error('Error updating preference:', error);
@@ -143,6 +143,18 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
               </Label>
               <p className="text-sm text-muted-foreground">
                 Students type their response. Requires manual grading by you.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent/50 transition-colors">
+            <RadioGroupItem value="poll" id="poll" />
+            <div className="space-y-1 leading-none flex-1">
+              <Label htmlFor="poll" className="font-semibold cursor-pointer">
+                Poll
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Collect anonymous responses from students. Not graded.
               </p>
             </div>
           </div>

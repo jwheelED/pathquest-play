@@ -19,6 +19,7 @@ import ReactMarkdown from "react-markdown";
 import { LectureCountdownTimer } from "./LectureCountdownTimer";
 import { MathRenderer } from "@/components/ui/math-renderer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EdvanaAnswerCelebration } from "./EdvanaAnswerCelebration";
 
 const BASE_REWARD = 10; // Base XP for lecture check-in questions
 
@@ -78,6 +79,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, Record<number, string>>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, string>>>({});
   const [submittedQuizzes, setSubmittedQuizzes] = useState<Record<string, boolean>>({});
+  const [celebrationTrigger, setCelebrationTrigger] = useState<number | null>(null);
+  const [celebrationCorrect, setCelebrationCorrect] = useState(false);
+  const [celebrationMultiplier, setCelebrationMultiplier] = useState(1);
   const [codeExecutionResults, setCodeExecutionResults] = useState<Record<string, any>>({});
   const [executingCode, setExecutingCode] = useState<Record<string, boolean>>({});
   const [showAllCheckIns, setShowAllCheckIns] = useState(false);
@@ -464,11 +468,15 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
     }
   };
 
-  const handleConfidenceSelect = (assignmentId: string, level: ConfidenceLevel, multiplier: number) => {
+  const handleConfidenceSelect = (assignmentId: string, level: ConfidenceLevel, multiplier: number, assignment?: Assignment) => {
     setConfidenceData(prev => ({
       ...prev,
       [assignmentId]: { level, multiplier, locked: true }
     }));
+    // Auto-submit after confidence is locked to reduce taps
+    if (assignment) {
+      setTimeout(() => handleSubmitQuiz(assignment), 250);
+    }
   };
 
   const handleTextAnswerChange = (assignmentId: string, questionIndex: number, answer: string) => {
@@ -916,6 +924,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
           sonnerToast.success(`Graded: ${avgGrade}%`, {
             description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
           });
+          setCelebrationCorrect(avgGrade >= 70);
+          setCelebrationMultiplier(1);
+          setCelebrationTrigger(Date.now());
         } else {
           // For manual_grade mode or no grades, just store recommendations
           const { error: updateError } = await supabase
@@ -935,6 +946,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
             sonnerToast.success(`Graded: ${avgGrade}%`, {
               description: avgGrade >= 70 ? "Great work!" : "Review the feedback for improvement areas."
             });
+            setCelebrationCorrect(avgGrade >= 70);
+            setCelebrationMultiplier(1);
+            setCelebrationTrigger(Date.now());
           } else {
             toast({ 
               title: "✅ Quiz Submitted Successfully!",
@@ -1157,6 +1171,11 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
 
   return (
     <>
+      <EdvanaAnswerCelebration
+        trigger={celebrationTrigger}
+        isCorrect={celebrationCorrect}
+        multiplier={celebrationMultiplier}
+      />
       {/* Lecture Countdown Timer - shows when instructor has auto-questions enabled */}
       {instructorId && (
         <div className="mb-4">
@@ -1769,7 +1788,9 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                             
                             <div className="space-y-2">
                               {q.options?.map((opt: string, i: number) => {
-                                const optionLetter = opt.trim().charAt(0).toUpperCase();
+                                // Use index-based letter so plain-text options (no "A. " prefix) grade correctly
+                                const MCQ_LETTERS = ['A', 'B', 'C', 'D'];
+                                const optionLetter = MCQ_LETTERS[i] ?? opt.trim().charAt(0).toUpperCase();
                                 const normalizedSelected = selectedAnswer?.trim().toUpperCase();
                                 const isSelected = normalizedSelected === optionLetter;
                                 
@@ -1924,7 +1945,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                         <div className="border-t pt-4">
                           <ConfidenceSelector
                             baseReward={BASE_REWARD}
-                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier)}
+                            onSelect={(level, multiplier) => handleConfidenceSelect(assignment.id, level, multiplier, assignment)}
                           />
                         </div>
                       )}
