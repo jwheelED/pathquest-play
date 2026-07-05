@@ -110,6 +110,16 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
             <LMSIntegrationSettings />
           </div>
         );
+      case "billing":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Plan & Billing</h2>
+              <p className="text-sm text-muted-foreground mt-1">Manage your subscription and usage limits.</p>
+            </div>
+            <BillingSettings />
+          </div>
+        );
       default:
         return null;
     }
