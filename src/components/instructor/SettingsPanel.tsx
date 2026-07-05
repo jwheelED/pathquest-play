@@ -23,7 +23,7 @@ const ACCOUNT_TABS = [
   { key: "billing", label: "Plan & Billing", icon: CreditCard },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+
 
 interface SettingsPanelProps {
   currentUserId: string;
