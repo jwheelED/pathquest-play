@@ -235,7 +235,7 @@ export default function InstructorSettings() {
           )}
 
           {/* Content panel */}
-          <div className="flex-1 min-w-0 max-w-3xl">
+          <div className="flex-1 min-w-0">
             {renderContent()}
           </div>
         </div>
