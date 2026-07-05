@@ -57,10 +57,10 @@ on conflict (name) do update set
   updated_at    = now();
 
 -- ---------------------------------------------------------------------------
--- AFTER creating the recurring monthly Prices in Stripe, set their IDs here.
--- Checkout will reject a paid tier whose stripe_price_id is NULL.
+-- Stripe Price IDs (test mode). Checkout rejects a paid tier whose
+-- stripe_price_id is NULL. Replace with live-mode IDs when going to production.
 -- ---------------------------------------------------------------------------
--- update public.subscription_tiers set stripe_price_id = 'price_XXXXXXXXXXXX' where name = 'starter';
--- update public.subscription_tiers set stripe_price_id = 'price_YYYYYYYYYYYY' where name = 'pro';
+update public.subscription_tiers set stripe_price_id = 'price_1TpeXuL88sjmY9hiUbmSMBqj' where name = 'starter'; -- Edvana Starter $29/mo
+update public.subscription_tiers set stripe_price_id = 'price_1TpeXvL88sjmY9hitMUGu0KO' where name = 'pro';     -- Edvana Professional $59/mo
 
 commit;

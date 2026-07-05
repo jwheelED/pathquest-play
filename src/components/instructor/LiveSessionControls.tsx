@@ -9,6 +9,7 @@ import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
+import { BILLING_ENFORCEMENT_ENABLED } from "@/lib/billingConfig";
 
 interface LiveSession {
   id: string;
@@ -208,11 +209,15 @@ export const LiveSessionControls = ({
           p_instructor_id: user.id,
           p_minutes: minutes,
         });
-        const row = Array.isArray(usage) ? usage[0] : usage;
-        if (row?.warning_level === "limit_reached") {
-          toast.warning("You've reached your monthly lecture-hour limit. Upgrade to keep running sessions.");
-        } else if (row?.warning_level === "warning_75") {
-          toast.info("You've used 75% of your monthly lecture hours.");
+        // Usage is recorded above regardless, but hour-limit warnings only
+        // surface once billing enforcement is turned on. See billingConfig.
+        if (BILLING_ENFORCEMENT_ENABLED) {
+          const row = Array.isArray(usage) ? usage[0] : usage;
+          if (row?.warning_level === "limit_reached") {
+            toast.warning("You've reached your monthly lecture-hour limit. Upgrade to keep running sessions.");
+          } else if (row?.warning_level === "warning_75") {
+            toast.info("You've used 75% of your monthly lecture hours.");
+          }
         }
       }
     } catch (meterError) {
