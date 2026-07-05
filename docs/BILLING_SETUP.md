@@ -86,10 +86,47 @@ so `customer-portal-session` works.
 5. Use **Manage Billing** to open the portal and cancel — confirm the webhook
    sets status `canceled` and reverts the limit to `180`.
 
-## Next: Institutional (not in this slice)
-- Institutional tiers are **annual** and use a **shared hour pool per org**
-  (`org_id`), tracked in `usage_records` (`metric_type='video_minutes'`) with
-  **rollover** carried across periods.
-- Overage is billed as **one-time top-up charges** (Stripe invoice items at the
-  tier's $/hr rate: $15 / $10 / $6.67), not metered subscriptions — this suits
-  sales-negotiated annual contracts.
+## Institutional tiers — Path 1 (track hours, bill overage by hand)
+
+Institutional tiers are **annual**, **org-scoped**, sales-negotiated contracts
+with a **shared hour pool per org**. Path 1 tracks usage and surfaces overage;
+it does **not** auto-charge or block sessions — overage is invoiced manually at
+renewal.
+
+| Tier | Included | Price | Overage |
+|---|---|---|---|
+| Department | 100 hrs/yr | $1,499/yr | $15.00/hr |
+| Campus | 400 hrs/yr | $3,999/yr | $10.00/hr |
+| Enterprise | 1,200 hrs/yr | $7,999/yr | $6.67/hr |
+
+**How it works**
+- The org's pool lives in `usage_records` (`metric_type='video_minutes'`):
+  `usage_limit` = included minutes (+ rolled-over minutes), `usage_count` =
+  minutes consumed. Period = the contract year.
+- `record_org_lecture_minutes()` runs at session end (via `LiveSessionControls`)
+  and draws the pool down — a no-op for non-institutional orgs.
+- Admins see the pool + overage estimate on the Admin Dashboard
+  (`InstitutionalUsageCard`), driven by `get_org_billing_summary()`.
+- **Rollover:** `provision_org_pool()` carries unused minutes into the next
+  year's pool automatically.
+
+**One-time setup**
+1. Apply the SQL: `supabase db execute --file supabase/institutional_billing.sql`
+   (activates the tiers and creates the functions).
+
+**Per institutional customer (when a contract is signed)**
+1. Create/record the annual base subscription (a Stripe annual Price, or invoice
+   the org directly — Path 1 doesn't require self-serve checkout for these).
+2. Provision their hour pool:
+   ```sql
+   select public.provision_org_pool('<org-uuid>', 'department'); -- or campus / enterprise
+   ```
+3. At renewal, re-run `provision_org_pool` (rolls over unused hours) and invoice
+   any overage shown on the dashboard.
+
+## Later: Path 2 / Path 3 (automated overage)
+- **Path 2** — app-driven one-time top-up charges (Stripe invoice items at the
+  tier's $/hr rate) when the pool is exceeded.
+- **Path 3** — Stripe usage-based billing (Meters + Credits): grant a credit
+  pool, meter every hour, let Stripe bill overage automatically. Your pricing
+  already fits this (base ≈ hours × rate), so it's a clean upgrade later.
