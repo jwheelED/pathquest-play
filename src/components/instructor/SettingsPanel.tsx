@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { MessageSquare, Video, CheckSquare, Plug } from "lucide-react";
+import { MessageSquare, Video, CheckSquare, Plug, CreditCard } from "lucide-react";
 import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
+import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const TABS = [
@@ -17,12 +19,18 @@ const TABS = [
   { key: "integrations", label: "Integrations", icon: Plug },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+const ACCOUNT_TABS = [
+  { key: "billing", label: "Plan & Billing", icon: CreditCard },
+] as const;
+
+
 
 interface SettingsPanelProps {
   currentUserId: string;
   professorType?: "stem" | "humanities" | "medical" | null;
 }
+
+type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
 
 export function SettingsPanel({ currentUserId, professorType }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("questions");
@@ -102,6 +110,16 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
             <LMSIntegrationSettings />
           </div>
         );
+      case "billing":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Plan & Billing</h2>
+              <p className="text-sm text-muted-foreground mt-1">Manage your subscription and usage limits.</p>
+            </div>
+            <BillingSettings />
+          </div>
+        );
       default:
         return null;
     }
@@ -115,6 +133,8 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
           <ScrollArea className="w-full">
             <div className="flex items-center gap-1 px-3 py-2">
               {TABS.map((item) => renderMobileNavItem(item, activeTab === item.key))}
+              <div className="w-px h-6 bg-border flex-shrink-0 mx-1" />
+              {ACCOUNT_TABS.map((item) => renderMobileNavItem(item, activeTab === item.key))}
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -128,6 +148,9 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
             <div className="sticky top-24 space-y-1">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Teaching</p>
               {TABS.map((item) => renderNavItem(item, activeTab === item.key))}
+              <Separator className="my-3" />
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">Account</p>
+              {ACCOUNT_TABS.map((item) => renderNavItem(item, activeTab === item.key))}
             </div>
           </nav>
         )}
