@@ -30,6 +30,8 @@ interface SettingsPanelProps {
   professorType?: "stem" | "humanities" | "medical" | null;
 }
 
+type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
+
 export function SettingsPanel({ currentUserId, professorType }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("questions");
   const isMobile = useIsMobile();
