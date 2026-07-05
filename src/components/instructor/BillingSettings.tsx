@@ -32,6 +32,7 @@ interface Subscription {
 export function BillingSettings() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
+  const [institutionalTiers, setInstitutionalTiers] = useState<SubscriptionTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
