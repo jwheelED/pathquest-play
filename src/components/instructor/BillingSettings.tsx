@@ -65,6 +65,20 @@ export function BillingSettings() {
       }));
       setTiers(parsedTiers);
 
+      // Fetch institutional (annual, org-scoped) tiers for display
+      const { data: instData } = await supabase
+        .from('subscription_tiers')
+        .select('*')
+        .eq('is_active', true)
+        .eq('billing_period', 'year')
+        .order('sort_order');
+
+      const parsedInst = (instData || []).map(tier => ({
+        ...tier,
+        features: Array.isArray(tier.features) ? tier.features : [],
+      }));
+      setInstitutionalTiers(parsedInst);
+
       // Fetch user's subscription
       const { data: subData, error: subError } = await supabase
         .from('subscriptions')
