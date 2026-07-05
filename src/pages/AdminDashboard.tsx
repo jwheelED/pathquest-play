@@ -19,6 +19,7 @@ import SupportQueueTable, { SupportCase, SupportTier, SupportSignal, ViewerRole 
 import CourseAtRiskRollup, { CourseRollupRow } from "@/components/admin/CourseAtRiskRollup";
 import GovernanceBanner from "@/components/admin/GovernanceBanner";
 import ExportReportsCard, { OrgSnapshot, CourseEngagementExportRow } from "@/components/admin/ExportReportsCard";
+import { InstitutionalUsageCard } from "@/components/admin/InstitutionalUsageCard";
 
 // Seed/demo names to filter before any individual data surfaces.
 const SEED_NAME_PATTERNS: RegExp[] = [
@@ -1012,6 +1013,9 @@ export default function AdminDashboard() {
                     hasAnyData={hasAnyData}
                     onConnect={() => setActiveTab("settings")}
                   />
+
+                  {/* Institutional hour pool (renders only for institutional orgs) */}
+                  <InstitutionalUsageCard />
 
                   {/* Usage Chart */}
                   <UsageOverTimeChart
