@@ -359,6 +359,85 @@ export function BillingSettings() {
           </div>
         </div>
 
+        {/* Institutional Plans */}
+        {institutionalTiers.length > 0 && (
+          <div className="border-t pt-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-medium flex items-center gap-2 flex-wrap">
+                  Institutional Plans
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">Annual</Badge>
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Department, campus, and enterprise plans with a shared annual pool of lecture hours across all instructors. Contact sales to get started.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 2xl:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
+              {institutionalTiers.map((tier) => {
+                const isEnterprise = tier.name === 'enterprise';
+                return (
+                  <div
+                    key={tier.id}
+                    className={`rounded-lg border p-4 transition-colors hover:border-primary/50 ${
+                      isEnterprise ? 'border-primary/40 bg-primary/5' : 'border-border'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-semibold flex items-center gap-2 flex-wrap">
+                          <span className="break-words">{tier.display_name}</span>
+                          {isEnterprise && <Crown className="h-4 w-4 text-primary shrink-0" />}
+                        </h4>
+                        <p className="text-2xl font-bold mt-1 truncate">
+                          {formatPrice(tier.price_cents)}
+                          <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
+                            {tier.price_suffix || '/year'}
+                          </span>
+                        </p>
+                      </div>
+                      {isEnterprise && (
+                        <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
+                          Best value
+                        </Badge>
+                      )}
+                    </div>
+
+                    {tier.description && (
+                      <p className="text-sm text-muted-foreground mb-3 break-words">
+                        {tier.description}
+                      </p>
+                    )}
+
+                    <ul className="space-y-2 mb-4">
+                      {tier.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                          <span className="break-words">{String(feature)}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      variant="outline"
+                      className="w-full whitespace-normal h-auto min-h-10"
+                      asChild
+                    >
+                      <a href={`mailto:sales@edvana.dev?subject=${encodeURIComponent(`Institutional plan inquiry — ${tier.display_name}`)}`}>
+                        <Mail className="h-4 w-4 mr-2 shrink-0" />
+                        Contact Sales
+                      </a>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Checkout Status Messages */}
         {typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('checkout') === 'success' && (
           <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4 flex items-center gap-3">
