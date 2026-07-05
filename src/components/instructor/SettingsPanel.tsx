@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { MessageSquare, Video, CheckSquare, Plug } from "lucide-react";
+import { MessageSquare, Video, CheckSquare, Plug, CreditCard } from "lucide-react";
 import { QuestionFormatSettings } from "@/components/instructor/QuestionFormatSettings";
 import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
+import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const TABS = [
@@ -15,6 +17,10 @@ const TABS = [
   { key: "pre-recorded", label: "Pre-Recorded Lectures", icon: Video },
   { key: "grading", label: "Grading", icon: CheckSquare },
   { key: "integrations", label: "Integrations", icon: Plug },
+] as const;
+
+const ACCOUNT_TABS = [
+  { key: "billing", label: "Plan & Billing", icon: CreditCard },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
