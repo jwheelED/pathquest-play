@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { format } from "date-fns";
+import { BILLING_ENFORCEMENT_ENABLED } from "@/lib/billingConfig";
 
 interface SubscriptionTier {
   id: string;
@@ -195,7 +196,7 @@ export function BillingSettings() {
               )}
               {currentTier === 'free' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Limited to 1 course and 60 min of lecture time per week
+                  3 hours of live lecture time per month, resets monthly
                 </p>
               )}
             </div>
@@ -217,13 +218,29 @@ export function BillingSettings() {
           </div>
         </div>
 
+        {/* Setup-mode note: billing can be registered, limits not yet enforced */}
+        {!BILLING_ENFORCEMENT_ENABLED && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
+            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              You can set up a plan and payment details now. Monthly lecture-hour
+              limits aren&apos;t enforced yet, so there&apos;s no rush &mdash;
+              subscribe whenever you&apos;re ready.
+            </p>
+          </div>
+        )}
+
         {/* Available Plans */}
         <div>
-          <h3 className="font-medium mb-4">Available Plans</h3>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          <h3 className="font-medium mb-1">Available Plans</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Change or cancel anytime. Paid plans are billed monthly.
+          </p>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {tiers.map((tier) => {
               const isCurrentTier = tier.name === currentTier;
               const isFreeTier = tier.name === 'free';
+              const isPopular = tier.name === 'starter';
               
               return (
                 <div
@@ -238,10 +255,10 @@ export function BillingSettings() {
                     <div>
                       <h4 className="font-semibold flex items-center gap-2">
                         {tier.display_name}
-                        {tier.name === 'instructor' && (
+                        {tier.name === 'starter' && (
                           <Sparkles className="h-4 w-4 text-amber-500" />
                         )}
-                        {tier.name === 'institutional' && (
+                        {tier.name === 'pro' && (
                           <Crown className="h-4 w-4 text-primary" />
                         )}
                       </h4>
@@ -259,11 +276,15 @@ export function BillingSettings() {
                         </p>
                       )}
                     </div>
-                    {isCurrentTier && (
+                    {isCurrentTier ? (
                       <Badge variant="secondary" className="bg-primary text-primary-foreground">
                         Current
                       </Badge>
-                    )}
+                    ) : isPopular ? (
+                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        Popular
+                      </Badge>
+                    ) : null}
                   </div>
 
                   {tier.description && (
@@ -273,23 +294,14 @@ export function BillingSettings() {
                   )}
 
                   <ul className="space-y-2 mb-4">
-                    {tier.name === 'institutional' && (
-                      <li className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        Everything in Instructor, plus:
-                      </li>
-                    )}
-                    {tier.name !== 'institutional' && (
-                      <>
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          {tier.name === 'free' ? '60 min lecture time/week' : 'Unlimited students'}
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
-                        </li>
-                      </>
-                    )}
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      {tier.name === 'free' ? '3 hours lecture time/month' : 'Unlimited students'}
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
+                    </li>
                     {tier.features.map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-sm">
                         <CheckCircle className="h-4 w-4 text-green-500" />

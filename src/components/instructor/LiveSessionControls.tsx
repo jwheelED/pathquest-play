@@ -9,6 +9,7 @@ import { Users, Play, Square, Copy, QrCode, Monitor } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
+import { BILLING_ENFORCEMENT_ENABLED } from "@/lib/billingConfig";
 
 interface LiveSession {
   id: string;
@@ -194,6 +195,34 @@ export const LiveSessionControls = ({
     if (error) {
       toast.error("Failed to end session");
       return;
+    }
+
+    // Meter the elapsed lecture time against the instructor's monthly hour
+    // allowance. add_lecture_minutes upserts the current usage_month row and
+    // returns the running total + warning level (75% / 100%).
+    try {
+      const elapsedMs = Date.now() - new Date(activeSession.created_at).getTime();
+      const minutes = Math.max(1, Math.round(elapsedMs / 60000));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: usage } = await supabase.rpc("add_lecture_minutes", {
+          p_instructor_id: user.id,
+          p_minutes: minutes,
+        });
+        // Usage is recorded above regardless, but hour-limit warnings only
+        // surface once billing enforcement is turned on. See billingConfig.
+        if (BILLING_ENFORCEMENT_ENABLED) {
+          const row = Array.isArray(usage) ? usage[0] : usage;
+          if (row?.warning_level === "limit_reached") {
+            toast.warning("You've reached your monthly lecture-hour limit. Upgrade to keep running sessions.");
+          } else if (row?.warning_level === "warning_75") {
+            toast.info("You've used 75% of your monthly lecture hours.");
+          }
+        }
+      }
+    } catch (meterError) {
+      // Metering must never block ending a session.
+      console.error("Failed to record lecture minutes:", meterError);
     }
 
     // Track session end in PostHog
