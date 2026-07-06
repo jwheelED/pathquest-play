@@ -10,5 +10,17 @@
       "Bash(find /c/Users/johna/Downloads/EdvanaClaude/src/components/instructor -type f -name *.tsx -o -name *.ts)",
       "Bash(bun run:*)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\":\"🔗 Local dev: http://localhost:8080  •  Admin dashboard: http://localhost:8080/admin/dashboard\"}'"
+          }
+        ]
+      }
+    ]
   }
 }
