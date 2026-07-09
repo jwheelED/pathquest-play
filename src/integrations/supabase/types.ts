@@ -4349,6 +4349,18 @@ export type Database = {
           org_name: string
         }[]
       }
+      get_org_billing_summary: {
+        Args: never
+        Returns: {
+          annual_price_cents: number
+          has_plan: boolean
+          included_minutes: number
+          period_end: string
+          tier_display: string
+          tier_name: string
+          used_minutes: number
+        }[]
+      }
       get_org_codes: {
         Args: { _org_id: string }
         Returns: {
@@ -4392,11 +4404,23 @@ export type Database = {
         }
         Returns: boolean
       }
+      institutional_included_minutes: {
+        Args: { p_tier_name: string }
+        Returns: number
+      }
       is_group_member: {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
       join_group_by_code: { Args: { _invite_code: string }; Returns: string }
+      provision_org_pool: {
+        Args: { p_org_id: string; p_tier_name: string }
+        Returns: undefined
+      }
+      record_org_lecture_minutes: {
+        Args: { p_instructor_id: string; p_minutes: number }
+        Returns: undefined
+      }
       set_auto_release_timer: {
         Args: { p_assignment_ids: string[]; p_minutes: number }
         Returns: undefined
