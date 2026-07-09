@@ -426,7 +426,7 @@ export function BillingSettings() {
                       className="w-full whitespace-normal h-auto min-h-10"
                       asChild
                     >
-                      <a href={`mailto:sales@edvana.dev?subject=${encodeURIComponent(`Institutional plan inquiry — ${tier.display_name}`)}`}>
+                      <a href={`mailto:johnathan@edvana.dev?subject=${encodeURIComponent(`Institutional plan inquiry — ${tier.display_name}`)}`}>
                         <Mail className="h-4 w-4 mr-2 shrink-0" />
                         Contact Sales
                       </a>
