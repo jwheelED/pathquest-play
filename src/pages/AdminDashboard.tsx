@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap, RefreshCw } from "lucide-react";
+import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap, RefreshCw, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
@@ -54,10 +54,12 @@ import {
   MISCONCEPTION_MAX_CORRECT_RATE,
 } from "@/lib/misconceptions";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
+import { AdminAccessCard } from "@/components/admin/AdminAccessCard";
+import { ensureDefaultAdminScope, getMyOrgAdminScopes, type OrgAdminScope } from "@/lib/orgScopesRpc";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
-type TabValue = "overview" | "adoption" | "support" | "settings";
+type TabValue = "overview" | "adoption" | "support" | "billing" | "settings";
 
 export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
@@ -256,6 +258,15 @@ export default function AdminDashboard() {
   // touching this component.
   const [viewerRole, setViewerRole] = useState<ViewerRole>("admin");
 
+  // ===== Admin scope resolution (owner / billing / academic) =====
+  // Orthogonal to app_role: every admin holds `admin`, but their scope decides
+  // which tabs they see. Resolved from org_admin_scopes in checkSession.
+  // NOTE: this is UX gating only — not a security boundary (see Phase 2 RLS).
+  const [scopes, setScopes] = useState<OrgAdminScope[]>([]);
+  const canBilling = scopes.includes("owner") || scopes.includes("billing");
+  const canAcademic = scopes.includes("owner") || scopes.includes("academic");
+  const isOwner = scopes.includes("owner");
+
   useEffect(() => {
     checkSession();
     
@@ -276,6 +287,19 @@ export default function AdminDashboard() {
       fetchDashboardData();
     }
   }, [session]);
+
+  // Keep activeTab on a tab the viewer's scopes actually allow (e.g. a
+  // billing-only admin must never land on the academic Overview).
+  useEffect(() => {
+    const allowed: TabValue[] = [
+      ...(canAcademic ? (["overview", "adoption", "support"] as TabValue[]) : []),
+      ...(canBilling ? (["billing"] as TabValue[]) : []),
+      "settings",
+    ];
+    if (!allowed.includes(activeTab)) {
+      setActiveTab(canAcademic ? "overview" : canBilling ? "billing" : "settings");
+    }
+  }, [canAcademic, canBilling, activeTab]);
 
   const checkSession = async () => {
     const { data } = await supabase.auth.getSession();
@@ -307,6 +331,17 @@ export default function AdminDashboard() {
       const revealEligible: ViewerRole[] = ["advisor", "instructor_of_record", "support_staff"];
       const resolved = revealEligible.find((r) => roleSet.has(r));
       setViewerRole(resolved ?? "admin");
+
+      // Seed a default scope on first arrival (first admin of an org -> owner,
+      // later joiners -> academic). Idempotent no-op once assigned or if the
+      // user has no org yet. Covers every onboarding path from one place.
+      await ensureDefaultAdminScope();
+
+      // Resolve admin scopes for tab gating. Belt-and-suspenders: a confirmed
+      // admin with no scope rows (e.g. no org yet, or partial rollout before
+      // the backfill) defaults to owner so they are never left with zero tabs.
+      const resolvedScopes = await getMyOrgAdminScopes();
+      setScopes(resolvedScopes.length > 0 ? resolvedScopes : ["owner"]);
     }
   };
 
@@ -890,10 +925,19 @@ export default function AdminDashboard() {
     }
   };
 
+  // Tabs are built from the viewer's admin scopes: academic scope unlocks the
+  // analytics tabs, billing scope unlocks Billing & Usage, Settings is shared.
   const navItems = [
-    { value: "overview" as TabValue, label: "Overview", icon: LayoutDashboard },
-    { value: "adoption" as TabValue, label: "Adoption", icon: BarChart3 },
-    { value: "support" as TabValue, label: "Support Workflow", icon: HeartHandshake },
+    ...(canAcademic
+      ? [
+          { value: "overview" as TabValue, label: "Overview", icon: LayoutDashboard },
+          { value: "adoption" as TabValue, label: "Adoption", icon: BarChart3 },
+          { value: "support" as TabValue, label: "Support Workflow", icon: HeartHandshake },
+        ]
+      : []),
+    ...(canBilling
+      ? [{ value: "billing" as TabValue, label: "Billing & Usage", icon: Wallet }]
+      : []),
     { value: "settings" as TabValue, label: "Settings", icon: Settings },
   ];
 
@@ -993,7 +1037,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {activeTab === "overview" && (
+          {activeTab === "overview" && canAcademic && (
             <div className="space-y-6 max-w-7xl mx-auto">
               {/* If no org yet, show creation flow front-and-center */}
               {!orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
@@ -1013,9 +1057,6 @@ export default function AdminDashboard() {
                     hasAnyData={hasAnyData}
                     onConnect={() => setActiveTab("settings")}
                   />
-
-                  {/* Institutional hour pool (renders only for institutional orgs) */}
-                  <InstitutionalUsageCard />
 
                   {/* Usage Chart */}
                   <UsageOverTimeChart
@@ -1039,7 +1080,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {activeTab === "adoption" && (
+          {activeTab === "adoption" && canAcademic && (
             <div className="space-y-6 max-w-7xl mx-auto">
               <CourseEngagementHealthCard
                 courses={filteredCourseEngagement}
@@ -1050,7 +1091,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {activeTab === "support" && (
+          {activeTab === "support" && canAcademic && (
             <div className="space-y-6 max-w-7xl mx-auto">
               <GovernanceBanner />
               <RetentionHealthCard
@@ -1090,9 +1131,19 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {activeTab === "billing" && canBilling && (
+            <div className="space-y-6 max-w-7xl mx-auto">
+              {/* Shared institutional hour pool. Self-fetches; renders nothing
+                  if the org has no institutional plan. */}
+              <InstitutionalUsageCard />
+            </div>
+          )}
+
           {activeTab === "settings" && (
             <div className="space-y-6 max-w-3xl mx-auto">
               {orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
+              {/* Owner-only: assign billing / academic access to org admins */}
+              {isOwner && orgId && <AdminAccessCard />}
               <LMSIntegrationSettings mode="admin" />
             </div>
           )}
