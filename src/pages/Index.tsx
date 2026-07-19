@@ -813,9 +813,8 @@ const Index = () => {
               className="text-center text-[13px] leading-relaxed mt-12 max-w-xl mx-auto"
               style={{ color: "hsl(var(--landing-muted))" }}
             >
-              Polling tools help collect responses. Edvana helps speakers know
-              what the room actually took away — while there is still time to
-              adjust.
+              Polls measure attendance. Edvana measures whether the class
+              landed — while there's still time to make sure it does.
             </p>
           </div>
         </section>
