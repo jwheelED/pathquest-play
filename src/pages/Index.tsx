@@ -607,21 +607,21 @@ const Index = () => {
               {[
                 {
                   num: "1",
-                  title: "Speak naturally",
-                  body: "Teach, train, explain, or present the way you normally would. Edvana listens in real time without forcing you to stop and build activities from scratch.",
-                  micro: "Real-time session context, without interrupting flow",
+                  title: "Keep teaching",
+                  body: "You lecture the way you always do. Edvana listens in the background — no scripts, no pre-built polls, no derailed lesson plans.",
+                  micro: "Zero prep, zero interruption.",
                 },
                 {
                   num: "2",
-                  title: "Preview and send a live check-in",
-                  body: "Edvana drafts a contextual audience check based on what you just said. You stay in control, review it, and send it when the moment is right.",
-                  micro: "You review before participants ever see it",
+                  title: "Approve a check-in in one tap",
+                  body: "Edvana drafts a question from what you just said. You glance, approve, and send — or skip it. Nothing goes to students without you.",
+                  micro: "You're always the last word.",
                 },
                 {
                   num: "3",
-                  title: "See the room instantly",
-                  body: "Watch live response patterns appear while the session is still happening. Clarify, slow down, move on, or go deeper with actual signal from the room.",
-                  micro: "Act while the session is still alive",
+                  title: "See who's lost, in time to fix it",
+                  body: "Watch responses land live. If half the room missed the concept, you know now — not on the midterm.",
+                  micro: "Catch drift before it becomes damage.",
                 },
               ].map((step) => (
                 <div
