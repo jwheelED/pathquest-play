@@ -1028,14 +1028,13 @@ const Index = () => {
         >
           <div className="max-w-xl mx-auto text-center">
             <h2 className="landing-heading text-3xl md:text-4xl mb-5">
-              See how Edvana changes a live session.
+              Stop finding out on the exam.
             </h2>
             <p
               className="landing-subheading text-base mb-11"
             >
-              Book a short demo or start a pilot conversation to see how Edvana
-              supports real-time understanding in teaching, training, and
-              explanation-heavy live sessions.
+              Book a short demo, or start a pilot in one class. See what
+              real-time understanding looks like in your own room.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
               <button
