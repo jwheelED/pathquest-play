@@ -674,14 +674,14 @@ const Index = () => {
             {/* Header */}
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">
-                Why It Changes the Live Moment
+                Why it changes the moment
               </p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Built for the live moment
+                Finding out later is too late.
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is designed for what speakers actually need in real
-                sessions, not for static polling workflows.
+                By the time a quiz score or exam grade tells you students were
+                lost, the class has moved on. Edvana closes that gap to seconds.
               </p>
             </div>
 
@@ -689,16 +689,16 @@ const Index = () => {
             <div className="grid md:grid-cols-3 gap-5">
               {[
                 {
-                  title: "No prebuilt polls",
-                  body: "Edvana works from what's actually being said, so you do not have to plan every check-in in advance.",
+                  title: "Catch confusion in real time",
+                  body: "See misunderstanding while you can still re-explain — not two weeks later on a rubric.",
                 },
                 {
-                  title: "No broken flow",
-                  body: "Check understanding without pausing to open a separate workflow, build a form, or derail momentum.",
+                  title: "Stay in the flow of the class",
+                  body: "No stopping to build a poll, open another tab, or break momentum. Check-ins slot into the lesson you're already teaching.",
                 },
                 {
-                  title: "No delayed insight",
-                  body: "See what the room understood while there is still time to respond, not after the moment has passed.",
+                  title: "Turn silence into signal",
+                  body: "A quiet room isn't a clear room. Edvana surfaces what students actually took away, even when nobody raises a hand.",
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
