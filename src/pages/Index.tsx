@@ -972,31 +972,30 @@ const Index = () => {
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">Use Cases</p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Where Edvana fits first
+                Where "found out too late" hurts most.
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is especially valuable in live sessions where explanation,
-                interpretation, or complex material needs to land clearly in the
-                moment.
+                Edvana is built first for classrooms where a single
+                misunderstood concept can compound for weeks.
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {[
                 {
                   title: "Higher education",
-                  body: "For instructors teaching difficult, abstract, or explanation-heavy material.",
+                  body: "Lecture-heavy courses where confusion in week 3 shows up as failing grades in week 10.",
                 },
                 {
                   title: "Clinical and health-professions education",
-                  body: "For nursing, medical, PA, and case-based learning environments.",
+                  body: "Case-based learning where a missed concept becomes a patient-safety gap on the floor.",
                 },
                 {
                   title: "Training and certification",
-                  body: "For trainers who need live signal without heavy prep or clunky interaction tools.",
+                  body: "High-stakes prep where finding out learners were lost means retaking an exam, not a quiz.",
                 },
                 {
                   title: "Workshops and cohort-based sessions",
-                  body: "For facilitators leading high-attention learning experiences.",
+                  body: "One-shot sessions where you don't get a second chance to correct a shaky foundation.",
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
