@@ -933,6 +933,14 @@ const Index = () => {
                   >
                     {card.stats}
                   </p>
+                  {card.outcome && (
+                    <p
+                      className="text-[13px] font-medium leading-relaxed mb-4"
+                      style={{ color: "hsl(var(--landing-accent))" }}
+                    >
+                      {card.outcome}
+                    </p>
+                  )}
                   <blockquote
                     className="text-[14px] leading-relaxed italic pl-4 mb-6"
                     style={{
