@@ -106,11 +106,11 @@ const Index = () => {
   return (
     <div className="landing-page min-h-screen">
       <Helmet>
-        <title>Edvana — Live Understanding Copilot for instructors</title>
-        <meta name="description" content="Edvana captures every lecture, asks AI-generated check-ins in real time, and shows instructors who's keeping up — so no student falls behind." />
+        <title>Edvana — See student understanding in real time</title>
+        <meta name="description" content="Instructors usually find out too late that students are lost. Edvana gives real-time visibility into understanding while class is still happening — so you can adjust before the moment passes." />
         <link rel="canonical" href="https://edvana.dev/" />
-        <meta property="og:title" content="Edvana — Live Understanding Copilot for instructors" />
-        <meta property="og:description" content="Capture lectures, run AI check-ins, and see who's keeping up — live." />
+        <meta property="og:title" content="Edvana — See student understanding in real time" />
+        <meta property="og:description" content="Real-time visibility into student understanding — while learning is happening. Adjust before the moment passes." />
         <meta property="og:url" content="https://edvana.dev/" />
       </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
