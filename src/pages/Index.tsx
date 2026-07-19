@@ -886,28 +886,32 @@ const Index = () => {
         >
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <p className="landing-eyebrow mb-4">Results</p>
+              <p className="landing-eyebrow mb-4">Pilots in progress</p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Used in live sessions where understanding matters
+                Already running in live classes.
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is already being used in explanation-heavy environments where it helps leaders see more, respond faster, and stay in flow.
+                Edvana is being used right now in higher-ed and STEM
+                classrooms — the same explanation-heavy settings where students
+                most often fall behind quietly.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
               {[
                 {
-                  eyebrow: "HIGHER EDUCATION",
+                  eyebrow: "HIGHER EDUCATION · ACTIVE PILOT",
                   title: "Intro to Writing",
-                  stats: "12 sessions · 78% average response rate",
+                  stats: "12 sessions · 78% average response rate · repeat use in 4 of 5 classes",
+                  outcome: "What changed: instructor could tell mid-lecture that students hadn't followed the argument.",
                   quote: "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
                   footer: "Repeat use: 4 of 5 class sessions",
                 },
                 {
-                  eyebrow: "STEM INSTRUCTION",
+                  eyebrow: "STEM INSTRUCTION · ACTIVE PILOT",
                   title: "Engineering Fundamentals",
-                  stats: "8 sessions · 85% average response rate",
+                  stats: "8 sessions · 85% average response rate · used every session after week 2",
+                  outcome: "What changed: students reported staying focused because they knew a check-in was coming.",
                   quote: "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
                   footer: "Repeat use: Every session after week 2",
                 },
