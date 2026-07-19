@@ -327,7 +327,7 @@ const Index = () => {
             <div className="max-w-2xl mx-auto text-center">
               {/* Eyebrow */}
               <p className="landing-eyebrow mb-5">
-                Live understanding, in real time
+                Real-time visibility into student understanding
               </p>
 
               {/* Headline */}
@@ -335,17 +335,17 @@ const Index = () => {
                 className="text-4xl md:text-[52px] lg:text-[60px] font-bold leading-[1.08] tracking-[-0.025em] mb-6"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
-                See understanding while you speak.
+                Know who's lost — while class is still happening.
               </h1>
 
               {/* Subheadline */}
               <p
-                className="text-lg md:text-xl leading-relaxed mb-11 max-w-lg mx-auto"
+                className="text-lg md:text-xl leading-relaxed mb-11 max-w-xl mx-auto"
                 style={{ color: "hsl(var(--landing-muted))" }}
               >
-                Edvana helps speakers turn live questions into instant audience
-                understanding checks, so they can adjust in real time without
-                breaking flow.
+                Instructors usually find out students didn't get it after the
+                quiz, the exam, or the withdrawal. Edvana shows understanding
+                live, in the room, so you can adjust before the moment passes.
               </p>
 
               {/* CTAs */}
@@ -363,7 +363,7 @@ const Index = () => {
 
               {/* Proof points */}
               <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]" style={{ color: "hsl(var(--landing-muted))" }}>
-                {["No prebuilt polls required", "Review before sending", "Built for real live sessions"].map((point) => (
+                {["Live signal, not next-week data", "You review every check-in before it sends", "Works in the classes you already teach"].map((point) => (
                   <span key={point} className="flex items-center gap-2">
                     <span
                       className="w-1 h-1 rounded-full shrink-0"
@@ -372,6 +372,30 @@ const Index = () => {
                     {point}
                   </span>
                 ))}
+              </div>
+
+              {/* In-use-today pilot strip */}
+              <div
+                className="mt-10 mx-auto max-w-2xl rounded-xl px-5 py-4 flex flex-col sm:flex-row items-center gap-3 text-left"
+                style={{
+                  border: "1px solid hsl(var(--landing-border))",
+                  backgroundColor: "hsl(var(--landing-surface))",
+                }}
+              >
+                <div className="flex-1">
+                  <p className="landing-eyebrow mb-1">In use today</p>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
+                    Running in live classes across higher-ed writing, STEM, and
+                    clinical instruction — 78–85% average response rates, repeat
+                    use every session.
+                  </p>
+                </div>
+                <button
+                  onClick={() => scrollToSection("results")}
+                  className="landing-util-link shrink-0 text-[13px]"
+                >
+                  See pilot results ↓
+                </button>
               </div>
             </div>
 
