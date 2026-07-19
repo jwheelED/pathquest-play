@@ -833,30 +833,31 @@ const Index = () => {
                 Built for Real Sessions
               </p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Built for control in real sessions
+                Built to be used — not abandoned by week three.
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana supports live use without taking control away from the speaker.
+                Every instructor tool promises live insight. Edvana is designed
+                so you'll actually keep using it after the pilot.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {[
                 {
-                  title: "Leader-controlled workflow",
-                  body: "Every check-in is reviewed before it is sent.",
+                  title: "You're always in control",
+                  body: "No check-in reaches students until you tap send. The room never sees a bad question.",
                 },
                 {
-                  title: "Designed for sensitive environments",
-                  body: "Built for settings where discretion, privacy, and responsible data handling matter.",
+                  title: "Fits how faculty actually teach",
+                  body: "No new lesson plans, no rebuilding your slides, no learning curve mid-semester.",
                 },
                 {
-                  title: "Easy to pilot",
-                  body: "Start small, test in a controlled setting, and expand once the workflow fits.",
+                  title: "Pilot in one class, not one department",
+                  body: "Start with a single course. Expand once the workflow proves itself.",
                 },
                 {
-                  title: "Low setup burden",
-                  body: "No heavy implementation, no complex rollout, no bloated adoption overhead.",
+                  title: "Low IT lift",
+                  body: "No LMS migration, no complex rollout, no six-month integration.",
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
