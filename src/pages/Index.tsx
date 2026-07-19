@@ -751,10 +751,10 @@ const Index = () => {
                 </h3>
                 <ul className="space-y-3">
                   {[
-                    "Require prebuilt questions before the session",
-                    "Interrupt flow to launch activities",
-                    "Often get used inconsistently or abandoned",
-                    "Focus on response collection more than live understanding",
+                    "You have to guess what to ask before class starts",
+                    "You stop teaching to launch an activity",
+                    "Response data arrives after the moment is gone",
+                    "You learn students were lost from the exam, not the room",
                   ].map((item) => (
                     <li
                       key={item}
