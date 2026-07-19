@@ -733,9 +733,9 @@ const Index = () => {
                 Why Edvana Is Different
               </p>
               <h2 className="landing-heading text-2xl md:text-3xl">
-                Polling collects responses.
+                Polls tell you who clicked.
                 <br />
-                Edvana helps you see understanding.
+                Edvana tells you who understood.
               </h2>
             </div>
 
