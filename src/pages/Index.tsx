@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Menu, X, ChevronDown } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
-
 const NAV_ITEMS = ["Product", "How It Works", "Use Cases", "Results", "Demo"];
 
 const Index = () => {
@@ -89,28 +88,31 @@ const Index = () => {
   }, []);
 
   const handleBookDemo = () => {
-    window.location.href =
-      "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
   };
 
   const handleStartPilot = () => {
-    window.location.href =
-      "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
   };
 
   const handleContact = () => {
-    window.location.href =
-      "mailto:nigel@edvana.dev?subject=Contact&body=";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Contact&body=";
   };
 
   return (
     <div className="landing-page min-h-screen">
       <Helmet>
         <title>Edvana — See student understanding in real time</title>
-        <meta name="description" content="Instructors usually find out too late that students are lost. Edvana gives real-time visibility into understanding while class is still happening — so you can adjust before the moment passes." />
+        <meta
+          name="description"
+          content="Instructors usually find out too late that students are lost. Edvana gives real-time visibility into understanding while class is still happening — so you can adjust before the moment passes."
+        />
         <link rel="canonical" href="https://edvana.dev/" />
         <meta property="og:title" content="Edvana — See student understanding in real time" />
-        <meta property="og:description" content="Real-time visibility into student understanding — while learning is happening. Adjust before the moment passes." />
+        <meta
+          property="og:description"
+          content="Real-time visibility into student understanding — while learning is happening. Adjust before the moment passes."
+        />
         <meta property="og:url" content="https://edvana.dev/" />
       </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
@@ -123,10 +125,7 @@ const Index = () => {
       >
         <div className="max-w-[1120px] mx-auto px-6 h-[60px] flex items-center justify-between">
           {/* Left — Logo */}
-          <div
-            className="flex items-center gap-2 cursor-pointer shrink-0"
-            onClick={() => scrollToSection("hero")}
-          >
+          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => scrollToSection("hero")}>
             <img
               src={edvanaLogo}
               alt="Edvana - Live Understanding Copilot"
@@ -149,9 +148,7 @@ const Index = () => {
                   />
                 )}
                 <button
-                  onClick={() =>
-                    scrollToSection(item.toLowerCase().replace(/\s+/g, "-"))
-                  }
+                  onClick={() => scrollToSection(item.toLowerCase().replace(/\s+/g, "-"))}
                   className="landing-nav-link"
                 >
                   {item}
@@ -162,16 +159,10 @@ const Index = () => {
 
           {/* Right — Utility (desktop) */}
           <div className="hidden lg:flex items-center gap-5 shrink-0">
-            <button
-              onClick={handleBookDemo}
-              className="landing-util-link"
-            >
+            <button onClick={handleBookDemo} className="landing-util-link">
               Book a Demo
             </button>
-            <button
-              onClick={handleStartPilot}
-              className="landing-util-link"
-            >
+            <button onClick={handleStartPilot} className="landing-util-link">
               Book a Pilot
             </button>
             {/* Corporate dropdown */}
@@ -192,14 +183,20 @@ const Index = () => {
                   }}
                 >
                   <button
-                    onClick={() => { navigate("/corporate/events"); setCorpDropdownOpen(false); }}
+                    onClick={() => {
+                      navigate("/corporate/events");
+                      setCorpDropdownOpen(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
                     Events
                   </button>
                   <button
-                    onClick={() => { navigate("/corporate/enterprise"); setCorpDropdownOpen(false); }}
+                    onClick={() => {
+                      navigate("/corporate/enterprise");
+                      setCorpDropdownOpen(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
@@ -208,10 +205,7 @@ const Index = () => {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => navigate("/join")}
-              className="landing-cta"
-            >
+            <button onClick={() => navigate("/join")} className="landing-cta">
               Join Session
             </button>
           </div>
@@ -254,21 +248,40 @@ const Index = () => {
               </button>
             ))}
             <div className="pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
-              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">Book a Demo</button>
-              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">Book a Pilot</button>
-              <button onClick={() => { navigate("/corporate/events"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Events</button>
-              <button onClick={() => { navigate("/corporate/enterprise"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Enterprise</button>
-              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">Join Session</button>
+              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">
+                Book a Demo
+              </button>
+              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">
+                Book a Pilot
+              </button>
+              <button
+                onClick={() => {
+                  navigate("/corporate/events");
+                  setMobileMenuOpen(false);
+                }}
+                className="landing-util-link text-left py-2"
+              >
+                Corporate Events
+              </button>
+              <button
+                onClick={() => {
+                  navigate("/corporate/enterprise");
+                  setMobileMenuOpen(false);
+                }}
+                className="landing-util-link text-left py-2"
+              >
+                Corporate Enterprise
+              </button>
+              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">
+                Join Session
+              </button>
             </div>
           </div>
         )}
       </header>
 
       {/* ═══════════ JOIN SESSION BANNER ═══════════ */}
-      <div
-        className="px-6 pt-20 md:pt-24 pb-0"
-        style={{ backgroundColor: "hsl(var(--landing-bg))" }}
-      >
+      <div className="px-6 pt-20 md:pt-24 pb-0" style={{ backgroundColor: "hsl(var(--landing-bg))" }}>
         <div
           className="max-w-[440px] mx-auto rounded-2xl px-5 py-4"
           style={{
@@ -281,10 +294,7 @@ const Index = () => {
               className="w-2 h-2 rounded-full animate-pulse shrink-0"
               style={{ backgroundColor: "hsl(var(--landing-accent))" }}
             />
-            <span
-              className="text-[13px] font-medium"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
+            <span className="text-[13px] font-medium" style={{ color: "hsl(var(--landing-text))" }}>
               Joining as a participant?
             </span>
           </div>
@@ -309,10 +319,7 @@ const Index = () => {
                 color: "hsl(var(--landing-text))",
               }}
             />
-            <button
-              type="submit"
-              className="landing-cta h-9 px-5 text-[13px] shrink-0"
-            >
+            <button type="submit" className="landing-cta h-9 px-5 text-[13px] shrink-0">
               Join
             </button>
           </form>
@@ -326,16 +333,14 @@ const Index = () => {
             {/* Text block */}
             <div className="max-w-2xl mx-auto text-center">
               {/* Eyebrow */}
-              <p className="landing-eyebrow mb-5">
-                Real-time visibility into student understanding
-              </p>
+              <p className="landing-eyebrow mb-5">Real-time visibility into student understanding</p>
 
               {/* Headline */}
               <h1
                 className="text-4xl md:text-[52px] lg:text-[60px] font-bold leading-[1.08] tracking-[-0.025em] mb-6"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
-                Know who's lost — while class is still happening.
+                Know who's lost while class is still happening.
               </h1>
 
               {/* Subheadline */}
@@ -343,9 +348,8 @@ const Index = () => {
                 className="text-lg md:text-xl leading-relaxed mb-11 max-w-xl mx-auto"
                 style={{ color: "hsl(var(--landing-muted))" }}
               >
-                Instructors usually find out students didn't get it after the
-                quiz, the exam, or the withdrawal. Edvana shows understanding
-                live, in the room, so you can adjust before the moment passes.
+                Instructors usually find out students didn't get it after the quiz, the exam, or the withdrawal. Edvana
+                shows understanding live, in the room, so you can adjust before the moment passes.
               </p>
 
               {/* CTAs */}
@@ -353,17 +357,21 @@ const Index = () => {
                 <button onClick={() => navigate("/instructor/auth")} className="landing-cta px-8 py-3 text-[15px]">
                   Instructor Sign In
                 </button>
-                <button
-                  onClick={() => navigate("/auth")}
-                  className="landing-secondary-btn px-8 py-3 text-[15px]"
-                >
+                <button onClick={() => navigate("/auth")} className="landing-secondary-btn px-8 py-3 text-[15px]">
                   Student Sign In
                 </button>
               </div>
 
               {/* Proof points */}
-              <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]" style={{ color: "hsl(var(--landing-muted))" }}>
-                {["Live signal, not next-week data", "You review every check-in before it sends", "Works in the classes you already teach"].map((point) => (
+              <div
+                className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                {[
+                  "Live signal, not next-week data",
+                  "You review every check-in before it sends",
+                  "Works in the classes you already teach",
+                ].map((point) => (
                   <span key={point} className="flex items-center gap-2">
                     <span
                       className="w-1 h-1 rounded-full shrink-0"
@@ -385,15 +393,11 @@ const Index = () => {
                 <div className="flex-1">
                   <p className="landing-eyebrow mb-1">In use today</p>
                   <p className="text-[13px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
-                    Running in live classes across higher-ed writing, STEM, and
-                    clinical instruction — 78–85% average response rates, repeat
-                    use every session.
+                    Running in live classes across higher-ed writing, STEM, and clinical instruction — 78–85% average
+                    response rates, repeat use every session.
                   </p>
                 </div>
-                <button
-                  onClick={() => scrollToSection("results")}
-                  className="landing-util-link shrink-0 text-[13px]"
-                >
+                <button onClick={() => scrollToSection("results")} className="landing-util-link shrink-0 text-[13px]">
                   See pilot results ↓
                 </button>
               </div>
@@ -447,8 +451,14 @@ const Index = () => {
                   {/* Panel 1: Live transcript */}
                   <div className="p-6 flex flex-col justify-center">
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "hsl(0 72% 55%)" }} />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--landing-muted))" }}>
+                      <span
+                        className="w-2 h-2 rounded-full animate-pulse"
+                        style={{ backgroundColor: "hsl(0 72% 55%)" }}
+                      />
+                      <span
+                        className="text-[11px] font-semibold uppercase tracking-wider"
+                        style={{ color: "hsl(var(--landing-muted))" }}
+                      >
                         Live
                       </span>
                       <span className="text-[11px] ml-auto" style={{ color: "hsl(var(--landing-border))" }}>
@@ -456,8 +466,8 @@ const Index = () => {
                       </span>
                     </div>
                     <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-text))" }}>
-                      "The key difference between Type I and Type II errors is that one rejects a true hypothesis
-                      while the other fails to reject a false one…"
+                      "The key difference between Type I and Type II errors is that one rejects a true hypothesis while
+                      the other fails to reject a false one…"
                     </p>
                     <div className="mt-4 flex items-center gap-3">
                       {[0.6, 1, 0.7, 0.9, 0.5, 0.8, 1, 0.6].map((h, i) => (
@@ -477,7 +487,10 @@ const Index = () => {
                   <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
 
                   {/* Panel 2: Drafted check-in */}
-                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+                  <div
+                    className="p-6 flex flex-col justify-center"
+                    style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+                  >
                     <div className="flex items-center justify-between mb-4">
                       <span
                         className="text-[11px] font-semibold uppercase tracking-wider"
@@ -516,7 +529,9 @@ const Index = () => {
                           <span
                             className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                             style={{
-                              backgroundColor: opt.correct ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
+                              backgroundColor: opt.correct
+                                ? "hsl(var(--landing-accent))"
+                                : "hsl(var(--landing-border))",
                               color: opt.correct ? "white" : "hsl(var(--landing-muted))",
                             }}
                           >
@@ -538,8 +553,14 @@ const Index = () => {
                   <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
 
                   {/* Panel 3: Response signal */}
-                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider mb-4" style={{ color: "hsl(var(--landing-muted))" }}>
+                  <div
+                    className="p-6 flex flex-col justify-center"
+                    style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+                  >
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wider mb-4"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
                       Room Signal
                     </span>
                     <div className="flex items-end gap-3 h-24 mb-4">
@@ -549,14 +570,21 @@ const Index = () => {
                         { pct: 11, highlight: false },
                       ].map((bar, i) => (
                         <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-[11px] font-semibold" style={{ color: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))" }}>
+                          <span
+                            className="text-[11px] font-semibold"
+                            style={{
+                              color: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))",
+                            }}
+                          >
                             {bar.pct}%
                           </span>
                           <div
                             className="w-full rounded-md"
                             style={{
                               height: `${bar.pct * 1.1}px`,
-                              backgroundColor: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
+                              backgroundColor: bar.highlight
+                                ? "hsl(var(--landing-accent))"
+                                : "hsl(var(--landing-border))",
                               minHeight: "8px",
                             }}
                           />
@@ -573,7 +601,9 @@ const Index = () => {
                         color: "hsl(var(--landing-text))",
                       }}
                     >
-                      <span className="font-semibold" style={{ color: "hsl(var(--landing-accent))" }}>58% correct</span>
+                      <span className="font-semibold" style={{ color: "hsl(var(--landing-accent))" }}>
+                        58% correct
+                      </span>
                       <span style={{ color: "hsl(var(--landing-muted))" }}> · 45 responded · </span>
                       <span className="font-medium">Consider revisiting</span>
                     </div>
@@ -583,9 +613,6 @@ const Index = () => {
             </div>
           </div>
         </section>
-
-
-
 
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section id="how-it-works" className="py-24 md:py-32 px-6">
@@ -597,8 +624,7 @@ const Index = () => {
                 From "I hope they got it" to "I can see they got it."
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Three steps that fit the way you already teach — no prep
-                questions, no separate tool to launch.
+                Three steps that fit the way you already teach — no prep questions, no separate tool to launch.
               </p>
             </div>
 
@@ -624,10 +650,7 @@ const Index = () => {
                   micro: "Catch drift before it becomes damage.",
                 },
               ].map((step) => (
-                <div
-                  key={step.num}
-                  className="landing-card flex flex-col"
-                >
+                <div key={step.num} className="landing-card flex flex-col">
                   {/* Step number */}
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-5"
@@ -638,20 +661,17 @@ const Index = () => {
                   >
                     {step.num}
                   </span>
-                  <h3
-                    className="text-[17px] font-semibold mb-3"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[17px] font-semibold mb-3" style={{ color: "hsl(var(--landing-text))" }}>
                     {step.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed mb-auto"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed mb-auto" style={{ color: "hsl(var(--landing-muted))" }}>
                     {step.body}
                   </p>
                   {/* Micro-line */}
-                  <div className="mt-6 flex items-center gap-2 text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
+                  <div
+                    className="mt-6 flex items-center gap-2 text-[12px]"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
                     <span
                       className="w-1 h-1 rounded-full shrink-0"
                       style={{ backgroundColor: "hsl(var(--landing-accent))" }}
@@ -673,15 +693,11 @@ const Index = () => {
           <div className="max-w-[1120px] mx-auto">
             {/* Header */}
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <p className="landing-eyebrow mb-4">
-                Why it changes the moment
-              </p>
-              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Finding out later is too late.
-              </h2>
+              <p className="landing-eyebrow mb-4">Why it changes the moment</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">Finding out later is too late.</h2>
               <p className="landing-subheading text-base md:text-lg">
-                By the time a quiz score or exam grade tells you students were
-                lost, the class has moved on. Edvana closes that gap to seconds.
+                By the time a quiz score or exam grade tells you students were lost, the class has moved on. Edvana
+                closes that gap to seconds.
               </p>
             </div>
 
@@ -702,16 +718,10 @@ const Index = () => {
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
-                  <h3
-                    className="text-[17px] font-semibold mb-3"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[17px] font-semibold mb-3" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.body}
                   </p>
                 </div>
@@ -729,9 +739,7 @@ const Index = () => {
           <div className="max-w-[1120px] mx-auto">
             {/* Header */}
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <p className="landing-eyebrow mb-4">
-                Why Edvana Is Different
-              </p>
+              <p className="landing-eyebrow mb-4">Why Edvana Is Different</p>
               <h2 className="landing-heading text-2xl md:text-3xl">
                 Polls tell you who clicked.
                 <br />
@@ -813,17 +821,14 @@ const Index = () => {
               className="text-center text-[13px] leading-relaxed mt-12 max-w-xl mx-auto"
               style={{ color: "hsl(var(--landing-muted))" }}
             >
-              Polls measure attendance. Edvana measures whether the class
-              landed — while there's still time to make sure it does.
+              Polls measure attendance. Edvana measures whether the class landed — while there's still time to make sure
+              it does.
             </p>
           </div>
         </section>
 
         {/* ── Built for Real Sessions ── */}
-        <section
-          className="py-24 md:py-32 px-6"
-          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-        >
+        <section className="py-24 md:py-32 px-6" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p
@@ -836,8 +841,8 @@ const Index = () => {
                 Built to be used — not abandoned by week three.
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Every instructor tool promises live insight. Edvana is designed
-                so you'll actually keep using it after the pilot.
+                Every instructor tool promises live insight. Edvana is designed so you'll actually keep using it after
+                the pilot.
               </p>
             </div>
 
@@ -861,16 +866,10 @@ const Index = () => {
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
-                  <h3
-                    className="text-[15px] font-semibold mb-2"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[15px] font-semibold mb-2" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.body}
                   </p>
                 </div>
@@ -880,20 +879,14 @@ const Index = () => {
         </section>
 
         {/* ── Results ── */}
-        <section
-          className="py-24 md:py-32 px-6"
-          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-        >
+        <section className="py-24 md:py-32 px-6" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">Pilots in progress</p>
-              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Already running in live classes.
-              </h2>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">Already running in live classes.</h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is being used right now in higher-ed and STEM
-                classrooms — the same explanation-heavy settings where students
-                most often fall behind quietly.
+                Edvana is being used right now in higher-ed and STEM classrooms — the same explanation-heavy settings
+                where students most often fall behind quietly.
               </p>
             </div>
 
@@ -903,8 +896,10 @@ const Index = () => {
                   eyebrow: "HIGHER EDUCATION · ACTIVE PILOT",
                   title: "Intro to Writing",
                   stats: "12 sessions · 78% average response rate · repeat use in 4 of 5 classes",
-                  outcome: "What changed: instructor could tell mid-lecture that students hadn't followed the argument.",
-                  quote: "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
+                  outcome:
+                    "What changed: instructor could tell mid-lecture that students hadn't followed the argument.",
+                  quote:
+                    "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
                   footer: "Repeat use: 4 of 5 class sessions",
                 },
                 {
@@ -912,25 +907,17 @@ const Index = () => {
                   title: "Engineering Fundamentals",
                   stats: "8 sessions · 85% average response rate · used every session after week 2",
                   outcome: "What changed: students reported staying focused because they knew a check-in was coming.",
-                  quote: "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
+                  quote:
+                    "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
                   footer: "Repeat use: Every session after week 2",
                 },
               ].map((card) => (
-                <div
-                  key={card.title}
-                  className="landing-card"
-                >
+                <div key={card.title} className="landing-card">
                   <p className="landing-eyebrow mb-3">{card.eyebrow}</p>
-                  <h3
-                    className="text-lg font-bold mb-1"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-lg font-bold mb-1" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[12px] mb-6"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[12px] mb-6" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.stats}
                   </p>
                   {card.outcome && (
@@ -950,10 +937,7 @@ const Index = () => {
                   >
                     {card.quote}
                   </blockquote>
-                  <p
-                    className="text-[12px]"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.footer}
                   </p>
                 </div>
@@ -971,12 +955,9 @@ const Index = () => {
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">Use Cases</p>
-              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Where "found out too late" hurts most.
-              </h2>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">Where "found out too late" hurts most.</h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is built first for classrooms where a single
-                misunderstood concept can compound for weeks.
+                Edvana is built first for classrooms where a single misunderstood concept can compound for weeks.
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
@@ -999,16 +980,10 @@ const Index = () => {
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
-                  <h3
-                    className="text-[17px] font-semibold mb-2"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[17px] font-semibold mb-2" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.body}
                   </p>
                 </div>
@@ -1017,9 +992,6 @@ const Index = () => {
           </div>
         </section>
 
-
-
-
         {/* ── Final CTA ── */}
         <section
           id="demo"
@@ -1027,33 +999,20 @@ const Index = () => {
           style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
           <div className="max-w-xl mx-auto text-center">
-            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
-              Stop finding out on the exam.
-            </h2>
-            <p
-              className="landing-subheading text-base mb-11"
-            >
-              Book a short demo, or start a pilot in one class. See what
-              real-time understanding looks like in your own room.
+            <h2 className="landing-heading text-3xl md:text-4xl mb-5">Stop finding out on the exam.</h2>
+            <p className="landing-subheading text-base mb-11">
+              Book a short demo, or start a pilot in one class. See what real-time understanding looks like in your own
+              room.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-              <button
-                onClick={handleBookDemo}
-                className="landing-cta px-8 py-3 text-[15px]"
-              >
+              <button onClick={handleBookDemo} className="landing-cta px-8 py-3 text-[15px]">
                 Book a Demo
               </button>
-              <button
-                onClick={handleStartPilot}
-                className="landing-secondary-btn px-8 py-3 text-[15px]"
-              >
+              <button onClick={handleStartPilot} className="landing-secondary-btn px-8 py-3 text-[15px]">
                 Start a Pilot Conversation
               </button>
             </div>
-            <p
-              className="text-[12px]"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
+            <p className="text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
               Short demo. Clear workflow. No bloated setup.
             </p>
           </div>
@@ -1072,10 +1031,7 @@ const Index = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
             {/* Product */}
             <div>
-              <h4
-                className="text-[13px] font-semibold mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h4 className="text-[13px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
                 Product
               </h4>
               <ul className="space-y-2.5">
@@ -1101,10 +1057,7 @@ const Index = () => {
 
             {/* Sessions */}
             <div>
-              <h4
-                className="text-[13px] font-semibold mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h4 className="text-[13px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
                 Sessions
               </h4>
               <ul className="space-y-2.5">
@@ -1129,10 +1082,7 @@ const Index = () => {
 
             {/* Company */}
             <div>
-              <h4
-                className="text-[13px] font-semibold mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h4 className="text-[13px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
                 Company
               </h4>
               <ul className="space-y-2.5">
@@ -1158,31 +1108,18 @@ const Index = () => {
 
             {/* Brand */}
             <div>
-              <p
-                className="text-[13px] font-semibold mb-2"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <p className="text-[13px] font-semibold mb-2" style={{ color: "hsl(var(--landing-text))" }}>
                 Edvana is the copilot for live understanding.
               </p>
-              <p
-                className="text-[12px] leading-relaxed"
-                style={{ color: "hsl(var(--landing-muted))" }}
-              >
-                Helping speakers see audience understanding in real time without
-                breaking flow.
+              <p className="text-[12px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
+                Helping speakers see audience understanding in real time without breaking flow.
               </p>
             </div>
           </div>
 
           {/* Bottom bar */}
-          <div
-            className="pt-6"
-            style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-          >
-            <p
-              className="text-[11px]"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
+          <div className="pt-6" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+            <p className="text-[11px]" style={{ color: "hsl(var(--landing-muted))" }}>
               © 2026 Edvana. All rights reserved.
             </p>
           </div>
