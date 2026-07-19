@@ -787,10 +787,10 @@ const Index = () => {
                 </h3>
                 <ul className="space-y-3">
                   {[
-                    "Supports in-the-moment checks with minimal prep",
-                    "Fits live teaching, training, and explanation flow",
-                    "Lets leaders act while the session is still happening",
-                    "Helps surface confusion before it becomes drift",
+                    "Questions come from what you actually just said",
+                    "Check-ins fit the lecture — no context switch",
+                    "You see understanding in seconds, not weeks",
+                    "Confusion surfaces while you can still fix it",
                   ].map((item) => (
                     <li
                       key={item}
