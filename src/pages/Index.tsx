@@ -415,10 +415,10 @@ const Index = () => {
                   style={{ borderBottom: "1px solid hsl(var(--landing-border))" }}
                 >
                   {[
-                    { num: "1", label: "Speaker is live" },
-                    { num: "2", label: "Edvana drafts a check-in" },
-                    { num: "3", label: "Sent to audience" },
-                    { num: "4", label: "Signal appears" },
+                    { num: "1", label: "Class is running" },
+                    { num: "2", label: "Edvana drafts a check-in from what you just said" },
+                    { num: "3", label: "Room answers in seconds" },
+                    { num: "4", label: "You see who's lost — now" },
                   ].map((step, i) => (
                     <div
                       key={step.num}
