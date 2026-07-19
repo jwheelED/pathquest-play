@@ -594,11 +594,11 @@ const Index = () => {
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">How It Works</p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Three steps. One continuous flow.
+                From "I hope they got it" to "I can see they got it."
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana fits into the way people already teach, train, explain,
-                and present.
+                Three steps that fit the way you already teach — no prep
+                questions, no separate tool to launch.
               </p>
             </div>
 
