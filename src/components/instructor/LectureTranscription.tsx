@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { readEdgeFunctionError } from "@/lib/edgeFunctionError";
+
 import { createRoot } from "react-dom/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
