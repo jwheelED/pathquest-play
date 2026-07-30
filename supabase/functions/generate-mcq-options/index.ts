@@ -62,22 +62,27 @@ function validateAnswer(
   const correctText = result.options[idx];
   const correctNorm = normalize(correctText);
 
-  // 1. If model provided a citation, require the citation to actually appear
-  //    in the transcript AND the correct option's tokens to overlap with it.
+  // 1. If the model provided a citation, use it only as a WEAK signal.
+  //    A correct answer very often shares no tokens with the transcript span
+  //    that prompted it (e.g. "Who wrote the Emancipation Proclamation?" →
+  //    "Abraham Lincoln"), so a low overlap here is NOT evidence of a bad
+  //    answer. Rejecting on it caused a needless second (slower) model call on
+  //    essentially every question. Fall through to transcript scoring instead.
   if (result.citation && result.citation.trim().length > 5) {
     const citationNorm = normalize(result.citation);
     const transcriptNorm = normalize(transcript);
-    // Look for a meaningful chunk of the citation (first 6 words) inside transcript
     const citationHead = citationNorm.split(' ').slice(0, 6).join(' ');
-    if (citationHead.length > 0 && !transcriptNorm.includes(citationHead)) {
+    if (citationHead.length > 0 && transcriptNorm.includes(citationHead)) {
+      // Citation is genuinely grounded in the transcript — accept.
+      return { ok: true };
+    }
+    // Hallucinated citation is only worth a retry when we have enough
+    // transcript to be confident it truly isn't there.
+    if (transcript.length >= 400) {
       return { ok: false, reason: `citation not found in transcript: "${citationHead}"` };
     }
-    const overlapWithCitation = tokenOverlap(correctText, result.citation);
-    if (overlapWithCitation < 0.2) {
-      return { ok: false, reason: `correct option does not overlap with its own citation (${overlapWithCitation.toFixed(2)})` };
-    }
-    return { ok: true };
   }
+
 
   // 2. No citation provided. If the transcript is too short to reliably score
   //    overlap, skip validation — the overlap heuristic produces too many
