@@ -5,6 +5,8 @@ import { toast as sonnerToast } from 'sonner';
 import { usePresenterBroadcast } from '@/hooks/useLecturePresenterChannel';
 import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
+import { readEdgeFunctionError } from '@/lib/edgeFunctionError';
+
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
