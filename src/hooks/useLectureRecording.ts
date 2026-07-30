@@ -445,9 +445,30 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       });
 
       if (error) {
-        console.error('Edge function error:', error);
-        throw error;
+        // Recover the JSON body supabase-js drops on non-2xx responses.
+        const details = await readEdgeFunctionError(error);
+        console.error('Edge function error:', details.status, details.body ?? details.message, error);
+
+        const errorType = (details.body?.error_type as string) || '';
+        if (details.status === 429) {
+          if (errorType === 'daily_limit') {
+            toast({
+              title: '🚫 Daily question limit reached',
+              description: `You've sent ${details.body?.current_count ?? ''}/${details.body?.daily_limit ?? ''} questions today. Resets at midnight UTC.`,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: '⏳ Slow down',
+              description: (details.body?.error as string) || 'Please wait a few seconds between questions.',
+            });
+          }
+          return;
+        }
+
+        throw new Error(details.message || (details.body?.error as string) || error.message);
       }
+
 
       if (data?.success) {
         playNotificationSound().catch(() => {});
