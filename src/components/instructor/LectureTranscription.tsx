@@ -1495,7 +1495,7 @@ export const LectureTranscription = ({
 
       // Retry logic for transient failures with progress tracking
       const sendStartTime = Date.now();
-      const { data, error } = await retryWithBackoff(async () => {
+      const invokeResult = await retryWithBackoff(async () => {
         return await supabase.functions.invoke("format-and-send-question", {
           body: {
             question_text: detectionData.question_text,
@@ -1520,6 +1520,16 @@ export const LectureTranscription = ({
         });
 
       });
+
+      const error = invokeResult.error;
+      // supabase-js drops the response body on non-2xx — recover it so the
+      // structured handling below (cooldown, daily limit, 4xx…) still works.
+      const errorDetails = error ? await readEdgeFunctionError(error) : null;
+      if (error && errorDetails?.status && !(error as any).status) {
+        (error as any).status = errorDetails.status;
+      }
+      const data: any = invokeResult.data ?? errorDetails?.body ?? null;
+
 
       // Clear the stashed prior context — single-use per send attempt
       pendingPriorContextRef.current = null;
