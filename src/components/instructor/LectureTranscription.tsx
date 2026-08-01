@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { readEdgeFunctionError } from "@/lib/edgeFunctionError";
+import { onInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
 
 import { createRoot } from "react-dom/client";
 import { Button } from "@/components/ui/button";
