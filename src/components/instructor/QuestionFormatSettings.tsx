@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, Code, FileText } from "lucide-react";
+import { emitInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
 
 interface QuestionFormatSettingsProps {
   instructorId: string;
