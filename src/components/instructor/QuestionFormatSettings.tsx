@@ -65,6 +65,8 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
         .single();
       console.log('✅ Settings verified after save:', verifyData);
 
+      emitInstructorPrefsUpdated({ question_format_preference: newFormat });
+
       toast({
         title: "✅ Preference saved",
         description: `Question format updated to ${newFormat === 'multiple_choice' ? 'Multiple Choice' : newFormat === 'short_answer' ? 'Short Answer' : newFormat === 'poll' ? 'Poll' : 'Coding'}`,
