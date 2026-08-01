@@ -744,6 +744,7 @@ export const LectureTranscription = ({
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
+      offPrefs();
       supabase.removeChannel(channel);
     };
   }, [isRecording]);
