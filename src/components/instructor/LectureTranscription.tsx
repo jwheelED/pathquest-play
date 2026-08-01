@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { readEdgeFunctionError } from "@/lib/edgeFunctionError";
+import { onInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
 
 import { createRoot } from "react-dom/client";
 import { Button } from "@/components/ui/button";
@@ -710,6 +711,16 @@ export const LectureTranscription = ({
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
 
+    // Same-tab settings changes broadcast immediately (no reload / re-login).
+    const offPrefs = onInstructorPrefsUpdated((detail) => {
+      if (detail.question_format_preference) {
+        setQuestionFormatPreference(detail.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+      }
+      if (detail.coding_question_style) {
+        setCodingStyle(detail.coding_question_style as 'simple' | 'full');
+      }
+    });
+
     // Realtime: react instantly if the instructor toggles preference elsewhere.
     const channel = supabase
       .channel(`profile-prefs-${Date.now()}`)
@@ -733,6 +744,7 @@ export const LectureTranscription = ({
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
+      offPrefs();
       supabase.removeChannel(channel);
     };
   }, [isRecording]);
