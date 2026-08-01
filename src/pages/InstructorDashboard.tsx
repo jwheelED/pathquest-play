@@ -111,6 +111,14 @@ export default function InstructorDashboard() {
 
   const professorType = instructorProfile?.professor_type;
 
+  // Preference changes made in the Settings tab must apply immediately —
+  // patch the cached profile so the Live Copilot picks up the new format.
+  useEffect(() => {
+    return onInstructorPrefsUpdated((detail) => {
+      setInstructorProfile((prev: any) => (prev ? { ...prev, ...detail } : prev));
+    });
+  }, []);
+
   // Stream live transcript chunks to enrolled students (realtime + persistence)
   useLiveTranscriptBroadcast({
     sessionId: liveSessionId,
