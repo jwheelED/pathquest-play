@@ -34,6 +34,7 @@ import { StudentLectureQuestions } from "@/components/instructor/StudentLectureQ
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
+import { onInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { useLiveTranscriptBroadcast } from "@/hooks/useLiveTranscriptBroadcast";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
