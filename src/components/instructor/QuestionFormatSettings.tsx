@@ -93,6 +93,8 @@ export const QuestionFormatSettings = ({ instructorId, professorType }: Question
 
       if (error) throw error;
 
+      emitInstructorPrefsUpdated({ coding_question_style: newStyle });
+
       toast({
         title: "✅ Coding style saved",
         description: newStyle === 'simple' 
