@@ -108,41 +108,9 @@ export default function AdminAuth() {
               navigate("/admin/onboarding");
             }
           } else {
-            // Possibly a fresh OAuth signup - check for student role to upgrade
-            const { data: studentRole } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("role", "student")
-              .maybeSingle();
-
-            // Only auto-promote on a fresh OAuth signup (within last 30s) — prevents
-            // an existing student from self-elevating to admin by visiting /admin/auth.
-            const sessionCreatedAt = new Date(session.user.created_at).getTime();
-            const isRecentSignup = (Date.now() - sessionCreatedAt) < 30000;
-
-            // Detect fresh OAuth callback so we don't strand existing non-admin users on a dead screen
-            const urlParams = new URLSearchParams(window.location.search);
-            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
-
-            if (studentRole && hasOAuthCallback && isRecentSignup) {
-              const { data: success } = await supabase
-                .rpc('assign_oauth_role', {
-                  p_user_id: session.user.id,
-                  p_role: 'admin'
-                });
-
-              if (success) {
-                toast.success("Admin account created!");
-                navigate("/admin/onboarding");
-              }
-            } else {
-              // Existing user lacking admin role - bounce to student portal so they aren't stranded.
-              toast.error("This account isn't registered as an administrator. Redirecting to the student sign-in.");
-              await supabase.auth.signOut();
-              navigate("/auth");
-            }
+            await handleMissingAdminRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       }
     });
