@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
+import { setOAuthRoleIntent, readOAuthRoleIntent, clearOAuthRoleIntent } from "@/lib/oauthRoleIntent";
 
 export default function AdminAuth() {
   const [email, setEmail] = useState("");
@@ -23,6 +24,34 @@ export default function AdminAuth() {
   const isSigningInRef = useRef(false);
   const hasResolvedRef = useRef(false);
   const navigate = useNavigate();
+
+  // Signed in without the admin role. Only a fresh signup that started from this
+  // portal's Google button gets promoted; everyone else keeps their session and
+  // is sent to their student dashboard instead of being signed out.
+  const handleMissingAdminRole = async (userId: string, userCreatedAt: string) => {
+    const intent = readOAuthRoleIntent();
+    const isRecentSignup = Date.now() - new Date(userCreatedAt).getTime() < 15 * 60 * 1000;
+
+    if (intent === 'admin' && isRecentSignup) {
+      clearOAuthRoleIntent();
+      const { data: success } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: userId,
+        p_role: 'admin',
+      });
+
+      if (success) {
+        toast.success("Admin account created!");
+        navigate("/admin/onboarding");
+        return;
+      }
+    }
+    clearOAuthRoleIntent();
+
+    toast.error("This account isn't registered as an administrator. Taking you to your dashboard.");
+    navigate("/dashboard");
+  };
+
+
 
   const handlePasswordUpdate = async () => {
     setLoading(true);
