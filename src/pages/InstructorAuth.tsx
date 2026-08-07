@@ -384,7 +384,39 @@ export default function InstructorAuth() {
     }
   };
 
+  if (conversionUserId) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-5 py-12 mastery-bg">
+        <div className="command-card px-7 py-9 sm:px-9 sm:py-10 w-full max-w-[400px] space-y-5">
+          <div className="space-y-1.5 text-center">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Set up instructor access?
+            </h1>
+            <p className="text-[13px] text-muted-foreground/70">
+              This account doesn't have instructor access yet, and it has no student activity.
+              You can convert it into an instructor account now.
+            </p>
+          </div>
+          <Button
+            onClick={convertToInstructor}
+            disabled={converting}
+            className="w-full h-[44px] rounded-[10px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm"
+          >
+            {converting ? "Setting up..." : "Convert to instructor account"}
+          </Button>
+          <button
+            onClick={declineConversion}
+            className="w-full text-center text-[13px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+          >
+            No thanks, continue as a student
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
+
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12 mastery-bg">
       {/* Ambient glow */}
       <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
