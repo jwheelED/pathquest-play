@@ -113,34 +113,9 @@ export default function InstructorAuth() {
                 navigate("/instructor/onboarding");
               }
           } else {
-            // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
-            const sessionCreatedAt = new Date(session.user.created_at).getTime();
-            const now = Date.now();
-            const isRecentSignup = (now - sessionCreatedAt) < 30000; // 30 seconds
-            
-            // Also check URL for OAuth callback indicators
-            const urlParams = new URLSearchParams(window.location.search);
-            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
-            
-            if (isRecentSignup && hasOAuthCallback) {
-              // This is a new OAuth signup - assign instructor role
-              const { data: success } = await supabase
-                .rpc('assign_oauth_role', { 
-                  p_user_id: session.user.id, 
-                  p_role: 'instructor' 
-                });
-              
-              if (success) {
-                toast.success("Instructor account created!");
-                navigate("/instructor/onboarding");
-              }
-            } else {
-              // Existing user who is not an instructor - redirect them to the student portal so they aren't stranded.
-              toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
-              await supabase.auth.signOut();
-              navigate("/auth");
-            }
+            await handleMissingInstructorRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       }
     });
