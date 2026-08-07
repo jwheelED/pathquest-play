@@ -526,6 +526,7 @@ export default function AuthPage() {
 
                   <button
                     onClick={async () => {
+                      clearOAuthRoleIntent();
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
