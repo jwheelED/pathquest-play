@@ -220,7 +220,11 @@ export default function InstructorAuth() {
             } else {
               navigate("/instructor/onboarding");
             }
+          } else if (readOAuthRoleIntent() === 'instructor') {
+            // Returning from the instructor portal's Google button without the role yet.
+            await handleMissingInstructorRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       });
     }
