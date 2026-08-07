@@ -436,15 +436,15 @@ export default function AdminAuth() {
 
                   <Button
                     onClick={async () => {
+                      // Persist intent: Supabase can't carry a role through the OAuth round-trip.
+                      setOAuthRoleIntent('admin');
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
                           redirectTo: `${window.location.origin}/admin/auth`,
-                          queryParams: {
-                            role: 'admin'
-                          }
                         }
                       });
+
                       if (error) {
                         toast.error(error.message);
                       }
