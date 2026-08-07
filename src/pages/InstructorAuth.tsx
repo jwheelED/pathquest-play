@@ -22,6 +22,8 @@ export default function InstructorAuth() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const [conversionUserId, setConversionUserId] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isSigningUpRef = useRef(false);
   const hasResolvedRef = useRef(false);
