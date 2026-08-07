@@ -172,7 +172,10 @@ export default function AdminAuth() {
             } else {
               navigate("/admin/onboarding");
             }
+          } else if (readOAuthRoleIntent() === 'admin') {
+            await handleMissingAdminRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       });
     }
