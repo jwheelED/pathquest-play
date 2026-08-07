@@ -68,6 +68,72 @@ export default function InstructorAuth() {
     }
   }, []);
 
+  // Handles a signed-in user who lacks the instructor role.
+  // 1) If they just came back from the instructor portal's Google button, grant the role.
+  // 2) If they look like a mis-roled OAuth signup (no student activity), offer conversion.
+  // 3) Otherwise they are a genuine student — keep them signed in and send them to /dashboard.
+  const handleMissingInstructorRole = async (userId: string, userCreatedAt: string) => {
+    const intent = readOAuthRoleIntent();
+    const isRecentSignup = Date.now() - new Date(userCreatedAt).getTime() < 15 * 60 * 1000;
+
+    if (intent === 'instructor' && isRecentSignup) {
+      clearOAuthRoleIntent();
+      const { data: success } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: userId,
+        p_role: 'instructor',
+      });
+
+      if (success) {
+        toast.success("Instructor account created!");
+        navigate("/instructor/onboarding");
+        return;
+      }
+    }
+    clearOAuthRoleIntent();
+
+    // Does this account have any real student activity?
+    const { count } = await supabase
+      .from("instructor_students")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", userId);
+
+    if ((count ?? 0) > 0) {
+      toast.error("This account is registered as a student. Taking you to your student dashboard.");
+      navigate("/dashboard");
+      return;
+    }
+
+    // No student activity — most likely a Google signup that was mis-labelled.
+    setConversionUserId(userId);
+  };
+
+  const convertToInstructor = async () => {
+    if (!conversionUserId) return;
+    setConverting(true);
+    try {
+      const { data: success, error } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: conversionUserId,
+        p_role: 'instructor',
+      });
+      if (error) throw error;
+      if (!success) throw new Error("Could not convert this account.");
+      toast.success("Instructor access enabled!");
+      setConversionUserId(null);
+      navigate("/instructor/onboarding");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not convert this account.");
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const declineConversion = async () => {
+    setConversionUserId(null);
+    navigate("/dashboard");
+  };
+
+
+
   // Combined auth state change handler
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
