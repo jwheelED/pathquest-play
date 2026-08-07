@@ -531,15 +531,15 @@ export default function InstructorAuth() {
 
                   <Button
                     onClick={async () => {
+                      // Persist intent: Supabase can't carry a role through the OAuth round-trip.
+                      setOAuthRoleIntent('instructor');
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
                           redirectTo: `${window.location.origin}/instructor/auth`,
-                          queryParams: {
-                            role: 'instructor'
-                          }
                         }
                       });
+
                       if (error) {
                         toast.error(error.message);
                       }
