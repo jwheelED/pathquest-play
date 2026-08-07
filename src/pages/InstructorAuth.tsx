@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
+import { setOAuthRoleIntent, readOAuthRoleIntent, clearOAuthRoleIntent } from "@/lib/oauthRoleIntent";
 
 export default function InstructorAuth() {
   const [email, setEmail] = useState("");
