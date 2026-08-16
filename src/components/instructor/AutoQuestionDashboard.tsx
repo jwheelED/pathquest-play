@@ -93,6 +93,14 @@ export const AutoQuestionDashboard = ({
         icon: <AlertCircle className="h-4 w-4" /> 
       };
     }
+
+    if (studentCount === 0) {
+      return {
+        status: 'warning',
+        message: 'Generating — no participants connected yet',
+        icon: <AlertCircle className="h-4 w-4" />
+      };
+    }
     
     return {
       status: 'healthy', 
