@@ -3697,7 +3697,8 @@ export const LectureTranscription = ({
                 {studentCount === 0 && (
                   <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-900 dark:text-amber-200">
-                      ⚠️ No students connected. Share your instructor code with students to enable question sending.
+                      ℹ️ No participants connected yet. Questions will still be generated and staged — share your
+                      instructor code so they can receive them.
                     </p>
                   </div>
                 )}
