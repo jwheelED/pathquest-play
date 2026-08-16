@@ -1361,7 +1361,6 @@ export const LectureTranscription = ({
         };
       }
 
-      // Check if students are connected
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -1372,25 +1371,9 @@ export const LectureTranscription = ({
         };
       }
 
-      const { data: students, error: studentsError } = await supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id);
+      // Note: an empty roster is NOT a blocker — questions can be generated and
+      // staged with zero students connected (they simply have no recipients yet).
 
-      if (studentsError) {
-        console.error("Error checking students:", studentsError);
-        return {
-          valid: false,
-          error: "❌ Could not verify student connections",
-        };
-      }
-
-      if (!students || students.length === 0) {
-        return {
-          valid: false,
-          error: "👥 No students connected - please share your instructor code with students",
-        };
-      }
 
       // Check if there's enough transcript content (skip for auto-questions - already checked)
       if (!isAutoQuestion && (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30)) {
