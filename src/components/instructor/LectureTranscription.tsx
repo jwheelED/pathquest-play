@@ -1361,7 +1361,6 @@ export const LectureTranscription = ({
         };
       }
 
-      // Check if students are connected
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -1372,25 +1371,9 @@ export const LectureTranscription = ({
         };
       }
 
-      const { data: students, error: studentsError } = await supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id);
+      // Note: an empty roster is NOT a blocker — questions can be generated and
+      // staged with zero students connected (they simply have no recipients yet).
 
-      if (studentsError) {
-        console.error("Error checking students:", studentsError);
-        return {
-          valid: false,
-          error: "❌ Could not verify student connections",
-        };
-      }
-
-      if (!students || students.length === 0) {
-        return {
-          valid: false,
-          error: "👥 No students connected - please share your instructor code with students",
-        };
-      }
 
       // Check if there's enough transcript content (skip for auto-questions - already checked)
       if (!isAutoQuestion && (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30)) {
@@ -3714,7 +3697,8 @@ export const LectureTranscription = ({
                 {studentCount === 0 && (
                   <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-900 dark:text-amber-200">
-                      ⚠️ No students connected. Share your instructor code with students to enable question sending.
+                      ℹ️ No participants connected yet. Questions will still be generated and staged — share your
+                      instructor code so they can receive them.
                     </p>
                   </div>
                 )}
