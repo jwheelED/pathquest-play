@@ -60,13 +60,6 @@ export const AutoQuestionDashboard = ({
       };
     }
     
-    if (studentCount === 0) {
-      return { 
-        status: 'blocked', 
-        message: 'No students connected', 
-        icon: <XCircle className="h-4 w-4" /> 
-      };
-    }
     
     if (!autoQuestionEnabled) {
       return { 
