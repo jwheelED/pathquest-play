@@ -2168,6 +2168,38 @@ export type Database = {
           },
         ]
       }
+      org_admin_scopes: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          scope: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          scope?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_admin_scopes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_domains: {
         Row: {
           created_at: string | null
@@ -4310,6 +4342,7 @@ export type Database = {
         Args: { _admin_code: string }
         Returns: string
       }
+      ensure_default_admin_scope: { Args: never; Returns: undefined }
       generate_admin_code: { Args: never; Returns: string }
       generate_course_code: { Args: never; Returns: string }
       generate_group_invite_code: { Args: never; Returns: string }
@@ -4349,6 +4382,24 @@ export type Database = {
           org_name: string
         }[]
       }
+      get_my_org_admin_scopes: {
+        Args: never
+        Returns: {
+          scope: string
+        }[]
+      }
+      get_org_billing_summary: {
+        Args: never
+        Returns: {
+          annual_price_cents: number
+          has_plan: boolean
+          included_minutes: number
+          period_end: string
+          tier_display: string
+          tier_name: string
+          used_minutes: number
+        }[]
+      }
       get_org_codes: {
         Args: { _org_id: string }
         Returns: {
@@ -4381,6 +4432,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: string
       }
+      has_admin_scope: { Args: { p_scope: string }; Returns: boolean }
       has_feature_access: {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
@@ -4392,13 +4444,38 @@ export type Database = {
         }
         Returns: boolean
       }
+      institutional_included_minutes: {
+        Args: { p_tier_name: string }
+        Returns: number
+      }
       is_group_member: {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
+      is_org_owner: { Args: never; Returns: boolean }
       join_group_by_code: { Args: { _invite_code: string }; Returns: string }
+      list_org_admins_with_scopes: {
+        Args: never
+        Returns: {
+          full_name: string
+          scope: string
+          user_id: string
+        }[]
+      }
+      provision_org_pool: {
+        Args: { p_org_id: string; p_tier_name: string }
+        Returns: undefined
+      }
+      record_org_lecture_minutes: {
+        Args: { p_instructor_id: string; p_minutes: number }
+        Returns: undefined
+      }
       set_auto_release_timer: {
         Args: { p_assignment_ids: string[]; p_minutes: number }
+        Returns: undefined
+      }
+      set_org_admin_scopes: {
+        Args: { p_scopes: string[]; p_target_user: string }
         Returns: undefined
       }
       submit_quiz: {
