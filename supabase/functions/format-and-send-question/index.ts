@@ -1037,16 +1037,31 @@ serve(async (req) => {
     // Error handling is now done within the conditionals above
 
     if (!studentLinks || studentLinks.length === 0) {
+      // No roster yet — the question was still generated (and pushed to any live
+      // session above). Treat this as a success with zero recipients instead of
+      // failing the whole request.
+      console.log("👥 No students linked — question generated with 0 recipients");
       return new Response(
         JSON.stringify({
-          success: false,
-          message: "No students linked to instructor",
+          success: true,
+          sent_to: 0,
+          total_students: 0,
+          failed_count: 0,
+          question_type: finalType,
+          question: formattedQuestion,
+          live_delivered: !!liveSession,
+          live_participant_count: liveParticipantCount,
+          session_code: liveSession?.session_code ?? null,
+          message: liveSession
+            ? `Delivered to ${liveParticipantCount} live participant(s)`
+            : "Question generated — no participants connected yet",
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
+
 
     console.log("👥 Sending to", studentLinks.length, "students");
 

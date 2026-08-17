@@ -60,13 +60,6 @@ export const AutoQuestionDashboard = ({
       };
     }
     
-    if (studentCount === 0) {
-      return { 
-        status: 'blocked', 
-        message: 'No students connected', 
-        icon: <XCircle className="h-4 w-4" /> 
-      };
-    }
     
     if (!autoQuestionEnabled) {
       return { 
@@ -98,6 +91,14 @@ export const AutoQuestionDashboard = ({
         status: 'warning', 
         message: 'Content quality low', 
         icon: <AlertCircle className="h-4 w-4" /> 
+      };
+    }
+
+    if (studentCount === 0) {
+      return {
+        status: 'warning',
+        message: 'Generating — no participants connected yet',
+        icon: <AlertCircle className="h-4 w-4" />
       };
     }
     
