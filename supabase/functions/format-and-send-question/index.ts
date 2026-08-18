@@ -14,8 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
 // Shuffle MCQ options so the correct answer isn't always A
 // Uses index tracking instead of indexOf to handle duplicate option text correctly
 const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {
@@ -504,7 +502,7 @@ serve(async (req) => {
     // The broad tail provides earlier-lecture history needed to resolve vague references like
     // "what does it produce?" to antecedents mentioned 15-60s ago. The focused prior_context
     // (when present) highlights the teaching prose immediately before the question.
-    // Sending BOTH gives Gemini the richest possible window for pronoun resolution.
+    // Sending BOTH gives the model the richest possible window for pronoun resolution.
     const broadContext: string = typeof context === "string" ? context : "";
     const focusedContext: string = typeof prior_context === "string" ? prior_context.trim() : "";
 
@@ -1316,7 +1314,7 @@ serve(async (req) => {
         userMessage = "AI service is busy. Please wait a moment and try again.";
         errorType = "rate_limit";
       } else if (error.message.includes("quota exceeded") || error.message.includes("402")) {
-        userMessage = "AI service quota exceeded. Please add credits to your Lovable workspace.";
+        userMessage = "AI service quota exceeded. Please check the Moonshot API account balance.";
         errorType = "quota_exceeded";
       } else if (error.message.includes("timed out")) {
         userMessage = "Request timed out. The AI service took too long to respond.";

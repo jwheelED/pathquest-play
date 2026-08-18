@@ -68,11 +68,6 @@ serve(async (req) => {
     // Trim to avoid token overflow
     const trimmedContext = materialContext.substring(0, 8000);
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
     console.log(`Generating ${questionCount} ${difficulty} questions for material: ${material.title}`);
 
     const response = await callClaude({

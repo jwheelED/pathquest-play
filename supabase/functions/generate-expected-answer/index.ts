@@ -56,11 +56,6 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
     const broadContext = (source_transcript || '').slice(-6000).trim();
     const focusedContext = (prior_context || '').trim();
     const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;

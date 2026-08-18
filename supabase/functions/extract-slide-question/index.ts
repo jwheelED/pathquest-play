@@ -69,11 +69,6 @@ serve(async (req) => {
 
     console.log(`📋 Extracting ${type} question from slide image (${slideImage.length} chars)`);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     // Build the prompt based on question type
     let extractionPrompt = "";
 
