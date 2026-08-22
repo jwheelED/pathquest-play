@@ -40,6 +40,7 @@ import CorporateEvents from "./pages/CorporateEvents";
 import CorporateEnterprise from "./pages/CorporateEnterprise";
 import CreateEvent from "./pages/CreateEvent";
 import EventDetail from "./pages/EventDetail";
+import EdvanaWhiteboardTutor from "./pages/EdvanaWhiteboardTutor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
@@ -181,6 +182,7 @@ function App() {
               <EventDetail />
             </ProtectedRoute>
           } />
+          <Route path="/whiteboard-tutor" element={<EdvanaWhiteboardTutor />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/accessibility" element={<AccessibilityStatement />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
