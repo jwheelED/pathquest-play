@@ -92,6 +92,44 @@ async function post(
   });
 }
 
+interface Attempt {
+  ok: boolean;
+  status: number;
+  text: string | null;
+  detail: string;
+}
+
+/** Extract assistant text, tolerating providers that use reasoning fields. */
+function extractText(data: unknown): string | null {
+  const msg = (data as { choices?: { message?: Record<string, unknown>; text?: unknown }[] })
+    ?.choices?.[0];
+  const content = msg?.message?.content;
+  if (typeof content === "string" && content.trim()) return content;
+  // Some reasoning models return an array of content parts.
+  if (Array.isArray(content)) {
+    const joined = content
+      .map((p) => (typeof p === "string" ? p : (p as { text?: string })?.text ?? ""))
+      .join("");
+    if (joined.trim()) return joined;
+  }
+  // Fallbacks seen across OpenRouter routes.
+  const alt = (msg?.message?.reasoning as string) ?? (msg?.text as string);
+  if (typeof alt === "string" && alt.trim()) return alt;
+  return typeof content === "string" ? content : null;
+}
+
+async function attempt(
+  provider: Provider,
+  body: Record<string, unknown>,
+): Promise<Attempt> {
+  const res = await post(provider, body);
+  if (!res.ok) {
+    return { ok: false, status: res.status, text: null, detail: await res.text() };
+  }
+  const data = await res.json();
+  return { ok: true, status: res.status, text: extractText(data), detail: "" };
+}
+
 /** Low-level chat completion. Returns the assistant message text. */
 export async function llmChat(opts: LlmChatOptions): Promise<string> {
   const provider = resolveProvider();
@@ -104,31 +142,24 @@ export async function llmChat(opts: LlmChatOptions): Promise<string> {
   };
   if (opts.maxTokens) base.max_tokens = opts.maxTokens;
 
-  const withJson = opts.jsonMode
-    ? { ...base, response_format: { type: "json_object" } }
-    : base;
-
-  let res = await post(provider, withJson);
-
-  // Some models/routes reject response_format — retry once without it.
-  if (!res.ok && opts.jsonMode) {
-    const detail = await res.text();
-    if (res.status >= 400 && res.status < 500 && /response_format|json/i.test(detail)) {
-      res = await post(provider, base);
-    } else {
-      throw new Error(`LLM API error ${res.status}: ${detail.slice(0, 500)}`);
+  if (opts.jsonMode) {
+    const first = await attempt(provider, { ...base, response_format: { type: "json_object" } });
+    if (first.ok && first.text) return first.text;
+    // Retry without response_format: some models emit empty content or reject
+    // JSON mode outright. The tolerant parser in llmJson handles fences/prose.
+    if (!first.ok && !(first.status >= 400 && first.status < 500)) {
+      throw new Error(`LLM API error ${first.status}: ${first.detail.slice(0, 500)}`);
     }
+    const second = await attempt(provider, base);
+    if (second.ok && second.text) return second.text;
+    if (!second.ok) throw new Error(`LLM API error ${second.status}: ${second.detail.slice(0, 500)}`);
+    throw new Error("LLM returned no message content");
   }
 
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`LLM API error ${res.status}: ${detail.slice(0, 500)}`);
-  }
-
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string") throw new Error("LLM returned no message content");
-  return text;
+  const only = await attempt(provider, base);
+  if (!only.ok) throw new Error(`LLM API error ${only.status}: ${only.detail.slice(0, 500)}`);
+  if (!only.text) throw new Error("LLM returned no message content");
+  return only.text;
 }
 
 /**

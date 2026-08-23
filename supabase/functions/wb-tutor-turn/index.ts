@@ -97,7 +97,7 @@ serve(async (req) => {
         { role: "user", content: JSON.stringify(context) },
       ],
       temperature: 0.5,
-      maxTokens: 700,
+      maxTokens: 1500,
     });
 
     // Normalize
