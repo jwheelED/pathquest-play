@@ -57,7 +57,7 @@ serve(async (req) => {
   }
   try {
     if (!kimiConfigured()) {
-      return json({ error: "AI service not configured (set KIMI_API_KEY)" }, 500);
+      return json({ error: "AI service not configured (set MOONSHOT_API_KEY)" }, 500);
     }
     const { problemText, title, concept } = (await req.json()) as DraftRequest;
     if (!problemText || problemText.trim().length < 8) {

@@ -4,10 +4,14 @@
 // fetch wrapper. Everything is env-configured so the exact K2 / K2.6 model IDs
 // and endpoint can be set as Supabase secrets without code changes:
 //
-//   KIMI_API_KEY      (required)  your Moonshot key
+//   MOONSHOT_API_KEY  (required)  your Moonshot key (KIMI_API_KEY also accepted)
 //   KIMI_BASE_URL     default https://api.moonshot.ai/v1
 //   KIMI_MODEL_TEXT   default kimi-k2-0711-preview
 //   KIMI_MODEL_VISION default moonshot-v1-8k-vision-preview
+
+function apiKey(): string | undefined {
+  return Deno.env.get("MOONSHOT_API_KEY") ?? Deno.env.get("KIMI_API_KEY");
+}
 
 export interface KimiTextPart {
   type: "text";
@@ -45,13 +49,13 @@ export function visionModel(): string {
 }
 
 export function kimiConfigured(): boolean {
-  return !!Deno.env.get("KIMI_API_KEY");
+  return !!apiKey();
 }
 
 /** Low-level chat completion. Returns the assistant message text. */
 export async function kimiChat(opts: KimiChatOptions): Promise<string> {
-  const apiKey = Deno.env.get("KIMI_API_KEY");
-  if (!apiKey) throw new Error("KIMI_API_KEY not configured");
+  const key = apiKey();
+  if (!key) throw new Error("MOONSHOT_API_KEY not configured");
 
   const body: Record<string, unknown> = {
     model: opts.model ?? textModel(),
@@ -65,7 +69,7 @@ export async function kimiChat(opts: KimiChatOptions): Promise<string> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify(body),
   });

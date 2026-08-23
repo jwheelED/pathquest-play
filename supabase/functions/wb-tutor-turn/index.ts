@@ -71,7 +71,7 @@ serve(async (req) => {
   }
   try {
     if (!kimiConfigured()) {
-      return json({ error: "AI service not configured (set KIMI_API_KEY)" }, 500);
+      return json({ error: "AI service not configured (set MOONSHOT_API_KEY)" }, 500);
     }
     const body = (await req.json()) as TurnRequest;
     if (!body.studentMessage || !body.problemText) {
