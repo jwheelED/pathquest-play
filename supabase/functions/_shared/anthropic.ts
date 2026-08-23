@@ -62,7 +62,14 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
     model,
     messages: body.messages,
   };
-  if (typeof body.temperature === "number") apiBody.temperature = body.temperature;
+  // Kimi K2.6 only accepts temperature = 1 and 400s on any other value, so force
+  // it for that model regardless of what the caller passed. Other models keep the
+  // caller's value.
+  if (model === "kimi-k2.6") {
+    apiBody.temperature = 1;
+  } else if (typeof body.temperature === "number") {
+    apiBody.temperature = body.temperature;
+  }
   if (typeof body.max_tokens === "number") apiBody.max_tokens = body.max_tokens;
   if (body.tools && body.tools.length > 0) apiBody.tools = body.tools;
   if (body.tool_choice !== undefined) apiBody.tool_choice = body.tool_choice;
