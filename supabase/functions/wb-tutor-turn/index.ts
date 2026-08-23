@@ -8,7 +8,7 @@
 //      NEVER stating the next step,
 //   3. flags a misconception when the student's line is wrong.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { kimiCors, kimiJson, kimiConfigured } from "../_shared/kimi.ts";
+import { llmCors, llmJson, llmConfigured } from "../_shared/llm.ts";
 
 interface BoardStepIn {
   expr: string;
@@ -67,11 +67,11 @@ Return ONLY a JSON object:
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: kimiCors });
+    return new Response(null, { headers: llmCors });
   }
   try {
-    if (!kimiConfigured()) {
-      return json({ error: "AI service not configured (set MOONSHOT_API_KEY)" }, 500);
+    if (!llmConfigured()) {
+      return json({ error: "AI service not configured (set OPENROUTER_API_KEY)" }, 500);
     }
     const body = (await req.json()) as TurnRequest;
     if (!body.studentMessage || !body.problemText) {
@@ -91,7 +91,7 @@ serve(async (req) => {
       mode: body.mode ?? "type",
     };
 
-    const result = await kimiJson<TurnResult>({
+    const result = await llmJson<TurnResult>({
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: JSON.stringify(context) },
@@ -115,6 +115,6 @@ serve(async (req) => {
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...kimiCors, "Content-Type": "application/json" },
+    headers: { ...llmCors, "Content-Type": "application/json" },
   });
 }

@@ -4,7 +4,7 @@
 // answer key + per-student variant ranges for the instructor to review and
 // approve before publishing. This never reaches students directly.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { kimiCors, kimiJson, kimiConfigured } from "../_shared/kimi.ts";
+import { llmCors, llmJson, llmConfigured } from "../_shared/llm.ts";
 
 interface DraftRequest {
   problemText: string;
@@ -53,11 +53,11 @@ across prompt_template, variant_ranges, expected_answer, and expected_steps.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: kimiCors });
+    return new Response(null, { headers: llmCors });
   }
   try {
-    if (!kimiConfigured()) {
-      return json({ error: "AI service not configured (set MOONSHOT_API_KEY)" }, 500);
+    if (!llmConfigured()) {
+      return json({ error: "AI service not configured (set OPENROUTER_API_KEY)" }, 500);
     }
     const { problemText, title, concept } = (await req.json()) as DraftRequest;
     if (!problemText || problemText.trim().length < 8) {
@@ -72,7 +72,7 @@ serve(async (req) => {
       .filter(Boolean)
       .join("\n");
 
-    const result = await kimiJson<DraftResult>({
+    const result = await llmJson<DraftResult>({
       messages: [
         { role: "system", content: SYSTEM },
         { role: "user", content: userMsg },
@@ -94,6 +94,6 @@ serve(async (req) => {
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...kimiCors, "Content-Type": "application/json" },
+    headers: { ...llmCors, "Content-Type": "application/json" },
   });
 }
