@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { callClaude } from "../_shared/anthropic.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,9 +88,9 @@ Explain:
 2. Why the student's answer is wrong (common misconception)
 3. A tip to remember the correct concept`;
 
-    console.log("Generating explanation via Kimi...", { effectiveWasCorrect, wasCorrect });
+    console.log("Generating explanation via ox-alpha (OpenRouter)...", { effectiveWasCorrect, wasCorrect });
 
-    const aiResponse = await callClaude({
+    const aiResponse = await callOpenRouter({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
