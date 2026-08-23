@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { callClaude } from "../_shared/anthropic.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -155,11 +155,6 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
     // Build a labelled, role-explicit context block. Prior context (focused, recent teaching prose
     // captured at trigger time) is given highest priority for pronoun resolution; the broader
     // source_transcript tail is included as background lecture history.
@@ -253,7 +248,7 @@ Rules (apply in order):
         });
       }
       const t0 = performance.now();
-      const res = await callClaude({
+      const res = await callOpenRouter({
         model,
         messages,
         tools,
@@ -273,9 +268,10 @@ Rules (apply in order):
       return res;
     }
 
-    // PERF: flash-lite is ~2-3x faster TTFT than flash on short factual MCQs and
-    // plenty capable for 4 options. Structural-failure retries escalate to flash.
-    const primaryModel = 'google/gemini-2.5-flash-lite';
+    // Primary + retry both use ox-alpha (OpenRouter). A structural-failure retry
+    // re-runs with the validator's reason injected as a hint (see below), which
+    // still clears the most common wrong-letter bug even on the same model.
+    const primaryModel = 'stealth/ox-alpha';
 
     const primaryStart = performance.now();
     let response = await callModel(primaryModel, 'primary');
@@ -311,10 +307,10 @@ Rules (apply in order):
       verdict.reason.includes('does not overlap with its own citation')
     );
     if (!verdict.ok && isStructuralFailure) {
-      console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
-      // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
-      // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
-      const retryResp = await callModel('google/gemini-2.5-flash', 'retry', verdict.reason);
+      console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with a corrective hint.`);
+      // Retry re-runs the same ox-alpha model with the validator's reason injected
+      // as a hint, which clears most structural (wrong-letter) failures.
+      const retryResp = await callModel('stealth/ox-alpha', 'retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
         const retryCall = retryData.choices?.[0]?.message?.tool_calls?.[0];

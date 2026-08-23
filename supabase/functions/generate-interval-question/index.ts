@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { callClaude } from "../_shared/anthropic.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -240,11 +240,6 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     const {
       interval_transcript,
       interval_minutes,
@@ -446,7 +441,7 @@ Generate ONE focused question that tests understanding of the most important con
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await callClaude({
+      const response = await callOpenRouter({
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

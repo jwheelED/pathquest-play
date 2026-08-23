@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,11 +15,6 @@ serve(async (req) => {
   }
 
   try {
-    const openAiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openAiKey) {
-      throw new Error("OPENAI_API_KEY not configured");
-    }
-
     // Use service role for cache operations since live session participants may be anonymous
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -92,32 +88,24 @@ Explain:
 2. Why the student's answer is wrong (common misconception)
 3. A tip to remember the correct concept`;
 
-    console.log("Generating explanation via OpenAI...", { effectiveWasCorrect, wasCorrect });
+    console.log("Generating explanation via ox-alpha (OpenRouter)...", { effectiveWasCorrect, wasCorrect });
 
-    const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
+    const aiResponse = await callOpenRouter({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
     });
 
-    if (!openAiResponse.ok) {
-      const errBody = await openAiResponse.text();
-      console.error("OpenAI API error:", openAiResponse.status, errBody);
-      throw new Error(`OpenAI API error: ${openAiResponse.status}`);
+    if (!aiResponse.ok) {
+      const errBody = await aiResponse.text();
+      console.error("AI API error:", aiResponse.status, errBody);
+      throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
-    const aiData = await openAiResponse.json();
+    const aiData = await aiResponse.json();
     const explanation = aiData.choices?.[0]?.message?.content || "Unable to generate explanation.";
 
     console.log("Explanation generated successfully");

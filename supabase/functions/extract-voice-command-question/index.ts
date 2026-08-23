@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { callClaude } from "../_shared/anthropic.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,11 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     // Fetch instructor preferences to respect their coding settings
     const authHeader = req.headers.get("Authorization");
     let instructorPreference = "multiple_choice";
@@ -196,7 +191,7 @@ The question is the main content in this transcript (voice commands have been re
 
 Return ONLY the complete question text, nothing else.`;
 
-    const response = await callClaude({
+    const response = await callOpenRouter({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

@@ -21,13 +21,13 @@ serve(async (req) => {
     details?: string;
   }> = [];
 
-  // Check 1: LOVABLE_API_KEY configured
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  // Check 1: MOONSHOT_API_KEY configured
+  const moonshotKey = Deno.env.get("MOONSHOT_API_KEY");
   checks.push({
-    id: "lovable_api",
+    id: "moonshot_api",
     name: "AI API Key",
-    status: lovableKey ? "pass" : "fail",
-    message: lovableKey ? "LOVABLE_API_KEY is configured" : "LOVABLE_API_KEY is missing",
+    status: moonshotKey ? "pass" : "fail",
+    message: moonshotKey ? "MOONSHOT_API_KEY is configured" : "MOONSHOT_API_KEY is missing",
   });
 
   // Check 2: Supabase connection
