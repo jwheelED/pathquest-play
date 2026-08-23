@@ -40,15 +40,7 @@ interface OpenAIRequest {
  * unchanged. Honors an explicit caller `model`; otherwise uses DEFAULT_MODEL.
  */
 export async function callOpenRouter(body: OpenAIRequest): Promise<Response> {
-  const rawKey = Deno.env.get("OPENROUTER_API_KEY");
-  const OPENROUTER_API_KEY = rawKey?.trim();
-  // Masked diagnostic (no key material): confirms whether the runtime actually
-  // sees the secret. "sk-or-v" is OpenRouter's public key prefix, not sensitive.
-  console.log("OpenRouter key check", {
-    present: !!rawKey,
-    len: OPENROUTER_API_KEY?.length ?? 0,
-    prefix: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.slice(0, 7) : null,
-  });
+  const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")?.trim();
   if (!OPENROUTER_API_KEY) {
     return new Response(
       JSON.stringify({ error: { message: "OPENROUTER_API_KEY is not configured" } }),

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { callClaude } from "../_shared/anthropic.ts";
+import { callOpenRouter } from "../_shared/openrouter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -248,7 +248,7 @@ Rules (apply in order):
         });
       }
       const t0 = performance.now();
-      const res = await callClaude({
+      const res = await callOpenRouter({
         model,
         messages,
         tools,
@@ -268,10 +268,10 @@ Rules (apply in order):
       return res;
     }
 
-    // Primary + retry both use the default Kimi model. A structural-failure retry
+    // Primary + retry both use ox-alpha (OpenRouter). A structural-failure retry
     // re-runs with the validator's reason injected as a hint (see below), which
     // still clears the most common wrong-letter bug even on the same model.
-    const primaryModel = 'kimi-k2.6';
+    const primaryModel = 'stealth/ox-alpha';
 
     const primaryStart = performance.now();
     let response = await callModel(primaryModel, 'primary');
@@ -308,9 +308,9 @@ Rules (apply in order):
     );
     if (!verdict.ok && isStructuralFailure) {
       console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with a corrective hint.`);
-      // Retry re-runs the same Kimi model with the validator's reason injected as
-      // a hint, which clears most structural (wrong-letter) failures.
-      const retryResp = await callModel('kimi-k2.6', 'retry', verdict.reason);
+      // Retry re-runs the same ox-alpha model with the validator's reason injected
+      // as a hint, which clears most structural (wrong-letter) failures.
+      const retryResp = await callModel('stealth/ox-alpha', 'retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
         const retryCall = retryData.choices?.[0]?.message?.tool_calls?.[0];
