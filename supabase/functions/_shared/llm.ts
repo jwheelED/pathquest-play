@@ -38,19 +38,9 @@ function resolveProvider(): Provider | null {
   return null;
 }
 
-export interface LlmTextPart {
-  type: "text";
-  text: string;
-}
-export interface LlmImagePart {
-  type: "image_url";
-  image_url: { url: string };
-}
-export type LlmContent = string | Array<LlmTextPart | LlmImagePart>;
-
 export interface LlmMessage {
   role: "system" | "user" | "assistant";
-  content: LlmContent;
+  content: unknown;
 }
 
 export interface LlmChatOptions {
@@ -73,10 +63,7 @@ export function llmConfigured(): boolean {
   return !!resolveProvider();
 }
 
-async function post(
-  provider: Provider,
-  body: Record<string, unknown>,
-): Promise<Response> {
+async function post(provider: Provider, body: Record<string, unknown>): Promise<Response> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${provider.key}`,
@@ -92,94 +79,123 @@ async function post(
   });
 }
 
-interface Attempt {
-  ok: boolean;
-  status: number;
-  text: string | null;
-  detail: string;
-}
-
-/** Extract assistant text, tolerating providers that use reasoning fields. */
-function extractText(data: unknown): string | null {
-  const msg = (data as { choices?: { message?: Record<string, unknown>; text?: unknown }[] })
-    ?.choices?.[0];
-  const content = msg?.message?.content;
-  if (typeof content === "string" && content.trim()) return content;
-  // Some reasoning models return an array of content parts.
+/** Pull the assistant text out of a completion. Content only — never the
+ * reasoning/CoT field, which would corrupt JSON parsing. */
+function extractText(data: unknown): string {
+  const msg = (data as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]?.message;
+  const content = msg?.content;
+  if (typeof content === "string") return content;
   if (Array.isArray(content)) {
-    const joined = content
+    return content
       .map((p) => (typeof p === "string" ? p : (p as { text?: string })?.text ?? ""))
       .join("");
-    if (joined.trim()) return joined;
   }
-  // Fallbacks seen across OpenRouter routes.
-  const alt = (msg?.message?.reasoning as string) ?? (msg?.text as string);
-  if (typeof alt === "string" && alt.trim()) return alt;
-  return typeof content === "string" ? content : null;
+  return "";
 }
 
-async function attempt(
-  provider: Provider,
-  body: Record<string, unknown>,
-): Promise<Attempt> {
-  const res = await post(provider, body);
-  if (!res.ok) {
-    return { ok: false, status: res.status, text: null, detail: await res.text() };
-  }
-  const data = await res.json();
-  return { ok: true, status: res.status, text: extractText(data), detail: "" };
-}
-
-/** Low-level chat completion. Returns the assistant message text. */
-export async function llmChat(opts: LlmChatOptions): Promise<string> {
-  const provider = resolveProvider();
-  if (!provider) throw new Error("LLM not configured (set OPENROUTER_API_KEY)");
-
-  const base: Record<string, unknown> = {
-    model: opts.model ?? textModel(),
-    messages: opts.messages,
-    temperature: opts.temperature ?? 0.4,
-  };
-  if (opts.maxTokens) base.max_tokens = opts.maxTokens;
-
-  if (opts.jsonMode) {
-    const first = await attempt(provider, { ...base, response_format: { type: "json_object" } });
-    if (first.ok && first.text) return first.text;
-    // Retry without response_format: some models emit empty content or reject
-    // JSON mode outright. The tolerant parser in llmJson handles fences/prose.
-    if (!first.ok && !(first.status >= 400 && first.status < 500)) {
-      throw new Error(`LLM API error ${first.status}: ${first.detail.slice(0, 500)}`);
+/** Extract the first balanced {...} object, ignoring braces inside strings.
+ * Tolerates leading/trailing prose and reasoning wrappers. */
+function firstJsonObject(s: string): string | null {
+  const start = s.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === "\\") esc = true;
+      else if (c === '"') inStr = false;
+    } else if (c === '"') inStr = true;
+    else if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return s.slice(start, i + 1);
     }
-    const second = await attempt(provider, base);
-    if (second.ok && second.text) return second.text;
-    if (!second.ok) throw new Error(`LLM API error ${second.status}: ${second.detail.slice(0, 500)}`);
-    throw new Error("LLM returned no message content");
   }
-
-  const only = await attempt(provider, base);
-  if (!only.ok) throw new Error(`LLM API error ${only.status}: ${only.detail.slice(0, 500)}`);
-  if (!only.text) throw new Error("LLM returned no message content");
-  return only.text;
+  return null;
 }
 
-/**
- * Chat completion that must return a JSON object. Tolerates models that wrap
- * JSON in ```json fences or add prose. Throws if nothing parses.
- */
-export async function llmJson<T>(opts: LlmChatOptions): Promise<T> {
-  const raw = await llmChat({ ...opts, jsonMode: true });
+function tryParse<T>(raw: string): T | null {
   const cleaned = raw
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
-  try {
-    return JSON.parse(cleaned) as T;
-  } catch {
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]) as T;
-    throw new Error(`LLM did not return valid JSON: ${raw.slice(0, 300)}`);
+  const candidates = [cleaned, firstJsonObject(cleaned)].filter(
+    (c): c is string => !!c,
+  );
+  for (const c of candidates) {
+    try {
+      return JSON.parse(c) as T;
+    } catch {
+      /* try next candidate */
+    }
   }
+  return null;
+}
+
+/** One completion request. Returns assistant text (possibly empty). */
+async function once(provider: Provider, opts: LlmChatOptions, json: boolean): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: opts.model ?? textModel(),
+    messages: opts.messages,
+    temperature: opts.temperature ?? 0.4,
+  };
+  if (opts.maxTokens) body.max_tokens = opts.maxTokens;
+  if (json) body.response_format = { type: "json_object" };
+
+  let res = await post(provider, body);
+  // A model/route that rejects response_format: retry once without it.
+  if (!res.ok && json) {
+    const detail = await res.text();
+    if (res.status >= 400 && res.status < 500 && /response_format|json/i.test(detail)) {
+      delete body.response_format;
+      res = await post(provider, body);
+    } else {
+      throw new Error(`LLM API error ${res.status}: ${detail.slice(0, 400)}`);
+    }
+  }
+  if (!res.ok) {
+    throw new Error(`LLM API error ${res.status}: ${(await res.text()).slice(0, 400)}`);
+  }
+  return extractText(await res.json());
+}
+
+/** Plain text completion. */
+export async function llmChat(opts: LlmChatOptions): Promise<string> {
+  const provider = resolveProvider();
+  if (!provider) throw new Error("LLM not configured (set OPENROUTER_API_KEY)");
+  const text = await once(provider, opts, !!opts.jsonMode);
+  if (!text.trim()) throw new Error("LLM returned empty content");
+  return text;
+}
+
+/**
+ * Completion that MUST yield a JSON object. Retries the whole call a few times
+ * because reasoning/preview models intermittently return empty or non-JSON
+ * content; each attempt requests strict JSON and is parsed leniently.
+ */
+export async function llmJson<T>(opts: LlmChatOptions): Promise<T> {
+  const provider = resolveProvider();
+  if (!provider) throw new Error("LLM not configured (set OPENROUTER_API_KEY)");
+
+  let lastRaw = "";
+  let lastErr = "";
+  for (let i = 0; i < 3; i++) {
+    try {
+      const raw = await once(provider, opts, true);
+      lastRaw = raw;
+      const parsed = tryParse<T>(raw);
+      if (parsed) return parsed;
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+    }
+  }
+  throw new Error(
+    `LLM did not return valid JSON after 3 tries. ${lastErr ? `Last error: ${lastErr}. ` : ""}Sample: ${lastRaw.slice(0, 200)}`,
+  );
 }
 
 export const llmCors = {
