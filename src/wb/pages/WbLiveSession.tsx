@@ -1,14 +1,14 @@
-/** Live typed working session — real tutor loop with persistence. */
+/** Live working session — typed AND voice, with real tutor loop + persistence. */
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Sparkles, Send, Loader2 } from "lucide-react";
+import { Pencil, Sparkles, Send, Loader2, Mic, Keyboard, Volume2 } from "lucide-react";
 import { T, FONT_MONO } from "@/components/edvana/tokens";
 import { Button, Card, Eyebrow, StatTile } from "@/components/edvana/primitives";
-import { SYMBOL_KEYS } from "@/components/edvana/data";
+import { SYMBOL_KEYS, MODE_COPY } from "@/components/edvana/data";
 import { WbChrome } from "../components/WbChrome";
 import { useDemoIdentity } from "../lib/demoIdentity";
-import { wb } from "../lib/wbClient";
+import { wb, wbInvokeBinary, wbFetchJson, wbFetchAudio } from "../lib/wbClient";
 import {
   ensureVariant,
   ensureSession,
@@ -16,8 +16,9 @@ import {
   callTutorTurn,
   persistTurn,
   finishSession,
+  TutorTurn,
 } from "../lib/wbData";
-import type { WbProblem, WbSession, WbVariant, Provenance } from "../lib/wbTypes";
+import type { WbBoardStep, WbProblem, WbSession, WbVariant, Provenance } from "../lib/wbTypes";
 
 const START_CLOCK = 154;
 
@@ -28,6 +29,9 @@ const provColor: Record<Provenance, string> = {
   you_drew: T.textSubtle,
   answer: T.emerald700,
 };
+
+type SessionMode = "type" | "talk";
+type VoiceStatus = "idle" | "recording" | "transcribing" | "thinking" | "speaking";
 
 function useProblem(problemId: string | undefined) {
   return useQuery({
@@ -57,14 +61,28 @@ export default function WbLiveSession() {
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
 
+  const [mode, setMode] = useState<SessionMode>("type");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [clock, setClock] = useState(START_CLOCK);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
+  // Voice state
+  const [recording, setRecording] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [playFallback, setPlayFallback] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const generationRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const { data: bundle, refetch } = useSessionBundle(session?.id);
   const steps = bundle?.steps ?? [];
   const transcript = bundle?.transcript ?? [];
+  const revealedIds = useRef<Set<string>>(new Set());
 
   // Bootstrap: variant + session for this student/problem.
   useEffect(() => {
@@ -94,9 +112,36 @@ export default function WbLiveSession() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [transcript.length]);
 
+  // Stop any recording/audio on unmount.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      if (autoStopRef.current) clearTimeout(autoStopRef.current);
+    };
+  }, []);
+
   const askText =
     session?.current_ask ??
     (variant ? `Let's work it. Walk me through your first step for: ${variant.prompt_text}` : "");
+
+  /** Shared tail: persist a completed turn and refresh local state. Used by both typed and voice paths. */
+  const finalizeTurn = async (studentMessage: string, turn: TutorTurn) => {
+    if (!session) return;
+    await persistTurn({
+      session,
+      studentName: current?.full_name.split(" ")[0] ?? "You",
+      studentMessage,
+      clockSeconds: clock,
+      nextPositionBoard: steps.length,
+      nextPositionTranscript: transcript.length,
+      turn,
+    });
+    setClock((c) => c + 28);
+    const { data: fresh } = await wb.from("whiteboard_sessions").select("*").eq("id", session.id).maybeSingle();
+    if (fresh) setSession(fresh as WbSession);
+    await refetch();
+  };
 
   const onSend = async () => {
     const text = draft.trim();
@@ -116,21 +161,8 @@ export default function WbLiveSession() {
         studentMessage: text,
         mode: "type",
       });
-      await persistTurn({
-        session,
-        studentName: current?.full_name.split(" ")[0] ?? "You",
-        studentMessage: text,
-        clockSeconds: clock,
-        nextPositionBoard: steps.length,
-        nextPositionTranscript: transcript.length,
-        turn,
-      });
-      setClock((c) => c + 28);
+      await finalizeTurn(text, turn);
       setDraft("");
-      // refresh local session counters + bundle
-      const { data: fresh } = await wb.from("whiteboard_sessions").select("*").eq("id", session.id).maybeSingle();
-      if (fresh) setSession(fresh as WbSession);
-      await refetch();
     } catch (e) {
       setBootError(e instanceof Error ? e.message : "The tutor could not respond");
     } finally {
@@ -138,8 +170,134 @@ export default function WbLiveSession() {
     }
   };
 
+  /* ---------------- Voice ---------------- */
+
+  const cancelInFlight = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPlayFallback(false);
+    setVoiceStatus("idle");
+  };
+
+  const startRecording = async () => {
+    setVoiceError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      chunksRef.current = [];
+      const myGen = ++generationRef.current;
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (autoStopRef.current) {
+          clearTimeout(autoStopRef.current);
+          autoStopRef.current = null;
+        }
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+        void processVoiceTurn(blob, myGen);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setRecording(true);
+      setVoiceStatus("recording");
+      autoStopRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      }, 90_000);
+    } catch {
+      setVoiceError("Microphone access denied or unavailable — try Type it out instead.");
+    }
+  };
+
+  const onMicTap = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    // Barge-in: cancel whatever is in flight or playing, then start fresh.
+    cancelInFlight();
+    await startRecording();
+  };
+
+  async function processVoiceTurn(blob: Blob, myGen: number) {
+    if (blob.size === 0 || !problem || !variant || !session) {
+      setVoiceStatus("idle");
+      return;
+    }
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setVoiceStatus("transcribing");
+    try {
+      const data = await wbInvokeBinary<{ transcript?: string; error?: string }>(
+        "wb-transcribe",
+        blob,
+        ac.signal,
+      );
+      if (myGen !== generationRef.current) return;
+      if (data.error) throw new Error(data.error);
+      const text = (data.transcript ?? "").trim();
+      if (!text) {
+        setVoiceStatus("idle");
+        setVoiceError("Didn't catch that — try again.");
+        return;
+      }
+
+      setVoiceStatus("thinking");
+      const res = await wbFetchJson<{ turn: TutorTurn }>(
+        "wb-tutor-turn",
+        {
+          problemText: variant.prompt_text,
+          expectedAnswer: problem.expected_answer,
+          expectedSteps: problem.expected_steps,
+          solutionNotes: problem.solution_notes,
+          board: steps.map((s) => ({ expr: s.content, provenance: s.provenance })),
+          transcript: transcript.map((t) => ({
+            who: t.speaker === "ai" ? "ai" : "you",
+            text: t.body,
+          })),
+          studentMessage: text,
+          mode: "talk",
+        },
+        ac.signal,
+      );
+      if (myGen !== generationRef.current) return;
+      const turn = res.turn;
+
+      await finalizeTurn(text, turn);
+      if (myGen !== generationRef.current) return;
+
+      setVoiceStatus("speaking");
+      const audioBlob = await wbFetchAudio("wb-tutor-tts", { text: turn.reply }, ac.signal);
+      if (myGen !== generationRef.current) return;
+
+      const url = URL.createObjectURL(audioBlob);
+      if (audioRef.current) {
+        audioRef.current.src = url;
+        try {
+          await audioRef.current.play();
+        } catch {
+          setPlayFallback(true);
+        }
+      }
+      setVoiceStatus("idle");
+    } catch (e) {
+      if (myGen !== generationRef.current) return;
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setVoiceStatus("idle");
+      setVoiceError(e instanceof Error ? e.message : "The tutor could not respond");
+    }
+  }
+
   const onFinish = async () => {
     if (!session) return;
+    cancelInFlight();
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
     await finishSession(session.id);
     qc.invalidateQueries({ queryKey: ["wb"] });
     navigate("/wb/student");
@@ -156,6 +314,12 @@ export default function WbLiveSession() {
   if (bootError && !session) return <WbChrome><div style={{ padding: 40, color: T.redText }}>{bootError}</div></WbChrome>;
 
   const canSend = draft.trim().length > 0 && !sending;
+  const thinking = mode === "talk" && (voiceStatus === "transcribing" || voiceStatus === "thinking");
+  const pillCopy = MODE_COPY[mode === "talk" ? "talk" : "type"];
+  const boardSubtitle =
+    mode === "talk"
+      ? "Edvana writes what you say — tap the mic to talk"
+      : "Edvana writes what you type — quiet mode, no mic";
 
   return (
     <WbChrome>
@@ -180,7 +344,7 @@ export default function WbLiveSession() {
           }}
         >
           <span className="edv-pulse" style={{ width: 7, height: 7, borderRadius: "50%", background: T.emerald500 }} />
-          <span style={{ fontSize: 11.5, fontWeight: 600, color: T.emerald700 }}>QUIET MODE</span>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: T.emerald700 }}>{pillCopy.pill}</span>
         </span>
         <Button size="sm" onClick={onFinish}>Finish problem</Button>
       </div>
@@ -191,7 +355,7 @@ export default function WbLiveSession() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 22px", borderBottom: `1px solid ${T.border}` }}>
             <Pencil size={17} color={T.primary} />
             <span style={{ fontSize: 14, fontWeight: 600 }}>Whiteboard</span>
-            <span style={{ fontSize: 12, color: T.textMuted }}>Edvana writes what you type — quiet mode, no mic</span>
+            <span style={{ fontSize: 12, color: T.textMuted }}>{boardSubtitle}</span>
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 11, fontWeight: 600, color: T.textSubtle }}>{steps.length} STEPS</span>
           </div>
@@ -216,32 +380,22 @@ export default function WbLiveSession() {
               <p style={{ fontSize: 16, lineHeight: 1.55, margin: 0, color: T.ink20 }}>{variant?.prompt_text}</p>
             </div>
 
-            {steps.length === 0 && (
+            {steps.length === 0 && !thinking && !sending && (
               <div style={{ color: T.textSubtle, fontSize: 13.5, fontStyle: "italic" }}>
-                Start typing your reasoning on the right — Edvana will write your steps here.
+                {mode === "talk"
+                  ? "Tap the mic on the right and talk me through your first step."
+                  : "Start typing your reasoning on the right — Edvana will write your steps here."}
               </div>
             )}
             {steps.map((s) => (
-              <div key={s.id} style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) 96px", gap: 14, alignItems: "baseline", padding: "10px 0" }}>
-                <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.textSubtle }}>
-                  {fmt(s.at_seconds)}
-                </span>
-                <span
-                  style={{
-                    fontFamily: FONT_MONO,
-                    fontSize: 18,
-                    color: s.provenance === "answer" || s.provenance === "self_corrected" ? T.emerald700 : T.ink22,
-                    textDecoration: s.struck_through ? "line-through" : "none",
-                    textDecorationColor: s.struck_through ? T.amberStrike : undefined,
-                  }}
-                >
-                  {s.content}
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: provColor[s.provenance] }}>
-                  {s.provenance.replace("_", "-")}
-                </span>
-              </div>
+              <AnimatedBoardStepRow key={s.id} step={s} revealedIds={revealedIds} />
             ))}
+            {(thinking || sending) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", color: T.textSubtle, fontSize: 12.5 }}>
+                <span className="edv-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald500 }} />
+                Edvana is writing…
+              </div>
+            )}
           </div>
         </Card>
 
@@ -285,47 +439,243 @@ export default function WbLiveSession() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <Sparkles size={14} color={T.emerald700} />
               <Eyebrow style={{ color: T.eyebrowGreen }}>Edvana is asking</Eyebrow>
+              <span style={{ flex: 1 }} />
+              <ModeToggle
+                mode={mode}
+                onChange={(m) => {
+                  if (m === mode) return;
+                  cancelInFlight();
+                  if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+                  setRecording(false);
+                  setVoiceError(null);
+                  setMode(m);
+                }}
+              />
             </div>
             <p style={{ fontSize: 15, lineHeight: 1.5, margin: 0, color: T.ink22 }}>{askText}</p>
 
-            <div style={{ marginTop: 14, background: T.white, border: `1px solid ${T.emerald100}`, borderRadius: 12, overflow: "hidden" }}>
-              <textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={onKey}
-                rows={3}
-                placeholder="Write your reasoning — a sentence is enough."
-                disabled={sending}
-                style={{ width: "100%", border: "none", outline: "none", resize: "none", padding: "12px 13px 8px", fontSize: 13.5, fontFamily: "inherit", color: T.ink22, background: "transparent" }}
-              />
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 10px", borderTop: `1px solid ${T.border}` }}>
-                {SYMBOL_KEYS.map((k) => (
+            {mode === "type" ? (
+              <div style={{ marginTop: 14, background: T.white, border: `1px solid ${T.emerald100}`, borderRadius: 12, overflow: "hidden" }}>
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={onKey}
+                  rows={3}
+                  placeholder="Write your reasoning — a sentence is enough."
+                  disabled={sending}
+                  style={{ width: "100%", border: "none", outline: "none", resize: "none", padding: "12px 13px 8px", fontSize: 13.5, fontFamily: "inherit", color: T.ink22, background: "transparent" }}
+                />
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, padding: "8px 10px", borderTop: `1px solid ${T.border}` }}>
+                  {SYMBOL_KEYS.map((k) => (
+                    <button
+                      key={k.glyph}
+                      type="button"
+                      title={k.tip}
+                      onClick={() => setDraft((d) => d + k.glyph)}
+                      style={{ minWidth: 26, height: 26, padding: "0 6px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.white, fontFamily: FONT_MONO, fontSize: 12.5, color: T.ink25, cursor: "pointer" }}
+                    >
+                      {k.glyph}
+                    </button>
+                  ))}
+                  <span style={{ flex: 1 }} />
                   <button
-                    key={k.glyph}
                     type="button"
-                    title={k.tip}
-                    onClick={() => setDraft((d) => d + k.glyph)}
-                    style={{ minWidth: 26, height: 26, padding: "0 6px", borderRadius: 8, border: `1px solid ${T.border}`, background: T.white, fontFamily: FONT_MONO, fontSize: 12.5, color: T.ink25, cursor: "pointer" }}
+                    onClick={() => void onSend()}
+                    disabled={!canSend}
+                    style={{ height: 30, padding: "0 14px", borderRadius: 9999, border: "none", display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: canSend ? "pointer" : "default", background: canSend ? T.primary : T.slate100, color: canSend ? T.white : T.textSubtle }}
                   >
-                    {k.glyph}
+                    {sending ? <Loader2 size={13} className="edv-spin" /> : <Send size={13} />}
+                    {sending ? "Thinking…" : "Send"}
                   </button>
-                ))}
-                <span style={{ flex: 1 }} />
-                <button
-                  type="button"
-                  onClick={() => void onSend()}
-                  disabled={!canSend}
-                  style={{ height: 30, padding: "0 14px", borderRadius: 9999, border: "none", display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: canSend ? "pointer" : "default", background: canSend ? T.primary : T.slate100, color: canSend ? T.white : T.textSubtle }}
-                >
-                  {sending ? <Loader2 size={13} className="edv-spin" /> : <Send size={13} />}
-                  {sending ? "Thinking…" : "Send"}
-                </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <VoicePanel
+                recording={recording}
+                status={voiceStatus}
+                error={voiceError}
+                playFallback={playFallback}
+                onMicTap={() => void onMicTap()}
+                onPlayFallback={() => {
+                  audioRef.current?.play().catch(() => {});
+                  setPlayFallback(false);
+                }}
+              />
+            )}
           </Card>
         </div>
       </div>
+      <audio ref={audioRef} style={{ display: "none" }} />
     </WbChrome>
+  );
+}
+
+function ModeToggle({ mode, onChange }: { mode: SessionMode; onChange: (m: SessionMode) => void }) {
+  const item = (m: SessionMode, Icon: typeof Mic, label: string) => {
+    const active = mode === m;
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(m)}
+        title={label}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "4px 9px",
+          borderRadius: 9999,
+          border: `1px solid ${active ? T.emerald100 : "transparent"}`,
+          background: active ? T.white : "transparent",
+          color: active ? T.emerald700 : T.textSubtle,
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        <Icon size={12} />
+        {label}
+      </button>
+    );
+  };
+  return (
+    <div style={{ display: "inline-flex", gap: 2, background: T.slate100, borderRadius: 9999, padding: 2 }}>
+      {item("type", Keyboard, "Type")}
+      {item("talk", Mic, "Talk")}
+    </div>
+  );
+}
+
+function VoicePanel({
+  recording,
+  status,
+  error,
+  playFallback,
+  onMicTap,
+  onPlayFallback,
+}: {
+  recording: boolean;
+  status: VoiceStatus;
+  error: string | null;
+  playFallback: boolean;
+  onMicTap: () => void;
+  onPlayFallback: () => void;
+}) {
+  const label =
+    status === "recording"
+      ? "Listening — tap to stop"
+      : status === "transcribing"
+        ? "Reading what you said…"
+        : status === "thinking"
+          ? "Edvana is thinking…"
+          : status === "speaking"
+            ? "Edvana is replying…"
+            : "Tap to talk";
+  const busy = status === "transcribing" || status === "thinking" || status === "speaking";
+
+  return (
+    <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <button
+        type="button"
+        onClick={onMicTap}
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          border: "none",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: recording ? T.redText2 : T.primary,
+          color: T.white,
+          boxShadow: recording ? "0 0 0 6px hsl(0 60% 42% / 0.15)" : "0 0 0 6px hsl(160 84% 29% / 0.12)",
+        }}
+      >
+        {recording ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 2, height: 18 }}>
+            {[0, 0.12, 0.24].map((d, i) => (
+              <span
+                key={i}
+                className="edv-wave-bar"
+                style={{ width: 3, height: 16, borderRadius: 2, background: T.white, animationDelay: `${d}s` }}
+              />
+            ))}
+          </div>
+        ) : busy ? (
+          <Loader2 size={20} className="edv-spin" />
+        ) : (
+          <Mic size={22} />
+        )}
+      </button>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: T.emerald700 }}>{label}</span>
+      {playFallback && (
+        <button
+          type="button"
+          onClick={onPlayFallback}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: T.primary, background: "none", border: `1px solid ${T.emerald100}`, borderRadius: 9999, padding: "5px 12px", cursor: "pointer" }}
+        >
+          <Volume2 size={13} /> Play reply
+        </button>
+      )}
+      {error && <div style={{ fontSize: 12, color: T.redText, textAlign: "center" }}>{error}</div>}
+    </div>
+  );
+}
+
+/** A board step that types itself onto the board once, then renders instantly on re-render. */
+function AnimatedBoardStepRow({
+  step,
+  revealedIds,
+}: {
+  step: WbBoardStep;
+  revealedIds: React.MutableRefObject<Set<string>>;
+}) {
+  const alreadyRevealed = revealedIds.current.has(step.id);
+  const [revealed, setRevealed] = useState(alreadyRevealed ? step.content.length : 0);
+
+  useEffect(() => {
+    if (alreadyRevealed) return;
+    const total = step.content.length;
+    if (total === 0) {
+      revealedIds.current.add(step.id);
+      return;
+    }
+    const stepMs = Math.min(45, Math.max(12, 900 / total));
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setRevealed(i);
+      if (i >= total) {
+        clearInterval(id);
+        revealedIds.current.add(step.id);
+      }
+    }, stepMs);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.id]);
+
+  const text = step.content.slice(0, revealed);
+  const done = revealed >= step.content.length;
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) 96px", gap: 14, alignItems: "baseline", padding: "10px 0" }}>
+      <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.textSubtle }}>{fmt(step.at_seconds)}</span>
+      <span
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: 18,
+          color: step.provenance === "answer" || step.provenance === "self_corrected" ? T.emerald700 : T.ink22,
+          textDecoration: done && step.struck_through ? "line-through" : "none",
+          textDecorationColor: step.struck_through ? T.amberStrike : undefined,
+        }}
+      >
+        {text}
+        {!done && <span style={{ opacity: 0.5 }}>▏</span>}
+      </span>
+      <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: provColor[step.provenance] }}>
+        {done ? step.provenance.replace("_", "-") : ""}
+      </span>
+    </div>
   );
 }
 
