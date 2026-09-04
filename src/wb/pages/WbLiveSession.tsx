@@ -254,7 +254,7 @@ export default function WbLiveSession() {
     abortRef.current = ac;
     const t0 = performance.now();
     const mark = (stage: string, from: number) =>
-      logger.debug(`[wb-voice] ${stage} ${Math.round(performance.now() - from)}ms`);
+      logger.info(`[wb-voice] ${stage} ${Math.round(performance.now() - from)}ms`);
     try {
       // Prefer the on-device live transcript (already finished, zero round-trip).
       // Fall back to the transcription service when it is unusable.
