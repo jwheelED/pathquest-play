@@ -39,13 +39,19 @@ export function useLiveSpeech() {
   const [liveText, setLiveText] = useState("");
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const finalRef = useRef("");
+  const latestRef = useRef("");
   const wantRef = useRef(false);
   const supported = getCtor() !== null;
 
+  /** Latest recognized text, readable synchronously (state may lag). */
+  const getText = useCallback(() => latestRef.current.trim(), []);
+
   const start = useCallback(() => {
+
     const Ctor = getCtor();
     if (!Ctor) return;
     finalRef.current = "";
+    latestRef.current = "";
     setLiveText("");
     wantRef.current = true;
     try {
@@ -61,7 +67,8 @@ export function useLiveSpeech() {
           if (r.isFinal) finalRef.current += r[0].transcript;
           else interim += r[0].transcript;
         }
-        setLiveText((finalRef.current + interim).trimStart());
+        latestRef.current = (finalRef.current + interim).trimStart();
+        setLiveText(latestRef.current);
       };
       rec.onerror = () => {};
       rec.onend = () => {
@@ -93,6 +100,7 @@ export function useLiveSpeech() {
 
   const clear = useCallback(() => {
     finalRef.current = "";
+    latestRef.current = "";
     setLiveText("");
   }, []);
 
@@ -107,5 +115,5 @@ export function useLiveSpeech() {
     };
   }, []);
 
-  return { liveText, supported, start, stop, clear };
+  return { liveText, supported, start, stop, clear, getText };
 }
