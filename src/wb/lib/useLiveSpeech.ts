@@ -39,10 +39,15 @@ export function useLiveSpeech() {
   const [liveText, setLiveText] = useState("");
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const finalRef = useRef("");
+  const latestRef = useRef("");
   const wantRef = useRef(false);
   const supported = getCtor() !== null;
 
+  /** Latest recognized text, readable synchronously (state may lag). */
+  const getText = useCallback(() => latestRef.current.trim(), []);
+
   const start = useCallback(() => {
+
     const Ctor = getCtor();
     if (!Ctor) return;
     finalRef.current = "";
