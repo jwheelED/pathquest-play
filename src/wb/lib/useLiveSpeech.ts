@@ -51,6 +51,7 @@ export function useLiveSpeech() {
     const Ctor = getCtor();
     if (!Ctor) return;
     finalRef.current = "";
+    latestRef.current = "";
     setLiveText("");
     wantRef.current = true;
     try {
@@ -66,7 +67,8 @@ export function useLiveSpeech() {
           if (r.isFinal) finalRef.current += r[0].transcript;
           else interim += r[0].transcript;
         }
-        setLiveText((finalRef.current + interim).trimStart());
+        latestRef.current = (finalRef.current + interim).trimStart();
+        setLiveText(latestRef.current);
       };
       rec.onerror = () => {};
       rec.onend = () => {
@@ -98,6 +100,7 @@ export function useLiveSpeech() {
 
   const clear = useCallback(() => {
     finalRef.current = "";
+    latestRef.current = "";
     setLiveText("");
   }, []);
 
@@ -112,5 +115,5 @@ export function useLiveSpeech() {
     };
   }, []);
 
-  return { liveText, supported, start, stop, clear };
+  return { liveText, supported, start, stop, clear, getText };
 }
