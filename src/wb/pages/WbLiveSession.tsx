@@ -121,6 +121,7 @@ export default function WbLiveSession() {
     return () => {
       abortRef.current?.abort();
       if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      liveSpeech.stop();
       if (autoStopRef.current) clearTimeout(autoStopRef.current);
     };
   }, []);
@@ -199,6 +200,8 @@ export default function WbLiveSession() {
       };
       mr.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
+        liveSpeech.stop();
+        setRecording(false);
         if (autoStopRef.current) {
           clearTimeout(autoStopRef.current);
           autoStopRef.current = null;
