@@ -7,6 +7,7 @@ import { T, FONT_MONO } from "@/components/edvana/tokens";
 import { Button, Card, Eyebrow, StatTile } from "@/components/edvana/primitives";
 import { SYMBOL_KEYS, MODE_COPY } from "@/components/edvana/data";
 import { WbChrome } from "../components/WbChrome";
+import { WbHandwrittenBoard } from "../components/WbHandwrittenBoard";
 import { useDemoIdentity } from "../lib/demoIdentity";
 import { wb, wbInvokeBinary, wbFetchJson, wbFetchAudio } from "../lib/wbClient";
 import {
