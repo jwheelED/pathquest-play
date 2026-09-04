@@ -359,14 +359,23 @@ export default function WbLiveSession() {
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 11, fontWeight: 600, color: T.textSubtle }}>{steps.length} STEPS</span>
           </div>
-          <div style={{ padding: "26px 28px 30px", background: `linear-gradient(${T.gridLine} 1px, transparent 1px) 0 0 / 100% 30px, ${T.white}`, minHeight: 260 }}>
+          <WbHandwrittenBoard
+            steps={steps}
+            revealedIds={revealedIds}
+            writing={thinking || sending}
+            emptyHint={
+              mode === "talk"
+                ? "Tap the mic and talk me through your first step…"
+                : "Type your reasoning on the right — I'll write it here…"
+            }
+          >
             <div
               style={{
                 background: T.surfaceEmeraldSoft,
                 border: `1px solid ${T.emerald100}`,
                 borderRadius: 16,
-                padding: "16px 18px",
-                marginBottom: 24,
+                padding: "14px 16px",
+                marginBottom: 22,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -379,24 +388,9 @@ export default function WbLiveSession() {
               </div>
               <p style={{ fontSize: 16, lineHeight: 1.55, margin: 0, color: T.ink20 }}>{variant?.prompt_text}</p>
             </div>
+          </WbHandwrittenBoard>
 
-            {steps.length === 0 && !thinking && !sending && (
-              <div style={{ color: T.textSubtle, fontSize: 13.5, fontStyle: "italic" }}>
-                {mode === "talk"
-                  ? "Tap the mic on the right and talk me through your first step."
-                  : "Start typing your reasoning on the right — Edvana will write your steps here."}
-              </div>
-            )}
-            {steps.map((s) => (
-              <AnimatedBoardStepRow key={s.id} step={s} revealedIds={revealedIds} />
-            ))}
-            {(thinking || sending) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", color: T.textSubtle, fontSize: 12.5 }}>
-                <span className="edv-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald500 }} />
-                Edvana is writing…
-              </div>
-            )}
-          </div>
+          <StepsList steps={steps} />
         </Card>
 
         {/* Right rail */}
