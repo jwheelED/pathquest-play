@@ -617,60 +617,48 @@ function VoicePanel({
   );
 }
 
-/** A board step that types itself onto the board once, then renders instantly on re-render. */
-function AnimatedBoardStepRow({
-  step,
-  revealedIds,
-}: {
-  step: WbBoardStep;
-  revealedIds: React.MutableRefObject<Set<string>>;
-}) {
-  const alreadyRevealed = revealedIds.current.has(step.id);
-  const [revealed, setRevealed] = useState(alreadyRevealed ? step.content.length : 0);
-
-  useEffect(() => {
-    if (alreadyRevealed) return;
-    const total = step.content.length;
-    if (total === 0) {
-      revealedIds.current.add(step.id);
-      return;
-    }
-    const stepMs = Math.min(45, Math.max(12, 900 / total));
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      setRevealed(i);
-      if (i >= total) {
-        clearInterval(id);
-        revealedIds.current.add(step.id);
-      }
-    }, stepMs);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.id]);
-
-  const text = step.content.slice(0, revealed);
-  const done = revealed >= step.content.length;
-
+/** The precise, timestamped record of every board step — collapsed by default. */
+function StepsList({ steps }: { steps: WbBoardStep[] }) {
+  if (steps.length === 0) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) 96px", gap: 14, alignItems: "baseline", padding: "10px 0" }}>
-      <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.textSubtle }}>{fmt(step.at_seconds)}</span>
-      <span
+    <details style={{ borderTop: `1px solid ${T.border}`, background: T.white }}>
+      <summary
         style={{
-          fontFamily: FONT_MONO,
-          fontSize: 18,
-          color: step.provenance === "answer" || step.provenance === "self_corrected" ? T.emerald700 : T.ink22,
-          textDecoration: done && step.struck_through ? "line-through" : "none",
-          textDecorationColor: step.struck_through ? T.amberStrike : undefined,
+          cursor: "pointer",
+          listStyle: "none",
+          padding: "12px 22px",
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: T.textMuted,
         }}
       >
-        {text}
-        {!done && <span style={{ opacity: 0.5 }}>▏</span>}
-      </span>
-      <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: provColor[step.provenance] }}>
-        {done ? step.provenance.replace("_", "-") : ""}
-      </span>
-    </div>
+        Steps and timestamps ({steps.length})
+      </summary>
+      <div style={{ padding: "4px 22px 18px" }}>
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) 96px", gap: 14, alignItems: "baseline", padding: "8px 0" }}
+          >
+            <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.textSubtle }}>{fmt(step.at_seconds)}</span>
+            <span
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 16,
+                color: step.provenance === "answer" || step.provenance === "self_corrected" ? T.emerald700 : T.ink22,
+                textDecoration: step.struck_through ? "line-through" : "none",
+                textDecorationColor: step.struck_through ? T.amberStrike : undefined,
+              }}
+            >
+              {step.content}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: provColor[step.provenance] }}>
+              {step.provenance.replace("_", "-")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
