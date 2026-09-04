@@ -75,3 +75,5 @@ export const T = {
 
 export const FONT_SANS = "'DM Sans', system-ui, -apple-system, sans-serif";
 export const FONT_MONO = "'DM Mono', ui-monospace, 'SFMono-Regular', monospace";
+/** Marker handwriting for the tutor's whiteboard. */
+export const FONT_HAND = "'Caveat', 'Segoe Script', 'Bradley Hand', cursive";

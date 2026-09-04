@@ -7,6 +7,7 @@ import { T, FONT_MONO } from "@/components/edvana/tokens";
 import { Button, Card, Eyebrow, StatTile } from "@/components/edvana/primitives";
 import { SYMBOL_KEYS, MODE_COPY } from "@/components/edvana/data";
 import { WbChrome } from "../components/WbChrome";
+import { WbHandwrittenBoard } from "../components/WbHandwrittenBoard";
 import { useDemoIdentity } from "../lib/demoIdentity";
 import { wb, wbInvokeBinary, wbFetchJson, wbFetchAudio } from "../lib/wbClient";
 import {
@@ -359,14 +360,23 @@ export default function WbLiveSession() {
             <span style={{ flex: 1 }} />
             <span style={{ fontSize: 11, fontWeight: 600, color: T.textSubtle }}>{steps.length} STEPS</span>
           </div>
-          <div style={{ padding: "26px 28px 30px", background: `linear-gradient(${T.gridLine} 1px, transparent 1px) 0 0 / 100% 30px, ${T.white}`, minHeight: 260 }}>
+          <WbHandwrittenBoard
+            steps={steps}
+            revealedIds={revealedIds}
+            writing={thinking || sending}
+            emptyHint={
+              mode === "talk"
+                ? "Tap the mic and talk me through your first step…"
+                : "Type your reasoning on the right — I'll write it here…"
+            }
+          >
             <div
               style={{
                 background: T.surfaceEmeraldSoft,
                 border: `1px solid ${T.emerald100}`,
                 borderRadius: 16,
-                padding: "16px 18px",
-                marginBottom: 24,
+                padding: "14px 16px",
+                marginBottom: 22,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -379,24 +389,9 @@ export default function WbLiveSession() {
               </div>
               <p style={{ fontSize: 16, lineHeight: 1.55, margin: 0, color: T.ink20 }}>{variant?.prompt_text}</p>
             </div>
+          </WbHandwrittenBoard>
 
-            {steps.length === 0 && !thinking && !sending && (
-              <div style={{ color: T.textSubtle, fontSize: 13.5, fontStyle: "italic" }}>
-                {mode === "talk"
-                  ? "Tap the mic on the right and talk me through your first step."
-                  : "Start typing your reasoning on the right — Edvana will write your steps here."}
-              </div>
-            )}
-            {steps.map((s) => (
-              <AnimatedBoardStepRow key={s.id} step={s} revealedIds={revealedIds} />
-            ))}
-            {(thinking || sending) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", color: T.textSubtle, fontSize: 12.5 }}>
-                <span className="edv-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald500 }} />
-                Edvana is writing…
-              </div>
-            )}
-          </div>
+          <StepsList steps={steps} />
         </Card>
 
         {/* Right rail */}
@@ -622,60 +617,48 @@ function VoicePanel({
   );
 }
 
-/** A board step that types itself onto the board once, then renders instantly on re-render. */
-function AnimatedBoardStepRow({
-  step,
-  revealedIds,
-}: {
-  step: WbBoardStep;
-  revealedIds: React.MutableRefObject<Set<string>>;
-}) {
-  const alreadyRevealed = revealedIds.current.has(step.id);
-  const [revealed, setRevealed] = useState(alreadyRevealed ? step.content.length : 0);
-
-  useEffect(() => {
-    if (alreadyRevealed) return;
-    const total = step.content.length;
-    if (total === 0) {
-      revealedIds.current.add(step.id);
-      return;
-    }
-    const stepMs = Math.min(45, Math.max(12, 900 / total));
-    let i = 0;
-    const id = setInterval(() => {
-      i++;
-      setRevealed(i);
-      if (i >= total) {
-        clearInterval(id);
-        revealedIds.current.add(step.id);
-      }
-    }, stepMs);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.id]);
-
-  const text = step.content.slice(0, revealed);
-  const done = revealed >= step.content.length;
-
+/** The precise, timestamped record of every board step — collapsed by default. */
+function StepsList({ steps }: { steps: WbBoardStep[] }) {
+  if (steps.length === 0) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) 96px", gap: 14, alignItems: "baseline", padding: "10px 0" }}>
-      <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.textSubtle }}>{fmt(step.at_seconds)}</span>
-      <span
+    <details style={{ borderTop: `1px solid ${T.border}`, background: T.white }}>
+      <summary
         style={{
-          fontFamily: FONT_MONO,
-          fontSize: 18,
-          color: step.provenance === "answer" || step.provenance === "self_corrected" ? T.emerald700 : T.ink22,
-          textDecoration: done && step.struck_through ? "line-through" : "none",
-          textDecorationColor: step.struck_through ? T.amberStrike : undefined,
+          cursor: "pointer",
+          listStyle: "none",
+          padding: "12px 22px",
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: T.textMuted,
         }}
       >
-        {text}
-        {!done && <span style={{ opacity: 0.5 }}>▏</span>}
-      </span>
-      <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: provColor[step.provenance] }}>
-        {done ? step.provenance.replace("_", "-") : ""}
-      </span>
-    </div>
+        Steps and timestamps ({steps.length})
+      </summary>
+      <div style={{ padding: "4px 22px 18px" }}>
+        {steps.map((step) => (
+          <div
+            key={step.id}
+            style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr) 96px", gap: 14, alignItems: "baseline", padding: "8px 0" }}
+          >
+            <span style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: T.textSubtle }}>{fmt(step.at_seconds)}</span>
+            <span
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 16,
+                color: step.provenance === "answer" || step.provenance === "self_corrected" ? T.emerald700 : T.ink22,
+                textDecoration: step.struck_through ? "line-through" : "none",
+                textDecorationColor: step.struck_through ? T.amberStrike : undefined,
+              }}
+            >
+              {step.content}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, textAlign: "right", color: provColor[step.provenance] }}>
+              {step.provenance.replace("_", "-")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
