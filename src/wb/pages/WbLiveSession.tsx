@@ -79,6 +79,8 @@ export default function WbLiveSession() {
   const generationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Live, on-device preview of the student's speech while the mic is open.
+  const liveSpeech = useLiveSpeech();
 
   const { data: bundle, refetch } = useSessionBundle(session?.id);
   const steps = bundle?.steps ?? [];
