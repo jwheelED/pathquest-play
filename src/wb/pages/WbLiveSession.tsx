@@ -9,6 +9,7 @@ import { SYMBOL_KEYS, MODE_COPY } from "@/components/edvana/data";
 import { WbChrome } from "../components/WbChrome";
 import { WbHandwrittenBoard } from "../components/WbHandwrittenBoard";
 import { useLiveSpeech } from "../lib/useLiveSpeech";
+import { logger } from "@/lib/logger";
 import { useDemoIdentity } from "../lib/demoIdentity";
 import { wb, wbInvokeBinary, wbFetchJson, wbFetchAudio } from "../lib/wbClient";
 import {
@@ -77,6 +78,7 @@ export default function WbLiveSession() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceCleanupRef = useRef<(() => void) | null>(null);
   const generationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -123,6 +125,7 @@ export default function WbLiveSession() {
       if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
       liveSpeech.stop();
       if (autoStopRef.current) clearTimeout(autoStopRef.current);
+      silenceCleanupRef.current?.();
     };
   }, []);
 
@@ -200,6 +203,9 @@ export default function WbLiveSession() {
       };
       mr.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
+        silenceCleanupRef.current?.();
+        silenceCleanupRef.current = null;
+        const spoken = liveSpeech.getText();
         liveSpeech.stop();
         setRecording(false);
         if (autoStopRef.current) {
@@ -207,13 +213,18 @@ export default function WbLiveSession() {
           autoStopRef.current = null;
         }
         const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
-        void processVoiceTurn(blob, myGen);
+        void processVoiceTurn(blob, myGen, spoken);
       };
       mediaRecorderRef.current = mr;
       mr.start();
       liveSpeech.start();
       setRecording(true);
       setVoiceStatus("recording");
+      // End the clip shortly after the student stops speaking, so the turn is
+      // sent without waiting for a second tap.
+      silenceCleanupRef.current = watchForSilence(stream, () => {
+        if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      });
       autoStopRef.current = setTimeout(() => {
         if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
       }, 90_000);
@@ -234,23 +245,38 @@ export default function WbLiveSession() {
     await startRecording();
   };
 
-  async function processVoiceTurn(blob: Blob, myGen: number) {
-    if (blob.size === 0 || !problem || !variant || !session) {
+  async function processVoiceTurn(blob: Blob, myGen: number, spokenPreview?: string) {
+    if (!problem || !variant || !session) {
       setVoiceStatus("idle");
       return;
     }
     const ac = new AbortController();
     abortRef.current = ac;
-    setVoiceStatus("transcribing");
+    const t0 = performance.now();
+    const mark = (stage: string, from: number) =>
+      logger.debug(`[wb-voice] ${stage} ${Math.round(performance.now() - from)}ms`);
     try {
-      const data = await wbInvokeBinary<{ transcript?: string; error?: string }>(
-        "wb-transcribe",
-        blob,
-        ac.signal,
-      );
-      if (myGen !== generationRef.current) return;
-      if (data.error) throw new Error(data.error);
-      const text = (data.transcript ?? "").trim();
+      // Prefer the on-device live transcript (already finished, zero round-trip).
+      // Fall back to the transcription service when it is unusable.
+      let text = (spokenPreview ?? "").trim();
+      if (text.split(/\s+/).filter(Boolean).length < 2) {
+        if (blob.size === 0) {
+          setVoiceStatus("idle");
+          setVoiceError("Didn't catch that — try again.");
+          return;
+        }
+        setVoiceStatus("transcribing");
+        const tT = performance.now();
+        const data = await wbInvokeBinary<{ transcript?: string; error?: string }>(
+          "wb-transcribe",
+          blob,
+          ac.signal,
+        );
+        mark("transcribe", tT);
+        if (myGen !== generationRef.current) return;
+        if (data.error) throw new Error(data.error);
+        text = (data.transcript ?? "").trim();
+      }
       if (!text) {
         setVoiceStatus("idle");
         setVoiceError("Didn't catch that — try again.");
@@ -258,6 +284,7 @@ export default function WbLiveSession() {
       }
 
       setVoiceStatus("thinking");
+      const tTurn = performance.now();
       const res = await wbFetchJson<{ turn: TutorTurn }>(
         "wb-tutor-turn",
         {
@@ -275,25 +302,30 @@ export default function WbLiveSession() {
         },
         ac.signal,
       );
+      mark("tutor", tTurn);
       if (myGen !== generationRef.current) return;
       const turn = res.turn;
 
-      await finalizeTurn(text, turn);
-      if (myGen !== generationRef.current) return;
+      // Persist in the background — speaking should not wait on the database.
+      void finalizeTurn(text, turn).catch(() => {});
 
       setVoiceStatus("speaking");
+      const tTts = performance.now();
       const audioBlob = await wbFetchAudio("wb-tutor-tts", { text: turn.reply }, ac.signal);
+      mark("tts", tTts);
       if (myGen !== generationRef.current) return;
 
       const url = URL.createObjectURL(audioBlob);
       if (audioRef.current) {
-        audioRef.current.src = url;
-        try {
-          await audioRef.current.play();
-        } catch {
-          setPlayFallback(true);
-        }
+        const el = audioRef.current;
+        el.src = url;
+        const playNow = () => {
+          el.play().catch(() => setPlayFallback(true));
+        };
+        if (el.readyState >= 3) playNow();
+        else el.addEventListener("canplay", playNow, { once: true });
       }
+      mark("total", t0);
       setVoiceStatus("idle");
     } catch (e) {
       if (myGen !== generationRef.current) return;
@@ -701,4 +733,59 @@ function fmt(s: number): string {
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+/**
+ * Calls onSilence once the mic level has stayed below a quiet threshold for
+ * ~1.5s (after at least some speech). Returns a cleanup function.
+ */
+function watchForSilence(stream: MediaStream, onSilence: () => void): () => void {
+  let ctx: AudioContext | null = null;
+  let raf = 0;
+  let quietSince = 0;
+  let heardSpeech = false;
+  let done = false;
+  try {
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return () => {};
+    ctx = new Ctor();
+    const src = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    src.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    const tick = () => {
+      if (done) return;
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      const now = performance.now();
+      if (rms > 0.035) {
+        heardSpeech = true;
+        quietSince = 0;
+      } else if (heardSpeech) {
+        if (!quietSince) quietSince = now;
+        else if (now - quietSince > 1500) {
+          done = true;
+          onSilence();
+          return;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  } catch {
+    return () => {};
+  }
+  return () => {
+    done = true;
+    cancelAnimationFrame(raf);
+    void ctx?.close().catch(() => {});
+  };
 }
