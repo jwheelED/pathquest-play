@@ -4231,6 +4231,568 @@ export type Database = {
         }
         Relationships: []
       }
+      whiteboard_assignments: {
+        Row: {
+          answer_weight: number | null
+          course_id: string | null
+          created_at: string
+          due_at: string | null
+          hint_budget: number
+          id: string
+          instructor_id: string
+          org_id: string | null
+          probe_depth: string
+          published_at: string | null
+          reasoning_weight: number
+          require_explanation: boolean
+          status: Database["public"]["Enums"]["whiteboard_assignment_status"]
+          student_count: number
+          subtitle: string | null
+          title: string
+          tutor_behavior: Database["public"]["Enums"]["whiteboard_tutor_behavior"]
+          updated_at: string
+          variants_enabled: boolean
+          work_modes: Database["public"]["Enums"]["whiteboard_work_mode"][]
+        }
+        Insert: {
+          answer_weight?: number | null
+          course_id?: string | null
+          created_at?: string
+          due_at?: string | null
+          hint_budget?: number
+          id?: string
+          instructor_id: string
+          org_id?: string | null
+          probe_depth?: string
+          published_at?: string | null
+          reasoning_weight?: number
+          require_explanation?: boolean
+          status?: Database["public"]["Enums"]["whiteboard_assignment_status"]
+          student_count?: number
+          subtitle?: string | null
+          title: string
+          tutor_behavior?: Database["public"]["Enums"]["whiteboard_tutor_behavior"]
+          updated_at?: string
+          variants_enabled?: boolean
+          work_modes?: Database["public"]["Enums"]["whiteboard_work_mode"][]
+        }
+        Update: {
+          answer_weight?: number | null
+          course_id?: string | null
+          created_at?: string
+          due_at?: string | null
+          hint_budget?: number
+          id?: string
+          instructor_id?: string
+          org_id?: string | null
+          probe_depth?: string
+          published_at?: string | null
+          reasoning_weight?: number
+          require_explanation?: boolean
+          status?: Database["public"]["Enums"]["whiteboard_assignment_status"]
+          student_count?: number
+          subtitle?: string | null
+          title?: string
+          tutor_behavior?: Database["public"]["Enums"]["whiteboard_tutor_behavior"]
+          updated_at?: string
+          variants_enabled?: boolean
+          work_modes?: Database["public"]["Enums"]["whiteboard_work_mode"][]
+        }
+        Relationships: []
+      }
+      whiteboard_attachments: {
+        Row: {
+          at_seconds: number | null
+          caption: string | null
+          created_at: string
+          id: string
+          kind: string
+          session_id: string
+          storage_path: string
+        }
+        Insert: {
+          at_seconds?: number | null
+          caption?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          session_id: string
+          storage_path: string
+        }
+        Update: {
+          at_seconds?: number | null
+          caption?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          session_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_attachments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_board_steps: {
+        Row: {
+          annotation: string | null
+          at_seconds: number
+          content: string
+          created_at: string
+          highlighted: boolean
+          id: string
+          position: number
+          provenance: Database["public"]["Enums"]["whiteboard_step_provenance"]
+          session_id: string
+          struck_through: boolean
+        }
+        Insert: {
+          annotation?: string | null
+          at_seconds: number
+          content: string
+          created_at?: string
+          highlighted?: boolean
+          id?: string
+          position: number
+          provenance?: Database["public"]["Enums"]["whiteboard_step_provenance"]
+          session_id: string
+          struck_through?: boolean
+        }
+        Update: {
+          annotation?: string | null
+          at_seconds?: number
+          content?: string
+          created_at?: string
+          highlighted?: boolean
+          id?: string
+          position?: number
+          provenance?: Database["public"]["Enums"]["whiteboard_step_provenance"]
+          session_id?: string
+          struck_through?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_board_steps_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_courses: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          instructor_id: string
+          term: string | null
+          title: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          instructor_id: string
+          term?: string | null
+          title: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          term?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_courses_instructor_fkey"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_demo_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_demo_users: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          initials: string | null
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name: string
+          id?: string
+          initials?: string | null
+          role: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+          initials?: string | null
+          role?: string
+        }
+        Relationships: []
+      }
+      whiteboard_enrollments: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_enrollments_course_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whiteboard_enrollments_student_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_demo_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_objective_mastery: {
+        Row: {
+          created_at: string
+          id: string
+          objective: string
+          position: number
+          score_pct: number
+          session_id: string
+          verdict: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          objective: string
+          position: number
+          score_pct: number
+          session_id: string
+          verdict?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          objective?: string
+          position?: number
+          score_pct?: number
+          session_id?: string
+          verdict?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_objective_mastery_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_problem_variants: {
+        Row: {
+          created_at: string
+          id: string
+          numbers: Json
+          problem_id: string
+          prompt_text: string
+          student_id: string
+          variant_label: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          numbers?: Json
+          problem_id: string
+          prompt_text: string
+          student_id: string
+          variant_label: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          numbers?: Json
+          problem_id?: string
+          prompt_text?: string
+          student_id?: string
+          variant_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_problem_variants_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_problems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_problems: {
+        Row: {
+          answer_key_status: string
+          assignment_id: string
+          concept: string | null
+          created_at: string
+          expected_answer: string | null
+          expected_steps: Json
+          id: string
+          position: number
+          prompt_template: string
+          range_summary: string | null
+          solution_notes: string | null
+          title: string
+          updated_at: string
+          variant_ranges: Json
+        }
+        Insert: {
+          answer_key_status?: string
+          assignment_id: string
+          concept?: string | null
+          created_at?: string
+          expected_answer?: string | null
+          expected_steps?: Json
+          id?: string
+          position: number
+          prompt_template: string
+          range_summary?: string | null
+          solution_notes?: string | null
+          title: string
+          updated_at?: string
+          variant_ranges?: Json
+        }
+        Update: {
+          answer_key_status?: string
+          assignment_id?: string
+          concept?: string | null
+          created_at?: string
+          expected_answer?: string | null
+          expected_steps?: Json
+          id?: string
+          position?: number
+          prompt_template?: string
+          range_summary?: string | null
+          solution_notes?: string | null
+          title?: string
+          updated_at?: string
+          variant_ranges?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_problems_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_session_tags: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          jump_to_seconds: number | null
+          session_id: string
+          tag_type: Database["public"]["Enums"]["whiteboard_tag_type"]
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          jump_to_seconds?: number | null
+          session_id: string
+          tag_type: Database["public"]["Enums"]["whiteboard_tag_type"]
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          jump_to_seconds?: number | null
+          session_id?: string
+          tag_type?: Database["public"]["Enums"]["whiteboard_tag_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_session_tags_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_sessions: {
+        Row: {
+          created_at: string
+          current_ask: string | null
+          duration_seconds: number
+          final_score: number | null
+          graded_at: string | null
+          graded_by: string | null
+          hints_used: number
+          id: string
+          last_activity_at: string | null
+          mode: Database["public"]["Enums"]["whiteboard_work_mode"]
+          org_id: string | null
+          probes_answered: number
+          problem_id: string
+          recorded_at: string | null
+          reply_index: number
+          self_corrections: number
+          started_at: string
+          status: Database["public"]["Enums"]["whiteboard_session_status"]
+          student_id: string
+          suggested_score: number | null
+          talk_seconds: number
+          updated_at: string
+          variant_id: string | null
+          words_written: number
+        }
+        Insert: {
+          created_at?: string
+          current_ask?: string | null
+          duration_seconds?: number
+          final_score?: number | null
+          graded_at?: string | null
+          graded_by?: string | null
+          hints_used?: number
+          id?: string
+          last_activity_at?: string | null
+          mode?: Database["public"]["Enums"]["whiteboard_work_mode"]
+          org_id?: string | null
+          probes_answered?: number
+          problem_id: string
+          recorded_at?: string | null
+          reply_index?: number
+          self_corrections?: number
+          started_at?: string
+          status?: Database["public"]["Enums"]["whiteboard_session_status"]
+          student_id: string
+          suggested_score?: number | null
+          talk_seconds?: number
+          updated_at?: string
+          variant_id?: string | null
+          words_written?: number
+        }
+        Update: {
+          created_at?: string
+          current_ask?: string | null
+          duration_seconds?: number
+          final_score?: number | null
+          graded_at?: string | null
+          graded_by?: string | null
+          hints_used?: number
+          id?: string
+          last_activity_at?: string | null
+          mode?: Database["public"]["Enums"]["whiteboard_work_mode"]
+          org_id?: string | null
+          probes_answered?: number
+          problem_id?: string
+          recorded_at?: string | null
+          reply_index?: number
+          self_corrections?: number
+          started_at?: string
+          status?: Database["public"]["Enums"]["whiteboard_session_status"]
+          student_id?: string
+          suggested_score?: number | null
+          talk_seconds?: number
+          updated_at?: string
+          variant_id?: string | null
+          words_written?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_sessions_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_problems"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whiteboard_sessions_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_problem_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whiteboard_transcript_entries: {
+        Row: {
+          at_seconds: number
+          body: string
+          created_at: string
+          id: string
+          is_probe: boolean
+          position: number
+          session_id: string
+          speaker: Database["public"]["Enums"]["whiteboard_speaker"]
+          speaker_name: string | null
+        }
+        Insert: {
+          at_seconds: number
+          body: string
+          created_at?: string
+          id?: string
+          is_probe?: boolean
+          position: number
+          session_id: string
+          speaker: Database["public"]["Enums"]["whiteboard_speaker"]
+          speaker_name?: string | null
+        }
+        Update: {
+          at_seconds?: number
+          body?: string
+          created_at?: string
+          id?: string
+          is_probe?: boolean
+          position?: number
+          session_id?: string
+          speaker?: Database["public"]["Enums"]["whiteboard_speaker"]
+          speaker_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_transcript_entries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       stem_problems_student_view: {
@@ -4516,6 +5078,21 @@ export type Database = {
       assignment_type: "quiz" | "lesson" | "mini_project" | "lecture_checkin"
       draft_status: "draft" | "approved" | "published"
       professor_type: "stem" | "humanities" | "medical"
+      whiteboard_assignment_status: "draft" | "published" | "closed"
+      whiteboard_session_status: "in_progress" | "recorded" | "graded"
+      whiteboard_speaker: "ai" | "student"
+      whiteboard_step_provenance:
+        | "from_you"
+        | "corrected"
+        | "self_corrected"
+        | "you_drew"
+        | "answer"
+      whiteboard_tag_type: "misconception" | "strength" | "pattern"
+      whiteboard_tutor_behavior:
+        | "socratic_only"
+        | "hints_on_request"
+        | "show_solution"
+      whiteboard_work_mode: "talk" | "type" | "draw" | "photo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4531,12 +5108,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4560,11 +5137,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4585,11 +5162,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4610,11 +5187,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4627,11 +5204,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4653,6 +5230,23 @@ export const Constants = {
       assignment_type: ["quiz", "lesson", "mini_project", "lecture_checkin"],
       draft_status: ["draft", "approved", "published"],
       professor_type: ["stem", "humanities", "medical"],
+      whiteboard_assignment_status: ["draft", "published", "closed"],
+      whiteboard_session_status: ["in_progress", "recorded", "graded"],
+      whiteboard_speaker: ["ai", "student"],
+      whiteboard_step_provenance: [
+        "from_you",
+        "corrected",
+        "self_corrected",
+        "you_drew",
+        "answer",
+      ],
+      whiteboard_tag_type: ["misconception", "strength", "pattern"],
+      whiteboard_tutor_behavior: [
+        "socratic_only",
+        "hints_on_request",
+        "show_solution",
+      ],
+      whiteboard_work_mode: ["talk", "type", "draw", "photo"],
     },
   },
 } as const
