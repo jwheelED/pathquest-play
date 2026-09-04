@@ -52,7 +52,7 @@ export interface LlmChatOptions {
 }
 
 export function textModel(): string {
-  return Deno.env.get("WB_LLM_MODEL") ?? "openrouter/auto";
+  return Deno.env.get("WB_LLM_MODEL") ?? "google/gemini-2.5-flash-lite";
 }
 
 export function visionModel(): string {
@@ -183,7 +183,7 @@ export async function llmJson<T>(opts: LlmChatOptions): Promise<T> {
 
   let lastRaw = "";
   let lastErr = "";
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     try {
       const raw = await once(provider, opts, true);
       lastRaw = raw;
@@ -194,7 +194,7 @@ export async function llmJson<T>(opts: LlmChatOptions): Promise<T> {
     }
   }
   throw new Error(
-    `LLM did not return valid JSON after 3 tries. ${lastErr ? `Last error: ${lastErr}. ` : ""}Sample: ${lastRaw.slice(0, 200)}`,
+    `LLM did not return valid JSON after 2 tries. ${lastErr ? `Last error: ${lastErr}. ` : ""}Sample: ${lastRaw.slice(0, 200)}`,
   );
 }
 
