@@ -8,6 +8,7 @@ import { Button, Card, Eyebrow, StatTile } from "@/components/edvana/primitives"
 import { SYMBOL_KEYS, MODE_COPY } from "@/components/edvana/data";
 import { WbChrome } from "../components/WbChrome";
 import { WbHandwrittenBoard } from "../components/WbHandwrittenBoard";
+import { useLiveSpeech } from "../lib/useLiveSpeech";
 import { useDemoIdentity } from "../lib/demoIdentity";
 import { wb, wbInvokeBinary, wbFetchJson, wbFetchAudio } from "../lib/wbClient";
 import {
@@ -79,6 +80,8 @@ export default function WbLiveSession() {
   const generationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Live, on-device preview of the student's speech while the mic is open.
+  const liveSpeech = useLiveSpeech();
 
   const { data: bundle, refetch } = useSessionBundle(session?.id);
   const steps = bundle?.steps ?? [];
@@ -118,6 +121,7 @@ export default function WbLiveSession() {
     return () => {
       abortRef.current?.abort();
       if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+      liveSpeech.stop();
       if (autoStopRef.current) clearTimeout(autoStopRef.current);
     };
   }, []);
@@ -196,6 +200,8 @@ export default function WbLiveSession() {
       };
       mr.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
+        liveSpeech.stop();
+        setRecording(false);
         if (autoStopRef.current) {
           clearTimeout(autoStopRef.current);
           autoStopRef.current = null;
@@ -205,6 +211,7 @@ export default function WbLiveSession() {
       };
       mediaRecorderRef.current = mr;
       mr.start();
+      liveSpeech.start();
       setRecording(true);
       setVoiceStatus("recording");
       autoStopRef.current = setTimeout(() => {
@@ -218,6 +225,7 @@ export default function WbLiveSession() {
   const onMicTap = async () => {
     if (recording) {
       mediaRecorderRef.current?.stop();
+      liveSpeech.stop();
       setRecording(false);
       return;
     }
@@ -486,6 +494,7 @@ export default function WbLiveSession() {
               </div>
             ) : (
               <VoicePanel
+                liveText={liveSpeech.liveText}
                 recording={recording}
                 status={voiceStatus}
                 error={voiceError}
@@ -541,6 +550,7 @@ function ModeToggle({ mode, onChange }: { mode: SessionMode; onChange: (m: Sessi
 }
 
 function VoicePanel({
+  liveText,
   recording,
   status,
   error,
@@ -548,6 +558,7 @@ function VoicePanel({
   onMicTap,
   onPlayFallback,
 }: {
+  liveText: string;
   recording: boolean;
   status: VoiceStatus;
   error: string | null;
@@ -603,6 +614,30 @@ function VoicePanel({
         )}
       </button>
       <span style={{ fontSize: 12.5, fontWeight: 600, color: T.emerald700 }}>{label}</span>
+      {(recording || status === "transcribing") && liveText && (
+        <div
+          aria-live="polite"
+          style={{
+            width: "100%",
+            maxHeight: 132,
+            overflowY: "auto",
+            background: T.slate100,
+            border: `1px solid ${T.border}`,
+            borderRadius: 14,
+            padding: "10px 13px",
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: T.ink25,
+          }}
+          className="edv-scroller"
+        >
+          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.08em", color: T.textSubtle, display: "block", marginBottom: 4 }}>
+            LIVE TRANSCRIPT
+          </span>
+          {liveText}
+          {recording && <span style={{ opacity: 0.5 }}>▏</span>}
+        </div>
+      )}
       {playFallback && (
         <button
           type="button"
