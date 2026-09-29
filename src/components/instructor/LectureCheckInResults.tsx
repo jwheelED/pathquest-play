@@ -54,10 +54,6 @@ export const LectureCheckInResults = () => {
     group: GroupedAssignment;
   } | null>(null);
   const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
-  const [showCharts, setShowCharts] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('lectureCheckInChartsVisibility');
-    return saved ? JSON.parse(saved) : {};
-  });
   const [questionSummaries, setQuestionSummaries] = useState<Record<string, {
     summary: string;
     trend: string;
@@ -74,9 +70,6 @@ export const LectureCheckInResults = () => {
   }>>({});
   const { selectedCourse } = useCourseContext();
 
-  useEffect(() => {
-    localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
-  }, [showCharts]);
 
   const fetchResults = useCallback(async () => {
     const {
