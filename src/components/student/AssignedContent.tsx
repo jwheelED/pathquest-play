@@ -1804,7 +1804,14 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                                 const isSelected = normalizedSelected === optionLetter;
                                 
                                 // After submission and answer release, show correct/incorrect indicators
-                                const studentAnswer = assignment.quiz_responses?.[idx];
+                                // The completed assignment can arrive slightly after the local submitted state.
+                                // Use the answer already selected in this view during that brief sync window so
+                                // an unanswered value is never presented as an incorrect result.
+                                const studentAnswer = assignment.quiz_responses?.[idx] ?? (
+                                  submittedQuizzes[assignment.id]
+                                    ? selectedAnswers[assignment.id]?.[idx]
+                                    : undefined
+                                );
                                 const correctAnswer = q.correctAnswer;
                                 // Detect poll mode - polls have no correct answer
                                 const isPollQuestion = q.isPoll || !correctAnswer || correctAnswer === '';
@@ -1862,16 +1869,16 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                                   </div>
                                 ) : (
                                   <div className={`p-3 rounded border-2 ${
-                                    (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                    (studentAnswer === q.correctAnswer)
                                       ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
                                       : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
                                   }`}>
                                     <p className={`text-sm font-medium ${
-                                      (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                      (studentAnswer === q.correctAnswer)
                                         ? 'text-green-900 dark:text-green-200'
                                         : 'text-red-900 dark:text-red-200'
                                     }`}>
-                                      {(assignment.quiz_responses?.[idx] === q.correctAnswer) 
+                                      {(studentAnswer === q.correctAnswer) 
                                         ? '✓ Correct Answer' 
                                         : '✗ Incorrect Answer'}
                                     </p>
