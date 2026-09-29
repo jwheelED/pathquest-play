@@ -8,6 +8,7 @@ import { Button, Card, Eyebrow, StatTile } from "@/components/edvana/primitives"
 import { SYMBOL_KEYS, MODE_COPY } from "@/components/edvana/data";
 import { WbChrome } from "../components/WbChrome";
 import { WbHandwrittenBoard } from "../components/WbHandwrittenBoard";
+import { interpolate } from "../lib/variantGen";
 import { useLiveSpeech } from "../lib/useLiveSpeech";
 import { logger } from "@/lib/logger";
 import { useDemoIdentity } from "../lib/demoIdentity";
@@ -158,9 +159,9 @@ export default function WbLiveSession() {
     try {
       const turn = await callTutorTurn({
         problemText: variant.prompt_text,
-        expectedAnswer: problem.expected_answer,
-        expectedSteps: problem.expected_steps,
-        solutionNotes: problem.solution_notes,
+        expectedAnswer: variant ? interpolate(problem.expected_answer ?? "", variant.numbers) || null : problem.expected_answer,
+        expectedSteps: variant ? problem.expected_steps.map((st) => ({ ...st, expr: interpolate(st.expr, variant.numbers), note: interpolate(st.note ?? "", variant.numbers) })) : problem.expected_steps,
+        solutionNotes: variant ? interpolate(problem.solution_notes ?? "", variant.numbers) || null : problem.solution_notes,
         board: steps.map((s) => ({ expr: s.content, provenance: s.provenance })),
         transcript: transcript.map((t) => ({
           who: t.speaker === "ai" ? "ai" : "you",
@@ -289,9 +290,9 @@ export default function WbLiveSession() {
         "wb-tutor-turn",
         {
           problemText: variant.prompt_text,
-          expectedAnswer: problem.expected_answer,
-          expectedSteps: problem.expected_steps,
-          solutionNotes: problem.solution_notes,
+          expectedAnswer: variant ? interpolate(problem.expected_answer ?? "", variant.numbers) || null : problem.expected_answer,
+          expectedSteps: variant ? problem.expected_steps.map((st) => ({ ...st, expr: interpolate(st.expr, variant.numbers), note: interpolate(st.note ?? "", variant.numbers) })) : problem.expected_steps,
+          solutionNotes: variant ? interpolate(problem.solution_notes ?? "", variant.numbers) || null : problem.solution_notes,
           board: steps.map((s) => ({ expr: s.content, provenance: s.provenance })),
           transcript: transcript.map((t) => ({
             who: t.speaker === "ai" ? "ai" : "you",
@@ -737,13 +738,15 @@ function fmt(s: number): string {
 
 /**
  * Calls onSilence once the mic level has stayed below a quiet threshold for
- * ~1.5s (after at least some speech). Returns a cleanup function.
+ * ~3.5s (after at least some speech). Returns a cleanup function.
  */
 function watchForSilence(stream: MediaStream, onSilence: () => void): () => void {
   let ctx: AudioContext | null = null;
   let raf = 0;
   let quietSince = 0;
   let heardSpeech = false;
+  let spokenMs = 0;
+  let lastLoud = 0;
   let done = false;
   try {
     const Ctor =
@@ -767,11 +770,13 @@ function watchForSilence(stream: MediaStream, onSilence: () => void): () => void
       const rms = Math.sqrt(sum / buf.length);
       const now = performance.now();
       if (rms > 0.035) {
-        heardSpeech = true;
+        if (lastLoud) spokenMs += Math.min(100, now - lastLoud);
+        lastLoud = now;
+        heardSpeech = spokenMs > 800;
         quietSince = 0;
       } else if (heardSpeech) {
         if (!quietSince) quietSince = now;
-        else if (now - quietSince > 1500) {
+        else if (now - quietSince > 3500) {
           done = true;
           onSilence();
           return;

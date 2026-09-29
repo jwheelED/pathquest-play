@@ -115,6 +115,23 @@ export function useSessionBundle(sessionId: string | undefined) {
   });
 }
 
+/** Problem ids this student has already submitted (recorded/graded). */
+export function useSubmittedProblemIds(studentId: string | undefined) {
+  return useQuery({
+    queryKey: ["wb", "submitted", studentId],
+    enabled: !!studentId,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await wb
+        .from("whiteboard_sessions")
+        .select("problem_id")
+        .eq("student_id", studentId!)
+        .in("status", ["recorded", "graded"]);
+      if (error) throw error;
+      return new Set((data ?? []).map((r: { problem_id: string }) => r.problem_id));
+    },
+  });
+}
+
 /* ---------------- Writes / helpers ---------------- */
 
 /** Get or create this student's variant for a problem. */
@@ -157,6 +174,7 @@ export async function ensureSession(
     .select("*")
     .eq("problem_id", problem.id)
     .eq("student_id", studentId)
+    .eq("status", "in_progress")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
