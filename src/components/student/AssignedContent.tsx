@@ -1385,6 +1385,13 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                     <div className="space-y-4">
                       {assignment.content.questions.map((q: any, idx: number) => {
                         const isSubmitted = submittedQuizzes[assignment.id] || assignment.completed;
+                        // The completed assignment can arrive slightly after the local submitted state.
+                        // Keep the just-selected answer available during that brief sync window.
+                        const displayedStudentAnswer = assignment.quiz_responses?.[idx] ?? (
+                          submittedQuizzes[assignment.id]
+                            ? selectedAnswers[assignment.id]?.[idx]
+                            : undefined
+                        );
                         
                         // Handle coding questions
                         if (q.type === 'coding' || q.type === 'coding_simple') {
@@ -1804,7 +1811,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                                 const isSelected = normalizedSelected === optionLetter;
                                 
                                 // After submission and answer release, show correct/incorrect indicators
-                                const studentAnswer = assignment.quiz_responses?.[idx];
+                                const studentAnswer = displayedStudentAnswer;
                                 const correctAnswer = q.correctAnswer;
                                 // Detect poll mode - polls have no correct answer
                                 const isPollQuestion = q.isPoll || !correctAnswer || correctAnswer === '';
@@ -1862,16 +1869,16 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
                                   </div>
                                 ) : (
                                   <div className={`p-3 rounded border-2 ${
-                                    (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                    (displayedStudentAnswer === q.correctAnswer)
                                       ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
                                       : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
                                   }`}>
                                     <p className={`text-sm font-medium ${
-                                      (assignment.quiz_responses?.[idx] === q.correctAnswer)
+                                      (displayedStudentAnswer === q.correctAnswer)
                                         ? 'text-green-900 dark:text-green-200'
                                         : 'text-red-900 dark:text-red-200'
                                     }`}>
-                                      {(assignment.quiz_responses?.[idx] === q.correctAnswer) 
+                                      {(displayedStudentAnswer === q.correctAnswer) 
                                         ? '✓ Correct Answer' 
                                         : '✗ Incorrect Answer'}
                                     </p>
