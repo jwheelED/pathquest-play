@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { resolveAiProvider } from "../_shared/aiProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,10 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const openAiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openAiKey) {
-      throw new Error("OPENAI_API_KEY not configured");
-    }
+    const ai = resolveAiProvider();
 
     // Use service role for cache operations since live session participants may be anonymous
     const supabaseClient = createClient(
@@ -94,14 +92,14 @@ Explain:
 
     console.log("Generating explanation via OpenAI...", { effectiveWasCorrect, wasCorrect });
 
-    const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const openAiResponse = await fetch(ai.url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${openAiKey}`,
+        Authorization: `Bearer ${ai.key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: ai.defaultModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

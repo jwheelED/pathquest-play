@@ -1,0 +1,1 @@
+ALTER TABLE public.student_assignments ADD COLUMN IF NOT EXISTS confidence_level text, ADD COLUMN IF NOT EXISTS confidence_multiplier numeric;

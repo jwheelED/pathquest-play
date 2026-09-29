@@ -475,7 +475,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
     }));
     // Auto-submit after confidence is locked to reduce taps
     if (assignment) {
-      setTimeout(() => handleSubmitQuiz(assignment), 250);
+      setTimeout(() => handleSubmitQuiz(assignment, { level, multiplier }), 250);
     }
   };
 
@@ -594,7 +594,7 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
     }
   };
 
-  const handleSubmitQuiz = async (assignment: Assignment) => {
+  const handleSubmitQuiz = async (assignment: Assignment, confOverride?: { level: ConfidenceLevel; multiplier: number }) => {
     const mcAnswers = selectedAnswers[assignment.id] || {};
     const textAns = textAnswers[assignment.id] || {};
     const questions = assignment.content.questions || [];
@@ -646,6 +646,15 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
         has_short_answer: boolean;
         assignment_mode: string;
       };
+
+      // Persist the student's confidence choice (MCQ check-ins)
+      const conf = confOverride ?? confidenceData[assignment.id];
+      if (conf?.level) {
+        await supabase
+          .from('student_assignments')
+          .update({ confidence_level: conf.level, confidence_multiplier: conf.multiplier } as never)
+          .eq('id', assignment.id);
+      }
 
       // Update response time in database if tracked
       if (responseTimeSeconds !== null) {

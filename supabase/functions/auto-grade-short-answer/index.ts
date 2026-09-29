@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { resolveAiProvider } from "../_shared/aiProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,14 +105,7 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "Grading service temporarily unavailable" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const ai = resolveAiProvider();
 
     // Use AI to grade the short answer with component-based scoring
     const systemPrompt = `You are an expert educational grader. Your goal is to fairly grade short answer responses. You should be GENEROUS with grading — if a student demonstrates understanding of the core concept, they should receive a high grade.
@@ -170,14 +164,14 @@ Then provide overall constructive feedback that:
 2. Explains specific gaps or errors by component
 3. Offers actionable suggestions for improvement`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(ai.url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${ai.key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: ai.defaultModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

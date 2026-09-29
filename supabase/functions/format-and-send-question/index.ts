@@ -14,8 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
 // Shuffle MCQ options so the correct answer isn't always A
 // Uses index tracking instead of indexOf to handle duplicate option text correctly
 const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {
@@ -1037,16 +1035,31 @@ serve(async (req) => {
     // Error handling is now done within the conditionals above
 
     if (!studentLinks || studentLinks.length === 0) {
+      // No roster yet — the question was still generated (and pushed to any live
+      // session above). Treat this as a success with zero recipients instead of
+      // failing the whole request.
+      console.log("👥 No students linked — question generated with 0 recipients");
       return new Response(
         JSON.stringify({
-          success: false,
-          message: "No students linked to instructor",
+          success: true,
+          sent_to: 0,
+          total_students: 0,
+          failed_count: 0,
+          question_type: finalType,
+          question: formattedQuestion,
+          live_delivered: !!liveSession,
+          live_participant_count: liveParticipantCount,
+          session_code: liveSession?.session_code ?? null,
+          message: liveSession
+            ? `Delivered to ${liveParticipantCount} live participant(s)`
+            : "Question generated — no participants connected yet",
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
+
 
     console.log("👥 Sending to", studentLinks.length, "students");
 
