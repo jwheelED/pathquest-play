@@ -5,7 +5,7 @@ import { T } from "@/components/edvana/tokens";
 import { Button, Card, Eyebrow } from "@/components/edvana/primitives";
 import { WbChrome } from "../components/WbChrome";
 import { useDemoIdentity } from "../lib/demoIdentity";
-import { useStudentCourse, useAssignments, useProblems } from "../lib/wbData";
+import { useStudentCourse, useAssignments, useProblems, useSubmittedProblemIds } from "../lib/wbData";
 import type { WbAssignment } from "../lib/wbTypes";
 
 export default function WbStudentHome() {
@@ -37,6 +37,8 @@ export default function WbStudentHome() {
 function AssignmentCard({ assignment }: { assignment: WbAssignment }) {
   const { data: problems = [] } = useProblems(assignment.id);
   const navigate = useNavigate();
+  const { current } = useDemoIdentity();
+  const { data: submitted } = useSubmittedProblemIds(current?.id);
   return (
     <Card style={{ overflow: "hidden" }}>
       <div style={{ padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>
@@ -74,11 +76,16 @@ function AssignmentCard({ assignment }: { assignment: WbAssignment }) {
           </span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14.5, fontWeight: 600 }}>{p.title}</div>
-            <div style={{ fontSize: 12.5, color: T.textMuted, marginTop: 2 }}>{p.concept}</div>
+            <div style={{ fontSize: 12.5, color: T.textMuted, marginTop: 2 }}>
+              {p.concept}
+              {submitted?.has(p.id) && (
+                <span style={{ marginLeft: 8, color: T.eyebrowGreen, fontWeight: 600 }}>· Submitted</span>
+              )}
+            </div>
           </div>
           {p.answer_key_status === "approved" ? (
             <Button size="sm" onClick={() => navigate(`/wb/student/problem/${p.id}`)}>
-              Start session
+              {submitted?.has(p.id) ? "Start new attempt" : "Start session"}
             </Button>
           ) : (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textSubtle }}>
