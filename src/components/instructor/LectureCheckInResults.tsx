@@ -1527,41 +1527,8 @@ export const LectureCheckInResults = () => {
                           summary={questionSummaries[`${groupIdx}-${qIdx}`]}
                           questionType={question.type}
                         />
-                      ) : (
-                        /* Multiple Choice: Show toggle for visual charts */
-                        <>
-                          <div className="pt-3 flex items-center justify-between border-t">
-                            <div className="flex items-center gap-2">
-                              <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Room Signal</span>
-                              {showCharts[`${groupIdx}-${qIdx}`] && (
-                                <Badge className="text-xs bg-emerald-100 text-emerald-700 border-0 hover:bg-emerald-100">Visible</Badge>
-                              )}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowCharts(prev => ({
-                                ...prev,
-                                [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
-                              }))}
-                              className="gap-2 text-xs"
-                            >
-                              {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
-                            </Button>
-                          </div>
+                      ) : null}
 
-                          {/* Visual Analytics Chart */}
-                          {showCharts[`${groupIdx}-${qIdx}`] && (
-                            <QuestionAnalyticsChart
-                              question={question}
-                              assignments={group.assignments}
-                              questionIndex={qIdx}
-                              stats={stats}
-                            />
-                          )}
-                        </>
-                      )}
 
                       {/* Question Quality Rating */}
                       <div className="pt-3 border-t flex items-center justify-between rounded-lg">
