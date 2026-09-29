@@ -21,13 +21,15 @@ serve(async (req) => {
     details?: string;
   }> = [];
 
-  // Check 1: LOVABLE_API_KEY configured
+  // Check 1: AI provider configured (Moonshot/Kimi or Lovable)
+  const moonshotKey = Deno.env.get("MOONSHOT_API_KEY") ?? Deno.env.get("KIMI_API_KEY");
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  const aiProvider = moonshotKey ? "Moonshot" : lovableKey ? "Lovable" : null;
   checks.push({
-    id: "lovable_api",
+    id: "ai_api",
     name: "AI API Key",
-    status: lovableKey ? "pass" : "fail",
-    message: lovableKey ? "LOVABLE_API_KEY is configured" : "LOVABLE_API_KEY is missing",
+    status: aiProvider ? "pass" : "fail",
+    message: aiProvider ? `${aiProvider} API key is configured` : "No AI provider key configured (set MOONSHOT_API_KEY or LOVABLE_API_KEY)",
   });
 
   // Check 2: Supabase connection

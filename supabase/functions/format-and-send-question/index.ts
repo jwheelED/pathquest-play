@@ -14,8 +14,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
 // Shuffle MCQ options so the correct answer isn't always A
 // Uses index tracking instead of indexOf to handle duplicate option text correctly
 const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {

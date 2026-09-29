@@ -13,11 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     // Fetch instructor preferences to respect their coding settings
     const authHeader = req.headers.get("Authorization");
     let instructorPreference = "multiple_choice";

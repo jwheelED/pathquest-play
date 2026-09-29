@@ -160,11 +160,6 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
     // Build a labelled, role-explicit context block. Prior context (focused, recent teaching prose
     // captured at trigger time) is given highest priority for pronoun resolution; the broader
     // source_transcript tail is included as background lecture history.
