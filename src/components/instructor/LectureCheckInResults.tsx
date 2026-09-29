@@ -16,6 +16,7 @@ import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { CheckInConfidenceBreakdown } from "./CheckInConfidenceBreakdown";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Progress } from "@/components/ui/progress";
 import { distinctStudentCount, studentCompletion } from "@/lib/lectureCheckInMetrics";
@@ -31,6 +32,7 @@ interface Assignment {
   created_at: string;
   student_name?: string;
   response_time_seconds?: number | null;
+  confidence_level?: string | null;
 }
 
 interface GroupedAssignment {
@@ -103,7 +105,8 @@ export const LectureCheckInResults = () => {
         completed,
         created_at,
         response_time_seconds,
-        ai_summary
+        ai_summary,
+        confidence_level
       `,
       )
       .eq("instructor_id", user.id)
@@ -1364,6 +1367,7 @@ export const LectureCheckInResults = () => {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-5 pt-5 pb-4">
+                <CheckInConfidenceBreakdown rows={group.assignments} />
                 {group.questions.map((question, qIdx) => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;

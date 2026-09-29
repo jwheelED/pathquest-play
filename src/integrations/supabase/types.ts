@@ -3259,6 +3259,8 @@ export type Database = {
           auto_release_enabled: boolean | null
           auto_release_minutes: number | null
           completed: boolean
+          confidence_level: string | null
+          confidence_multiplier: number | null
           content: Json
           course_id: string | null
           created_at: string
@@ -3285,6 +3287,8 @@ export type Database = {
           auto_release_enabled?: boolean | null
           auto_release_minutes?: number | null
           completed?: boolean
+          confidence_level?: string | null
+          confidence_multiplier?: number | null
           content: Json
           course_id?: string | null
           created_at?: string
@@ -3311,6 +3315,8 @@ export type Database = {
           auto_release_enabled?: boolean | null
           auto_release_minutes?: number | null
           completed?: boolean
+          confidence_level?: string | null
+          confidence_multiplier?: number | null
           content?: Json
           course_id?: string | null
           created_at?: string

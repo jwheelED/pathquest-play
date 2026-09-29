@@ -647,6 +647,15 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
         assignment_mode: string;
       };
 
+      // Persist the student's confidence choice (MCQ check-ins)
+      const conf = confidenceData[assignment.id];
+      if (conf?.level) {
+        await supabase
+          .from('student_assignments')
+          .update({ confidence_level: conf.level, confidence_multiplier: conf.multiplier } as never)
+          .eq('id', assignment.id);
+      }
+
       // Update response time in database if tracked
       if (responseTimeSeconds !== null) {
         await supabase
