@@ -542,11 +542,29 @@ export function QuestionOnDeck({
           if (data?.options?.length === 4) {
             // Only overwrite if a bank match hasn't already populated options.
             if (!settled) {
-              setMcqOptions(data.options);
+              const firstOptions: string[] = data.options;
+              setMcqOptions(firstOptions);
               if (data.correct_answer && format === 'multiple_choice') {
                 setCorrectAnswer(data.correct_answer);
               }
               markSettledIfHas(true);
+              // Background refine: swap in only if still latest and options unchanged.
+              if (data.needs_review) {
+                supabase.functions
+                  .invoke('generate-mcq-options', { body: { ...body, refine: true } })
+                  .then((refRes) => {
+                    const ref = (refRes as { data: any }).data;
+                    if (!isLatest() || !ref?.options || ref.options.length !== 4) return;
+                    setMcqOptions((cur) => {
+                      if (cur !== firstOptions) return cur;
+                      if (ref.correct_answer && format === 'multiple_choice') {
+                        setCorrectAnswer(ref.correct_answer);
+                      }
+                      return ref.options;
+                    });
+                  })
+                  .catch(() => {});
+              }
             }
           }
         } else if (data?.expected_answer) {
