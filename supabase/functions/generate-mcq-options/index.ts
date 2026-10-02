@@ -62,22 +62,27 @@ function validateAnswer(
   const correctText = result.options[idx];
   const correctNorm = normalize(correctText);
 
-  // 1. If model provided a citation, require the citation to actually appear
-  //    in the transcript AND the correct option's tokens to overlap with it.
+  // 1. If the model provided a citation, use it only as a WEAK signal.
+  //    A correct answer very often shares no tokens with the transcript span
+  //    that prompted it (e.g. "Who wrote the Emancipation Proclamation?" →
+  //    "Abraham Lincoln"), so a low overlap here is NOT evidence of a bad
+  //    answer. Rejecting on it caused a needless second (slower) model call on
+  //    essentially every question. Fall through to transcript scoring instead.
   if (result.citation && result.citation.trim().length > 5) {
     const citationNorm = normalize(result.citation);
     const transcriptNorm = normalize(transcript);
-    // Look for a meaningful chunk of the citation (first 6 words) inside transcript
     const citationHead = citationNorm.split(' ').slice(0, 6).join(' ');
-    if (citationHead.length > 0 && !transcriptNorm.includes(citationHead)) {
+    if (citationHead.length > 0 && transcriptNorm.includes(citationHead)) {
+      // Citation is genuinely grounded in the transcript — accept.
+      return { ok: true };
+    }
+    // Hallucinated citation is only worth a retry when we have enough
+    // transcript to be confident it truly isn't there.
+    if (transcript.length >= 400) {
       return { ok: false, reason: `citation not found in transcript: "${citationHead}"` };
     }
-    const overlapWithCitation = tokenOverlap(correctText, result.citation);
-    if (overlapWithCitation < 0.2) {
-      return { ok: false, reason: `correct option does not overlap with its own citation (${overlapWithCitation.toFixed(2)})` };
-    }
-    return { ok: true };
   }
+
 
   // 2. No citation provided. If the transcript is too short to reliably score
   //    overlap, skip validation — the overlap heuristic produces too many
@@ -146,7 +151,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, source_transcript, prior_context } = await req.json();
+    const { question_text, source_transcript, prior_context, refine } = await req.json();
 
     if (!question_text || question_text.trim() === '') {
       return new Response(
@@ -168,7 +173,7 @@ serve(async (req) => {
     // hard (1200 chars vs 3000). The focused window covers pronoun resolution, and the
     // extra ~1800 chars of stale lecture history adds input-token latency without
     // improving answer quality on short factual questions.
-    const focusedContext = (prior_context || '').trim();
+    const focusedContext = (prior_context || '').trim().slice(-1200);
     const broadCap = focusedContext.length > 0 ? 1200 : 2400;
     const broadContext = (source_transcript || '').slice(-broadCap).trim();
     const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
@@ -192,56 +197,21 @@ serve(async (req) => {
     // PERF: tight system prompt — keeps the critical rules (transcript overrides
     // training data, no vague distractors, time-sensitive guard) while cutting
     // ~1.4 KB of input tokens per request.
+    // NOTE: Uses JSON response_format instead of tool calling for broad provider
+    // compatibility (Moonshot/Kimi does not reliably handle tool_choice).
     const systemPrompt = `Today is ${todayStr}. You generate ONE 4-option MCQ from a professor's live-lecture utterance for Edvana.
 
 Rules (apply in order):
 1. RESOLVE pronouns and isolated symbols ("it","this","E","the function") against MOST RECENT TEACHING first, then EARLIER LECTURE HISTORY. Never resolve from training data when transcript evidence exists.
 2. CORRECT ANSWER: extract from the transcript when transcript evidence exists. Transcript ALWAYS overrides training data. If non-time-sensitive and no transcript evidence, answer from general knowledge. If the question asks for a CURRENT fact (current officeholder, price, champion, version, recent event) and the transcript does NOT supply it, set the correct option to "Needs current verification" and say so in the explanation. Do NOT guess time-sensitive facts.
 3. DISTRACTORS: domain-specific, on-topic, plausible. FORBIDDEN: "none of the above", "all of the above", "not specified", "the end result", or any generic filler.
-4. Emit ONLY via the \`generate_mcq_options\` tool call. Exactly 4 options "A. …" through "D. …", a \`correct_answer\` letter, a brief \`explanation\`, and optionally a short \`citation\` (transcript span you used).`;
+4. Respond with ONLY a JSON object (no markdown, no code fences). Schema: {"options":["A. ...","B. ...","C. ...","D. ..."],"correct_answer":"A"|"B"|"C"|"D","explanation":"...","citation":"..."}`;
 
     const userPrompt = `${teachingContextBlock ? `=== TEACHING CONTEXT ===\n${teachingContextBlock}\n\n` : ''}=== INSTRUCTOR'S QUESTION ===\n"${question_text}"\n\nGenerate 4 MCQ options ("A. …" through "D. …"). Resolve pronouns using the transcript. If time-sensitive and not supplied, correct answer = "Needs current verification". Distractors must be specific.`;
 
-    const tools = [
-      {
-        type: 'function' as const,
-        function: {
-          name: 'generate_mcq_options',
-          description: 'Generate 4 multiple choice options with a correct answer',
-          parameters: {
-            type: 'object',
-            properties: {
-              options: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Array of exactly 4 answer options (A, B, C, D)',
-                minItems: 4,
-                maxItems: 4
-              },
-              correct_answer: {
-                type: 'string',
-                enum: ['A', 'B', 'C', 'D'],
-                description: 'The letter of the correct answer'
-              },
-              citation: {
-                type: 'string',
-                description: 'Exact transcript span (10-200 chars) that justifies the correct answer, or empty string if answered from general knowledge.',
-              },
-              explanation: {
-                type: 'string',
-                description: 'Brief explanation of why the correct answer is correct'
-              }
-            },
-            required: ['options', 'correct_answer'],
-            additionalProperties: false
-          }
-        }
-      }
-    ];
-
     // D1 — structured timing log. Each call emits a single JSON line so the
     // Supabase Functions dashboard can be filtered/aggregated by `evt`.
-    async function callModel(model: string, stage: 'primary' | 'retry', retryHint?: string) {
+    async function callModel(stage: 'primary' | 'retry', retryHint?: string) {
       const messages: Array<{ role: 'system' | 'user'; content: string }> = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -253,17 +223,25 @@ Rules (apply in order):
         });
       }
       const t0 = performance.now();
-      const res = await callClaude({
-        model,
+      const doCall = () => callClaude({
         messages,
-        tools,
-        tool_choice: { type: 'function', function: { name: 'generate_mcq_options' } },
+        response_format: { type: 'json_object' },
       });
+      const TIMEOUT_MS = 6000;
+      const withTimeout = (p: Promise<Response>) => Promise.race([
+        p,
+        new Promise<null>((r) => setTimeout(() => r(null), TIMEOUT_MS)),
+      ]);
+      let res = await withTimeout(doCall());
+      if (!res) {
+        console.warn(JSON.stringify({ evt: 'mcq.timeout', stage, ms: TIMEOUT_MS }));
+        res = await withTimeout(doCall());
+        if (!res) res = new Response('timeout', { status: 504 });
+      }
       const elapsed = Math.round(performance.now() - t0);
       console.log(JSON.stringify({
         evt: 'mcq.llm_call',
         stage,
-        model,
         ms: elapsed,
         ok: res.ok,
         status: res.status,
@@ -273,12 +251,10 @@ Rules (apply in order):
       return res;
     }
 
-    // PERF: flash-lite is ~2-3x faster TTFT than flash on short factual MCQs and
-    // plenty capable for 4 options. Structural-failure retries escalate to flash.
-    const primaryModel = 'google/gemini-2.5-flash-lite';
+    // Routes through Lovable AI Gateway (Gemini) via callClaude.
 
     const primaryStart = performance.now();
-    let response = await callModel(primaryModel, 'primary');
+    let response = await callModel('primary');
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -287,12 +263,20 @@ Rules (apply in order):
     }
 
     let data = await response.json();
-    let toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.function?.name !== 'generate_mcq_options') {
-      throw new Error('Invalid response from AI - no tool call found');
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('Invalid response from AI - no content returned');
     }
 
-    let result = JSON.parse(toolCall.function.arguments);
+    // Parse JSON from message content (strip markdown fences if present)
+    const jsonStr = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    let result: { options: string[]; correct_answer: string; explanation?: string; citation?: string };
+    try {
+      result = JSON.parse(jsonStr);
+    } catch (_) {
+      console.error('Failed to parse MCQ JSON from model:', content.substring(0, 500));
+      throw new Error('Invalid JSON response from AI');
+    }
 
     if (!result.options || result.options.length !== 4 || !result.correct_answer) {
       throw new Error('Invalid MCQ options generated');
@@ -310,26 +294,37 @@ Rules (apply in order):
       verdict.reason.includes('citation not found in transcript') ||
       verdict.reason.includes('does not overlap with its own citation')
     );
-    if (!verdict.ok && isStructuralFailure) {
+    let needsReview = false;
+    if (!verdict.ok && isStructuralFailure && !refine) {
+      // PERF: don't block on a second model call. Ship the first result now;
+      // the client runs a background refine (refine: true) and swaps it in.
+      needsReview = true;
+      console.warn(`MCQ structural warning, deferring refine to client: ${verdict.reason}`);
+    } else if (!verdict.ok && isStructuralFailure) {
       console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
       // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
       // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
-      const retryResp = await callModel('google/gemini-2.5-flash', 'retry', verdict.reason);
+      const retryResp = await callModel('retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
-        const retryCall = retryData.choices?.[0]?.message?.tool_calls?.[0];
-        if (retryCall?.function?.name === 'generate_mcq_options') {
-          const retryResult = JSON.parse(retryCall.function.arguments);
-          if (retryResult.options?.length === 4 && retryResult.correct_answer) {
-            const retryVerdict = validateAnswer(retryResult, focusedContext, broadContext);
-            if (retryVerdict.ok) {
-              console.log('MCQ validator accepted retry attempt.');
-              result = retryResult;
-              verdict = retryVerdict;
-            } else {
-              console.warn(`MCQ retry also rejected: ${retryVerdict.reason}. Shipping retry result anyway with warning flag.`);
-              result = retryResult; // still better than original
+        const retryContent = retryData.choices?.[0]?.message?.content;
+        if (retryContent) {
+          try {
+            const retryJson = retryContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+            const retryResult = JSON.parse(retryJson);
+            if (retryResult.options?.length === 4 && retryResult.correct_answer) {
+              const retryVerdict = validateAnswer(retryResult, focusedContext, broadContext);
+              if (retryVerdict.ok) {
+                console.log('MCQ validator accepted retry attempt.');
+                result = retryResult;
+                verdict = retryVerdict;
+              } else {
+                console.warn(`MCQ retry also rejected: ${retryVerdict.reason}. Shipping retry result anyway with warning flag.`);
+                result = retryResult;
+              }
             }
+          } catch (_) {
+            console.warn('MCQ retry returned unparseable JSON, keeping primary result.');
           }
         }
       }
@@ -353,6 +348,7 @@ Rules (apply in order):
         explanation: result.explanation || null,
         citation: result.citation || null,
         validator_warning: verdict.ok ? null : verdict.reason,
+        needs_review: needsReview,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

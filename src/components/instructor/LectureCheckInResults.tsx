@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
@@ -11,11 +11,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
 import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { CheckInConfidenceBreakdown } from "./CheckInConfidenceBreakdown";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Progress } from "@/components/ui/progress";
 import { distinctStudentCount, studentCompletion } from "@/lib/lectureCheckInMetrics";
@@ -31,6 +31,7 @@ interface Assignment {
   created_at: string;
   student_name?: string;
   response_time_seconds?: number | null;
+  confidence_level?: string | null;
 }
 
 interface GroupedAssignment {
@@ -52,10 +53,6 @@ export const LectureCheckInResults = () => {
     group: GroupedAssignment;
   } | null>(null);
   const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
-  const [showCharts, setShowCharts] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('lectureCheckInChartsVisibility');
-    return saved ? JSON.parse(saved) : {};
-  });
   const [questionSummaries, setQuestionSummaries] = useState<Record<string, {
     summary: string;
     trend: string;
@@ -72,9 +69,6 @@ export const LectureCheckInResults = () => {
   }>>({});
   const { selectedCourse } = useCourseContext();
 
-  useEffect(() => {
-    localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
-  }, [showCharts]);
 
   const fetchResults = useCallback(async () => {
     const {
@@ -103,7 +97,8 @@ export const LectureCheckInResults = () => {
         completed,
         created_at,
         response_time_seconds,
-        ai_summary
+        ai_summary,
+        confidence_level
       `,
       )
       .eq("instructor_id", user.id)
@@ -1364,6 +1359,7 @@ export const LectureCheckInResults = () => {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-5 pt-5 pb-4">
+                <CheckInConfidenceBreakdown rows={group.assignments} />
                 {group.questions.map((question, qIdx) => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
@@ -1530,41 +1526,8 @@ export const LectureCheckInResults = () => {
                           summary={questionSummaries[`${groupIdx}-${qIdx}`]}
                           questionType={question.type}
                         />
-                      ) : (
-                        /* Multiple Choice: Show toggle for visual charts */
-                        <>
-                          <div className="pt-3 flex items-center justify-between border-t">
-                            <div className="flex items-center gap-2">
-                              <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Room Signal</span>
-                              {showCharts[`${groupIdx}-${qIdx}`] && (
-                                <Badge className="text-xs bg-emerald-100 text-emerald-700 border-0 hover:bg-emerald-100">Visible</Badge>
-                              )}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowCharts(prev => ({
-                                ...prev,
-                                [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
-                              }))}
-                              className="gap-2 text-xs"
-                            >
-                              {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
-                            </Button>
-                          </div>
+                      ) : null}
 
-                          {/* Visual Analytics Chart */}
-                          {showCharts[`${groupIdx}-${qIdx}`] && (
-                            <QuestionAnalyticsChart
-                              question={question}
-                              assignments={group.assignments}
-                              questionIndex={qIdx}
-                              stats={stats}
-                            />
-                          )}
-                        </>
-                      )}
 
                       {/* Question Quality Rating */}
                       <div className="pt-3 border-t flex items-center justify-between rounded-lg">

@@ -1,0 +1,91 @@
+/* Edvana Whiteboard Tutor — scoped animations & scrollbars.
+   Everything is namespaced under .edv-root so it never leaks into the
+   rest of the app's global styles. */
+
+.edv-root {
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  color: hsl(220 25% 15%);
+  background: hsl(40 20% 97%);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.edv-root *,
+.edv-root *::before,
+.edv-root *::after {
+  box-sizing: border-box;
+}
+
+/* Recording dot */
+@keyframes edv-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.edv-pulse {
+  animation: edv-pulse 2s ease-in-out infinite;
+}
+
+/* Listening waveform */
+@keyframes edv-wave {
+  0%,
+  100% {
+    transform: scaleY(0.32);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.edv-wave-bar {
+  animation: edv-wave 1s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Transcript scroller thumb */
+.edv-scroller::-webkit-scrollbar {
+  width: 8px;
+}
+.edv-scroller::-webkit-scrollbar-thumb {
+  background: hsl(220 15% 88%);
+  border-radius: 9999px;
+}
+.edv-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+.edv-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(220 15% 88%) transparent;
+}
+
+.edv-transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes edv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.edv-spin {
+  animation: edv-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edv-pulse,
+  .edv-wave-bar {
+    animation: none !important;
+  }
+  .edv-transition {
+    transition: none !important;
+  }
+  .edv-spin {
+    animation-duration: 2s;
+  }
+}

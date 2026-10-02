@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { resolveAiProvider, callAiProvider } from "../_shared/aiProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -170,78 +171,72 @@ Then provide overall constructive feedback that:
 2. Explains specific gaps or errors by component
 3. Offers actionable suggestions for improvement`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "grade_answer",
-              description: "Grade a student's short answer response using component-based scoring",
-              parameters: {
-                type: "object",
-                properties: {
-                  conceptual_understanding: {
-                    type: "number",
-                    description: "Score for conceptual understanding (0-25)",
-                    minimum: 0,
-                    maximum: 25,
-                  },
-                  accuracy: {
-                    type: "number",
-                    description: "Score for accuracy of information (0-25)",
-                    minimum: 0,
-                    maximum: 25,
-                  },
-                  completeness: {
-                    type: "number",
-                    description: "Score for completeness of answer (0-25)",
-                    minimum: 0,
-                    maximum: 25,
-                  },
-                  application: {
-                    type: "number",
-                    description: "Score for application of knowledge (0-25)",
-                    minimum: 0,
-                    maximum: 25,
-                  },
-                  total_grade: {
-                    type: "number",
-                    description: "Total grade (sum of all components, 0-100)",
-                    minimum: 0,
-                    maximum: 100,
-                  },
-                  feedback: {
-                    type: "string",
-                    description: "Constructive feedback explaining each component score and overall performance",
-                  },
+    const ai = resolveAiProvider();
+    const response = await callAiProvider(ai, {
+      model: ai.defaultModel,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "grade_answer",
+            description: "Grade a student's short answer response using component-based scoring",
+            parameters: {
+              type: "object",
+              properties: {
+                conceptual_understanding: {
+                  type: "number",
+                  description: "Score for conceptual understanding (0-25)",
+                  minimum: 0,
+                  maximum: 25,
                 },
-                required: [
-                  "conceptual_understanding",
-                  "accuracy",
-                  "completeness",
-                  "application",
-                  "total_grade",
-                  "feedback",
-                ],
-                additionalProperties: false,
+                accuracy: {
+                  type: "number",
+                  description: "Score for accuracy of information (0-25)",
+                  minimum: 0,
+                  maximum: 25,
+                },
+                completeness: {
+                  type: "number",
+                  description: "Score for completeness of answer (0-25)",
+                  minimum: 0,
+                  maximum: 25,
+                },
+                application: {
+                  type: "number",
+                  description: "Score for application of knowledge (0-25)",
+                  minimum: 0,
+                  maximum: 25,
+                },
+                total_grade: {
+                  type: "number",
+                  description: "Total grade (sum of all components, 0-100)",
+                  minimum: 0,
+                  maximum: 100,
+                },
+                feedback: {
+                  type: "string",
+                  description: "Constructive feedback explaining each component score and overall performance",
+                },
               },
+              required: [
+                "conceptual_understanding",
+                "accuracy",
+                "completeness",
+                "application",
+                "total_grade",
+                "feedback",
+              ],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "grade_answer" } },
-        temperature: 0.3,
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "grade_answer" } },
+      temperature: 0.3,
     });
 
     if (!response.ok) {
