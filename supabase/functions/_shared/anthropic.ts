@@ -57,13 +57,11 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
       ? requestedModel
       : DEFAULT_MODEL;
 
-  // Moonshot does not reliably handle OpenAI-style tool_choice. When tools
-  // are requested AND the provider is Moonshot, convert to JSON mode: inject
-  // the tool schema into the system message and ask for a plain JSON object,
-  // then repackage the text response as a tool_call so callers don't change.
-  const useMoonshot = provider.name === "Moonshot";
+  // callClaude always routes through the Lovable AI Gateway (Gemini), which
+  // handles tool_choice natively. The Moonshot shim lives in callAiProvider
+  // (aiProvider.ts) for functions that call Moonshot directly.
   const hasTools = body.tools && body.tools.length > 0;
-  const shimToolCall = useMoonshot && hasTools;
+  const shimToolCall = false;
 
   let toolFnName: string | undefined;
   const messages = [...body.messages] as Record<string, unknown>[];
