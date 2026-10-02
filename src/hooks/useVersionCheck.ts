@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from "react";
-import { toast } from "sonner";
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // every 5 minutes
 
@@ -31,10 +30,16 @@ async function fetchRemoteHash(): Promise<string | null> {
 
 export function useVersionCheck() {
   const initialHash = useRef<string | null>(null);
-  const hasNotified = useRef(false);
+  const hasReloaded = useRef(false);
+
+  const reloadForUpdate = useCallback(() => {
+    if (hasReloaded.current) return;
+    hasReloaded.current = true;
+    window.location.reload();
+  }, []);
 
   const check = useCallback(async () => {
-    if (hasNotified.current) return;
+    if (hasReloaded.current) return;
 
     if (!initialHash.current) {
       initialHash.current = getCurrentScriptHash();
@@ -44,33 +49,17 @@ export function useVersionCheck() {
     const remoteHash = await fetchRemoteHash();
     if (!remoteHash || remoteHash === initialHash.current) return;
 
-    hasNotified.current = true;
-    toast("Update Available", {
-      description: "A new version of Edvana is ready.",
-      duration: Infinity,
-      action: {
-        label: "Refresh",
-        onClick: () => window.location.reload(),
-      },
-    });
-  }, []);
+    reloadForUpdate();
+  }, [reloadForUpdate]);
 
   useEffect(() => {
-    // Listen for service worker updates and notify (do NOT auto-reload —
-    // controllerchange fires when returning to the tab and would wipe state).
+    // Reload once when the service worker activates a newer app version.
+    const handleControllerChange = () => {
+      reloadForUpdate();
+    };
+
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (hasNotified.current) return;
-        hasNotified.current = true;
-        toast("Update Available", {
-          description: "A new version of Edvana is ready.",
-          duration: Infinity,
-          action: {
-            label: "Refresh",
-            onClick: () => window.location.reload(),
-          },
-        });
-      });
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
     }
 
     // Check when user returns to the tab (biggest win for freshness)
@@ -92,6 +81,9 @@ export function useVersionCheck() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', check);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      }
     };
-  }, [check]);
+  }, [check, reloadForUpdate]);
 }

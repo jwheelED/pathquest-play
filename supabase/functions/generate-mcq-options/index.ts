@@ -151,7 +151,7 @@ serve(async (req) => {
       );
     }
 
-    const { question_text, source_transcript, prior_context } = await req.json();
+    const { question_text, source_transcript, prior_context, refine } = await req.json();
 
     if (!question_text || question_text.trim() === '') {
       return new Response(
@@ -173,7 +173,7 @@ serve(async (req) => {
     // hard (1200 chars vs 3000). The focused window covers pronoun resolution, and the
     // extra ~1800 chars of stale lecture history adds input-token latency without
     // improving answer quality on short factual questions.
-    const focusedContext = (prior_context || '').trim();
+    const focusedContext = (prior_context || '').trim().slice(-1200);
     const broadCap = focusedContext.length > 0 ? 1200 : 2400;
     const broadContext = (source_transcript || '').slice(-broadCap).trim();
     const hasAnyContext = broadContext.length > 0 || focusedContext.length > 0;
@@ -223,10 +223,21 @@ Rules (apply in order):
         });
       }
       const t0 = performance.now();
-      const res = await callClaude({
+      const doCall = () => callClaude({
         messages,
         response_format: { type: 'json_object' },
       });
+      const TIMEOUT_MS = 6000;
+      const withTimeout = (p: Promise<Response>) => Promise.race([
+        p,
+        new Promise<null>((r) => setTimeout(() => r(null), TIMEOUT_MS)),
+      ]);
+      let res = await withTimeout(doCall());
+      if (!res) {
+        console.warn(JSON.stringify({ evt: 'mcq.timeout', stage, ms: TIMEOUT_MS }));
+        res = await withTimeout(doCall());
+        if (!res) res = new Response('timeout', { status: 504 });
+      }
       const elapsed = Math.round(performance.now() - t0);
       console.log(JSON.stringify({
         evt: 'mcq.llm_call',
@@ -283,7 +294,13 @@ Rules (apply in order):
       verdict.reason.includes('citation not found in transcript') ||
       verdict.reason.includes('does not overlap with its own citation')
     );
-    if (!verdict.ok && isStructuralFailure) {
+    let needsReview = false;
+    if (!verdict.ok && isStructuralFailure && !refine) {
+      // PERF: don't block on a second model call. Ship the first result now;
+      // the client runs a background refine (refine: true) and swaps it in.
+      needsReview = true;
+      console.warn(`MCQ structural warning, deferring refine to client: ${verdict.reason}`);
+    } else if (!verdict.ok && isStructuralFailure) {
       console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
       // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
       // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
@@ -331,6 +348,7 @@ Rules (apply in order):
         explanation: result.explanation || null,
         citation: result.citation || null,
         validator_warning: verdict.ok ? null : verdict.reason,
+        needs_review: needsReview,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
