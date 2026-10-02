@@ -14,7 +14,7 @@ export function resolveAiProvider(): AiProvider {
     return {
       url: "https://api.moonshot.ai/v1/chat/completions",
       key: moonshotKey,
-      defaultModel: "moonshot-v1-32k",
+      defaultModel: "kimi-k2.6",
       name: "Moonshot",
     };
   }
