@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { resolveAiProvider, callAiProvider } from "../_shared/aiProvider.ts";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -222,10 +222,8 @@ Rules (apply in order):
           content: `RETRY: Your previous attempt failed validation: ${retryHint}. Re-read the transcript carefully. Identify the answer FROM the transcript first, then assign the correct letter to the option that matches that answer. Fill \`citation\` with the exact transcript span.`,
         });
       }
-      const ai = resolveAiProvider();
       const t0 = performance.now();
-      const doCall = () => callAiProvider(ai, {
-        model: ai.defaultModel,
+      const doCall = () => callClaude({
         messages,
         response_format: { type: 'json_object' },
       });
@@ -253,7 +251,7 @@ Rules (apply in order):
       return res;
     }
 
-    // Uses resolveAiProvider() → Moonshot when MOONSHOT_API_KEY is set, else Lovable.
+    // Routes through Lovable AI Gateway (Gemini) via callClaude.
 
     const primaryStart = performance.now();
     let response = await callModel('primary');
