@@ -966,16 +966,61 @@ serve(async (req) => {
 
       liveQuestionNumber = (questionCount || 0) + 1;
 
+      // Determine image kind: diagram for quantitative/spatial concepts
+      const questionStr = typeof formattedQuestion.question === "string"
+        ? formattedQuestion.question.toLowerCase()
+        : "";
+      const diagramKeywords = [
+        "graph", "chart", "diagram", "plot", "axis", "curve", "slope",
+        "equation", "formula", "calculate", "ratio", "proportion",
+        "flow", "cycle", "pathway", "circuit", "structure", "anatomy",
+      ];
+      const imageKind = diagramKeywords.some((kw) => questionStr.includes(kw))
+        ? "diagram"
+        : "illustration";
+
       // Insert into live_questions for anonymous participants
-      const { error: liveInsertError } = await supabase.from("live_questions").insert({
-        session_id: liveSession.id,
-        instructor_id: user.id,
-        question_content: formattedQuestion,
-        question_number: liveQuestionNumber,
-      });
+      const { data: liveQuestion, error: liveInsertError } = await supabase
+        .from("live_questions")
+        .insert({
+          session_id: liveSession.id,
+          instructor_id: user.id,
+          question_content: formattedQuestion,
+          question_number: liveQuestionNumber,
+          image_status: "pending",
+          image_kind: imageKind,
+        })
+        .select("id")
+        .single();
 
       if (liveInsertError) {
         console.error("❌ Failed to insert live question:", liveInsertError);
+      }
+
+      // Fire off image generation (non-blocking)
+      if (liveQuestion?.id) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const courseTitle =
+          (course_context as { title?: string } | null)?.title || undefined;
+        fetch(`${supabaseUrl}/functions/v1/generate-question-image`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            questionId: liveQuestion.id,
+            questionText: formattedQuestion.question,
+            courseTitle,
+            imageKind,
+          }),
+        }).catch((err: unknown) =>
+          console.error("Failed to trigger image generation:", err)
+        );
+        console.log(
+          `🎨 Image generation triggered for question ${liveQuestion.id} (${imageKind})`
+        );
       }
 
       // Get participant count for logging
