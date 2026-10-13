@@ -410,10 +410,8 @@ export const LectureCheckInResults = () => {
 
     const hasAIGrades = aiGrades.length > 0;
     
-    // For short answer with no AI grades and no expected answer, mark as manual
-    const isManualGradeShortAnswer = question.type === 'short_answer' && 
-      !hasAIGrades &&
-      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+    // Short answers without any grade yet are pending, never "incorrect"
+    const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrades;
     
     // Calculate correct count based on available data
     let correct: Assignment[] = [];
@@ -1625,9 +1623,7 @@ export const LectureCheckInResults = () => {
                             
                               // For manual grade short answers without AI grade, show pending
                               // Also check for coding_simple without AI grade
-                              const isManualGradeShortAnswer = question.type === 'short_answer' && 
-                                !hasAIGrade &&
-                                (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+                              const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrade;
                               const isCodingSimple = question.type === 'coding_simple';
                               
                               // coding_simple uses AI grade threshold >= 70 as correct
