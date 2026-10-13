@@ -1509,6 +1509,8 @@ export const LectureTranscription = ({
             explanation: detectionData.explanation,
             // Pre-edited coding payload from on-deck inline preview
             coding_payload: detectionData.coding_payload,
+            // Picture pre-generated while the question was On Deck
+            image_prep_key: (detectionData as { image_prep_key?: string }).image_prep_key,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
             // Pass source transcript for voice-sent questions (to show students where question came from)
@@ -4172,6 +4174,7 @@ export const LectureTranscription = ({
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
                   coding_payload: data.codingPayload,
+                  image_prep_key: data.imagePrepKey,
                 };
                 handleConfirmPreviewSend({
                   question_text: questionText,
