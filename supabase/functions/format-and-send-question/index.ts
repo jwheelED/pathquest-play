@@ -492,6 +492,7 @@ serve(async (req) => {
       course_id = null,
       source_transcript = null, // Raw transcript to display with question
       coding_payload = null, // Pre-generated/edited coding question from on-deck preview
+      image_prep_key = null, // Key of picture pre-generated while On Deck
     } = await req.json();
 
     // Normalize coding_payload (may arrive as {style:'simple'|'full', ...fields})
@@ -979,6 +980,23 @@ serve(async (req) => {
         ? "diagram"
         : "illustration";
 
+      // Reuse a picture pre-generated while the question was On Deck, if ready
+      const prepKey = typeof image_prep_key === "string" &&
+          /^[0-9a-f-]{36}$/i.test(image_prep_key)
+        ? image_prep_key
+        : null;
+      let preparedUrl: string | null = null;
+      if (prepKey) {
+        const base = (Deno.env.get("R2_PUBLIC_URL") || "").replace(/\/+$/, "");
+        if (base) {
+          const candidateUrl = `${base}/question-images/prep-${prepKey}.png`;
+          try {
+            const head = await fetch(candidateUrl, { method: "HEAD" });
+            if (head.ok) preparedUrl = candidateUrl;
+          } catch { /* fall through to generation */ }
+        }
+      }
+
       // Insert into live_questions for anonymous participants
       const { data: liveQuestion, error: liveInsertError } = await supabase
         .from("live_questions")
@@ -987,7 +1005,8 @@ serve(async (req) => {
           instructor_id: user.id,
           question_content: formattedQuestion,
           question_number: liveQuestionNumber,
-          image_status: "pending",
+          image_status: preparedUrl ? "ready" : "pending",
+          image_url: preparedUrl,
           image_kind: imageKind,
         })
         .select("id")
@@ -998,7 +1017,7 @@ serve(async (req) => {
       }
 
       // Fire off image generation (non-blocking)
-      if (liveQuestion?.id) {
+      if (liveQuestion?.id && !preparedUrl) {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const courseTitle =
@@ -1014,6 +1033,7 @@ serve(async (req) => {
             questionText: formattedQuestion.question,
             courseTitle,
             imageKind,
+            prepKey,
           }),
         }).catch((err: unknown) =>
           console.error("Failed to trigger image generation:", err)

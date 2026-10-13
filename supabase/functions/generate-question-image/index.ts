@@ -70,7 +70,8 @@ function encodeObjectKey(key: string): string {
 
 async function uploadToR2(
   imageBytes: Uint8Array,
-  contentType: string
+  contentType: string,
+  fixedKey?: string
 ): Promise<string> {
   const R2_ACCOUNT_ID = Deno.env.get("R2_ACCOUNT_ID");
   const R2_ACCESS_KEY_ID = Deno.env.get("R2_ACCESS_KEY_ID");
@@ -88,8 +89,7 @@ async function uploadToR2(
     throw new Error("R2 credentials not configured");
   }
 
-  const uniqueId = crypto.randomUUID();
-  const key = `question-images/${uniqueId}.png`;
+  const key = fixedKey ?? `question-images/${crypto.randomUUID()}.png`;
   const encodedKey = encodeObjectKey(key);
   const host = `${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
   const canonicalUri = `/${encodeRfc3986(R2_BUCKET_NAME)}/${encodedKey}`;
@@ -143,40 +143,48 @@ async function uploadToR2(
   return `${publicBase}/${key}`;
 }
 
-// --- Main handler ---
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+const DIAGRAM_KEYWORDS = [
+  "graph", "chart", "diagram", "plot", "axis", "curve", "slope",
+  "equation", "formula", "calculate", "ratio", "proportion",
+  "flow", "cycle", "pathway", "circuit", "structure", "anatomy",
+];
+
+function prepObjectKey(prepKey: string): string {
+  return `question-images/prep-${prepKey}.png`;
+}
+
+function preparedPublicUrl(prepKey: string): string | null {
+  const base = (Deno.env.get("R2_PUBLIC_URL") || "").replace(/\/+$/, "");
+  return base ? `${base}/${prepObjectKey(prepKey)}` : null;
+}
+
+async function waitForPrepared(prepKey: string, maxMs: number): Promise<string | null> {
+  const url = preparedPublicUrl(prepKey);
+  if (!url) return null;
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      if (res.ok) return url;
+    } catch { /* keep waiting */ }
+    await new Promise((r) => setTimeout(r, 1000));
   }
+  return null;
+}
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
-  let questionId: string | undefined;
-
-  try {
-    const body = await req.json();
-    questionId = body.questionId;
-    const questionText: string = body.questionText;
-    const courseTitle: string | undefined = body.courseTitle;
-    const imageKind: "illustration" | "diagram" = body.imageKind || "illustration";
-
-    if (!questionId || !questionText) {
-      return new Response(
-        JSON.stringify({ error: "questionId and questionText are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+async function generateAndUpload(
+  questionText: string,
+  courseTitle: string | undefined,
+  imageKind: "illustration" | "diagram",
+  fixedKey?: string,
+): Promise<string> {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY not configured");
     }
 
-    console.log(`🎨 Generating ${imageKind} for question ${questionId}`);
+    console.log(`🎨 Generating ${imageKind}`);
 
     const styleGuide =
       imageKind === "diagram"
@@ -223,7 +231,82 @@ serve(async (req) => {
 
     console.log(`🎨 Image generated (${imageBytes.length} bytes), uploading to R2...`);
 
-    const publicUrl = await uploadToR2(imageBytes, "image/png");
+    return await uploadToR2(imageBytes, "image/png", fixedKey);
+}
+
+// --- Main handler ---
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  let questionId: string | undefined;
+
+  try {
+    const body = await req.json();
+    questionId = body.questionId;
+    const questionText: string = body.questionText;
+    const courseTitle: string | undefined = body.courseTitle;
+    const imageKind: "illustration" | "diagram" = body.imageKind || "illustration";
+    const prepKey: string | null =
+      typeof body.prepKey === "string" && /^[0-9a-f-]{36}$/i.test(body.prepKey)
+        ? body.prepKey
+        : null;
+
+    // --- Prepare mode: pre-generate while the question is On Deck ---
+    if (body.mode === "prepare") {
+      questionId = undefined;
+      if (!prepKey || typeof questionText !== "string" || !questionText.trim()) {
+        return new Response(JSON.stringify({ error: "prepKey and questionText are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+      const { data: userData } = await supabase.auth.getUser(token);
+      const userId = userData?.user?.id;
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const { data: live } = await supabase
+        .from("live_sessions")
+        .select("id")
+        .eq("instructor_id", userId)
+        .eq("is_active", true)
+        .limit(1);
+      if (!live || live.length === 0) {
+        return new Response(JSON.stringify({ skipped: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const lower = questionText.toLowerCase();
+      const kind = DIAGRAM_KEYWORDS.some((k) => lower.includes(k)) ? "diagram" : "illustration";
+      const url = await generateAndUpload(questionText, courseTitle, kind, prepObjectKey(prepKey));
+      console.log(`✅ Pre-generated image ready: ${url}`);
+      return new Response(JSON.stringify({ success: true, imageUrl: url }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (!questionId || !questionText) {
+      return new Response(
+        JSON.stringify({ error: "questionId and questionText are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    let publicUrl: string | null = null;
+    if (prepKey) {
+      // A pre-generation may still be in flight — wait briefly for it
+      publicUrl = await waitForPrepared(prepKey, 20_000);
+      if (publicUrl) console.log(`♻️ Reusing pre-generated image for ${questionId}`);
+    }
+    if (!publicUrl) {
+      publicUrl = await generateAndUpload(questionText, courseTitle, imageKind);
+    }
 
     console.log(`✅ Image uploaded: ${publicUrl}`);
 
