@@ -644,6 +644,8 @@ export function QuestionOnDeck({
       };
     }
 
+    const prep = imagePrepRef.current;
+    if (prep && candidate && prep.text === candidate.text) data.imagePrepKey = prep.key;
     onSendNow(questionText, data);
   };
 
