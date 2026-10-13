@@ -772,11 +772,12 @@ function watchForSilence(stream: MediaStream, onSilence: () => void): () => void
       if (rms > 0.035) {
         if (lastLoud) spokenMs += Math.min(100, now - lastLoud);
         lastLoud = now;
-        heardSpeech = spokenMs > 800;
+        // ~200ms of voice is enough for short replies like "yes" / "twelve".
+        if (spokenMs > 200) heardSpeech = true;
         quietSince = 0;
       } else if (heardSpeech) {
         if (!quietSince) quietSince = now;
-        else if (now - quietSince > 3500) {
+        else if (now - quietSince > 2200) {
           done = true;
           onSilence();
           return;
