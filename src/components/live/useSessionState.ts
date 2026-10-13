@@ -242,7 +242,7 @@ export function useSessionState(sessionCode: string | undefined) {
         participant_id: participantId,
         answer,
         is_correct: wasCorrect ?? false,
-        confidence_level: confidence,
+        confidence_level: confidence === null ? undefined : String(confidence),
         response_time_ms: (totalDuration - timeLeft) * 1000,
       });
     } catch {
