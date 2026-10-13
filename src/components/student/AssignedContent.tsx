@@ -959,9 +959,8 @@ export const AssignedContent = ({ userId, instructorId, courseId }: AssignedCont
             setCelebrationMultiplier(1);
             setCelebrationTrigger(Date.now());
           } else {
-            toast({ 
-              title: "✅ Quiz Submitted Successfully!",
-              description: "Your answers have been submitted for review."
+            sonnerToast.warning("Grading delayed", {
+              description: "Your answer was saved — your instructor will review it.",
             });
           }
         }
