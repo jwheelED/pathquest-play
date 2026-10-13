@@ -81,7 +81,8 @@ export async function callAiProvider(
     model: body.model,
     messages,
   };
-  if (typeof body.temperature === "number") reqBody.temperature = body.temperature;
+  // Kimi K2.6 only accepts temperature = 1; sending anything else is a 400.
+  if (typeof body.temperature === "number" && !useMoonshot) reqBody.temperature = body.temperature;
   if (typeof body.max_tokens === "number") reqBody.max_tokens = body.max_tokens;
 
   if (shimToolCall) {

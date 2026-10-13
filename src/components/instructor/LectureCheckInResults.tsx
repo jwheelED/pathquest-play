@@ -68,6 +68,45 @@ export const LectureCheckInResults = () => {
     responseCount?: number;
   }>>({});
   const { selectedCourse } = useCourseContext();
+  const [regrading, setRegrading] = useState<string | null>(null);
+
+  // Re-run AI grading for submitted short answers that never got a grade.
+  const handleRegrade = async (
+    key: string,
+    questionText: string,
+    expectedAnswer: string,
+    assignments: Assignment[],
+  ) => {
+    setRegrading(key);
+    let graded = 0;
+    let failed = 0;
+    for (const a of assignments) {
+      const qs = ((a.content as { questions?: Array<{ question?: string; type?: string }> })?.questions) || [];
+      const idx = qs.findIndex((q) => q.question === questionText && q.type === 'short_answer');
+      const responses = (a.quiz_responses || {}) as Record<string, unknown>;
+      const recs = (responses._ai_recommendations || {}) as Record<string, { grade?: number }>;
+      if (!a.completed || idx < 0 || typeof recs[idx]?.grade === 'number' || a.grade !== null) continue;
+      const { data, error } = await supabase.functions.invoke('auto-grade-short-answer', {
+        body: { studentAnswer: String(responses[idx] ?? ''), expectedAnswer, question: questionText },
+      });
+      if (error || typeof data?.grade !== 'number') { failed++; continue; }
+      const { error: upErr } = await supabase
+        .from('student_assignments')
+        .update({
+          grade: data.grade,
+          quiz_responses: { ...responses, _ai_recommendations: { ...recs, [idx]: { grade: data.grade, feedback: data.feedback } } },
+          answers_released: true,
+          release_method: 'auto_grade',
+        } as never)
+        .eq('id', a.id);
+      if (upErr) failed++; else graded++;
+    }
+    setRegrading(null);
+    if (graded === 0 && failed === 0) toast.info('No ungraded answers to grade');
+    else if (failed) toast.warning(`Graded ${graded}, ${failed} failed`);
+    else toast.success(`Graded ${graded} answer${graded === 1 ? '' : 's'}`);
+    fetchResults();
+  };
 
 
   const fetchResults = useCallback(async () => {
@@ -410,10 +449,8 @@ export const LectureCheckInResults = () => {
 
     const hasAIGrades = aiGrades.length > 0;
     
-    // For short answer with no AI grades and no expected answer, mark as manual
-    const isManualGradeShortAnswer = question.type === 'short_answer' && 
-      !hasAIGrades &&
-      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+    // Short answers without any grade yet are pending, never "incorrect"
+    const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrades;
     
     // Calculate correct count based on available data
     let correct: Assignment[] = [];
@@ -1625,9 +1662,7 @@ export const LectureCheckInResults = () => {
                             
                               // For manual grade short answers without AI grade, show pending
                               // Also check for coding_simple without AI grade
-                              const isManualGradeShortAnswer = question.type === 'short_answer' && 
-                                !hasAIGrade &&
-                                (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+                              const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrade;
                               const isCodingSimple = question.type === 'coding_simple';
                               
                               // coding_simple uses AI grade threshold >= 70 as correct
@@ -1788,9 +1823,21 @@ export const LectureCheckInResults = () => {
                         {/* Short answer review section */}
                         {question.type === "short_answer" && (
                           <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            <p className="text-xs font-medium mb-2 text-foreground">
-                              Student Text Responses & Grading:
-                            </p>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-medium text-foreground">
+                                Student Text Responses & Grading:
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1"
+                                disabled={regrading === `${groupIdx}-${qIdx}`}
+                                onClick={() => handleRegrade(`${groupIdx}-${qIdx}`, question.question, question.expectedAnswer || '', group.assignments)}
+                              >
+                                <RefreshCw className={`h-3 w-3 ${regrading === `${groupIdx}-${qIdx}` ? 'animate-spin' : ''}`} />
+                                Re-run auto-grade
+                              </Button>
+                            </div>
                             <div className="space-y-2">
                               {(() => {
                                 // Filter assignments to only those containing this specific question
