@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.12 (cd3cf9e)"
+    PostgrestVersion: "12.2.12"
   }
   public: {
     Tables: {
@@ -1643,6 +1643,38 @@ export type Database = {
         }
         Relationships: []
       }
+      live_confusion_signals: {
+        Row: {
+          id: string
+          participant_id: string
+          sent_at: string
+          session_id: string
+          transcript_segment: string | null
+        }
+        Insert: {
+          id?: string
+          participant_id: string
+          sent_at?: string
+          session_id: string
+          transcript_segment?: string | null
+        }
+        Update: {
+          id?: string
+          participant_id?: string
+          sent_at?: string
+          session_id?: string
+          transcript_segment?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_confusion_signals_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_participants: {
         Row: {
           id: string
@@ -1678,6 +1710,9 @@ export type Database = {
       live_questions: {
         Row: {
           id: string
+          image_kind: string | null
+          image_status: string | null
+          image_url: string | null
           instructor_id: string
           question_content: Json
           question_number: number
@@ -1686,6 +1721,9 @@ export type Database = {
         }
         Insert: {
           id?: string
+          image_kind?: string | null
+          image_status?: string | null
+          image_url?: string | null
           instructor_id: string
           question_content: Json
           question_number: number
@@ -1694,6 +1732,9 @@ export type Database = {
         }
         Update: {
           id?: string
+          image_kind?: string | null
+          image_status?: string | null
+          image_url?: string | null
           instructor_id?: string
           question_content?: Json
           question_number?: number

@@ -240,8 +240,9 @@ export function useSessionState(sessionCode: string | undefined) {
       await supabase.from("live_responses").insert({
         question_id: currentQuestion.id,
         participant_id: participantId,
-        response: answer,
-        confidence_level: confidence,
+        answer,
+        is_correct: wasCorrect ?? false,
+        confidence_level: confidence === null ? undefined : String(confidence),
         response_time_ms: (totalDuration - timeLeft) * 1000,
       });
     } catch {

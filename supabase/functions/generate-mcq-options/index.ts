@@ -223,21 +223,13 @@ Rules (apply in order):
         });
       }
       const t0 = performance.now();
-      const doCall = () => callClaude({
+      // Primary uses the fast flash-lite model; the structural retry escalates
+      // to flash. No artificial timeout — aborting discards billed work.
+      const res = await callClaude({
+        model: stage === 'primary' ? 'google/gemini-2.5-flash-lite' : 'google/gemini-2.5-flash',
         messages,
         response_format: { type: 'json_object' },
       });
-      const TIMEOUT_MS = 6000;
-      const withTimeout = (p: Promise<Response>) => Promise.race([
-        p,
-        new Promise<null>((r) => setTimeout(() => r(null), TIMEOUT_MS)),
-      ]);
-      let res = await withTimeout(doCall());
-      if (!res) {
-        console.warn(JSON.stringify({ evt: 'mcq.timeout', stage, ms: TIMEOUT_MS }));
-        res = await withTimeout(doCall());
-        if (!res) res = new Response('timeout', { status: 504 });
-      }
       const elapsed = Math.round(performance.now() - t0);
       console.log(JSON.stringify({
         evt: 'mcq.llm_call',
@@ -294,13 +286,11 @@ Rules (apply in order):
       verdict.reason.includes('citation not found in transcript') ||
       verdict.reason.includes('does not overlap with its own citation')
     );
-    let needsReview = false;
-    if (!verdict.ok && isStructuralFailure && !refine) {
-      // PERF: don't block on a second model call. Ship the first result now;
-      // the client runs a background refine (refine: true) and swaps it in.
-      needsReview = true;
-      console.warn(`MCQ structural warning, deferring refine to client: ${verdict.reason}`);
-    } else if (!verdict.ok && isStructuralFailure) {
+    // Structural failures (wrong answer letter, hallucinated citation) are
+    // always repaired before returning, so a flawed key never reaches students.
+    const needsReview = false;
+    void refine;
+    if (!verdict.ok && isStructuralFailure) {
       console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
       // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
       // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
