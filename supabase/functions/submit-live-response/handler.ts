@@ -129,6 +129,8 @@ export async function handleSubmit(
       confidence_multiplier: multiplier,
       points_earned: points,
       response_time_ms: responseTimeMs,
+      ai_grade: aiGrade,
+      ai_feedback: aiFeedback,
     })
     .select()
     .single();
@@ -189,7 +191,7 @@ export async function handleSubmit(
                     await supabase.from("student_assignments").update({
                       completed: true,
                       quiz_responses: updatedResponses,
-                      grade: isCorrect ? 100 : 0,
+                      grade: aiGrade ?? (isCorrect ? 100 : 0),
                       response_time_seconds: responseTimeMs ? Math.round(responseTimeMs / 1000) : null,
                     }).eq("id", assignment.id);
                     break;
@@ -215,6 +217,8 @@ export async function handleSubmit(
         pointsEarned: points,
         confidenceMultiplier: multiplier,
         correctAnswer,
+        aiGrade,
+        aiFeedback,
       },
     },
   };

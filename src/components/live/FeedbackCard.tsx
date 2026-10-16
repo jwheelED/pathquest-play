@@ -8,7 +8,8 @@ interface FeedbackCardProps {
 }
 
 export function FeedbackCard({ feedback, onDismiss }: FeedbackCardProps) {
-  const { wasCorrect, selectedAnswer, correctAnswer, explanation, sameAnswerPct } = feedback;
+  const { wasCorrect, selectedAnswer, correctAnswer, explanation, sameAnswerPct, aiGrade, aiFeedback } = feedback;
+  const isWritten = selectedAnswer.length > 1 && !/^[A-D]([).\-\s]|$)/.test(selectedAnswer);
 
   return (
     <div className="w-full max-w-[720px] mx-auto bg-white rounded-[var(--radius-xl)] shadow-md p-[30px_32px] flex flex-col gap-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -27,14 +28,33 @@ export function FeedbackCard({ feedback, onDismiss }: FeedbackCardProps) {
             </>
           )}
         </h2>
-        <p className="text-sm text-[hsl(var(--text-muted-live))]">
-          You chose {selectedAnswer}
-          {!wasCorrect && `. The answer is ${correctAnswer}.`}
-        </p>
+        {isWritten ? (
+          <p className="text-sm text-[hsl(var(--text-muted-live))] line-clamp-3">You wrote: {selectedAnswer}</p>
+        ) : (
+          <p className="text-sm text-[hsl(var(--text-muted-live))]">
+            You chose {selectedAnswer}
+            {!wasCorrect && `. The answer is ${correctAnswer}.`}
+          </p>
+        )}
+      </div>
+
+      {typeof aiGrade === "number" && (
+        <div className="flex flex-col gap-2 p-4 rounded-[var(--radius-lg)] border border-[hsl(var(--slate-200))]">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--text-subtle))]">AI grade</span>
+            <span className="text-2xl font-bold text-[hsl(var(--ink))]">{aiGrade}/100</span>
+          </div>
+          {aiFeedback && <p className="text-sm leading-relaxed text-[hsl(var(--text-muted-live))]">{aiFeedback}</p>}
+        </div>
+      )}
+      {isWritten && typeof aiGrade !== "number" && (
+        <p className="text-sm text-[hsl(var(--text-muted-live))]">Grading delayed — your instructor will review your answer.</p>
+      )}
+      <div className="hidden">
       </div>
 
       {/* Answer comparison */}
-      {!wasCorrect && (
+      {!wasCorrect && !isWritten && (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <AnswerTile letter={selectedAnswer} variant="incorrect" />
           <ArrowRight className="w-5 h-5 text-[hsl(var(--slate-400))]" />
