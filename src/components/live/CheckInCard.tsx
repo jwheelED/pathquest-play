@@ -92,6 +92,18 @@ export function CheckInCard({
           </div>
         )}
 
+        {/* Written answer for short-answer / coding questions */}
+        {options.length === 0 && (
+          <textarea
+            aria-label="Your answer"
+            value={selectedOption ?? ""}
+            onChange={(e) => onSelectOption(e.target.value)}
+            placeholder={qc.type === "coding" ? "Write your code here…" : "Type your answer…"}
+            rows={qc.type === "coding" ? 8 : 4}
+            className={`w-full rounded-[var(--radius-lg)] border border-[hsl(var(--slate-200))] bg-white p-3 text-sm text-[hsl(var(--ink))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] ${qc.type === "coding" ? "font-mono" : ""}`}
+          />
+        )}
+
         {/* Divider */}
         <div className="w-full h-px bg-[hsl(var(--slate-200))]" />
 

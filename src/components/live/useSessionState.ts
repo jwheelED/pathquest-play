@@ -309,6 +309,7 @@ export function useSessionState(sessionCode: string | undefined) {
 
   return {
     phase,
+    notFound,
     sessionId,
     sessionTitle,
     participantId,
