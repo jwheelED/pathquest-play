@@ -25,7 +25,7 @@ export function CheckInCard({
 }: CheckInCardProps) {
   const qc = question.question_content;
   const options = qc.options || [];
-  const canSubmit = selectedOption !== null && confidence !== null;
+  const canSubmit = !!selectedOption && selectedOption.trim() !== "" && confidence !== null;
   const timerStr = `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, "0")}`;
 
   return (
