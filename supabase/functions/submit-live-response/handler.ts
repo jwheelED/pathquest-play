@@ -22,9 +22,19 @@ interface QuestionContent {
   questions?: Array<{ question?: string; type?: string; options?: string[]; correctAnswer?: string }>;
 }
 
+/** AI grade at or above this counts a written answer as correct. */
+export const PASSING_GRADE = 70;
+
+export type WrittenGrader = (input: {
+  question: string;
+  expectedAnswer: string;
+  answer: string;
+  questionType: string;
+}) => Promise<{ grade: number; feedback: string } | null>;
+
 export async function handleSubmit(
   body: SubmitBody | null,
-  deps: { supabase: SupabaseLike },
+  deps: { supabase: SupabaseLike; grade?: WrittenGrader },
 ): Promise<HandlerResult> {
   const { supabase } = deps;
   const { questionId, participantId, answer, confidenceLevel, responseTimeMs } = body ?? {};
@@ -73,7 +83,27 @@ export async function handleSubmit(
 
   const normalizedStudentAnswer = normalizeAnswer(answer!.toString().trim(), questionType, options);
   const normalizedCorrectAnswer = normalizeAnswer(correctAnswer, questionType, options);
-  const isCorrect = normalizedStudentAnswer.toUpperCase() === normalizedCorrectAnswer.toUpperCase();
+  let isCorrect = normalizedStudentAnswer.toUpperCase() === normalizedCorrectAnswer.toUpperCase();
+
+  // Written answers (short answer / coding) go through the AI grader.
+  let aiGrade: number | null = null;
+  let aiFeedback: string | null = null;
+  const isWritten = questionType === "short_answer" || questionType === "coding";
+  if (isWritten && normalizedStudentAnswer && deps.grade) {
+    const questionText = questionContent.questions?.[0]?.question || questionContent.question || "";
+    const result = await deps.grade({
+      question: questionText,
+      expectedAnswer: correctAnswer,
+      answer: normalizedStudentAnswer,
+      questionType,
+    });
+    if (result) {
+      aiGrade = result.grade;
+      aiFeedback = result.feedback;
+      isCorrect = result.grade >= PASSING_GRADE;
+    }
+  }
+
   const { points, multiplier } = calculatePoints(isCorrect, confidenceLevel ?? null);
 
   // Exactly-once: existence check (the DB unique constraint is the real guard).
