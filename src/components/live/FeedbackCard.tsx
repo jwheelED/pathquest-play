@@ -50,8 +50,6 @@ export function FeedbackCard({ feedback, onDismiss }: FeedbackCardProps) {
       {isWritten && typeof aiGrade !== "number" && (
         <p className="text-sm text-[hsl(var(--text-muted-live))]">Grading delayed — your instructor will review your answer.</p>
       )}
-      <div className="hidden">
-      </div>
 
       {/* Answer comparison */}
       {!wasCorrect && !isWritten && (
