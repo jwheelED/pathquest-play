@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/colors.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/typography.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/effects.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/base.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/tokens/landing.css">
+<link rel="stylesheet" href="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/styles.css">
+<script src="_ds/edvana-design-system-5bb0a001-843f-4886-ad8d-b0394ef023e4/_ds_bundle.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+body{margin:0;background:#ecebe6;font-family:var(--font-sans);color:hsl(var(--text-body))}
+a{color:hsl(var(--emerald-700))}a:hover{color:hsl(var(--emerald-800))}
+@keyframes edv-breathe{0%,100%{transform:scale(.94);opacity:.75}50%{transform:scale(1.04);opacity:1}}
+@keyframes edv-wave{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@keyframes edv-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes edv-drift{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-18px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+i[data-lucide],svg.lucide{width:16px;height:16px;flex:none}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}
+.dv-group{font:600 11px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(0,0,0,.45);margin:36px 0 14px}
+.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.6)}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:28px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.5)}
+.dv-notes{max-width:900px;font:13px/1.6 system-ui,sans-serif;color:rgba(0,0,0,.65);margin:0 0 4px}
+</style>
+</helmet>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Edvana Live — student laptop, auto check-in mode</span></div>
+<p class="dv-notes"><b style="font-weight:600;color:#1a1a1a">Now animated:</b> every screen loops its own sequence: the check-in arrives, the generated image resolves from a blur, answers and confidence get picked, feedback reveals, and the "Lost me" confirmation runs. You can turn motion off or change the loop length in Tweaks.<br>Translated the docx concepts (dark purple) into Edvana's light emerald system. Decisions from your form: desktop browser · generated image as a full-width banner above the question (illustration by default, diagram when needed) · confidence in the same card as the answer · "Lost me" in the bottom bar next to "I'm following" with a quiet anonymous confirmation · auto timing shown only as a subtle "listening" status. Course images are cropped from your docx as stand-ins for generated art.</p>
+
+<div class="dv-group">01 · Listening (between auto check-ins)</div>
+<div class="dv-opts">
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Breathing spiral — the mark at the center, rings breathe slowly</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--surface-app));position:relative;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);backdrop-filter:blur(16px);border-bottom:var(--card-border);position:relative;z-index:2">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  <div style="position:absolute;inset:0;background:var(--gradient-mesh);pointer-events:none"></div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;position:relative">
+   {{ rings }}
+   <div style="text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center">
+    <div style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--emerald-700))">Edvana Live</div>
+    <div style="font-size:34px;font-weight:700;letter-spacing:-.025em;line-height:1.1">Listening with your class</div>
+    <div style="font-size:15px;color:hsl(var(--text-muted));max-width:420px;line-height:1.6;text-wrap:pretty">Following the lecture and looking for a moment worth checking. You'll see it here.</div>
+   </div>
+   <div style="display:flex;gap:8px">
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9999px;background:hsl(var(--white));border:var(--card-border);font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="audio-lines" style="color:hsl(var(--emerald-600))"></i>Following the lecture</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9999px;background:hsl(var(--white));border:var(--card-border);font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="layers" style="color:hsl(var(--emerald-600))"></i>Finding key concepts</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9999px;background:hsl(var(--emerald-50));border:1px solid hsl(var(--emerald-100));font-size:12px;color:hsl(var(--emerald-700));font-weight:500">{{ pulse }}Preparing a check-in</span>
+   </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;background:hsl(var(--white) / .85);backdrop-filter:blur(16px);border-top:var(--card-border);position:relative">
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer" style-hover="background:hsl(var(--slate-50));border-color:hsl(var(--slate-300))"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer" style-hover="background:hsl(var(--slate-100))"><i data-lucide="check"></i>I'm following</button>
+   <span style="position:absolute;right:24px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-subtle))"><i data-lucide="shield" style="width:14px;height:14px"></i>Always anonymous</span>
+  </div>
+ </div>
+</div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Topic thread — editorial, shows what's being discussed with a live listening wave</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--white));position:relative;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);backdrop-filter:blur(16px);border-bottom:var(--card-border);position:relative;z-index:2">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  {{ glow }}
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 96px;gap:22px;position:relative">
+   <div style="display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--emerald-700))">{{ pulse }}Now discussing</div>
+   <div style="font-size:56px;font-weight:700;letter-spacing:-.03em;line-height:1.04;max-width:720px">The Frank-Starling mechanism</div>
+   <div style="font-size:17px;color:hsl(var(--text-muted));max-width:520px;line-height:1.6;text-wrap:pretty">Edvana is listening alongside you. When there's something worth checking, a short question will appear — no need to do anything until then.</div>
+   <div style="margin-top:18px">{{ wave }}</div>
+   <div style="display:flex;gap:28px;font-size:13px;color:hsl(var(--text-subtle))"><span>Earlier: venous return</span><span>Earlier: end-diastolic volume</span></div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;background:hsl(var(--white) / .85);backdrop-filter:blur(16px);border-top:var(--card-border);position:relative">
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer" style-hover="background:hsl(var(--slate-50))"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer" style-hover="background:hsl(var(--slate-100))"><i data-lucide="check"></i>I'm following</button>
+   <span style="position:absolute;right:24px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-subtle))"><i data-lucide="shield" style="width:14px;height:14px"></i>Always anonymous</span>
+  </div>
+ </div>
+</div></div>
+</div>
+
+<div class="dv-group">02 · Auto check-in with generated image + confidence</div>
+<div class="dv-opts">
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>By the book — banner inside the card, 2×2 answers, confidence row beside submit</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--surface-app));overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);backdrop-filter:blur(16px);border-bottom:var(--card-border)">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  <div style="flex:1;display:flex;justify-content:center;padding:22px 24px;overflow:hidden">
+   <div data-a="rise" data-d="0" style="width:100%;max-width:780px;background:hsl(var(--white));border:var(--card-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-md);overflow:hidden;display:flex;flex-direction:column">
+    <div style="position:relative;height:168px;flex:none;overflow:hidden">
+     <img src="assets/gen-heart.png" data-a="gen" data-d="0.04" alt="Generated illustration of the heart and great vessels" style="width:100%;height:100%;object-fit:cover;display:block">
+     <span data-a="genlabel" data-d="0.16" style="position:absolute;left:14px;bottom:12px;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:9999px;background:hsl(var(--white) / .9);backdrop-filter:blur(12px);font-size:11px;font-weight:600;color:hsl(var(--text-muted))"><i data-lucide="wand-sparkles" style="width:13px;height:13px;color:hsl(var(--emerald-600))"></i>Drawing from the last few minutes…</span>
+     <span data-a="fade" data-d="0.17" style="position:absolute;left:14px;bottom:12px;display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:9999px;background:hsl(var(--white) / .9);backdrop-filter:blur(12px);font-size:11px;font-weight:600;color:hsl(var(--text-body))"><i data-lucide="sparkles" style="width:13px;height:13px;color:hsl(var(--emerald-600))"></i>Generated for this check-in</span>
+    </div>
+    <div style="padding:20px 28px 22px;display:flex;flex-direction:column;gap:14px">
+     <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--emerald-700))">Prediction</span>
+      <span style="font-size:12px;color:hsl(var(--text-subtle))">From the last few minutes</span>
+      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font:500 13px var(--font-mono);color:hsl(var(--text-muted));padding:4px 10px;border-radius:9999px;background:hsl(var(--slate-100))"><i data-lucide="timer" style="width:14px;height:14px"></i><span data-countdown="25" data-d="0.18">0:25</span></span>
+     </div>
+     <div>
+      <div data-a="rise" data-d="0.18" style="font-size:22px;font-weight:600;letter-spacing:-.015em;line-height:1.3">What happens to stroke volume when venous return increases?</div>
+      <div data-a="fade" data-d="0.21" style="font-size:14px;color:hsl(var(--text-muted));margin-top:4px">Assume all other factors stay constant on a normal Frank-Starling curve.</div>
+     </div>
+     <div data-a="stagger" data-d="0.24" data-pick="2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="A" hint-size="100%,52px">Decreases</x-import>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="B" hint-size="100%,52px">Remains the same</x-import>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="C" state="selected" hint-size="100%,52px">Increases</x-import>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="D" hint-size="100%,52px">First increases, then decreases</x-import>
+     </div>
+     <div style="height:1px;background:hsl(var(--border))"></div>
+     <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:14px;font-weight:600;white-space:nowrap">How sure are you?</div>
+      <div data-a="stagger" data-d="0.40" data-pick="2" style="display:flex;gap:6px;flex:1">
+       <button style="flex:1;height:44px;border-radius:12px;border:1px solid hsl(var(--border));background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 12px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><span style="display:flex;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span></span>Not sure</button>
+       <button style="flex:1;height:44px;border-radius:12px;border:1px solid hsl(var(--border));background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 12px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><span style="display:flex;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span></span>Think so</button>
+       <button style="flex:1;height:44px;border-radius:12px;border:2px solid hsl(var(--primary));background:hsl(var(--primary) / .06);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:600 12px var(--font-sans);color:hsl(var(--emerald-800));cursor:pointer"><span style="display:flex;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--primary))"></span><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--primary))"></span><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--primary))"></span></span>Confident</button>
+       <button style="flex:1;height:44px;border-radius:12px;border:1px solid hsl(var(--border));background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 12px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><span style="display:flex;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span><span style="width:5px;height:5px;border-radius:50%;background:hsl(var(--slate-400))"></span></span>Certain</button>
+      </div>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Button" hint-size="140px,44px"><i data-lucide="send"></i>Submit</x-import>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;background:hsl(var(--white) / .85);border-top:var(--card-border);position:relative">
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><i data-lucide="check"></i>I'm following</button>
+   <span style="position:absolute;right:24px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-subtle))"><i data-lucide="shield" style="width:14px;height:14px"></i>Always anonymous</span>
+  </div>
+ </div>
+</div></div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Full-bleed — image spans the page, question card overlaps it; answers stacked, confidence as a 4-step scale</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--surface-app));overflow:hidden;position:relative">
+  <img src="assets/gen-heart.png" data-a="gen" data-d="0.02" alt="Generated illustration of the heart" style="position:absolute;left:0;right:0;top:0;width:100%;height:300px;object-fit:cover">
+  <div style="position:absolute;left:0;right:0;top:180px;height:120px;background:linear-gradient(180deg,transparent,hsl(var(--canvas-warm)))"></div>
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .8);backdrop-filter:blur(16px);border-bottom:1px solid hsl(var(--white) / .5);position:relative">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  <div style="flex:1;display:flex;justify-content:center;padding:96px 24px 0;position:relative;overflow:hidden">
+   <div data-a="rise" data-d="0.14" style="width:100%;max-width:640px;background:hsl(var(--white) / .96);backdrop-filter:blur(24px);border:var(--card-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-hero);padding:24px 28px;display:flex;flex-direction:column;gap:14px;align-self:flex-start">
+    <div style="display:flex;align-items:center;gap:10px">
+     <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;background:hsl(var(--emerald-50));border:1px solid hsl(var(--emerald-100));font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:hsl(var(--emerald-700))"><i data-lucide="sparkles" style="width:12px;height:12px"></i>Prediction</span>
+     <span style="font-size:12px;color:hsl(var(--text-subtle))">Image drawn from what Prof. Mitchell just described</span>
+     <span style="margin-left:auto;font:500 13px var(--font-mono);color:hsl(var(--text-muted))"><span data-countdown="25" data-d="0.14">0:25</span></span>
+    </div>
+    <div style="font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:1.25">What happens to stroke volume when venous return increases?</div>
+    <div data-a="stagger" data-d="0.24" data-pick="2" style="display:flex;flex-direction:column;gap:8px">
+     <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="A" hint-size="100%,50px">Decreases</x-import>
+     <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="B" hint-size="100%,50px">Remains the same</x-import>
+     <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="C" state="selected" hint-size="100%,50px">Increases</x-import>
+     <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="D" hint-size="100%,50px">First increases, then decreases</x-import>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding-top:4px">
+     <div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:600">How sure are you?</span><span data-a="fade" data-d="0.5" style="color:hsl(var(--emerald-700));font-weight:600">Confident</span></div>
+     <div style="position:relative;height:28px;display:flex;align-items:center">
+      <div style="position:absolute;left:0;right:0;height:6px;border-radius:9999px;background:hsl(var(--slate-100))"></div>
+      <div data-a="fill" data-d="0.42" data-s="0.1" style="position:absolute;left:0;width:66.6%;height:6px;border-radius:9999px;background:var(--gradient-primary)"></div>
+      <div style="position:absolute;left:0;right:0;display:flex;justify-content:space-between">
+       <span style="width:14px;height:14px;border-radius:50%;background:hsl(var(--primary));border:3px solid #fff;box-shadow:var(--shadow-sm)"></span>
+       <span style="width:14px;height:14px;border-radius:50%;background:hsl(var(--primary));border:3px solid #fff;box-shadow:var(--shadow-sm)"></span>
+       <span data-a="pop" data-d="0.5" style="width:22px;height:22px;margin-top:-4px;border-radius:50%;background:hsl(var(--primary));border:4px solid #fff;box-shadow:var(--shadow-md)"></span>
+       <span style="width:14px;height:14px;border-radius:50%;background:hsl(var(--slate-200));border:3px solid #fff"></span>
+      </div>
+     </div>
+     <div style="display:flex;justify-content:space-between;font-size:12px;color:hsl(var(--text-subtle))"><span>Not sure</span><span>Think so</span><span>Confident</span><span>Certain</span></div>
+    </div>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Button" style="width:100%" hint-size="100%,44px">Submit answer and confidence</x-import>
+   </div>
+   <div data-a="fade" data-d="0.3" style="position:absolute;right:28px;bottom:20px;display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+    <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 20px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));box-shadow:var(--shadow-md);font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer"><i data-lucide="circle-help"></i>Lost me</button>
+    <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 20px;border-radius:9999px;border:1px solid transparent;background:hsl(var(--white) / .7);font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><i data-lucide="check"></i>I'm following</button>
+   </div>
+  </div>
+ </div>
+</div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Diagram mode — when the concept needs a figure; shows the lecture moment it came from</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--surface-app));overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);border-bottom:var(--card-border)">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  <div style="flex:1;display:flex;justify-content:center;padding:22px 24px;overflow:hidden">
+   <div style="width:100%;max-width:820px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:12px;height:190px">
+     <div data-a="gen" data-d="0.02" style="border-radius:var(--radius-lg);border:1.5px dashed hsl(var(--emerald-300));background:hsl(var(--emerald-50));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:hsl(var(--emerald-700))">
+      <i data-lucide="line-chart" style="width:24px;height:24px"></i>
+      <div style="font-size:14px;font-weight:600">Generated diagram</div>
+      <div style="font-size:12px;color:hsl(var(--text-muted))">Frank-Starling curve · stroke volume vs. preload, point marked</div>
+     </div>
+     <div data-a="rise" data-d="0.08" style="border-radius:var(--radius-lg);background:hsl(var(--white));border:var(--card-border);padding:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle))"><i data-lucide="quote" style="width:13px;height:13px"></i>From the lecture · 2 min ago</div>
+      <div style="font-size:14px;line-height:1.55;color:hsl(var(--text-body));text-wrap:pretty">"…when the ventricle fills more, the fibers stretch, and the next contraction is stronger."</div>
+     </div>
+    </div>
+    <div data-a="rise" data-d="0.16" style="background:hsl(var(--white));border:var(--card-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-sm);padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+     <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--sky-600))">Application</span>
+      <span style="margin-left:auto;font:500 13px var(--font-mono);color:hsl(var(--text-muted))"><span data-countdown="40" data-d="0.16">0:40</span></span>
+     </div>
+     <div style="font-size:20px;font-weight:600;letter-spacing:-.015em;line-height:1.35;text-wrap:pretty">A patient receives a rapid IV fluid bolus. With afterload and heart rate unchanged, where on the curve do they move?</div>
+     <div data-a="stagger" data-d="0.24" data-pick="2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="A" hint-size="100%,50px">Down and left</x-import>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="B" hint-size="100%,50px">Stays at the same point</x-import>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="C" state="selected" hint-size="100%,50px">Up and right along the curve</x-import>
+      <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.McqOption" label="D" hint-size="100%,50px">Onto a lower curve</x-import>
+     </div>
+     <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:hsl(var(--slate-50))">
+      <span style="font-size:13px;font-weight:600">Then, how sure?</span>
+      <div data-a="stagger" data-d="0.42" data-pick="3" style="display:flex;gap:6px">
+       <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Not sure</span>
+       <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Think so</span>
+       <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Confident</span>
+       <span style="padding:7px 12px;border-radius:9999px;background:hsl(var(--primary));color:#fff;font-size:12px;font-weight:600">Certain</span>
+      </div>
+      <div style="margin-left:auto"><x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Button" size="sm" hint-size="100px,36px">Submit</x-import></div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;background:hsl(var(--white) / .85);border-top:var(--card-border);position:relative">
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><i data-lucide="check"></i>I'm following</button>
+   <span style="position:absolute;right:24px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-subtle))"><i data-lucide="shield" style="width:14px;height:14px"></i>Always anonymous</span>
+  </div>
+ </div>
+</div></div>
+</div>
+
+<div class="dv-group">03 · Personal misconception feedback</div>
+<div class="dv-opts">
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Calm tutor — your answer → correct answer, two-sentence why, "you weren't alone"</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--surface-app));overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);border-bottom:var(--card-border)">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  <div style="flex:1;display:flex;justify-content:center;padding:32px 24px;overflow:hidden">
+   <div data-a="rise" data-d="0" style="width:100%;max-width:720px;background:hsl(var(--white));border:var(--card-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-md);padding:30px 32px;display:flex;flex-direction:column;gap:20px;align-self:flex-start">
+    <div style="display:flex;flex-direction:column;gap:6px">
+     <div style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--text-subtle))">Your response</div>
+     <div data-a="rise" data-d="0.05" style="font-size:32px;font-weight:700;letter-spacing:-.025em;line-height:1.1">You found a <span style="color:hsl(var(--emerald-600))">misconception.</span></div>
+     <div style="font-size:15px;color:hsl(var(--text-muted))">You chose B and marked Certain. The answer is C.</div>
+    </div>
+    <div data-a="stagger" data-d="0.14" style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center">
+     <div style="padding:14px 16px;border-radius:var(--radius-lg);border:1px solid hsl(var(--border));display:flex;align-items:center;gap:12px">
+      <span style="width:30px;height:30px;border-radius:50%;background:hsl(var(--slate-200));color:hsl(var(--text-body));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">B</span>
+      <div><div style="font-size:12px;color:hsl(var(--text-subtle))">Your answer · Certain</div><div style="font-size:15px;font-weight:600">Remains the same</div></div>
+     </div>
+     <i data-lucide="arrow-right" style="color:hsl(var(--slate-400))"></i>
+     <div style="padding:13px 15px;border-radius:var(--radius-lg);border:2px solid hsl(var(--primary));background:hsl(var(--primary) / .06);display:flex;align-items:center;gap:12px">
+      <span style="width:30px;height:30px;border-radius:50%;background:hsl(var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">C</span>
+      <div><div style="font-size:12px;color:hsl(var(--emerald-700))">Correct answer</div><div style="font-size:15px;font-weight:600;color:hsl(var(--emerald-800))">Increases</div></div>
+     </div>
+    </div>
+    <div data-a="rise" data-d="0.30" style="padding:18px 20px;border-radius:var(--radius-lg);background:hsl(var(--slate-50));display:flex;gap:14px">
+     <i data-lucide="lightbulb" style="width:18px;height:18px;color:hsl(var(--amber-strong));margin-top:2px"></i>
+     <div><div style="font-size:15px;font-weight:600;margin-bottom:4px">Why B felt right</div><div style="font-size:14px;line-height:1.65;color:hsl(var(--text-muted));text-wrap:pretty">It's natural to think the heart pumps a fixed amount. But more venous return stretches the ventricle, and on the Frank-Starling curve a stretched muscle contracts harder — so stroke volume rises.</div></div>
+    </div>
+    <div data-a="rise" data-d="0.42" style="display:flex;align-items:center;gap:12px;padding-top:4px;border-top:1px solid hsl(var(--border));padding-top:16px">
+     <i data-lucide="users" style="color:hsl(var(--sky-500))"></i>
+     <div style="font-size:14px"><b style="font-weight:600">You weren't alone.</b> <span style="color:hsl(var(--text-muted))">43% of the class made the same distinction.</span></div>
+     <span style="margin-left:auto;font-size:13px;color:hsl(var(--text-subtle))">Prof. Mitchell sees this too</span>
+    </div>
+   </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;background:hsl(var(--white) / .85);border-top:var(--card-border);position:relative">
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><i data-lucide="check"></i>I'm following</button>
+   <span style="position:absolute;right:24px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-subtle))"><i data-lucide="shield" style="width:14px;height:14px"></i>Always anonymous</span>
+  </div>
+ </div>
+</div></div>
+
+<div class="dv-opt" id="1g"><div class="dv-olabel"><a class="dv-oid" href="#1g">1g</a>Thinking mirror — confidence × correctness grid shows where you landed; warmer copy</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--white));overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);border-bottom:var(--card-border)">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-muted))"><i data-lucide="users"></i>142 in the room</span>
+    <x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="live" hint-size="90px,24px">Class is live</x-import>
+   </div>
+  </div>
+  <div style="flex:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:48px;padding:48px 72px;align-items:center;overflow:hidden">
+   <div data-a="stagger" data-d="0.02" style="display:flex;flex-direction:column;gap:18px">
+    <img src="assets/gen-heart.png" alt="" style="width:100%;height:110px;object-fit:cover;border-radius:var(--radius-lg)">
+    <div style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--emerald-700))">Check-in 3 · your thinking</div>
+    <div style="font-size:38px;font-weight:700;letter-spacing:-.03em;line-height:1.08;text-wrap:pretty">Your certainty just taught you something.</div>
+    <div style="font-size:15px;line-height:1.7;color:hsl(var(--text-muted));text-wrap:pretty">You were sure stroke volume stays the same. It actually increases: more filling stretches the ventricle, and a stretched muscle contracts harder. That's the Frank-Starling link worth holding onto.</div>
+    <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:hsl(var(--text-muted))"><i data-lucide="users" style="color:hsl(var(--sky-500))"></i>43% of the room landed in the same square.</div>
+   </div>
+   <div style="display:flex;flex-direction:column;gap:10px">
+    <div data-a="stagger" data-d="0.22" data-pick="5" style="display:grid;grid-template-columns:28px 1fr 1fr;grid-template-rows:auto 1fr 1fr;gap:8px">
+     <span></span>
+     <span style="font-size:12px;font-weight:600;color:hsl(var(--text-subtle));text-align:center">Correct</span>
+     <span style="font-size:12px;font-weight:600;color:hsl(var(--text-subtle));text-align:center">Not yet</span>
+     <span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;font-weight:600;color:hsl(var(--text-subtle));text-align:center">Sure</span>
+     <div style="height:130px;border-radius:var(--radius-lg);background:hsl(var(--slate-50));border:var(--card-border);padding:14px;display:flex;flex-direction:column;justify-content:flex-end"><div style="font-size:14px;font-weight:600;color:hsl(var(--text-muted))">Solid</div><div style="font-size:12px;color:hsl(var(--text-subtle))">You knew it, and knew you knew it.</div></div>
+     <div style="height:130px;border-radius:var(--radius-lg);background:hsl(var(--emerald-50));border:2px solid hsl(var(--primary));padding:13px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--shadow-glow)"><span style="align-self:flex-start;font-size:11px;font-weight:600;padding:3px 9px;border-radius:9999px;background:hsl(var(--primary));color:#fff">You · B, Certain</span><div><div style="font-size:14px;font-weight:600;color:hsl(var(--emerald-800))">Misconception found</div><div style="font-size:12px;color:hsl(var(--emerald-700))">The most valuable square to land in.</div></div></div>
+     <span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;font-weight:600;color:hsl(var(--text-subtle));text-align:center">Unsure</span>
+     <div style="height:130px;border-radius:var(--radius-lg);background:hsl(var(--slate-50));border:var(--card-border);padding:14px;display:flex;flex-direction:column;justify-content:flex-end"><div style="font-size:14px;font-weight:600;color:hsl(var(--text-muted))">Knew more than you thought</div></div>
+     <div style="height:130px;border-radius:var(--radius-lg);background:hsl(var(--slate-50));border:var(--card-border);padding:14px;display:flex;flex-direction:column;justify-content:flex-end"><div style="font-size:14px;font-weight:600;color:hsl(var(--text-muted))">Still forming</div></div>
+    </div>
+    <div style="font-size:13px;color:hsl(var(--text-subtle));text-align:center;margin-top:6px">Waiting for Prof. Mitchell to walk through it…</div>
+   </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 24px;background:hsl(var(--white) / .85);border-top:var(--card-border);position:relative">
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body));cursor:pointer"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted));cursor:pointer"><i data-lucide="check"></i>I'm following</button>
+   <span style="position:absolute;right:24px;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:hsl(var(--text-subtle))"><i data-lucide="shield" style="width:14px;height:14px"></i>Always anonymous</span>
+  </div>
+ </div>
+</div></div>
+</div>
+
+<div class="dv-group">04 · "Lost me" — bottom bar, idle → after tap (quiet, anonymous)</div>
+<div class="dv-opts">
+<div class="dv-opt" id="1h"><div class="dv-olabel"><a class="dv-oid" href="#1h">1h</a>Paired pills — the tapped pill itself becomes the confirmation, then resets</div>
+<div class="dv-card" style="width:1120px;display:grid;grid-template-columns:1fr 1fr">
+ <div style="background:hsl(var(--surface-app));display:flex;flex-direction:column;border-right:1px solid hsl(var(--border))">
+  <div style="padding:14px 20px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle));height:80px">Idle</div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 20px;background:hsl(var(--white) / .85);border-top:var(--card-border)">
+   <button data-a="press" data-d="0.08" style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--border));background:hsl(var(--white));font:600 14px var(--font-sans);color:hsl(var(--text-body))"><i data-lucide="circle-help"></i>Lost me</button>
+   <button style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid transparent;background:transparent;font:600 14px var(--font-sans);color:hsl(var(--text-muted))"><i data-lucide="check"></i>I'm following</button>
+  </div>
+ </div>
+ <div style="background:hsl(var(--surface-app));display:flex;flex-direction:column">
+  <div style="padding:14px 20px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle));height:80px">After tap · ~4s, then resets</div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 20px;background:hsl(var(--white) / .85);border-top:var(--card-border)">
+   <button data-a="pop" data-d="0.14" style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 22px;border-radius:9999px;border:1px solid hsl(var(--sky-100));background:hsl(var(--sky-50));font:600 14px var(--font-sans);color:hsl(var(--sky-600))"><i data-lucide="check-circle-2"></i>Sent anonymously</button>
+   <span data-a="fade" data-d="0.2" style="font-size:13px;color:hsl(var(--text-muted))">Prof. Mitchell sees the room, never your name.</span>
+  </div>
+ </div>
+</div></div>
+
+<div class="dv-opt" id="1i"><div class="dv-olabel"><a class="dv-oid" href="#1i">1i</a>Segmented switch — one control, two states; a small note rises above it</div>
+<div class="dv-card" style="width:1120px;display:grid;grid-template-columns:1fr 1fr">
+ <div style="background:hsl(var(--surface-app));display:flex;flex-direction:column;border-right:1px solid hsl(var(--border))">
+  <div style="padding:14px 20px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle));height:80px">Idle</div>
+  <div style="display:flex;align-items:center;justify-content:center;padding:14px 20px;background:hsl(var(--white) / .85);border-top:var(--card-border)">
+   <div style="display:flex;padding:4px;gap:4px;border-radius:9999px;background:hsl(var(--slate-100))">
+    <span style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 20px;border-radius:9999px;font:600 14px var(--font-sans);color:hsl(var(--text-muted))"><i data-lucide="circle-help"></i>Lost me</span>
+    <span style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 20px;border-radius:9999px;background:#fff;box-shadow:var(--shadow-sm);font:600 14px var(--font-sans);color:hsl(var(--emerald-700))"><i data-lucide="check"></i>I'm following</span>
+   </div>
+  </div>
+ </div>
+ <div style="background:hsl(var(--surface-app));display:flex;flex-direction:column">
+  <div style="padding:14px 20px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle));height:80px;position:relative">After tap
+   <div data-a="fade" data-d="0.18" style="position:absolute;left:50%;bottom:8px;transform:translateX(-50%);display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;background:hsl(var(--ink));color:#fff;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;white-space:nowrap;box-shadow:var(--shadow-lg)"><i data-lucide="shield-check" style="width:15px;height:15px;color:hsl(var(--emerald-300))"></i>Noted, anonymously. You can switch back anytime.</div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;padding:14px 20px;background:hsl(var(--white) / .85);border-top:var(--card-border)">
+   <div style="display:flex;padding:4px;gap:4px;border-radius:9999px;background:hsl(var(--slate-100))">
+    <span data-a="press" data-d="0.1" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 20px;border-radius:9999px;background:#fff;box-shadow:var(--shadow-sm);font:600 14px var(--font-sans);color:hsl(var(--sky-600))"><i data-lucide="circle-help"></i>Lost me</span>
+    <span style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 20px;border-radius:9999px;font:600 14px var(--font-sans);color:hsl(var(--text-muted))"><i data-lucide="check"></i>I'm following</span>
+   </div>
+  </div>
+ </div>
+</div></div>
+
+<div class="dv-opt" id="1j"><div class="dv-olabel"><a class="dv-oid" href="#1j">1j</a>Whisper — small text buttons at the edge; a hairline fills while the signal stays active</div>
+<div class="dv-card" style="width:1120px;display:grid;grid-template-columns:1fr 1fr">
+ <div style="background:hsl(var(--surface-app));display:flex;flex-direction:column;border-right:1px solid hsl(var(--border))">
+  <div style="padding:14px 20px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle));height:80px">Idle</div>
+  <div style="display:flex;align-items:center;gap:6px;padding:10px 20px;background:hsl(var(--white) / .85);border-top:var(--card-border)">
+   <span style="font-size:12px;color:hsl(var(--text-subtle));display:inline-flex;align-items:center;gap:6px">{{ pulse }}Listening with your class</span>
+   <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 14px;border-radius:9999px;font:500 13px var(--font-sans);color:hsl(var(--text-muted))"><i data-lucide="check" style="width:14px;height:14px"></i>Following</span>
+   <span style="display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 14px;border-radius:9999px;font:600 13px var(--font-sans);color:hsl(var(--text-body));background:hsl(var(--slate-100))"><i data-lucide="circle-help" style="width:14px;height:14px"></i>Lost me</span>
+  </div>
+ </div>
+ <div style="background:hsl(var(--surface-app));display:flex;flex-direction:column">
+  <div style="padding:14px 20px;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:hsl(var(--text-subtle));height:80px">After tap · active for 60s</div>
+  <div style="position:relative;display:flex;align-items:center;gap:6px;padding:10px 20px;background:hsl(var(--white) / .85);border-top:var(--card-border)">
+   <span data-a="fill" data-d="0.1" data-s="0.8" style="position:absolute;left:0;top:-1px;height:2px;width:100%;background:hsl(var(--sky-400))"></span>
+   <span data-a="fade" data-d="0.06" style="font-size:13px;color:hsl(var(--sky-600));display:inline-flex;align-items:center;gap:6px;font-weight:500"><i data-lucide="shield-check" style="width:15px;height:15px"></i>Your signal is in — anonymous</span>
+   <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 14px;border-radius:9999px;font:500 13px var(--font-sans);color:hsl(var(--text-muted))">Undo</span>
+  </div>
+ </div>
+</div></div>
+</div>
+
+<div class="dv-group">05 · After-class recap</div>
+<div class="dv-opts">
+<div class="dv-opt" id="1k"><div class="dv-olabel"><a class="dv-oid" href="#1k">1k</a>What changed today — understanding over time, survey tucked at the bottom</div>
+<div class="dv-card" style="width:1120px">
+ <div style="height:36px;display:flex;align-items:center;gap:7px;padding:0 14px;background:hsl(var(--slate-100));border-bottom:1px solid hsl(var(--border))"><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><span style="width:10px;height:10px;border-radius:50%;background:hsl(var(--slate-300))"></span><div style="margin-left:14px;width:360px;height:22px;border-radius:9999px;background:#fff;display:flex;align-items:center;padding:0 12px;font:12px var(--font-mono);color:hsl(var(--text-subtle))">edvana.dev/live/482913/recap</div></div>
+ <div style="height:740px;display:flex;flex-direction:column;background:hsl(var(--surface-app));overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 24px;background:hsl(var(--white) / .85);border-bottom:var(--card-border)">
+   <img src="assets/edvana-logo-wide.png" alt="Edvana" style="height:22px;width:auto">
+   <span style="width:1px;height:24px;background:hsl(var(--border))"></span>
+   <img src="assets/course-thumb.png" alt="" style="width:36px;height:36px;border-radius:10px;object-fit:cover">
+   <div><div style="font-size:15px;font-weight:600;letter-spacing:-.01em">Cardiovascular Physiology</div><div style="font-size:12px;color:hsl(var(--text-muted))">BIO 301 · Prof. Mitchell</div></div>
+   <div style="margin-left:auto"><x-import component-from-global-scope="EdvanaDesignSystem_5bb0a0.Badge" variant="outline" hint-size="90px,24px">Class ended · 10:50</x-import></div>
+  </div>
+  <div style="flex:1;display:flex;justify-content:center;padding:36px 24px 24px;overflow:hidden">
+   <div style="width:100%;max-width:820px;display:flex;flex-direction:column;gap:22px">
+    <div>
+     <div style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:hsl(var(--emerald-700));margin-bottom:8px">What changed today</div>
+     <div data-a="rise" data-d="0.02" style="font-size:36px;font-weight:700;letter-spacing:-.025em;line-height:1.1">Today in Cardiac Physiology</div>
+    </div>
+    <div data-a="stagger" data-d="0.1" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+     <div style="background:#fff;border:var(--card-border);border-radius:var(--radius-lg);padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:hsl(var(--emerald-700))"><i data-lucide="check-circle-2"></i>Strong</div>
+      <div style="font-size:16px;font-weight:600">Frank-Starling mechanism · Venous return</div>
+     </div>
+     <div style="background:#fff;border:var(--card-border);border-radius:var(--radius-lg);padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:hsl(var(--sky-600))"><i data-lucide="refresh-cw"></i>Misconception corrected</div>
+      <div style="font-size:16px;font-weight:600">Preload vs. afterload</div>
+     </div>
+     <div style="background:#fff;border:var(--card-border);border-radius:var(--radius-lg);padding:20px;display:flex;align-items:center;gap:16px">
+      <div style="font-size:40px;font-weight:700;letter-spacing:-.03em;color:hsl(var(--emerald-600));line-height:1">2×</div>
+      <div><div style="font-size:16px;font-weight:600">You changed your mind correctly</div><div style="font-size:13px;color:hsl(var(--text-muted))">Second-chance questions, both right</div></div>
+     </div>
+     <div style="background:#fff;border:var(--card-border);border-radius:var(--radius-lg);padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:hsl(38 80% 32%)"><i data-lucide="bookmark"></i>Worth another look</div>
+      <div style="font-size:16px;font-weight:600">Ventricular compliance</div>
+     </div>
+    </div>
+    <div data-a="fade" data-d="0.4" style="margin-top:auto;padding:16px 20px;border-radius:var(--radius-lg);background:hsl(var(--white) / .6);border:1px dashed hsl(var(--border));display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+     <span style="font-size:13px;color:hsl(var(--text-muted))">Would you want Edvana used again next class?</span>
+     <div style="display:flex;gap:6px;margin-left:auto">
+      <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Definitely yes</span>
+      <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Probably yes</span>
+      <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Probably no</span>
+      <span style="padding:7px 12px;border-radius:9999px;border:1px solid hsl(var(--border));background:#fff;font-size:12px;color:hsl(var(--text-muted))">Definitely no</span>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div></div>
+</div>
+
+<p class="dv-next">Try next: "combine <a class="dv-oid" href="#1d">1d</a>'s full-bleed image with <a class="dv-oid" href="#1c">1c</a>'s 2×2 answers" · "use <a class="dv-oid" href="#1i">1i</a> for Lost me everywhere" · "make it a clickable prototype from <a class="dv-oid" href="#1a">1a</a> through <a class="dv-oid" href="#1k">1k</a>"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ambientMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;loopSeconds&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:10,&quot;min&quot;:6,&quot;max&quot;:20,&quot;step&quot;:1,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this.icons();
+    this._t = [0, 400, 1200, 2500, 5000].map(ms => setTimeout(() => this.motion(), ms));
+    this._cd = setInterval(() => this.tick(), 250);
+  }
+  componentDidUpdate() { this.icons(); this.motion(); }
+  componentWillUnmount() { (this._t || []).forEach(clearTimeout); clearInterval(this._cd); }
+  on() { return (this.props.ambientMotion ?? true) && !matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  D() { return (this.props.loopSeconds ?? 10) * 1000; }
+  frames(type, d, s) {
+    const end = 0.94, c = (x) => Math.min(x, end - 0.01);
+    const out = 'cubic-bezier(0.16,1,0.3,1)', spring = 'cubic-bezier(0.34,1.56,0.64,1)';
+    const seq = (hide, show, ease) => [
+      { offset: 0, ...hide }, { offset: c(d), ...hide, easing: ease || out },
+      { offset: c(d + s), ...show }, { offset: end, ...show }, { offset: 1, ...hide }];
+    switch (type) {
+      case 'fade': return seq({ opacity: 0 }, { opacity: 1 });
+      case 'pop': return seq({ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'scale(1)' }, spring);
+      case 'fill': return seq({ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }, 'cubic-bezier(0.4,0,0.2,1)');
+      case 'gen': return seq({ filter: 'blur(14px) saturate(.3)', opacity: 0.55, transform: 'scale(1.06)' },
+        { filter: 'blur(0px) saturate(1)', opacity: 1, transform: 'scale(1)' }, 'cubic-bezier(0.4,0,0.2,1)').map((k, i) => i === 2 ? { ...k, offset: c(d + 0.12) } : k);
+      case 'genlabel': return [{ offset: 0, opacity: 1 }, { offset: c(d), opacity: 1 }, { offset: c(d + 0.02), opacity: 0 }, { offset: 1, opacity: 0 }];
+      case 'press': {
+        const n = { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(16,185,129,0)' };
+        return [{ offset: 0, ...n }, { offset: c(d), ...n, easing: spring },
+          { offset: c(d + 0.025), transform: 'scale(.95)', boxShadow: '0 0 0 6px rgba(16,185,129,.22)' },
+          { offset: c(d + 0.07), ...n }, { offset: 1, ...n }];
+      }
+      default: return seq({ opacity: 0, transform: 'translateY(16px)' }, { opacity: 1, transform: 'translateY(0)' });
+    }
+  }
+  motion() {
+    const on = this.on(), D = this.D();
+    document.querySelectorAll('[data-a]').forEach(el => {
+      const type = el.dataset.a, live = el.__edvT && el.__edvT.every(t => t.isConnected) &&
+        (type !== 'stagger' || el.children.length === el.__edvT.length);
+      if (el.__edv && (!on || !live || el.__edvD !== D)) { el.__edv.forEach(a => a.cancel()); el.__edv = null; }
+      if (!on || el.__edv) return;
+      const d = +(el.dataset.d || 0), s = +(el.dataset.s || 0.07);
+      const targets = type === 'stagger' ? [...el.children] : [el];
+      if (!targets.length) return;
+      const anims = [];
+      targets.forEach((t, i) => {
+        const dd = d + (type === 'stagger' ? i * 0.035 : 0);
+        if (type === 'fill') t.style.transformOrigin = 'left center';
+        const a = t.animate(this.frames(type === 'stagger' ? 'rise' : type, dd, s), { duration: D, iterations: Infinity });
+        a.startTime = 0; anims.push(a);
+        if (type === 'stagger' && el.dataset.pick !== undefined && +el.dataset.pick === i) {
+          const p = t.animate(this.frames('press', dd + 0.1, s), { duration: D, iterations: Infinity, composite: 'add' });
+          p.startTime = 0; anims.push(p);
+        }
+      });
+      el.__edv = anims; el.__edvT = targets; el.__edvD = D;
+    });
+  }
+  tick() {
+    const on = this.on(), D = this.D(), now = document.timeline.currentTime || 0;
+    const t = (now % D) / D;
+    document.querySelectorAll('[data-countdown]').forEach(el => {
+      const n = +el.dataset.countdown, d = +(el.dataset.d || 0);
+      const r = on && t > d && t < 0.94 ? Math.max(0, n - Math.floor((t - d) * D / 1000)) : n;
+      const txt = Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0');
+      if (el.textContent !== txt) el.textContent = txt;
+    });
+  }
+  icons() {
+    const go = () => window.lucide && window.lucide.createIcons();
+    go(); setTimeout(go, 400); setTimeout(go, 1500);
+  }
+  renderVals() {
+    const h = React.createElement;
+    const motion = this.props.ambientMotion ?? true;
+    const anim = (v) => (motion ? v : 'none');
+    const rings = h('div', { style: { position: 'relative', width: 240, height: 240 } },
+      [0, 1, 2, 3].map(i => h('span', { key: i, style: {
+        position: 'absolute', inset: i * 28, borderRadius: '50%',
+        border: '1px solid hsl(var(--emerald-300) / ' + (0.6 - i * 0.1) + ')',
+        background: 'hsl(var(--emerald-100) / ' + (0.22 - i * 0.03) + ')',
+        animation: anim('edv-breathe 5s cubic-bezier(0.4,0,0.2,1) ' + (i * 0.7) + 's infinite') } })),
+      h('img', { key: 'm', src: 'assets/edvana-mark.png', alt: '', style: { position: 'absolute', left: 92, top: 92, width: 56, height: 56, borderRadius: '50%', boxShadow: 'var(--shadow-glow)' } }));
+    const wave = h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, height: 44 } },
+      Array.from({ length: 48 }, (_, i) => h('span', { key: i, style: {
+        width: 4, height: 8 + ((i * 37) % 36), borderRadius: 9999,
+        background: 'hsl(var(--emerald-' + (i % 3 === 0 ? '500' : '300') + ') / .8)',
+        transformOrigin: 'center',
+        animation: anim('edv-wave ' + (1.4 + (i % 5) * 0.25) + 's ease-in-out ' + ((i * 0.09) % 1.2) + 's infinite') } })));
+    const pulse = h('span', { style: { width: 7, height: 7, borderRadius: '50%', background: 'hsl(var(--emerald-500))', display: 'inline-block', animation: anim('edv-pulse 2s ease-in-out infinite') } });
+    const glow = h('div', { style: { position: 'absolute', right: -120, top: 60, width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, hsl(var(--emerald-100) / .7), hsl(var(--sky-100) / .25) 45%, transparent 70%)', pointerEvents: 'none', animation: anim('edv-drift 14s ease-in-out infinite') } });
+    return { rings, wave, pulse, glow };
+  }
+}
+</script>
+</body>
+</html>

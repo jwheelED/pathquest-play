@@ -77,7 +77,26 @@ export type QuestionDetectionFilter =
   | 'max_word_count'
   | 'monologue'
   | 'rhetorical'
-  | 'no_interrogative_trigger';
+  | 'no_interrogative_trigger'
+  | 'cooldown_block'
+  | 'gate_hold'
+  | 'empty_slice';
+
+/** Where in the pipeline a question candidate came from. */
+export type QuestionDetectionPath = 'trigger_capture' | 'passive' | 'manual';
+
+const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
+
+/**
+ * Mirrors detection telemetry into the browser console so the same "enhanced
+ * feedback" that lands in PostHog is visible live in dev tools. PostHog's
+ * console-log recording then captures these lines alongside the events.
+ */
+const logDetection = (label: string, payload: Record<string, unknown>) => {
+  if (!isDev) return;
+  // eslint-disable-next-line no-console
+  console.log(`📊 [posthog] ${label}`, payload);
+};
 
 /**
  * Fired whenever a live question candidate is discarded by a detection filter.
@@ -86,20 +105,61 @@ export type QuestionDetectionFilter =
  */
 export const trackQuestionDetectionDrop = (
   filter: QuestionDetectionFilter,
-  details?: { text?: string; wordCount?: number; confidence?: number },
+  details?: {
+    text?: string;
+    wordCount?: number;
+    confidence?: number;
+    path?: QuestionDetectionPath;
+    reason?: string;
+  },
 ) => {
   try {
-    posthog.capture('question_detection_drop', {
+    const payload = {
       filter,
       // Instructor speech (not student PII); truncate to keep events lean.
       text_snippet: details?.text?.slice(0, 80),
       word_count: details?.wordCount,
       confidence: details?.confidence,
-    });
+      path: details?.path,
+      reason: details?.reason,
+    };
+    posthog.capture('question_detection_drop', payload);
+    logDetection(`question_detection_drop → ${filter}`, payload);
   } catch {
     // Telemetry must never break the detection path.
   }
 };
+
+/**
+ * Fired when a question candidate survives every gate and reaches the on-deck
+ * card. Pairs with `question_detection_drop` so pickup rate is measurable.
+ */
+export const trackQuestionDetected = (
+  path: QuestionDetectionPath,
+  details?: {
+    text?: string;
+    wordCount?: number;
+    confidence?: number;
+    latencyMs?: number;
+    contextChars?: number;
+  },
+) => {
+  try {
+    const payload = {
+      path,
+      text_snippet: details?.text?.slice(0, 80),
+      word_count: details?.wordCount,
+      confidence: details?.confidence,
+      latency_ms: details?.latencyMs,
+      context_chars: details?.contextChars,
+    };
+    posthog.capture('question_detected', payload);
+    logDetection(`question_detected ← ${path}`, payload);
+  } catch {
+    // Telemetry must never break the detection path.
+  }
+};
+
 
 // ============= Error Tracking =============
 

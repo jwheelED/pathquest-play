@@ -99,6 +99,33 @@
     --shadow-xl: 0 24px 48px -8px hsl(220 25% 15% / 0.1);
     --shadow-glow: 0 0 30px hsl(var(--primary) / 0.15);
     --shadow-glow-secondary: 0 0 30px hsl(var(--secondary) / 0.15);
+    --shadow-hero: 0 24px 80px hsl(220 25% 15% / 0.08);
+
+    /* Live session tokens */
+    --radius-xl: 1rem;
+    --radius-lg: 0.75rem;
+    --surface-app: 40 20% 97%;
+    --emerald-50: 160 50% 96%;
+    --emerald-100: 160 45% 90%;
+    --emerald-300: 160 50% 65%;
+    --emerald-500: 160 84% 39%;
+    --emerald-600: 160 84% 29%;
+    --emerald-700: 160 84% 23%;
+    --emerald-800: 160 80% 17%;
+    --sky-50: 199 90% 95%;
+    --sky-100: 199 90% 88%;
+    --sky-400: 199 89% 48%;
+    --sky-500: 199 89% 42%;
+    --sky-600: 199 85% 34%;
+    --slate-50: 210 20% 98%;
+    --slate-100: 220 15% 94%;
+    --slate-200: 220 15% 88%;
+    --slate-300: 200 15% 78%;
+    --slate-400: 200 15% 58%;
+    --ink: 220 25% 15%;
+    --text-muted-live: 220 12% 45%;
+    --text-subtle: 220 10% 55%;
+    --amber-strong: 45 93% 47%;
 
     /* Animations */
     --transition-spring: cubic-bezier(0.34, 1.56, 0.64, 1);

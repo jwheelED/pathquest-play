@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
@@ -11,11 +11,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
 import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { CheckInConfidenceBreakdown } from "./CheckInConfidenceBreakdown";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Progress } from "@/components/ui/progress";
 import { distinctStudentCount, studentCompletion } from "@/lib/lectureCheckInMetrics";
@@ -31,6 +31,7 @@ interface Assignment {
   created_at: string;
   student_name?: string;
   response_time_seconds?: number | null;
+  confidence_level?: string | null;
 }
 
 interface GroupedAssignment {
@@ -52,10 +53,6 @@ export const LectureCheckInResults = () => {
     group: GroupedAssignment;
   } | null>(null);
   const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
-  const [showCharts, setShowCharts] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('lectureCheckInChartsVisibility');
-    return saved ? JSON.parse(saved) : {};
-  });
   const [questionSummaries, setQuestionSummaries] = useState<Record<string, {
     summary: string;
     trend: string;
@@ -71,10 +68,46 @@ export const LectureCheckInResults = () => {
     responseCount?: number;
   }>>({});
   const { selectedCourse } = useCourseContext();
+  const [regrading, setRegrading] = useState<string | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
-  }, [showCharts]);
+  // Re-run AI grading for submitted short answers that never got a grade.
+  const handleRegrade = async (
+    key: string,
+    questionText: string,
+    expectedAnswer: string,
+    assignments: Assignment[],
+  ) => {
+    setRegrading(key);
+    let graded = 0;
+    let failed = 0;
+    for (const a of assignments) {
+      const qs = ((a.content as { questions?: Array<{ question?: string; type?: string }> })?.questions) || [];
+      const idx = qs.findIndex((q) => q.question === questionText && q.type === 'short_answer');
+      const responses = (a.quiz_responses || {}) as Record<string, unknown>;
+      const recs = (responses._ai_recommendations || {}) as Record<string, { grade?: number }>;
+      if (!a.completed || idx < 0 || typeof recs[idx]?.grade === 'number' || a.grade !== null) continue;
+      const { data, error } = await supabase.functions.invoke('auto-grade-short-answer', {
+        body: { studentAnswer: String(responses[idx] ?? ''), expectedAnswer, question: questionText },
+      });
+      if (error || typeof data?.grade !== 'number') { failed++; continue; }
+      const { error: upErr } = await supabase
+        .from('student_assignments')
+        .update({
+          grade: data.grade,
+          quiz_responses: { ...responses, _ai_recommendations: { ...recs, [idx]: { grade: data.grade, feedback: data.feedback } } },
+          answers_released: true,
+          release_method: 'auto_grade',
+        } as never)
+        .eq('id', a.id);
+      if (upErr) failed++; else graded++;
+    }
+    setRegrading(null);
+    if (graded === 0 && failed === 0) toast.info('No ungraded answers to grade');
+    else if (failed) toast.warning(`Graded ${graded}, ${failed} failed`);
+    else toast.success(`Graded ${graded} answer${graded === 1 ? '' : 's'}`);
+    fetchResults();
+  };
+
 
   const fetchResults = useCallback(async () => {
     const {
@@ -103,7 +136,8 @@ export const LectureCheckInResults = () => {
         completed,
         created_at,
         response_time_seconds,
-        ai_summary
+        ai_summary,
+        confidence_level
       `,
       )
       .eq("instructor_id", user.id)
@@ -415,10 +449,8 @@ export const LectureCheckInResults = () => {
 
     const hasAIGrades = aiGrades.length > 0;
     
-    // For short answer with no AI grades and no expected answer, mark as manual
-    const isManualGradeShortAnswer = question.type === 'short_answer' && 
-      !hasAIGrades &&
-      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+    // Short answers without any grade yet are pending, never "incorrect"
+    const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrades;
     
     // Calculate correct count based on available data
     let correct: Assignment[] = [];
@@ -1364,6 +1396,7 @@ export const LectureCheckInResults = () => {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-5 pt-5 pb-4">
+                <CheckInConfidenceBreakdown rows={group.assignments} />
                 {group.questions.map((question, qIdx) => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
@@ -1530,41 +1563,8 @@ export const LectureCheckInResults = () => {
                           summary={questionSummaries[`${groupIdx}-${qIdx}`]}
                           questionType={question.type}
                         />
-                      ) : (
-                        /* Multiple Choice: Show toggle for visual charts */
-                        <>
-                          <div className="pt-3 flex items-center justify-between border-t">
-                            <div className="flex items-center gap-2">
-                              <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Room Signal</span>
-                              {showCharts[`${groupIdx}-${qIdx}`] && (
-                                <Badge className="text-xs bg-emerald-100 text-emerald-700 border-0 hover:bg-emerald-100">Visible</Badge>
-                              )}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowCharts(prev => ({
-                                ...prev,
-                                [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
-                              }))}
-                              className="gap-2 text-xs"
-                            >
-                              {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
-                            </Button>
-                          </div>
+                      ) : null}
 
-                          {/* Visual Analytics Chart */}
-                          {showCharts[`${groupIdx}-${qIdx}`] && (
-                            <QuestionAnalyticsChart
-                              question={question}
-                              assignments={group.assignments}
-                              questionIndex={qIdx}
-                              stats={stats}
-                            />
-                          )}
-                        </>
-                      )}
 
                       {/* Question Quality Rating */}
                       <div className="pt-3 border-t flex items-center justify-between rounded-lg">
@@ -1662,9 +1662,7 @@ export const LectureCheckInResults = () => {
                             
                               // For manual grade short answers without AI grade, show pending
                               // Also check for coding_simple without AI grade
-                              const isManualGradeShortAnswer = question.type === 'short_answer' && 
-                                !hasAIGrade &&
-                                (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+                              const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrade;
                               const isCodingSimple = question.type === 'coding_simple';
                               
                               // coding_simple uses AI grade threshold >= 70 as correct
@@ -1825,9 +1823,21 @@ export const LectureCheckInResults = () => {
                         {/* Short answer review section */}
                         {question.type === "short_answer" && (
                           <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            <p className="text-xs font-medium mb-2 text-foreground">
-                              Student Text Responses & Grading:
-                            </p>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-medium text-foreground">
+                                Student Text Responses & Grading:
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1"
+                                disabled={regrading === `${groupIdx}-${qIdx}`}
+                                onClick={() => handleRegrade(`${groupIdx}-${qIdx}`, question.question, question.expectedAnswer || '', group.assignments)}
+                              >
+                                <RefreshCw className={`h-3 w-3 ${regrading === `${groupIdx}-${qIdx}` ? 'animate-spin' : ''}`} />
+                                Re-run auto-grade
+                              </Button>
+                            </div>
                             <div className="space-y-2">
                               {(() => {
                                 // Filter assignments to only those containing this specific question

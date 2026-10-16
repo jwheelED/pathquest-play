@@ -1,3 +1,4 @@
+import { toast as sonnerToast } from "sonner";
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,8 @@ export interface OnDeckSendData {
   sourceBankItemId?: string;
   codingStyle?: 'simple' | 'full';
   codingPayload?: OnDeckCodingPayload;
+  /** Key of the picture pre-generated while this question was On Deck */
+  imagePrepKey?: string;
 }
 
 interface QuestionOnDeckProps {
@@ -412,6 +415,22 @@ export function QuestionOnDeck({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate?.text, effectiveFormat, codingStyle]);
 
+  // Pre-generate the live-session picture while the question sits On Deck,
+  // so it's ready the moment the instructor presses Send. The server skips
+  // this when no live session is active.
+  const imagePrepRef = useRef<{ text: string; key: string } | null>(null);
+  useEffect(() => {
+    if (!candidate?.text) return;
+    if (imagePrepRef.current?.text === candidate.text) return;
+    const key = crypto.randomUUID();
+    imagePrepRef.current = { text: candidate.text, key };
+    supabase.functions
+      .invoke('generate-question-image', {
+        body: { mode: 'prepare', prepKey: key, questionText: candidate.text },
+      })
+      .catch(() => { /* best effort — send falls back to generating */ });
+  }, [candidate?.text]);
+
   // Reset generated state when candidate is cleared
   useEffect(() => {
     if (!candidate) {
@@ -537,7 +556,14 @@ export function QuestionOnDeck({
       ).then((aiRes) => {
         if (!isLatest()) return;
         const { data, error } = aiRes as { data: any; error: any };
-        if (error) return;
+        if (error) {
+          if (!settled) {
+            sonnerToast.error("Couldn't generate answer choices", {
+              description: 'Press regenerate or type the choices yourself.',
+            });
+          }
+          return;
+        }
         if (format === 'multiple_choice' || format === 'poll') {
           if (data?.options?.length === 4) {
             // Only overwrite if a bank match hasn't already populated options.
@@ -618,6 +644,8 @@ export function QuestionOnDeck({
       };
     }
 
+    const prep = imagePrepRef.current;
+    if (prep && candidate && prep.text === candidate.text) data.imagePrepKey = prep.key;
     onSendNow(questionText, data);
   };
 

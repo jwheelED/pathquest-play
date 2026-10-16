@@ -57,15 +57,43 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
       ? requestedModel
       : DEFAULT_MODEL;
 
+  // callClaude always routes through the Lovable AI Gateway (Gemini), which
+  // handles tool_choice natively. The Moonshot shim lives in callAiProvider
+  // (aiProvider.ts) for functions that call Moonshot directly.
+  const hasTools = body.tools && body.tools.length > 0;
+  const shimToolCall = false;
+
+  let toolFnName: string | undefined;
+  const messages = [...body.messages] as Record<string, unknown>[];
+
+  if (shimToolCall) {
+    const tool = body.tools![0];
+    toolFnName = tool.function.name;
+    const schema = JSON.stringify(tool.function.parameters);
+    const jsonInstruction = `\nRespond with ONLY a JSON object (no markdown, no code fences) matching this schema:\n${schema}`;
+    // Append to existing system message or add one
+    const sysIdx = messages.findIndex((m) => m.role === "system");
+    if (sysIdx >= 0) {
+      messages[sysIdx] = { ...messages[sysIdx], content: (messages[sysIdx].content as string) + jsonInstruction };
+    } else {
+      messages.unshift({ role: "system", content: jsonInstruction.trim() });
+    }
+  }
+
   const gatewayBody: Record<string, unknown> = {
     model,
-    messages: body.messages,
+    messages,
   };
   if (typeof body.temperature === "number") gatewayBody.temperature = body.temperature;
   if (typeof body.max_tokens === "number") gatewayBody.max_tokens = body.max_tokens;
-  if (body.tools && body.tools.length > 0) gatewayBody.tools = body.tools;
-  if (body.tool_choice !== undefined) gatewayBody.tool_choice = body.tool_choice;
-  if (body.response_format !== undefined) gatewayBody.response_format = body.response_format;
+
+  if (shimToolCall) {
+    gatewayBody.response_format = { type: "json_object" };
+  } else {
+    if (hasTools) gatewayBody.tools = body.tools;
+    if (body.tool_choice !== undefined) gatewayBody.tool_choice = body.tool_choice;
+    if (body.response_format !== undefined) gatewayBody.response_format = body.response_format;
+  }
 
   const upstream = await fetch(LOVABLE_AI_URL, {
     method: "POST",
@@ -92,6 +120,21 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
 
   // Gateway already returns OpenAI-shaped JSON — pass it straight through.
   const data = await upstream.json();
+
+  // Repackage JSON-mode text response as a tool_call so callers see the same
+  // shape they would from a provider with native tool support.
+  if (shimToolCall && data.choices?.[0]?.message?.content && toolFnName) {
+    const raw = data.choices[0].message.content as string;
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    data.choices[0].message.tool_calls = [
+      {
+        id: `shim_${Date.now()}`,
+        type: "function",
+        function: { name: toolFnName, arguments: cleaned },
+      },
+    ];
+  }
+
   return new Response(JSON.stringify(data), {
     status: 200,
     headers: { "Content-Type": "application/json" },

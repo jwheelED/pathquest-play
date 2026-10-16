@@ -40,6 +40,7 @@ interface QuestionAnalyticsChartProps {
 
 const EMERALD = "#10b981";
 const SLATE_LIGHT = "#e2e8f0";
+const RED = "#ef4444";
 
 export const QuestionAnalyticsChart = ({
   question,
@@ -144,10 +145,13 @@ export const QuestionAnalyticsChart = ({
     : [];
 
   // Two-segment donut: correct vs everything else
-  const notCorrect = stats.total - stats.correct;
+  const answeredCount = deduplicatedAssignments.filter((a) => a.completed).length;
+  const incorrectCount = Math.max(0, answeredCount - stats.correct);
+  const notAnsweredCount = Math.max(0, stats.total - stats.correct - incorrectCount);
   const donutData = [
     { name: "Correct", value: stats.correct, color: EMERALD },
-    { name: "Not Answered", value: notCorrect, color: SLATE_LIGHT },
+    { name: "Incorrect", value: incorrectCount, color: RED },
+    { name: "Not Answered", value: notAnsweredCount, color: SLATE_LIGHT },
   ].filter((d) => d.value > 0);
 
   // Y-axis max for bar chart — ceiling whole number
@@ -306,17 +310,18 @@ export const QuestionAnalyticsChart = ({
                 </div>
               </div>
               {/* Legend */}
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: EMERALD }} />
-                  <span className="text-foreground font-medium">Correct</span>
-                  <span className="text-muted-foreground">({stats.correct})</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: SLATE_LIGHT }} />
-                  <span className="text-foreground font-medium">Not Answered</span>
-                  <span className="text-muted-foreground">({stats.total - stats.correct})</span>
-                </div>
+              <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+                {[
+                  { name: "Correct", value: stats.correct, color: EMERALD },
+                  { name: "Incorrect", value: incorrectCount, color: RED },
+                  { name: "Not Answered", value: notAnsweredCount, color: SLATE_LIGHT },
+                ].map((l) => (
+                  <div key={l.name} className="flex items-center gap-1.5">
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: l.color }} />
+                    <span className="text-foreground font-medium">{l.name}</span>
+                    <span className="text-muted-foreground">({l.value})</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

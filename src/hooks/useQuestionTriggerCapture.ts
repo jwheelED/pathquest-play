@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState } from 'react';
 import { type PassiveQuestionCandidate, hasInterrogativeTrigger } from './usePassiveQuestionDetection';
+import { trackQuestionDetectionDrop, trackQuestionDetected } from '@/lib/posthogTracking';
 
 // Re-use the same blocklists from passive detection
 const GREETING_PATTERNS = [
@@ -536,6 +537,7 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
       if (!slice.question) {
         if (debug) console.log('🎯 [trigger-capture] empty slice, abort');
+        trackQuestionDetectionDrop('empty_slice', { path: 'trigger_capture' });
         pendingTriggerRef.current = null;
         extensionsUsedRef.current = 0;
         clearCompletionTimer();
@@ -572,6 +574,12 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
             const tag = verdict.status === 'reject' ? 'gate-reject' : 'gate-reject (max-ext)';
             console.log(`🚦 [${tag}] reason="${verdict.reason}" — cooldown NOT set, retry allowed`);
           }
+          trackQuestionDetectionDrop('gate_hold', {
+            path: 'trigger_capture',
+            text: question,
+            wordCount: wordCount(question),
+            reason: verdict.reason,
+          });
           pendingTriggerRef.current = null;
           extensionsUsedRef.current = 0;
           clearCompletionTimer();
@@ -590,11 +598,21 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
 
       if (isRhetoricalOrGreeting(question)) {
         if (debug) console.log('🎯 [trigger-capture] blocked — rhetorical/greeting (no cooldown)');
+        trackQuestionDetectionDrop('rhetorical', {
+          path: 'trigger_capture',
+          text: question,
+          wordCount: wordCount(question),
+        });
         return;
       }
 
       if (wordCount(question) < 5) {
         if (debug) console.log('🎯 [trigger-capture] blocked — too short (no cooldown)');
+        trackQuestionDetectionDrop('min_word_count', {
+          path: 'trigger_capture',
+          text: question,
+          wordCount: wordCount(question),
+        });
         return;
       }
 
@@ -619,6 +637,11 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       }
       if (!hasInterrogativeTrigger(finalQuestion)) {
         if (debug) console.log('🎯 [trigger-capture] blocked — no interrogative trigger in final question:', question);
+        trackQuestionDetectionDrop('no_interrogative_trigger', {
+          path: 'trigger_capture',
+          text: finalQuestion,
+          wordCount: wordCount(finalQuestion),
+        });
         return;
       }
 
@@ -644,6 +667,12 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       lastSuccessTimeRef.current = Date.now();
 
       if (debug) console.log(`🎯 [trigger-capture] FINAL (cooldown ${cooldownMs}ms armed) priorCtx=${priorContext.length}chars:`, finalQuestion);
+      trackQuestionDetected('trigger_capture', {
+        text: finalQuestion,
+        wordCount: wordCount(finalQuestion),
+        latencyMs: elapsedSinceTrigger,
+        contextChars: priorContext.length,
+      });
       onCaptureCompleteRef.current?.(candidate);
     } finally {
       isFinalizingRef.current = false;
@@ -736,6 +765,11 @@ export function useQuestionTriggerCapture(options: UseQuestionTriggerCaptureOpti
       if (debug) {
         console.log(`🚦 [cooldown-block] remaining=${cooldownMs - sinceSuccess}ms`);
       }
+      trackQuestionDetectionDrop('cooldown_block', {
+        path: 'trigger_capture',
+        text,
+        reason: `remaining=${cooldownMs - sinceSuccess}ms`,
+      });
       return false;
     }
 

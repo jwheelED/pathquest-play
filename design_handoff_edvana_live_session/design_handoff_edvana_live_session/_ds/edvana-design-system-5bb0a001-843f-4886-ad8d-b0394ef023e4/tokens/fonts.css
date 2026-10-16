@@ -1,0 +1,4 @@
+/* Edvana webfonts — DM Sans is the single brand typeface (display + UI + body).
+   Loaded from Google Fonts, matching the production app (tailwind fontFamily: 'DM Sans').
+   No local binaries ship with the codebase, so consumers pull DM Sans from the CDN. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap');

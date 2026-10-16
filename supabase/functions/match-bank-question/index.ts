@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { resolveAiProvider, callAiProvider } from "../_shared/aiProvider.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -202,43 +203,37 @@ serve(async (req) => {
       .map((c, i) => `[${i}] id=${c.id} | "${c.bankQuestion.slice(0, 240)}"`)
       .join('\n');
 
-    const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You decide whether an instructor\'s spoken question is essentially the same question (same intent and same correct answer) as one of the candidate bank questions. Return the index of the best match and a confidence 0–1. If no candidate is essentially the same, return match_index=-1.',
-          },
-          {
-            role: 'user',
-            content: `SPOKEN QUESTION:\n"${question_text}"\n\nCANDIDATES:\n${candidatesBlock}\n\nReturn the index of the candidate that asks essentially the same thing (same answer expected). Be strict: paraphrases of the same question = match. Different topic, different specifics, or different correct answer = no match (-1).`,
-          },
-        ],
-        tools: [{
-          type: 'function',
-          function: {
-            name: 'pick_match',
-            description: 'Pick the matching candidate index',
-            parameters: {
-              type: 'object',
-              properties: {
-                match_index: { type: 'integer', description: 'Index of best matching candidate, or -1 for no match' },
-                confidence: { type: 'number', description: '0 to 1 confidence in the match' },
-                reason: { type: 'string' },
-              },
-              required: ['match_index', 'confidence'],
-              additionalProperties: false,
+    const ai = resolveAiProvider();
+    const aiResp = await callAiProvider(ai, {
+      model: ai.defaultModel,
+      messages: [
+        {
+          role: 'system',
+          content: 'You decide whether an instructor\'s spoken question is essentially the same question (same intent and same correct answer) as one of the candidate bank questions. Return the index of the best match and a confidence 0–1. If no candidate is essentially the same, return match_index=-1.',
+        },
+        {
+          role: 'user',
+          content: `SPOKEN QUESTION:\n"${question_text}"\n\nCANDIDATES:\n${candidatesBlock}\n\nReturn the index of the candidate that asks essentially the same thing (same answer expected). Be strict: paraphrases of the same question = match. Different topic, different specifics, or different correct answer = no match (-1).`,
+        },
+      ],
+      tools: [{
+        type: 'function',
+        function: {
+          name: 'pick_match',
+          description: 'Pick the matching candidate index',
+          parameters: {
+            type: 'object',
+            properties: {
+              match_index: { type: 'integer', description: 'Index of best matching candidate, or -1 for no match' },
+              confidence: { type: 'number', description: '0 to 1 confidence in the match' },
+              reason: { type: 'string' },
             },
+            required: ['match_index', 'confidence'],
+            additionalProperties: false,
           },
-        }],
-        tool_choice: { type: 'function', function: { name: 'pick_match' } },
-      }),
+        },
+      }],
+      tool_choice: { type: 'function', function: { name: 'pick_match' } },
     });
 
     if (!aiResp.ok) {

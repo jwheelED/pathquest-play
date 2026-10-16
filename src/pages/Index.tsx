@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Menu, X, ChevronDown } from "lucide-react";
 import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
-
 const NAV_ITEMS = ["Product", "How It Works", "Use Cases", "Results", "Demo"];
 
 const Index = () => {
@@ -89,28 +88,31 @@ const Index = () => {
   }, []);
 
   const handleBookDemo = () => {
-    window.location.href =
-      "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Demo Request&body=I'd like to schedule a demo of Edvana.";
   };
 
   const handleStartPilot = () => {
-    window.location.href =
-      "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Pilot Conversation&body=I'd like to set up a pilot.";
   };
 
   const handleContact = () => {
-    window.location.href =
-      "mailto:nigel@edvana.dev?subject=Contact&body=";
+    window.location.href = "mailto:nigel@edvana.dev?subject=Contact&body=";
   };
 
   return (
     <div className="landing-page min-h-screen">
       <Helmet>
-        <title>Edvana — Live Understanding Copilot for instructors</title>
-        <meta name="description" content="Edvana captures every lecture, asks AI-generated check-ins in real time, and shows instructors who's keeping up — so no student falls behind." />
+        <title>Edvana — See student understanding in real time</title>
+        <meta
+          name="description"
+          content="Instructors usually find out too late that students are lost. Edvana gives real-time visibility into understanding while class is still happening — so you can adjust before the moment passes."
+        />
         <link rel="canonical" href="https://edvana.dev/" />
-        <meta property="og:title" content="Edvana — Live Understanding Copilot for instructors" />
-        <meta property="og:description" content="Capture lectures, run AI check-ins, and see who's keeping up — live." />
+        <meta property="og:title" content="Edvana — See student understanding in real time" />
+        <meta
+          property="og:description"
+          content="Real-time visibility into student understanding — while learning is happening. Adjust before the moment passes."
+        />
         <meta property="og:url" content="https://edvana.dev/" />
       </Helmet>
       {/* ═══════════ HEADER ═══════════ */}
@@ -123,10 +125,7 @@ const Index = () => {
       >
         <div className="max-w-[1120px] mx-auto px-6 h-[60px] flex items-center justify-between">
           {/* Left — Logo */}
-          <div
-            className="flex items-center gap-2 cursor-pointer shrink-0"
-            onClick={() => scrollToSection("hero")}
-          >
+          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => scrollToSection("hero")}>
             <img
               src={edvanaLogo}
               alt="Edvana - Live Understanding Copilot"
@@ -149,9 +148,7 @@ const Index = () => {
                   />
                 )}
                 <button
-                  onClick={() =>
-                    scrollToSection(item.toLowerCase().replace(/\s+/g, "-"))
-                  }
+                  onClick={() => scrollToSection(item.toLowerCase().replace(/\s+/g, "-"))}
                   className="landing-nav-link"
                 >
                   {item}
@@ -162,16 +159,10 @@ const Index = () => {
 
           {/* Right — Utility (desktop) */}
           <div className="hidden lg:flex items-center gap-5 shrink-0">
-            <button
-              onClick={handleBookDemo}
-              className="landing-util-link"
-            >
+            <button onClick={handleBookDemo} className="landing-util-link">
               Book a Demo
             </button>
-            <button
-              onClick={handleStartPilot}
-              className="landing-util-link"
-            >
+            <button onClick={handleStartPilot} className="landing-util-link">
               Book a Pilot
             </button>
             {/* Corporate dropdown */}
@@ -192,14 +183,20 @@ const Index = () => {
                   }}
                 >
                   <button
-                    onClick={() => { navigate("/corporate/events"); setCorpDropdownOpen(false); }}
+                    onClick={() => {
+                      navigate("/corporate/events");
+                      setCorpDropdownOpen(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
                     Events
                   </button>
                   <button
-                    onClick={() => { navigate("/corporate/enterprise"); setCorpDropdownOpen(false); }}
+                    onClick={() => {
+                      navigate("/corporate/enterprise");
+                      setCorpDropdownOpen(false);
+                    }}
                     className="block w-full text-left px-4 py-2 text-[13px] transition-colors hover:opacity-80"
                     style={{ color: "hsl(var(--landing-text))" }}
                   >
@@ -208,10 +205,7 @@ const Index = () => {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => navigate("/join")}
-              className="landing-cta"
-            >
+            <button onClick={() => navigate("/join")} className="landing-cta">
               Join Session
             </button>
           </div>
@@ -254,21 +248,40 @@ const Index = () => {
               </button>
             ))}
             <div className="pt-3 flex flex-col gap-2" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
-              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">Book a Demo</button>
-              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">Book a Pilot</button>
-              <button onClick={() => { navigate("/corporate/events"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Events</button>
-              <button onClick={() => { navigate("/corporate/enterprise"); setMobileMenuOpen(false); }} className="landing-util-link text-left py-2">Corporate Enterprise</button>
-              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">Join Session</button>
+              <button onClick={handleBookDemo} className="landing-util-link text-left py-2">
+                Book a Demo
+              </button>
+              <button onClick={handleStartPilot} className="landing-util-link text-left py-2">
+                Book a Pilot
+              </button>
+              <button
+                onClick={() => {
+                  navigate("/corporate/events");
+                  setMobileMenuOpen(false);
+                }}
+                className="landing-util-link text-left py-2"
+              >
+                Corporate Events
+              </button>
+              <button
+                onClick={() => {
+                  navigate("/corporate/enterprise");
+                  setMobileMenuOpen(false);
+                }}
+                className="landing-util-link text-left py-2"
+              >
+                Corporate Enterprise
+              </button>
+              <button onClick={() => navigate("/join")} className="landing-util-link text-left py-2">
+                Join Session
+              </button>
             </div>
           </div>
         )}
       </header>
 
       {/* ═══════════ JOIN SESSION BANNER ═══════════ */}
-      <div
-        className="px-6 pt-20 md:pt-24 pb-0"
-        style={{ backgroundColor: "hsl(var(--landing-bg))" }}
-      >
+      <div className="px-6 pt-20 md:pt-24 pb-0" style={{ backgroundColor: "hsl(var(--landing-bg))" }}>
         <div
           className="max-w-[440px] mx-auto rounded-2xl px-5 py-4"
           style={{
@@ -281,10 +294,7 @@ const Index = () => {
               className="w-2 h-2 rounded-full animate-pulse shrink-0"
               style={{ backgroundColor: "hsl(var(--landing-accent))" }}
             />
-            <span
-              className="text-[13px] font-medium"
-              style={{ color: "hsl(var(--landing-text))" }}
-            >
+            <span className="text-[13px] font-medium" style={{ color: "hsl(var(--landing-text))" }}>
               Joining as a participant?
             </span>
           </div>
@@ -309,10 +319,7 @@ const Index = () => {
                 color: "hsl(var(--landing-text))",
               }}
             />
-            <button
-              type="submit"
-              className="landing-cta h-9 px-5 text-[13px] shrink-0"
-            >
+            <button type="submit" className="landing-cta h-9 px-5 text-[13px] shrink-0">
               Join
             </button>
           </form>
@@ -326,26 +333,23 @@ const Index = () => {
             {/* Text block */}
             <div className="max-w-2xl mx-auto text-center">
               {/* Eyebrow */}
-              <p className="landing-eyebrow mb-5">
-                Live understanding, in real time
-              </p>
+              <p className="landing-eyebrow mb-5">Real-time visibility into student understanding</p>
 
               {/* Headline */}
               <h1
                 className="text-4xl md:text-[52px] lg:text-[60px] font-bold leading-[1.08] tracking-[-0.025em] mb-6"
                 style={{ color: "hsl(var(--landing-text))" }}
               >
-                See understanding while you speak.
+                Know who's lost while class is still happening.
               </h1>
 
               {/* Subheadline */}
               <p
-                className="text-lg md:text-xl leading-relaxed mb-11 max-w-lg mx-auto"
+                className="text-lg md:text-xl leading-relaxed mb-11 max-w-xl mx-auto"
                 style={{ color: "hsl(var(--landing-muted))" }}
               >
-                Edvana helps speakers turn live questions into instant audience
-                understanding checks, so they can adjust in real time without
-                breaking flow.
+                Instructors usually find out students didn't get it after the quiz, the exam, or the withdrawal. Edvana
+                shows understanding live, in the room, so you can adjust before the moment passes.
               </p>
 
               {/* CTAs */}
@@ -353,17 +357,21 @@ const Index = () => {
                 <button onClick={() => navigate("/instructor/auth")} className="landing-cta px-8 py-3 text-[15px]">
                   Instructor Sign In
                 </button>
-                <button
-                  onClick={() => navigate("/auth")}
-                  className="landing-secondary-btn px-8 py-3 text-[15px]"
-                >
+                <button onClick={() => navigate("/auth")} className="landing-secondary-btn px-8 py-3 text-[15px]">
                   Student Sign In
                 </button>
               </div>
 
               {/* Proof points */}
-              <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]" style={{ color: "hsl(var(--landing-muted))" }}>
-                {["No prebuilt polls required", "Review before sending", "Built for real live sessions"].map((point) => (
+              <div
+                className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-[13px]"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                {[
+                  "Live signal, not next-week data",
+                  "You review every check-in before it sends",
+                  "Works in the classes you already teach",
+                ].map((point) => (
                   <span key={point} className="flex items-center gap-2">
                     <span
                       className="w-1 h-1 rounded-full shrink-0"
@@ -372,6 +380,26 @@ const Index = () => {
                     {point}
                   </span>
                 ))}
+              </div>
+
+              {/* In-use-today pilot strip */}
+              <div
+                className="mt-10 mx-auto max-w-2xl rounded-xl px-5 py-4 flex flex-col sm:flex-row items-center gap-3 text-left"
+                style={{
+                  border: "1px solid hsl(var(--landing-border))",
+                  backgroundColor: "hsl(var(--landing-surface))",
+                }}
+              >
+                <div className="flex-1">
+                  <p className="landing-eyebrow mb-1">In use today</p>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
+                    Running in live classes across higher-ed writing, STEM, and clinical instruction — 78–85% average
+                    response rates, repeat use every session.
+                  </p>
+                </div>
+                <button onClick={() => scrollToSection("results")} className="landing-util-link shrink-0 text-[13px]">
+                  See pilot results ↓
+                </button>
               </div>
             </div>
 
@@ -391,10 +419,10 @@ const Index = () => {
                   style={{ borderBottom: "1px solid hsl(var(--landing-border))" }}
                 >
                   {[
-                    { num: "1", label: "Speaker is live" },
-                    { num: "2", label: "Edvana drafts a check-in" },
-                    { num: "3", label: "Sent to audience" },
-                    { num: "4", label: "Signal appears" },
+                    { num: "1", label: "Class is running" },
+                    { num: "2", label: "Edvana drafts a check-in from what you just said" },
+                    { num: "3", label: "Room answers in seconds" },
+                    { num: "4", label: "You see who's lost — now" },
                   ].map((step, i) => (
                     <div
                       key={step.num}
@@ -423,8 +451,14 @@ const Index = () => {
                   {/* Panel 1: Live transcript */}
                   <div className="p-6 flex flex-col justify-center">
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "hsl(0 72% 55%)" }} />
-                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--landing-muted))" }}>
+                      <span
+                        className="w-2 h-2 rounded-full animate-pulse"
+                        style={{ backgroundColor: "hsl(0 72% 55%)" }}
+                      />
+                      <span
+                        className="text-[11px] font-semibold uppercase tracking-wider"
+                        style={{ color: "hsl(var(--landing-muted))" }}
+                      >
                         Live
                       </span>
                       <span className="text-[11px] ml-auto" style={{ color: "hsl(var(--landing-border))" }}>
@@ -432,8 +466,8 @@ const Index = () => {
                       </span>
                     </div>
                     <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-text))" }}>
-                      "The key difference between Type I and Type II errors is that one rejects a true hypothesis
-                      while the other fails to reject a false one…"
+                      "The key difference between Type I and Type II errors is that one rejects a true hypothesis while
+                      the other fails to reject a false one…"
                     </p>
                     <div className="mt-4 flex items-center gap-3">
                       {[0.6, 1, 0.7, 0.9, 0.5, 0.8, 1, 0.6].map((h, i) => (
@@ -453,7 +487,10 @@ const Index = () => {
                   <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
 
                   {/* Panel 2: Drafted check-in */}
-                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+                  <div
+                    className="p-6 flex flex-col justify-center"
+                    style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+                  >
                     <div className="flex items-center justify-between mb-4">
                       <span
                         className="text-[11px] font-semibold uppercase tracking-wider"
@@ -492,7 +529,9 @@ const Index = () => {
                           <span
                             className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
                             style={{
-                              backgroundColor: opt.correct ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
+                              backgroundColor: opt.correct
+                                ? "hsl(var(--landing-accent))"
+                                : "hsl(var(--landing-border))",
                               color: opt.correct ? "white" : "hsl(var(--landing-muted))",
                             }}
                           >
@@ -514,8 +553,14 @@ const Index = () => {
                   <div className="hidden md:block" style={{ backgroundColor: "hsl(var(--landing-border))" }} />
 
                   {/* Panel 3: Response signal */}
-                  <div className="p-6 flex flex-col justify-center" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider mb-4" style={{ color: "hsl(var(--landing-muted))" }}>
+                  <div
+                    className="p-6 flex flex-col justify-center"
+                    style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
+                  >
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wider mb-4"
+                      style={{ color: "hsl(var(--landing-muted))" }}
+                    >
                       Room Signal
                     </span>
                     <div className="flex items-end gap-3 h-24 mb-4">
@@ -525,14 +570,21 @@ const Index = () => {
                         { pct: 11, highlight: false },
                       ].map((bar, i) => (
                         <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-[11px] font-semibold" style={{ color: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))" }}>
+                          <span
+                            className="text-[11px] font-semibold"
+                            style={{
+                              color: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-muted))",
+                            }}
+                          >
                             {bar.pct}%
                           </span>
                           <div
                             className="w-full rounded-md"
                             style={{
                               height: `${bar.pct * 1.1}px`,
-                              backgroundColor: bar.highlight ? "hsl(var(--landing-accent))" : "hsl(var(--landing-border))",
+                              backgroundColor: bar.highlight
+                                ? "hsl(var(--landing-accent))"
+                                : "hsl(var(--landing-border))",
                               minHeight: "8px",
                             }}
                           />
@@ -549,7 +601,9 @@ const Index = () => {
                         color: "hsl(var(--landing-text))",
                       }}
                     >
-                      <span className="font-semibold" style={{ color: "hsl(var(--landing-accent))" }}>58% correct</span>
+                      <span className="font-semibold" style={{ color: "hsl(var(--landing-accent))" }}>
+                        58% correct
+                      </span>
                       <span style={{ color: "hsl(var(--landing-muted))" }}> · 45 responded · </span>
                       <span className="font-medium">Consider revisiting</span>
                     </div>
@@ -560,9 +614,6 @@ const Index = () => {
           </div>
         </section>
 
-
-
-
         {/* ═══════════ HOW IT WORKS ═══════════ */}
         <section id="how-it-works" className="py-24 md:py-32 px-6">
           <div className="max-w-[1120px] mx-auto">
@@ -570,11 +621,10 @@ const Index = () => {
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">How It Works</p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Three steps. One continuous flow.
+                From "I hope they got it" to "I can see they got it."
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana fits into the way people already teach, train, explain,
-                and present.
+                Three steps that fit the way you already teach — no prep questions, no separate tool to launch.
               </p>
             </div>
 
@@ -583,27 +633,24 @@ const Index = () => {
               {[
                 {
                   num: "1",
-                  title: "Speak naturally",
-                  body: "Teach, train, explain, or present the way you normally would. Edvana listens in real time without forcing you to stop and build activities from scratch.",
-                  micro: "Real-time session context, without interrupting flow",
+                  title: "Keep teaching",
+                  body: "You lecture the way you always do. Edvana listens in the background — no scripts, no pre-built polls, no derailed lesson plans.",
+                  micro: "Zero prep, zero interruption.",
                 },
                 {
                   num: "2",
-                  title: "Preview and send a live check-in",
-                  body: "Edvana drafts a contextual audience check based on what you just said. You stay in control, review it, and send it when the moment is right.",
-                  micro: "You review before participants ever see it",
+                  title: "Approve a check-in in one tap",
+                  body: "Edvana drafts a question from what you just said. You glance, approve, and send — or skip it. Nothing goes to students without you.",
+                  micro: "You're always the last word.",
                 },
                 {
                   num: "3",
-                  title: "See the room instantly",
-                  body: "Watch live response patterns appear while the session is still happening. Clarify, slow down, move on, or go deeper with actual signal from the room.",
-                  micro: "Act while the session is still alive",
+                  title: "See who's lost, in time to fix it",
+                  body: "Watch responses land live. If half the room missed the concept, you know now — not on the midterm.",
+                  micro: "Catch drift before it becomes damage.",
                 },
               ].map((step) => (
-                <div
-                  key={step.num}
-                  className="landing-card flex flex-col"
-                >
+                <div key={step.num} className="landing-card flex flex-col">
                   {/* Step number */}
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-5"
@@ -614,20 +661,17 @@ const Index = () => {
                   >
                     {step.num}
                   </span>
-                  <h3
-                    className="text-[17px] font-semibold mb-3"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[17px] font-semibold mb-3" style={{ color: "hsl(var(--landing-text))" }}>
                     {step.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed mb-auto"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed mb-auto" style={{ color: "hsl(var(--landing-muted))" }}>
                     {step.body}
                   </p>
                   {/* Micro-line */}
-                  <div className="mt-6 flex items-center gap-2 text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
+                  <div
+                    className="mt-6 flex items-center gap-2 text-[12px]"
+                    style={{ color: "hsl(var(--landing-muted))" }}
+                  >
                     <span
                       className="w-1 h-1 rounded-full shrink-0"
                       style={{ backgroundColor: "hsl(var(--landing-accent))" }}
@@ -649,15 +693,11 @@ const Index = () => {
           <div className="max-w-[1120px] mx-auto">
             {/* Header */}
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <p className="landing-eyebrow mb-4">
-                Why It Changes the Live Moment
-              </p>
-              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Built for the live moment
-              </h2>
+              <p className="landing-eyebrow mb-4">Why it changes the moment</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">Finding out later is too late.</h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is designed for what speakers actually need in real
-                sessions, not for static polling workflows.
+                By the time a quiz score or exam grade tells you students were lost, the class has moved on. Edvana
+                closes that gap to seconds.
               </p>
             </div>
 
@@ -665,29 +705,23 @@ const Index = () => {
             <div className="grid md:grid-cols-3 gap-5">
               {[
                 {
-                  title: "No prebuilt polls",
-                  body: "Edvana works from what's actually being said, so you do not have to plan every check-in in advance.",
+                  title: "Catch confusion in real time",
+                  body: "See misunderstanding while you can still re-explain — not two weeks later on a rubric.",
                 },
                 {
-                  title: "No broken flow",
-                  body: "Check understanding without pausing to open a separate workflow, build a form, or derail momentum.",
+                  title: "Stay in the flow of the class",
+                  body: "No stopping to build a poll, open another tab, or break momentum. Check-ins slot into the lesson you're already teaching.",
                 },
                 {
-                  title: "No delayed insight",
-                  body: "See what the room understood while there is still time to respond, not after the moment has passed.",
+                  title: "Turn silence into signal",
+                  body: "A quiet room isn't a clear room. Edvana surfaces what students actually took away, even when nobody raises a hand.",
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
-                  <h3
-                    className="text-[17px] font-semibold mb-3"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[17px] font-semibold mb-3" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.body}
                   </p>
                 </div>
@@ -705,13 +739,11 @@ const Index = () => {
           <div className="max-w-[1120px] mx-auto">
             {/* Header */}
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <p className="landing-eyebrow mb-4">
-                Why Edvana Is Different
-              </p>
+              <p className="landing-eyebrow mb-4">Why Edvana Is Different</p>
               <h2 className="landing-heading text-2xl md:text-3xl">
-                Polling collects responses.
+                Polls tell you who clicked.
                 <br />
-                Edvana helps you see understanding.
+                Edvana tells you who understood.
               </h2>
             </div>
 
@@ -727,10 +759,10 @@ const Index = () => {
                 </h3>
                 <ul className="space-y-3">
                   {[
-                    "Require prebuilt questions before the session",
-                    "Interrupt flow to launch activities",
-                    "Often get used inconsistently or abandoned",
-                    "Focus on response collection more than live understanding",
+                    "You have to guess what to ask before class starts",
+                    "You stop teaching to launch an activity",
+                    "Response data arrives after the moment is gone",
+                    "You learn students were lost from the exam, not the room",
                   ].map((item) => (
                     <li
                       key={item}
@@ -763,10 +795,10 @@ const Index = () => {
                 </h3>
                 <ul className="space-y-3">
                   {[
-                    "Supports in-the-moment checks with minimal prep",
-                    "Fits live teaching, training, and explanation flow",
-                    "Lets leaders act while the session is still happening",
-                    "Helps surface confusion before it becomes drift",
+                    "Questions come from what you actually just said",
+                    "Check-ins fit the lecture — no context switch",
+                    "You see understanding in seconds, not weeks",
+                    "Confusion surfaces while you can still fix it",
                   ].map((item) => (
                     <li
                       key={item}
@@ -789,18 +821,14 @@ const Index = () => {
               className="text-center text-[13px] leading-relaxed mt-12 max-w-xl mx-auto"
               style={{ color: "hsl(var(--landing-muted))" }}
             >
-              Polling tools help collect responses. Edvana helps speakers know
-              what the room actually took away — while there is still time to
-              adjust.
+              Polls measure attendance. Edvana measures whether the class landed — while there's still time to make sure
+              it does.
             </p>
           </div>
         </section>
 
         {/* ── Built for Real Sessions ── */}
-        <section
-          className="py-24 md:py-32 px-6"
-          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-        >
+        <section className="py-24 md:py-32 px-6" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p
@@ -810,43 +838,38 @@ const Index = () => {
                 Built for Real Sessions
               </p>
               <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Built for control in real sessions
+                Built to be used — not abandoned by week three.
               </h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana supports live use without taking control away from the speaker.
+                Every instructor tool promises live insight. Edvana is designed so you'll actually keep using it after
+                the pilot.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {[
                 {
-                  title: "Leader-controlled workflow",
-                  body: "Every check-in is reviewed before it is sent.",
+                  title: "You're always in control",
+                  body: "No check-in reaches students until you tap send. The room never sees a bad question.",
                 },
                 {
-                  title: "Designed for sensitive environments",
-                  body: "Built for settings where discretion, privacy, and responsible data handling matter.",
+                  title: "Fits how faculty actually teach",
+                  body: "No new lesson plans, no rebuilding your slides, no learning curve mid-semester.",
                 },
                 {
-                  title: "Easy to pilot",
-                  body: "Start small, test in a controlled setting, and expand once the workflow fits.",
+                  title: "Pilot in one class, not one department",
+                  body: "Start with a single course. Expand once the workflow proves itself.",
                 },
                 {
-                  title: "Low setup burden",
-                  body: "No heavy implementation, no complex rollout, no bloated adoption overhead.",
+                  title: "Low IT lift",
+                  body: "No LMS migration, no complex rollout, no six-month integration.",
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
-                  <h3
-                    className="text-[15px] font-semibold mb-2"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[15px] font-semibold mb-2" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.body}
                   </p>
                 </div>
@@ -856,55 +879,55 @@ const Index = () => {
         </section>
 
         {/* ── Results ── */}
-        <section
-          className="py-24 md:py-32 px-6"
-          style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-        >
+        <section className="py-24 md:py-32 px-6" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
-              <p className="landing-eyebrow mb-4">Results</p>
-              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Used in live sessions where understanding matters
-              </h2>
+              <p className="landing-eyebrow mb-4">Pilots in progress</p>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">Already running in live classes.</h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is already being used in explanation-heavy environments where it helps leaders see more, respond faster, and stay in flow.
+                Edvana is being used right now in higher-ed and STEM classrooms — the same explanation-heavy settings
+                where students most often fall behind quietly.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
               {[
                 {
-                  eyebrow: "HIGHER EDUCATION",
+                  eyebrow: "HIGHER EDUCATION · ACTIVE PILOT",
                   title: "Intro to Writing",
-                  stats: "12 sessions · 78% average response rate",
-                  quote: "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
+                  stats: "12 sessions · 78% average response rate · repeat use in 4 of 5 classes",
+                  outcome:
+                    "What changed: instructor could tell mid-lecture that students hadn't followed the argument.",
+                  quote:
+                    "\u201cI demoed this. It has tremendous promise for student engagement. Finally, a way to know if my students are following along.\u201d",
                   footer: "Repeat use: 4 of 5 class sessions",
                 },
                 {
-                  eyebrow: "STEM INSTRUCTION",
+                  eyebrow: "STEM INSTRUCTION · ACTIVE PILOT",
                   title: "Engineering Fundamentals",
-                  stats: "8 sessions · 85% average response rate",
-                  quote: "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
+                  stats: "8 sessions · 85% average response rate · used every session after week 2",
+                  outcome: "What changed: students reported staying focused because they knew a check-in was coming.",
+                  quote:
+                    "\u201cIt was quite refreshing to have quick questions about what was said a few minutes ago. Keeps me focused!\u201d",
                   footer: "Repeat use: Every session after week 2",
                 },
               ].map((card) => (
-                <div
-                  key={card.title}
-                  className="landing-card"
-                >
+                <div key={card.title} className="landing-card">
                   <p className="landing-eyebrow mb-3">{card.eyebrow}</p>
-                  <h3
-                    className="text-lg font-bold mb-1"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-lg font-bold mb-1" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[12px] mb-6"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[12px] mb-6" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.stats}
                   </p>
+                  {card.outcome && (
+                    <p
+                      className="text-[13px] font-medium leading-relaxed mb-4"
+                      style={{ color: "hsl(var(--landing-accent))" }}
+                    >
+                      {card.outcome}
+                    </p>
+                  )}
                   <blockquote
                     className="text-[14px] leading-relaxed italic pl-4 mb-6"
                     style={{
@@ -914,10 +937,7 @@ const Index = () => {
                   >
                     {card.quote}
                   </blockquote>
-                  <p
-                    className="text-[12px]"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.footer}
                   </p>
                 </div>
@@ -935,45 +955,35 @@ const Index = () => {
           <div className="max-w-[1120px] mx-auto">
             <div className="max-w-2xl mx-auto text-center mb-16">
               <p className="landing-eyebrow mb-4">Use Cases</p>
-              <h2 className="landing-heading text-3xl md:text-4xl mb-4">
-                Where Edvana fits first
-              </h2>
+              <h2 className="landing-heading text-3xl md:text-4xl mb-4">Where "found out too late" hurts most.</h2>
               <p className="landing-subheading text-base md:text-lg">
-                Edvana is especially valuable in live sessions where explanation,
-                interpretation, or complex material needs to land clearly in the
-                moment.
+                Edvana is built first for classrooms where a single misunderstood concept can compound for weeks.
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-5 max-w-3xl mx-auto">
               {[
                 {
                   title: "Higher education",
-                  body: "For instructors teaching difficult, abstract, or explanation-heavy material.",
+                  body: "Lecture-heavy courses where confusion in week 3 shows up as failing grades in week 10.",
                 },
                 {
                   title: "Clinical and health-professions education",
-                  body: "For nursing, medical, PA, and case-based learning environments.",
+                  body: "Case-based learning where a missed concept becomes a patient-safety gap on the floor.",
                 },
                 {
                   title: "Training and certification",
-                  body: "For trainers who need live signal without heavy prep or clunky interaction tools.",
+                  body: "High-stakes prep where finding out learners were lost means retaking an exam, not a quiz.",
                 },
                 {
                   title: "Workshops and cohort-based sessions",
-                  body: "For facilitators leading high-attention learning experiences.",
+                  body: "One-shot sessions where you don't get a second chance to correct a shaky foundation.",
                 },
               ].map((card) => (
                 <div key={card.title} className="landing-card">
-                  <h3
-                    className="text-[17px] font-semibold mb-2"
-                    style={{ color: "hsl(var(--landing-text))" }}
-                  >
+                  <h3 className="text-[17px] font-semibold mb-2" style={{ color: "hsl(var(--landing-text))" }}>
                     {card.title}
                   </h3>
-                  <p
-                    className="text-[14px] leading-relaxed"
-                    style={{ color: "hsl(var(--landing-muted))" }}
-                  >
+                  <p className="text-[14px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
                     {card.body}
                   </p>
                 </div>
@@ -982,9 +992,6 @@ const Index = () => {
           </div>
         </section>
 
-
-
-
         {/* ── Final CTA ── */}
         <section
           id="demo"
@@ -992,34 +999,20 @@ const Index = () => {
           style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
         >
           <div className="max-w-xl mx-auto text-center">
-            <h2 className="landing-heading text-3xl md:text-4xl mb-5">
-              See how Edvana changes a live session.
-            </h2>
-            <p
-              className="landing-subheading text-base mb-11"
-            >
-              Book a short demo or start a pilot conversation to see how Edvana
-              supports real-time understanding in teaching, training, and
-              explanation-heavy live sessions.
+            <h2 className="landing-heading text-3xl md:text-4xl mb-5">Stop finding out on the exam.</h2>
+            <p className="landing-subheading text-base mb-11">
+              Book a short demo, or start a pilot in one class. See what real-time understanding looks like in your own
+              room.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-              <button
-                onClick={handleBookDemo}
-                className="landing-cta px-8 py-3 text-[15px]"
-              >
+              <button onClick={handleBookDemo} className="landing-cta px-8 py-3 text-[15px]">
                 Book a Demo
               </button>
-              <button
-                onClick={handleStartPilot}
-                className="landing-secondary-btn px-8 py-3 text-[15px]"
-              >
+              <button onClick={handleStartPilot} className="landing-secondary-btn px-8 py-3 text-[15px]">
                 Start a Pilot Conversation
               </button>
             </div>
-            <p
-              className="text-[12px]"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
+            <p className="text-[12px]" style={{ color: "hsl(var(--landing-muted))" }}>
               Short demo. Clear workflow. No bloated setup.
             </p>
           </div>
@@ -1038,10 +1031,7 @@ const Index = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
             {/* Product */}
             <div>
-              <h4
-                className="text-[13px] font-semibold mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h4 className="text-[13px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
                 Product
               </h4>
               <ul className="space-y-2.5">
@@ -1067,10 +1057,7 @@ const Index = () => {
 
             {/* Sessions */}
             <div>
-              <h4
-                className="text-[13px] font-semibold mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h4 className="text-[13px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
                 Sessions
               </h4>
               <ul className="space-y-2.5">
@@ -1095,10 +1082,7 @@ const Index = () => {
 
             {/* Company */}
             <div>
-              <h4
-                className="text-[13px] font-semibold mb-4"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <h4 className="text-[13px] font-semibold mb-4" style={{ color: "hsl(var(--landing-text))" }}>
                 Company
               </h4>
               <ul className="space-y-2.5">
@@ -1124,31 +1108,18 @@ const Index = () => {
 
             {/* Brand */}
             <div>
-              <p
-                className="text-[13px] font-semibold mb-2"
-                style={{ color: "hsl(var(--landing-text))" }}
-              >
+              <p className="text-[13px] font-semibold mb-2" style={{ color: "hsl(var(--landing-text))" }}>
                 Edvana is the copilot for live understanding.
               </p>
-              <p
-                className="text-[12px] leading-relaxed"
-                style={{ color: "hsl(var(--landing-muted))" }}
-              >
-                Helping speakers see audience understanding in real time without
-                breaking flow.
+              <p className="text-[12px] leading-relaxed" style={{ color: "hsl(var(--landing-muted))" }}>
+                Helping speakers see audience understanding in real time without breaking flow.
               </p>
             </div>
           </div>
 
           {/* Bottom bar */}
-          <div
-            className="pt-6"
-            style={{ borderTop: "1px solid hsl(var(--landing-border))" }}
-          >
-            <p
-              className="text-[11px]"
-              style={{ color: "hsl(var(--landing-muted))" }}
-            >
+          <div className="pt-6" style={{ borderTop: "1px solid hsl(var(--landing-border))" }}>
+            <p className="text-[11px]" style={{ color: "hsl(var(--landing-muted))" }}>
               © 2026 Edvana. All rights reserved.
             </p>
           </div>
