@@ -80,6 +80,8 @@ export function useSessionState(sessionCode: string | undefined) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
+  const [notFound, setNotFound] = useState(false);
+
   // Resolve session
   useEffect(() => {
     if (!sessionCode) return;
@@ -91,7 +93,10 @@ export function useSessionState(sessionCode: string | undefined) {
         const { data, error } = await supabase.functions.invoke("resolve-live-session", {
           body: { sessionCode },
         });
-        if (error || !data?.session) return;
+        if (error || !data?.session) {
+          setNotFound(true);
+          return;
+        }
         if (!data.session.is_active) {
           setPhase("recap");
           return;
@@ -102,7 +107,7 @@ export function useSessionState(sessionCode: string | undefined) {
           handleNewQuestion(data.questions[0]);
         }
       } catch {
-        // handled upstream
+        setNotFound(true);
       }
     };
     init();
@@ -232,19 +237,26 @@ export function useSessionState(sessionCode: string | undefined) {
     answeredIdsRef.current.add(currentQuestion.id);
 
     const answer = selectedOption || "";
-    const correct = currentQuestion.question_content.correctAnswer;
-    const wasCorrect = correct ? answer.charAt(0).toUpperCase() === correct.charAt(0).toUpperCase() : null;
+    let correct = currentQuestion.question_content.correctAnswer || "";
+    const isMcq = (currentQuestion.question_content.options?.length ?? 0) > 0;
+    let wasCorrect: boolean | null = isMcq && correct
+      ? answer.charAt(0).toUpperCase() === correct.charAt(0).toUpperCase()
+      : null;
 
-    // Submit response
+    // Grade + save server-side (points, confidence multiplier, gradebook sync).
     try {
-      await supabase.from("live_responses").insert({
-        question_id: currentQuestion.id,
-        participant_id: participantId,
-        answer,
-        is_correct: wasCorrect ?? false,
-        confidence_level: confidence === null ? undefined : String(confidence),
-        response_time_ms: (totalDuration - timeLeft) * 1000,
+      const { data } = await supabase.functions.invoke("submit-live-response", {
+        body: {
+          questionId: currentQuestion.id,
+          participantId,
+          answer,
+          confidenceLevel: confidence === null ? null : String(confidence),
+          responseTimeMs: (totalDuration - timeLeft) * 1000,
+        },
       });
+      const resp = data?.response as { isCorrect?: boolean; correctAnswer?: string } | undefined;
+      if (resp && typeof resp.isCorrect === "boolean") wasCorrect = resp.isCorrect;
+      if (resp?.correctAnswer) correct = resp.correctAnswer;
     } catch {
       // best effort
     }
