@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleSubmit } from "./handler.ts";
+import { gradeWrittenAnswer } from "./aiGrade.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +19,7 @@ Deno.serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { status, body: respBody } = await handleSubmit(body, { supabase });
+    const { status, body: respBody } = await handleSubmit(body, { supabase, grade: gradeWrittenAnswer });
 
     return new Response(JSON.stringify(respBody), {
       status,

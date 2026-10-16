@@ -46,6 +46,8 @@ export interface FeedbackData {
   correctAnswer: string;
   explanation: string;
   sameAnswerPct: number | null;
+  aiGrade?: number | null;
+  aiFeedback?: string | null;
 }
 
 export interface RecapItem {
@@ -243,6 +245,8 @@ export function useSessionState(sessionCode: string | undefined) {
       ? answer.charAt(0).toUpperCase() === correct.charAt(0).toUpperCase()
       : null;
 
+    let aiGrade: number | null = null;
+    let aiFeedback: string | null = null;
     // Grade + save server-side (points, confidence multiplier, gradebook sync).
     try {
       const { data } = await supabase.functions.invoke("submit-live-response", {
@@ -254,7 +258,11 @@ export function useSessionState(sessionCode: string | undefined) {
           responseTimeMs: (totalDuration - timeLeft) * 1000,
         },
       });
-      const resp = data?.response as { isCorrect?: boolean; correctAnswer?: string } | undefined;
+      const resp = data?.response as
+        | { isCorrect?: boolean; correctAnswer?: string; aiGrade?: number | null; aiFeedback?: string | null }
+        | undefined;
+      aiGrade = resp?.aiGrade ?? null;
+      aiFeedback = resp?.aiFeedback ?? null;
       if (resp && typeof resp.isCorrect === "boolean") wasCorrect = resp.isCorrect;
       if (resp?.correctAnswer) correct = resp.correctAnswer;
     } catch {
@@ -267,6 +275,8 @@ export function useSessionState(sessionCode: string | undefined) {
       correctAnswer: correct || "",
       explanation: currentQuestion.question_content.explanation || "",
       sameAnswerPct: null,
+      aiGrade,
+      aiFeedback,
     });
 
     setRecapData((prev) => [
