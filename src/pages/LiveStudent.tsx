@@ -25,6 +25,7 @@ const LiveStudent = () => {
 
   const {
     phase,
+    notFound,
     sessionId,
     sessionTitle,
     currentQuestion,
@@ -41,6 +42,13 @@ const LiveStudent = () => {
     sendLostMe,
     lostMeSentAt,
   } = useSessionState(sessionCode);
+
+  useEffect(() => {
+    if (notFound) {
+      toast.error("Session not found");
+      navigate("/join");
+    }
+  }, [notFound, navigate]);
 
   const isEnded = phase === "recap";
 
