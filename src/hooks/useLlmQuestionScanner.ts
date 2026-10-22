@@ -113,7 +113,7 @@ export function useLlmQuestionScanner({
           const { detected: _d, ...rest } = res;
           cbs.current.onDetected({ ...rest, priorContext: contextText });
         }
-      } else if (res.failed) {
+      } else if ("failed" in res && res.failed) {
         cbs.current.onScanFailed?.();
       }
     } catch {
