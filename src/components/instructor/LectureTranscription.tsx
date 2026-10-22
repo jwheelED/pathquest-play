@@ -66,7 +66,8 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
-import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
+import { usePassiveQuestionDetection, PassiveQuestionCandidate, type PrebuiltAnswerData } from "@/hooks/usePassiveQuestionDetection";
+import { useLlmQuestionScanner, type ScanResponse } from "@/hooks/useLlmQuestionScanner";
 import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
 import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
 import { ConfidenceCheckService } from "@/lib/confidenceCheck/service";
