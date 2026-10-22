@@ -58,9 +58,9 @@ export function useLlmQuestionScanner({
   scan,
   onDetected,
   onScanFailed,
-  pauseMs = 800,
+  pauseMs = 500,
   wordTrigger = 35,
-  minGapMs = 1500,
+  minGapMs = 1000,
   contextWindowMs = 60_000,
   getRecentlySent,
 }: Options) {
