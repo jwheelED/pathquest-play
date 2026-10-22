@@ -357,7 +357,9 @@ export const LectureTranscription = ({
     scan: async (req) => {
       const startedAt = performance.now();
       const { data, error } = await supabase.functions.invoke('scan-transcript-questions', {
-        body: { ...req, sessionId, formatPreference: questionFormatPreference },
+        // On Deck falls back to multiple choice when no preference is set; ask the
+        // scanner for the same format so its choices are used instead of regenerated.
+        body: { ...req, sessionId, formatPreference: questionFormatPreference ?? 'multiple_choice' },
       });
       const roundTripMs = Math.round(performance.now() - startedAt);
       const newWords = req.newText.split(/\s+/).filter(Boolean).length;

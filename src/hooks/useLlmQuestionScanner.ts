@@ -123,8 +123,11 @@ export function useLlmQuestionScanner({
       cbs.current.onScanFailed?.();
     } finally {
       inFlight.current = false;
-      // Speech that arrived during the scan gets its own turn.
-      if (words(pendingText.current) >= wordTrigger) void runScan();
+      // Speech that arrived during the scan gets its own turn right away if the
+      // instructor already paused (its pause timer fired while we were busy)
+      // or it's long — otherwise its pending pause timer will run it.
+      const pendingWords = words(pendingText.current);
+      if (pendingWords >= wordTrigger || (pendingWords >= 2 && !pauseTimer.current)) void runScan();
     }
   }, [minGapMs, contextWindowMs, wordTrigger]);
 
