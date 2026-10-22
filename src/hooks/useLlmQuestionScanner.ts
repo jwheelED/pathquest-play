@@ -26,7 +26,11 @@ export type ScanResponse =
 interface Options {
   enabled: boolean;
   scan: (req: ScanRequest) => Promise<ScanResponse>;
-  onDetected: (d: ScannerDetection) => void;
+  /**
+   * Return false when the caller could not put the question On Deck, so it is
+   * not remembered as "already detected" and a repeat can still get through.
+   */
+  onDetected: (d: ScannerDetection) => boolean | void;
   /** Called when a scan errors so the caller can let classic detection through. */
   onScanFailed?: () => void;
   pauseMs?: number;
@@ -35,6 +39,8 @@ interface Options {
   wordTrigger?: number;
   minGapMs?: number;
   contextWindowMs?: number;
+  /** A question re-asked after this long counts as new, not a duplicate. */
+  duplicateWindowMs?: number;
   getRecentlySent?: () => string[];
 }
 
@@ -70,6 +76,7 @@ export function useLlmQuestionScanner({
   wordTrigger = 35,
   minGapMs = 1000,
   contextWindowMs = 60_000,
+  duplicateWindowMs = 120_000,
   getRecentlySent,
 }: Options) {
   const lines = useRef<{ text: string; at: number }[]>([]);
@@ -80,7 +87,8 @@ export function useLlmQuestionScanner({
   const lastScanAt = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const detected = useRef<string[]>([]);
+  /** Questions actually placed On Deck, with when — used only to drop quick repeats. */
+  const detected = useRef<{ text: string; at: number }[]>([]);
   const cbs = useRef({ scan, onDetected, onScanFailed, getRecentlySent });
   cbs.current = { scan, onDetected, onScanFailed, getRecentlySent };
   const enabledRef = useRef(enabled);
@@ -123,16 +131,20 @@ export function useLlmQuestionScanner({
     inFlight.current = true;
     lastScanAt.current = now;
     const sent = cbs.current.getRecentlySent?.() ?? [];
+    detected.current = detected.current.filter((d) => now - d.at <= duplicateWindowMs);
+    const recentDetected = detected.current.map((d) => d.text);
     try {
-      const res = await cbs.current.scan({ contextText, newText, recentlySent: [...detected.current.slice(-3), ...sent].slice(0, 5) });
+      const res = await cbs.current.scan({ contextText, newText, recentlySent: [...recentDetected.slice(-3), ...sent].slice(0, 5) });
       if (res.detected) {
-        const dup = [...detected.current, ...sent].some((q) => questionSimilarity(q, res.question) >= 0.7);
-        if (!dup) {
-          detected.current = [...detected.current.slice(-9), res.question];
+        const match = [...recentDetected, ...sent].find((q) => questionSimilarity(q, res.question) >= 0.7);
+        if (!match) {
           const { detected: _d, ...rest } = res;
-          cbs.current.onDetected({ ...rest, priorContext: contextText });
+          const accepted = cbs.current.onDetected({ ...rest, priorContext: contextText });
+          if (accepted !== false) {
+            detected.current = [...detected.current.slice(-9), { text: res.question, at: Date.now() }];
+          }
         } else {
-          trackQuestionDetectionDrop('duplicate', { path: 'ai_scan', text: res.question });
+          trackQuestionDetectionDrop('duplicate', { path: 'ai_scan', text: res.question, reason: `matches recent: ${match.slice(0, 80)}` });
         }
       } else if ("failed" in res && res.failed) {
         cbs.current.onScanFailed?.();
