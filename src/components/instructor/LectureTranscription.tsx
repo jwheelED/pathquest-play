@@ -371,7 +371,7 @@ export const LectureTranscription = ({
         provider: res.provider,
         serverMs: res.latencyMs,
         roundTripMs,
-        reason: res.detected ? undefined : res.reason,
+        reason: res.detected === false ? res.reason : undefined,
         text: res.detected ? res.question : req.newText,
         newWords,
         hasChoices: res.detected ? Boolean(res.options?.length || res.expectedAnswer) : undefined,
