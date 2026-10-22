@@ -562,6 +562,32 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     [enabled, armSilenceTimer, clearSilenceTimer, promotePending, debug]
   );
 
+  /** AI-vetted candidate: skip rule filters and promote immediately. */
+  const acceptAiCandidate = useCallback(
+    (text: string, priorContext?: string, prebuilt?: PrebuiltAnswerData) => {
+      if (!enabled || !text.trim()) return;
+      const now = Date.now();
+      const newCandidate: PassiveQuestionCandidate = {
+        text: text.trim(),
+        detectedAt: now,
+        id: `ai-${++candidateIdCounter}`,
+        priorContext: priorContext || undefined,
+        prebuilt,
+        source: 'ai_scan',
+      };
+      trackQuestionDetected('ai_scan' as never, {
+        text: newCandidate.text,
+        wordCount: wordCount(newCandidate.text),
+        contextChars: priorContext?.length,
+      });
+      clearSilenceTimer();
+      pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
+      promotePending();
+    },
+    [enabled, clearSilenceTimer, promotePending]
+  );
+
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
     clearAutoDismiss();
@@ -589,6 +615,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     trailingSilenceMs,
     checkUtterance,
     acceptVettedCandidate,
+    acceptAiCandidate,
     notifySpeech,
     dismissCandidate,
     removeFromHistory,
