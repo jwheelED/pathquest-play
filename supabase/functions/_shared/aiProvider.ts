@@ -1,5 +1,6 @@
 // Shared AI provider resolution for functions that call the LLM directly.
 // Prioritizes Moonshot/Kimi, falls back to Lovable AI Gateway.
+import { GEMINI_FLASH, DEFAULT_REASONING_EFFORT } from "./models.ts";
 
 export interface AiProvider {
   url: string;
@@ -24,7 +25,7 @@ export function resolveAiProvider(): AiProvider {
     return {
       url: "https://ai.gateway.lovable.dev/v1/chat/completions",
       key: lovableKey,
-      defaultModel: "google/gemini-2.5-flash",
+      defaultModel: GEMINI_FLASH,
       name: "Lovable",
     };
   }
@@ -83,7 +84,12 @@ export async function callAiProvider(
   };
   // Kimi K2.6 only accepts temperature = 1; sending anything else is a 400.
   if (typeof body.temperature === "number" && !useMoonshot) reqBody.temperature = body.temperature;
-  if (typeof body.max_tokens === "number") reqBody.max_tokens = body.max_tokens;
+  if (body.model === GEMINI_FLASH) {
+    // 3.8 Flash: thinking tokens count against max_tokens, so no output cap.
+    reqBody.reasoning_effort = DEFAULT_REASONING_EFFORT;
+  } else if (typeof body.max_tokens === "number") {
+    reqBody.max_tokens = body.max_tokens;
+  }
 
   if (shimToolCall) {
     reqBody.response_format = { type: "json_object" };

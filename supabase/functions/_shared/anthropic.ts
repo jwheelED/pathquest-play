@@ -3,11 +3,10 @@
 // call sites continue to work without edits. Despite the legacy name, this
 // now routes to Google Gemini via the Lovable AI Gateway.
 
+import { GEMINI_FLASH, DEFAULT_REASONING_EFFORT, type ReasoningEffort } from "./models.ts";
+
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-// NOTE: "google/gemini-3.5-flash" never existed — the typo silently fell back
-// through the gateway and added latency to every default-model call. Fixed to
-// the real fast model exposed by Lovable.
-const DEFAULT_MODEL = "google/gemini-2.5-flash";
+const DEFAULT_MODEL = GEMINI_FLASH;
 
 interface OpenAIMessage {
   role: "system" | "user" | "assistant";
@@ -31,6 +30,7 @@ interface OpenAIRequest {
   tools?: OpenAITool[];
   tool_choice?: any;
   response_format?: any;
+  reasoning_effort?: ReasoningEffort;
 }
 
 /**
@@ -64,7 +64,7 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
   const shimToolCall = false;
 
   let toolFnName: string | undefined;
-  const messages = [...body.messages] as Record<string, unknown>[];
+  const messages = [...body.messages] as unknown as Record<string, unknown>[];
 
   if (shimToolCall) {
     const tool = body.tools![0];
@@ -85,7 +85,12 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
     messages,
   };
   if (typeof body.temperature === "number") gatewayBody.temperature = body.temperature;
-  if (typeof body.max_tokens === "number") gatewayBody.max_tokens = body.max_tokens;
+  if (model === GEMINI_FLASH) {
+    // 3.8 Flash: thinking tokens count against max_tokens, so no output cap.
+    gatewayBody.reasoning_effort = body.reasoning_effort ?? DEFAULT_REASONING_EFFORT;
+  } else if (typeof body.max_tokens === "number") {
+    gatewayBody.max_tokens = body.max_tokens;
+  }
 
   if (shimToolCall) {
     gatewayBody.response_format = { type: "json_object" };

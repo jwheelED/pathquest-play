@@ -11,6 +11,8 @@
 //   WB_LLM_BASE_URL     override the API base entirely.
 //   WB_LLM_REFERER / WB_LLM_TITLE  optional OpenRouter attribution headers.
 
+import { GEMINI_FLASH, DEFAULT_REASONING_EFFORT } from "./models.ts";
+
 interface Provider {
   key: string;
   baseUrl: string;
@@ -52,7 +54,7 @@ export interface LlmChatOptions {
 }
 
 export function textModel(): string {
-  return Deno.env.get("WB_LLM_MODEL") ?? "google/gemini-2.5-flash-lite";
+  return Deno.env.get("WB_LLM_MODEL") ?? GEMINI_FLASH;
 }
 
 export function visionModel(): string {
@@ -138,12 +140,18 @@ function tryParse<T>(raw: string): T | null {
 
 /** One completion request. Returns assistant text (possibly empty). */
 async function once(provider: Provider, opts: LlmChatOptions, json: boolean): Promise<string> {
+  const model = opts.model ?? textModel();
   const body: Record<string, unknown> = {
-    model: opts.model ?? textModel(),
+    model,
     messages: opts.messages,
     temperature: opts.temperature ?? 0.4,
   };
-  if (opts.maxTokens) body.max_tokens = opts.maxTokens;
+  if (model === GEMINI_FLASH && provider.isOpenRouter) {
+    // 3.8 Flash: thinking tokens count against max_tokens, so no output cap.
+    body.reasoning = { effort: DEFAULT_REASONING_EFFORT };
+  } else if (opts.maxTokens) {
+    body.max_tokens = opts.maxTokens;
+  }
   if (json) body.response_format = { type: "json_object" };
 
   let res = await post(provider, body);

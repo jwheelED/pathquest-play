@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { callClaude } from "../_shared/anthropic.ts";
+import { GEMINI_FLASH } from "../_shared/models.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -223,10 +224,12 @@ Rules (apply in order):
         });
       }
       const t0 = performance.now();
-      // Primary uses the fast flash-lite model; the structural retry escalates
-      // to flash. No artificial timeout — aborting discards billed work.
+      // Both stages use Gemini 3.8 Flash; the structural retry thinks harder
+      // (medium effort) instead of switching models. No artificial timeout —
+      // aborting discards billed work.
       const res = await callClaude({
-        model: stage === 'primary' ? 'google/gemini-2.5-flash-lite' : 'google/gemini-2.5-flash',
+        model: GEMINI_FLASH,
+        reasoning_effort: stage === 'primary' ? 'low' : 'medium',
         messages,
         response_format: { type: 'json_object' },
       });
@@ -291,9 +294,7 @@ Rules (apply in order):
     const needsReview = false;
     void refine;
     if (!verdict.ok && isStructuralFailure) {
-      console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with stronger model.`);
-      // PERF: retry escalates to flash (not pro) — pro is 8-12s and rarely worth it
-      // for a 4-option MCQ. flash is the previous primary model and clears structural bugs.
+      console.warn(`MCQ validator REJECTED first attempt (structural): ${verdict.reason}. Retrying once with more reasoning.`);
       const retryResp = await callModel('retry', verdict.reason);
       if (retryResp.ok) {
         const retryData = await retryResp.json();
