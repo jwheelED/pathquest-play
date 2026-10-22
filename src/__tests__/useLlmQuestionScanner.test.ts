@@ -56,4 +56,23 @@ describe("useLlmQuestionScanner", () => {
     expect(scan).toHaveBeenCalledTimes(2);
     expect(onDetected).toHaveBeenCalledTimes(1);
   });
+
+  it("scans a question spoken during a busy scan as soon as that scan returns", async () => {
+    let resolveFirst: (v: ScanResponse) => void = () => {};
+    const scan = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<ScanResponse>((r) => { resolveFirst = r; }))
+      .mockImplementation(async () => yes("What is four plus four?"));
+    const onDetected = vi.fn();
+    const { result } = renderHook(() => useLlmQuestionScanner({ enabled: true, scan, onDetected, minGapMs: 0 }));
+    act(() => result.current.feed("okay let's warm up"));
+    await act(async () => { vi.advanceTimersByTime(550); });
+    expect(scan).toHaveBeenCalledTimes(1);
+    act(() => result.current.feed("what's four plus four"));
+    await act(async () => { vi.advanceTimersByTime(550); });
+    expect(scan).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveFirst({ detected: false }); });
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(onDetected).toHaveBeenCalledTimes(1);
+  });
 });
