@@ -38,7 +38,6 @@ async function scanWithGroq(messages: Msg[]): Promise<{ parsed: unknown } | { fa
       body: JSON.stringify({
         model: GROQ_SCANNER_MODEL,
         messages: jsonMessages,
-        temperature: 0.3,
         reasoning_effort: "low",
         response_format: { type: "json_object" },
       }),
