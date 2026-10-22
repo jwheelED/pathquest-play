@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseScanResult, buildScanMessages } from "../scan-transcript-questions/scanner.ts";
+import { parseScanResult, buildScanMessages, parseJsonText } from "../scan-transcript-questions/scanner.ts";
 
 const good = {
   detected: true,
@@ -41,5 +41,22 @@ describe("parseScanResult", () => {
   it("puts only new speech in the NEW SPEECH section", () => {
     const [, user] = buildScanMessages({ contextText: "old part", newText: "Why?", recentlySent: [] });
     expect(user.content).toContain("NEW SPEECH:\nWhy?");
+  });
+});
+
+describe("parseJsonText (Llama JSON replies)", () => {
+  it("reads JSON wrapped in code fences", () => {
+    expect(parseJsonText('```json\n{"detected":false}\n```')).toEqual({ detected: false });
+  });
+
+  it("reads JSON with stray text around it", () => {
+    expect(parseJsonText('Here you go: {"detected":true,"question":"Why did Rome fall?"} done')).toEqual({
+      detected: true,
+      question: "Why did Rome fall?",
+    });
+  });
+
+  it("returns null for non-JSON", () => {
+    expect(parseJsonText("no question here")).toBeNull();
   });
 });
