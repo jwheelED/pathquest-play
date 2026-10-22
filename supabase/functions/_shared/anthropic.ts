@@ -64,7 +64,7 @@ export async function callClaude(body: OpenAIRequest): Promise<Response> {
   const shimToolCall = false;
 
   let toolFnName: string | undefined;
-  const messages = [...body.messages] as Record<string, unknown>[];
+  const messages = [...body.messages] as unknown as Record<string, unknown>[];
 
   if (shimToolCall) {
     const tool = body.tools![0];
