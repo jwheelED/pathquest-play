@@ -78,7 +78,6 @@ serve(async (req) => {
         { role: "user", content: userMsg },
       ],
       temperature: 0.3,
-      maxTokens: 4000,
     });
 
     // Clamp weight into range defensively.
