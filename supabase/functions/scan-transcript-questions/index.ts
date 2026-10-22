@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { callClaude } from "../_shared/anthropic.ts";
-import { GEMINI_FLASH_LITE, GROQ_LLAMA_FAST } from "../_shared/models.ts";
+import { GEMINI_FLASH_LITE, GROQ_SCANNER_MODEL } from "../_shared/models.ts";
 import { buildScanMessages, parseJsonText, parseScanResult, SCAN_TOOL, type ScanFormat } from "./scanner.ts";
 
 const corsHeaders = {
@@ -19,7 +19,7 @@ const GROQ_TIMEOUT_MS = 2500;
 
 type Msg = { role: "system" | "user"; content: string };
 
-/** Llama 3.1 8B on Groq in JSON mode. Returns parsed output, or null to fall back. */
+/** Groq (gpt-oss-120b) in JSON mode. Returns parsed output, or null to fall back. */
 async function scanWithGroq(messages: Msg[]): Promise<{ parsed: unknown } | { failed: string }> {
   const key = Deno.env.get("GROQ_API_KEY");
   if (!key) return { failed: "no_key" };
@@ -36,10 +36,10 @@ async function scanWithGroq(messages: Msg[]): Promise<{ parsed: unknown } | { fa
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: GROQ_LLAMA_FAST,
+        model: GROQ_SCANNER_MODEL,
         messages: jsonMessages,
         temperature: 0.3,
-        max_tokens: 500,
+        reasoning_effort: "low",
         response_format: { type: "json_object" },
       }),
       signal: ctrl.signal,
