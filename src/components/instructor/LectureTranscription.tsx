@@ -241,6 +241,16 @@ export const LectureTranscription = ({
   const lastDetectionTimeRef = useRef<number>(0);
   const lastDetectedChunkIndexRef = useRef<number>(-1);
   const lastQuestionSentTimeRef = useRef<number>(0);
+  const recentlySentQuestionsRef = useRef<string[]>([]);
+  const aiScanFailedAtRef = useRef<number>(0);
+  const [aiScannerEnabled, setAiScannerEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('edvana.aiQuestionScanner') !== 'off'; } catch { return true; }
+  });
+  const aiScannerEnabledRef = useRef(aiScannerEnabled);
+  useEffect(() => {
+    aiScannerEnabledRef.current = aiScannerEnabled;
+    try { localStorage.setItem('edvana.aiQuestionScanner', aiScannerEnabled ? 'on' : 'off'); } catch { /* ignore */ }
+  }, [aiScannerEnabled]);
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const intervalStartTimeRef = useRef<number>(0);
   
@@ -259,6 +269,7 @@ export const LectureTranscription = ({
     trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
     acceptVettedCandidate: acceptVettedPassiveCandidate,
+    acceptAiCandidate: acceptAiPassiveCandidate,
     notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     removeFromHistory: removePassiveFromHistory,
@@ -328,10 +339,39 @@ export const LectureTranscription = ({
       console.log('🎯 Trigger capture emitted question:', candidate.text);
       pendingPriorContextRef.current = candidate.priorContext ?? null;
       resetPassiveDetection?.();
+      // In AI mode, classic detection is only a safety net while the AI scanner is failing.
+      if (aiScannerEnabledRef.current && Date.now() - aiScanFailedAtRef.current > 30_000) {
+        console.log('🤖 AI scanner active — classic candidate held back');
+        return;
+      }
       const priorContext = candidate.priorContext || (intervalTranscriptRef.current || "").trim();
       acceptVettedPassiveCandidate(candidate.text, priorContext);
     });
   }, [setTriggerCaptureComplete, acceptVettedPassiveCandidate, resetPassiveDetection]);
+
+  const { feed: feedAiScanner, reset: resetAiScanner } = useLlmQuestionScanner({
+    enabled: aiScannerEnabled,
+    getRecentlySent: () => recentlySentQuestionsRef.current,
+    scan: async (req) => {
+      const { data, error } = await supabase.functions.invoke('scan-transcript-questions', {
+        body: { ...req, sessionId, formatPreference: questionFormatPreference },
+      });
+      if (error || !data) return { detected: false, failed: true };
+      return data as ScanResponse;
+    },
+    onScanFailed: () => { aiScanFailedAtRef.current = Date.now(); },
+    onDetected: (d) => {
+      if (isSendingQuestionRef.current) return;
+      console.log('🤖 AI scanner found question:', d.question);
+      const prebuilt: PrebuiltAnswerData = {
+        format: d.format,
+        options: d.options,
+        correctAnswer: d.correctAnswer,
+        expectedAnswer: d.expectedAnswer,
+      };
+      acceptAiPassiveCandidate(d.question, d.priorContext, prebuilt);
+    },
+  });
 
 
 
@@ -2660,6 +2700,7 @@ export const LectureTranscription = ({
           // (what/why/how/when/where/who/which …). Question-mark-only utterances
           // no longer trigger Question on Deck — too noisy from rhetorical asides.
           feedTriggerChunk(cleanText, Date.now());
+          feedAiScanner(cleanText);
 
           // Reset trailing-silence timer on any pending passive candidate —
           // the instructor is still talking, so don't promote yet.
@@ -2786,6 +2827,7 @@ export const LectureTranscription = ({
       setIsCircuitOpen(false);
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
+      resetAiScanner();
 
       // Use Deepgram WebSocket streaming via Fly.io proxy for real-time transcription
       console.log("🌊 Starting recording with Deepgram real-time streaming via Fly.io proxy");
@@ -4117,6 +4159,26 @@ export const LectureTranscription = ({
       {/* Question on Deck — persistent autodraft card */}
       {isRecording && (
         <div className="mt-4">
+          {/* AI question scanner toggle */}
+          <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
+            <div className="min-w-0">
+              <Label htmlFor="ai-scanner-toggle" className="text-sm font-semibold cursor-pointer" style={{ color: "#000000" }}>
+                AI question scanner
+              </Label>
+              <p className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
+                {aiScannerEnabled
+                  ? "AI checks each pause for questions you ask the class"
+                  : "Classic detection (word rules only)"}
+              </p>
+            </div>
+            <Switch
+              id="ai-scanner-toggle"
+              checked={aiScannerEnabled}
+              onCheckedChange={setAiScannerEnabled}
+              className="data-[state=checked]:bg-[#388e6e] shrink-0 mt-0.5"
+            />
+          </div>
+
           {/* CONFIDENCE CHECK — Auto check-ins toggle (Element 1) */}
           <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
             <div className="min-w-0">
@@ -4152,6 +4214,7 @@ export const LectureTranscription = ({
             courseId={selectedCourseId}
             onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
+              recentlySentQuestionsRef.current = [questionText, ...recentlySentQuestionsRef.current].slice(0, 5);
               // Map on-deck format → wire suggested_type. For coding, expand to
               // 'coding_simple' or 'coding' based on the instructor's style.
               const wireType = (() => {
