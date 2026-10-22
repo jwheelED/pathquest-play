@@ -421,6 +421,7 @@ export function QuestionOnDeck({
         setBankMatch(null);
         setMcqOptions(pb.options);
         if (pb.correctAnswer) setCorrectAnswer(pb.correctAnswer);
+        trackOnDeckChoices({ source: 'ai_scan', format: pb.format, ms: 0, text: candidate.text });
         return;
       }
       if (pb.format === 'short_answer' && pb.expectedAnswer) {
@@ -428,10 +429,17 @@ export function QuestionOnDeck({
         setIsGenerating(false);
         setBankMatch(null);
         setExpectedAnswer(pb.expectedAnswer);
+        trackOnDeckChoices({ source: 'ai_scan', format: pb.format, ms: 0, text: candidate.text });
         return;
       }
     }
-    generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
+    // Why the AI scan's choices couldn't be used (shown with the generated event).
+    const prebuiltReason = !pb
+      ? candidate.source === 'ai_scan' ? 'scan_returned_no_choices' : 'classic_detection'
+      : pb.format !== effectiveFormat
+        ? `format_mismatch(${pb.format}→${effectiveFormat})`
+        : 'scan_choices_incomplete';
+    generatePreview(candidate.text, effectiveFormat, candidate.priorContext, prebuiltReason);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate?.text, effectiveFormat, codingStyle]);
 

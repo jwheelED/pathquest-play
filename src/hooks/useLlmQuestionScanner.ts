@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { trackQuestionDetectionDrop } from "@/lib/posthogTracking";
 
 export type ScannerFormat = "multiple_choice" | "short_answer" | "poll" | "coding";
 
@@ -112,6 +113,8 @@ export function useLlmQuestionScanner({
           detected.current = [...detected.current.slice(-9), res.question];
           const { detected: _d, ...rest } = res;
           cbs.current.onDetected({ ...rest, priorContext: contextText });
+        } else {
+          trackQuestionDetectionDrop('duplicate', { path: 'ai_scan', text: res.question });
         }
       } else if ("failed" in res && res.failed) {
         cbs.current.onScanFailed?.();
