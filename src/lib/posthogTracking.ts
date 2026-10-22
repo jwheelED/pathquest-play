@@ -80,12 +80,27 @@ export type QuestionDetectionFilter =
   | 'no_interrogative_trigger'
   | 'cooldown_block'
   | 'gate_hold'
-  | 'empty_slice';
+  | 'empty_slice'
+  | 'duplicate'
+  | 'ai_held_back';
 
 /** Where in the pipeline a question candidate came from. */
 export type QuestionDetectionPath = 'trigger_capture' | 'passive' | 'manual' | 'ai_scan';
 
-const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
+const DEBUG_KEY = 'edvana.debugDetection';
+
+/**
+ * Detection logs show in dev tools everywhere (preview and live site) so
+ * question pickup can be debugged during real sessions. They contain only
+ * instructor speech. Turn off with localStorage.setItem('edvana.debugDetection', '0').
+ */
+const detectionLogsOn = () => {
+  try {
+    return typeof window !== 'undefined' && window.localStorage.getItem(DEBUG_KEY) !== '0';
+  } catch {
+    return true;
+  }
+};
 
 /**
  * Mirrors detection telemetry into the browser console so the same "enhanced
@@ -93,9 +108,67 @@ const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV
  * console-log recording then captures these lines alongside the events.
  */
 const logDetection = (label: string, payload: Record<string, unknown>) => {
-  if (!isDev) return;
+  if (!detectionLogsOn()) return;
   // eslint-disable-next-line no-console
   console.log(`📊 [posthog] ${label}`, payload);
+};
+
+/**
+ * One event per AI scanner call: whether it found a question, which AI
+ * answered (groq / gemini fallback), and how long it took end to end.
+ */
+export const trackAiScan = (details: {
+  outcome: 'detected' | 'none' | 'failed';
+  provider?: string;
+  serverMs?: number;
+  roundTripMs: number;
+  reason?: string;
+  text?: string;
+  newWords?: number;
+  hasChoices?: boolean;
+}) => {
+  try {
+    const payload = {
+      outcome: details.outcome,
+      provider: details.provider,
+      server_ms: details.serverMs,
+      round_trip_ms: details.roundTripMs,
+      reason: details.reason,
+      text_snippet: details.text?.slice(0, 80),
+      new_words: details.newWords,
+      has_choices: details.hasChoices,
+    };
+    posthog.capture('question_ai_scan', payload);
+    logDetection(`question_ai_scan → ${details.outcome}${details.provider ? ` (${details.provider})` : ''} ${details.roundTripMs}ms`, payload);
+  } catch {
+    // Telemetry must never break the detection path.
+  }
+};
+
+/**
+ * How the On Deck card got its answer choices: instantly from the AI scan,
+ * from a separate generation call, or not at all.
+ */
+export const trackOnDeckChoices = (details: {
+  source: 'ai_scan' | 'generated' | 'failed';
+  format: string;
+  ms: number;
+  reason?: string;
+  text?: string;
+}) => {
+  try {
+    const payload = {
+      source: details.source,
+      format: details.format,
+      ms: details.ms,
+      reason: details.reason,
+      text_snippet: details.text?.slice(0, 80),
+    };
+    posthog.capture('on_deck_choices', payload);
+    logDetection(`on_deck_choices ← ${details.source} ${details.ms}ms`, payload);
+  } catch {
+    // Telemetry must never break the On Deck card.
+  }
 };
 
 /**

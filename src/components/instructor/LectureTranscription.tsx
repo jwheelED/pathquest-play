@@ -68,6 +68,7 @@ import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuest
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
 import { usePassiveQuestionDetection, PassiveQuestionCandidate, type PrebuiltAnswerData } from "@/hooks/usePassiveQuestionDetection";
 import { useLlmQuestionScanner, type ScanResponse } from "@/hooks/useLlmQuestionScanner";
+import { trackAiScan, trackQuestionDetectionDrop } from "@/lib/posthogTracking";
 import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
 import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
 import { ConfidenceCheckService } from "@/lib/confidenceCheck/service";
@@ -342,7 +343,7 @@ export const LectureTranscription = ({
       resetPassiveDetection?.();
       // In AI mode, classic detection is only a safety net while the AI scanner is failing.
       if (aiScannerEnabledRef.current && Date.now() - aiScanFailedAtRef.current > 30_000) {
-        console.log('🤖 AI scanner active — classic candidate held back');
+        trackQuestionDetectionDrop('ai_held_back', { path: 'trigger_capture', text: candidate.text });
         return;
       }
       const priorContext = candidate.priorContext || (intervalTranscriptRef.current || "").trim();
@@ -354,11 +355,28 @@ export const LectureTranscription = ({
     enabled: aiScannerEnabled,
     getRecentlySent: () => recentlySentQuestionsRef.current,
     scan: async (req) => {
+      const startedAt = performance.now();
       const { data, error } = await supabase.functions.invoke('scan-transcript-questions', {
         body: { ...req, sessionId, formatPreference: questionFormatPreference },
       });
-      if (error || !data) return { detected: false, failed: true };
-      return data as ScanResponse;
+      const roundTripMs = Math.round(performance.now() - startedAt);
+      const newWords = req.newText.split(/\s+/).filter(Boolean).length;
+      if (error || !data) {
+        trackAiScan({ outcome: 'failed', roundTripMs, reason: error?.message ?? 'no_data', text: req.newText, newWords });
+        return { detected: false, failed: true };
+      }
+      const res = data as ScanResponse & { provider?: string; latencyMs?: number };
+      trackAiScan({
+        outcome: res.detected ? 'detected' : 'failed' in res && res.failed ? 'failed' : 'none',
+        provider: res.provider,
+        serverMs: res.latencyMs,
+        roundTripMs,
+        reason: res.detected === false ? res.reason : undefined,
+        text: res.detected ? res.question : req.newText,
+        newWords,
+        hasChoices: res.detected ? Boolean(res.options?.length || res.expectedAnswer) : undefined,
+      });
+      return res;
     },
     onScanFailed: () => { aiScanFailedAtRef.current = Date.now(); },
     onDetected: (d) => {
