@@ -575,7 +575,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         prebuilt,
         source: 'ai_scan',
       };
-      trackQuestionDetected('ai_scan' as never, {
+      trackQuestionDetected('ai_scan', {
         text: newCandidate.text,
         wordCount: wordCount(newCandidate.text),
         contextChars: priorContext?.length,
