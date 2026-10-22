@@ -6,12 +6,22 @@ const MIN_WORD_COUNT = 4;
 // monologue blob that Deepgram appended a "?" to based on intonation.
 const MAX_WORD_COUNT = 30;
 
+export interface PrebuiltAnswerData {
+  format: 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
+  options?: string[];
+  correctAnswer?: 'A' | 'B' | 'C' | 'D';
+  expectedAnswer?: string;
+}
+
 export interface PassiveQuestionCandidate {
   text: string;
   detectedAt: number;
   id: string;
   /** Optional teaching prose that came BEFORE the question — used to resolve pronouns downstream */
   priorContext?: string;
+  /** Answer data produced together with detection (AI scanner) — On Deck skips generation when present */
+  prebuilt?: PrebuiltAnswerData;
+  source?: 'ai_scan' | 'classic';
 }
 
 export interface CheckUtteranceOptions {
