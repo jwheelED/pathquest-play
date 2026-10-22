@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { OPENAI_IMAGE_MODEL } from "../_shared/models.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -194,6 +195,8 @@ async function generateAndUpload(
     const courseContext = courseTitle ? ` for a ${courseTitle} course` : "";
     const prompt = `${styleGuide}\n\nConcept: ${questionText}${courseContext}\n\nCreate a simple, clear visual that helps a student understand this concept at a glance.`;
 
+    // DALL-E 3 was retired by OpenAI. GPT Image models always return base64
+    // and reject `response_format`; "low" quality is the fastest (~6s).
     const dalleRes = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
@@ -201,25 +204,24 @@ async function generateAndUpload(
         Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "dall-e-3",
+        model: OPENAI_IMAGE_MODEL,
         prompt,
         n: 1,
-        size: "1792x1024",
-        quality: "standard",
-        response_format: "b64_json",
+        size: "1536x1024",
+        quality: "low",
       }),
     });
 
     if (!dalleRes.ok) {
       const errBody = await dalleRes.text();
-      console.error("DALL-E API error:", dalleRes.status, errBody.slice(0, 300));
-      throw new Error(`DALL-E API error: ${dalleRes.status}`);
+      console.error("OpenAI image API error:", dalleRes.status, errBody.slice(0, 300));
+      throw new Error(`OpenAI image API error: ${dalleRes.status}`);
     }
 
     const dalleData = await dalleRes.json();
     const b64 = dalleData.data?.[0]?.b64_json;
     if (!b64) {
-      throw new Error("No image data in DALL-E response");
+      throw new Error("No image data in OpenAI image response");
     }
 
     // Decode base64 to bytes
@@ -247,10 +249,12 @@ serve(async (req) => {
   );
 
   let questionId: string | undefined;
+  let isPrepare = false;
 
   try {
     const body = await req.json();
     questionId = body.questionId;
+    isPrepare = body.mode === "prepare";
     const questionText: string = body.questionText;
     const courseTitle: string | undefined = body.courseTitle;
     const imageKind: "illustration" | "diagram" = body.imageKind || "illustration";
@@ -340,6 +344,14 @@ serve(async (req) => {
         .then(({ error: e }) => {
           if (e) console.error("Failed to mark image_status=failed:", e);
         });
+    }
+
+    // Pre-generation is best effort: a failure must not surface as an app error.
+    if (isPrepare) {
+      return new Response(
+        JSON.stringify({ success: false, error: message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
