@@ -89,9 +89,10 @@ Deno.serve(async (req) => {
     const userId = claims?.claims?.sub as string | undefined;
     if (claimsErr || !userId) return json({ error: "Unauthorized" }, 401);
 
+    // Signed-in user verified above; the instructor-role lookup runs alongside
+    // the AI call (saves a database round trip per scan) and gates the result.
     const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const { data: isInstructor } = await admin.rpc("has_role", { _user_id: userId, _role: "instructor" });
-    if (!isInstructor) return json({ error: "Forbidden" }, 403);
+    const rolePromise = admin.rpc("has_role", { _user_id: userId, _role: "instructor" });
 
     const body = await req.json().catch(() => null);
     const newText = typeof body?.newText === "string" ? body.newText.trim().slice(0, 2000) : "";
@@ -100,18 +101,27 @@ Deno.serve(async (req) => {
       ? body.recentlySent.filter((s: unknown) => typeof s === "string").slice(0, 5).map((s: string) => s.slice(0, 300))
       : [];
     const formatPreference = FORMATS.includes(body?.formatPreference) ? (body.formatPreference as ScanFormat) : null;
-    if (newText.split(/\s+/).filter(Boolean).length < 2) return json({ detected: false, reason: "too_short" });
+    if (newText.split(/\s+/).filter(Boolean).length < 2) {
+      const { data: ok } = await rolePromise;
+      return ok ? json({ detected: false, reason: "too_short" }) : json({ error: "Forbidden" }, 403);
+    }
 
     const messages = buildScanMessages({ contextText, newText, recentlySent, formatPreference, courseType: body?.courseType ?? null });
 
-    let provider = "groq";
-    let out: { parsed: unknown } | { failed: string; status?: number } = await scanWithGroq(messages);
-    if ("failed" in out) {
-      const groqReason = out.failed;
-      provider = "gemini";
-      out = await scanWithGemini(messages);
-      if (groqReason !== "no_key") console.log(`[scan-transcript-questions] fell back to Gemini (${groqReason})`);
-    }
+    const aiPromise = (async () => {
+      let provider = "groq";
+      let out: { parsed: unknown } | { failed: string; status?: number } = await scanWithGroq(messages);
+      if ("failed" in out) {
+        const groqReason = out.failed;
+        provider = "gemini";
+        out = await scanWithGemini(messages);
+        if (groqReason !== "no_key") console.log(`[scan-transcript-questions] fell back to Gemini (${groqReason})`);
+      }
+      return { provider, out };
+    })();
+
+    const [{ data: isInstructor }, { provider, out }] = await Promise.all([rolePromise, aiPromise]);
+    if (!isInstructor) return json({ error: "Forbidden" }, 403);
 
     if ("failed" in out) {
       console.warn(`[scan-transcript-questions] AI failed: ${out.failed}`);
