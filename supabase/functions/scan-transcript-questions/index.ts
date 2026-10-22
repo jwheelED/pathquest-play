@@ -129,7 +129,10 @@ Deno.serve(async (req) => {
     }
     const result = parseScanResult(out.parsed, formatPreference);
     const latencyMs = Date.now() - started;
-    console.log(`[scan-transcript-questions] ${provider} ${latencyMs}ms detected=${result.detected}`);
+    // Instructor speech only (no participant data) — lets pickup be debugged from server logs.
+    const heard = JSON.stringify(newText.slice(-120));
+    const found = result.detected ? ` question=${JSON.stringify(result.question.slice(0, 120))} choices=${Boolean(result.options?.length || result.expectedAnswer)}` : "";
+    console.log(`[scan-transcript-questions] ${provider} ${latencyMs}ms detected=${result.detected} heard=${heard}${found}`);
     return json({ ...result, provider, latencyMs });
   } catch (err) {
     console.error("[scan-transcript-questions] error", err);

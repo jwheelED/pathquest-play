@@ -82,7 +82,8 @@ export type QuestionDetectionFilter =
   | 'gate_hold'
   | 'empty_slice'
   | 'duplicate'
-  | 'ai_held_back';
+  | 'ai_held_back'
+  | 'sending_in_progress';
 
 /** Where in the pipeline a question candidate came from. */
 export type QuestionDetectionPath = 'trigger_capture' | 'passive' | 'manual' | 'ai_scan';
