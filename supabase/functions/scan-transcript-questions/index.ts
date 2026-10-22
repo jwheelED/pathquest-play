@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { callClaude } from "../_shared/anthropic.ts";
-import { GEMINI_FLASH, DEFAULT_REASONING_EFFORT } from "../_shared/models.ts";
-import { buildScanMessages, parseScanResult, SCAN_TOOL, type ScanFormat } from "./scanner.ts";
+import { GEMINI_FLASH_LITE, GROQ_LLAMA_FAST } from "../_shared/models.ts";
+import { buildScanMessages, parseJsonText, parseScanResult, SCAN_TOOL, type ScanFormat } from "./scanner.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +13,69 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const FORMATS: ScanFormat[] = ["multiple_choice", "short_answer", "poll", "coding"];
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+// Groq normally answers in well under a second; if it stalls, Gemini takes over.
+const GROQ_TIMEOUT_MS = 2500;
+
+type Msg = { role: "system" | "user"; content: string };
+
+/** Llama 3.1 8B on Groq in JSON mode. Returns parsed output, or null to fall back. */
+async function scanWithGroq(messages: Msg[]): Promise<{ parsed: unknown } | { failed: string }> {
+  const key = Deno.env.get("GROQ_API_KEY");
+  if (!key) return { failed: "no_key" };
+  const schema = JSON.stringify(SCAN_TOOL.function.parameters);
+  const jsonMessages = messages.map((m, i) =>
+    i === 0
+      ? { ...m, content: `${m.content.replace(/Call report_question with detected:false if no question was asked\./, "")}\nRespond with ONLY a JSON object (no markdown) matching this schema: ${schema}\nUse {"detected": false} if no question was asked.` }
+      : m,
+  );
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), GROQ_TIMEOUT_MS);
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: GROQ_LLAMA_FAST,
+        messages: jsonMessages,
+        temperature: 0.3,
+        max_tokens: 500,
+        response_format: { type: "json_object" },
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      console.warn(`[scan-transcript-questions] Groq status ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      return { failed: `groq_${res.status}` };
+    }
+    const data = await res.json();
+    const parsed = parseJsonText(data?.choices?.[0]?.message?.content);
+    return parsed ? { parsed } : { failed: "groq_bad_json" };
+  } catch (err) {
+    const reason = err instanceof DOMException && err.name === "AbortError" ? "groq_timeout" : "groq_error";
+    console.warn(`[scan-transcript-questions] ${reason}`);
+    return { failed: reason };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Fallback: fastest Gemini on the Lovable AI Gateway, no thinking. */
+async function scanWithGemini(messages: Msg[]): Promise<{ parsed: unknown } | { failed: string; status: number }> {
+  const res = await callClaude({
+    model: GEMINI_FLASH_LITE,
+    messages,
+    tools: [SCAN_TOOL],
+    tool_choice: { type: "function", function: { name: "report_question" } },
+  });
+  if (!res.ok) {
+    return { failed: res.status === 429 ? "rate_limited" : res.status === 402 ? "credits" : "ai_error", status: res.status };
+  }
+  const data = await res.json();
+  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+  const parsed = typeof args === "string" ? parseJsonText(args) : args ?? null;
+  return { parsed };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -40,25 +103,25 @@ Deno.serve(async (req) => {
     const formatPreference = FORMATS.includes(body?.formatPreference) ? (body.formatPreference as ScanFormat) : null;
     if (newText.split(/\s+/).filter(Boolean).length < 2) return json({ detected: false, reason: "too_short" });
 
-    const res = await callClaude({
-      model: GEMINI_FLASH,
-      reasoning_effort: DEFAULT_REASONING_EFFORT,
-      messages: buildScanMessages({ contextText, newText, recentlySent, formatPreference, courseType: body?.courseType ?? null }),
-      tools: [SCAN_TOOL],
-      tool_choice: { type: "function", function: { name: "report_question" } },
-    });
+    const messages = buildScanMessages({ contextText, newText, recentlySent, formatPreference, courseType: body?.courseType ?? null });
 
-    if (!res.ok) {
-      console.warn(`[scan-transcript-questions] AI status ${res.status}`);
-      return json({ detected: false, reason: res.status === 429 ? "rate_limited" : res.status === 402 ? "credits" : "ai_error", failed: true });
+    let provider = "groq";
+    let out: { parsed: unknown } | { failed: string; status?: number } = await scanWithGroq(messages);
+    if ("failed" in out) {
+      const groqReason = out.failed;
+      provider = "gemini";
+      out = await scanWithGemini(messages);
+      if (groqReason !== "no_key") console.log(`[scan-transcript-questions] fell back to Gemini (${groqReason})`);
     }
-    const data = await res.json();
-    const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    let parsed: unknown = null;
-    try { parsed = typeof args === "string" ? JSON.parse(args) : args; } catch { parsed = null; }
-    const result = parseScanResult(parsed, formatPreference);
-    console.log(`[scan-transcript-questions] ${Date.now() - started}ms detected=${result.detected}`);
-    return json({ ...result, latencyMs: Date.now() - started });
+
+    if ("failed" in out) {
+      console.warn(`[scan-transcript-questions] AI failed: ${out.failed}`);
+      return json({ detected: false, reason: out.failed, failed: true, provider });
+    }
+    const result = parseScanResult(out.parsed, formatPreference);
+    const latencyMs = Date.now() - started;
+    console.log(`[scan-transcript-questions] ${provider} ${latencyMs}ms detected=${result.detected}`);
+    return json({ ...result, provider, latencyMs });
   } catch (err) {
     console.error("[scan-transcript-questions] error", err);
     return json({ detected: false, reason: "internal", failed: true });

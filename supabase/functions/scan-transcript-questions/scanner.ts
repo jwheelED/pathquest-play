@@ -78,6 +78,18 @@ Call report_question with detected:false if no question was asked.`;
 
 const stripPrefix = (s: string) => s.replace(/^\s*(?:[A-D][\).:\-]\s+)/, "").trim();
 
+/** Parse a model's JSON text reply, tolerating code fences and stray prose. */
+export function parseJsonText(raw: unknown): unknown {
+  if (typeof raw !== "string") return null;
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  try { return JSON.parse(cleaned); } catch { /* try the first {...} block */ }
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { return null; }
+}
+
+
 export function parseScanResult(raw: unknown, preferred?: ScanFormat | null): ScanResult {
   if (!raw || typeof raw !== "object") return { detected: false, reason: "bad_output" };
   const r = raw as Record<string, unknown>;
