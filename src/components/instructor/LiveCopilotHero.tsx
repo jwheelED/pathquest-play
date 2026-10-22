@@ -41,7 +41,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import type { PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
+import type { PassiveQuestionCandidate, PrebuiltAnswerData } from "@/hooks/usePassiveQuestionDetection";
+import { trackOnDeckChoices } from "@/lib/posthogTracking";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -622,6 +623,7 @@ export function LiveCopilotHero({
   const [bankMatch, setBankMatch] = useState<BankMatchPreview | null>(null);
   const generatedForRef = useRef<string | null>(null);
   const priorContextByQuestionRef = useRef<Map<string, string>>(new Map());
+  const prebuiltByQuestionRef = useRef<Map<string, PrebuiltAnswerData>>(new Map());
 
   // effectiveFormat is the resolved instructor preference. Keep 'coding' as a
   // first-class branch so we never silently fall back to MCQ when the
@@ -651,6 +653,9 @@ export function LiveCopilotHero({
     const candidatePrior = questionCandidate.priorContext ?? "";
     if (candidatePrior) {
       priorContextByQuestionRef.current.set(candidateText, candidatePrior);
+    }
+    if (questionCandidate.prebuilt) {
+      prebuiltByQuestionRef.current.set(candidateText, questionCandidate.prebuilt);
     }
     setQuestionHistory((prev) => {
       if (prev.includes(candidateText)) return prev;
@@ -727,12 +732,45 @@ export function LiveCopilotHero({
   // Single source of truth for preview generation. Branches by effectiveFormat
   // and NEVER calls MCQ generation when the instructor preference is Coding,
   // Short Answer, or Poll — preventing the stale MCQ fallback we used to see.
-  const runPreviewGeneration = (questionText: string) => {
+  const runPreviewGeneration = (questionText: string, usePrebuilt = true) => {
     setIsGeneratingPreview(true);
     setPreviewOptions([]);
     setPreviewExpectedAnswer("");
     setPreviewCodingPayload(null);
     setBankMatch(null);
+
+    // The AI scanner already wrote the answer data together with detection —
+    // show it instantly instead of a second generation call. Regenerate skips this.
+    const pb = usePrebuilt ? prebuiltByQuestionRef.current.get(questionText) : undefined;
+    const pbFormat = pb?.format === 'multiple_choice' ? 'mcq' : pb?.format;
+    if (pb && pbFormat === effectiveFormat) {
+      if ((effectiveFormat === 'mcq' || effectiveFormat === 'poll') && pb.options?.length === 4) {
+        setPreviewOptions(parseOptions(pb.options, pb.correctAnswer ?? 'A', effectiveFormat === 'mcq'));
+        setIsGeneratingPreview(false);
+        trackOnDeckChoices({ source: 'ai_scan', format: effectiveFormat, ms: 0, text: questionText });
+        return;
+      }
+      if (effectiveFormat === 'short_answer' && pb.expectedAnswer) {
+        setPreviewExpectedAnswer(pb.expectedAnswer);
+        setIsGeneratingPreview(false);
+        trackOnDeckChoices({ source: 'ai_scan', format: effectiveFormat, ms: 0, text: questionText });
+        return;
+      }
+    }
+    const choicesReason = !usePrebuilt
+      ? 'regenerate'
+      : !pb
+        ? 'no_scan_choices'
+        : pbFormat !== effectiveFormat ? `format_mismatch(${pbFormat}→${effectiveFormat})` : 'scan_choices_incomplete';
+    const choicesStartedAt = performance.now();
+    const logChoices = (ok: boolean) =>
+      trackOnDeckChoices({
+        source: ok ? 'generated' : 'failed',
+        format: effectiveFormat,
+        ms: Math.round(performance.now() - choicesStartedAt),
+        reason: choicesReason,
+        text: questionText,
+      });
 
     const lastChunkLocal = currentTranscript || transcriptChunks[transcriptChunks.length - 1] || "";
     const fullTranscript = transcriptChunks.join(' ').slice(-6000) || lastChunkLocal;
@@ -781,6 +819,7 @@ export function LiveCopilotHero({
         supabase.functions.invoke('generate-mcq-options', {
           body: { question_text: questionText, source_transcript: fullTranscript, prior_context: priorContext },
         }).then(({ data, error }) => {
+          logChoices(!error && Array.isArray(data?.options));
           if (!error && data?.options && Array.isArray(data.options)) {
             const correctLetter: string = data.correct_answer ?? 'A';
             setPreviewOptions(parseOptions(data.options as string[], correctLetter, effectiveFormat === 'mcq'));
@@ -886,7 +925,7 @@ export function LiveCopilotHero({
 
   const handleRegenPreview = () => {
     generatedForRef.current = null;
-    if (displayedQuestion) runPreviewGeneration(displayedQuestion);
+    if (displayedQuestion) runPreviewGeneration(displayedQuestion, false);
   };
 
   const isSent = !!sentQuestion;
