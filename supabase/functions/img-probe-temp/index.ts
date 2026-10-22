@@ -2,8 +2,8 @@
 Deno.serve(async () => {
   const key = Deno.env.get("OPENAI_API_KEY");
   const variants: Record<string, Record<string, unknown>> = {
-    dalle3_no_rf: { model: "dall-e-3", size: "1792x1024", quality: "standard" },
-    gpt_image_1: { model: "gpt-image-1", size: "1536x1024", quality: "low" },
+    mini: { model: "gpt-image-1-mini", size: "1536x1024", quality: "low" },
+    v15: { model: "gpt-image-1.5", size: "1536x1024", quality: "low" },
   };
   const out: Record<string, unknown> = {};
   for (const [name, v] of Object.entries(variants)) {
