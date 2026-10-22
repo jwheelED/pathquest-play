@@ -6,12 +6,22 @@ const MIN_WORD_COUNT = 4;
 // monologue blob that Deepgram appended a "?" to based on intonation.
 const MAX_WORD_COUNT = 30;
 
+export interface PrebuiltAnswerData {
+  format: 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
+  options?: string[];
+  correctAnswer?: 'A' | 'B' | 'C' | 'D';
+  expectedAnswer?: string;
+}
+
 export interface PassiveQuestionCandidate {
   text: string;
   detectedAt: number;
   id: string;
   /** Optional teaching prose that came BEFORE the question — used to resolve pronouns downstream */
   priorContext?: string;
+  /** Answer data produced together with detection (AI scanner) — On Deck skips generation when present */
+  prebuilt?: PrebuiltAnswerData;
+  source?: 'ai_scan' | 'classic';
 }
 
 export interface CheckUtteranceOptions {
@@ -552,6 +562,32 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     [enabled, armSilenceTimer, clearSilenceTimer, promotePending, debug]
   );
 
+  /** AI-vetted candidate: skip rule filters and promote immediately. */
+  const acceptAiCandidate = useCallback(
+    (text: string, priorContext?: string, prebuilt?: PrebuiltAnswerData) => {
+      if (!enabled || !text.trim()) return;
+      const now = Date.now();
+      const newCandidate: PassiveQuestionCandidate = {
+        text: text.trim(),
+        detectedAt: now,
+        id: `ai-${++candidateIdCounter}`,
+        priorContext: priorContext || undefined,
+        prebuilt,
+        source: 'ai_scan',
+      };
+      trackQuestionDetected('ai_scan', {
+        text: newCandidate.text,
+        wordCount: wordCount(newCandidate.text),
+        contextChars: priorContext?.length,
+      });
+      clearSilenceTimer();
+      pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
+      promotePending();
+    },
+    [enabled, clearSilenceTimer, promotePending]
+  );
+
   const resetDetection = useCallback(() => {
     lastDetectionTimeRef.current = 0;
     clearAutoDismiss();
@@ -579,6 +615,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     trailingSilenceMs,
     checkUtterance,
     acceptVettedCandidate,
+    acceptAiCandidate,
     notifySpeech,
     dismissCandidate,
     removeFromHistory,

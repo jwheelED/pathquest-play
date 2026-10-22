@@ -411,6 +411,26 @@ export function QuestionOnDeck({
     const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
     if (generatedForRef.current === key) return;
     generatedForRef.current = key;
+    // AI scanner already produced the answer data together with detection —
+    // show it instantly instead of a second generation call.
+    const pb = candidate.prebuilt;
+    if (pb && pb.format === effectiveFormat) {
+      if ((pb.format === 'multiple_choice' || pb.format === 'poll') && pb.options?.length === 4) {
+        requestIdRef.current++;
+        setIsGenerating(false);
+        setBankMatch(null);
+        setMcqOptions(pb.options);
+        if (pb.correctAnswer) setCorrectAnswer(pb.correctAnswer);
+        return;
+      }
+      if (pb.format === 'short_answer' && pb.expectedAnswer) {
+        requestIdRef.current++;
+        setIsGenerating(false);
+        setBankMatch(null);
+        setExpectedAnswer(pb.expectedAnswer);
+        return;
+      }
+    }
     generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate?.text, effectiveFormat, codingStyle]);

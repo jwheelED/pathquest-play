@@ -83,7 +83,7 @@ export type QuestionDetectionFilter =
   | 'empty_slice';
 
 /** Where in the pipeline a question candidate came from. */
-export type QuestionDetectionPath = 'trigger_capture' | 'passive' | 'manual';
+export type QuestionDetectionPath = 'trigger_capture' | 'passive' | 'manual' | 'ai_scan';
 
 const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
 
