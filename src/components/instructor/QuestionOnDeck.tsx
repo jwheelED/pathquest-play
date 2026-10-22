@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import type { PassiveQuestionCandidate } from '@/hooks/usePassiveQuestionDetection';
+import { trackOnDeckChoices } from '@/lib/posthogTracking';
 
 export type OnDeckFormat = 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
 
@@ -475,9 +476,11 @@ export function QuestionOnDeck({
     questionText: string,
     format: OnDeckFormat,
     priorContext?: string,
+    choicesReason = 'regenerate',
   ) => {
     const reqId = ++requestIdRef.current;
     const isLatest = () => requestIdRef.current === reqId;
+    const choicesStartedAt = performance.now();
 
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
@@ -584,7 +587,9 @@ export function QuestionOnDeck({
       ).then((aiRes) => {
         if (!isLatest()) return;
         const { data, error } = aiRes as { data: any; error: any };
+        const ms = Math.round(performance.now() - choicesStartedAt);
         if (error) {
+          trackOnDeckChoices({ source: 'failed', format, ms, reason: error?.message ?? choicesReason, text: questionText });
           if (!settled) {
             sonnerToast.error("Couldn't generate answer choices", {
               description: 'Press regenerate or type the choices yourself.',
@@ -592,6 +597,7 @@ export function QuestionOnDeck({
           }
           return;
         }
+        trackOnDeckChoices({ source: 'generated', format, ms, reason: choicesReason, text: questionText });
         if (format === 'multiple_choice' || format === 'poll') {
           if (data?.options?.length === 4) {
             // Only overwrite if a bank match hasn't already populated options.
