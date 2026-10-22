@@ -159,7 +159,7 @@ export function useLlmQuestionScanner({
       const pendingWords = words(unscanned().text);
       if (pendingWords >= wordTrigger || (pendingWords >= 2 && !pauseTimer.current)) void runScan();
     }
-  }, [minGapMs, contextWindowMs, wordTrigger]);
+  }, [minGapMs, contextWindowMs, wordTrigger, duplicateWindowMs]);
 
   const armPause = useCallback((ms: number) => {
     if (pauseTimer.current) clearTimeout(pauseTimer.current);

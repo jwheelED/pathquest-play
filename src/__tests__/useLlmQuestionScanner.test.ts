@@ -94,4 +94,27 @@ describe("useLlmQuestionScanner", () => {
     await act(async () => { vi.advanceTimersByTime(3000); });
     expect(scan).toHaveBeenCalledTimes(1);
   });
+
+  it("lets a repeat through when the first detection could not be shown", async () => {
+    const onDetected = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
+    const scan = vi.fn(async () => yes("What is four plus four?"));
+    const { result } = renderHook(() => useLlmQuestionScanner({ enabled: true, scan, onDetected, minGapMs: 0 }));
+    act(() => result.current.feed("what is four plus four"));
+    await act(async () => { vi.advanceTimersByTime(600); });
+    act(() => result.current.feed("again, what is four plus four"));
+    await act(async () => { vi.advanceTimersByTime(600); });
+    expect(onDetected).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats the same question asked again after 2 minutes as new", async () => {
+    const onDetected = vi.fn();
+    const scan = vi.fn(async () => yes("What is four plus four?"));
+    const { result } = renderHook(() => useLlmQuestionScanner({ enabled: true, scan, onDetected, minGapMs: 0 }));
+    act(() => result.current.feed("what is four plus four"));
+    await act(async () => { vi.advanceTimersByTime(600); });
+    await act(async () => { vi.advanceTimersByTime(121_000); });
+    act(() => result.current.feed("what is four plus four"));
+    await act(async () => { vi.advanceTimersByTime(600); });
+    expect(onDetected).toHaveBeenCalledTimes(2);
+  });
 });

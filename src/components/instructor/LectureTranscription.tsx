@@ -382,7 +382,11 @@ export const LectureTranscription = ({
     },
     onScanFailed: () => { aiScanFailedAtRef.current = Date.now(); },
     onDetected: (d) => {
-      if (isSendingQuestionRef.current) return;
+      if (isSendingQuestionRef.current) {
+        // Not shown, so not remembered either — saying it again will get through.
+        trackQuestionDetectionDrop('sending_in_progress', { path: 'ai_scan', text: d.question });
+        return false;
+      }
       console.log('🤖 AI scanner found question:', d.question);
       const prebuilt: PrebuiltAnswerData = {
         format: d.format,
@@ -391,6 +395,7 @@ export const LectureTranscription = ({
         expectedAnswer: d.expectedAnswer,
       };
       acceptAiPassiveCandidate(d.question, d.priorContext, prebuilt);
+      return true;
     },
   });
 
