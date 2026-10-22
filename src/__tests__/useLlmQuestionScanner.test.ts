@@ -75,4 +75,23 @@ describe("useLlmQuestionScanner", () => {
     expect(scan).toHaveBeenCalledTimes(2);
     expect(onDetected).toHaveBeenCalledTimes(1);
   });
+
+  it("scans live text once it stops changing, without waiting for the final line", async () => {
+    const scan = vi.fn(async () => yes("What is two plus two?"));
+    const onDetected = vi.fn();
+    const { result } = renderHook(() => useLlmQuestionScanner({ enabled: true, scan, onDetected }));
+    act(() => result.current.feedInterim("What is two"));
+    await act(async () => { vi.advanceTimersByTime(900); });
+    act(() => result.current.feedInterim("What is two plus two?"));
+    await act(async () => { vi.advanceTimersByTime(900); });
+    act(() => result.current.feedInterim("What is two plus two?")); // unchanged repeat
+    expect(scan).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(250); });
+    expect(scan).toHaveBeenCalledTimes(1);
+    expect(onDetected).toHaveBeenCalledTimes(1);
+    // The late FINAL for the same words is not scanned again.
+    act(() => result.current.feed("What is two plus two?"));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(scan).toHaveBeenCalledTimes(1);
+  });
 });

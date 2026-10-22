@@ -30,6 +30,8 @@ interface Options {
   /** Called when a scan errors so the caller can let classic detection through. */
   onScanFailed?: () => void;
   pauseMs?: number;
+  /** How long the live (interim) text must stay unchanged before it's scanned. */
+  interimPauseMs?: number;
   wordTrigger?: number;
   minGapMs?: number;
   contextWindowMs?: number;
@@ -50,9 +52,13 @@ export function questionSimilarity(a: string, b: string): number {
 }
 
 /**
- * Pause-based AI scanner. Buffers final transcript lines and, when the
- * instructor pauses (or after ~N new words), asks the AI whether a question
- * was just asked. One scan in flight at a time, with a minimum gap between scans.
+ * Pause-based AI scanner. Buffers transcript lines and, when the instructor
+ * pauses (or after ~N new words), asks the AI whether a question was just
+ * asked. One scan in flight at a time, with a minimum gap between scans.
+ *
+ * Deepgram can hold a FINAL line for several seconds when the room isn't
+ * silent, so the live (interim) text also counts: if it stops changing for
+ * `interimPauseMs`, it is scanned right away and the matching FINAL is skipped.
  */
 export function useLlmQuestionScanner({
   enabled,
@@ -60,6 +66,7 @@ export function useLlmQuestionScanner({
   onDetected,
   onScanFailed,
   pauseMs = 500,
+  interimPauseMs = 1100,
   wordTrigger = 35,
   minGapMs = 1000,
   contextWindowMs = 60_000,
@@ -67,6 +74,8 @@ export function useLlmQuestionScanner({
 }: Options) {
   const lines = useRef<{ text: string; at: number }[]>([]);
   const pendingText = useRef<string>("");
+  const interimText = useRef<string>("");
+  const scannedInterim = useRef<string>("");
   const inFlight = useRef(false);
   const lastScanAt = useRef(0);
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,9 +93,16 @@ export function useLlmQuestionScanner({
     gapTimer.current = null;
   };
 
+  /** Speech not yet sent to the AI: pending FINAL lines plus unscanned live text. */
+  const unscanned = () => {
+    const interim = interimText.current;
+    const includeInterim = !!interim && interim !== scannedInterim.current;
+    return { text: `${pendingText.current} ${includeInterim ? interim : ""}`.trim(), interim: includeInterim ? interim : "" };
+  };
+
   const runScan = useCallback(async () => {
     if (!enabledRef.current || inFlight.current) return;
-    const newText = pendingText.current.trim();
+    const { text: newText, interim } = unscanned();
     if (words(newText) < 2) return;
     const wait = minGapMs - (Date.now() - lastScanAt.current);
     if (wait > 0) {
@@ -100,8 +116,10 @@ export function useLlmQuestionScanner({
       .filter((l) => now - l.at <= contextWindowMs)
       .map((l) => l.text)
       .join(" ");
-    const contextText = context.endsWith(newText) ? context.slice(0, context.length - newText.length).trim() : context;
+    const pending = pendingText.current.trim();
+    const contextText = pending && context.endsWith(pending) ? context.slice(0, context.length - pending.length).trim() : context;
     pendingText.current = "";
+    if (interim) scannedInterim.current = interim;
     inFlight.current = true;
     lastScanAt.current = now;
     const sent = cbs.current.getRecentlySent?.() ?? [];
@@ -126,33 +144,61 @@ export function useLlmQuestionScanner({
       // Speech that arrived during the scan gets its own turn right away if the
       // instructor already paused (its pause timer fired while we were busy)
       // or it's long — otherwise its pending pause timer will run it.
-      const pendingWords = words(pendingText.current);
+      const pendingWords = words(unscanned().text);
       if (pendingWords >= wordTrigger || (pendingWords >= 2 && !pauseTimer.current)) void runScan();
     }
   }, [minGapMs, contextWindowMs, wordTrigger]);
 
+  const armPause = useCallback((ms: number) => {
+    if (pauseTimer.current) clearTimeout(pauseTimer.current);
+    pauseTimer.current = setTimeout(() => { pauseTimer.current = null; void runScan(); }, ms);
+  }, [runScan]);
+
+  /** FINAL transcript line. */
   const feed = useCallback((text: string) => {
     if (!enabledRef.current || !text.trim()) return;
+    const t = text.trim();
     const now = Date.now();
-    lines.current = [...lines.current.filter((l) => now - l.at <= contextWindowMs), { text: text.trim(), at: now }];
-    pendingText.current = `${pendingText.current} ${text.trim()}`.trim();
-    if (pauseTimer.current) clearTimeout(pauseTimer.current);
+    lines.current = [...lines.current.filter((l) => now - l.at <= contextWindowMs), { text: t, at: now }];
+    // Already scanned from the live text? Keep it as context only.
+    const covered = !!scannedInterim.current && questionSimilarity(t, scannedInterim.current) >= 0.8;
+    interimText.current = "";
+    scannedInterim.current = "";
+    if (covered) {
+      if (pauseTimer.current) clearTimeout(pauseTimer.current);
+      pauseTimer.current = null;
+      if (words(pendingText.current) >= 2) armPause(pauseMs);
+      return;
+    }
+    pendingText.current = `${pendingText.current} ${t}`.trim();
     if (words(pendingText.current) >= wordTrigger) {
+      if (pauseTimer.current) clearTimeout(pauseTimer.current);
       pauseTimer.current = null;
       void runScan();
       return;
     }
-    pauseTimer.current = setTimeout(() => { pauseTimer.current = null; void runScan(); }, pauseMs);
-  }, [contextWindowMs, pauseMs, runScan, wordTrigger]);
+    armPause(pauseMs);
+  }, [armPause, contextWindowMs, pauseMs, runScan, wordTrigger]);
+
+  /** Live (interim) transcript text for the current utterance. */
+  const feedInterim = useCallback((text: string) => {
+    if (!enabledRef.current) return;
+    const t = text.trim();
+    if (!t || norm(t) === norm(interimText.current)) return; // unchanged → keep counting the pause
+    interimText.current = t;
+    armPause(interimPauseMs);
+  }, [armPause, interimPauseMs]);
 
   const reset = useCallback(() => {
     clearTimers();
     lines.current = [];
     pendingText.current = "";
+    interimText.current = "";
+    scannedInterim.current = "";
   }, []);
 
   useEffect(() => () => clearTimers(), []);
   useEffect(() => { if (!enabled) reset(); }, [enabled, reset]);
 
-  return { feed, reset };
+  return { feed, feedInterim, reset };
 }

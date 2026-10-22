@@ -351,7 +351,7 @@ export const LectureTranscription = ({
     });
   }, [setTriggerCaptureComplete, acceptVettedPassiveCandidate, resetPassiveDetection]);
 
-  const { feed: feedAiScanner, reset: resetAiScanner } = useLlmQuestionScanner({
+  const { feed: feedAiScanner, feedInterim: feedAiScannerInterim, reset: resetAiScanner } = useLlmQuestionScanner({
     enabled: aiScannerEnabled,
     getRecentlySent: () => recentlySentQuestionsRef.current,
     scan: async (req) => {
@@ -2774,6 +2774,9 @@ export const LectureTranscription = ({
           const cleanText = sanitizeTranscript(newText);
           if (cleanText) {
             setLastTranscript(cleanText);
+            // Deepgram can hold the FINAL line for seconds; the scanner checks
+            // live text once it stops changing so questions show up sooner.
+            feedAiScannerInterim(cleanText);
           }
         }
       },
