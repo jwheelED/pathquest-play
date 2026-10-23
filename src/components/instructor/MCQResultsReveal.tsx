@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 interface MCQResponse {
   answer: string;
@@ -24,7 +25,7 @@ const answerToIdx = (answer: string, options: string[]): number => {
     if (idx >= 0 && idx < options.length) return idx;
   }
   const directIdx = options.findIndex((opt) => {
-    const clean = opt.replace(/^[A-Da-d][.):\s]+/, "").trim();
+    const clean = stripOptionLabel(opt);
     return clean === trimmed || opt === trimmed;
   });
   return directIdx;
@@ -298,7 +299,7 @@ export const MCQResultsReveal = ({
       `}</style>
 
       {options.map((opt, idx) => {
-        const cleanText = opt.replace(/^[A-Da-d][.):\s]+/, "").trim() || opt;
+        const cleanText = stripOptionLabel(opt) || opt;
         return (
           <BarRow
             key={idx}

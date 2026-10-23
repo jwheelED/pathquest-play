@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ImageBanner } from "./ImageBanner";
 import { ConfidenceRow } from "./ConfidenceRow";
 import type { LiveQuestion } from "./useSessionState";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 interface DiagramCheckInProps {
   question: LiveQuestion;
@@ -70,7 +71,7 @@ export function DiagramCheckIn({
           <div className="grid grid-cols-2 gap-2.5">
             {options.map((opt) => {
               const letter = opt.charAt(0);
-              const text = opt.replace(/^[A-D][\).\-\s]+\s*/i, "").trim();
+              const text = stripOptionLabel(opt);
               const isSelected = selectedOption === letter;
               return (
                 <button

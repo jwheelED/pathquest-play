@@ -43,6 +43,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import type { PassiveQuestionCandidate, PrebuiltAnswerData } from "@/hooks/usePassiveQuestionDetection";
 import { trackOnDeckChoices } from "@/lib/posthogTracking";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ function parseOptions(options: string[], correctLetter = "A", markCorrect = true
   const labels = ["A", "B", "C", "D"];
   return options.slice(0, 4).map((opt, i) => {
     const label = labels[i] ?? String.fromCharCode(65 + i);
-    const stripped = opt.replace(/^[A-D]\.?\s*/i, "");
+    const stripped = stripOptionLabel(opt);
     return { label, text: stripped, isCorrect: markCorrect ? label === correctLetter : false };
   });
 }
@@ -207,7 +208,7 @@ function ReviewModal({
         const labels = ["A", "B", "C", "D"];
         const correctLetter: string = data.correct_answer ?? "A";
         const parsed: MCQOption[] = (data.options as string[]).slice(0, 4).map((opt, i) => {
-          const stripped = opt.replace(/^[A-D]\.\s*/i, "");
+          const stripped = stripOptionLabel(opt);
           return { label: labels[i] ?? String.fromCharCode(65 + i), text: stripped, isCorrect: labels[i] === correctLetter };
         });
         return parsed;
