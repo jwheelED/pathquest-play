@@ -582,12 +582,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       // Track auto-question triggered in PostHog
       trackAutoQuestionTriggered(autoQuestionInterval);
       
-      // Auto-generated questions always send directly - no preview
+      // Auto-generated questions always send directly - no preview.
+      // Pass the misconception-targeted choices through so they aren't regenerated.
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
         expected_answer: data.expected_answer || "",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
+        misconception: data.misconception ?? null,
         extraction_method: 'auto_interval',
         source: 'auto_interval',
       });

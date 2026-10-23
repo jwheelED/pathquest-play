@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
+import { isMisconceptionRequired, misconceptionGraceMs, MISCONCEPTION_WAIT_ERRORS } from "@/lib/misconceptionCadence";
 import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
@@ -255,6 +256,8 @@ export const LectureTranscription = ({
   }, [aiScannerEnabled]);
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const intervalStartTimeRef = useRef<number>(0);
+  // When this cycle's interval was first reached (0 = not yet); starts the misconception grace window
+  const autoQuestionDueAtRef = useRef<number>(0);
   
   // Deepgram WebSocket streaming via Fly.io proxy
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
@@ -1195,6 +1198,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after voice command
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after voice command");
@@ -1336,6 +1340,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after manual send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after manual send");
@@ -1380,6 +1385,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after preview send");
@@ -1573,6 +1579,8 @@ export const LectureTranscription = ({
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // What an auto question diagnoses (misconception-targeted interval questions)
+            misconception: detectionData.misconception ?? undefined,
             // Pre-edited coding payload from on-deck inline preview
             coding_payload: detectionData.coding_payload,
             // Picture pre-generated while the question was On Deck
@@ -1820,8 +1828,14 @@ export const LectureTranscription = ({
   };
 
   // Core auto-question generation logic (extracted for reuse) with enhanced logging
-  const generateAndSendAutoQuestion = async (intervalTranscript: string, isManualTest = false) => {
+  const generateAndSendAutoQuestion = async (
+    intervalTranscript: string,
+    isManualTest = false,
+    opts: { misconceptionRequired?: boolean; isRetry?: boolean } = {},
+  ) => {
     const startTime = Date.now();
+    const misconceptionRequired = opts.misconceptionRequired ?? false;
+    const isRetry = opts.isRetry ?? false;
 
     try {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -1831,6 +1845,7 @@ export const LectureTranscription = ({
       console.log("  - Transcript length:", intervalTranscript.length, "chars");
       console.log("  - Interval:", autoQuestionInterval, "minutes");
       console.log("  - Manual test:", isManualTest);
+      console.log("  - Misconception required:", misconceptionRequired, isRetry ? "(retry)" : "");
       console.log("  - Is sending:", isSendingQuestion);
       console.log("  - Recording:", isRecording);
       console.log("  - Transcript preview:", intervalTranscript.substring(0, 150) + "...");
@@ -1840,14 +1855,16 @@ export const LectureTranscription = ({
       );
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      // Show pre-generation animation
-      setVoiceCommandDetected(true);
-      setTimeout(() => setVoiceCommandDetected(false), 2000);
+      // Show pre-generation animation (once per cycle, not on quiet retries)
+      if (!isRetry) {
+        setVoiceCommandDetected(true);
+        setTimeout(() => setVoiceCommandDetected(false), 2000);
+      }
 
-      if (!isManualTest) {
+      if (!isManualTest && !isRetry) {
         toast({
-          title: "⏰ Auto-question triggered!",
-          description: "Generating question from recent content...",
+          title: "⏰ Auto-question time",
+          description: "Finding a misconception to check from what you just taught...",
           duration: 3000,
         });
       }
@@ -1978,6 +1995,7 @@ export const LectureTranscription = ({
           materialContext: materialContext,
           course_context: courseContext,
           retry_context: retryQueue.length > 0 ? retryQueue : null,
+          misconception_required: !isManualTest && misconceptionRequired,
         },
       });
       const invokeTime = Date.now() - invokeStartTime;
@@ -1997,6 +2015,13 @@ export const LectureTranscription = ({
         dataKeys: data ? Object.keys(data) : [],
         errorMessage: error?.message,
       });
+
+      // Still inside the grace window and no strong misconception yet: wait
+      // quietly and look again in 30s with more lecture content.
+      if (!error && data && !data.success && MISCONCEPTION_WAIT_ERRORS.has(data.error_type)) {
+        console.log(`🧠 Waiting for a misconception to check (${data.error_type}): ${data.error}`);
+        return false;
+      }
 
       if (error || !data?.success) {
         console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -2070,6 +2095,7 @@ export const LectureTranscription = ({
       console.log("📝 Sending via handleQuestionSend...");
 
       // Send the question using existing flow — pass pre-generated MCQ data to avoid double AI generation
+      // Auto questions always go straight to participants — never On Deck.
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
@@ -2079,6 +2105,8 @@ export const LectureTranscription = ({
         options: data.options,
         correct_answer: data.correct_answer,
         explanation: data.explanation,
+        expected_answer: data.expected_answer || "",
+        misconception: data.misconception ?? null,
       });
 
       const totalTime = Date.now() - startTime;
@@ -2255,8 +2283,17 @@ export const LectureTranscription = ({
         transcriptLength: intervalTranscript.length,
       });
 
+      // Misconception-first cadence: inside the grace window after the interval
+      // is reached, only send if a real misconception is found; afterwards send
+      // the best grounded question so pacing holds.
+      const now = Date.now();
+      const dueAt = autoQuestionDueAtRef.current;
+      const intervalMs = autoQuestionInterval * 60 * 1000;
+      const misconceptionRequired = isMisconceptionRequired(dueAt, now, intervalMs);
+      const isRetry = dueAt > 0 && now - dueAt > 2000;
+
       // Use the sliding window content for generation (same as we analyzed)
-      return await generateAndSendAutoQuestion(transcriptToAnalyze, false);
+      return await generateAndSendAutoQuestion(transcriptToAnalyze, false, { misconceptionRequired, isRetry });
     } catch (error) {
       console.error("Auto-question error:", error);
       return false;
@@ -2524,6 +2561,8 @@ export const LectureTranscription = ({
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
         isGeneratingAutoQuestionRef.current = true;
+        // Start of this cycle's misconception grace window
+        if (autoQuestionDueAtRef.current === 0) autoQuestionDueAtRef.current = now;
 
         console.log("🚀 AUTO-QUESTION INTERVAL REACHED");
         console.log("📊 Timer State:", {
@@ -2533,6 +2572,7 @@ export const LectureTranscription = ({
           transcriptWords: intervalTranscriptRef.current.split(/\s+/).length,
           lastAutoQuestionTime: new Date(lastAutoQuestionTimeRef.current).toLocaleTimeString(),
           now: new Date(now).toLocaleTimeString(),
+          misconceptionGraceLeft: `${Math.max(0, Math.round((misconceptionGraceMs(intervalMs) - (now - autoQuestionDueAtRef.current)) / 1000))}s`,
         });
 
         handleAutoQuestionGeneration()
@@ -2542,6 +2582,7 @@ export const LectureTranscription = ({
               setLastAutoQuestionTime(newTime);
               lastAutoQuestionTimeRef.current = newTime;
               intervalStartTimeRef.current = newTime;
+              autoQuestionDueAtRef.current = 0;
               setRetryAttempts(0);
               retryAttemptsRef.current = 0;
               setLastAutoQuestionError(null);
@@ -2551,7 +2592,7 @@ export const LectureTranscription = ({
               const retryTime = Date.now() - (intervalMs - 30000);
               setLastAutoQuestionTime(retryTime);
               lastAutoQuestionTimeRef.current = retryTime;
-              console.log("⏭️ Quality check failed, will retry in 30 seconds");
+              console.log("⏭️ No question sent yet, will retry in 30 seconds");
             }
           })
           .catch((error) => {
@@ -2622,6 +2663,7 @@ export const LectureTranscription = ({
       setContentQualityScore(0);
       intervalTranscriptRef.current = "";
       isGeneratingAutoQuestionRef.current = false;
+      autoQuestionDueAtRef.current = 0;
     }
   }, [isRecording]);
 
