@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Check } from "lucide-react";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 interface Assignment {
   id: string;
@@ -71,7 +72,7 @@ export const QuestionAnalyticsChart = ({
     if (prefixMatch) return prefixMatch[1].toUpperCase();
     if (question.options) {
       const idx = question.options.findIndex((opt: string) => {
-        const optClean = opt.replace(/^[A-Da-d][.):\s]+/, "").trim();
+        const optClean = stripOptionLabel(opt);
         return optClean === raw || opt === raw;
       });
       if (idx >= 0) return String.fromCharCode(65 + idx);

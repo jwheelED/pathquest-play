@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { MCQResultsReveal } from "./MCQResultsReveal";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 interface LiveResponse {
   id: string;
@@ -472,7 +473,7 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                                 return letterMatch[1].toUpperCase().charCodeAt(0) - 65 === filterIdx;
                               }
                               const directIdx = options.findIndex((opt) => {
-                                const clean = opt.replace(/^[A-Da-d][.):\s]+/, "").trim();
+                                const clean = stripOptionLabel(opt);
                                 return clean === trimmed || opt === trimmed;
                               });
                               return directIdx === filterIdx;

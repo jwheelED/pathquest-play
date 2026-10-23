@@ -27,7 +27,7 @@ const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAn
 
   // Strip letter prefixes and track which index is correct
   const augmented = mcq.options.map((opt, i) => ({
-    text: opt.replace(/^[A-D][\).\-\s]+\s*/i, '').trim(),
+    text: opt.replace(/^\(?[A-Da-d][.):](?:\s+|$)/, '').trim(),
     wasCorrect: i === correctIdx,
   }));
 

@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import type { BankQuestion } from "./QuestionBankCard";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 interface CreateQuestionDialogProps {
   open: boolean;
@@ -60,7 +61,7 @@ export function CreateQuestionDialog({
       });
       if (error) throw error;
       if (data?.options?.length === 4) {
-        setMcqOptions(data.options.map((o: string) => o.replace(/^[A-D][\).\s]+/, "")));
+        setMcqOptions(data.options.map((o: string) => stripOptionLabel(o)));
         setMcqCorrectAnswer(data.correct_answer || "A");
         if (data.explanation) setMcqExplanation(data.explanation);
         toast.success("AI options generated — review & adjust as needed");
@@ -137,7 +138,7 @@ export function CreateQuestionDialog({
         const content = editQuestion.question_content;
         if (editQuestion.question_type === "multiple_choice") {
           setMcqQuestion(content.question || "");
-          setMcqOptions(content.options?.map((o: string) => o.replace(/^[A-D][\).\s]+/, "")) || ["", "", "", ""]);
+          setMcqOptions(content.options?.map((o: string) => stripOptionLabel(o)) || ["", "", "", ""]);
           setMcqCorrectAnswer(content.correctAnswer || "A");
           setMcqExplanation(content.explanation || "");
         } else if (editQuestion.question_type === "short_answer") {

@@ -155,7 +155,7 @@ export function shuffleWithMisconceptions(
   if (options.length !== 4 || correctIdx === -1) return null;
 
   const items = options.map((o, i) => ({
-    text: String(o).replace(/^[A-D][\).\-\s]+\s*/i, "").trim(),
+    text: String(o).replace(/^\(?[A-Da-d][.):](?:\s+|$)/, "").trim(),
     wasCorrect: i === correctIdx,
     misconception: distractors[LETTERS[i]] ?? "",
   }));
