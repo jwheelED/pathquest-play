@@ -330,12 +330,20 @@ serve(async (req) => {
     // Course context constraint
     let courseConstraint = "";
     if (course_context?.title) {
-      courseConstraint += `\n\n🎓 COURSE CONSTRAINT: This is a "${course_context.title}" class.`;
+      courseConstraint += `\n\n🎓 COURSE BACKGROUND: This is a "${course_context.title}" class.`;
       if (course_context.topics?.length) {
-        courseConstraint += ` Relevant topics include: ${course_context.topics.join(", ")}.`;
+        courseConstraint += ` Listed topics: ${course_context.topics.join(", ")}.`;
       }
-      courseConstraint += ` Only generate questions relevant to this subject area.`;
+      courseConstraint += usingMaterialsFallback
+        ? ` Only generate questions relevant to this subject area.`
+        : ` This is background only — the transcript is what is being taught right now and ALWAYS wins. Never ask about the course title or listed topics unless they were actually discussed, and never lower your confidence just because the transcript doesn't match the course title.`;
     }
+
+    // After the grace window the client needs a question so pacing holds.
+    const bestEffort = misconception_required !== true;
+    const bestEffortGuidance = bestEffort && !usingMaterialsFallback
+      ? `\n\nA QUESTION IS REQUIRED THIS TIME: If no strong misconception exists, ask about the most substantive specific thing the instructor said (even course structure, expectations, or an example they gave counts). Score confidence by how well the question is grounded in the transcript, not by how deep the content is.`
+      : "";
 
     // Long interval guidance
     const longIntervalGuidance = interval_minutes >= 20
@@ -395,7 +403,7 @@ CRITICAL GROUNDING RULES:
 - NEVER generate generic questions like "summarize the key points" or "what was the main concept". Always ask about SPECIFIC topics from the content.
 ${courseConstraint}
 ${longIntervalGuidance}
-${difficultyInstructions}
+${difficultyInstructions}${bestEffortGuidance}
 
 ${formatInstructions}
 
@@ -491,10 +499,11 @@ Find the strongest misconception opportunity EXPLICITLY taught in this transcrip
       console.log("   Confidence:", parsed.confidence);
 
       // Layer 2: Confidence threshold check
-      // Hard questions synthesize ideas, so the model rates itself lower;
-      // the keyword-overlap check below still guards grounding.
-      const minConfidence = diffLevel === "hard" ? 0.45 : 0.6;
-      if ((parsed.confidence || 0) < minConfidence) {
+      // Hard questions synthesize ideas, so the model rates itself lower.
+      // After the grace window (best effort) the self-score is skipped and the
+      // keyword-overlap check below is the grounding guard, so pacing holds.
+      const minConfidence = bestEffort ? 0 : diffLevel === "hard" ? 0.45 : 0.6;
+      if (minConfidence > 0 && (parsed.confidence || 0) < minConfidence) {
         console.warn(`⚠️ Low confidence (${parsed.confidence}) - rejecting question`);
         const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
           `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}".`);
