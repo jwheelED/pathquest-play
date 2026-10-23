@@ -35,7 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
-import { isMisconceptionRequired, misconceptionGraceMs, MISCONCEPTION_WAIT_ERRORS } from "@/lib/misconceptionCadence";
+import { isMisconceptionRequired, misconceptionGraceMs, MISCONCEPTION_WAIT_ERRORS, GRACE_QUIET_RETRY_ERRORS } from "@/lib/misconceptionCadence";
 import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
@@ -2018,7 +2018,11 @@ export const LectureTranscription = ({
 
       // Still inside the grace window and no strong misconception yet: wait
       // quietly and look again in 30s with more lecture content.
-      if (!error && data && !data.success && MISCONCEPTION_WAIT_ERRORS.has(data.error_type)) {
+      if (
+        !error && data && !data.success &&
+        (MISCONCEPTION_WAIT_ERRORS.has(data.error_type) ||
+          (!isManualTest && misconceptionRequired && GRACE_QUIET_RETRY_ERRORS.has(data.error_type)))
+      ) {
         console.log(`🧠 Waiting for a misconception to check (${data.error_type}): ${data.error}`);
         return false;
       }

@@ -21,6 +21,12 @@ export function isMisconceptionRequired(dueAt: number, now: number, intervalMs: 
 }
 
 /** Generator error types that mean "keep waiting for a misconception", not a failure. */
+/** Quality rejections that should also retry quietly while inside the grace window. */
+export const GRACE_QUIET_RETRY_ERRORS = new Set([
+  "fallback_format_mismatch",
+  "no_relevant_fallback",
+]);
+
 export const MISCONCEPTION_WAIT_ERRORS = new Set([
   "no_misconception_opportunity",
   "missing_distractor_rationale",
