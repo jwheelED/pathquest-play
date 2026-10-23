@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+import { readEdgeFunctionError } from "@/lib/edgeFunctionError";
+import { onInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
+
 import { createRoot } from "react-dom/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
+import { isMisconceptionRequired, misconceptionGraceMs, MISCONCEPTION_WAIT_ERRORS, GRACE_QUIET_RETRY_ERRORS } from "@/lib/misconceptionCadence";
 import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
@@ -63,7 +67,9 @@ import { DeepgramStreamingClient, DeepgramTranscript } from "@/lib/deepgramStrea
 import { LectureSummarySheet, type LectureSummaryData } from "./LectureSummarySheet";
 import { VoiceQuestionPreviewDialog, ExtractedVoiceQuestion } from "./VoiceQuestionPreviewDialog";
 import { sanitizeTranscript } from "@/lib/transcriptSanitizer";
-import { usePassiveQuestionDetection, PassiveQuestionCandidate } from "@/hooks/usePassiveQuestionDetection";
+import { usePassiveQuestionDetection, PassiveQuestionCandidate, type PrebuiltAnswerData } from "@/hooks/usePassiveQuestionDetection";
+import { useLlmQuestionScanner, type ScanResponse } from "@/hooks/useLlmQuestionScanner";
+import { trackAiScan, trackQuestionDetectionDrop } from "@/lib/posthogTracking";
 import { useQuestionTriggerCapture } from "@/hooks/useQuestionTriggerCapture";
 import { QuestionOnDeck, OnDeckSendData } from "./QuestionOnDeck";
 import { ConfidenceCheckService } from "@/lib/confidenceCheck/service";
@@ -238,8 +244,20 @@ export const LectureTranscription = ({
   const lastDetectionTimeRef = useRef<number>(0);
   const lastDetectedChunkIndexRef = useRef<number>(-1);
   const lastQuestionSentTimeRef = useRef<number>(0);
+  const recentlySentQuestionsRef = useRef<string[]>([]);
+  const aiScanFailedAtRef = useRef<number>(0);
+  const [aiScannerEnabled, setAiScannerEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('edvana.aiQuestionScanner') !== 'off'; } catch { return true; }
+  });
+  const aiScannerEnabledRef = useRef(aiScannerEnabled);
+  useEffect(() => {
+    aiScannerEnabledRef.current = aiScannerEnabled;
+    try { localStorage.setItem('edvana.aiQuestionScanner', aiScannerEnabled ? 'on' : 'off'); } catch { /* ignore */ }
+  }, [aiScannerEnabled]);
   const isGeneratingAutoQuestionRef = useRef<boolean>(false);
   const intervalStartTimeRef = useRef<number>(0);
+  // When this cycle's interval was first reached (0 = not yet); starts the misconception grace window
+  const autoQuestionDueAtRef = useRef<number>(0);
   
   // Deepgram WebSocket streaming via Fly.io proxy
   const deepgramClientRef = useRef<DeepgramStreamingClient | null>(null);
@@ -256,6 +274,7 @@ export const LectureTranscription = ({
     trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
     acceptVettedCandidate: acceptVettedPassiveCandidate,
+    acceptAiCandidate: acceptAiPassiveCandidate,
     notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     removeFromHistory: removePassiveFromHistory,
@@ -325,10 +344,63 @@ export const LectureTranscription = ({
       console.log('🎯 Trigger capture emitted question:', candidate.text);
       pendingPriorContextRef.current = candidate.priorContext ?? null;
       resetPassiveDetection?.();
+      // In AI mode, classic detection is only a safety net while the AI scanner is failing.
+      if (aiScannerEnabledRef.current && Date.now() - aiScanFailedAtRef.current > 30_000) {
+        trackQuestionDetectionDrop('ai_held_back', { path: 'trigger_capture', text: candidate.text });
+        return;
+      }
       const priorContext = candidate.priorContext || (intervalTranscriptRef.current || "").trim();
       acceptVettedPassiveCandidate(candidate.text, priorContext);
     });
   }, [setTriggerCaptureComplete, acceptVettedPassiveCandidate, resetPassiveDetection]);
+
+  const { feed: feedAiScanner, feedInterim: feedAiScannerInterim, reset: resetAiScanner } = useLlmQuestionScanner({
+    enabled: aiScannerEnabled,
+    getRecentlySent: () => recentlySentQuestionsRef.current,
+    scan: async (req) => {
+      const startedAt = performance.now();
+      const { data, error } = await supabase.functions.invoke('scan-transcript-questions', {
+        // On Deck falls back to multiple choice when no preference is set; ask the
+        // scanner for the same format so its choices are used instead of regenerated.
+        body: { ...req, sessionId, formatPreference: questionFormatPreference ?? 'multiple_choice' },
+      });
+      const roundTripMs = Math.round(performance.now() - startedAt);
+      const newWords = req.newText.split(/\s+/).filter(Boolean).length;
+      if (error || !data) {
+        trackAiScan({ outcome: 'failed', roundTripMs, reason: error?.message ?? 'no_data', text: req.newText, newWords });
+        return { detected: false, failed: true };
+      }
+      const res = data as ScanResponse & { provider?: string; latencyMs?: number };
+      trackAiScan({
+        outcome: res.detected ? 'detected' : 'failed' in res && res.failed ? 'failed' : 'none',
+        provider: res.provider,
+        serverMs: res.latencyMs,
+        roundTripMs,
+        reason: res.detected === false ? res.reason : undefined,
+        text: res.detected ? res.question : req.newText,
+        newWords,
+        hasChoices: res.detected ? Boolean(res.options?.length || res.expectedAnswer) : undefined,
+      });
+      return res;
+    },
+    onScanFailed: () => { aiScanFailedAtRef.current = Date.now(); },
+    onDetected: (d) => {
+      if (isSendingQuestionRef.current) {
+        // Not shown, so not remembered either — saying it again will get through.
+        trackQuestionDetectionDrop('sending_in_progress', { path: 'ai_scan', text: d.question });
+        return false;
+      }
+      console.log('🤖 AI scanner found question:', d.question);
+      const prebuilt: PrebuiltAnswerData = {
+        format: d.format,
+        options: d.options,
+        correctAnswer: d.correctAnswer,
+        expectedAnswer: d.expectedAnswer,
+      };
+      acceptAiPassiveCandidate(d.question, d.priorContext, prebuilt);
+      return true;
+    },
+  });
 
 
 
@@ -708,6 +780,16 @@ export const LectureTranscription = ({
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
 
+    // Same-tab settings changes broadcast immediately (no reload / re-login).
+    const offPrefs = onInstructorPrefsUpdated((detail) => {
+      if (detail.question_format_preference) {
+        setQuestionFormatPreference(detail.question_format_preference as 'multiple_choice' | 'short_answer' | 'poll' | 'coding');
+      }
+      if (detail.coding_question_style) {
+        setCodingStyle(detail.coding_question_style as 'simple' | 'full');
+      }
+    });
+
     // Realtime: react instantly if the instructor toggles preference elsewhere.
     const channel = supabase
       .channel(`profile-prefs-${Date.now()}`)
@@ -731,6 +813,7 @@ export const LectureTranscription = ({
       clearInterval(interval);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
+      offPrefs();
       supabase.removeChannel(channel);
     };
   }, [isRecording]);
@@ -1115,6 +1198,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after voice command
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after voice command");
@@ -1256,6 +1340,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after manual send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after manual send");
@@ -1300,6 +1385,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after preview send");
@@ -1347,7 +1433,6 @@ export const LectureTranscription = ({
         };
       }
 
-      // Check if students are connected
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -1358,25 +1443,9 @@ export const LectureTranscription = ({
         };
       }
 
-      const { data: students, error: studentsError } = await supabase
-        .from("instructor_students")
-        .select("student_id")
-        .eq("instructor_id", user.id);
+      // Note: an empty roster is NOT a blocker — questions can be generated and
+      // staged with zero students connected (they simply have no recipients yet).
 
-      if (studentsError) {
-        console.error("Error checking students:", studentsError);
-        return {
-          valid: false,
-          error: "❌ Could not verify student connections",
-        };
-      }
-
-      if (!students || students.length === 0) {
-        return {
-          valid: false,
-          error: "👥 No students connected - please share your instructor code with students",
-        };
-      }
 
       // Check if there's enough transcript content (skip for auto-questions - already checked)
       if (!isAutoQuestion && (!transcriptBufferRef.current || transcriptBufferRef.current.length < 30)) {
@@ -1495,7 +1564,7 @@ export const LectureTranscription = ({
 
       // Retry logic for transient failures with progress tracking
       const sendStartTime = Date.now();
-      const { data, error } = await retryWithBackoff(async () => {
+      const invokeResult = await retryWithBackoff(async () => {
         return await supabase.functions.invoke("format-and-send-question", {
           body: {
             question_text: detectionData.question_text,
@@ -1510,8 +1579,12 @@ export const LectureTranscription = ({
             options: detectionData.options,
             correct_answer: detectionData.correct_answer,
             explanation: detectionData.explanation,
+            // What an auto question diagnoses (misconception-targeted interval questions)
+            misconception: detectionData.misconception ?? undefined,
             // Pre-edited coding payload from on-deck inline preview
             coding_payload: detectionData.coding_payload,
+            // Picture pre-generated while the question was On Deck
+            image_prep_key: (detectionData as { image_prep_key?: string }).image_prep_key,
             // Pass course_id for proper assignment scoping
             course_id: selectedCourseId,
             // Pass source transcript for voice-sent questions (to show students where question came from)
@@ -1520,6 +1593,16 @@ export const LectureTranscription = ({
         });
 
       });
+
+      const error = invokeResult.error;
+      // supabase-js drops the response body on non-2xx — recover it so the
+      // structured handling below (cooldown, daily limit, 4xx…) still works.
+      const errorDetails = error ? await readEdgeFunctionError(error) : null;
+      if (error && errorDetails?.status && !(error as any).status) {
+        (error as any).status = errorDetails.status;
+      }
+      const data: any = invokeResult.data ?? errorDetails?.body ?? null;
+
 
       // Clear the stashed prior context — single-use per send attempt
       pendingPriorContextRef.current = null;
@@ -1745,8 +1828,14 @@ export const LectureTranscription = ({
   };
 
   // Core auto-question generation logic (extracted for reuse) with enhanced logging
-  const generateAndSendAutoQuestion = async (intervalTranscript: string, isManualTest = false) => {
+  const generateAndSendAutoQuestion = async (
+    intervalTranscript: string,
+    isManualTest = false,
+    opts: { misconceptionRequired?: boolean; isRetry?: boolean } = {},
+  ) => {
     const startTime = Date.now();
+    const misconceptionRequired = opts.misconceptionRequired ?? false;
+    const isRetry = opts.isRetry ?? false;
 
     try {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -1756,6 +1845,7 @@ export const LectureTranscription = ({
       console.log("  - Transcript length:", intervalTranscript.length, "chars");
       console.log("  - Interval:", autoQuestionInterval, "minutes");
       console.log("  - Manual test:", isManualTest);
+      console.log("  - Misconception required:", misconceptionRequired, isRetry ? "(retry)" : "");
       console.log("  - Is sending:", isSendingQuestion);
       console.log("  - Recording:", isRecording);
       console.log("  - Transcript preview:", intervalTranscript.substring(0, 150) + "...");
@@ -1765,14 +1855,16 @@ export const LectureTranscription = ({
       );
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      // Show pre-generation animation
-      setVoiceCommandDetected(true);
-      setTimeout(() => setVoiceCommandDetected(false), 2000);
+      // Show pre-generation animation (once per cycle, not on quiet retries)
+      if (!isRetry) {
+        setVoiceCommandDetected(true);
+        setTimeout(() => setVoiceCommandDetected(false), 2000);
+      }
 
-      if (!isManualTest) {
+      if (!isManualTest && !isRetry) {
         toast({
-          title: "⏰ Auto-question triggered!",
-          description: "Generating question from recent content...",
+          title: "⏰ Auto-question time",
+          description: "Finding a misconception to check from what you just taught...",
           duration: 3000,
         });
       }
@@ -1903,6 +1995,7 @@ export const LectureTranscription = ({
           materialContext: materialContext,
           course_context: courseContext,
           retry_context: retryQueue.length > 0 ? retryQueue : null,
+          misconception_required: !isManualTest && misconceptionRequired,
         },
       });
       const invokeTime = Date.now() - invokeStartTime;
@@ -1922,6 +2015,17 @@ export const LectureTranscription = ({
         dataKeys: data ? Object.keys(data) : [],
         errorMessage: error?.message,
       });
+
+      // Still inside the grace window and no strong misconception yet: wait
+      // quietly and look again in 30s with more lecture content.
+      if (
+        !error && data && !data.success &&
+        (MISCONCEPTION_WAIT_ERRORS.has(data.error_type) ||
+          (!isManualTest && misconceptionRequired && GRACE_QUIET_RETRY_ERRORS.has(data.error_type)))
+      ) {
+        console.log(`🧠 Waiting for a misconception to check (${data.error_type}): ${data.error}`);
+        return false;
+      }
 
       if (error || !data?.success) {
         console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -1995,6 +2099,7 @@ export const LectureTranscription = ({
       console.log("📝 Sending via handleQuestionSend...");
 
       // Send the question using existing flow — pass pre-generated MCQ data to avoid double AI generation
+      // Auto questions always go straight to participants — never On Deck.
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
@@ -2004,6 +2109,8 @@ export const LectureTranscription = ({
         options: data.options,
         correct_answer: data.correct_answer,
         explanation: data.explanation,
+        expected_answer: data.expected_answer || "",
+        misconception: data.misconception ?? null,
       });
 
       const totalTime = Date.now() - startTime;
@@ -2180,8 +2287,17 @@ export const LectureTranscription = ({
         transcriptLength: intervalTranscript.length,
       });
 
+      // Misconception-first cadence: inside the grace window after the interval
+      // is reached, only send if a real misconception is found; afterwards send
+      // the best grounded question so pacing holds.
+      const now = Date.now();
+      const dueAt = autoQuestionDueAtRef.current;
+      const intervalMs = autoQuestionInterval * 60 * 1000;
+      const misconceptionRequired = isMisconceptionRequired(dueAt, now, intervalMs);
+      const isRetry = dueAt > 0 && now - dueAt > 2000;
+
       // Use the sliding window content for generation (same as we analyzed)
-      return await generateAndSendAutoQuestion(transcriptToAnalyze, false);
+      return await generateAndSendAutoQuestion(transcriptToAnalyze, false, { misconceptionRequired, isRetry });
     } catch (error) {
       console.error("Auto-question error:", error);
       return false;
@@ -2449,6 +2565,8 @@ export const LectureTranscription = ({
       // Trigger when interval is reached
       if (elapsed >= intervalMs) {
         isGeneratingAutoQuestionRef.current = true;
+        // Start of this cycle's misconception grace window
+        if (autoQuestionDueAtRef.current === 0) autoQuestionDueAtRef.current = now;
 
         console.log("🚀 AUTO-QUESTION INTERVAL REACHED");
         console.log("📊 Timer State:", {
@@ -2458,6 +2576,7 @@ export const LectureTranscription = ({
           transcriptWords: intervalTranscriptRef.current.split(/\s+/).length,
           lastAutoQuestionTime: new Date(lastAutoQuestionTimeRef.current).toLocaleTimeString(),
           now: new Date(now).toLocaleTimeString(),
+          misconceptionGraceLeft: `${Math.max(0, Math.round((misconceptionGraceMs(intervalMs) - (now - autoQuestionDueAtRef.current)) / 1000))}s`,
         });
 
         handleAutoQuestionGeneration()
@@ -2467,6 +2586,7 @@ export const LectureTranscription = ({
               setLastAutoQuestionTime(newTime);
               lastAutoQuestionTimeRef.current = newTime;
               intervalStartTimeRef.current = newTime;
+              autoQuestionDueAtRef.current = 0;
               setRetryAttempts(0);
               retryAttemptsRef.current = 0;
               setLastAutoQuestionError(null);
@@ -2476,7 +2596,7 @@ export const LectureTranscription = ({
               const retryTime = Date.now() - (intervalMs - 30000);
               setLastAutoQuestionTime(retryTime);
               lastAutoQuestionTimeRef.current = retryTime;
-              console.log("⏭️ Quality check failed, will retry in 30 seconds");
+              console.log("⏭️ No question sent yet, will retry in 30 seconds");
             }
           })
           .catch((error) => {
@@ -2547,6 +2667,7 @@ export const LectureTranscription = ({
       setContentQualityScore(0);
       intervalTranscriptRef.current = "";
       isGeneratingAutoQuestionRef.current = false;
+      autoQuestionDueAtRef.current = 0;
     }
   }, [isRecording]);
 
@@ -2651,6 +2772,7 @@ export const LectureTranscription = ({
           // (what/why/how/when/where/who/which …). Question-mark-only utterances
           // no longer trigger Question on Deck — too noisy from rhetorical asides.
           feedTriggerChunk(cleanText, Date.now());
+          feedAiScanner(cleanText);
 
           // Reset trailing-silence timer on any pending passive candidate —
           // the instructor is still talking, so don't promote yet.
@@ -2703,6 +2825,9 @@ export const LectureTranscription = ({
           const cleanText = sanitizeTranscript(newText);
           if (cleanText) {
             setLastTranscript(cleanText);
+            // Deepgram can hold the FINAL line for seconds; the scanner checks
+            // live text once it stops changing so questions show up sooner.
+            feedAiScannerInterim(cleanText);
           }
         }
       },
@@ -2777,6 +2902,7 @@ export const LectureTranscription = ({
       setIsCircuitOpen(false);
       lastDetectionTimeRef.current = 0;
       lastDetectedChunkIndexRef.current = -1;
+      resetAiScanner();
 
       // Use Deepgram WebSocket streaming via Fly.io proxy for real-time transcription
       console.log("🌊 Starting recording with Deepgram real-time streaming via Fly.io proxy");
@@ -3690,7 +3816,8 @@ export const LectureTranscription = ({
                 {studentCount === 0 && (
                   <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/20 rounded border border-amber-200 dark:border-amber-800">
                     <p className="text-xs text-amber-900 dark:text-amber-200">
-                      ⚠️ No students connected. Share your instructor code with students to enable question sending.
+                      ℹ️ No participants connected yet. Questions will still be generated and staged — share your
+                      instructor code so they can receive them.
                     </p>
                   </div>
                 )}
@@ -4107,6 +4234,26 @@ export const LectureTranscription = ({
       {/* Question on Deck — persistent autodraft card */}
       {isRecording && (
         <div className="mt-4">
+          {/* AI question scanner toggle */}
+          <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
+            <div className="min-w-0">
+              <Label htmlFor="ai-scanner-toggle" className="text-sm font-semibold cursor-pointer" style={{ color: "#000000" }}>
+                AI question scanner
+              </Label>
+              <p className="text-xs mt-0.5" style={{ color: "#6b7280" }}>
+                {aiScannerEnabled
+                  ? "AI checks each pause for questions you ask the class"
+                  : "Classic detection (word rules only)"}
+              </p>
+            </div>
+            <Switch
+              id="ai-scanner-toggle"
+              checked={aiScannerEnabled}
+              onCheckedChange={setAiScannerEnabled}
+              className="data-[state=checked]:bg-[#388e6e] shrink-0 mt-0.5"
+            />
+          </div>
+
           {/* CONFIDENCE CHECK — Auto check-ins toggle (Element 1) */}
           <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
             <div className="min-w-0">
@@ -4142,6 +4289,7 @@ export const LectureTranscription = ({
             courseId={selectedCourseId}
             onSendNow={(questionText, data?: OnDeckSendData) => {
               dismissPassiveCandidate();
+              recentlySentQuestionsRef.current = [questionText, ...recentlySentQuestionsRef.current].slice(0, 5);
               // Map on-deck format → wire suggested_type. For coding, expand to
               // 'coding_simple' or 'coding' based on the instructor's style.
               const wireType = (() => {
@@ -4164,6 +4312,7 @@ export const LectureTranscription = ({
                   extraction_method: 'passive_detection',
                   source: 'passive_detection',
                   coding_payload: data.codingPayload,
+                  image_prep_key: data.imagePrepKey,
                 };
                 handleConfirmPreviewSend({
                   question_text: questionText,

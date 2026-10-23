@@ -99,7 +99,7 @@ export default function AdminOnboarding() {
           admin_code: adminCode,
           instructor_invite_code: inviteCode,
         })
-        .select()
+        .select("id, name, slug, created_at")
         .single();
 
       if (orgError) throw orgError;

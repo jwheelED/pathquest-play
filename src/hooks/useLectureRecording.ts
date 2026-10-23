@@ -5,6 +5,8 @@ import { toast as sonnerToast } from 'sonner';
 import { usePresenterBroadcast } from '@/hooks/useLecturePresenterChannel';
 import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
+import { readEdgeFunctionError } from '@/lib/edgeFunctionError';
+
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
@@ -445,9 +447,30 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       });
 
       if (error) {
-        console.error('Edge function error:', error);
-        throw error;
+        // Recover the JSON body supabase-js drops on non-2xx responses.
+        const details = await readEdgeFunctionError(error);
+        console.error('Edge function error:', details.status, details.body ?? details.message, error);
+
+        const errorType = (details.body?.error_type as string) || '';
+        if (details.status === 429) {
+          if (errorType === 'daily_limit') {
+            toast({
+              title: '🚫 Daily question limit reached',
+              description: `You've sent ${details.body?.current_count ?? ''}/${details.body?.daily_limit ?? ''} questions today. Resets at midnight UTC.`,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: '⏳ Slow down',
+              description: (details.body?.error as string) || 'Please wait a few seconds between questions.',
+            });
+          }
+          return;
+        }
+
+        throw new Error(details.message || (details.body?.error as string) || error.message);
       }
+
 
       if (data?.success) {
         playNotificationSound().catch(() => {});
@@ -559,12 +582,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       // Track auto-question triggered in PostHog
       trackAutoQuestionTriggered(autoQuestionInterval);
       
-      // Auto-generated questions always send directly - no preview
+      // Auto-generated questions always send directly - no preview.
+      // Pass the misconception-targeted choices through so they aren't regenerated.
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
         expected_answer: data.expected_answer || "",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
+        misconception: data.misconception ?? null,
         extraction_method: 'auto_interval',
         source: 'auto_interval',
       });

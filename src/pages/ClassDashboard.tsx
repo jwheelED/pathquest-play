@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BookOpen, Video, FileText, Trophy, MessageSquareText } from "lucide-react";
+import { ArrowLeft, BookOpen, Video, FileText, Trophy } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
@@ -34,12 +34,11 @@ interface ClassStats {
   nextIncompleteLecture: string | null;
 }
 
-type TabValue = "assigned" | "lectures" | "transcripts" | "results";
+type TabValue = "assigned" | "lectures" | "results";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "assigned", label: "Assigned Content", icon: FileText },
   { value: "lectures", label: "Pre-Recorded Lectures", icon: Video },
-  { value: "transcripts", label: "Transcripts", icon: MessageSquareText },
   { value: "results", label: "Results", icon: Trophy },
 ];
 
@@ -354,6 +353,7 @@ export default function ClassDashboard() {
             
             {activeTab === "assigned" && user && (
               <div className="space-y-6 animate-fade-in">
+                <ActiveLiveTranscriptSection instructorId={instructorId} courseId={courseId ?? undefined} />
                 <AssignedContent
                   userId={user.id}
                   instructorId={instructorId}
@@ -368,9 +368,8 @@ export default function ClassDashboard() {
               </div>
             )}
 
-            {activeTab === "transcripts" && (
-              <div className="space-y-6 animate-fade-in">
-                <ActiveLiveTranscriptSection instructorId={instructorId} courseId={courseId ?? undefined} />
+            {activeTab === "assigned" && (
+              <div className="space-y-6 animate-fade-in mt-6">
                 <PastTranscriptsList instructorId={instructorId} courseId={courseId ?? undefined} />
               </div>
             )}

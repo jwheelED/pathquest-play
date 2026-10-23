@@ -1,10 +1,17 @@
 import { useRef, useCallback, useState, useEffect } from 'react';
-import { trackQuestionDetectionDrop } from '@/lib/posthogTracking';
+import { trackQuestionDetectionDrop, trackQuestionDetected } from '@/lib/posthogTracking';
 
 const MIN_WORD_COUNT = 4;
 // Real spoken questions are short. Anything longer is almost certainly a
 // monologue blob that Deepgram appended a "?" to based on intonation.
 const MAX_WORD_COUNT = 30;
+
+export interface PrebuiltAnswerData {
+  format: 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
+  options?: string[];
+  correctAnswer?: 'A' | 'B' | 'C' | 'D';
+  expectedAnswer?: string;
+}
 
 export interface PassiveQuestionCandidate {
   text: string;
@@ -12,6 +19,9 @@ export interface PassiveQuestionCandidate {
   id: string;
   /** Optional teaching prose that came BEFORE the question — used to resolve pronouns downstream */
   priorContext?: string;
+  /** Answer data produced together with detection (AI scanner) — On Deck skips generation when present */
+  prebuilt?: PrebuiltAnswerData;
+  source?: 'ai_scan' | 'classic';
 }
 
 export interface CheckUtteranceOptions {
@@ -465,6 +475,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       const cleaned = stripLeadingFiller(q);
       const displayed = cleaned.length > 0 ? (cleaned.charAt(0).toUpperCase() + cleaned.slice(1)) : q;
       console.log('🔍 Passive question candidate (pending trailing silence):', displayed);
+      trackQuestionDetected('passive', { text: displayed, wordCount: wc, confidence });
 
       const newCandidate: PassiveQuestionCandidate = {
         text: displayed,
@@ -500,10 +511,12 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       const wc = wordCount(text);
       if (wc > MAX_WORD_COUNT) {
         if (debug) console.log(`🛑 [passive] vetted candidate rejected — too long (${wc} words)`);
+        trackQuestionDetectionDrop('max_word_count', { path: 'trigger_capture', text, wordCount: wc });
         return;
       }
       if (looksLikeMonologue(text)) {
         if (debug) console.log('🛑 [passive] vetted candidate rejected — looks like monologue');
+        trackQuestionDetectionDrop('monologue', { path: 'trigger_capture', text, wordCount: wc });
         return;
       }
       // Enforce interrogative trigger even on vetted candidates — defends against
@@ -511,6 +524,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       // (e.g. "Today, we'll be talking about osmosis?").
       if (!hasInterrogativeTrigger(text)) {
         if (debug) console.log('🛑 [passive] vetted candidate rejected — no interrogative trigger:', text);
+        trackQuestionDetectionDrop('no_interrogative_trigger', { path: 'trigger_capture', text, wordCount: wc });
         return;
       }
       const cleaned = stripLeadingFiller(text);
@@ -525,6 +539,11 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
         priorContext: priorContext || undefined,
       };
       if (debug) console.log('✅ [passive] accepted vetted candidate:', displayed);
+      trackQuestionDetected('trigger_capture', {
+        text: displayed,
+        wordCount: wc,
+        contextChars: priorContext?.length,
+      });
       pendingRef.current = newCandidate;
       pendingStartedAtRef.current = now;
       setPendingCandidate(newCandidate);
@@ -541,6 +560,32 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
       armSilenceTimer();
     },
     [enabled, armSilenceTimer, clearSilenceTimer, promotePending, debug]
+  );
+
+  /** AI-vetted candidate: skip rule filters and promote immediately. */
+  const acceptAiCandidate = useCallback(
+    (text: string, priorContext?: string, prebuilt?: PrebuiltAnswerData) => {
+      if (!enabled || !text.trim()) return;
+      const now = Date.now();
+      const newCandidate: PassiveQuestionCandidate = {
+        text: text.trim(),
+        detectedAt: now,
+        id: `ai-${++candidateIdCounter}`,
+        priorContext: priorContext || undefined,
+        prebuilt,
+        source: 'ai_scan',
+      };
+      trackQuestionDetected('ai_scan', {
+        text: newCandidate.text,
+        wordCount: wordCount(newCandidate.text),
+        contextChars: priorContext?.length,
+      });
+      clearSilenceTimer();
+      pendingRef.current = newCandidate;
+      pendingStartedAtRef.current = now;
+      promotePending();
+    },
+    [enabled, clearSilenceTimer, promotePending]
   );
 
   const resetDetection = useCallback(() => {
@@ -570,6 +615,7 @@ export function usePassiveQuestionDetection(options: UsePassiveQuestionDetection
     trailingSilenceMs,
     checkUtterance,
     acceptVettedCandidate,
+    acceptAiCandidate,
     notifySpeech,
     dismissCandidate,
     removeFromHistory,

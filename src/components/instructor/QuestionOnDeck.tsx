@@ -1,3 +1,4 @@
+import { toast as sonnerToast } from "sonner";
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import type { PassiveQuestionCandidate } from '@/hooks/usePassiveQuestionDetection';
+import { trackOnDeckChoices } from '@/lib/posthogTracking';
 
 export type OnDeckFormat = 'multiple_choice' | 'short_answer' | 'poll' | 'coding';
 
@@ -52,6 +54,8 @@ export interface OnDeckSendData {
   sourceBankItemId?: string;
   codingStyle?: 'simple' | 'full';
   codingPayload?: OnDeckCodingPayload;
+  /** Key of the picture pre-generated while this question was On Deck */
+  imagePrepKey?: string;
 }
 
 interface QuestionOnDeckProps {
@@ -408,9 +412,53 @@ export function QuestionOnDeck({
     const key = `${candidate.text}::${effectiveFormat}::${codingStyle}`;
     if (generatedForRef.current === key) return;
     generatedForRef.current = key;
-    generatePreview(candidate.text, effectiveFormat, candidate.priorContext);
+    // AI scanner already produced the answer data together with detection —
+    // show it instantly instead of a second generation call.
+    const pb = candidate.prebuilt;
+    if (pb && pb.format === effectiveFormat) {
+      if ((pb.format === 'multiple_choice' || pb.format === 'poll') && pb.options?.length === 4) {
+        requestIdRef.current++;
+        setIsGenerating(false);
+        setBankMatch(null);
+        setMcqOptions(pb.options);
+        if (pb.correctAnswer) setCorrectAnswer(pb.correctAnswer);
+        trackOnDeckChoices({ source: 'ai_scan', format: pb.format, ms: 0, text: candidate.text });
+        return;
+      }
+      if (pb.format === 'short_answer' && pb.expectedAnswer) {
+        requestIdRef.current++;
+        setIsGenerating(false);
+        setBankMatch(null);
+        setExpectedAnswer(pb.expectedAnswer);
+        trackOnDeckChoices({ source: 'ai_scan', format: pb.format, ms: 0, text: candidate.text });
+        return;
+      }
+    }
+    // Why the AI scan's choices couldn't be used (shown with the generated event).
+    const prebuiltReason = !pb
+      ? candidate.source === 'ai_scan' ? 'scan_returned_no_choices' : 'classic_detection'
+      : pb.format !== effectiveFormat
+        ? `format_mismatch(${pb.format}→${effectiveFormat})`
+        : 'scan_choices_incomplete';
+    generatePreview(candidate.text, effectiveFormat, candidate.priorContext, prebuiltReason);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate?.text, effectiveFormat, codingStyle]);
+
+  // Pre-generate the live-session picture while the question sits On Deck,
+  // so it's ready the moment the instructor presses Send. The server skips
+  // this when no live session is active.
+  const imagePrepRef = useRef<{ text: string; key: string } | null>(null);
+  useEffect(() => {
+    if (!candidate?.text) return;
+    if (imagePrepRef.current?.text === candidate.text) return;
+    const key = crypto.randomUUID();
+    imagePrepRef.current = { text: candidate.text, key };
+    supabase.functions
+      .invoke('generate-question-image', {
+        body: { mode: 'prepare', prepKey: key, questionText: candidate.text },
+      })
+      .catch(() => { /* best effort — send falls back to generating */ });
+  }, [candidate?.text]);
 
   // Reset generated state when candidate is cleared
   useEffect(() => {
@@ -428,9 +476,11 @@ export function QuestionOnDeck({
     questionText: string,
     format: OnDeckFormat,
     priorContext?: string,
+    choicesReason = 'regenerate',
   ) => {
     const reqId = ++requestIdRef.current;
     const isLatest = () => requestIdRef.current === reqId;
+    const choicesStartedAt = performance.now();
 
     setIsGenerating(true);
     setMcqOptions(['', '', '', '']);
@@ -537,7 +587,17 @@ export function QuestionOnDeck({
       ).then((aiRes) => {
         if (!isLatest()) return;
         const { data, error } = aiRes as { data: any; error: any };
-        if (error) return;
+        const ms = Math.round(performance.now() - choicesStartedAt);
+        if (error) {
+          trackOnDeckChoices({ source: 'failed', format, ms, reason: error?.message ?? choicesReason, text: questionText });
+          if (!settled) {
+            sonnerToast.error("Couldn't generate answer choices", {
+              description: 'Press regenerate or type the choices yourself.',
+            });
+          }
+          return;
+        }
+        trackOnDeckChoices({ source: 'generated', format, ms, reason: choicesReason, text: questionText });
         if (format === 'multiple_choice' || format === 'poll') {
           if (data?.options?.length === 4) {
             // Only overwrite if a bank match hasn't already populated options.
@@ -618,6 +678,8 @@ export function QuestionOnDeck({
       };
     }
 
+    const prep = imagePrepRef.current;
+    if (prep && candidate && prep.text === candidate.text) data.imagePrepKey = prep.key;
     onSendNow(questionText, data);
   };
 
