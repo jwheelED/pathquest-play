@@ -1,4 +1,5 @@
-import { Users } from "lucide-react";
+import { Users, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import edvanaWordmark from "@/assets/edvana-wordmark.png";
 
@@ -10,8 +11,21 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, subtitle, inRoom, isActive }: TopBarProps) {
+  const navigate = useNavigate();
+  const goBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/join");
+  };
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-white/85 backdrop-blur-[16px] border-b border-[hsl(220_15%_88%)]">
+      <button
+        type="button"
+        onClick={goBack}
+        aria-label="Go back"
+        className="flex items-center justify-center w-8 h-8 -ml-2 rounded-full text-[hsl(var(--ink))] hover:bg-[hsl(var(--slate-200))] transition-colors shrink-0"
+      >
+        <ArrowLeft className="w-4 h-4" />
+      </button>
       <img src={edvanaWordmark} alt="Edvana" className="h-[18px] w-auto shrink-0" />
       <div className="w-px h-6 bg-[hsl(220_15%_88%)]" />
       <div className="min-w-0 flex-1">
