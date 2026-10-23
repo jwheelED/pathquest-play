@@ -222,7 +222,12 @@ export function useSessionState(sessionCode: string | undefined) {
     }
   }, [timeLeft, phase]);
 
-  // Fallback polling
+  // Fallback polling. Guests can't always receive picture updates live, so
+  // check more often while the current question's picture is still drawing.
+  const waitingForImage =
+    phase === "checkin" &&
+    !!currentQuestion?.image_kind &&
+    currentQuestion.image_status === "pending";
   useEffect(() => {
     if (!sessionId || !sessionCode) return;
     const interval = setInterval(async () => {
@@ -239,9 +244,9 @@ export function useSessionState(sessionCode: string | undefined) {
       } catch {
         // silent
       }
-    }, 10_000);
+    }, waitingForImage ? 3_000 : 10_000);
     return () => clearInterval(interval);
-  }, [sessionId, sessionCode, handleNewQuestion]);
+  }, [sessionId, sessionCode, handleNewQuestion, waitingForImage]);
 
   const selectOption = useCallback((opt: string) => {
     if (phase !== "checkin") return;
