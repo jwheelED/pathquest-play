@@ -464,9 +464,8 @@ Find the strongest misconception opportunity EXPLICITLY taught in this transcrip
         ],
         temperature: diffLevel === "hard" ? 0.5 : 0.7,
         response_format: { type: "json_object" },
-        // Interval questions aren't latency-critical; extra thinking picks
-        // sharper misconceptions and distractors.
-        reasoning_effort: "medium",
+        // Auto questions are sent live, so keep thinking low for speed.
+        reasoning_effort: "low",
       });
 
       // (kept for parity with previous timeout cleanup)
@@ -492,7 +491,10 @@ Find the strongest misconception opportunity EXPLICITLY taught in this transcrip
       console.log("   Confidence:", parsed.confidence);
 
       // Layer 2: Confidence threshold check
-      if ((parsed.confidence || 0) < 0.6) {
+      // Hard questions synthesize ideas, so the model rates itself lower;
+      // the keyword-overlap check below still guards grounding.
+      const minConfidence = diffLevel === "hard" ? 0.45 : 0.6;
+      if ((parsed.confidence || 0) < minConfidence) {
         console.warn(`⚠️ Low confidence (${parsed.confidence}) - rejecting question`);
         const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
           `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}".`);
