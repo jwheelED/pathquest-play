@@ -21,7 +21,8 @@ export interface LiveQuestion {
   sent_at: string;
   image_url: string | null;
   image_status: ImageStatus;
-  image_kind: ImageKind;
+  /** null = no picture planned for this question */
+  image_kind: ImageKind | null;
 }
 
 export interface SessionState {
@@ -115,9 +116,26 @@ export function useSessionState(sessionCode: string | undefined) {
     init();
   }, [sessionCode]);
 
+  const currentQuestionIdRef = useRef<string | null>(null);
+
   const handleNewQuestion = useCallback((raw: Record<string, unknown>) => {
     const q = normalizeQuestion(raw);
     if (!q || answeredIdsRef.current.has(q.id)) return;
+    // Same question again (fallback poll): only refresh its picture — never
+    // reset the participant's choice, confidence or timer.
+    if (currentQuestionIdRef.current === q.id) {
+      setCurrentQuestion((prev) => {
+        if (!prev || prev.id !== q.id) return prev;
+        if (
+          prev.image_url === q.image_url &&
+          prev.image_status === q.image_status &&
+          prev.image_kind === q.image_kind
+        ) return prev;
+        return { ...prev, image_url: q.image_url, image_status: q.image_status, image_kind: q.image_kind };
+      });
+      return;
+    }
+    currentQuestionIdRef.current = q.id;
     setCurrentQuestion(q);
     setSelectedOption(null);
     setConfidence(null);
@@ -204,7 +222,12 @@ export function useSessionState(sessionCode: string | undefined) {
     }
   }, [timeLeft, phase]);
 
-  // Fallback polling
+  // Fallback polling. Guests can't always receive picture updates live, so
+  // check more often while the current question's picture is still drawing.
+  const waitingForImage =
+    phase === "checkin" &&
+    !!currentQuestion?.image_kind &&
+    currentQuestion.image_status === "pending";
   useEffect(() => {
     if (!sessionId || !sessionCode) return;
     const interval = setInterval(async () => {
@@ -221,9 +244,9 @@ export function useSessionState(sessionCode: string | undefined) {
       } catch {
         // silent
       }
-    }, 10_000);
+    }, waitingForImage ? 3_000 : 10_000);
     return () => clearInterval(interval);
-  }, [sessionId, sessionCode, handleNewQuestion]);
+  }, [sessionId, sessionCode, handleNewQuestion, waitingForImage]);
 
   const selectOption = useCallback((opt: string) => {
     if (phase !== "checkin") return;
@@ -361,7 +384,9 @@ function normalizeQuestion(raw: Record<string, unknown>): LiveQuestion | null {
     question_number: (raw.question_number as number) || 1,
     sent_at: (raw.sent_at as string) || new Date().toISOString(),
     image_url: (raw.image_url as string) || null,
-    image_status: (raw.image_status as ImageStatus) || "pending",
-    image_kind: (raw.image_kind as ImageKind) || "illustration",
+    image_status: (raw.image_status as ImageStatus) || (raw.image_url ? "ready" : "pending"),
+    image_kind: raw.image_kind === "diagram" || raw.image_kind === "illustration"
+      ? (raw.image_kind as ImageKind)
+      : null,
   };
 }

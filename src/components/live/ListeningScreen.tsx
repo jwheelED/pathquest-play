@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import edvanaMark from "@/assets/edvana/edvana-mark.png";
 
 export function ListeningScreen() {
   const prefersReduced = usePrefersReducedMotion();
@@ -22,7 +23,7 @@ export function ListeningScreen() {
           />
         ))}
         <img
-          src="/edvana-mark.png"
+          src={edvanaMark}
           alt=""
           className="relative w-14 h-14 drop-shadow-[0_0_20px_hsl(var(--primary)/0.3)]"
         />
