@@ -493,6 +493,7 @@ serve(async (req) => {
       source_transcript = null, // Raw transcript to display with question
       coding_payload = null, // Pre-generated/edited coding question from on-deck preview
       image_prep_key = null, // Key of picture pre-generated while On Deck
+      misconception = null, // Misconception metadata from generate-interval-question
     } = await req.json();
 
     // Normalize coding_payload (may arrive as {style:'simple'|'full', ...fields})
@@ -932,6 +933,30 @@ serve(async (req) => {
         type: "short_answer",
         expectedAnswer: expected_answer || "",
         gradingMode: autoGradePrefs.short_answer && expected_answer ? "auto_grade" : "manual_grade",
+      };
+    }
+
+    // Misconception-targeted auto questions: keep what the question diagnoses
+    // and what each wrong choice means, so results can explain the room.
+    // Only kept when the options came from the interval generator unchanged.
+    if (
+      misconception && typeof misconception === "object" &&
+      typeof (misconception as Record<string, unknown>).target_misconception === "string" &&
+      formattedQuestion && formattedQuestion.source !== "answer_key"
+    ) {
+      const m = misconception as Record<string, unknown>;
+      const rawMap = m.distractor_misconceptions;
+      const distractorMap: Record<string, string> = {};
+      if (rawMap && typeof rawMap === "object" && formattedQuestion.type === "multiple_choice" && formattedQuestion.source === "preview_edited") {
+        for (const [k, v] of Object.entries(rawMap as Record<string, unknown>)) {
+          if (/^[A-D]$/.test(k) && typeof v === "string") distractorMap[k] = v.slice(0, 300);
+        }
+      }
+      formattedQuestion.misconception = {
+        target_concept: String(m.target_concept ?? "").slice(0, 200),
+        target_misconception: String(m.target_misconception).slice(0, 300),
+        misconception_score: typeof m.misconception_score === "number" ? m.misconception_score : null,
+        distractor_misconceptions: distractorMap,
       };
     }
 
