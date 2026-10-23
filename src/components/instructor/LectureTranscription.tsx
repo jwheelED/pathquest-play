@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuthRefresh } from "@/hooks/useAuthRefresh";
 import { Progress } from "@/components/ui/progress";
 import { analyzeContentQuality, isPauseDetected } from "@/lib/contentQuality";
+import { isMisconceptionRequired, misconceptionGraceMs, MISCONCEPTION_WAIT_ERRORS } from "@/lib/misconceptionCadence";
 import { type AutoQuestionMetrics, type SkipReason } from "./AutoQuestionDashboard";
 import { ErrorHistoryPanel, type ErrorRecord } from "./ErrorHistoryPanel";
 import { AutoQuestionDebugDashboard } from "./AutoQuestionDebugDashboard";
@@ -1197,6 +1198,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after voice command
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after voice command");
@@ -1338,6 +1340,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after manual send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after manual send");
@@ -1382,6 +1385,7 @@ export const LectureTranscription = ({
       // Reset auto-question timer after send
       if (autoQuestionEnabled) {
         setLastAutoQuestionTime(Date.now());
+        autoQuestionDueAtRef.current = 0;
         intervalTranscriptRef.current = "";
         setIntervalTranscriptLength(0);
         console.log("🔄 Auto-question timer reset after preview send");
