@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import edvanaWordmark from "@/assets/edvana-wordmark.png";
 
 interface TopBarProps {
   title: string;
@@ -11,7 +12,7 @@ interface TopBarProps {
 export function TopBar({ title, subtitle, inRoom, isActive }: TopBarProps) {
   return (
     <header className="sticky top-0 z-30 flex items-center gap-3 px-6 py-3 bg-white/85 backdrop-blur-[16px] border-b border-[hsl(220_15%_88%)]">
-      <img src="/edvana-logo.png" alt="Edvana" className="h-[22px] w-auto" />
+      <img src={edvanaWordmark} alt="Edvana" className="h-[18px] w-auto shrink-0" />
       <div className="w-px h-6 bg-[hsl(220_15%_88%)]" />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold tracking-[-0.01em] truncate text-[hsl(var(--ink))]">
