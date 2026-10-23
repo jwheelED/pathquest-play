@@ -172,8 +172,14 @@ export function useLlmQuestionScanner({
     const t = text.trim();
     const now = Date.now();
     lines.current = [...lines.current.filter((l) => now - l.at <= contextWindowMs), { text: t, at: now }];
-    // Already scanned from the live text? Keep it as context only.
-    const covered = !!scannedInterim.current && questionSimilarity(t, scannedInterim.current) >= 0.8;
+    // Already scanned from the live text? Keep it as context only — but only
+    // when the final adds no words. A final that finishes a sentence the
+    // instructor paused in ("what is four plus… four") must still be scanned.
+    const scanned = scannedInterim.current;
+    const covered =
+      !!scanned &&
+      words(norm(t)) <= words(norm(scanned)) &&
+      questionSimilarity(t, scanned) >= 0.8;
     interimText.current = "";
     scannedInterim.current = "";
     if (covered) {

@@ -95,6 +95,25 @@ describe("useLlmQuestionScanner", () => {
     expect(scan).toHaveBeenCalledTimes(1);
   });
 
+  it("still scans the full question when the instructor paused before the last word", async () => {
+    const scan = vi
+      .fn()
+      .mockImplementationOnce(async () => ({ detected: false }) as ScanResponse)
+      .mockImplementation(async () => yes("What is four plus four?"));
+    const onDetected = vi.fn();
+    const { result } = renderHook(() => useLlmQuestionScanner({ enabled: true, scan, onDetected }));
+    act(() => result.current.feedInterim("What is four plus"));
+    await act(async () => { vi.advanceTimersByTime(1150); });
+    expect(scan).toHaveBeenCalledTimes(1);
+    act(() => result.current.feedInterim("What is four plus four?"));
+    await act(async () => { vi.advanceTimersByTime(300); });
+    act(() => result.current.feed("What is four plus four?"));
+    await act(async () => { vi.advanceTimersByTime(1500); });
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(scan.mock.calls[1][0].newText).toContain("four plus four");
+    expect(onDetected).toHaveBeenCalledTimes(1);
+  });
+
   it("lets a repeat through when the first detection could not be shown", async () => {
     const onDetected = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
     const scan = vi.fn(async () => yes("What is four plus four?"));
