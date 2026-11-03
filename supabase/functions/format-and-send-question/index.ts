@@ -1012,13 +1012,9 @@ serve(async (req) => {
         : null;
       let preparedUrl: string | null = null;
       if (prepKey) {
-        const base = (Deno.env.get("R2_PUBLIC_URL") || "").replace(/\/+$/, "");
-        if (base) {
-          const candidateUrl = `${base}/question-images/prep-${prepKey}.png`;
-          try {
-            const head = await fetch(candidateUrl, { method: "HEAD" });
-            if (head.ok) preparedUrl = candidateUrl;
-          } catch { /* fall through to generation */ }
+        const candidateUrl = preparedImageUrl(prepKey);
+        if (candidateUrl && await imageExists(candidateUrl)) {
+          preparedUrl = candidateUrl;
         }
       }
 
@@ -1047,7 +1043,9 @@ serve(async (req) => {
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const courseTitle =
           (course_context as { title?: string } | null)?.title || undefined;
-        fetch(`${supabaseUrl}/functions/v1/generate-question-image`, {
+        // Keep the instance alive until the picture job finishes; an
+        // unawaited fetch is cut off once this response is returned.
+        const imageJob = fetch(`${supabaseUrl}/functions/v1/generate-question-image`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1060,9 +1058,15 @@ serve(async (req) => {
             imageKind,
             prepKey,
           }),
+        }).then(async (res) => {
+          if (!res.ok) {
+            console.error(`🎨 Image generation failed (${res.status}):`, (await res.text()).slice(0, 200));
+          }
         }).catch((err: unknown) =>
           console.error("Failed to trigger image generation:", err)
         );
+        const runtime = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
+        if (runtime?.waitUntil) runtime.waitUntil(imageJob);
         console.log(
           `🎨 Image generation triggered for question ${liveQuestion.id} (${imageKind})`
         );
