@@ -5,6 +5,7 @@ import { callClaude } from "../_shared/anthropic.ts";
 import { summarizeDelivery } from "../_shared/deliveryVerification.ts";
 import { initSentry } from "../_shared/sentry.ts";
 import { createLogger } from "../_shared/log.ts";
+import { imageExists, preparedImageUrl } from "../_shared/questionImageStore.ts";
 
 // Initialize Sentry once at cold start (no-op unless SENTRY_DSN is set).
 initSentry();
