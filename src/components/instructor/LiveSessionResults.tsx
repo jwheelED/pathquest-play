@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 import { MCQResultsReveal } from "./MCQResultsReveal";
+import { stripOptionLabel } from "@/lib/optionLabel";
 
 interface LiveResponse {
   id: string;
@@ -134,7 +135,7 @@ const ExpandableResponseRow = ({
         "flex items-center gap-2 py-2 px-1 border-b border-border/40 last:border-0 text-sm transition-colors",
         isLong ? "cursor-pointer hover:bg-muted/30" : "hover:bg-muted/20"
       )}
-      onClick={() => isLong && setExpanded(!expanded)}
+      onClick={() => (isLong || response.ai_feedback) && setExpanded(!expanded)}
     >
       {response.is_correct ? (
         <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
@@ -149,6 +150,9 @@ const ExpandableResponseRow = ({
       </span>
       <span className={cn("flex-1 min-w-0 text-xs text-foreground", !expanded && "truncate")}>
         {fullAnswer}
+        {expanded && response.ai_feedback && (
+          <span className="block mt-1 text-muted-foreground italic">AI feedback: {response.ai_feedback}</span>
+        )}
       </span>
       {isLong && (
         expanded ? (
@@ -156,6 +160,11 @@ const ExpandableResponseRow = ({
         ) : (
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         )
+      )}
+      {typeof response.ai_grade === "number" && (
+        <Badge variant="outline" className="text-[10px] shrink-0" title={response.ai_feedback || undefined}>
+          AI {response.ai_grade}/100
+        </Badge>
       )}
       {response.confidence_level && (
         <Badge variant="outline" className="text-[10px] shrink-0 border-slate-300 text-slate-500">
@@ -464,7 +473,7 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                                 return letterMatch[1].toUpperCase().charCodeAt(0) - 65 === filterIdx;
                               }
                               const directIdx = options.findIndex((opt) => {
-                                const clean = opt.replace(/^[A-Da-d][.):\s]+/, "").trim();
+                                const clean = stripOptionLabel(opt);
                                 return clean === trimmed || opt === trimmed;
                               });
                               return directIdx === filterIdx;

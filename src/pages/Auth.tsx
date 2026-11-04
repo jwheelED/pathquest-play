@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { studentSignUpSchema, signInSchema } from "@/lib/validation";
 import { getOrgId } from "@/hooks/useOrgId";
 import { Label } from "@/components/ui/label";
+import { clearOAuthRoleIntent } from "@/lib/oauthRoleIntent";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -526,6 +527,7 @@ export default function AuthPage() {
 
                   <button
                     onClick={async () => {
+                      clearOAuthRoleIntent();
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {

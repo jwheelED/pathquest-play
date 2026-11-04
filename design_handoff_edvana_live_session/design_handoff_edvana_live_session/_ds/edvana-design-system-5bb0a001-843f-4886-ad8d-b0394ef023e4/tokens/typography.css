@@ -1,0 +1,43 @@
+/* ============================================================
+   EDVANA — TYPOGRAPHY TOKENS
+   One typeface: DM Sans (display, UI, body). DM Mono for codes/code.
+   Friendly geometric sans with soft terminals — calm, approachable,
+   never corporate. Headlines lean tight & negative-tracked.
+   ============================================================ */
+
+:root {
+  --font-sans: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* @kind font */
+  --font-display: 'DM Sans', system-ui, sans-serif; /* @kind font */
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace; /* @kind font */
+
+  /* Type scale (px → rem @16) */
+  --text-xs:   0.75rem;    /* 12 — meta, captions */
+  --text-sm:   0.875rem;   /* 14 — body small, UI labels */
+  --text-base: 1rem;       /* 16 — body */
+  --text-lg:   1.125rem;   /* 18 — lead body */
+  --text-xl:   1.25rem;    /* 20 — card titles */
+  --text-2xl:  1.5rem;     /* 24 — section heads */
+  --text-3xl:  1.875rem;   /* 30 */
+  --text-4xl:  2.25rem;    /* 36 — page H2 */
+  --text-5xl:  3.25rem;    /* 52 — hero */
+  --text-6xl:  3.75rem;    /* 60 — hero large */
+
+  /* Weights — DM Sans: 400/500/600/700 */
+  --weight-regular: 400;   /* @kind font */
+  --weight-medium: 500;    /* @kind font */
+  --weight-semibold: 600;  /* @kind font */
+  --weight-bold: 700;      /* @kind font */
+
+  /* Line heights */
+  --leading-tight: 1.08;   /* @kind font */
+  --leading-snug: 1.2;     /* @kind font */
+  --leading-normal: 1.5;   /* @kind font */
+  --leading-relaxed: 1.7;  /* @kind font */
+
+  /* Letter spacing */
+  --tracking-tighter: -0.025em;  /* @kind font */
+  --tracking-tight: -0.01em;     /* @kind font */
+  --tracking-normal: 0;          /* @kind font */
+  --tracking-eyebrow: 0.16em;    /* @kind font */
+  --tracking-mono: 0.5em;        /* @kind font */
+}

@@ -1,0 +1,139 @@
+/* ============================================================
+   EDVANA — BASE RESETS & REUSABLE BRAND UTILITY CLASSES
+   These mirror the product's hand-rolled classes (index.css) so
+   foundation cards, components and UI kits share one vocabulary.
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: hsl(var(--text-body));
+  background: hsl(var(--background));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* ---- App canvas ---- */
+.edv-app-bg { background: hsl(var(--surface-app)); }
+.edv-mesh { background-image: var(--gradient-mesh); }
+
+/* ---- Cards ---- */
+.headspace-card,
+.command-card {
+  background: hsl(var(--white));
+  border-radius: var(--radius-lg);
+  border: var(--card-border);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s var(--ease-smooth);
+}
+.headspace-card:hover,
+.command-card:hover { box-shadow: var(--shadow-md); }
+
+.bento-card {
+  background: hsl(var(--surface-card));
+  border-radius: var(--radius-2xl);
+  border: 0;
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-smooth);
+}
+.bento-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+
+.signal-card {
+  background: hsl(var(--white));
+  border-radius: var(--radius-md);
+  border: 1px solid hsl(220 15% 92%);
+  box-shadow: 0 1px 2px 0 hsl(var(--ink) / 0.02);
+  transition: all 0.2s var(--ease-smooth);
+}
+.signal-card:hover { border-color: hsl(220 15% 88%); box-shadow: var(--shadow-sm); }
+
+/* ---- Eyebrows / headings ---- */
+.section-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: hsl(160 50% 38%);
+}
+.section-headline {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: hsl(220 20% 18%);
+}
+
+/* ---- Charcoal text palette ---- */
+.text-charcoal { color: hsl(220 20% 18%); }
+.text-charcoal-muted { color: hsl(var(--ink-muted)); }
+.text-charcoal-subtle { color: hsl(var(--ink-subtle)); }
+
+/* ---- Pill button (app) ---- */
+.headspace-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none; cursor: pointer;
+  border-radius: var(--radius-full);
+  padding: 0.75rem 2rem;
+  font-weight: var(--weight-semibold);
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s var(--ease-smooth);
+}
+.headspace-button:hover { box-shadow: var(--shadow-lg); transform: scale(1.02); }
+
+/* ---- Stat pill ---- */
+.stat-pill {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  background: hsl(var(--surface-card));
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Live badge (pulsing) ---- */
+.live-badge {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: 0.02em;
+  background: hsl(var(--emerald-50)); color: hsl(var(--emerald-700));
+  border: 1px solid hsl(var(--emerald-100));
+}
+.live-badge .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: hsl(var(--emerald-500)); animation: edv-pulse 2s ease-in-out infinite;
+}
+
+/* ---- MCQ option ---- */
+.mcq-option {
+  background: hsl(var(--surface-accent) / 0.5);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+.mcq-option:hover { background: hsl(var(--surface-accent)); border-color: hsl(var(--primary) / 0.3); }
+.mcq-option.selected { background: hsl(var(--primary) / 0.1); border-color: hsl(var(--primary)); }
+.mcq-option.correct { background: hsl(var(--primary) / 0.08); border-color: hsl(var(--primary)); }
+
+/* ---- Glass ---- */
+.glass {
+  background: hsl(var(--surface-card) / 0.8);
+  backdrop-filter: blur(var(--blur-glass));
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+/* ---- Motion keyframes ---- */
+@keyframes edv-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes edv-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes edv-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

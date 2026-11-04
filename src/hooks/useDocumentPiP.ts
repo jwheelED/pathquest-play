@@ -1,16 +1,12 @@
 import { useState, useCallback } from 'react';
 
-// Extend Window interface for Document Picture-in-Picture API
-declare global {
-  interface Window {
-    documentPictureInPicture?: {
-      requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
-    };
-  }
-  interface DocumentPictureInPictureEvent extends Event {
-    window: Window;
-  }
+// Document Picture-in-Picture API. Newer TypeScript DOM libs declare it
+// globally, so read it through a local type instead of redeclaring Window.
+interface PiPApi {
+  requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
 }
+const getPiPApi = (): PiPApi | undefined =>
+  (window as unknown as { documentPictureInPicture?: PiPApi }).documentPictureInPicture;
 
 export interface UseDocumentPiPOptions {
   width?: number;
@@ -30,7 +26,9 @@ export const useDocumentPiP = (options: UseDocumentPiPOptions = {}) => {
     }
 
     try {
-      const newWindow = await window.documentPictureInPicture!.requestWindow({
+      const api = getPiPApi();
+      if (!api) return null;
+      const newWindow = await api.requestWindow({
         width,
         height,
       });

@@ -201,7 +201,6 @@ Return ONLY the complete question text, nothing else.`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 500,
     });
 
     if (!response.ok) {

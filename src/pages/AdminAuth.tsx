@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
+import { setOAuthRoleIntent, readOAuthRoleIntent, clearOAuthRoleIntent } from "@/lib/oauthRoleIntent";
 
 export default function AdminAuth() {
   const [email, setEmail] = useState("");
@@ -23,6 +24,34 @@ export default function AdminAuth() {
   const isSigningInRef = useRef(false);
   const hasResolvedRef = useRef(false);
   const navigate = useNavigate();
+
+  // Signed in without the admin role. Only a fresh signup that started from this
+  // portal's Google button gets promoted; everyone else keeps their session and
+  // is sent to their student dashboard instead of being signed out.
+  const handleMissingAdminRole = async (userId: string, userCreatedAt: string) => {
+    const intent = readOAuthRoleIntent();
+    const isRecentSignup = Date.now() - new Date(userCreatedAt).getTime() < 15 * 60 * 1000;
+
+    if (intent === 'admin' && isRecentSignup) {
+      clearOAuthRoleIntent();
+      const { data: success } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: userId,
+        p_role: 'admin',
+      });
+
+      if (success) {
+        toast.success("Admin account created!");
+        navigate("/admin/onboarding");
+        return;
+      }
+    }
+    clearOAuthRoleIntent();
+
+    toast.error("This account isn't registered as an administrator. Taking you to your dashboard.");
+    navigate("/dashboard");
+  };
+
+
 
   const handlePasswordUpdate = async () => {
     setLoading(true);
@@ -108,41 +137,9 @@ export default function AdminAuth() {
               navigate("/admin/onboarding");
             }
           } else {
-            // Possibly a fresh OAuth signup - check for student role to upgrade
-            const { data: studentRole } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("role", "student")
-              .maybeSingle();
-
-            // Only auto-promote on a fresh OAuth signup (within last 30s) — prevents
-            // an existing student from self-elevating to admin by visiting /admin/auth.
-            const sessionCreatedAt = new Date(session.user.created_at).getTime();
-            const isRecentSignup = (Date.now() - sessionCreatedAt) < 30000;
-
-            // Detect fresh OAuth callback so we don't strand existing non-admin users on a dead screen
-            const urlParams = new URLSearchParams(window.location.search);
-            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
-
-            if (studentRole && hasOAuthCallback && isRecentSignup) {
-              const { data: success } = await supabase
-                .rpc('assign_oauth_role', {
-                  p_user_id: session.user.id,
-                  p_role: 'admin'
-                });
-
-              if (success) {
-                toast.success("Admin account created!");
-                navigate("/admin/onboarding");
-              }
-            } else {
-              // Existing user lacking admin role - bounce to student portal so they aren't stranded.
-              toast.error("This account isn't registered as an administrator. Redirecting to the student sign-in.");
-              await supabase.auth.signOut();
-              navigate("/auth");
-            }
+            await handleMissingAdminRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       }
     });
@@ -175,7 +172,10 @@ export default function AdminAuth() {
             } else {
               navigate("/admin/onboarding");
             }
+          } else if (readOAuthRoleIntent() === 'admin') {
+            await handleMissingAdminRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       });
     }
@@ -303,12 +303,9 @@ export default function AdminAuth() {
           if (roleData) {
             navigate("/admin/dashboard");
           } else {
-            // Signed in to admin portal but doesn't have admin role.
-            // Sign out and send them to the student portal so they aren't stranded.
-            toast.error("This account isn't registered as an administrator. Redirecting to the student sign-in.");
-            await supabase.auth.signOut();
-            navigate("/auth");
+            await handleMissingAdminRole(user.id, user.created_at);
           }
+
         }
       }
     } catch (error: unknown) {
@@ -439,15 +436,15 @@ export default function AdminAuth() {
 
                   <Button
                     onClick={async () => {
+                      // Persist intent: Supabase can't carry a role through the OAuth round-trip.
+                      setOAuthRoleIntent('admin');
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
                           redirectTo: `${window.location.origin}/admin/auth`,
-                          queryParams: {
-                            role: 'admin'
-                          }
                         }
                       });
+
                       if (error) {
                         toast.error(error.message);
                       }

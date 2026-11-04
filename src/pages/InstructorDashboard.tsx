@@ -34,6 +34,7 @@ import { StudentLectureQuestions } from "@/components/instructor/StudentLectureQ
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
+import { onInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { useLiveTranscriptBroadcast } from "@/hooks/useLiveTranscriptBroadcast";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
@@ -110,6 +111,14 @@ export default function InstructorDashboard() {
   );
 
   const professorType = instructorProfile?.professor_type;
+
+  // Preference changes made in the Settings tab must apply immediately —
+  // patch the cached profile so the Live Copilot picks up the new format.
+  useEffect(() => {
+    return onInstructorPrefsUpdated((detail) => {
+      setInstructorProfile((prev: any) => (prev ? { ...prev, ...detail } : prev));
+    });
+  }, []);
 
   // Stream live transcript chunks to enrolled students (realtime + persistence)
   useLiveTranscriptBroadcast({

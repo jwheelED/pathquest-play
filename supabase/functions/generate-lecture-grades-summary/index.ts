@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { GEMINI_FLASH, DEFAULT_REASONING_EFFORT } from "../_shared/models.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,7 +125,7 @@ ${questionSummaries
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: GEMINI_FLASH,
           messages: [
             {
               role: "system",
@@ -144,7 +145,7 @@ Use markdown formatting. Be concise and data-driven.`,
             },
           ],
           temperature: 0.3,
-          max_tokens: 1000,
+          reasoning_effort: DEFAULT_REASONING_EFFORT,
         }),
       }
     );

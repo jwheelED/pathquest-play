@@ -25,19 +25,19 @@ insert into public.subscription_tiers
    pricing_model, price_suffix, features, is_active, sort_order,
    student_limit, course_limit)
 values
-  ('department', 'Department', '100 shared lecture hours per year across your department. Annual contract, unused hours roll over.',
+  ('department', 'Department', '100 shared session hours per year for a single department. Annual contract with rollover — top up at renewal, not mid-year.',
    149900, 'year', 'flat_rate', '/year',
-   '["100 shared lecture hours / year","Shared across all instructors","Unused hours roll over","Overage billed at $15/hr"]'::jsonb,
+   '["100 shared session hours / year","Shared across all instructors in the department","Usage dashboard & admin reporting","Unused hours roll over to next year"]'::jsonb,
    true, 10, null, null),
 
-  ('campus', 'Campus', '400 shared lecture hours per year with admin reporting and workflows. Annual contract, unused hours roll over.',
+  ('campus', 'Campus', '400 shared session hours per year across your campus, with advanced admin workflows. Annual contract with rollover.',
    399900, 'year', 'flat_rate', '/year',
-   '["400 shared lecture hours / year","Admin reporting & workflows","Unused hours roll over","Overage billed at $10/hr"]'::jsonb,
+   '["400 shared session hours / year","Shared across all instructors on campus","Advanced admin workflows & role management","Usage dashboard & admin reporting","Unused hours roll over to next year"]'::jsonb,
    true, 11, null, null),
 
-  ('enterprise', 'Enterprise', '1,200 shared lecture hours per year with priority support. Annual contract, unused hours roll over.',
+  ('enterprise', 'Enterprise', '1,200 shared session hours per year with priority support and onboarding. Annual contract with rollover.',
    799900, 'year', 'flat_rate', '/year',
-   '["1,200 shared lecture hours / year","Priority support & onboarding","Unused hours roll over","Overage billed at $6.67/hr"]'::jsonb,
+   '["1,200 shared session hours / year","Shared across your entire organization","Priority support & dedicated onboarding","Advanced admin workflows & reporting","Unused hours roll over to next year"]'::jsonb,
    true, 12, null, null)
 
 on conflict (name) do update set

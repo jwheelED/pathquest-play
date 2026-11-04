@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
+import { setOAuthRoleIntent, readOAuthRoleIntent, clearOAuthRoleIntent } from "@/lib/oauthRoleIntent";
 
 export default function InstructorAuth() {
   const [email, setEmail] = useState("");
@@ -21,6 +22,8 @@ export default function InstructorAuth() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isSigningUp, setIsSigningUp] = useState(false);
+  const [conversionUserId, setConversionUserId] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
   const isRecoveryModeRef = useRef(false);
   const isSigningUpRef = useRef(false);
   const hasResolvedRef = useRef(false);
@@ -68,6 +71,72 @@ export default function InstructorAuth() {
     }
   }, []);
 
+  // Handles a signed-in user who lacks the instructor role.
+  // 1) If they just came back from the instructor portal's Google button, grant the role.
+  // 2) If they look like a mis-roled OAuth signup (no student activity), offer conversion.
+  // 3) Otherwise they are a genuine student — keep them signed in and send them to /dashboard.
+  const handleMissingInstructorRole = async (userId: string, userCreatedAt: string) => {
+    const intent = readOAuthRoleIntent();
+    const isRecentSignup = Date.now() - new Date(userCreatedAt).getTime() < 15 * 60 * 1000;
+
+    if (intent === 'instructor' && isRecentSignup) {
+      clearOAuthRoleIntent();
+      const { data: success } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: userId,
+        p_role: 'instructor',
+      });
+
+      if (success) {
+        toast.success("Instructor account created!");
+        navigate("/instructor/onboarding");
+        return;
+      }
+    }
+    clearOAuthRoleIntent();
+
+    // Does this account have any real student activity?
+    const { count } = await supabase
+      .from("instructor_students")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", userId);
+
+    if ((count ?? 0) > 0) {
+      toast.error("This account is registered as a student. Taking you to your student dashboard.");
+      navigate("/dashboard");
+      return;
+    }
+
+    // No student activity — most likely a Google signup that was mis-labelled.
+    setConversionUserId(userId);
+  };
+
+  const convertToInstructor = async () => {
+    if (!conversionUserId) return;
+    setConverting(true);
+    try {
+      const { data: success, error } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: conversionUserId,
+        p_role: 'instructor',
+      });
+      if (error) throw error;
+      if (!success) throw new Error("Could not convert this account.");
+      toast.success("Instructor access enabled!");
+      setConversionUserId(null);
+      navigate("/instructor/onboarding");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Could not convert this account.");
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const declineConversion = async () => {
+    setConversionUserId(null);
+    navigate("/dashboard");
+  };
+
+
+
   // Combined auth state change handler
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -113,34 +182,9 @@ export default function InstructorAuth() {
                 navigate("/instructor/onboarding");
               }
           } else {
-            // Not an instructor - check if this is a fresh OAuth redirect (within last 30 seconds)
-            const sessionCreatedAt = new Date(session.user.created_at).getTime();
-            const now = Date.now();
-            const isRecentSignup = (now - sessionCreatedAt) < 30000; // 30 seconds
-            
-            // Also check URL for OAuth callback indicators
-            const urlParams = new URLSearchParams(window.location.search);
-            const hasOAuthCallback = urlParams.has('code') || window.location.hash.includes('access_token');
-            
-            if (isRecentSignup && hasOAuthCallback) {
-              // This is a new OAuth signup - assign instructor role
-              const { data: success } = await supabase
-                .rpc('assign_oauth_role', { 
-                  p_user_id: session.user.id, 
-                  p_role: 'instructor' 
-                });
-              
-              if (success) {
-                toast.success("Instructor account created!");
-                navigate("/instructor/onboarding");
-              }
-            } else {
-              // Existing user who is not an instructor - redirect them to the student portal so they aren't stranded.
-              toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
-              await supabase.auth.signOut();
-              navigate("/auth");
-            }
+            await handleMissingInstructorRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       }
     });
@@ -176,7 +220,11 @@ export default function InstructorAuth() {
             } else {
               navigate("/instructor/onboarding");
             }
+          } else if (readOAuthRoleIntent() === 'instructor') {
+            // Returning from the instructor portal's Google button without the role yet.
+            await handleMissingInstructorRole(session.user.id, session.user.created_at);
           }
+
         }, 0);
       });
     }
@@ -320,12 +368,10 @@ export default function InstructorAuth() {
               navigate("/instructor/onboarding");
             }
           } else {
-            // Signed in to instructor portal but doesn't have instructor role.
-            // Sign out and send them to the student portal so they aren't stranded.
-            toast.error("This account isn't registered as an instructor. Redirecting to the student sign-in.");
-            await supabase.auth.signOut();
-            navigate("/auth");
+            // Signed in to the instructor portal without the instructor role.
+            await handleMissingInstructorRole(user.id, user.created_at);
           }
+
         }
       }
     } catch (error: unknown) {
@@ -338,7 +384,39 @@ export default function InstructorAuth() {
     }
   };
 
+  if (conversionUserId) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-5 py-12 mastery-bg">
+        <div className="command-card px-7 py-9 sm:px-9 sm:py-10 w-full max-w-[400px] space-y-5">
+          <div className="space-y-1.5 text-center">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Set up instructor access?
+            </h1>
+            <p className="text-[13px] text-muted-foreground/70">
+              This account doesn't have instructor access yet, and it has no student activity.
+              You can convert it into an instructor account now.
+            </p>
+          </div>
+          <Button
+            onClick={convertToInstructor}
+            disabled={converting}
+            className="w-full h-[44px] rounded-[10px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm"
+          >
+            {converting ? "Setting up..." : "Convert to instructor account"}
+          </Button>
+          <button
+            onClick={declineConversion}
+            className="w-full text-center text-[13px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+          >
+            No thanks, continue as a student
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
+
     <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-5 py-12 mastery-bg">
       {/* Ambient glow */}
       <div className="absolute top-[-20%] left-[30%] w-[500px] h-[500px] rounded-full opacity-[0.04] pointer-events-none" style={{ background: 'radial-gradient(circle, hsl(160, 50%, 45%), transparent 70%)' }} />
@@ -487,15 +565,15 @@ export default function InstructorAuth() {
 
                   <Button
                     onClick={async () => {
+                      // Persist intent: Supabase can't carry a role through the OAuth round-trip.
+                      setOAuthRoleIntent('instructor');
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
                           redirectTo: `${window.location.origin}/instructor/auth`,
-                          queryParams: {
-                            role: 'instructor'
-                          }
                         }
                       });
+
                       if (error) {
                         toast.error(error.message);
                       }

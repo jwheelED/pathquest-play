@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { resolveAiProvider, callAiProvider } from "../_shared/aiProvider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -137,83 +138,77 @@ For each component, provide a score and brief justification:
 
 Remember: If the student clearly understands the concept, award full or near-full marks!`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "grade_coding",
-              description: "Grade a student's coding solution with lenient, concept-focused scoring",
-              parameters: {
-                type: "object",
-                properties: {
-                  algorithmic_understanding: {
-                    type: "number",
-                    description: "Score for algorithmic understanding (0-50)",
-                    minimum: 0,
-                    maximum: 50,
-                  },
-                  logic_correctness: {
-                    type: "number",
-                    description: "Score for logic correctness (0-30)",
-                    minimum: 0,
-                    maximum: 30,
-                  },
-                  code_quality: {
-                    type: "number",
-                    description: "Score for code quality (0-10)",
-                    minimum: 0,
-                    maximum: 10,
-                  },
-                  edge_case_awareness: {
-                    type: "number",
-                    description: "Score for edge case awareness (0-10)",
-                    minimum: 0,
-                    maximum: 10,
-                  },
-                  total_grade: {
-                    type: "number",
-                    description: "Total grade (sum of all components, 0-100)",
-                    minimum: 0,
-                    maximum: 100,
-                  },
-                  understands_concept: {
-                    type: "boolean",
-                    description: "Does the student clearly understand the core concept/algorithm?",
-                  },
-                  feedback: {
-                    type: "string",
-                    description: "Constructive feedback focused on what the student did well and specific areas for improvement",
-                  },
+    const ai = resolveAiProvider();
+    const response = await callAiProvider(ai, {
+      model: ai.defaultModel,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "grade_coding",
+            description: "Grade a student's coding solution with lenient, concept-focused scoring",
+            parameters: {
+              type: "object",
+              properties: {
+                algorithmic_understanding: {
+                  type: "number",
+                  description: "Score for algorithmic understanding (0-50)",
+                  minimum: 0,
+                  maximum: 50,
                 },
-                required: [
-                  "algorithmic_understanding",
-                  "logic_correctness",
-                  "code_quality",
-                  "edge_case_awareness",
-                  "total_grade",
-                  "understands_concept",
-                  "feedback",
-                ],
-                additionalProperties: false,
+                logic_correctness: {
+                  type: "number",
+                  description: "Score for logic correctness (0-30)",
+                  minimum: 0,
+                  maximum: 30,
+                },
+                code_quality: {
+                  type: "number",
+                  description: "Score for code quality (0-10)",
+                  minimum: 0,
+                  maximum: 10,
+                },
+                edge_case_awareness: {
+                  type: "number",
+                  description: "Score for edge case awareness (0-10)",
+                  minimum: 0,
+                  maximum: 10,
+                },
+                total_grade: {
+                  type: "number",
+                  description: "Total grade (sum of all components, 0-100)",
+                  minimum: 0,
+                  maximum: 100,
+                },
+                understands_concept: {
+                  type: "boolean",
+                  description: "Does the student clearly understand the core concept/algorithm?",
+                },
+                feedback: {
+                  type: "string",
+                  description: "Constructive feedback focused on what the student did well and specific areas for improvement",
+                },
               },
+              required: [
+                "algorithmic_understanding",
+                "logic_correctness",
+                "code_quality",
+                "edge_case_awareness",
+                "total_grade",
+                "understands_concept",
+                "feedback",
+              ],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "grade_coding" } },
-        temperature: 0.3,
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "grade_coding" } },
+      temperature: 0.3,
     });
 
     if (!response.ok) {

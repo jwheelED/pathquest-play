@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
 
     const { data: questions } = await adminClient
       .from('live_questions')
-      .select('id, question_content, sent_at')
+      .select('id, question_content, sent_at, question_number, image_url, image_status, image_kind')
       .eq('session_id', session.id)
       .order('sent_at', { ascending: false })
       .limit(5);

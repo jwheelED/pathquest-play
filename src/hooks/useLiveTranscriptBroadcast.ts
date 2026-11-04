@@ -23,11 +23,14 @@ export function useLiveTranscriptBroadcast({
   enabled,
 }: Options) {
   const lastSentIndexRef = useRef(0);
+  // Running offset so chunk numbering continues across Stop → Start restarts
+  const offsetRef = useRef(0);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Reset counter when session changes
+  // Reset counters when session changes
   useEffect(() => {
     lastSentIndexRef.current = 0;
+    offsetRef.current = 0;
   }, [sessionId]);
 
   // Maintain a single channel for the active session
@@ -54,11 +57,17 @@ export function useLiveTranscriptBroadcast({
 
   // Push new chunks
   useEffect(() => {
-    if (!enabled || !sessionId || !instructorId || !channelRef.current) return;
+    if (!enabled || !sessionId || !instructorId) return;
+
+    // Recording restarted: the chunk list was cleared/shrunk. Continue numbering.
+    if (chunks.length < lastSentIndexRef.current) {
+      offsetRef.current += lastSentIndexRef.current;
+      lastSentIndexRef.current = 0;
+    }
     if (chunks.length <= lastSentIndexRef.current) return;
 
     const newChunks = chunks.slice(lastSentIndexRef.current);
-    const startIndex = lastSentIndexRef.current;
+    const startIndex = offsetRef.current + lastSentIndexRef.current;
     lastSentIndexRef.current = chunks.length;
 
     newChunks.forEach((text, i) => {

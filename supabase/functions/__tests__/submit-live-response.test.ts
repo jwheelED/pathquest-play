@@ -89,3 +89,23 @@ describe("handleSubmit (characterization)", () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe("handleSubmit AI grading for written answers", () => {
+  const saQuestion = {
+    question_content: { question: "Why do leaves change color?", type: "short_answer", correctAnswer: "Chlorophyll breaks down" },
+    question_number: 1, instructor_id: "i1", session_id: null,
+  };
+  it("grade >= 70 counts as correct and returns grade + feedback", async () => {
+    const { client } = makeMockSupabase({ live_questions: [{ data: saQuestion }], live_responses: [{ data: null }, { data: { id: "r1" } }] });
+    const res = await handleSubmit({ ...base, answer: "chlorophyll fades" }, { supabase: client, grade: async () => ({ grade: 70, feedback: "Good" }) });
+    const r = (res.body as { response: { isCorrect: boolean; aiGrade: number; aiFeedback: string } }).response;
+    expect(r.isCorrect).toBe(true);
+    expect(r.aiGrade).toBe(70);
+    expect(r.aiFeedback).toBe("Good");
+  });
+  it("grade below 70 counts as incorrect", async () => {
+    const { client } = makeMockSupabase({ live_questions: [{ data: saQuestion }], live_responses: [{ data: null }, { data: { id: "r1" } }] });
+    const res = await handleSubmit({ ...base, answer: "wind" }, { supabase: client, grade: async () => ({ grade: 69, feedback: "" }) });
+    expect((res.body as { response: { isCorrect: boolean } }).response.isCorrect).toBe(false);
+  });
+});
