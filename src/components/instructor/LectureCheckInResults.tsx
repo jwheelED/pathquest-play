@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, BarChart3, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
+import { CheckCircle, XCircle, Clock, TrendingUp, Trash2, AlertTriangle, Download, Trash, ThumbsUp, ThumbsDown, Sparkles, RefreshCw, Heart, FileText, ChevronDown, Code, Users, ClipboardList } from "lucide-react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
@@ -11,13 +11,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { QuestionAnalyticsChart } from "./QuestionAnalyticsChart";
 import { ShortAnswerAnalytics } from "./ShortAnswerAnalytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { MathRenderer } from "@/components/ui/math-renderer";
+import { CheckInConfidenceBreakdown } from "./CheckInConfidenceBreakdown";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Progress } from "@/components/ui/progress";
+import { distinctStudentCount, studentCompletion } from "@/lib/lectureCheckInMetrics";
 
 interface Assignment {
   id: string;
@@ -30,6 +31,7 @@ interface Assignment {
   created_at: string;
   student_name?: string;
   response_time_seconds?: number | null;
+  confidence_level?: string | null;
 }
 
 interface GroupedAssignment {
@@ -51,10 +53,6 @@ export const LectureCheckInResults = () => {
     group: GroupedAssignment;
   } | null>(null);
   const [questionRatings, setQuestionRatings] = useState<Record<string, string>>({});
-  const [showCharts, setShowCharts] = useState<Record<string, boolean>>(() => {
-    const saved = localStorage.getItem('lectureCheckInChartsVisibility');
-    return saved ? JSON.parse(saved) : {};
-  });
   const [questionSummaries, setQuestionSummaries] = useState<Record<string, {
     summary: string;
     trend: string;
@@ -70,10 +68,46 @@ export const LectureCheckInResults = () => {
     responseCount?: number;
   }>>({});
   const { selectedCourse } = useCourseContext();
+  const [regrading, setRegrading] = useState<string | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('lectureCheckInChartsVisibility', JSON.stringify(showCharts));
-  }, [showCharts]);
+  // Re-run AI grading for submitted short answers that never got a grade.
+  const handleRegrade = async (
+    key: string,
+    questionText: string,
+    expectedAnswer: string,
+    assignments: Assignment[],
+  ) => {
+    setRegrading(key);
+    let graded = 0;
+    let failed = 0;
+    for (const a of assignments) {
+      const qs = ((a.content as { questions?: Array<{ question?: string; type?: string }> })?.questions) || [];
+      const idx = qs.findIndex((q) => q.question === questionText && q.type === 'short_answer');
+      const responses = (a.quiz_responses || {}) as Record<string, unknown>;
+      const recs = (responses._ai_recommendations || {}) as Record<string, { grade?: number }>;
+      if (!a.completed || idx < 0 || typeof recs[idx]?.grade === 'number' || a.grade !== null) continue;
+      const { data, error } = await supabase.functions.invoke('auto-grade-short-answer', {
+        body: { studentAnswer: String(responses[idx] ?? ''), expectedAnswer, question: questionText },
+      });
+      if (error || typeof data?.grade !== 'number') { failed++; continue; }
+      const { error: upErr } = await supabase
+        .from('student_assignments')
+        .update({
+          grade: data.grade,
+          quiz_responses: { ...responses, _ai_recommendations: { ...recs, [idx]: { grade: data.grade, feedback: data.feedback } } },
+          answers_released: true,
+          release_method: 'auto_grade',
+        } as never)
+        .eq('id', a.id);
+      if (upErr) failed++; else graded++;
+    }
+    setRegrading(null);
+    if (graded === 0 && failed === 0) toast.info('No ungraded answers to grade');
+    else if (failed) toast.warning(`Graded ${graded}, ${failed} failed`);
+    else toast.success(`Graded ${graded} answer${graded === 1 ? '' : 's'}`);
+    fetchResults();
+  };
+
 
   const fetchResults = useCallback(async () => {
     const {
@@ -102,7 +136,8 @@ export const LectureCheckInResults = () => {
         completed,
         created_at,
         response_time_seconds,
-        ai_summary
+        ai_summary,
+        confidence_level
       `,
       )
       .eq("instructor_id", user.id)
@@ -414,10 +449,8 @@ export const LectureCheckInResults = () => {
 
     const hasAIGrades = aiGrades.length > 0;
     
-    // For short answer with no AI grades and no expected answer, mark as manual
-    const isManualGradeShortAnswer = question.type === 'short_answer' && 
-      !hasAIGrades &&
-      (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+    // Short answers without any grade yet are pending, never "incorrect"
+    const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrades;
     
     // Calculate correct count based on available data
     let correct: Assignment[] = [];
@@ -864,7 +897,7 @@ export const LectureCheckInResults = () => {
 
       await recalculateGradesForQuestion(group.assignments, questionIdx, updatedQuestions);
 
-      toast.success(`Answer overridden! Grades recalculated for ${group.assignments.length} student(s).`);
+      toast.success(`Answer overridden! Grades recalculated for ${distinctStudentCount(group.assignments)} student(s).`);
       
       // Refresh results
       await fetchResults();
@@ -916,7 +949,7 @@ export const LectureCheckInResults = () => {
         doc.text(`Check-In: ${checkInDate}`, 20, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
-        doc.text(`${group.assignments.length} student(s)`, 20, yPosition + 6);
+        doc.text(`${distinctStudentCount(group.assignments)} student(s)`, 20, yPosition + 6);
         yPosition += 15;
 
         // Questions section
@@ -1200,64 +1233,64 @@ export const LectureCheckInResults = () => {
   };
 
   return (
-    <Card className="shadow-lg border-2 overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <TrendingUp className="h-6 w-6 text-primary shrink-0" />
-                <span className="truncate">Live Room Insight</span>
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs">
-                Auto-graded performance • Last synced: {formatLastUpdated()}
-              </CardDescription>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              onClick={handleManualRefresh} 
-              variant="outline" 
-              size="sm" 
-              className="gap-1"
-              disabled={refreshing}
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{refreshing ? 'Syncing...' : 'Refresh'}</span>
-            </Button>
-            <Button onClick={exportToPDF} variant="outline" size="sm" className="gap-1">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">PDF</span>
-            </Button>
-            <Button onClick={exportToCSV} variant="outline" size="sm" className="gap-1">
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">CSV</span>
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="gap-1">
-                  <Trash className="h-4 w-4" />
-                  <span className="hidden sm:inline">Delete All</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete All Check-Ins?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete all lecture check-in results and student responses. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete All
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+    <div className="space-y-4">
+      {/* Section header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <span className="section-eyebrow">Live Room Insight</span>
+          <h3 className="text-lg font-semibold text-charcoal mt-1">
+            Check-in results
+          </h3>
+          <p className="text-xs text-charcoal-subtle mt-0.5">
+            Auto-graded performance • Last synced: {formatLastUpdated()}
+          </p>
         </div>
-      </CardHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button 
+            onClick={handleManualRefresh} 
+            variant="outline" 
+            size="sm" 
+            className="rounded-full h-8 px-3 gap-1.5 text-xs font-medium border-slate-200 hover:bg-slate-50"
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{refreshing ? 'Syncing...' : 'Refresh'}</span>
+          </Button>
+          <Button onClick={exportToPDF} variant="outline" size="sm" className="rounded-full h-8 px-3 gap-1.5 text-xs font-medium border-slate-200 hover:bg-slate-50">
+            <FileText className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
+          <Button onClick={exportToCSV} variant="outline" size="sm" className="rounded-full h-8 px-3 gap-1.5 text-xs font-medium border-slate-200 hover:bg-slate-50">
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">CSV</span>
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="rounded-full h-8 px-3 gap-1.5 text-xs font-medium border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700">
+                <Trash className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Delete All</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete All Check-Ins?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete all lecture check-in results and student responses. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete All
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
+      {/* Results content */}
+      <div className="command-card overflow-hidden">
       <CardContent className="pt-6">
         {/* Summary Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -1298,8 +1331,8 @@ export const LectureCheckInResults = () => {
                 <div className="flex items-center justify-between w-full pr-4">
                   <div className="flex items-center gap-3 flex-wrap">
                     <Badge variant="outline">{formatRelativeTime(group.timestamp)}</Badge>
-                    <Badge variant="secondary" className="text-xs">{group.questions.length} question{group.questions.length !== 1 ? 's' : ''}</Badge>
-                    <span className="text-sm text-muted-foreground">{group.assignments.length} student(s)</span>
+                    <Badge className="text-xs bg-emerald-600 text-white border-0 hover:bg-emerald-600">{group.questions.length} question{group.questions.length !== 1 ? 's' : ''}</Badge>
+                    <span className="text-sm text-muted-foreground">{distinctStudentCount(group.assignments)} student(s)</span>
                     {(() => {
                       const groupPercentages: number[] = [];
                       group.questions.forEach((q, qi) => {
@@ -1309,24 +1342,29 @@ export const LectureCheckInResults = () => {
                       if (groupPercentages.length === 0) return null;
                       const avg = Math.round(groupPercentages.reduce((a, b) => a + b, 0) / groupPercentages.length);
                       return (
-                        <Badge variant="outline" className={`text-xs ${avg >= 70 ? 'border-green-500 text-green-600' : avg >= 50 ? 'border-amber-500 text-amber-600' : 'border-red-500 text-red-600'}`}>
+                        <Badge variant="outline" className={`text-xs font-semibold ${avg >= 70 ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : avg >= 50 ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-rose-50 border-rose-300 text-rose-700'}`}>
                           {avg}% avg
                         </Badge>
                       );
                     })()}
                   </div>
                   <div className="flex items-center gap-3">
-                    {group.assignments.filter((a) => a.completed).length === group.assignments.length ? (
-                      <Badge variant="default" className="gap-1">
-                        <CheckCircle className="h-3 w-3" />
-                        All Complete
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="gap-1">
-                        <Clock className="h-3 w-3" />
-                        {group.assignments.filter((a) => a.completed).length}/{group.assignments.length} Complete
-                      </Badge>
-                    )}
+                    {(() => {
+                      // A student is "complete" only when every question they were
+                      // sent is answered; denominator is distinct students.
+                      const { complete, total } = studentCompletion(group.assignments);
+                      return complete === total && total > 0 ? (
+                        <Badge variant="outline" className="gap-1 border-slate-300 text-slate-600">
+                          <CheckCircle className="h-3 w-3" />
+                          All Complete
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 border-slate-300 text-slate-600">
+                          <Clock className="h-3 w-3" />
+                          {complete}/{total} Complete
+                        </Badge>
+                      );
+                    })()}
                     <AlertDialog>
                       <AlertDialogTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0">
@@ -1337,7 +1375,7 @@ export const LectureCheckInResults = () => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Check-In?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will permanently remove this check-in for all {group.assignments.length} student(s). This action cannot be undone.
+                            This will permanently remove this check-in for all {distinctStudentCount(group.assignments)} student(s). This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -1358,6 +1396,7 @@ export const LectureCheckInResults = () => {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="space-y-5 pt-5 pb-4">
+                <CheckInConfidenceBreakdown rows={group.assignments} />
                 {group.questions.map((question, qIdx) => {
                   const stats = calculateQuestionStats(group.assignments, qIdx, question);
                   const currentCorrectAnswer = question.overriddenAnswer || question.correctAnswer;
@@ -1392,11 +1431,11 @@ export const LectureCheckInResults = () => {
                                 return (
                                   <li
                                     key={oIdx}
-                                    className={`flex items-start gap-1 ${isCorrect ? "font-medium text-green-600 dark:text-green-500" : ""}`}
+                                    className={`flex items-start gap-1.5 ${isCorrect ? "font-medium text-foreground" : ""}`}
                                   >
-                                    <span className="font-bold shrink-0">{letter}.</span>
+                                    <span className="shrink-0 font-mono">{letter}.</span>
                                     <span className="flex-1"><MathRenderer content={opt} /></span>
-                                    {isCorrect && <span className="shrink-0">✓</span>}
+                                    {isCorrect && <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />}
                                   </li>
                                 );
                               })}
@@ -1409,7 +1448,7 @@ export const LectureCheckInResults = () => {
                                 <span>{stats.completed}/{stats.total} responded</span>
                                 <span>{Math.round((stats.completed / stats.total) * 100)}%</span>
                               </div>
-                              <Progress value={(stats.completed / stats.total) * 100} className="h-2" />
+                              <Progress value={(stats.completed / stats.total) * 100} className="h-2 [&>div]:bg-emerald-500" />
                             </div>
                           )}
                         </div>
@@ -1417,7 +1456,7 @@ export const LectureCheckInResults = () => {
                           <div>
                             {stats.hasAIGrades && stats.avgAIGrade !== null ? (
                               <>
-                                <div className={`text-2xl font-bold ${stats.avgAIGrade >= 70 ? 'text-green-600' : stats.avgAIGrade >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                <div className={`text-2xl font-bold ${stats.avgAIGrade >= 70 ? 'text-emerald-600' : stats.avgAIGrade >= 50 ? 'text-amber-500' : 'text-rose-500'}`}>
                                   {stats.avgAIGrade}%
                                 </div>
                                 <div className="text-xs text-muted-foreground">
@@ -1433,7 +1472,7 @@ export const LectureCheckInResults = () => {
                               </>
                             ) : (
                               <>
-                                <div className="text-2xl font-bold">{(stats.percentage || 0).toFixed(0)}%</div>
+                                <div className={`text-2xl font-bold ${(stats.percentage || 0) >= 70 ? 'text-emerald-600' : (stats.percentage || 0) >= 50 ? 'text-amber-500' : 'text-rose-500'}`}>{(stats.percentage || 0).toFixed(0)}%</div>
                                 <div className="text-xs text-muted-foreground">
                                   {stats.correct}/{stats.completed} correct
                                 </div>
@@ -1460,7 +1499,7 @@ export const LectureCheckInResults = () => {
                       </div>
 
                       {/* AI Summary Section */}
-                      <div className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-lg shadow-sm">
+                      <div className="p-4 bg-emerald-50/40 border border-emerald-200/50 rounded-lg shadow-sm">
                         <div className="flex items-center gap-2 mb-3">
                           <Sparkles className="h-4 w-4 text-primary" />
                           <h4 className="text-sm font-semibold">Insights</h4>
@@ -1500,7 +1539,7 @@ export const LectureCheckInResults = () => {
                             size="sm"
                             onClick={() => generateSummary(groupIdx, qIdx, question, group.assignments)}
                             disabled={questionSummaries[`${groupIdx}-${qIdx}`]?.loading}
-                            className="gap-2 shrink-0"
+                            className="gap-2 shrink-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                           >
                             <Sparkles className="h-4 w-4" />
                             {(() => {
@@ -1524,63 +1563,28 @@ export const LectureCheckInResults = () => {
                           summary={questionSummaries[`${groupIdx}-${qIdx}`]}
                           questionType={question.type}
                         />
-                      ) : (
-                        /* Multiple Choice: Show toggle for visual charts */
-                        <>
-                          <div className="pt-3 flex items-center justify-between border-t">
-                            <div className="flex items-center gap-2">
-                              <BarChart3 className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">Room Signal</span>
-                              {showCharts[`${groupIdx}-${qIdx}`] && (
-                                <Badge variant="secondary" className="text-xs">Visible</Badge>
-                              )}
-                            </div>
-                            <Button
-                              variant={showCharts[`${groupIdx}-${qIdx}`] ? "secondary" : "outline"}
-                              size="sm"
-                              onClick={() => setShowCharts(prev => ({
-                                ...prev,
-                                [`${groupIdx}-${qIdx}`]: !prev[`${groupIdx}-${qIdx}`]
-                              }))}
-                              className="gap-2"
-                            >
-                              {showCharts[`${groupIdx}-${qIdx}`] ? 'Hide Charts' : 'Show Charts'}
-                            </Button>
-                          </div>
+                      ) : null}
 
-                          {/* Visual Analytics Chart */}
-                          {showCharts[`${groupIdx}-${qIdx}`] && (
-                            <QuestionAnalyticsChart
-                              question={question}
-                              assignments={group.assignments}
-                              questionIndex={qIdx}
-                              stats={stats}
-                            />
-                          )}
-                        </>
-                      )}
 
                       {/* Question Quality Rating */}
-                      <div className="pt-3 border-t flex items-center justify-between bg-muted/30 rounded-lg p-3">
-                        <p className="text-xs text-muted-foreground">Was this AI-generated question relevant?</p>
+                      <div className="pt-3 border-t flex items-center justify-between rounded-lg">
+                        <p className="text-xs text-muted-foreground">Was this AI question relevant?</p>
                         <div className="flex gap-2">
                           <Button
-                            variant={questionRatings[`${groupIdx}-${qIdx}`] === 'helpful' ? 'default' : 'outline'}
+                            variant="outline"
                             size="sm"
                             onClick={() => handleRateQuestion(question, groupIdx, qIdx, 'helpful')}
-                            className="gap-1"
+                            className={`gap-1 text-xs h-7 px-2 ${questionRatings[`${groupIdx}-${qIdx}`] === 'helpful' ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : 'text-muted-foreground'}`}
                           >
                             <ThumbsUp className="h-3 w-3" />
-                            Yes
                           </Button>
                           <Button
-                            variant={questionRatings[`${groupIdx}-${qIdx}`] === 'not_helpful' ? 'destructive' : 'outline'}
+                            variant="outline"
                             size="sm"
                             onClick={() => handleRateQuestion(question, groupIdx, qIdx, 'not_helpful')}
-                            className="gap-1"
+                            className={`gap-1 text-xs h-7 px-2 ${questionRatings[`${groupIdx}-${qIdx}`] === 'not_helpful' ? 'border-rose-300 text-rose-600 bg-rose-50' : 'text-muted-foreground'}`}
                           >
                             <ThumbsDown className="h-3 w-3" />
-                            No
                           </Button>
                         </div>
                       </div>
@@ -1658,9 +1662,7 @@ export const LectureCheckInResults = () => {
                             
                               // For manual grade short answers without AI grade, show pending
                               // Also check for coding_simple without AI grade
-                              const isManualGradeShortAnswer = question.type === 'short_answer' && 
-                                !hasAIGrade &&
-                                (!question.expectedAnswer || question.expectedAnswer === '' || question.gradingMode === 'manual_grade');
+                              const isManualGradeShortAnswer = question.type === 'short_answer' && !hasAIGrade;
                               const isCodingSimple = question.type === 'coding_simple';
                               
                               // coding_simple uses AI grade threshold >= 70 as correct
@@ -1677,30 +1679,25 @@ export const LectureCheckInResults = () => {
                             return (
                               <div
                                 key={assignment.id}
-                                className={`flex items-center justify-between text-sm p-2 rounded hover:bg-muted/50 ${
-                                  !isCompleted ? '' :
-                                  isCorrect === true ? 'bg-green-50/50 dark:bg-green-950/20' :
-                                  isCorrect === false ? 'bg-red-50/50 dark:bg-red-950/20' : ''
-                                }`}
+                                className="flex items-center justify-between text-sm py-2 px-1 border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors"
                               >
                                 <div className="flex items-center gap-2">
-                                  <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                  <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
                                     {(assignment.student_name || '?').charAt(0).toUpperCase()}
                                   </div>
-                                  <span className="font-medium">{assignment.student_name}</span>
+                                  <span className="font-medium text-foreground">{assignment.student_name}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {!isCompleted ? (
-                                    <Badge variant="outline" className="gap-1">
+                                    <Badge variant="outline" className="gap-1 text-slate-500 border-slate-300 text-xs">
                                       <Clock className="h-3 w-3" />
                                       Not Answered
                                     </Badge>
                                    ) : hasAIGrade && (question.type === 'short_answer' || isCodingSimple) ? (
                                     <div className="flex flex-col items-end gap-1">
                                       <div className="flex items-center gap-2">
-                                        <Badge 
-                                          variant={studentAIGrade >= 70 ? "default" : "destructive"}
-                                          className={`gap-1 ${studentAIGrade >= 70 ? "bg-green-600" : ""}`}
+                                        <Badge
+                                          className={`gap-1 text-xs ${studentAIGrade >= 70 ? "bg-emerald-600 text-white border-0" : "bg-transparent border border-rose-300 text-rose-600"}`}
                                         >
                                           {studentAIGrade}%
                                         </Badge>
@@ -1735,8 +1732,7 @@ export const LectureCheckInResults = () => {
                                    ) : (
                                     <>
                                       <Badge
-                                        variant={isCorrect ? "default" : "destructive"}
-                                        className={`gap-1 ${isCorrect ? "bg-green-600" : ""}`}
+                                        className={`gap-1 text-xs ${isCorrect ? "bg-emerald-600 text-white border-0" : "bg-transparent border border-rose-300 text-rose-600"}`}
                                       >
                                         {isCorrect ? (
                                           <CheckCircle className="h-3 w-3" />
@@ -1745,14 +1741,13 @@ export const LectureCheckInResults = () => {
                                         )}
                                         {isCorrect ? "Correct" : "Incorrect"}
                                       </Badge>
-                                      <span className="text-muted-foreground font-mono bg-muted px-2 py-1 rounded">
-                                        Answer: {studentAnswer || '(none)'}
+                                      <span className="text-muted-foreground font-mono text-xs bg-muted/60 px-1.5 py-0.5 rounded">
+                                        {studentAnswer || '—'}
                                       </span>
                                       {assignment.response_time_seconds !== null && assignment.response_time_seconds !== undefined && (
-                                        <Badge variant="outline" className="gap-1 text-xs">
-                                          <Clock className="h-3 w-3" />
+                                        <span className="text-xs text-muted-foreground">
                                           {formatTime(assignment.response_time_seconds)}
-                                        </Badge>
+                                        </span>
                                       )}
                                     </>
                                   )}
@@ -1765,20 +1760,16 @@ export const LectureCheckInResults = () => {
 
                         {/* Answer distribution */}
                         {question.options && (
-                          <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                            <p className="text-xs font-medium mb-2">Answer Distribution:</p>
-                            <div className="space-y-1">
+                          <div className="mt-4 p-4 bg-white border border-border/50 rounded-lg">
+                            <p className="text-xs font-semibold text-foreground mb-3">Answer Distribution</p>
+                            <div className="space-y-2">
                               {question.options?.map((opt: string, optIdx: number) => {
-                                const optionLetter = String.fromCharCode(65 + optIdx); // A, B, C, D...
-                                
-                                // Filter assignments to only those containing this specific question
+                                const optionLetter = String.fromCharCode(65 + optIdx);
                                 const questionAssignments = group.assignments.filter((a) => {
                                   const content = a.content as any;
                                   const assignmentQuestions = content?.questions || [];
                                   return assignmentQuestions.some((q: any) => q.question === question.question);
                                 });
-
-                                // DEDUPLICATION: Keep only the latest submission per student
                                 const uniqueStudents = new Map<string, Assignment>();
                                 questionAssignments.forEach((a) => {
                                   const existing = uniqueStudents.get(a.student_id);
@@ -1787,8 +1778,6 @@ export const LectureCheckInResults = () => {
                                   }
                                 });
                                 const deduplicatedAssignments = Array.from(uniqueStudents.values());
-
-                                // Count using correct question index for each student's deduplicated assignment
                                 const count = deduplicatedAssignments.filter((a) => {
                                   if (!a.completed) return false;
                                   const assignmentContent = a.content as any;
@@ -1796,7 +1785,7 @@ export const LectureCheckInResults = () => {
                                   const studentQuestionIdx = assignmentQuestions.findIndex(
                                     (q: any) => q.question === question.question
                                   );
-                                  const studentAnswer = studentQuestionIdx >= 0 
+                                  const studentAnswer = studentQuestionIdx >= 0
                                     ? (a.quiz_responses?.[studentQuestionIdx.toString()] || a.quiz_responses?.[studentQuestionIdx])
                                     : null;
                                   return studentAnswer === optionLetter;
@@ -1808,18 +1797,21 @@ export const LectureCheckInResults = () => {
 
                                 return (
                                   <div key={optionLetter} className="flex items-center gap-2 text-xs">
-                                    <span className={`font-mono w-6 ${isCorrect ? "text-green-600 font-bold" : ""}`}>
-                                      {optionLetter}
-                                      {isCorrect ? " ✓" : ""}
-                                    </span>
-                                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
+                                    <div className="flex items-center gap-1 w-7 shrink-0">
+                                      <span className="font-mono font-semibold text-muted-foreground">{optionLetter}</span>
+                                      {isCorrect && <CheckCircle className="h-3 w-3 text-emerald-500" />}
+                                    </div>
+                                    <div className="flex-1 bg-slate-100 rounded-full h-3 overflow-hidden">
                                       <div
-                                        className={`h-full ${isCorrect ? "bg-green-500" : "bg-primary"}`}
-                                        style={{ width: `${percentage}%` }}
+                                        className="h-full rounded-full transition-all"
+                                        style={{
+                                          width: `${percentage}%`,
+                                          backgroundColor: isCorrect ? '#10b981' : '#cbd5e1',
+                                        }}
                                       />
                                     </div>
-                                    <span className="w-16 text-right">
-                                      {count}/{total} ({(percentage || 0).toFixed(0)}%)
+                                    <span className="w-20 text-right text-muted-foreground shrink-0">
+                                      {count}/{total} · {(percentage || 0).toFixed(0)}%
                                     </span>
                                   </div>
                                 );
@@ -1830,10 +1822,22 @@ export const LectureCheckInResults = () => {
 
                         {/* Short answer review section */}
                         {question.type === "short_answer" && (
-                          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                            <p className="text-xs font-medium mb-2 text-blue-900 dark:text-blue-200">
-                              Student Text Responses & Grading:
-                            </p>
+                          <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs font-medium text-foreground">
+                                Student Text Responses & Grading:
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1"
+                                disabled={regrading === `${groupIdx}-${qIdx}`}
+                                onClick={() => handleRegrade(`${groupIdx}-${qIdx}`, question.question, question.expectedAnswer || '', group.assignments)}
+                              >
+                                <RefreshCw className={`h-3 w-3 ${regrading === `${groupIdx}-${qIdx}` ? 'animate-spin' : ''}`} />
+                                Re-run auto-grade
+                              </Button>
+                            </div>
                             <div className="space-y-2">
                               {(() => {
                                 // Filter assignments to only those containing this specific question
@@ -1890,11 +1894,11 @@ export const LectureCheckInResults = () => {
                                           {studentAnswer}
                                         </p>
                                         {assignment.quiz_responses?._ai_recommendations?.[0] && (
-                                          <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded">
-                                            <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-1">
-                                              🤖 AI Recommended Grade: {assignment.quiz_responses._ai_recommendations[0].grade}/100
+                                          <div className="mb-3 p-2 bg-emerald-50 border border-emerald-200/60 rounded">
+                                            <p className="text-xs font-semibold text-emerald-800 mb-1">
+                                              AI Recommended Grade: {assignment.quiz_responses._ai_recommendations[0].grade}/100
                                             </p>
-                                            <p className="text-xs text-blue-800 dark:text-blue-300">
+                                            <p className="text-xs text-emerald-700">
                                               {assignment.quiz_responses._ai_recommendations[0].feedback}
                                             </p>
                                           </div>
@@ -2053,7 +2057,7 @@ export const LectureCheckInResults = () => {
                     </div>
                     <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                       <p className="text-sm text-amber-900 dark:text-amber-200">
-                        <strong>Impact:</strong> This will affect {selectedOverride.group.assignments.length} student(s). 
+                        <strong>Impact:</strong> This will affect {distinctStudentCount(selectedOverride.group.assignments)} student(s). 
                         Grades will be automatically recalculated based on the new correct answer.
                       </p>
                     </div>
@@ -2075,6 +2079,7 @@ export const LectureCheckInResults = () => {
           </AlertDialogContent>
         </AlertDialog>
       </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

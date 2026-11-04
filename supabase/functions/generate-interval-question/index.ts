@@ -1,4 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { callClaude } from "../_shared/anthropic.ts";
+import {
+  buildMisconceptionInstructions,
+  checkMisconception,
+  MISCONCEPTION_JSON_FIELDS,
+  shuffleWithMisconceptions,
+} from "./misconception.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -210,6 +218,34 @@ serve(async (req) => {
   }
 
   try {
+    // ── Auth: require instructor JWT to prevent anonymous AI cost abuse ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: isInstructor } = await adminClient.rpc("has_role", {
+      _user_id: claimsData.claims.sub,
+      _role: "instructor",
+    });
+    if (!isInstructor) {
+      return new Response(JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -226,6 +262,8 @@ serve(async (req) => {
       materialContext = [],
       slide_context = null,
       course_context = null,
+      // true = only send if a real misconception is found (client grace window)
+      misconception_required = false,
     } = await req.json();
 
     console.log("📝 Generating interval question");
@@ -292,17 +330,27 @@ serve(async (req) => {
     // Course context constraint
     let courseConstraint = "";
     if (course_context?.title) {
-      courseConstraint += `\n\n🎓 COURSE CONSTRAINT: This is a "${course_context.title}" class.`;
+      courseConstraint += `\n\n🎓 COURSE BACKGROUND: This is a "${course_context.title}" class.`;
       if (course_context.topics?.length) {
-        courseConstraint += ` Relevant topics include: ${course_context.topics.join(", ")}.`;
+        courseConstraint += ` Listed topics: ${course_context.topics.join(", ")}.`;
       }
-      courseConstraint += ` Only generate questions relevant to this subject area.`;
+      courseConstraint += usingMaterialsFallback
+        ? ` Only generate questions relevant to this subject area.`
+        : ` This is background only — the transcript is what is being taught right now and ALWAYS wins. Never ask about the course title or listed topics unless they were actually discussed, and never lower your confidence just because the transcript doesn't match the course title.`;
     }
+
+    // After the grace window the client needs a question so pacing holds.
+    const bestEffort = misconception_required !== true;
+    const bestEffortGuidance = bestEffort && !usingMaterialsFallback
+      ? `\n\nA QUESTION IS REQUIRED THIS TIME: If no strong misconception exists, ask about the most substantive specific thing the instructor said (even course structure, expectations, or an example they gave counts). Score confidence by how well the question is grounded in the transcript, not by how deep the content is.`
+      : "";
 
     // Long interval guidance
     const longIntervalGuidance = interval_minutes >= 20
       ? `\n⚠️ LONG INTERVAL (${interval_minutes} min): Focus on THE SINGLE MOST IMPORTANT concept. Prioritize topics that were emphasized or repeated.`
       : "";
+
+    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
 
     // Build difficulty instructions
     let difficultyInstructions = "";
@@ -310,7 +358,23 @@ serve(async (req) => {
     if (diffLevel === "easy") {
       difficultyInstructions = `\nDIFFICULTY LEVEL: EASY - Generate a simple question focusing on basic recall, definitions, or straightforward facts. The answer should be directly stated in the content.`;
     } else if (diffLevel === "hard") {
-      difficultyInstructions = `\nDIFFICULTY LEVEL: HARD - Generate a challenging question requiring analysis, synthesis, or evaluation. Students should connect multiple concepts or apply knowledge to new situations.`;
+      difficultyInstructions = `
+DIFFICULTY LEVEL: HARD
+
+Question Stem Requirements:
+- Ask students to APPLY, ANALYZE, or EVALUATE — never just recall a definition.
+- Prefer "What would happen if...", "Why does X lead to Y rather than Z?", "Compare X and Y in the context of...", or "Which of these scenarios demonstrates [concept]?"
+- Require connecting TWO or more concepts from the ${groundingSource}.
+- Avoid questions answerable by someone who only memorized a glossary.
+- Frame questions around cause-effect reasoning, edge cases, predicting outcomes, or identifying exceptions.
+
+MCQ Distractor Requirements (when format is multiple_choice):
+- Each distractor must represent a SPECIFIC misconception or common student error.
+- Distractors should be plausible to someone who partially understands the material.
+- Match the length, detail, and grammatical structure of the correct answer.
+- NEVER use "All of the above", "None of the above", or vague fillers like "Not specified in lecture".
+- At least one distractor should be a "near-miss" — correct logic but wrong conclusion, or right concept applied to the wrong context.
+- At least one distractor should reflect a common confusion between similar terms or concepts from the ${groundingSource}.`;
     } else {
       difficultyInstructions = `\nDIFFICULTY LEVEL: MEDIUM - Generate a moderate question requiring understanding and application of concepts. Students should need to think about the content, not just recall it.`;
     }
@@ -327,13 +391,11 @@ serve(async (req) => {
       formatInstructions = `Generate a multiple choice question with 4 options, one correct answer.`;
     }
 
-    const groundingSource = usingMaterialsFallback ? "course materials" : "transcript";
-
-    const systemPrompt = `You are an expert educational AI that generates high-quality check-in questions from ${groundingSource}.
+    const systemPrompt = `You are an expert educational AI that generates diagnostic check-in questions from ${groundingSource}. Your goal is to surface participant MISCONCEPTIONS, not to test memorized facts.
 
 CRITICAL GROUNDING RULES:
 - You MUST ONLY ask about concepts, terms, and ideas that are EXPLICITLY mentioned in the ${groundingSource} below.
-- NEVER use your general knowledge to create questions about topics not discussed in the ${groundingSource}.
+- NEVER use your general knowledge to create questions about topics not discussed in the ${groundingSource}. (You MAY use general knowledge of how learners typically misunderstand a concept that WAS taught.)
 - NEVER introduce technical terms, frameworks, languages, or concepts that do not appear in the ${groundingSource}.
 - If the content is unclear, repetitive, or lacks substantive educational content, set confidence to 0.0.
 - Every key term in your question MUST trace back to something actually present in the provided ${groundingSource}.
@@ -341,9 +403,11 @@ CRITICAL GROUNDING RULES:
 - NEVER generate generic questions like "summarize the key points" or "what was the main concept". Always ask about SPECIFIC topics from the content.
 ${courseConstraint}
 ${longIntervalGuidance}
-${difficultyInstructions}
+${difficultyInstructions}${bestEffortGuidance}
 
 ${formatInstructions}
+
+${buildMisconceptionInstructions(format_preference, groundingSource)}
 
 MATH FORMATTING - CRITICAL:
 Do NOT use LaTeX syntax. No $, \\frac, \\int, {, }, or backslash commands.
@@ -361,13 +425,14 @@ Return JSON in this exact format:
   "question_text": "the question (use plain Unicode math, no LaTeX)",
   "suggested_type": "${format_preference}",
   "confidence": 0.0-1.0,
-  "reasoning": "why this question tests the key concept FROM THE ${groundingSource.toUpperCase()}"
+${MISCONCEPTION_JSON_FIELDS}
+  "reasoning": "which misconception opportunity you picked FROM THE ${groundingSource.toUpperCase()} and why"
 }
 
 For multiple_choice, also include:
 - "options": ["A. ...", "B. ...", "C. ...", "D. ..."]
 - "correct_answer": "A" | "B" | "C" | "D"
-- "explanation": "why the correct answer is right"
+- "explanation": "why the correct answer is right and which misconception each wrong choice reflects"
 
 For coding questions:
 - "question_text": { "title": "...", "description": "...", "starterCode": "...", "language": "python" | "javascript" }
@@ -385,39 +450,33 @@ CONFIDENCE SCORING GUIDE:
 ${primaryContent}
 """
 
-Generate ONE focused question that tests understanding of an important concept from these materials. Do NOT ask about topics not covered above.`
-      : `Generate a question from this lecture transcript:
+Find the strongest misconception opportunity in these materials and generate ONE diagnostic question for it. Do NOT ask about topics not covered above.`
+      : `Here is everything the instructor said during this ${interval_minutes || ""} minute interval:
 
 """
 ${primaryContent}
 """
 ${additionalContext}
 
-Generate ONE focused question that tests understanding of the most important concept EXPLICITLY discussed in this transcript. Do NOT ask about topics not mentioned above.`;
+Find the strongest misconception opportunity EXPLICITLY taught in this transcript and generate ONE diagnostic question for it. Do NOT ask about topics not mentioned above.`;
 
     // Call AI
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
+      const response = await callClaude({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: diffLevel === "hard" ? 0.5 : 0.7,
+        response_format: { type: "json_object" },
+        // Auto questions are sent live, so keep thinking low for speed.
+        reasoning_effort: "low",
       });
 
+      // (kept for parity with previous timeout cleanup)
       clearTimeout(timeoutId);
 
       if (!response.ok) {
@@ -440,7 +499,11 @@ Generate ONE focused question that tests understanding of the most important con
       console.log("   Confidence:", parsed.confidence);
 
       // Layer 2: Confidence threshold check
-      if ((parsed.confidence || 0) < 0.6) {
+      // Hard questions synthesize ideas, so the model rates itself lower.
+      // After the grace window (best effort) the self-score is skipped and the
+      // keyword-overlap check below is the grounding guard, so pacing holds.
+      const minConfidence = bestEffort ? 0 : diffLevel === "hard" ? 0.45 : 0.6;
+      if (minConfidence > 0 && (parsed.confidence || 0) < minConfidence) {
         console.warn(`⚠️ Low confidence (${parsed.confidence}) - rejecting question`);
         const fallbackResult = getFallbackResponse(format_preference, parsed.confidence,
           `AI confidence too low (${parsed.confidence}). Original: "${parsed.question_text?.substring?.(0, 80) || parsed.question_text?.title}".`);
@@ -511,41 +574,47 @@ Generate ONE focused question that tests understanding of the most important con
         console.log("ℹ️ Skipping course scope check — question is grounded in live transcript");
       }
 
-      // Shuffle MCQ options so correct answer isn't always A
-      // Uses index tracking to handle duplicate option text correctly
+      // Layer 5: Misconception targeting. While the client is still inside its
+      // grace window it requires a real misconception; afterwards it accepts the
+      // best grounded question so the instructor's pacing holds.
+      const misconceptionCheck = checkMisconception(parsed, format_preference, misconception_required === true);
+      if (!misconceptionCheck.ok) {
+        console.warn(`🧠 Misconception check failed (${misconceptionCheck.error_type}): ${misconceptionCheck.reason}`);
+        return new Response(JSON.stringify({
+          success: false,
+          error: misconceptionCheck.reason,
+          error_type: misconceptionCheck.error_type,
+          confidence: parsed.confidence,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      let misconception = misconceptionCheck.meta;
+      console.log(misconception
+        ? `🧠 Target misconception (${misconception.misconception_score}): ${misconception.target_misconception}`
+        : "🧠 No misconception metadata (best-effort question)");
+
+      // Shuffle MCQ options so correct answer isn't always A, carrying each
+      // wrong choice's misconception along with it.
       let finalOptions = parsed.options;
       let finalCorrectAnswer = parsed.correct_answer;
       if (parsed.suggested_type === "multiple_choice" || format_preference === "multiple_choice") {
-        if (finalOptions && Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
-          const letters = ['A', 'B', 'C', 'D'];
-          const correctIdx = letters.indexOf(String(finalCorrectAnswer).trim().toUpperCase());
-          if (correctIdx !== -1) {
-            // Strip prefixes and track correct index
-            const augmented = finalOptions.map((o: string, i: number) => ({
-              text: o.replace(/^[A-D][\).\-\s]+\s*/i, '').trim(),
-              wasCorrect: i === correctIdx,
-            }));
-
-            // Check for duplicate option text — skip shuffle if found
-            const uniqueTexts = new Set(augmented.map((o: { text: string }) => o.text.toLowerCase()));
-            if (uniqueTexts.size < 4) {
-              console.warn('⚠️ Duplicate interval MCQ options — skipping shuffle');
-            } else {
-              // Fisher-Yates shuffle
-              for (let i = augmented.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [augmented[i], augmented[j]] = [augmented[j], augmented[i]];
-              }
-
-              const newIdx = augmented.findIndex((o: { wasCorrect: boolean }) => o.wasCorrect);
-              if (newIdx !== -1) {
-                finalCorrectAnswer = letters[newIdx];
-                finalOptions = augmented.map((o: { text: string }, i: number) => `${letters[i]}. ${o.text}`);
-                console.log(`🔀 Shuffled interval MCQ: correct answer → ${finalCorrectAnswer}`);
-              } else {
-                console.error('🚫 Shuffle tracking failed — keeping original order');
-              }
+        if (Array.isArray(finalOptions) && finalOptions.length === 4 && finalCorrectAnswer) {
+          const shuffled = shuffleWithMisconceptions(
+            finalOptions,
+            String(finalCorrectAnswer),
+            misconception?.distractor_misconceptions ?? {},
+          );
+          if (shuffled) {
+            finalOptions = shuffled.options;
+            finalCorrectAnswer = shuffled.correct_answer;
+            if (misconception) {
+              misconception = { ...misconception, distractor_misconceptions: shuffled.distractor_misconceptions };
             }
+            console.log(`🔀 Shuffled interval MCQ: correct answer → ${finalCorrectAnswer}`);
+          } else {
+            console.warn("⚠️ Could not shuffle interval MCQ options — keeping original order");
           }
         }
       }
@@ -558,7 +627,9 @@ Generate ONE focused question that tests understanding of the most important con
         options: finalOptions,
         correct_answer: finalCorrectAnswer,
         explanation: parsed.explanation,
+        expected_answer: typeof parsed.expected_answer === "string" ? parsed.expected_answer : "",
         reasoning: parsed.reasoning,
+        misconception,
         is_fallback: false,
         relevance_rejected: false,
         from_materials: usingMaterialsFallback,

@@ -736,7 +736,7 @@ async function transcribeWithDeepgram(
 ): Promise<{ text: string; duration: number; segments: Array<{ text: string; start: number; duration: number }> } | null> {
   try {
     const resp = await fetch(
-      "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&paragraphs=true&utterances=true&language=en",
+      "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&paragraphs=true&utterances=true&language=en",
       {
         method: "POST",
         headers: {

@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Mirror any guard/ref changes in Auth.tsx and InstructorAuth.tsx.
+// Before editing: read CRITICAL_PATHS.md §1. After editing: run `bun run test:auth`.
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { instructorAdminSignUpSchema, signInSchema } from "@/lib/validation";
+import { setOAuthRoleIntent, readOAuthRoleIntent, clearOAuthRoleIntent } from "@/lib/oauthRoleIntent";
 
 export default function AdminAuth() {
   const [email, setEmail] = useState("");
@@ -16,19 +20,38 @@ export default function AdminAuth() {
   const [loading, setLoading] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const isRecoveryModeRef = useRef(false);
+  const isSigningInRef = useRef(false);
+  const hasResolvedRef = useRef(false);
   const navigate = useNavigate();
 
-  // Handle password recovery flow when user clicks link from email
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveryMode(true);
-        toast.info("Please enter your new password");
-      }
-    });
+  // Signed in without the admin role. Only a fresh signup that started from this
+  // portal's Google button gets promoted; everyone else keeps their session and
+  // is sent to their student dashboard instead of being signed out.
+  const handleMissingAdminRole = async (userId: string, userCreatedAt: string) => {
+    const intent = readOAuthRoleIntent();
+    const isRecentSignup = Date.now() - new Date(userCreatedAt).getTime() < 15 * 60 * 1000;
 
-    return () => subscription.unsubscribe();
-  }, []);
+    if (intent === 'admin' && isRecentSignup) {
+      clearOAuthRoleIntent();
+      const { data: success } = await supabase.rpc('assign_oauth_role', {
+        p_user_id: userId,
+        p_role: 'admin',
+      });
+
+      if (success) {
+        toast.success("Admin account created!");
+        navigate("/admin/onboarding");
+        return;
+      }
+    }
+    clearOAuthRoleIntent();
+
+    toast.error("This account isn't registered as an administrator. Taking you to your dashboard.");
+    navigate("/dashboard");
+  };
+
+
 
   const handlePasswordUpdate = async () => {
     setLoading(true);
@@ -44,6 +67,7 @@ export default function AdminAuth() {
       if (error) throw error;
 
       toast.success("Password updated successfully! Please sign in.");
+      isRecoveryModeRef.current = false;
       setIsRecoveryMode(false);
       setNewPassword("");
       await supabase.auth.signOut();
@@ -65,6 +89,7 @@ export default function AdminAuth() {
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     if (hashParams.get('type') === 'recovery') {
+      isRecoveryModeRef.current = true;
       setIsRecoveryMode(true);
       toast.info("Please enter your new password");
     }
@@ -75,73 +100,88 @@ export default function AdminAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Handle password recovery event
       if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryModeRef.current = true;
         setIsRecoveryMode(true);
         toast.info("Please enter your new password");
         return;
       }
 
-      // Skip session checks if we're in recovery mode
-      if (isRecoveryMode) {
+      // Skip session checks if we're in recovery mode or actively handling sign-in
+      if (isRecoveryModeRef.current || isSigningInRef.current) {
         return;
       }
-    });
 
-    // Check for existing session on mount (but not during recovery)
-    if (!isRecoveryMode) {
-      const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // Check if user has admin role
+      // Handle sign-in: route based on admin role + onboarding state
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
+        setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningInRef.current) return;
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", session.user.id)
             .eq("role", "admin")
             .maybeSingle();
-          
+
           if (roleData) {
-            // Check if admin has org_id set
             const { data: profileData } = await supabase
               .from("profiles")
               .select("org_id, onboarded")
               .eq("id", session.user.id)
-              .single();
-            
+              .maybeSingle();
+
             if (profileData?.org_id && profileData?.onboarded) {
               navigate("/admin/dashboard");
             } else {
               navigate("/admin/onboarding");
             }
           } else {
-            // Check if this is a new OAuth signup (only has student role)
-            const { data: studentRole } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("role", "student")
-              .maybeSingle();
-            
-            if (studentRole) {
-              // New OAuth signup - assign admin role
-              const { data: success } = await supabase
-                .rpc('assign_oauth_role', { 
-                  p_user_id: session.user.id, 
-                  p_role: 'admin' 
-                });
-              
-              if (success) {
-                toast.success("Admin account created!");
-                navigate("/admin/onboarding");
-              }
-            }
+            await handleMissingAdminRole(session.user.id, session.user.created_at);
           }
-        }
-      };
-      checkSession();
+
+        }, 0);
+      }
+    });
+
+    // Check for existing session on mount (but not during recovery)
+    if (!isRecoveryModeRef.current) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session || isRecoveryModeRef.current || isSigningInRef.current) return;
+        // Respect the same single-resolve guard as the listener path.
+        if (hasResolvedRef.current) return;
+        hasResolvedRef.current = true;
+        setTimeout(async () => {
+          if (isRecoveryModeRef.current || isSigningInRef.current) return;
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", session.user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          if (roleData) {
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("org_id, onboarded")
+              .eq("id", session.user.id)
+              .maybeSingle();
+
+            if (profileData?.org_id && profileData?.onboarded) {
+              navigate("/admin/dashboard");
+            } else {
+              navigate("/admin/onboarding");
+            }
+          } else if (readOAuthRoleIntent() === 'admin') {
+            await handleMissingAdminRole(session.user.id, session.user.created_at);
+          }
+
+        }, 0);
+      });
     }
 
     return () => subscription.unsubscribe();
-  }, [navigate, isRecoveryMode]);
+  }, [navigate]);
 
   const handlePasswordReset = async () => {
     setLoading(true);
@@ -192,15 +232,26 @@ export default function AdminAuth() {
           email: validData.email, 
           password: validData.password,
           options: {
+            emailRedirectTo: `${window.location.origin}/admin/auth`,
             data: {
               full_name: validData.name,
               role: "admin"
             }
           }
         });
-        if (error) throw error;
+        if (error) {
+          // Newer Supabase returns an explicit error for duplicate emails
+          const msg = error.message.toLowerCase();
+          if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('already been registered')) {
+            toast.error("This email is already registered. Please sign in instead.");
+            setIsSignUp(false);
+            return;
+          }
+          throw error;
+        }
 
         if (data.user) {
+          // Legacy fallback: obfuscated duplicate (older Supabase returns empty identities)
           if (data.user.identities && data.user.identities.length === 0) {
             toast.error("This email is already registered. Please sign in instead.");
             setIsSignUp(false);
@@ -226,6 +277,8 @@ export default function AdminAuth() {
           return;
         }
 
+        // Guard the SIGNED_IN listener so it doesn't race with this navigation
+        isSigningInRef.current = true;
         const { error } = await supabase.auth.signInWithPassword({ 
           email: validationResult.data.email, 
           password: validationResult.data.password 
@@ -250,9 +303,9 @@ export default function AdminAuth() {
           if (roleData) {
             navigate("/admin/dashboard");
           } else {
-            toast.error("This account is not registered as an administrator");
-            await supabase.auth.signOut();
+            await handleMissingAdminRole(user.id, user.created_at);
           }
+
         }
       }
     } catch (error: unknown) {
@@ -260,6 +313,7 @@ export default function AdminAuth() {
       toast.error(message);
     } finally {
       setLoading(false);
+      isSigningInRef.current = false;
     }
   };
 
@@ -382,15 +436,15 @@ export default function AdminAuth() {
 
                   <Button
                     onClick={async () => {
+                      // Persist intent: Supabase can't carry a role through the OAuth round-trip.
+                      setOAuthRoleIntent('admin');
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
                           redirectTo: `${window.location.origin}/admin/auth`,
-                          queryParams: {
-                            role: 'admin'
-                          }
                         }
                       });
+
                       if (error) {
                         toast.error(error.message);
                       }

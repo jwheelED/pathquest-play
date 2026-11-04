@@ -10,43 +10,34 @@ interface CheckInPreviewProps {
 
 export function CheckInPreview({ activeSessionId, onNavigate }: CheckInPreviewProps) {
   if (!activeSessionId) {
-    return (
-      <EmptyState
-        icon={<BarChart3 className="w-7 h-7" />}
-        title="Live check-in results"
-        description="During a live session, check-in results appear here in real time. You'll see how students respond to each question as it happens."
-        action={{
-          label: "Start Live Session",
-          onClick: () => onNavigate("live"),
-        }}
-      />
-    );
+    return null; // Don't show empty state when not in session - cleaner overview
   }
 
   return (
-    <Card className="headspace-card">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
-            Live Check-In Results
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs text-primary hover:underline gap-1"
-            onClick={() => onNavigate("live")}
-          >
-            View all check-ins <ArrowRight className="w-3 h-3" />
-          </Button>
+    <div className="command-card p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center border border-emerald-100">
+            <BarChart3 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="section-headline text-base">Live Check-In Results</h3>
+            <p className="text-sm text-charcoal-subtle">Real-time responses from your session</p>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Radio className="w-4 h-4 text-destructive animate-pulse" />
-          Session is active — switch to the Live Session tab for full results.
-        </div>
-      </CardContent>
-    </Card>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-sm text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 gap-1 rounded-full"
+          onClick={() => onNavigate("live")}
+        >
+          View all <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      <div className="flex items-center gap-2.5 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+        <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
+        <span className="text-sm text-emerald-700">Session is active — switch to Live Session tab for full results.</span>
+      </div>
+    </div>
   );
 }

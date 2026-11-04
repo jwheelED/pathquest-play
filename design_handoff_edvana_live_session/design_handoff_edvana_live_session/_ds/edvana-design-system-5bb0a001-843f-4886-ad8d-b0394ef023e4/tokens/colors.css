@@ -1,0 +1,88 @@
+/* ============================================================
+   EDVANA — COLOR TOKENS
+   Theme: "Headspace-inspired calm learning" — Emerald Green & Sky Blue.
+   All hues stored as raw HSL triplets so they compose into hsl()/hsla()
+   with any alpha. Base ramps first, then semantic aliases.
+   ============================================================ */
+
+:root {
+  /* ---- Brand ramp: Emerald (primary) ---- */
+  --emerald-50:  160 50% 96%;  /* @kind color */
+  --emerald-100: 160 45% 90%;  /* @kind color */
+  --emerald-200: 160 42% 80%;  /* @kind color */
+  --emerald-300: 160 50% 65%;  /* @kind color */
+  --emerald-400: 160 64% 50%;  /* @kind color */
+  --emerald-500: 160 84% 39%;  /* @kind color */
+  --emerald-600: 160 84% 29%;  /* @kind color */
+  --emerald-700: 160 84% 23%;  /* @kind color */
+  --emerald-800: 160 80% 17%;  /* @kind color */
+
+  /* ---- Brand ramp: Sky Blue (secondary) ---- */
+  --sky-50:  199 90% 95%;  /* @kind color */
+  --sky-100: 199 90% 88%;  /* @kind color */
+  --sky-200: 199 85% 75%;  /* @kind color */
+  --sky-300: 199 95% 60%;  /* @kind color */
+  --sky-400: 199 89% 48%;  /* @kind color */
+  --sky-500: 199 89% 42%;  /* @kind color */
+  --sky-600: 199 85% 34%;  /* @kind color */
+
+  /* ---- Accent ramps ---- */
+  --amber:   45 93% 55%;       /* @kind color */
+  --amber-strong: 45 93% 47%;  /* @kind color */
+  --mint:    160 50% 85%;      /* @kind color */
+  --mint-dark: 160 45% 45%;    /* @kind color */
+  --teal-landing: 162 42% 38%; /* @kind color */
+
+  /* ---- Neutrals: cool slate + warm canvas ---- */
+  --ink:        220 25% 15%;   /* @kind color */
+  --ink-muted:  220 12% 45%;   /* @kind color */
+  --ink-subtle: 220 10% 55%;   /* @kind color */
+  --slate-50:  210 20% 98%;    /* @kind color */
+  --slate-100: 220 15% 94%;    /* @kind color */
+  --slate-200: 220 15% 88%;    /* @kind color */
+  --slate-300: 200 15% 78%;    /* @kind color */
+  --slate-400: 200 15% 58%;    /* @kind color */
+  --canvas-warm: 40 20% 97%;   /* @kind color */
+  --white: 0 0% 100%;          /* @kind color */
+
+  /* ---- Semantic status ---- */
+  --success: 160 84% 29%;      /* @kind color */
+  --warning: 45 93% 47%;       /* @kind color */
+  --danger:  0 84% 60%;        /* @kind color */
+  --info:    199 89% 48%;      /* @kind color */
+  --streak-fire: 25 100% 55%;  /* @kind color */
+
+  /* ============ SEMANTIC ALIASES ============ */
+  --background: var(--slate-50);          /* @kind color */
+  --foreground: var(--ink);               /* @kind color */
+  --surface-card: var(--white);           /* @kind color */
+  --surface-app: var(--canvas-warm);      /* @kind color */
+  --surface-muted: 200 30% 92%;           /* @kind color */
+  --surface-accent: 160 40% 92%;          /* @kind color */
+  --surface-emerald-soft: 160 45% 96%;    /* @kind color */
+
+  --text-body: var(--ink);                /* @kind color */
+  --text-muted: var(--ink-muted);         /* @kind color */
+  --text-subtle: var(--ink-subtle);       /* @kind color */
+  --text-on-primary: var(--white);        /* @kind color */
+  --text-on-dark: 0 0% 98%;               /* @kind color */
+
+  --primary: var(--emerald-600);          /* @kind color */
+  --primary-hover: var(--emerald-700);    /* @kind color */
+  --primary-glow: var(--emerald-500);     /* @kind color */
+  --primary-foreground: var(--white);     /* @kind color */
+
+  --secondary: var(--sky-400);            /* @kind color */
+  --secondary-foreground: var(--white);   /* @kind color */
+
+  --accent-amber: var(--amber);           /* @kind color */
+  --border: var(--slate-200);             /* @kind color */
+  --border-strong: var(--slate-400);      /* @kind color */
+  --ring: 160 84% 39%;                    /* @kind color */
+
+  /* Badge tiers (gamification) */
+  --badge-bronze:   25 75% 47%;    /* @kind color */
+  --badge-silver:   200 15% 64%;   /* @kind color */
+  --badge-gold:     45 93% 47%;    /* @kind color */
+  --badge-platinum: 199 89% 55%;   /* @kind color */
+}

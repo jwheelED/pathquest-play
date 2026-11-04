@@ -1,0 +1,100 @@
+/* ============================================================
+   EDVANA — LANDING (MARKETING) SCOPED TOKENS
+   The marketing site uses a calmer, more editorial palette than the
+   app: muted teal accent, cooler neutrals, tighter card radius.
+   Scoped to .landing-page so it never leaks into the product UI.
+   ============================================================ */
+
+.landing-page {
+  --landing-bg: 210 20% 99%; /* @kind color */
+  --landing-text: 220 25% 10%; /* @kind color */
+  --landing-muted: 220 10% 48%; /* @kind color */
+  --landing-border: 220 12% 91%; /* @kind color */
+  --landing-surface: 210 20% 98.5%; /* @kind color */
+  --landing-accent: 162 42% 38%; /* @kind color */
+  --landing-accent-hover: 162 42% 30%; /* @kind color */
+
+  background-color: hsl(var(--landing-bg));
+  color: hsl(var(--landing-text));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Editorial card */
+.landing-page .landing-card {
+  background: hsl(var(--landing-surface));
+  border: 1px solid hsl(var(--landing-border));
+  border-radius: var(--radius-landing-card);
+  padding: 1.75rem;
+  box-shadow: 0 1px 3px -1px hsl(220 20% 12% / 0.04);
+  transition: box-shadow 0.2s ease;
+}
+.landing-page .landing-card:hover {
+  box-shadow: 0 4px 16px -4px hsl(220 20% 12% / 0.07);
+}
+
+/* Primary pill CTA */
+.landing-page .landing-cta {
+  background-color: hsl(var(--landing-accent));
+  color: #fff;
+  border-radius: var(--radius-full);
+  padding: 0.625rem 1.5rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+  box-shadow: 0 1px 3px hsl(162 42% 38% / 0.2);
+}
+.landing-page .landing-cta:hover {
+  background-color: hsl(var(--landing-accent-hover));
+  box-shadow: 0 4px 12px hsl(162 42% 38% / 0.25);
+  transform: translateY(-1px);
+}
+
+/* Secondary outline pill */
+.landing-page .landing-secondary-btn {
+  border-radius: var(--radius-full);
+  padding: 0.625rem 1.5rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  border: 1px solid hsl(var(--landing-border));
+  color: hsl(var(--landing-text));
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+.landing-page .landing-secondary-btn:hover {
+  background: hsl(var(--landing-surface));
+  border-color: hsl(var(--landing-muted) / 0.3);
+}
+
+/* Eyebrow / heading / subheading */
+.landing-page .landing-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+  color: hsl(var(--landing-accent));
+}
+.landing-page .landing-heading {
+  color: hsl(var(--landing-text));
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.landing-page .landing-subheading {
+  color: hsl(var(--landing-muted));
+  line-height: var(--leading-relaxed);
+}
+.landing-page .landing-nav-link {
+  font-size: 14px;
+  font-weight: var(--weight-medium);
+  color: hsl(var(--landing-muted));
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.landing-page .landing-nav-link:hover { color: hsl(var(--landing-text)); }

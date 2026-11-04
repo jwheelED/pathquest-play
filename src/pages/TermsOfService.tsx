@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -10,16 +11,25 @@ const TermsOfService = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Terms of Service — Edvana</title>
+        <meta name="description" content="The terms that govern your use of Edvana, including acceptable use, account responsibilities, and limitations of liability." />
+        <link rel="canonical" href="https://edvana.dev/terms" />
+        <meta property="og:title" content="Terms of Service — Edvana" />
+        <meta property="og:description" content="Terms governing use of the Edvana platform." />
+        <meta property="og:url" content="https://edvana.dev/terms" />
+      </Helmet>
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <img src={edvanaLogo} alt="Edvana" className="h-8 cursor-pointer" onClick={() => navigate("/")} />
+          <img src={edvanaLogo} alt="Edvana logo" className="h-8 cursor-pointer" onClick={() => navigate("/")} />
           <Button onClick={() => navigate("/")} variant="ghost" size="sm">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
         </div>
       </header>
+
 
       {/* Content */}
       <main className="container mx-auto px-4 py-12 max-w-4xl">

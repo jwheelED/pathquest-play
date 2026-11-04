@@ -45,6 +45,9 @@ verify_jwt = false
 [functions.push-bank-question]
 verify_jwt = false
 
+[functions.match-bank-question]
+verify_jwt = false
+
 [functions.generate-detailed-explanation]
 verify_jwt = false
 
@@ -73,4 +76,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-slide-questions]
+verify_jwt = false
+
+# Stripe calls this directly, so it cannot require a Supabase JWT.
+# Authenticity is enforced via Stripe webhook signature verification.
+[functions.stripe-webhook]
 verify_jwt = false

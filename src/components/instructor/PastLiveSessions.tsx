@@ -104,73 +104,78 @@ export const PastLiveSessions = () => {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <History className="h-5 w-5 text-primary" />
-            Past Live Sessions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse h-16 bg-muted rounded-lg" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <div className="h-3 w-28 bg-slate-100 rounded animate-pulse" />
+          <div className="h-5 w-40 bg-slate-100 rounded animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-slate-50 rounded-xl animate-pulse border border-slate-100" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <History className="h-5 w-5 text-primary" />
-            Past Live Sessions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center text-muted-foreground py-6">
-            No past live sessions found.
+      <div className="space-y-4">
+        <div>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-charcoal-subtle/70">
+            Past Sessions
+          </span>
+          <h3 className="text-lg font-semibold text-charcoal mt-1">
+            Previous live sessions
+          </h3>
+        </div>
+        <div className="command-card p-6 text-center">
+          <p className="text-sm text-charcoal-muted">
+            No past live sessions found. Your completed sessions will appear here.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <History className="h-5 w-5 text-primary" />
-          Past Live Sessions
-          <Badge variant="outline" className="ml-2">
-            {sessions.length}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <div className="space-y-4">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-charcoal-subtle/70">
+            Past Sessions
+          </span>
+          <h3 className="text-lg font-semibold text-charcoal mt-1">
+            Previous live sessions
+          </h3>
+        </div>
+        <span className="text-xs font-medium text-charcoal-muted bg-slate-100 px-2.5 py-1 rounded-full">
+          {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* Sessions list */}
+      <div className="space-y-2">
         {sessions.map((session) => {
           const isExpanded = expandedSessionId === session.id;
           return (
-            <div key={session.id} className="border rounded-lg overflow-hidden">
+            <div key={session.id} className="command-card overflow-hidden">
               <button
                 onClick={() =>
                   setExpandedSessionId(isExpanded ? null : session.id)
                 }
-                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-50/50 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <Badge variant="secondary" className="shrink-0 font-mono text-xs">
+                  <code className="shrink-0 font-semibold text-xs bg-slate-50 px-2 py-1 rounded border border-slate-100 text-charcoal tracking-wider">
                     {session.session_code}
-                  </Badge>
+                  </code>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
+                    <p className="text-sm font-medium text-charcoal truncate">
                       {session.title || "Untitled Session"}
                     </p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                    <div className="flex items-center gap-3 text-xs text-charcoal-subtle mt-0.5">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {formatDate(session.created_at)}
@@ -179,26 +184,26 @@ export const PastLiveSessions = () => {
                         <Users className="h-3 w-3" />
                         {session.participantCount} students
                       </span>
-                      <span>{session.questionCount} questions</span>
+                      <span>{session.questionCount} check-ins</span>
                     </div>
                   </div>
                 </div>
                 {isExpanded ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <ChevronUp className="h-4 w-4 text-charcoal-subtle shrink-0" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <ChevronDown className="h-4 w-4 text-charcoal-subtle shrink-0" />
                 )}
               </button>
 
               {isExpanded && (
-                <div className="border-t px-4 py-4">
+                <div className="border-t border-slate-100 px-4 py-4 bg-slate-50/30">
                   <LiveSessionResults sessionId={session.id} />
                 </div>
               )}
             </div>
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

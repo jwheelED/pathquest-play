@@ -232,7 +232,10 @@ export default function InstructorOnboarding() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/instructor/dashboard')}
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate('/instructor/auth');
+              }}
               className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4 mr-1" />

@@ -1,0 +1,86 @@
+name: CI
+
+# Critical-path gate (audit EV-012). Runs the test suite + a build smoke check
+# on every PR to main and on pushes to main. Enable branch protection
+# (Settings → Branches → require status checks) so a red run blocks merge.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Use npm, NOT bun: package-lock.json resolves from public
+      # registry.npmjs.org, whereas bun.lock is pinned to a private Lovable
+      # Artifact Registry that CI runners can't authenticate to.
+      #
+      # `npm install` (not `npm ci`): the committed lockfile is missing the
+      # platform-specific @esbuild/* optional deps, which `npm ci` rejects.
+      # `npm install` reconciles them for the runner's platform. (package-lock
+      # is DO-NOT-EDIT; any drift written here is ephemeral and not committed.)
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      # --- Hard gates: a failure here blocks the merge ---
+      - name: Unit tests
+        run: npm test
+
+      - name: Build smoke check
+        run: npm run build
+
+      # --- Informational (non-blocking) until the pre-existing findings are
+      #     cleared. Promote tsc to a hard gate after fixing the 3 known type
+      #     errors (LectureMaterialsUpload.tsx, StudentProgressCard.tsx). ---
+      - name: Typecheck (non-blocking)
+        run: npx tsc --noEmit -p tsconfig.app.json
+        continue-on-error: true
+
+      - name: Lint (non-blocking)
+        run: npm run lint
+        continue-on-error: true
+
+  deno-check:
+    name: deno check (shared edge modules, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # Scope to the pure modules with no external imports (shared helpers +
+      # the extracted edge-function handlers). The index.ts shells and log.ts /
+      # sentry.ts pull remote/`npm:` imports that `deno check` can't resolve
+      # without a node_modules/deno.json setup — left out to keep this green.
+      - name: Type-check pure shared + handler modules
+        run: >-
+          deno check
+          supabase/functions/_shared/deliveryVerification.ts
+          supabase/functions/_shared/joinRateLimit.ts
+          supabase/functions/_shared/handlerTypes.ts
+          supabase/functions/join-live-session/handler.ts
+          supabase/functions/create-live-session/handler.ts
+          supabase/functions/submit-live-response/handler.ts
+          supabase/functions/submit-live-response/grading.ts

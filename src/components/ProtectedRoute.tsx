@@ -1,3 +1,6 @@
+// CRITICAL PATH #1 — Authentication. See CRITICAL_PATHS.md.
+// Invariants enforced by src/components/__tests__/ProtectedRoute.test.tsx
+// Before editing: read the test file. After editing: run `bun run test:auth`.
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,25 +23,41 @@ export function ProtectedRoute({
   const navigate = useNavigate();
   const location = useLocation();
   const hasCheckedRef = useRef<string | null>(null);
+  const hasResolvedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+    hasResolvedRef.current = false;
+
     // Set up auth state listener FIRST to catch session restoration
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (event === 'INITIAL_SESSION') {
-          // Auth is now initialized - check authorization
+        if (cancelled) return;
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (hasResolvedRef.current) return;
+          hasResolvedRef.current = true;
           checkAuthorization(session);
           setIsLoading(false);
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          checkAuthorization(session);
         } else if (event === 'SIGNED_OUT') {
           setAuthorized(false);
+          setIsLoading(false);
           navigate(redirectTo);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    // Fallback: if INITIAL_SESSION never fires (missed event), resolve via getSession
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled || hasResolvedRef.current) return;
+      hasResolvedRef.current = true;
+      checkAuthorization(session);
+      setIsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [requiredRole, redirectTo, navigate]);
 
   const checkAuthorization = async (session: Session | null) => {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Globe, Mail, Plus, Trash2, UserPlus, Check, Clock, X } from "lucide-react";
+import { Building2, Globe, Mail, Plus, Trash2, UserPlus, Check, Clock, X, Pencil } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,11 +43,13 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [orgName, setOrgName] = useState("");
-  const [orgSlug, setOrgSlug] = useState("");
   const [newDomain, setNewDomain] = useState("");
   const [newInviteEmail, setNewInviteEmail] = useState("");
   const [addingDomain, setAddingDomain] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     fetchOrganization();
@@ -101,8 +103,8 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
   };
 
   const createOrganization = async () => {
-    if (!orgName.trim() || !orgSlug.trim()) {
-      toast.error("Please enter both organization name and slug");
+    if (!orgName.trim()) {
+      toast.error("Please enter an organization name");
       return;
     }
 
@@ -115,11 +117,15 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
       const { data: adminCode } = await supabase.rpc("generate_admin_code");
       const { data: inviteCode } = await supabase.rpc("generate_org_invite_code");
 
+      // Auto-generate a URL-safe slug from the name; append a short suffix to keep it unique.
+      const baseSlug = orgName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "org";
+      const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+
       const { data: newOrg, error: orgError } = await supabase
         .from("organizations")
         .insert({
-          name: orgName,
-          slug: orgSlug.toLowerCase().replace(/\s+/g, "-"),
+          name: orgName.trim(),
+          slug,
           admin_code: adminCode,
           instructor_invite_code: inviteCode,
         })
@@ -143,6 +149,41 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
       toast.error(error.message || "Failed to create organization");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEditName = () => {
+    if (!organization) return;
+    setEditedName(organization.name);
+    setEditingName(true);
+  };
+
+  const saveName = async () => {
+    if (!organization) return;
+    const trimmed = editedName.trim();
+    if (!trimmed) {
+      toast.error("Organization name can't be empty");
+      return;
+    }
+    if (trimmed === organization.name) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    try {
+      const { error } = await supabase
+        .from("organizations")
+        .update({ name: trimmed })
+        .eq("id", organization.id);
+      if (error) throw error;
+      setOrganization({ ...organization, name: trimmed });
+      setEditingName(false);
+      toast.success("Organization renamed");
+    } catch (error: any) {
+      console.error("Error renaming organization:", error);
+      toast.error(error.message || "Failed to rename organization");
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -323,15 +364,9 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
               onChange={(e) => setOrgName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="orgSlug">Organization Slug (URL-friendly)</Label>
-            <Input
-              id="orgSlug"
-              placeholder="e.g., stanford-cs"
-              value={orgSlug}
-              onChange={(e) => setOrgSlug(e.target.value)}
-            />
-          </div>
+          <p className="text-xs text-muted-foreground">
+            You can rename your organization any time from this page.
+          </p>
           <Button
             onClick={createOrganization}
             disabled={creating}
@@ -351,18 +386,50 @@ export default function OrganizationSetup({ onOrgCreated }: OrganizationSetupPro
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="w-5 h-5" />
-            {organization.name}
+            {editingName ? (
+              <div className="flex items-center gap-2 flex-1">
+                <Input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveName();
+                    if (e.key === "Escape") setEditingName(false);
+                  }}
+                  autoFocus
+                  className="h-9 text-base"
+                  disabled={savingName}
+                />
+                <Button size="sm" onClick={saveName} disabled={savingName}>
+                  {savingName ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingName(false)}
+                  disabled={savingName}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <>
+                <span>{organization.name}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={startEditName}
+                  className="h-7 px-2"
+                  aria-label="Rename organization"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            )}
           </CardTitle>
           <CardDescription>
             Manage how instructors join your organization
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Slug:</span>
-            <code className="px-2 py-1 bg-muted rounded text-sm">{organization.slug}</code>
-          </div>
-        </CardContent>
       </Card>
 
       {/* Email Domain Matching */}

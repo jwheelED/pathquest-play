@@ -5,9 +5,12 @@ import { toast as sonnerToast } from 'sonner';
 import { usePresenterBroadcast } from '@/hooks/useLecturePresenterChannel';
 import { analyzeContentQuality } from '@/lib/contentQuality';
 import { playNotificationSound } from '@/lib/audioNotification';
+import { readEdgeFunctionError } from '@/lib/edgeFunctionError';
+
 import { DeepgramStreamingClient, DeepgramTranscript } from '@/lib/deepgramStreaming';
 import { useVoiceCommandDetection } from '@/hooks/useVoiceCommandDetection';
 import { usePassiveQuestionDetection } from '@/hooks/usePassiveQuestionDetection';
+import { useQuestionTriggerCapture } from '@/hooks/useQuestionTriggerCapture';
 
 import { createReliableTimer, type ReliableTimer } from '@/lib/reliableTimer';
 import { retryWithBackoff } from '@/lib/retryWithBackoff';
@@ -203,16 +206,52 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Passive question detection hook
   const {
     candidate: passiveCandidate,
+    pendingCandidate: passivePendingCandidate,
+    pendingStartedAt: passivePendingStartedAt,
+    trailingSilenceMs: passiveTrailingSilenceMs,
     checkUtterance: checkPassiveQuestion,
+    acceptVettedCandidate: acceptVettedPassiveCandidate,
+    notifySpeech: notifyPassiveSpeech,
     dismissCandidate: dismissPassiveCandidate,
     resetDetection: resetPassiveDetection,
   } = usePassiveQuestionDetection({
     enabled: true, // Always on
     cooldownMs: 8000,
-    minWordCount: 5,
+    minWordCount: 5, // Allow short natural WH questions like "Who wrote the Emancipation Proclamation?"
+    minTranscriptConfidence: 0.8,
+    trailingSilenceMs: 1200,
     autoDismissMs: 60000,
     lastQuestionSentTime: lastQuestionSentTimeRef.current,
   });
+
+  // Trigger-based question capture — buffers multi-chunk questions
+  const {
+    feedChunk: feedTriggerChunk,
+    isCapturing: isTriggerCapturing,
+    resetCapture: resetTriggerCapture,
+    setOnCaptureComplete: setTriggerCaptureComplete,
+  } = useQuestionTriggerCapture({
+    cooldownMs: 12000,
+    silenceGapMs: 2500,
+    minSilenceMs: 1200,
+    bufferWindowMs: 60000,
+    lookbackMs: 30000,
+    maxBufferChars: 8000,
+    minCompleteWords: 5, // Allow short natural WH questions
+  });
+
+  // Route trigger-captured questions directly into the passive candidate pipeline.
+  // Use acceptVettedCandidate (not checkPassiveQuestion) — the trigger-capture
+  // hook has already vetted the question, and re-running passive filters here
+  // was silently dropping valid short questions.
+  useEffect(() => {
+    setTriggerCaptureComplete((candidate) => {
+      console.log('🎯 Trigger capture emitted question:', candidate.text);
+      resetPassiveDetection?.();
+      const priorContext = candidate.priorContext || intervalTranscriptRef.current;
+      acceptVettedPassiveCandidate(candidate.text, priorContext);
+    });
+  }, [setTriggerCaptureComplete, acceptVettedPassiveCandidate, resetPassiveDetection]);
 
 
   // Deepgram streaming refs for real-time transcription
@@ -221,6 +260,8 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
   // Direct voice command detection refs (independent of state-based detection)
   const directVoiceLastDetectedRef = useRef<string>('');
   const directVoiceLastTimeRef = useRef<number>(0);
+  // Debounced toast when we hear a question-like utterance but capture failed
+  const lastMissToastTimeRef = useRef<number>(0);
   const [isStreamingMode, setIsStreamingMode] = useState(false);
 
   // Keep refs updated when state changes (avoids stale closures in timer callbacks)
@@ -406,9 +447,30 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       });
 
       if (error) {
-        console.error('Edge function error:', error);
-        throw error;
+        // Recover the JSON body supabase-js drops on non-2xx responses.
+        const details = await readEdgeFunctionError(error);
+        console.error('Edge function error:', details.status, details.body ?? details.message, error);
+
+        const errorType = (details.body?.error_type as string) || '';
+        if (details.status === 429) {
+          if (errorType === 'daily_limit') {
+            toast({
+              title: '🚫 Daily question limit reached',
+              description: `You've sent ${details.body?.current_count ?? ''}/${details.body?.daily_limit ?? ''} questions today. Resets at midnight UTC.`,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: '⏳ Slow down',
+              description: (details.body?.error as string) || 'Please wait a few seconds between questions.',
+            });
+          }
+          return;
+        }
+
+        throw new Error(details.message || (details.body?.error as string) || error.message);
       }
+
 
       if (data?.success) {
         playNotificationSound().catch(() => {});
@@ -520,12 +582,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       // Track auto-question triggered in PostHog
       trackAutoQuestionTriggered(autoQuestionInterval);
       
-      // Auto-generated questions always send directly - no preview
+      // Auto-generated questions always send directly - no preview.
+      // Pass the misconception-targeted choices through so they aren't regenerated.
       await handleQuestionSend({
         question_text: data.question_text,
         suggested_type: data.suggested_type,
         confidence: data.confidence,
         expected_answer: data.expected_answer || "",
+        options: data.options,
+        correct_answer: data.correct_answer,
+        explanation: data.explanation,
+        misconception: data.misconception ?? null,
         extraction_method: 'auto_interval',
         source: 'auto_interval',
       });
@@ -958,8 +1025,37 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
             }
           }
           
-          // Passive question detection — check final utterances for ?
-          checkPassiveQuestion(cleanText);
+          // Trigger-based question capture — interrogative trigger phrases.
+          const wasCapturingBefore = isTriggerCapturing;
+          feedTriggerChunk(cleanText, Date.now());
+
+          // Fallback: if the chunk clearly ends with "?" and the trigger
+          // pipeline did not arm, route through the vetted-candidate path so
+          // we don't silently drop natural-sounding questions like
+          // "Who wrote the Emancipation Proclamation?"
+          const endsWithQuestion = /\?\s*$/.test(cleanText.trim());
+          const hasWhWord = /\b(what|why|how|when|where|who|whom|whose|which)\b/i.test(cleanText);
+          const triggerArmed = isTriggerCapturing || wasCapturingBefore;
+
+          if (endsWithQuestion && !triggerArmed) {
+            console.log('🛟 Fallback: routing "?"-ending chunk to vetted candidate path');
+            acceptVettedPassiveCandidate(cleanText, intervalTranscriptRef.current);
+          } else if ((endsWithQuestion || hasWhWord) && !triggerArmed) {
+            // Visible miss signal — debounced to once per 30s
+            const now = Date.now();
+            if (now - lastMissToastTimeRef.current > 30000) {
+              lastMissToastTimeRef.current = now;
+              console.log('⚠️ Question-like utterance not captured:', cleanText);
+              toast({
+                title: 'Heard a question but couldn\'t capture it',
+                description: 'Tap "Send Question" to use the last few seconds of speech.',
+              });
+            }
+          }
+
+          // Notify passive detection that the instructor is still speaking — resets
+          // the trailing-silence timer on any pending candidate.
+          notifyPassiveSpeech();
           
           // Update React state less frequently to reduce re-renders (every 5 chunks)
 
@@ -1013,15 +1109,31 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
   }, []);
 
+  // Full reset of all per-recording state — call on start AND stop so a fresh
+  // recording never inherits buffers, candidates, or cooldowns from the previous one.
+  const resetRecordingState = useCallback(() => {
+    setTranscriptChunks([]);
+    setLastTranscript('');
+    transcriptBufferRef.current = '';
+    intervalTranscriptRef.current = '';
+    intervalTranscriptSnapshotRef.current = '';
+    transcriptChunkCountRef.current = 0;
+    recordingCycleCountRef.current = 0;
+    directVoiceLastDetectedRef.current = '';
+    directVoiceLastTimeRef.current = 0;
+    lastMissToastTimeRef.current = 0;
+    setFailureCount(0);
+    resetTriggerCapture?.();
+    resetPassiveDetection?.();
+    resetVoiceCommandCooldown?.();
+  }, [resetTriggerCapture, resetPassiveDetection, resetVoiceCommandCooldown]);
+
   // Start recording
   const startRecording = useCallback(async () => {
     try {
       isRecordingRef.current = true;
       setIsRecording(true);
-      setTranscriptChunks([]);
-      transcriptBufferRef.current = '';
-      intervalTranscriptRef.current = '';
-      setFailureCount(0);
+      resetRecordingState();
 
       console.log('🌊 Using Deepgram WebSocket streaming via Fly.io proxy');
       await startDeepgramStreaming();
@@ -1045,7 +1157,7 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
         variant: 'destructive',
       });
     }
-  }, [startDeepgramStreaming, broadcast, toast]);
+  }, [startDeepgramStreaming, broadcast, toast, resetRecordingState]);
 
   // Stop recording - cleans up both modes
   const stopRecording = useCallback(() => {
@@ -1059,8 +1171,12 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
     }
 
     if (mediaRecorderRef.current) {
+      // Unbind handlers BEFORE stopping so any late-arriving chunk from this
+      // session can't be processed after we've torn down state.
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
       if (mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
+        try { mediaRecorderRef.current.stop(); } catch { /* noop */ }
       }
       mediaRecorderRef.current = null;
     }
@@ -1081,13 +1197,17 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
       reliableTimerRef.current.stop();
     }
 
+    // Clear all per-recording state so the next start begins clean
+    resetRecordingState();
+
+
     broadcast('recording_status', { isRecording: false });
     
     // Track recording end in PostHog (using current recordingDuration)
     trackRecordingEnded(recordingDuration);
     
     toast({ title: 'Recording stopped' });
-  }, [broadcast, toast, stopDeepgramStreaming, recordingDuration]);
+  }, [broadcast, toast, stopDeepgramStreaming, recordingDuration, resetRecordingState]);
 
   // Manual question send
   const handleManualQuestionSend = useCallback(async () => {
@@ -1095,6 +1215,10 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
     try {
       setIsSendingQuestion(true);
+
+      // Brief flush delay so a question spoken immediately before the button
+      // press has time to land in the transcript buffer from Deepgram.
+      await new Promise((r) => setTimeout(r, 250));
 
       const hasTranscript = transcriptBufferRef.current && transcriptBufferRef.current.length >= 20;
       const hasSlideContext = slideContextRef.current && slideContextRef.current.length >= 20;
@@ -1369,6 +1493,9 @@ export function useLectureRecording(options: UseLectureRecordingOptions = {}) {
 
     // Passive question detection
     passiveCandidate,
+    passivePendingCandidate,
+    passivePendingStartedAt,
+    passiveTrailingSilenceMs,
     passiveDetectionEnabled,
     setPassiveDetectionEnabled,
     dismissPassiveCandidate,

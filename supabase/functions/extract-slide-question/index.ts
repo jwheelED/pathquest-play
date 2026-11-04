@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -108,6 +109,14 @@ If the slide contains graphs, charts, diagrams, or data visualizations:
 
 If there's an existing question on the slide, extract it. If not, CREATE a question based on the slide content.
 
+DISTRACTOR QUALITY — CRITICAL:
+- Every wrong answer (distractor) MUST be a real, specific, plausible value or concept from the same domain.
+- Use your full knowledge of the subject to create realistic distractors based on common student misconceptions and typical errors.
+- NEVER use vague filler like "Not specified in lecture", "None of the above", "Cannot be determined", "Not enough information", or "All of the above" as distractors.
+- For factual questions (e.g., "How many bones in the human body?"), distractors must be real numbers or facts that a student might confuse with the correct answer.
+- Example: If the correct answer is "206 bones", good distractors are "196", "212", "256" — NOT "Not specified" or "It depends".
+- Each distractor should represent a specific, common misconception or error a student might make.
+
 Return in this exact JSON format:
 {
   "found": true,
@@ -117,6 +126,8 @@ Return in this exact JSON format:
   "explanation": "Brief explanation of why this is the correct answer",
   "difficulty": "${difficulty}"
 }
+
+IMPORTANT: Randomize which letter (A, B, C, or D) is the correct answer — do NOT always make A correct.
 
 For graph-based questions, ensure answer options include plausible values/interpretations from the visual data.
 If the slide has a question with correct answer marked (checkmark, highlight, asterisk), use that.
@@ -188,30 +199,22 @@ If no coding problem is found on this slide, return:
 Return ONLY valid JSON, no other text.`;
     }
 
-    // Call Gemini with vision
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: extractionPrompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: slideImage.startsWith("data:") ? slideImage : `data:image/png;base64,${slideImage}`,
-                },
+    // Call Claude Sonnet 4.5 with vision
+    const response = await callClaude({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: extractionPrompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: slideImage.startsWith("data:") ? slideImage : `data:image/png;base64,${slideImage}`,
               },
-            ],
-          },
-        ],
-      }),
+            },
+          ],
+        },
+      ],
     });
 
     if (!response.ok) {

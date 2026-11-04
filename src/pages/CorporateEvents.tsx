@@ -1,579 +1,592 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { EdvanaIcon } from "@/components/ui/EdvanaIcon";
-import { toast } from "sonner";
-import {
-  ArrowLeft, Play, Square, Copy, QrCode, Users, Mic, BarChart3,
-  Clock, CheckCircle, Radio, Settings, History, Zap, ChevronRight,
-  Eye, TrendingUp,
-} from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
+import { ArrowLeft, Check } from "lucide-react";
+import edvanaLogo from "@/assets/edvana-icon-logo.png";
 
-// --- Types ---
-interface MockSession {
-  id: string;
-  title: string;
-  date: string;
-  participants: number;
-  questionsSent: number;
-  avgScore: number;
-  status: "completed" | "live";
-  questions: { text: string; responses: number; correctPct: number }[];
-}
 
-interface SpeakerSettings {
-  name: string;
-  email: string;
-  defaultFormat: string;
-  audioAlerts: boolean;
-  showQrOnStart: boolean;
-}
-
-// --- Mock Data ---
-const MOCK_PAST_SESSIONS: MockSession[] = [
-  {
-    id: "1", title: "AI in Healthcare Keynote", date: "2026-03-08T14:00:00",
-    participants: 342, questionsSent: 8, avgScore: 76, status: "completed",
-    questions: [
-      { text: "What is the primary benefit of AI in diagnostics?", responses: 298, correctPct: 82 },
-      { text: "Which ML model is most used in radiology?", responses: 312, correctPct: 64 },
-      { text: "What does HIPAA regulate?", responses: 305, correctPct: 91 },
-    ],
-  },
-  {
-    id: "2", title: "Future of Remote Work Panel", date: "2026-03-05T10:00:00",
-    participants: 189, questionsSent: 5, avgScore: 81, status: "completed",
-    questions: [
-      { text: "What percentage of workers prefer hybrid?", responses: 167, correctPct: 73 },
-      { text: "Which tool is most used for async communication?", responses: 172, correctPct: 88 },
-    ],
-  },
-  {
-    id: "3", title: "Startup Pitch Workshop", date: "2026-02-28T09:00:00",
-    participants: 94, questionsSent: 12, avgScore: 68, status: "completed",
-    questions: [
-      { text: "What is a cap table?", responses: 88, correctPct: 72 },
-      { text: "Which metric do VCs prioritize for SaaS?", responses: 91, correctPct: 59 },
-    ],
-  },
-  {
-    id: "4", title: "Data Privacy Compliance Talk", date: "2026-02-20T15:30:00",
-    participants: 215, questionsSent: 6, avgScore: 74, status: "completed",
-    questions: [
-      { text: "What is GDPR's core principle?", responses: 198, correctPct: 85 },
-    ],
-  },
+/* ── Pricing data ── */
+const SELF_SERVE_CAPACITIES = ["Up to 50", "Up to 150", "Up to 300"] as const;
+const SELF_SERVE_ROWS: { duration: string; prices: string[] }[] = [
+  { duration: "1 hour", prices: ["$29", "$69", "$129"] },
+  { duration: "2 hours", prices: ["$49", "$119", "$219"] },
+  { duration: "4 hours", prices: ["$79", "$179", "$329"] },
+  { duration: "Full day", prices: ["$129", "$279", "$399"] },
 ];
 
-const generateSessionCode = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-};
+const PREMIUM_CAPACITIES = ["Up to 300", "Up to 500"] as const;
+const PREMIUM_ROWS: { duration: string; prices: string[] }[] = [
+  { duration: "1 hour", prices: ["$399", "$599"] },
+  { duration: "2 hours", prices: ["$649", "$949"] },
+  { duration: "4 hours", prices: ["$899", "$1,299"] },
+];
 
-// --- Component ---
-export default function CorporateEvents() {
+/* ── Component ── */
+const CorporateEvents = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
-
-  // Live session state
-  const [sessionTitle, setSessionTitle] = useState("");
-  const [isLive, setIsLive] = useState(false);
-  const [liveCode, setLiveCode] = useState("");
-  const [liveParticipants, setLiveParticipants] = useState(0);
-  const [showQR, setShowQR] = useState(false);
-
-  // Past sessions
-  const [detailSession, setDetailSession] = useState<MockSession | null>(null);
-
-  // Settings
-  const [settings, setSettings] = useState<SpeakerSettings>({
-    name: "Alex Rivera",
-    email: "alex@company.com",
-    defaultFormat: "keynote",
-    audioAlerts: true,
-    showQrOnStart: true,
-  });
-
-  const origin = window.location.hostname === "localhost"
-    ? "http://localhost:8080"
-    : "https://edvana.dev";
-  const joinUrl = `${origin}/join`;
-
-  const handleGoLive = () => {
-    if (!sessionTitle.trim()) {
-      toast.error("Enter a session title to go live");
-      return;
-    }
-    const code = generateSessionCode();
-    setLiveCode(code);
-    setIsLive(true);
-    setLiveParticipants(0);
-    setActiveTab("live");
-    toast.success(`You're live! Session code: ${code}`);
-    if (settings.showQrOnStart) setShowQR(true);
-
-    // Simulate participants joining
-    let count = 0;
-    const interval = setInterval(() => {
-      count += Math.floor(Math.random() * 8) + 1;
-      if (count > 150) { clearInterval(interval); return; }
-      setLiveParticipants(count);
-    }, 2000);
-  };
-
-  const handleEndSession = () => {
-    setIsLive(false);
-    setLiveCode("");
-    setSessionTitle("");
-    setLiveParticipants(0);
-    toast.success("Session ended");
-  };
-
-  const copyJoinLink = () => {
-    navigator.clipboard.writeText(joinUrl);
-    toast.success("Join link copied!");
-  };
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(liveCode);
-    toast.success("Code copied!");
-  };
-
-  // Metrics
-  const totalSessions = MOCK_PAST_SESSIONS.length;
-  const totalParticipants = MOCK_PAST_SESSIONS.reduce((s, e) => s + e.participants, 0);
-  const avgEngagement = Math.round(MOCK_PAST_SESSIONS.reduce((s, e) => s + e.avgScore, 0) / totalSessions);
+  const [tier, setTier] = useState<"self-serve" | "premium">("self-serve");
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <EdvanaIcon className="w-8 h-8" />
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Speaker Dashboard</h1>
-              <p className="text-xs text-muted-foreground">Corporate Events</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {isLive && (
-              <Badge variant="default" className="animate-pulse gap-1">
-                <Radio className="w-3 h-3" /> LIVE
-              </Badge>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Home
-            </Button>
-          </div>
+    <div className="landing-page min-h-screen">
+      <Helmet>
+        <title>Edvana for Corporate Events — live engagement & analytics</title>
+        <meta name="description" content="Run conferences and corporate events with live transcription, audience check-ins, and post-event analytics. Self-serve and premium pricing available." />
+        <link rel="canonical" href="https://edvana.dev/corporate/events" />
+        <meta property="og:title" content="Edvana for Corporate Events — live engagement & analytics" />
+        <meta property="og:description" content="Live transcription, audience check-ins, and analytics for conferences and corporate events." />
+        <meta property="og:url" content="https://edvana.dev/corporate/events" />
+      </Helmet>
+      {/* ── Header ── */}
+      <header
+        className="sticky top-0 z-20 border-b backdrop-blur-sm"
+        style={{
+          borderColor: "hsl(var(--landing-border))",
+          backgroundColor: "hsl(var(--landing-bg) / 0.92)",
+        }}
+      >
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <button
+            type="button"
+            aria-label="Edvana home"
+            onClick={() => navigate("/")}
+            className="bg-transparent border-0 p-0 cursor-pointer"
+          >
+            <img
+              src={edvanaLogo}
+              alt="Edvana - Live Understanding Copilot"
+              className="h-8"
+            />
+          </button>
+          <button
+            onClick={() => navigate("/")}
+            className="landing-secondary-btn inline-flex items-center gap-2 text-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </button>
         </div>
       </header>
 
-      {/* Main */}
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 w-full md:w-auto">
-            <TabsTrigger value="overview" className="gap-1.5"><Zap className="w-4 h-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="live" className="gap-1.5"><Radio className="w-4 h-4" /> Live Session</TabsTrigger>
-            <TabsTrigger value="past" className="gap-1.5"><History className="w-4 h-4" /> Past Sessions</TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1.5"><Settings className="w-4 h-4" /> Settings</TabsTrigger>
-          </TabsList>
+      {/* ══════════════════════════════════════
+          SECTION 1 — Hero
+         ══════════════════════════════════════ */}
+      <section className="max-w-4xl mx-auto px-6 pt-24 pb-20 text-center">
+        <p className="landing-eyebrow mb-4">EDVANA FOR EVENTS</p>
+        <h1 className="landing-heading text-4xl md:text-5xl lg:text-[3.25rem] mb-6">
+          Real-time audience understanding
+          <br className="hidden sm:block" /> for your live event.
+        </h1>
+        <p className="landing-subheading text-base md:text-lg max-w-2xl mx-auto mb-12">
+          No subscription required. Buy the time you need, for the room you
+          have. Edvana generates live understanding checks from your speaker's
+          words in real time, so your audience stays engaged and your team sees
+          what the room actually took away.
+        </p>
 
-          {/* ===== OVERVIEW ===== */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Quick Start */}
-            <Card className="border-primary/30 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Play className="w-5 h-5 text-primary" /> Quick Start
-                </CardTitle>
-                <CardDescription>Launch a live session — attendees join with a code on their phone</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Input
-                    placeholder="Session title (e.g., 'Keynote — AI Ethics')"
-                    value={sessionTitle}
-                    onChange={(e) => setSessionTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && !isLive && handleGoLive()}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleGoLive} disabled={isLive || !sessionTitle.trim()} className="gap-2 shrink-0">
-                    <Play className="w-4 h-4" /> Go Live
-                  </Button>
-                </div>
-                {isLive && (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    You're live! Switch to the <button className="text-primary underline" onClick={() => setActiveTab("live")}>Live Session</button> tab to manage.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10"><BarChart3 className="w-5 h-5 text-primary" /></div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{totalSessions}</p>
-                      <p className="text-xs text-muted-foreground">Total Sessions</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10"><Users className="w-5 h-5 text-primary" /></div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{totalParticipants.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">Total Attendees</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10"><TrendingUp className="w-5 h-5 text-primary" /></div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{avgEngagement}%</p>
-                      <p className="text-xs text-muted-foreground">Avg Engagement</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Proof points */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10">
+          {[
+            "No prebuilt polls required",
+            "Speaker stays in full control",
+            "Launch pricing for early event partners",
+          ].map((point) => (
+            <div key={point} className="flex items-center gap-2 text-sm font-medium" style={{ color: "hsl(var(--landing-text))" }}>
+              <Check className="w-4 h-4 flex-shrink-0" style={{ color: "hsl(var(--landing-accent))" }} />
+              {point}
             </div>
+          ))}
+        </div>
+      </section>
 
-            {/* Recent Sessions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Recent Sessions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {MOCK_PAST_SESSIONS.slice(0, 3).map((s) => (
-                  <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
-                    <div>
-                      <p className="font-medium text-foreground">{s.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {s.participants} attendees · {s.questionsSent} questions
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => { setDetailSession(s); setActiveTab("past"); }}>
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
+      {/* ══════════════════════════════════════
+          SECTION 2 — How It Works
+         ══════════════════════════════════════ */}
+      <section
+        className="py-20"
+        style={{ backgroundColor: "hsl(var(--landing-surface))" }}
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="landing-eyebrow mb-3 text-center">HOW IT WORKS</p>
+          <h2 className="landing-heading text-3xl md:text-4xl text-center mb-3">
+            Buy a block of time. Run your event. See the room.
+          </h2>
+          <p className="landing-subheading text-center max-w-2xl mx-auto mb-14">
+            Edvana works like a venue rental, not a software subscription. You
+            pick your duration and your room size. The session activates when you
+            are ready. You pay once and you are done.
+          </p>
 
-          {/* ===== LIVE SESSION ===== */}
-          <TabsContent value="live" className="space-y-6">
-            {isLive ? (
-              <>
-                {/* Active Session Card */}
-                <Card className="border-primary overflow-hidden">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <Badge variant="default" className="animate-pulse">LIVE</Badge>
-                        {sessionTitle}
-                      </span>
-                      <Button variant="destructive" size="sm" onClick={handleEndSession}>
-                        <Square className="mr-2 h-4 w-4" /> End Session
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-col gap-4 p-4 bg-primary/5 rounded-lg">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Session Code</p>
-                          <p className="text-4xl font-mono font-bold tracking-widest text-foreground">{liveCode}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setShowQR(true)}><QrCode className="h-4 w-4" /></Button>
-                          <Button variant="outline" size="sm" onClick={copyCode}><Copy className="mr-1 h-4 w-4" /> Code</Button>
-                          <Button variant="outline" size="sm" onClick={copyJoinLink}><Copy className="mr-1 h-4 w-4" /> Link</Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      <span>{liveParticipants} attendee{liveParticipants !== 1 ? "s" : ""} joined</span>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground">
-                      Attendees join at: <span className="font-mono text-foreground">{joinUrl}</span>
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Live Capture */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Mic className="w-5 h-5 text-primary" /> Live Capture
-                    </CardTitle>
-                    <CardDescription>Real-time transcription generates understanding checks for your audience</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-3 p-4 rounded-lg border border-border bg-muted/20">
-                      <div className="relative">
-                        <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
-                        <div className="absolute inset-0 w-3 h-3 rounded-full bg-primary animate-ping opacity-50" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Listening…</p>
-                        <p className="text-xs text-muted-foreground">AI is transcribing your talk and will generate questions automatically</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Live Results */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <BarChart3 className="w-5 h-5 text-primary" /> Live Results
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border border-border">
-                      <div className="flex items-center gap-3">
-                        <Users className="h-7 w-7 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Responses</p>
-                          <p className="text-2xl font-bold text-foreground">0/{liveParticipants}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-7 w-7 text-primary" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Correct</p>
-                          <p className="text-2xl font-bold text-primary">—</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Clock className="h-7 w-7 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Avg Time</p>
-                          <p className="text-2xl font-bold text-foreground">—</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <Card className="text-center py-12">
-                <CardContent className="space-y-4">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                    <Radio className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground">No Active Session</h3>
-                    <p className="text-sm text-muted-foreground mt-1">Start a live session from the Overview tab or enter a title below.</p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-                    <Input
-                      placeholder="Session title…"
-                      value={sessionTitle}
-                      onChange={(e) => setSessionTitle(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleGoLive()}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleGoLive} disabled={!sessionTitle.trim()} className="gap-2">
-                      <Play className="w-4 h-4" /> Go Live
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* ===== PAST SESSIONS ===== */}
-          <TabsContent value="past" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Session History</CardTitle>
-                <CardDescription>Review engagement data from your past talks</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Session</TableHead>
-                      <TableHead className="hidden sm:table-cell">Date</TableHead>
-                      <TableHead className="text-right">Attendees</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">Questions</TableHead>
-                      <TableHead className="text-right">Avg Score</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {MOCK_PAST_SESSIONS.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">{s.title}</TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">
-                          {new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </TableCell>
-                        <TableCell className="text-right">{s.participants}</TableCell>
-                        <TableCell className="text-right hidden sm:table-cell">{s.questionsSent}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={s.avgScore >= 75 ? "default" : "secondary"}>{s.avgScore}%</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => setDetailSession(s)}>
-                            <Eye className="w-4 h-4 mr-1" /> Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            {detailSession && (
-              <Card className="border-primary/30">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{detailSession.title} — Question Breakdown</CardTitle>
-                    <Button variant="ghost" size="sm" onClick={() => setDetailSession(null)}>Close</Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Question</TableHead>
-                        <TableHead className="text-right">Responses</TableHead>
-                        <TableHead className="text-right">Correct</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detailSession.questions.map((q, i) => (
-                        <TableRow key={i}>
-                          <TableCell>{q.text}</TableCell>
-                          <TableCell className="text-right">{q.responses}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant={q.correctPct >= 75 ? "default" : "secondary"}>{q.correctPct}%</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* ===== SETTINGS ===== */}
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Speaker Profile</CardTitle>
-                <CardDescription>Your information displayed during live sessions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input value={settings.name} onChange={(e) => setSettings({ ...settings, name: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" value={settings.email} onChange={(e) => setSettings({ ...settings, email: e.target.value })} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Default Session Format</Label>
-                  <Select value={settings.defaultFormat} onValueChange={(v) => setSettings({ ...settings, defaultFormat: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="keynote">Keynote</SelectItem>
-                      <SelectItem value="workshop">Workshop</SelectItem>
-                      <SelectItem value="panel">Panel Discussion</SelectItem>
-                      <SelectItem value="training">Training</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Preferences</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Audio alerts for responses</Label>
-                    <p className="text-xs text-muted-foreground">Play a sound when attendees respond</p>
-                  </div>
-                  <Switch checked={settings.audioAlerts} onCheckedChange={(v) => setSettings({ ...settings, audioAlerts: v })} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Show QR code on session start</Label>
-                    <p className="text-xs text-muted-foreground">Automatically display join QR when you go live</p>
-                  </div>
-                  <Switch checked={settings.showQrOnStart} onCheckedChange={(v) => setSettings({ ...settings, showQrOnStart: v })} />
-                </div>
-                <Button onClick={() => toast.success("Settings saved")} className="mt-2">Save Settings</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
-
-      {/* QR Dialog */}
-      <Dialog open={showQR} onOpenChange={setShowQR}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-center text-xl">🎤 You're Live!</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6 text-center py-4">
-            <div className="p-6 bg-primary/10 rounded-xl border-2 border-primary/30">
-              <p className="text-sm text-muted-foreground mb-2">Attendees enter this code:</p>
-              <div className="flex items-center justify-center gap-3">
-                <p className="text-5xl font-mono font-bold tracking-widest text-primary">{liveCode}</p>
-                <Button variant="outline" size="sm" onClick={copyCode}><Copy className="h-4 w-4" /></Button>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                step: "1",
+                title: "Choose your event size and duration",
+                body: "Pick the capacity tier that matches your expected attendance and the time block you need. No annual commitment.",
+              },
+              {
+                step: "2",
+                title: "Run your event with live understanding",
+                body: "Edvana listens while your speaker presents and drafts real-time audience checks automatically. You review and send. The room responds instantly.",
+              },
+              {
+                step: "3",
+                title: "See what the room took away",
+                body: "Live response patterns surface while the session is still happening. Post-event insights are delivered automatically.",
+              },
+            ].map((s) => (
+              <div key={s.step} className="landing-card flex flex-col">
+                <span
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold mb-4"
+                  style={{
+                    backgroundColor: "hsl(var(--landing-accent) / 0.1)",
+                    color: "hsl(var(--landing-accent))",
+                  }}
+                >
+                  {s.step}
+                </span>
+                <h3
+                  className="font-semibold text-base mb-2"
+                  style={{ color: "hsl(var(--landing-text))" }}
+                >
+                  {s.title}
+                </h3>
+                <p className="landing-subheading text-sm leading-relaxed">
+                  {s.body}
+                </p>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            <div>
-              <p className="text-sm text-muted-foreground mb-3">Or scan to join:</p>
-              <div className="p-4 bg-white rounded-lg inline-block shadow-md">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${joinUrl}`}
-                  alt="QR Code to join session"
-                  className="w-48 h-48"
-                />
+      {/* ══════════════════════════════════════
+          SECTION 3 — Two Ways to Run an Event
+         ══════════════════════════════════════ */}
+      <section className="py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="landing-eyebrow mb-3 text-center">
+            TWO WAYS TO RUN AN EVENT
+          </p>
+          <h2 className="landing-heading text-3xl md:text-4xl text-center mb-12">
+            Self-serve or fully supported. You choose.
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Self-Serve */}
+            <div className="landing-card flex flex-col justify-between">
+              <div>
+                <h3
+                  className="font-semibold text-lg mb-3"
+                  style={{ color: "hsl(var(--landing-text))" }}
+                >
+                  Self-Serve Events
+                </h3>
+                <p className="landing-subheading text-sm leading-relaxed mb-6">
+                  Buy your event online in under two minutes. Set up your
+                  session, share your join code, and run it yourself. Best for
+                  teams who know what they need and want to move fast.
+                </p>
               </div>
+              <span
+                className="inline-block text-xs font-semibold px-3 py-1 rounded-full w-fit"
+                style={{
+                  backgroundColor: "hsl(var(--landing-accent) / 0.08)",
+                  color: "hsl(var(--landing-accent))",
+                }}
+              >
+                No setup call required
+              </span>
             </div>
 
-            <div className="flex items-center justify-center gap-2 p-3 bg-muted rounded-lg">
-              <span className="text-sm font-mono truncate">{joinUrl}</span>
-              <Button variant="ghost" size="sm" onClick={copyJoinLink}><Copy className="h-4 w-4" /></Button>
+            {/* Premium */}
+            <div className="landing-card flex flex-col justify-between">
+              <div>
+                <h3
+                  className="font-semibold text-lg mb-3"
+                  style={{ color: "hsl(var(--landing-text))" }}
+                >
+                  Premium Events
+                </h3>
+                <p className="landing-subheading text-sm leading-relaxed mb-6">
+                  For high-stakes sessions where you want setup assistance, live
+                  monitoring, post-event insights, and a branded participant
+                  experience. A short intake form gets you a tailored quote.
+                </p>
+              </div>
+              <span
+                className="inline-block text-xs font-semibold px-3 py-1 rounded-full w-fit"
+                style={{
+                  backgroundColor: "hsl(var(--landing-accent) / 0.08)",
+                  color: "hsl(var(--landing-accent))",
+                }}
+              >
+                Includes support and setup
+              </span>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          SECTION 4 — Pricing
+         ══════════════════════════════════════ */}
+      <section
+        className="py-20"
+        style={{ backgroundColor: "hsl(var(--landing-surface))" }}
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="landing-eyebrow mb-3 text-center">PRICING</p>
+          <h2 className="landing-heading text-3xl md:text-4xl text-center mb-3">
+            Launch pricing for early event partners.
+          </h2>
+          <p className="landing-subheading text-center max-w-2xl mx-auto mb-10">
+            Simple, transparent, and based on how long your event runs and how
+            many people attend. No subscriptions. No per-user fees. No surprise
+            charges.
+          </p>
+
+          {/* Tier toggle */}
+          <div className="flex justify-center mb-10">
+            <div
+              className="inline-flex rounded-full p-1"
+              style={{
+                backgroundColor: "hsl(var(--landing-border))",
+              }}
+            >
+              {(["self-serve", "premium"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTier(t)}
+                  className="px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200"
+                  style={{
+                    backgroundColor:
+                      tier === t ? "hsl(var(--landing-accent))" : "transparent",
+                    color:
+                      tier === t ? "#fff" : "hsl(var(--landing-muted))",
+                  }}
+                >
+                  {t === "self-serve" ? "Self-Serve" : "Premium"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Self-Serve matrix */}
+          {tier === "self-serve" && (
+            <div className="landing-card">
+              <p
+                className="text-sm font-medium mb-6"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                For events up to 300 attendees. Buy online. No support included.
+              </p>
+
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full border-collapse text-sm min-w-[480px]">
+                  <thead>
+                    <tr>
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "hsl(var(--landing-text))" }}
+                      >
+                        Duration
+                      </th>
+                      {SELF_SERVE_CAPACITIES.map((cap) => (
+                        <th
+                          key={cap}
+                          className="text-center py-3 px-4 font-semibold"
+                          style={{ color: "hsl(var(--landing-text))" }}
+                        >
+                          {cap}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SELF_SERVE_ROWS.map((row) => (
+                      <tr
+                        key={row.duration}
+                        style={{
+                          borderTop: "1px solid hsl(var(--landing-border))",
+                        }}
+                      >
+                        <td
+                          className="py-4 px-4 font-medium"
+                          style={{ color: "hsl(var(--landing-text))" }}
+                        >
+                          {row.duration}
+                        </td>
+                        {row.prices.map((price, ci) => (
+                          <td
+                            key={ci}
+                            className="py-4 px-4 text-center font-semibold transition-colors duration-150 rounded-lg cursor-default"
+                            style={{ color: "hsl(var(--landing-text))" }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLElement).style.backgroundColor =
+                                "hsl(var(--landing-accent) / 0.07)";
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLElement).style.backgroundColor =
+                                "transparent";
+                            }}
+                          >
+                            {price}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p
+                className="text-xs mt-6 leading-relaxed"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                If your expected attendance exceeds your tier during a live
+                event, you will see a one-click upgrade prompt. No one gets cut
+                off.
+              </p>
+
+              <div className="mt-8 text-center">
+                <a
+                  href="mailto:nigel@edvana.dev?subject=Plan%20My%20Event&body=I%27d%20like%20to%20plan%20an%20event%20with%20Edvana."
+                  className="landing-cta inline-block"
+                >
+                  Plan Your Event
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Premium matrix */}
+          {tier === "premium" && (
+            <div className="landing-card">
+              <p
+                className="text-sm font-medium mb-6"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                For high-stakes events up to 500 attendees. Includes setup
+                support, live monitoring, and post-event insights.
+              </p>
+
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full border-collapse text-sm min-w-[380px]">
+                  <thead>
+                    <tr>
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "hsl(var(--landing-text))" }}
+                      >
+                        Duration
+                      </th>
+                      {PREMIUM_CAPACITIES.map((cap) => (
+                        <th
+                          key={cap}
+                          className="text-center py-3 px-4 font-semibold"
+                          style={{ color: "hsl(var(--landing-text))" }}
+                        >
+                          {cap}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {PREMIUM_ROWS.map((row) => (
+                      <tr
+                        key={row.duration}
+                        style={{
+                          borderTop: "1px solid hsl(var(--landing-border))",
+                        }}
+                      >
+                        <td
+                          className="py-4 px-4 font-medium"
+                          style={{ color: "hsl(var(--landing-text))" }}
+                        >
+                          {row.duration}
+                        </td>
+                        {row.prices.map((price, ci) => (
+                          <td
+                            key={ci}
+                            className="py-4 px-4 text-center font-semibold transition-colors duration-150 rounded-lg cursor-default"
+                            style={{ color: "hsl(var(--landing-text))" }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLElement).style.backgroundColor =
+                                "hsl(var(--landing-accent) / 0.07)";
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLElement).style.backgroundColor =
+                                "transparent";
+                            }}
+                          >
+                            {price}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p
+                className="text-xs mt-6 leading-relaxed"
+                style={{ color: "hsl(var(--landing-muted))" }}
+              >
+                Full-day premium events and multi-session packages are available.
+                Contact us for a custom quote.
+              </p>
+
+              <div className="mt-8 text-center">
+                <a
+                  href="mailto:nigel@edvana.dev?subject=Request%20a%20Quote%20-%20Premium%20Event&body=I%27d%20like%20a%20quote%20for%20a%20premium%20event."
+                  className="landing-cta inline-block"
+                >
+                  Request a Quote
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          SECTION 5 — Enterprise Callout
+         ══════════════════════════════════════ */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <div
+            className="landing-card text-center"
+            style={{
+              borderColor: "hsl(var(--landing-accent) / 0.25)",
+              borderWidth: "1px",
+            }}
+          >
+            <p className="landing-eyebrow mb-3">ENTERPRISE</p>
+            <h2 className="landing-heading text-2xl md:text-3xl mb-4">
+              Running events across teams, departments, or your entire
+              organization?
+            </h2>
+            <p className="landing-subheading text-sm max-w-xl mx-auto mb-8">
+              Enterprise plans start at $6,000 annually and include unlimited
+              events, white-label options, a dedicated success manager, and
+              organizational billing. Pricing is scoped to your needs through a
+              short conversation.
+            </p>
+            <a
+              href="mailto:nigel@edvana.dev?subject=Enterprise%20Events%20Inquiry&body=I%27m%20interested%20in%20an%20enterprise%20events%20plan."
+              className="landing-cta inline-block"
+            >
+              Contact Sales
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          SECTION 6 — Built for Live Events
+         ══════════════════════════════════════ */}
+      <section
+        className="py-20"
+        style={{ backgroundColor: "hsl(var(--landing-surface))" }}
+      >
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="landing-eyebrow mb-3 text-center">BUILT FOR LIVE EVENTS</p>
+          <h2 className="landing-heading text-3xl md:text-4xl text-center mb-12">
+            What makes Edvana different for events.
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {[
+              {
+                title: "No prebuilt polls",
+                body: "Edvana drafts understanding checks from your speaker's live words. You do not have to build anything before the event starts.",
+              },
+              {
+                title: "Speaker stays in control",
+                body: "Every check-in is reviewed before it goes to the room. Nothing is sent automatically.",
+              },
+              {
+                title: "Participants join in seconds",
+                body: "No app download. No account required. Scan a QR code or enter a session code and you are in.",
+              },
+              {
+                title: "Pricing that matches how events work",
+                body: "You buy a block of time for your room size. No subscriptions. No annual commitments. No paying for features you will never use.",
+              },
+            ].map((card) => (
+              <div key={card.title} className="landing-card">
+                <h3
+                  className="font-semibold text-base mb-2"
+                  style={{ color: "hsl(var(--landing-text))" }}
+                >
+                  {card.title}
+                </h3>
+                <p className="landing-subheading text-sm leading-relaxed">
+                  {card.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          SECTION 7 — Final CTA
+         ══════════════════════════════════════ */}
+      <section className="py-24">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="landing-heading text-3xl md:text-4xl mb-4">
+            Ready to bring real-time understanding to your next event?
+          </h2>
+          <p className="landing-subheading text-base max-w-xl mx-auto mb-10">
+            Start with self-serve and be running in under two minutes, or tell us
+            about your event and we will help you find the right setup.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <a
+              href="mailto:nigel@edvana.dev?subject=Plan%20My%20Event&body=I%27d%20like%20to%20plan%20an%20event%20with%20Edvana."
+              className="landing-cta inline-block"
+            >
+              Plan Your Event
+            </a>
+            <a
+              href="mailto:nigel@edvana.dev?subject=Talk%20to%20the%20Team&body=I%27d%20like%20to%20discuss%20running%20an%20event%20with%20Edvana."
+              className="landing-secondary-btn inline-block"
+            >
+              Talk to the Team
+            </a>
+          </div>
+          <p
+            className="text-xs"
+            style={{ color: "hsl(var(--landing-muted))" }}
+          >
+            Launch pricing available for early event partners.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer
+        className="border-t py-8"
+        style={{ borderColor: "hsl(var(--landing-border))" }}
+      >
+        <div
+          className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs"
+          style={{ color: "hsl(var(--landing-muted))" }}
+        >
+          <span>© {new Date().getFullYear()} Edvana. All rights reserved.</span>
+          <div className="flex gap-6">
+            <Link to="/privacy" className="landing-util-link">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="landing-util-link">
+              Terms of Service
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
-}
+};
+
+export default CorporateEvents;

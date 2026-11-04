@@ -1,20 +1,58 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap } from "lucide-react";
+import { LogOut, Building2, Shield, LayoutDashboard, Users, BarChart3, HeartHandshake, Settings, GraduationCap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import OrganizationSetup from "@/components/admin/OrganizationSetup";
+import GovernanceChips from "@/components/admin/GovernanceChips";
 import AggregateMetricsCard from "@/components/admin/AggregateMetricsCard";
 import UsageOverTimeChart from "@/components/admin/UsageOverTimeChart";
 import LearningInsightsCard from "@/components/admin/LearningInsightsCard";
 import AtRiskStudentsTable, { AtRiskStudent, calculateRiskScore } from "@/components/admin/AtRiskStudentsTable";
-import InstructorPerformanceCard, { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
+import { InstructorPerformance } from "@/components/admin/InstructorPerformanceCard";
+import CourseEngagementHealthCard, { CourseEngagement, EngagementSignal } from "@/components/admin/CourseEngagementHealthCard";
 import RetentionHealthCard from "@/components/admin/RetentionHealthCard";
-import ExportReportsCard from "@/components/admin/ExportReportsCard";
+import SupportQueueTable, { SupportCase, SupportTier, SupportSignal, ViewerRole } from "@/components/admin/SupportQueueTable";
+import CourseAtRiskRollup, { CourseRollupRow } from "@/components/admin/CourseAtRiskRollup";
+import GovernanceBanner from "@/components/admin/GovernanceBanner";
+import ExportReportsCard, { OrgSnapshot, CourseEngagementExportRow } from "@/components/admin/ExportReportsCard";
+import { InstitutionalUsageCard } from "@/components/admin/InstitutionalUsageCard";
+
+// Seed/demo names to filter before any individual data surfaces.
+const SEED_NAME_PATTERNS: RegExp[] = [
+  /^hello\s+students?$/i,
+  /^newstu\s*dash$/i,
+  /\btest\b/i,
+  /\bdemo\b/i,
+  /^unknown\s+student$/i,
+];
+const isSeedName = (name: string) => !name || SEED_NAME_PATTERNS.some(r => r.test(name.trim()));
+
+// Seed/demo course titles — hidden from leadership UI + exports.
+const SEED_COURSE_PATTERNS: RegExp[] = [
+  /^my\s+course$/i,
+  /\btest(ing)?\b/i,
+  /\bdemo\b/i,
+  /^untitled/i,
+  /necessary\s+eleven\s+steps/i,
+  /detective\s+fiction/i,
+  /^course\s*\d*$/i,
+];
+const isSeedCourse = (title: string) => !title || SEED_COURSE_PATTERNS.some(r => r.test(title.trim()));
+import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
+import { SmartPresetChips } from "@/components/admin/SmartPresetChips";
 import { useAdminDashboardData } from "@/hooks/useAdminDashboardData";
+import { useAdminFilters } from "@/hooks/useAdminFilters";
+import { SMART_PRESETS } from "@/lib/adminSmartPresets";
+import {
+  parseQuestionText,
+  truncateQuestionText,
+  MISCONCEPTION_MIN_RESPONSES,
+  MISCONCEPTION_MAX_CORRECT_RATE,
+} from "@/lib/misconceptions";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -29,22 +67,194 @@ export default function AdminDashboard() {
     totalStudents: 0,
     activeStudents: 0,
     avgCompletionRate: 0,
+    windowedCompletionRate: 0,
   });
   const [atRiskStudents, setAtRiskStudents] = useState<AtRiskStudent[]>([]);
   const [instructorPerformance, setInstructorPerformance] = useState<InstructorPerformance[]>([]);
+  const [courseEngagement, setCourseEngagement] = useState<CourseEngagement[]>([]);
   const [retentionMetrics, setRetentionMetrics] = useState({
     atRiskCount: 0,
-    passRate: 0,
-    retentionRate: 0,
-    avgCompletionRate: 0,
+    sevenDayResponseRate: null as number | null,
+    inactiveCount: 0,
+    sessionsPerStudent: null as number | null,
+    hasRecentSessions: false,
   });
+  const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [adminName, setAdminName] = useState("");
+  const [orgId, setOrgId] = useState<string | null>(null);
   const [instructorIds, setInstructorIds] = useState<string[]>([]);
   const navigate = useNavigate();
 
-  // Use the new hook for aggregate data
-  const { metrics, weeklyUsage, misconceptions, confidenceIssues, loading: aggregateLoading } = 
-    useAdminDashboardData(instructorIds);
+  const { filters } = useAdminFilters();
+  const activePreset = useMemo(
+    () => SMART_PRESETS.find((p) => p.id === filters.presetId),
+    [filters.presetId],
+  );
+
+  // Use the new hook for aggregate data (now filter-aware)
+  const { metrics, weeklyUsage, misconceptions, confidenceIssues, hasAnyData, loading: aggregateLoading } =
+    useAdminDashboardData(instructorIds, filters);
+
+
+  // Client-side refinements: filter atRiskStudents and instructorPerformance by global filters + preset refinement
+  const filteredAtRisk = useMemo(() => {
+    let list = atRiskStudents;
+    if (filters.instructorIds.length > 0) {
+      const names = new Set(
+        instructorPerformance
+          .filter((i) => filters.instructorIds.includes(i.id))
+          .map((i) => i.name),
+      );
+      list = list.filter((s) => names.has(s.instructorName));
+    }
+    const ref = activePreset?.refinement;
+    if (ref?.riskLevels) list = list.filter((s) => ref.riskLevels!.includes(s.riskLevel));
+    if (ref?.inactiveDays != null) {
+      list = list.filter((s) => s.lastActive.includes("day") || s.lastActive === "Never");
+    }
+    return list;
+  }, [atRiskStudents, instructorPerformance, filters.instructorIds, activePreset]);
+
+  const filteredCourseEngagement = useMemo(() => {
+    let list = courseEngagement.filter(c => !isSeedCourse(c.title));
+    if (filters.instructorIds.length > 0) {
+      const allowedNames = new Set(
+        instructorPerformance
+          .filter((i) => filters.instructorIds.includes(i.id))
+          .map((i) => i.name),
+      );
+      list = list.filter((c) => allowedNames.has(c.instructorName));
+    }
+    return list;
+  }, [courseEngagement, instructorPerformance, filters.instructorIds]);
+
+  const filteredMisconceptions = useMemo(() => {
+    const ref = activePreset?.refinement;
+    if (!ref?.maxCorrectRate) return misconceptions;
+    return misconceptions.filter((m) => m.correctRate <= ref.maxCorrectRate!);
+  }, [misconceptions, activePreset]);
+
+  const filteredConfidenceIssues = useMemo(() => {
+    const ref = activePreset?.refinement;
+    if (!ref?.minConfidentWrong) return confidenceIssues;
+    return confidenceIssues.filter((c) => c.confidentWrongCount >= ref.minConfidentWrong!);
+  }, [confidenceIssues, activePreset]);
+
+  // ===== Single source of truth for org-wide engagement (Overview + PDF + CSV) =====
+  const periodLabel = useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 28);
+    const f = (d: Date) =>
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return `${f(start)} – ${f(end)}`;
+  }, []);
+
+  // Build deduplicated, scrubbed, sorted course engagement rows (single source for UI + export)
+  const courseEngagementExportRows: CourseEngagementExportRow[] = useMemo(() => {
+    const casesByInstructor = supportCases.reduce<Record<string, number>>((acc, c) => {
+      acc[c.instructorName] = (acc[c.instructorName] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Disambiguate duplicate titles
+    const titleCounts = new Map<string, number>();
+    filteredCourseEngagement.forEach(c => {
+      titleCounts.set(c.title, (titleCounts.get(c.title) || 0) + 1);
+    });
+    const disambig = (c: typeof filteredCourseEngagement[number]) => {
+      if ((titleCounts.get(c.title) || 0) <= 1) return c.title;
+      const suffix = c.courseCode || c.id.slice(-4).toUpperCase();
+      return `${c.title} · ${suffix}`;
+    };
+
+    const rows = filteredCourseEngagement.map(c => {
+      const activeStudents = Math.round((c.sevenDayActiveRate / 100) * (c.studentCount || 0));
+      return {
+        courseTitle: disambig(c),
+        sessionsInWindow: c.sessionsInWindow,
+        responseRateCurrent: c.responseRateCurrent || null,
+        responseRatePrior: c.responseRatePrior || null,
+        activeStudents,
+        openSupportCases: casesByInstructor[c.instructorName] || 0,
+      };
+    });
+
+    // Suppress fully-empty rows
+    const nonEmpty = rows.filter(
+      r => r.sessionsInWindow > 0 || r.activeStudents > 0 || r.openSupportCases > 0
+    );
+
+    // Sort by sessions desc, then active students desc
+    nonEmpty.sort((a, b) => (b.sessionsInWindow - a.sessionsInWindow) || (b.activeStudents - a.activeStudents));
+    return nonEmpty;
+  }, [filteredCourseEngagement, supportCases]);
+
+  const orgSnapshot: OrgSnapshot = useMemo(() => {
+    const sessions = metrics.sessionsUsed ?? 0;
+    const activeStudents = metrics.activeStudents7d ?? 0;
+    // "Active" requires both sessions ran AND someone participated (responses or students active).
+    const isPeriodActive = hasAnyData && sessions > 0 && (activeStudents > 0 || courseEngagementExportRows.length > 0);
+
+    const totalCourseCount = filteredCourseEngagement.length;
+    const activeCourseCount = courseEngagementExportRows.length;
+
+    // Top rising / falling by Δ response rate
+    const withDelta = filteredCourseEngagement
+      .filter(c => c.sessionsInWindow > 0 && !isSeedCourse(c.title))
+      .map(c => ({
+        title: c.title,
+        delta: (c.responseRateCurrent || 0) - (c.responseRatePrior || 0),
+      }));
+    const topRising = [...withDelta].filter(c => c.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
+    const topFalling = [...withDelta].filter(c => c.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
+
+    const topMisconceptions = filteredMisconceptions.slice(0, 3).map(m => ({
+      text: m.questionText,
+      correctRate: m.correctRate,
+      courseName: m.courseName,
+    }));
+
+    return {
+      totalStudents: stats.totalStudents || null,
+      activeStudents: isPeriodActive ? activeStudents : null,
+      totalInstructors: instructorIds.length || null,
+      totalSessions: isPeriodActive ? sessions : null,
+      totalQuestions: null,
+      // Use period-windowed completion to match the session window — fixes 56% vs 0% contradiction.
+      avgCompletionRate: isPeriodActive ? stats.windowedCompletionRate : null,
+      avgResponseRate: isPeriodActive ? metrics.responseRate : null,
+      sessionsDelta: isPeriodActive ? metrics.sessionsUsedDelta : null,
+      responseRateDelta: isPeriodActive ? metrics.responseRateDelta : null,
+      activeCourseCount,
+      totalCourseCount,
+      topRising,
+      topFalling,
+      topMisconceptions,
+      openSupportCases: supportCases.length,
+      hasUsableData: isPeriodActive,
+      periodLabel,
+    };
+  }, [metrics, hasAnyData, stats, instructorIds.length, periodLabel, filteredCourseEngagement, courseEngagementExportRows, filteredMisconceptions, supportCases.length]);
+
+  // dev-only invariant check: support cases imply active students
+  useEffect(() => {
+    if (import.meta.env.DEV && supportCases.length > 0 && orgSnapshot.activeStudents === 0) {
+      console.warn(
+        "[AdminDashboard] invariant: supportCases >0 but activeStudents=0 — data sources disagree.",
+        { supportCases: supportCases.length, snapshot: orgSnapshot },
+      );
+    }
+  }, [supportCases, orgSnapshot]);
+
+  // ===== Viewer role resolution for FERPA-gated identity reveals =====
+  // Admin/dean = masked by default. Other roles (advisor / IoR / support_staff) can reveal.
+  // Resolved from user_roles in checkSession. Reveal-eligible staff roles
+  // (advisor / instructor_of_record / support_staff) do not yet exist in the
+  // app_role enum, so this currently resolves to "admin" (identities masked) —
+  // but the wiring is real, so adding those roles later flips reveal on without
+  // touching this component.
+  const [viewerRole, setViewerRole] = useState<ViewerRole>("admin");
 
   useEffect(() => {
     checkSession();
@@ -74,17 +284,29 @@ export default function AdminDashboard() {
     } else {
       setSession(data.session);
       
-      const { data: roleData } = await supabase
+      // Fetch all roles for this user so we can (a) gate access on "admin" and
+      // (b) resolve the FERPA reveal role. Reveal-eligible staff roles aren't in
+      // the app_role enum yet, so today this only ever resolves to "admin".
+      const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", data.session.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      
-      if (!roleData) {
+        .eq("user_id", data.session.user.id);
+
+      // Typed as string so it can also hold future reveal-eligible staff roles
+      // that aren't in the app_role enum yet.
+      const roleSet = new Set<string>((roles || []).map((r) => String(r.role)));
+
+      if (!roleSet.has("admin")) {
         toast.error("Access denied. Admin privileges required.");
         navigate("/");
+        return;
       }
+
+      // Map to the FERPA reveal role. Only non-admin staff roles may reveal
+      // individual identities; admins see masked names by default.
+      const revealEligible: ViewerRole[] = ["advisor", "instructor_of_record", "support_staff"];
+      const resolved = revealEligible.find((r) => roleSet.has(r));
+      setViewerRole(resolved ?? "admin");
     }
   };
 
@@ -103,19 +325,23 @@ export default function AdminDashboard() {
 
       setAdminName(profile?.full_name || "Administrator");
       const userOrgId = profile?.org_id;
-      
+      setOrgId(userOrgId ?? null);
+
       if (!userOrgId) {
         // No org yet — let OrganizationSetup handle creation
         setLoading(false);
         return;
       }
 
-      const { data: connectedInstructors } = await supabase
-        .from('admin_instructors')
-        .select('instructor_id')
-        .eq('admin_id', user.id);
+      // Only show instructors actually connected to this admin — either they
+      // accepted an invite to this org or their email domain matches one
+      // registered to this org. Excludes bulk/legacy org members.
+      const { data: connectedRows } = await supabase
+        .rpc("get_admin_connected_instructors", { _admin_id: user.id });
 
-      const fetchedInstructorIds = connectedInstructors?.map(ci => ci.instructor_id) || [];
+      const fetchedInstructorIds: string[] = [
+        ...new Set(((connectedRows as any[]) || []).map((r) => r.instructor_id)),
+      ];
       setInstructorIds(fetchedInstructorIds);
 
       if (fetchedInstructorIds.length === 0) {
@@ -123,15 +349,19 @@ export default function AdminDashboard() {
           totalStudents: 0,
           activeStudents: 0,
           avgCompletionRate: 0,
+          windowedCompletionRate: 0,
         });
         setAtRiskStudents([]);
         setInstructorPerformance([]);
+        setCourseEngagement([]);
         setRetentionMetrics({
           atRiskCount: 0,
-          passRate: 0,
-          retentionRate: 0,
-          avgCompletionRate: 0,
+          sevenDayResponseRate: null,
+          inactiveCount: 0,
+          sessionsPerStudent: null,
+          hasRecentSessions: false,
         });
+        setSupportCases([]);
         setLoading(false);
         return;
       }
@@ -187,7 +417,8 @@ export default function AdminDashboard() {
       const { data: assignments } = await supabase
         .from("student_assignments")
         .select("student_id, instructor_id, grade, completed, created_at")
-        .in("student_id", studentIds);
+        .in("student_id", studentIds)
+        .in("instructor_id", fetchedInstructorIds);
 
       const studentMetrics = new Map<string, {
         grades: number[];
@@ -256,6 +487,11 @@ export default function AdminDashboard() {
         const incompleteAssignments = metrics.total - metrics.completed;
         const streakBroken = lastActivityStat?.current_streak === 0 && (lastActivityStat?.longest_streak || 0) > 3;
 
+        // weakConcepts is intentionally 0: per-student comprehension can't be
+        // wired in yet. live_participants has no user_id (only a free-text
+        // nickname), so live_responses.is_correct cannot be reliably joined to a
+        // student identity. Comprehension is surfaced at the COURSE level instead
+        // (CourseEngagement.topMisconception). Do not read this 0 as an oversight.
         const { score, level, factors } = calculateRiskScore(
           avgGrade,
           daysSinceActive,
@@ -285,91 +521,341 @@ export default function AdminDashboard() {
       atRiskList.sort((a, b) => b.riskScore - a.riskScore);
       setAtRiskStudents(atRiskList);
 
-      const instructorStats = new Map<string, {
-        studentCount: number;
-        grades: number[];
-        atRiskCount: number;
-        activeCount: number;
-      }>();
-
-      fetchedInstructorIds.forEach(id => {
-        instructorStats.set(id, {
-          studentCount: 0,
-          grades: [],
-          atRiskCount: 0,
-          activeCount: 0,
-        });
-      });
-
-      studentRelations?.forEach(rel => {
-        const stats = instructorStats.get(rel.instructor_id);
-        if (stats) {
-          stats.studentCount++;
-          if (activeUserIds.has(rel.student_id)) {
-            stats.activeCount++;
-          }
-        }
-      });
-
-      studentMetrics.forEach((metrics, studentId) => {
-        const stats = instructorStats.get(metrics.instructorId);
-        if (stats && metrics.grades.length > 0) {
-          const avgGrade = metrics.grades.reduce((a, b) => a + b, 0) / metrics.grades.length;
-          stats.grades.push(avgGrade);
-        }
-      });
-
-      atRiskList.forEach(student => {
-        const instructorId = studentRelations?.find(r => r.student_id === student.id)?.instructor_id;
-        if (instructorId) {
-          const stats = instructorStats.get(instructorId);
-          if (stats) {
-            stats.atRiskCount++;
-          }
-        }
-      });
-
-      const instructorPerf: InstructorPerformance[] = fetchedInstructorIds.map(id => {
-        const stats = instructorStats.get(id)!;
-        const avgGrade = stats.grades.length > 0
-          ? stats.grades.reduce((a, b) => a + b, 0) / stats.grades.length
-          : 0;
-
-        return {
-          id,
-          name: instructorMap.get(id) || 'Unknown Instructor',
-          email: '',
-          studentCount: stats.studentCount,
-          avgClassGrade: avgGrade,
-          atRiskCount: stats.atRiskCount,
-          activeRate: stats.studentCount > 0
-            ? (stats.activeCount / stats.studentCount) * 100
-            : 0,
-        };
-      });
+      // Instructor id→name map only. The grade-based instructor scoreboard
+      // (avgClassGrade / "Needs Attention" ranking) was removed — it framed the
+      // dashboard as faculty evaluation, which the footer explicitly disavows.
+      // Other metric fields are zeroed to satisfy the type; the only consumers
+      // (instructor filter in filteredAtRisk / filteredCourseEngagement) read
+      // just id + name.
+      const instructorPerf: InstructorPerformance[] = fetchedInstructorIds.map(id => ({
+        id,
+        name: instructorMap.get(id) || 'Unknown Instructor',
+        email: '',
+        studentCount: 0,
+        avgClassGrade: 0,
+        atRiskCount: 0,
+        activeRate: 0,
+      }));
 
       setInstructorPerformance(instructorPerf);
 
+      // ===== Course Engagement Health =====
+      try {
+        const { data: courseRows } = await supabase
+          .from("courses")
+          .select("id, title, instructor_id, course_code")
+          .in("instructor_id", fetchedInstructorIds)
+          .eq("is_active", true);
+
+        const courses = courseRows || [];
+        const now = Date.now();
+        const DAY = 24 * 60 * 60 * 1000;
+        const WINDOW_DAYS = 28;
+        const since = new Date(now - WINDOW_DAYS * DAY).toISOString();
+
+        const { data: sessionRows } = await (supabase.from("live_sessions") as any)
+          .select("id, course_id, instructor_id, created_at")
+          .in("instructor_id", fetchedInstructorIds)
+          .gte("created_at", since);
+
+        const sessions = (sessionRows || []) as Array<{ id: string; course_id: string | null; instructor_id: string; created_at: string }>;
+        const sessionIds = sessions.map(s => s.id);
+        const sessionToCourse = new Map<string, string>();
+        sessions.forEach(s => {
+          if (s.course_id) sessionToCourse.set(s.id, s.course_id);
+        });
+
+        let participantsBySession = new Map<string, number>();
+        let questionsBySession = new Map<string, number>();
+        let responsesBySession = new Map<string, number>();
+        // Per-question correctness, used to surface each course's top misconception.
+        const questionStats = new Map<string, { correct: number; total: number; content: string; sessionId: string }>();
+
+        if (sessionIds.length > 0) {
+          const [{ data: partRows }, { data: qRows }] = await Promise.all([
+            (supabase.from("live_participants") as any)
+              .select("session_id")
+              .in("session_id", sessionIds),
+            (supabase.from("live_questions") as any)
+              .select("id, session_id, question_content")
+              .in("session_id", sessionIds),
+          ]);
+
+          ((partRows || []) as Array<{ session_id: string }>).forEach(p => {
+            participantsBySession.set(p.session_id, (participantsBySession.get(p.session_id) || 0) + 1);
+          });
+
+          const questionToSession = new Map<string, string>();
+          ((qRows || []) as Array<{ id: string; session_id: string; question_content: unknown }>).forEach(q => {
+            questionToSession.set(q.id, q.session_id);
+            questionsBySession.set(q.session_id, (questionsBySession.get(q.session_id) || 0) + 1);
+            questionStats.set(q.id, {
+              correct: 0,
+              total: 0,
+              content: parseQuestionText(q.question_content),
+              sessionId: q.session_id,
+            });
+          });
+
+          const questionIds = Array.from(questionToSession.keys());
+          if (questionIds.length > 0) {
+            // Chunk if huge — usually fine in <=1000
+            const { data: respRows } = await (supabase.from("live_responses") as any)
+              .select("question_id, is_correct")
+              .in("question_id", questionIds);
+            ((respRows || []) as Array<{ question_id: string; is_correct: boolean | null }>).forEach(r => {
+              const sid = questionToSession.get(r.question_id);
+              if (sid) responsesBySession.set(sid, (responsesBySession.get(sid) || 0) + 1);
+              const qs = questionStats.get(r.question_id);
+              if (qs) {
+                qs.total++;
+                if (r.is_correct) qs.correct++;
+              }
+            });
+          }
+        }
+
+        // Group question ids by course (course → its sessions → their questions).
+        const questionIdsByCourse = new Map<string, string[]>();
+        questionStats.forEach((qs, questionId) => {
+          const courseId = sessionToCourse.get(qs.sessionId);
+          if (!courseId) return;
+          const arr = questionIdsByCourse.get(courseId) || [];
+          arr.push(questionId);
+          questionIdsByCourse.set(courseId, arr);
+        });
+
+        const sessionRate = (sid: string) => {
+          const p = participantsBySession.get(sid) || 0;
+          const q = questionsBySession.get(sid) || 0;
+          const r = responsesBySession.get(sid) || 0;
+          const denom = p * q;
+          if (denom <= 0) return null;
+          return Math.min(100, Math.round((r / denom) * 100));
+        };
+
+        const courseSessions = new Map<string, typeof sessions>();
+        sessions.forEach(s => {
+          if (!s.course_id) return;
+          const arr = courseSessions.get(s.course_id) || [];
+          arr.push(s);
+          courseSessions.set(s.course_id, arr);
+        });
+
+        const engagement: CourseEngagement[] = courses.map(course => {
+          const csSessions = courseSessions.get(course.id) || [];
+          const inWindow = (days: number) => {
+            const cutoff = now - days * DAY;
+            return csSessions.filter(s => new Date(s.created_at).getTime() >= cutoff);
+          };
+
+          const avgRate = (list: typeof sessions) => {
+            const rates = list.map(s => sessionRate(s.id)).filter((v): v is number => v !== null);
+            if (!rates.length) return 0;
+            return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
+          };
+
+          const current = avgRate(inWindow(7));
+          const prior = avgRate(csSessions.filter(s => {
+            const t = new Date(s.created_at).getTime();
+            return t < now - 7 * DAY && t >= now - 14 * DAY;
+          }));
+
+          const sparkline = [3, 2, 1, 0].map(weeksAgo => {
+            const start = now - (weeksAgo + 1) * 7 * DAY;
+            const end = now - weeksAgo * 7 * DAY;
+            return avgRate(csSessions.filter(s => {
+              const t = new Date(s.created_at).getTime();
+              return t >= start && t < end;
+            }));
+          });
+
+          // students for this course = students of this instructor (proxy until course enrollment table is wired)
+          const courseStudentIds = (studentRelations || [])
+            .filter(r => r.instructor_id === course.instructor_id)
+            .map(r => r.student_id);
+          const uniqueStudents = new Set(courseStudentIds);
+          const studentCount = uniqueStudents.size;
+          const activeCount = Array.from(uniqueStudents).filter(id => activeUserIds.has(id)).length;
+          const sevenDayActiveRate = studentCount > 0 ? (activeCount / studentCount) * 100 : 0;
+          const studentsDisengaging = Math.max(0, studentCount - activeCount);
+
+          let signal: EngagementSignal = "steady";
+          if (current > 0 && prior > 0 && current < prior * 0.7) signal = "dropping";
+          else if (current > 0 && prior > 0 && current < prior * 0.9) signal = "softening";
+          else if (current >= 70) signal = "strong";
+
+          // grade context (avg across this instructor's students with grades — approximation)
+          const grades: number[] = [];
+          studentMetrics.forEach((m) => {
+            if (m.instructorId === course.instructor_id && m.grades.length > 0) {
+              grades.push(m.grades.reduce((a, b) => a + b, 0) / m.grades.length);
+            }
+          });
+          const avgGrade = grades.length > 0 ? grades.reduce((a, b) => a + b, 0) / grades.length : null;
+
+          // Top misconception for this course: the lowest-correct-rate question
+          // (among those with enough responses) below the misconception threshold.
+          // Mirrors the org-wide Learning Insights logic via shared helpers.
+          let topMisconception: string | null = null;
+          let lowestRate = Infinity;
+          (questionIdsByCourse.get(course.id) || []).forEach(qid => {
+            const qs = questionStats.get(qid);
+            if (!qs || qs.total < MISCONCEPTION_MIN_RESPONSES) return;
+            const rate = (qs.correct / qs.total) * 100;
+            if (rate < MISCONCEPTION_MAX_CORRECT_RATE && rate < lowestRate) {
+              lowestRate = rate;
+              topMisconception = truncateQuestionText(qs.content);
+            }
+          });
+
+          return {
+            id: course.id,
+            title: course.title || "Untitled course",
+            courseCode: (course as any).course_code || undefined,
+            instructorName: instructorMap.get(course.instructor_id) || "Course team",
+            studentCount,
+            responseRateCurrent: current,
+            responseRatePrior: prior,
+            studentsDisengaging,
+            sevenDayActiveRate,
+            sparkline,
+            signal,
+            avgGrade,
+            sessionsInWindow: csSessions.length,
+            topMisconception,
+          };
+        });
+
+        setCourseEngagement(engagement);
+      } catch (e) {
+        logger.error("Course engagement compute failed:", e);
+        setCourseEngagement([]);
+      }
+
+
       const engagementScore = totalStudents && totalStudents > 0
         ? ((activeStudents || 0) / totalStudents) * 100
+        : 0;
+
+      // Period-windowed completion rate (last 28d) to reconcile with session-window metrics.
+      const PERIOD_DAYS = 28;
+      const periodCutoff = Date.now() - PERIOD_DAYS * 24 * 60 * 60 * 1000;
+      const windowedAssignments = (assignments || []).filter(
+        a => new Date(a.created_at).getTime() >= periodCutoff
+      );
+      const windowedCompletionRate = windowedAssignments.length > 0
+        ? (windowedAssignments.filter(a => a.completed).length / windowedAssignments.length) * 100
         : 0;
 
       setStats({
         totalStudents: totalStudents || 0,
         activeStudents: activeStudents || 0,
         avgCompletionRate: studentMetrics.size > 0 ? totalCompletionRate / studentMetrics.size : 0,
+        windowedCompletionRate,
       });
 
-      const passRate = totalGradedStudents > 0 ? (passCount / totalGradedStudents) * 100 : 100;
-      const avgAssignmentCompletion = studentMetrics.size > 0
-        ? totalCompletionRate / studentMetrics.size
-        : 0;
+      // ===== Behavioral support cases (FERPA-friendly, no demographics, no grades) =====
+      const cases: SupportCase[] = [];
+      let inactiveCountAgg = 0;
+      const HAS_ANY_LIFETIME = (m: { total: number }) => m.total >= 3;
+
+      studentMetrics.forEach((metrics, studentId) => {
+        const lastActivityStat = userStats?.find(s => s.user_id === studentId);
+        const lastActivityDate = lastActivityStat?.last_activity_date
+          ? new Date(lastActivityStat.last_activity_date)
+          : metrics.lastActivity;
+        const daysSinceActive = lastActivityDate
+          ? Math.floor((Date.now() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        // seed-data hygiene: exclude unusable rows
+        const instructorName = instructorMap.get(metrics.instructorId);
+        if (!instructorName || instructorName === "Unknown Instructor" || isSeedName(instructorName)) return;
+        if (daysSinceActive === null) return;
+        if (!HAS_ANY_LIFETIME(metrics)) return;
+        const studentName = studentNameMap.get(studentId) || "";
+        if (isSeedName(studentName)) return;
+
+        if (daysSinceActive >= 7) inactiveCountAgg++;
+
+        const signals: SupportSignal[] = [];
+        let score = 0;
+
+        if (daysSinceActive >= 9) {
+          signals.push({ label: `Inactive ${daysSinceActive} days`, weight: 3 });
+          score += 3;
+        } else if (daysSinceActive >= 4) {
+          signals.push({ label: `Inactive ${daysSinceActive} days`, weight: 1 });
+          score += 1;
+        }
+
+        const streakBroken =
+          lastActivityStat?.current_streak === 0 && (lastActivityStat?.longest_streak || 0) > 3;
+        if (streakBroken) {
+          signals.push({ label: "Streak broken", weight: 1 });
+          score += 1;
+        }
+
+        const incomplete = metrics.total - metrics.completed;
+        if (incomplete >= 3) {
+          signals.push({ label: `${incomplete} missed sessions`, weight: 2 });
+          score += 2;
+        } else if (incomplete >= 1) {
+          signals.push({ label: `${incomplete} missed session${incomplete > 1 ? "s" : ""}`, weight: 1 });
+          score += 1;
+        }
+
+        const completionRate = metrics.total > 0 ? metrics.completed / metrics.total : 1;
+        if (metrics.total >= 5 && completionRate < 0.4) {
+          signals.push({ label: `Submission rate ${Math.round(completionRate * 100)}%`, weight: 2 });
+          score += 2;
+        }
+
+        if (score < 2 || signals.length === 0) return;
+
+        const tier: SupportTier = score >= 6 ? "critical" : score >= 4 ? "high" : "medium";
+
+        // dominant signal → suggested action
+        const dominant = [...signals].sort((a, b) => b.weight - a.weight)[0];
+        let action = "Send check-in";
+        if (dominant.label.startsWith("Inactive")) action = "Send check-in";
+        else if (dominant.label.includes("missed")) action = "Flag to instructor";
+        else if (dominant.label === "Streak broken") action = "Refer to advising";
+        else if (dominant.label.startsWith("Submission")) action = "Flag to instructor";
+
+        cases.push({
+          id: studentId,
+          studentName: studentName || "Unknown Student",
+          instructorName,
+          signals,
+          tier,
+          score,
+          suggestedAction: action,
+          daysSinceActive,
+        });
+      });
+
+      cases.sort((a, b) => {
+        const tierOrder = { critical: 3, high: 2, medium: 1 };
+        return (tierOrder[b.tier] - tierOrder[a.tier]) ||
+               ((b.daysSinceActive ?? 0) - (a.daysSinceActive ?? 0));
+      });
+      setSupportCases(cases);
+
+      const hasRecentSessions = (assignments?.length || 0) > 0;
+      const sessionsPerStudent = studentMetrics.size > 0
+        ? Array.from(studentMetrics.values()).reduce((s, m) => s + m.total, 0) / studentMetrics.size
+        : null;
 
       setRetentionMetrics({
-        atRiskCount: atRiskList.length,
-        passRate,
-        retentionRate: engagementScore,
-        avgCompletionRate: avgAssignmentCompletion,
+        atRiskCount: cases.length,
+        sevenDayResponseRate: totalStudents && totalStudents > 0
+          ? ((activeStudents || 0) / totalStudents) * 100
+          : null,
+        inactiveCount: inactiveCountAgg,
+        sessionsPerStudent,
+        hasRecentSessions,
       });
 
     } catch (error) {
@@ -383,6 +869,25 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+  };
+
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("admin_sync_org_members");
+      if (error) throw error;
+      const r = data || {};
+      toast.success(
+        `Sync complete · ${r.instructors_linked ?? 0} instructor(s), ${r.students_linked ?? 0} student(s) linked`
+      );
+      await fetchDashboardData();
+    } catch (e: any) {
+      logger.error("Sync failed", e);
+      toast.error(e?.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const navItems = [
@@ -459,65 +964,139 @@ export default function AdminDashboard() {
                 Institutional Analytics for Deans, Chairs & Administrators
               </p>
             </div>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-              <Shield className="w-3 h-3 mr-1" />
-              Admin
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Admin
+              </Badge>
+              <Button
+                onClick={handleSyncNow}
+                disabled={syncing || !orgId}
+                size="sm"
+                variant="outline"
+                title="Re-sync instructors & their students into your organization"
+              >
+                <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            </div>
           </div>
         </header>
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-6">
+          {/* Filter bar + smart presets — adoption tab only */}
+          {orgId && activeTab === "adoption" && (
+            <div className="max-w-7xl mx-auto space-y-3 mb-6">
+              <SmartPresetChips />
+              <AdminFilterBar orgId={orgId} instructorIds={instructorIds} />
+            </div>
+          )}
+
           {activeTab === "overview" && (
             <div className="space-y-6 max-w-7xl mx-auto">
-              {/* Organization Setup */}
-              <OrganizationSetup onOrgCreated={fetchDashboardData} />
+              {/* If no org yet, show creation flow front-and-center */}
+              {!orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
 
-              {/* Aggregate Metrics */}
-              <AggregateMetricsCard metrics={metrics} loading={aggregateLoading} />
+              {orgId && (
+                <>
+                  {/* Governance chips */}
+                  <GovernanceChips />
 
-              {/* Usage Chart */}
-              <UsageOverTimeChart data={weeklyUsage} loading={aggregateLoading} />
+                  {/* Quick views */}
+                  <SmartPresetChips />
 
-              {/* Learning Insights */}
-              <LearningInsightsCard
-                misconceptions={misconceptions}
-                confidenceIssues={confidenceIssues}
-                loading={aggregateLoading}
-              />
+                  {/* KPI cards */}
+                  <AggregateMetricsCard
+                    metrics={metrics}
+                    loading={aggregateLoading}
+                    hasAnyData={hasAnyData}
+                    onConnect={() => setActiveTab("settings")}
+                  />
 
-              {/* Export Reports */}
-              <ExportReportsCard data={stats} />
+                  {/* Institutional hour pool (renders only for institutional orgs) */}
+                  <InstitutionalUsageCard />
+
+                  {/* Usage Chart */}
+                  <UsageOverTimeChart
+                    data={weeklyUsage}
+                    loading={aggregateLoading}
+                    hasAnyData={hasAnyData}
+                    onConnect={() => setActiveTab("settings")}
+                  />
+
+                  {/* Learning Insights */}
+                  <LearningInsightsCard
+                    misconceptions={filteredMisconceptions}
+                    confidenceIssues={filteredConfidenceIssues}
+                    loading={aggregateLoading}
+                  />
+
+                  {/* Export Reports — uses reconciled org snapshot */}
+                  <ExportReportsCard snapshot={orgSnapshot} courseEngagement={courseEngagementExportRows} />
+                </>
+              )}
             </div>
           )}
 
           {activeTab === "adoption" && (
             <div className="space-y-6 max-w-7xl mx-auto">
-              <InstructorPerformanceCard
-                instructors={instructorPerformance}
+              <CourseEngagementHealthCard
+                courses={filteredCourseEngagement}
                 loading={loading}
+                lmsConnected={instructorIds.length > 0}
+                onConnectLms={() => setActiveTab("settings")}
               />
             </div>
           )}
 
           {activeTab === "support" && (
             <div className="space-y-6 max-w-7xl mx-auto">
+              <GovernanceBanner />
               <RetentionHealthCard
-                atRiskCount={retentionMetrics.atRiskCount}
+                lmsConnected={instructorIds.length > 0}
+                hasRecentSessions={retentionMetrics.hasRecentSessions}
+                atRiskCount={supportCases.length}
                 totalStudents={stats.totalStudents}
-                passRate={retentionMetrics.passRate}
-                retentionRate={retentionMetrics.retentionRate}
-                avgCompletionRate={retentionMetrics.avgCompletionRate}
+                sevenDayResponseRate={retentionMetrics.sevenDayResponseRate}
+                inactiveCount={retentionMetrics.inactiveCount}
+                sessionsPerStudent={retentionMetrics.sessionsPerStudent}
+                onConnect={() => setActiveTab("settings")}
               />
-              <AtRiskStudentsTable students={atRiskStudents} loading={loading} />
+              <CourseAtRiskRollup
+                rows={Object.values(
+                  supportCases.reduce<Record<string, CourseRollupRow>>((acc, c) => {
+                    const key = c.instructorName;
+                    if (!acc[key]) acc[key] = {
+                      courseId: key,
+                      courseTitle: `${c.instructorName}'s students`,
+                      criticalCount: 0, highCount: 0, mediumCount: 0,
+                    };
+                    if (c.tier === "critical") acc[key].criticalCount++;
+                    else if (c.tier === "high") acc[key].highCount++;
+                    else acc[key].mediumCount++;
+                    return acc;
+                  }, {})
+                )}
+                loading={loading}
+              />
+              <SupportQueueTable
+                cases={supportCases}
+                loading={loading}
+                canViewIndividuals={true}
+                viewerRole={viewerRole}
+                viewerId={session?.user?.id}
+              />
             </div>
           )}
 
           {activeTab === "settings" && (
             <div className="space-y-6 max-w-3xl mx-auto">
+              {orgId && <OrganizationSetup onOrgCreated={fetchDashboardData} />}
               <LMSIntegrationSettings mode="admin" />
             </div>
           )}
+
         </div>
 
         {/* Footer Disclaimer */}

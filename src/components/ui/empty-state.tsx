@@ -28,19 +28,22 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center text-center p-8 rounded-2xl bg-card/50 border border-border/50",
+        "flex flex-col items-center justify-center text-center p-8 rounded-2xl command-card",
         className
       )}
     >
-      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-        <div className="text-muted-foreground">{icon}</div>
+      <div className="w-14 h-14 rounded-xl bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
+        <div className="text-charcoal-muted">{icon}</div>
       </div>
-      <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground max-w-sm mb-6">{description}</p>
+      <h3 className="text-lg font-semibold text-charcoal mb-2">{title}</h3>
+      <p className="text-sm text-charcoal-muted max-w-sm mb-6">{description}</p>
       {(action || secondaryAction) && (
         <div className="flex flex-col sm:flex-row gap-2">
           {action && (
-            <Button onClick={action.onClick} className="rounded-full">
+            <Button 
+              onClick={action.onClick} 
+              className="rounded-full bg-emerald-600 hover:bg-emerald-700"
+            >
               {action.label}
             </Button>
           )}
@@ -48,7 +51,7 @@ export function EmptyState({
             <Button
               variant="outline"
               onClick={secondaryAction.onClick}
-              className="rounded-full"
+              className="rounded-full border-slate-200 hover:bg-slate-50"
             >
               {secondaryAction.label}
             </Button>

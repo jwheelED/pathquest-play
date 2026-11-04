@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { CreditCard, Crown, Sparkles, ExternalLink, Loader2, CheckCircle, AlertCircle, Info, Building2, Mail } from "lucide-react";
 import { format } from "date-fns";
+import { BILLING_ENFORCEMENT_ENABLED } from "@/lib/billingConfig";
 
 interface SubscriptionTier {
   id: string;
@@ -31,6 +32,7 @@ interface Subscription {
 export function BillingSettings() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
+  const [institutionalTiers, setInstitutionalTiers] = useState<SubscriptionTier[]>([]);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -45,10 +47,13 @@ export function BillingSettings() {
       if (!user) return;
 
       // Fetch available tiers
+      // Instructor billing page shows only the monthly instructor tiers.
+      // Institutional (annual, org-scoped) tiers are managed separately.
       const { data: tiersData, error: tiersError } = await supabase
         .from('subscription_tiers')
         .select('*')
         .eq('is_active', true)
+        .eq('billing_period', 'month')
         .order('sort_order');
 
       if (tiersError) throw tiersError;
@@ -59,6 +64,20 @@ export function BillingSettings() {
         features: Array.isArray(tier.features) ? tier.features : [],
       }));
       setTiers(parsedTiers);
+
+      // Fetch institutional (annual, org-scoped) tiers for display
+      const { data: instData } = await supabase
+        .from('subscription_tiers')
+        .select('*')
+        .eq('is_active', true)
+        .eq('billing_period', 'year')
+        .order('sort_order');
+
+      const parsedInst = (instData || []).map(tier => ({
+        ...tier,
+        features: Array.isArray(tier.features) ? tier.features : [],
+      }));
+      setInstitutionalTiers(parsedInst);
 
       // Fetch user's subscription
       const { data: subData, error: subError } = await supabase
@@ -195,7 +214,7 @@ export function BillingSettings() {
               )}
               {currentTier === 'free' && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Limited to 1 course and 60 min of lecture time per week
+                  3 hours of live lecture time per month, resets monthly
                 </p>
               )}
             </div>
@@ -217,53 +236,73 @@ export function BillingSettings() {
           </div>
         </div>
 
+        {/* Setup-mode note: billing can be registered, limits not yet enforced */}
+        {!BILLING_ENFORCEMENT_ENABLED && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
+            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              You can set up a plan and payment details now. Monthly lecture-hour
+              limits aren&apos;t enforced yet, so there&apos;s no rush &mdash;
+              subscribe whenever you&apos;re ready.
+            </p>
+          </div>
+        )}
+
         {/* Available Plans */}
         <div>
-          <h3 className="font-medium mb-4">Available Plans</h3>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          <h3 className="font-medium mb-1">Available Plans</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Change or cancel anytime. Paid plans are billed monthly.
+          </p>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 2xl:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
             {tiers.map((tier) => {
               const isCurrentTier = tier.name === currentTier;
               const isFreeTier = tier.name === 'free';
-              
+              const isPopular = tier.name === 'starter';
+
               return (
                 <div
                   key={tier.id}
                   className={`rounded-lg border p-4 ${
-                    isCurrentTier 
-                      ? 'border-primary bg-primary/5' 
+                    isCurrentTier
+                      ? 'border-primary bg-primary/5'
                       : 'border-border hover:border-primary/50'
                   } transition-colors`}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="font-semibold flex items-center gap-2">
-                        {tier.display_name}
-                        {tier.name === 'instructor' && (
-                          <Sparkles className="h-4 w-4 text-amber-500" />
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold flex items-center gap-2 flex-wrap">
+                        <span className="break-words">{tier.display_name}</span>
+                        {tier.name === 'starter' && (
+                          <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
                         )}
-                        {tier.name === 'institutional' && (
-                          <Crown className="h-4 w-4 text-primary" />
+                        {tier.name === 'pro' && (
+                          <Crown className="h-4 w-4 text-primary shrink-0" />
                         )}
                       </h4>
-                      <p className="text-2xl font-bold mt-1 break-words">
+                      <p className="text-2xl font-bold mt-1 truncate">
                         {isFreeTier ? 'Free' : formatPrice(tier.price_cents)}
                         {!isFreeTier && tier.price_suffix && (
-                          <span className="text-sm font-normal text-muted-foreground">
+                          <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
                             {tier.price_suffix}
                           </span>
                         )}
                       </p>
                       {tier.pricing_model === 'per_seat' && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-1 break-words">
                           Billed based on active student count
                         </p>
                       )}
                     </div>
-                    {isCurrentTier && (
-                      <Badge variant="secondary" className="bg-primary text-primary-foreground">
+                    {isCurrentTier ? (
+                      <Badge variant="secondary" className="bg-primary text-primary-foreground shrink-0">
                         Current
                       </Badge>
-                    )}
+                    ) : isPopular ? (
+                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                        Popular
+                      </Badge>
+                    ) : null}
                   </div>
 
                   {tier.description && (
@@ -273,34 +312,25 @@ export function BillingSettings() {
                   )}
 
                   <ul className="space-y-2 mb-4">
-                    {tier.name === 'institutional' && (
-                      <li className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        Everything in Instructor, plus:
-                      </li>
-                    )}
-                    {tier.name !== 'institutional' && (
-                      <>
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          {tier.name === 'free' ? '60 min lecture time/week' : 'Unlimited students'}
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          {tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}
-                        </li>
-                      </>
-                    )}
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span className="break-words">{tier.name === 'free' ? '3 hours lecture time/month' : 'Unlimited students'}</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span className="break-words">{tier.course_limit === null ? 'Unlimited courses' : `${tier.course_limit} course`}</span>
+                    </li>
                     {tier.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        {String(feature)}
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                        <span className="break-words">{String(feature)}</span>
                       </li>
                     ))}
                   </ul>
 
                   {!isCurrentTier && !isFreeTier && (
-                    <Button 
-                      className="w-full"
+                    <Button
+                      className="w-full whitespace-normal h-auto min-h-10"
                       onClick={() => handleUpgrade(tier.name)}
                       disabled={upgrading === tier.name}
                     >
@@ -311,7 +341,7 @@ export function BillingSettings() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="h-4 w-4 mr-2" />
+                          <Sparkles className="h-4 w-4 mr-2 shrink-0" />
                           Upgrade to {tier.display_name}
                         </>
                       )}
@@ -319,7 +349,7 @@ export function BillingSettings() {
                   )}
                   {isCurrentTier && (
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                       Your current plan
                     </div>
                   )}
@@ -328,6 +358,85 @@ export function BillingSettings() {
             })}
           </div>
         </div>
+
+        {/* Institutional Plans */}
+        {institutionalTiers.length > 0 && (
+          <div className="border-t pt-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-medium flex items-center gap-2 flex-wrap">
+                  Institutional Plans
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">Annual</Badge>
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Department, campus, and enterprise plans with a shared annual pool of lecture hours across all instructors. Contact sales to get started.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 2xl:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
+              {institutionalTiers.map((tier) => {
+                const isEnterprise = tier.name === 'enterprise';
+                return (
+                  <div
+                    key={tier.id}
+                    className={`rounded-lg border p-4 transition-colors hover:border-primary/50 ${
+                      isEnterprise ? 'border-primary/40 bg-primary/5' : 'border-border'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-semibold flex items-center gap-2 flex-wrap">
+                          <span className="break-words">{tier.display_name}</span>
+                          {isEnterprise && <Crown className="h-4 w-4 text-primary shrink-0" />}
+                        </h4>
+                        <p className="text-2xl font-bold mt-1 truncate">
+                          {formatPrice(tier.price_cents)}
+                          <span className="text-sm font-normal text-muted-foreground whitespace-nowrap">
+                            {tier.price_suffix || '/year'}
+                          </span>
+                        </p>
+                      </div>
+                      {isEnterprise && (
+                        <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
+                          Best value
+                        </Badge>
+                      )}
+                    </div>
+
+                    {tier.description && (
+                      <p className="text-sm text-muted-foreground mb-3 break-words">
+                        {tier.description}
+                      </p>
+                    )}
+
+                    <ul className="space-y-2 mb-4">
+                      {tier.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                          <span className="break-words">{String(feature)}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      variant="outline"
+                      className="w-full whitespace-normal h-auto min-h-10"
+                      asChild
+                    >
+                      <a href={`mailto:johnathan@edvana.dev?subject=${encodeURIComponent(`Institutional plan inquiry — ${tier.display_name}`)}`}>
+                        <Mail className="h-4 w-4 mr-2 shrink-0" />
+                        Contact Sales
+                      </a>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Checkout Status Messages */}
         {typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('checkout') === 'success' && (

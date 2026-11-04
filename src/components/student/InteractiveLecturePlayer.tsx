@@ -112,9 +112,9 @@ const CONFIDENCE_OPTIONS = [
   { key: 'absolutely_sure', label: 'Absolutely Sure', icon: Flame, multiplier: 3.0, color: 'text-red-500', bg: 'bg-red-500/10' },
 ];
 
-const InlineConfidenceSelector = ({ selected, onSelect }: { selected: string; onSelect: (val: string) => void }) => (
+const InlineConfidenceSelector = ({ selected, onSelect, disabled }: { selected: string; onSelect: (val: string) => void; disabled?: boolean }) => (
   <div className="space-y-2">
-    <Label className="text-sm font-medium">How confident are you?</Label>
+    <Label className="text-sm font-medium">How confident are you? <span className="text-xs text-muted-foreground font-normal">(tap to submit)</span></Label>
     <div className="grid grid-cols-2 gap-2">
       {CONFIDENCE_OPTIONS.map((opt) => {
         const Icon = opt.icon;
@@ -122,9 +122,11 @@ const InlineConfidenceSelector = ({ selected, onSelect }: { selected: string; on
           <button
             key={opt.key}
             type="button"
+            disabled={disabled}
             onClick={() => onSelect(opt.key)}
             className={cn(
               "flex items-center gap-2 p-3 rounded-lg border transition-all text-left",
+              disabled && "opacity-50 cursor-not-allowed",
               selected === opt.key 
                 ? `${opt.bg} border-current ${opt.color}` 
                 : "border-border hover:border-primary/30"
@@ -532,7 +534,7 @@ export const InteractiveLecturePlayer = ({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setAskSubmitting(false); return; }
 
-    const { error } = await supabase.from('student_lecture_questions').insert({
+    const { error } = await (supabase.from('student_lecture_questions' as any) as any).insert({
       lecture_video_id: lectureId,
       student_id: user.id,
       instructor_id: lectureInstructorId,
@@ -605,8 +607,9 @@ export const InteractiveLecturePlayer = ({
   const [shortAnswerGrade, setShortAnswerGrade] = useState<number | null>(null);
   const [shortAnswerFeedback, setShortAnswerFeedback] = useState<string | null>(null);
 
-  const handleSubmitAnswer = async () => {
-    if (!currentQuestion || !confidenceLevel) {
+  const handleSubmitAnswer = async (levelOverride?: string) => {
+    const effectiveLevel = levelOverride || confidenceLevel;
+    if (!currentQuestion || !effectiveLevel) {
       toast.error('Please select your confidence level');
       return;
     }
@@ -671,7 +674,7 @@ export const InteractiveLecturePlayer = ({
     };
     
     const basePoints = 100;
-    const multiplier = multipliers[confidenceLevel] || 1;
+    const multiplier = multipliers[effectiveLevel] || 1;
     
     // For short answers, scale points by grade percentage
     let points: number;
@@ -722,7 +725,7 @@ export const InteractiveLecturePlayer = ({
         correct,
         grade,
         feedback,
-        confidence: confidenceLevel,
+        confidence: effectiveLevel,
         points,
         timestamp: new Date().toISOString()
       };
@@ -1185,29 +1188,28 @@ export const InteractiveLecturePlayer = ({
                       </div>
                     )}
 
-                    {/* Confidence Selector */}
+                    {/* Confidence Selector — selecting auto-submits */}
                     <div className="pt-4 border-t">
                       <InlineConfidenceSelector
                         selected={confidenceLevel}
-                        onSelect={setConfidenceLevel}
+                        disabled={
+                          isGrading ||
+                          (currentQuestion.question_type === 'multiple_choice'
+                            ? !selectedAnswer
+                            : !shortAnswer.trim())
+                        }
+                        onSelect={(level) => {
+                          setConfidenceLevel(level);
+                          handleSubmitAnswer(level);
+                        }}
                       />
-                    </div>
-
-                    <Button
-                      onClick={handleSubmitAnswer}
-                      className="w-full"
-                      size="lg"
-                      disabled={isGrading || !confidenceLevel || (currentQuestion.question_type === 'multiple_choice' ? !selectedAnswer : !shortAnswer.trim())}
-                    >
-                      {isGrading ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      {isGrading && (
+                        <div className="flex items-center justify-center gap-2 pt-3 text-sm text-muted-foreground">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
                           Grading...
-                        </>
-                      ) : (
-                        'Submit Answer'
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   </>
                 ) : (
                   <>

@@ -22,12 +22,18 @@ export function UpgradePrompt({
 }: UpgradePromptProps) {
   const [upgrading, setUpgrading] = useState(false);
 
+  // A course limit needs unlimited courses (Professional); a student limit is
+  // lifted on any paid tier, so recommend the cheaper Starter entry point.
+  const recommendedTier = limitType === 'course'
+    ? { name: 'pro', label: 'Professional', price: '$59/month', hours: '40 hours of lecture time / month' }
+    : { name: 'starter', label: 'Starter', price: '$29/month', hours: '15 hours of lecture time / month' };
+
   const handleUpgrade = async () => {
     setUpgrading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { 
-          tierName: 'instructor',
+        body: {
+          tierName: recommendedTier.name,
           successUrl: `${window.location.origin}/instructor/settings?checkout=success`,
           cancelUrl: `${window.location.origin}/instructor/dashboard`,
         },
@@ -82,13 +88,13 @@ export function UpgradePrompt({
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
             <h4 className="font-semibold flex items-center gap-2 mb-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              Instructor Plan - $149/semester
+              {recommendedTier.label} Plan - {recommendedTier.price}
             </h4>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>✓ Unlimited courses</li>
+              <li>✓ {recommendedTier.hours}</li>
               <li>✓ Unlimited students</li>
-              <li>✓ Advanced analytics</li>
-              <li>✓ Priority support</li>
+              <li>✓ {limitType === 'course' ? 'Unlimited courses' : '1 course'}</li>
+              <li>✓ {limitType === 'course' ? 'Advanced analytics & priority support' : 'Full AI question suite'}</li>
             </ul>
           </div>
 

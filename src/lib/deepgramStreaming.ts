@@ -36,7 +36,7 @@ export class DeepgramStreamingClient {
   private stream: MediaStream | null = null;
   private isConnecting: boolean = false;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 3;
+  private maxReconnectAttempts: number = 10; // Increased for long sessions (30-60+ min)
   private reconnectDelay: number = 2000;
   private audioChunksQueue: Blob[] = [];
   private isDeepgramReady: boolean = false;
@@ -126,17 +126,29 @@ export class DeepgramStreamingClient {
           console.log("🔗 Fly.io proxy mode: persistent connection, no proactive reconnect needed");
           
           // For Fly.io proxy, set up long session health monitoring
-          // Detect if no transcripts received for 60s (possible stale connection)
+          // Auto-reconnect if no transcripts received for 90s (stale connection)
           this.longSessionHealthInterval = window.setInterval(() => {
             const timeSinceLastTranscript = Date.now() - this.lastTranscriptTime;
             const connectionAge = Date.now() - this.connectionStartTime;
             
             // Only check after at least 30 seconds of connection
-            if (connectionAge > 30000 && timeSinceLastTranscript > 60000) {
-              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s - connection may be stale`);
-              // Don't auto-reconnect, just log warning - user might be paused
+            if (connectionAge > 30000 && timeSinceLastTranscript > 90000) {
+              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s - connection is stale, auto-reconnecting`);
+              // Reset reconnect attempts since this is a health-triggered reconnect, not a failure
+              this.reconnectAttempts = 0;
+              this.proactiveReconnect();
+            } else if (connectionAge > 30000 && timeSinceLastTranscript > 45000) {
+              // Early warning — try sending a keepalive ping
+              console.warn(`⚠️ No transcript for ${Math.round(timeSinceLastTranscript / 1000)}s — sending keepalive`);
+              try {
+                if (this.ws?.readyState === WebSocket.OPEN) {
+                  this.ws.send(JSON.stringify({ type: "KeepAlive" }));
+                }
+              } catch (e) {
+                console.error("❌ Keepalive send failed:", e);
+              }
             }
-          }, 30000); // Check every 30 seconds
+          }, 15000); // Check every 15 seconds for faster detection
         }
       };
 
@@ -349,19 +361,32 @@ export class DeepgramStreamingClient {
       return;
     }
 
-    // LAYER 1: Stricter confidence threshold (75% for final, 60% for interim)
-    if (isFinal && confidence < 0.75) {
-      console.warn(`⚠️ Low confidence (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
+    // LAYER 1: Confidence threshold.
+    // Deepgram's confidence is consistently low (0.55–0.75) for the FIRST
+    // utterance after a connection opens while the acoustic model adapts to
+    // the speaker / room. Dropping those finals silently was causing the
+    // "first question never registers, I have to repeat myself" bug.
+    // We now only drop transcripts whose confidence is implausibly low
+    // (<0.45) AND which contain no question shape — anything plausibly
+    // useful is allowed through and validated by the downstream trigger /
+    // completeness gates instead.
+    const looksLikeQuestion = /[?]/.test(transcript) || /\b(what|why|how|when|where|who|which|can|could|would|should|is|are|do|does|did)\b/i.test(transcript);
+    if (isFinal && confidence < 0.45 && !looksLikeQuestion) {
+      console.warn(`⚠️ Dropping very-low-confidence final (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 60)}`);
       return;
     }
+    if (isFinal && confidence < 0.6) {
+      console.log(`ℹ️ Low-confidence final allowed through (${(confidence * 100).toFixed(0)}%): ${transcript.substring(0, 60)}`);
+    }
 
-    // LAYER 2: Word-level confidence filtering
+    // LAYER 2: Word-level confidence — same reasoning. Only block when the
+    // vast majority of words are unreliable AND no question shape is present.
     const words: DeepgramWord[] = alternative.words || [];
-    if (isFinal && words.length > 0) {
-      const confidentWords = words.filter(w => w.confidence >= 0.6);
+    if (isFinal && words.length > 0 && !looksLikeQuestion) {
+      const confidentWords = words.filter(w => w.confidence >= 0.5);
       const confidentRatio = confidentWords.length / words.length;
-      
-      if (confidentRatio < 0.5) {
+
+      if (confidentRatio < 0.3) {
         console.warn(`⚠️ Too many low-confidence words (${(confidentRatio * 100).toFixed(0)}%): ${transcript.substring(0, 40)}`);
         return;
       }

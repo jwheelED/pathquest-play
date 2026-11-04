@@ -5,9 +5,8 @@ import { AutoGradeSettings } from "@/components/instructor/AutoGradeSettings";
 import { QuestionDifficultySettings } from "@/components/instructor/QuestionDifficultySettings";
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
-import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
-import { KalturaSettings } from "@/components/instructor/KalturaSettings";
+import { BillingSettings } from "@/components/instructor/BillingSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -24,12 +23,14 @@ const ACCOUNT_TABS = [
   { key: "billing", label: "Plan & Billing", icon: CreditCard },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
+
 
 interface SettingsPanelProps {
   currentUserId: string;
   professorType?: "stem" | "humanities" | "medical" | null;
 }
+
+type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
 
 export function SettingsPanel({ currentUserId, professorType }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("questions");
@@ -104,10 +105,9 @@ export function SettingsPanel({ currentUserId, professorType }: SettingsPanelPro
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Integrations</h2>
-              <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS or Kaltura to sync grades and content.</p>
+              <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS to sync grades and content.</p>
             </div>
             <LMSIntegrationSettings />
-            <KalturaSettings instructorId={currentUserId} />
           </div>
         );
       case "billing":

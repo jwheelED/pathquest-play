@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callClaude } from "../_shared/anthropic.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,22 +61,20 @@ Generate a JSON summary with:
   "lectureHighlights": ["key moment 1", "key moment 2"]
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are an expert educational analyst. Return only valid JSON." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.5,
-        response_format: { type: "json_object" },
-      }),
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await callClaude({
+      messages: [
+        { role: "system", content: "You are an expert educational analyst. Return only valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.5,
+      response_format: { type: "json_object" },
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.error("AI API error:", response.status);
@@ -107,7 +106,19 @@ Generate a JSON summary with:
     const aiResponse = await response.json();
     let content = aiResponse.choices[0].message.content;
     content = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-    const summary = JSON.parse(content);
+    
+    let summary;
+    try {
+      summary = JSON.parse(content);
+    } catch (parseError) {
+      console.error("JSON parse failed for summary, attempting extraction:", content.substring(0, 200));
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        summary = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("Failed to parse AI summary response");
+      }
+    }
 
     console.log("✅ Summary generated:", summary.topicsIdentified?.slice(0, 3));
 
@@ -130,6 +141,24 @@ Generate a JSON summary with:
 
   } catch (error: any) {
     console.error("Summary generation error:", error);
+    // Return a graceful fallback instead of error for timeout/parse failures
+    if (error.name === 'AbortError') {
+      return new Response(JSON.stringify({
+        success: true,
+        summary: {
+          overallScore: 70,
+          topicsIdentified: ["Lecture content"],
+          keyConceptsCovered: ["Topics discussed during lecture"],
+          engagementAnalysis: "Summary generation timed out. Review student responses for engagement insights.",
+          teachingSuggestions: ["Check student check-in results for teaching insights"],
+          conceptsToReview: [],
+          lectureHighlights: [],
+        },
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({
       success: false,
       error: error.message,

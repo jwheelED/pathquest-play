@@ -30,22 +30,34 @@ export default function LearningInsightsCard({
     );
   }
 
-  // Generate recommendations based on data
-  const recommendations: string[] = [];
-  
-  if (misconceptions.length > 0) {
-    const avgCorrectRate = misconceptions.reduce((acc, m) => acc + m.correctRate, 0) / misconceptions.length;
-    if (avgCorrectRate < 40) {
-      recommendations.push("Consider a mini-review session on commonly missed topics");
+  // Course-tied recommendations
+  const recommendations: { text: string; course?: string }[] = [];
+  const misconceptionCourses = new Set(
+    misconceptions.map((m) => m.courseName).filter(Boolean) as string[],
+  );
+  const confidenceCourses = new Set(
+    confidenceIssues.map((c) => c.courseName).filter(Boolean) as string[],
+  );
+
+  misconceptionCourses.forEach((course) => {
+    recommendations.push({
+      text: `Run a mini-review on the topics students miss most`,
+      course,
+    });
+  });
+  confidenceCourses.forEach((course) => {
+    if (!misconceptionCourses.has(course)) {
+      recommendations.push({
+        text: `Address overconfidence with targeted feedback`,
+        course,
+      });
     }
-  }
-  
-  if (confidenceIssues.length > 0) {
-    recommendations.push("Address overconfidence with targeted feedback on flagged concepts");
-  }
-  
-  if (misconceptions.length === 0 && confidenceIssues.length === 0) {
-    recommendations.push("Great job! No major learning gaps detected in recent sessions");
+  });
+
+  if (recommendations.length === 0) {
+    recommendations.push({
+      text: "No learning gaps detected this period.",
+    });
   }
 
   return (
@@ -53,7 +65,8 @@ export default function LearningInsightsCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Learning Insights</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Aggregate patterns from check-in responses
+          Aggregate patterns from check-in responses. Course-level only — no named instructors or
+          students.
         </p>
       </CardHeader>
       <CardContent>
@@ -65,14 +78,24 @@ export default function LearningInsightsCard({
               Top Misconceptions
             </div>
             {misconceptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No significant misconceptions detected</p>
+              <p className="text-sm text-muted-foreground">
+                No misconceptions detected this period.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {misconceptions.map((item, idx) => (
-                  <li key={idx} className="text-sm p-2 rounded-lg bg-destructive/5 border border-destructive/10">
+                  <li
+                    key={idx}
+                    className="text-sm p-3 rounded-lg bg-destructive/5 border border-destructive/10 space-y-1"
+                  >
                     <p className="font-medium text-foreground line-clamp-2">{item.questionText}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {item.correctRate}% correct ({item.totalResponses} responses)
+                    <p className="text-xs text-muted-foreground">
+                      {item.correctRate}% correct · {item.totalResponses} responses
+                      {item.courseName ? ` · ${item.courseName}` : ""}
+                    </p>
+                    <p className="text-xs text-destructive">
+                      Suggested: share with the{item.courseName ? ` ${item.courseName}` : ""}{" "}
+                      instructor team.
                     </p>
                   </li>
                 ))}
@@ -84,17 +107,27 @@ export default function LearningInsightsCard({
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-4 h-4" />
-              Confidence Issues
+              Confident but Wrong
             </div>
             {confidenceIssues.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No overconfidence patterns detected</p>
+              <p className="text-sm text-muted-foreground">
+                No overconfidence patterns this period.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {confidenceIssues.map((item, idx) => (
-                  <li key={idx} className="text-sm p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                  <li
+                    key={idx}
+                    className="text-sm p-3 rounded-lg bg-amber-500/5 border border-amber-500/10 space-y-1"
+                  >
                     <p className="font-medium text-foreground line-clamp-2">{item.questionText}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {item.confidentWrongCount} students were confidently wrong
+                    <p className="text-xs text-muted-foreground">
+                      {item.confidentWrongCount} students confidently wrong
+                      {item.courseName ? ` · ${item.courseName}` : ""}
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Suggested: targeted re-teach in
+                      {item.courseName ? ` ${item.courseName}` : " the affected course"}.
                     </p>
                   </li>
                 ))}
@@ -112,9 +145,12 @@ export default function LearningInsightsCard({
               {recommendations.map((rec, idx) => (
                 <li
                   key={idx}
-                  className="text-sm p-2 rounded-lg bg-primary/5 border border-primary/10"
+                  className="text-sm p-3 rounded-lg bg-primary/5 border border-primary/10"
                 >
-                  {rec}
+                  <p className="text-foreground">{rec.text}</p>
+                  {rec.course && (
+                    <p className="text-xs text-muted-foreground mt-1">For {rec.course}</p>
+                  )}
                 </li>
               ))}
             </ul>

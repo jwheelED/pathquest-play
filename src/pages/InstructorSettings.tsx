@@ -10,8 +10,10 @@ import { QuestionDifficultySettings } from "@/components/instructor/QuestionDiff
 import { LMSIntegrationSettings } from "@/components/instructor/LMSIntegrationSettings";
 import { AdaptiveTutoringSettings } from "@/components/instructor/AdaptiveTutoringSettings";
 import { BillingSettings } from "@/components/instructor/BillingSettings";
+
+
 import { QuestionPreviewSettings } from "@/components/instructor/QuestionPreviewSettings";
-import { KalturaSettings } from "@/components/instructor/KalturaSettings";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -27,6 +29,7 @@ const TABS = [
 const ACCOUNT_TABS = [
   { key: "billing", label: "Plan & Billing", icon: CreditCard },
 ] as const;
+
 
 type TabKey = (typeof TABS)[number]["key"] | (typeof ACCOUNT_TABS)[number]["key"];
 
@@ -161,10 +164,9 @@ export default function InstructorSettings() {
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Integrations</h2>
-              <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS or Kaltura to sync grades and content.</p>
+              <p className="text-sm text-muted-foreground mt-1">Connect external platforms like your LMS to sync grades and content.</p>
             </div>
             <LMSIntegrationSettings />
-            <KalturaSettings instructorId={currentUser.id} />
           </div>
         );
       case "billing":
@@ -178,6 +180,7 @@ export default function InstructorSettings() {
           </div>
         );
       default:
+
         return null;
     }
   };
@@ -232,7 +235,7 @@ export default function InstructorSettings() {
           )}
 
           {/* Content panel */}
-          <div className="flex-1 min-w-0 max-w-3xl">
+          <div className="flex-1 min-w-0">
             {renderContent()}
           </div>
         </div>
