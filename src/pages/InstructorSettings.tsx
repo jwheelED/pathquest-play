@@ -21,7 +21,6 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const TABS = [
   { key: "questions", label: "Question Generation", icon: MessageSquare },
-  { key: "pre-recorded", label: "Pre-Recorded Lectures", icon: Video },
   { key: "grading", label: "Grading", icon: CheckSquare },
   { key: "integrations", label: "Integrations", icon: Plug },
 ] as const;
@@ -137,16 +136,6 @@ export default function InstructorSettings() {
             <QuestionFormatSettings instructorId={currentUser.id} professorType={professorType} />
             <QuestionPreviewSettings />
             <QuestionDifficultySettings />
-          </div>
-        );
-      case "pre-recorded":
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Pre-Recorded Lectures</h2>
-              <p className="text-sm text-muted-foreground mt-1">Control question presets, difficulty mix, and style balance for pre-recorded lecture content.</p>
-            </div>
-            <AdaptiveTutoringSettings />
           </div>
         );
       case "grading":

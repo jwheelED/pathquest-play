@@ -488,21 +488,13 @@ export function StudentLectureQuestions({ instructorId }: StudentLectureQuestion
 
         <CardContent>
           <Tabs defaultValue="live" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsList className="grid w-full grid-cols-1 mb-4">
               <TabsTrigger value="live" className="flex items-center gap-2">
                 <Radio className="h-4 w-4" />
                 <span className="hidden sm:inline">Live Lectures</span>
                 <span className="sm:hidden">Live</span>
                 {completedAssignments.length > 0 && (
                   <Badge variant="secondary" className="ml-1 text-xs">{completedAssignments.length}</Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="recorded" className="flex items-center gap-2">
-                <Video className="h-4 w-4" />
-                <span className="hidden sm:inline">Pre-Recorded</span>
-                <span className="sm:hidden">Recorded</span>
-                {lecturesWithProgress.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-xs">{lecturesWithProgress.length}</Badge>
                 )}
               </TabsTrigger>
             </TabsList>

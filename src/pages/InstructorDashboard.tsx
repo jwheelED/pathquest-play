@@ -27,9 +27,7 @@ import { LectureMaterialsUpload } from "@/components/instructor/LectureMaterials
 import { LiveSessionControls } from "@/components/instructor/LiveSessionControls";
 import { LiveSessionResults } from "@/components/instructor/LiveSessionResults";
 import { PastLiveSessions } from "@/components/instructor/PastLiveSessions";
-import { PreRecordedLectureUpload } from "@/components/instructor/PreRecordedLectureUpload";
 import { LectureVideoManager } from "@/components/instructor/LectureVideoManager";
-import { PreRecordedLectureGrades } from "@/components/instructor/PreRecordedLectureGrades";
 import { StudentLectureQuestions } from "@/components/instructor/StudentLectureQuestions";
 import { QuestionBankTab } from "@/components/instructor/QuestionBankTab";
 import { SettingsPanel } from "@/components/instructor/SettingsPanel";
@@ -54,7 +52,6 @@ type TabValue = "overview" | "live" | "recorded" | "students" | "materials" | "q
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "overview", label: "Overview", icon: LayoutDashboard },
   { value: "live", label: "Live Copilot", icon: Radio },
-  { value: "recorded", label: "Pre-Recorded", icon: Video },
   { value: "question-bank", label: "Question Bank", icon: Library },
   { value: "summaries", label: "Summaries", icon: Award },
   { value: "students", label: "Students", icon: Users },
@@ -517,29 +514,6 @@ export default function InstructorDashboard() {
             <section>
               <PastLiveSessions />
             </section>
-          </div>
-        );
-
-      case "recorded":
-        return (
-          <div className="space-y-6">
-            <div className="min-w-0">
-              <PreRecordedLectureUpload />
-            </div>
-            
-            <div className="min-w-0">
-              <LectureVideoManager />
-            </div>
-            
-            <div className="min-w-0">
-              <PreRecordedLectureGrades />
-            </div>
-
-            {currentUser && (
-              <div className="min-w-0">
-                <StudentLectureQuestions instructorId={currentUser.id} />
-              </div>
-            )}
           </div>
         );
 

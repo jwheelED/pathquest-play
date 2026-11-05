@@ -6,7 +6,6 @@ import { ArrowLeft, BookOpen, Video, FileText, Trophy } from "lucide-react";
 import { MobileHeader } from "@/components/mobile/MobileHeader";
 import { BottomNav } from "@/components/mobile/BottomNav";
 import { AssignedContent } from "@/components/student/AssignedContent";
-import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureList";
 import { StudentLectureQuestions } from "@/components/student/StudentLectureQuestions";
 import { PastTranscriptsList } from "@/components/student/PastTranscriptsList";
 import { ActiveLiveTranscriptSection } from "@/components/student/ActiveLiveTranscriptSection";
@@ -39,7 +38,6 @@ type TabValue = "assigned" | "lectures" | "results";
 
 const navItems: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "assigned", label: "Assigned Content", icon: FileText },
-  { value: "lectures", label: "Pre-Recorded Lectures", icon: Video },
   { value: "results", label: "Results", icon: Trophy },
 ];
 
@@ -360,12 +358,6 @@ export default function ClassDashboard() {
                   instructorId={instructorId}
                   courseId={courseId ?? undefined}
                 />
-              </div>
-            )}
-            
-            {activeTab === "lectures" && (
-              <div className="space-y-6 animate-fade-in">
-                <PreRecordedLectureList instructorId={instructorId} />
               </div>
             )}
 

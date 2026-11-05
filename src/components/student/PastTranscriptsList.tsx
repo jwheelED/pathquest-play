@@ -183,28 +183,6 @@ export function PastTranscriptsList({ instructorId, courseId }: PastTranscriptsL
         </section>
       )}
 
-      {lectures.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Video className="h-4 w-4 text-blue-600" aria-hidden="true" />
-            Pre-recorded lectures
-          </h2>
-          <div className="space-y-2">
-            {lectures.map((l) => (
-              <TranscriptRow
-                key={l.id}
-                id={l.id}
-                title={l.title ?? "Untitled lecture"}
-                createdAt={l.created_at}
-                badge="Recorded"
-                open={expandedId === l.id}
-                loaded={transcripts[l.id]}
-                onToggle={() => handleToggle("lecture", l.id, l.transcript)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
