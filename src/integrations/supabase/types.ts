@@ -1682,6 +1682,7 @@ export type Database = {
           last_seen_at: string
           nickname: string
           session_id: string
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -1689,6 +1690,7 @@ export type Database = {
           last_seen_at?: string
           nickname: string
           session_id: string
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -1696,6 +1698,7 @@ export type Database = {
           last_seen_at?: string
           nickname?: string
           session_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {

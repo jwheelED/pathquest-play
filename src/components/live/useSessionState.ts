@@ -84,11 +84,16 @@ export function useSessionState(sessionCode: string | undefined) {
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
   const [notFound, setNotFound] = useState(false);
+  const [needsJoin, setNeedsJoin] = useState(false);
 
   // Resolve session
   useEffect(() => {
     if (!sessionCode) return;
-    const stored = localStorage.getItem("participantId");
+    // Participant ids are scoped per session; the legacy global key is a
+    // fallback for guests who joined via the code form.
+    const stored =
+      localStorage.getItem(`participantId:${sessionCode}`) ||
+      localStorage.getItem("participantId");
     if (stored) setParticipantId(stored);
 
     const init = async () => {
@@ -106,6 +111,31 @@ export function useSessionState(sessionCode: string | undefined) {
         }
         setSessionId(data.session.id);
         setSessionTitle(data.session.title || "");
+
+        // Signed-in student without a participant yet: auto-join so their
+        // answers link to their account history. Guests must join via code.
+        if (!stored) {
+          const { data: authData } = await supabase.auth.getSession();
+          if (authData.session) {
+            const { data: joinData, error: joinError } = await supabase.functions.invoke(
+              "join-live-session",
+              { body: { sessionCode } },
+            );
+            if (!joinError && joinData?.participant?.id) {
+              localStorage.setItem(`participantId:${sessionCode}`, joinData.participant.id);
+              localStorage.setItem("participantId", joinData.participant.id);
+              localStorage.setItem("participantNickname", joinData.participant.nickname);
+              setParticipantId(joinData.participant.id);
+            } else {
+              setNeedsJoin(true);
+              return;
+            }
+          } else {
+            setNeedsJoin(true);
+            return;
+          }
+        }
+
         if (data.questions?.length > 0) {
           handleNewQuestion(data.questions[0]);
         }
@@ -343,6 +373,7 @@ export function useSessionState(sessionCode: string | undefined) {
   return {
     phase,
     notFound,
+    needsJoin,
     sessionId,
     sessionTitle,
     participantId,

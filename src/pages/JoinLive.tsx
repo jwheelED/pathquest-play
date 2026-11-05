@@ -59,7 +59,8 @@ const JoinLive = () => {
 
       if (error) throw error;
 
-      // Store participant ID in localStorage
+      // Store participant ID in localStorage (per-session + legacy global key)
+      localStorage.setItem(`participantId:${sessionCode.toUpperCase()}`, data.participant.id);
       localStorage.setItem("participantId", data.participant.id);
       localStorage.setItem("participantNickname", nickname.trim());
       

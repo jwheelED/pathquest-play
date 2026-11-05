@@ -10,6 +10,7 @@ import { PreRecordedLectureList } from "@/components/student/PreRecordedLectureL
 import { StudentLectureQuestions } from "@/components/student/StudentLectureQuestions";
 import { PastTranscriptsList } from "@/components/student/PastTranscriptsList";
 import { ActiveLiveTranscriptSection } from "@/components/student/ActiveLiveTranscriptSection";
+import { LiveSessionHistory } from "@/components/student/LiveSessionHistory";
 import { cn } from "@/lib/utils";
 
 
@@ -376,6 +377,7 @@ export default function ClassDashboard() {
             
             {activeTab === "results" && (
               <div className="space-y-6 animate-fade-in">
+                <LiveSessionHistory />
                 <StudentLectureQuestions instructorId={instructorId} />
               </div>
             )}

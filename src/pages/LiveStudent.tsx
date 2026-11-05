@@ -14,18 +14,10 @@ const LiveStudent = () => {
   const { sessionCode } = useParams();
   const navigate = useNavigate();
 
-  // Validate participant before anything else
-  useEffect(() => {
-    const stored = localStorage.getItem("participantId");
-    if (!stored) {
-      toast.error("Please join the session first");
-      navigate("/join");
-    }
-  }, [navigate]);
-
   const {
     phase,
     notFound,
+    needsJoin,
     sessionId,
     sessionTitle,
     currentQuestion,
@@ -49,6 +41,14 @@ const LiveStudent = () => {
       navigate("/join");
     }
   }, [notFound, navigate]);
+
+  // Guests without a participant (and failed auto-joins) go to the code form
+  useEffect(() => {
+    if (needsJoin) {
+      toast.error("Please join the session first");
+      navigate("/join");
+    }
+  }, [needsJoin, navigate]);
 
   const isEnded = phase === "recap";
 

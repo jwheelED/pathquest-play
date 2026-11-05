@@ -19,11 +19,24 @@ export interface JoinDeps {
   log?: LoggerLike;
 }
 
+/** Verified account joining the session (resolved from the bearer token in
+ * index.ts). When present, the participant row is linked to the account so
+ * live answers persist to the student's permanent course history. */
+export interface JoinAuthUser {
+  id: string;
+  displayName?: string | null;
+}
+
 export async function handleJoin(
-  input: { body: { sessionCode?: string; nickname?: string } | null; clientIp: string; now: number },
+  input: {
+    body: { sessionCode?: string; nickname?: string } | null;
+    clientIp: string;
+    now: number;
+    authUser?: JoinAuthUser | null;
+  },
   deps: JoinDeps,
 ): Promise<HandlerResult> {
-  const { body, clientIp, now } = input;
+  const { body, clientIp, now, authUser } = input;
   const { admin, rateStore, limits, log } = deps;
 
   // 1) Rate-limit by IP before any DB work.
@@ -37,15 +50,16 @@ export async function handleJoin(
   }
 
   const sessionCode = body?.sessionCode;
-  const nickname = body?.nickname;
-  if (!sessionCode || !nickname || !nickname.trim()) {
+  // Signed-in students may omit a nickname — fall back to their profile name.
+  const rawNickname = body?.nickname?.trim() || authUser?.displayName?.trim() || "";
+  if (!sessionCode || !rawNickname) {
     log?.info("join rejected: missing fields", { error_category: "bad_request", success: false });
     return { status: 400, body: { error: "sessionCode and nickname are required" } };
   }
 
   // Nickname uniqueness intentionally NOT enforced — identity is the
   // server-generated participant id, never the nickname.
-  const cleanNickname = nickname.trim().slice(0, limits.maxNicknameLength);
+  const cleanNickname = rawNickname.slice(0, limits.maxNicknameLength);
 
   const { data: session, error: sessionError } = await admin
     .from("live_sessions")
@@ -70,6 +84,21 @@ export async function handleJoin(
     return { status: 400, body: { error: "This session has ended." } };
   }
 
+  // Rejoin: a signed-in student who already joined this session gets their
+  // existing participant row back instead of a duplicate.
+  if (authUser) {
+    const { data: existing } = await admin
+      .from("live_participants")
+      .select("id, nickname")
+      .eq("session_id", session.id)
+      .eq("user_id", authUser.id)
+      .maybeSingle();
+    if (existing) {
+      slog?.info("participant rejoined", { participant_id: existing.id, success: true });
+      return { status: 200, body: { participant: existing } };
+    }
+  }
+
   // Per-session participant cap (small over-count under concurrency is fine).
   const { count, error: countError } = await admin
     .from("live_participants")
@@ -83,7 +112,11 @@ export async function handleJoin(
 
   const { data: participant, error: insertError } = await admin
     .from("live_participants")
-    .insert({ session_id: session.id, nickname: cleanNickname })
+    .insert({
+      session_id: session.id,
+      nickname: cleanNickname,
+      ...(authUser ? { user_id: authUser.id } : {}),
+    })
     .select("id, nickname")
     .single();
 
@@ -92,6 +125,6 @@ export async function handleJoin(
     return { status: 500, body: { error: "Failed to join session" } };
   }
 
-  slog?.info("participant joined", { participant_id: participant.id, success: true });
+  slog?.info("participant joined", { participant_id: participant.id, linked: !!authUser, success: true });
   return { status: 200, body: { participant } };
 }

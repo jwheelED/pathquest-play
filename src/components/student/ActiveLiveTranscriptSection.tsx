@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Radio, ExternalLink } from "lucide-react";
+import { Radio, Loader2, LogIn } from "lucide-react";
+import { toast } from "sonner";
 import { LiveTranscriptPanel } from "./LiveTranscriptPanel";
 import { logger } from "@/lib/logger";
 
@@ -21,12 +21,15 @@ interface ActiveSession {
 
 /**
  * Shows a live transcript panel for any currently-active live session
- * belonging to the student's instructor/course, so they can read along
- * without joining the session.
+ * belonging to the student's instructor/course, plus a one-tap join button
+ * that links the student's account to the session so answers persist to
+ * their permanent history.
  */
 export function ActiveLiveTranscriptSection({ instructorId, courseId }: Props) {
   const [session, setSession] = useState<ActiveSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!instructorId) return;
@@ -74,6 +77,28 @@ export function ActiveLiveTranscriptSection({ instructorId, courseId }: Props) {
     };
   }, [instructorId, courseId]);
 
+  const handleJoin = async () => {
+    if (!session?.session_code) return;
+    setJoining(true);
+    try {
+      // The signed-in user's JWT rides along automatically, so the edge
+      // function links this participant to their account.
+      const { data, error } = await supabase.functions.invoke("join-live-session", {
+        body: { sessionCode: session.session_code },
+      });
+      if (error || !data?.participant?.id) throw error ?? new Error("join failed");
+      localStorage.setItem(`participantId:${session.session_code}`, data.participant.id);
+      localStorage.setItem("participantId", data.participant.id);
+      localStorage.setItem("participantNickname", data.participant.nickname);
+      navigate(`/live/${session.session_code}`);
+    } catch (e) {
+      logger.warn("One-tap live join failed", e instanceof Error ? e.message : String(e));
+      toast.error("Couldn't join the live session. Try the session code instead.");
+    } finally {
+      setJoining(false);
+    }
+  };
+
   if (loading || !session) return null;
 
   return (
@@ -88,6 +113,33 @@ export function ActiveLiveTranscriptSection({ instructorId, courseId }: Props) {
       </h2>
 
       <Card className="p-4 space-y-3 border-emerald-200 bg-emerald-50/40">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {session.title || "Live session in progress"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Join to answer check-ins — your answers save to your course history.
+            </p>
+          </div>
+          <Button
+            onClick={handleJoin}
+            disabled={joining || !session.session_code}
+            className="rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shrink-0"
+          >
+            {joining ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Joining...
+              </>
+            ) : (
+              <>
+                <LogIn className="mr-2 h-4 w-4" />
+                Join live session
+              </>
+            )}
+          </Button>
+        </div>
         <LiveTranscriptPanel sessionId={session.id} canFetchHistory />
       </Card>
     </section>

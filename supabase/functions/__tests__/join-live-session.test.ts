@@ -94,4 +94,53 @@ describe("handleJoin (characterization)", () => {
     const res = await handleJoin({ body: { sessionCode: "123456", nickname: "JW" }, clientIp: "ip", now: NOW }, d);
     expect(res.status).toBe(500);
   });
+
+  it("links the participant to the account when a verified user joins", async () => {
+    const d = deps({
+      live_sessions: [{ data: { id: "s1", is_active: true, ends_at: future } }],
+      live_participants: [
+        { data: null }, // rejoin lookup: no existing row
+        { count: 3, error: null }, // capacity check
+        { data: { id: "p9", nickname: "Ada Lovelace" } }, // insert
+      ],
+    });
+    const res = await handleJoin(
+      {
+        body: { sessionCode: "123456" },
+        clientIp: "ip",
+        now: NOW,
+        authUser: { id: "u1", displayName: "Ada Lovelace" },
+      },
+      d,
+    );
+    expect(res.status).toBe(200);
+    const insert = d.calls.find((c) => c.table === "live_participants" && c.op === "insert");
+    expect(insert?.payload).toMatchObject({ session_id: "s1", user_id: "u1", nickname: "Ada Lovelace" });
+  });
+
+  it("reuses the existing participant row when the same account rejoins", async () => {
+    const d = deps({
+      live_sessions: [{ data: { id: "s1", is_active: true, ends_at: future } }],
+      live_participants: [{ data: { id: "p1", nickname: "Ada" } }], // rejoin lookup: found
+    });
+    const res = await handleJoin(
+      {
+        body: { sessionCode: "123456", nickname: "Ada" },
+        clientIp: "ip",
+        now: NOW,
+        authUser: { id: "u1", displayName: "Ada" },
+      },
+      d,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ participant: { id: "p1", nickname: "Ada" } });
+    // No duplicate insert and no capacity check consumed
+    expect(d.calls.some((c) => c.op === "insert")).toBe(false);
+  });
+
+  it("still requires a nickname for guests (no account)", async () => {
+    const d = deps();
+    const res = await handleJoin({ body: { sessionCode: "123456" }, clientIp: "ip", now: NOW }, d);
+    expect(res.status).toBe(400);
+  });
 });
