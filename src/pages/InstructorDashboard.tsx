@@ -131,10 +131,17 @@ export default function InstructorDashboard() {
   // recording (even without explicitly opening a live class). This lets
   // enrolled students see the live transcript from their class dashboard the
   // moment "Start Recording" is pressed.
+  // Only auto-open once per recording, so "End Session" mid-recording sticks.
+  const autoOpenedThisRecordingRef = useRef(false);
+  useEffect(() => {
+    if (!isListening) autoOpenedThisRecordingRef.current = false;
+  }, [isListening]);
   useEffect(() => {
     let cancelled = false;
     const ensureSession = async () => {
-      if (!isListening || liveSessionId || !currentUser?.id) return;
+      if (!isListening || liveSessionId || activeSession?.id || !currentUser?.id) return;
+      if (autoOpenedThisRecordingRef.current) return;
+      autoOpenedThisRecordingRef.current = true;
       try {
         // Route through the canonical edge function (same as LiveSessionControls
         // / CommandStripHero) so the recording session gets a real session_code
@@ -160,7 +167,7 @@ export default function InstructorDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [isListening, liveSessionId, currentUser?.id, selectedCourseId, selectedCourse?.title]);
+  }, [isListening, liveSessionId, activeSession?.id, currentUser?.id, selectedCourseId, selectedCourse?.title]);
 
 
   useEffect(() => {

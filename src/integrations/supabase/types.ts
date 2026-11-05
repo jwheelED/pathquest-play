@@ -4954,6 +4954,10 @@ export type Database = {
         Args: { _admin_code: string }
         Returns: string
       }
+      current_user_joined_live_session: {
+        Args: { _session_id: string }
+        Returns: boolean
+      }
       ensure_default_admin_scope: { Args: never; Returns: undefined }
       generate_admin_code: { Args: never; Returns: string }
       generate_course_code: { Args: never; Returns: string }
