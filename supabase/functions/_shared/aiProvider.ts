@@ -33,6 +33,18 @@ export function resolveAiProvider(): AiProvider {
   throw new Error("No AI provider configured (set MOONSHOT_API_KEY or LOVABLE_API_KEY)");
 }
 
+/** The Lovable AI Gateway provider, used as a backup when the primary fails. */
+export function lovableGatewayProvider(): AiProvider | null {
+  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!lovableKey) return null;
+  return {
+    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    key: lovableKey,
+    defaultModel: GEMINI_FLASH,
+    name: "Lovable",
+  };
+}
+
 interface ToolDef {
   type: "function";
   function: { name: string; description?: string; parameters: unknown };

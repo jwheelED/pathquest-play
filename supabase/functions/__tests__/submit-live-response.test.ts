@@ -108,4 +108,16 @@ describe("handleSubmit AI grading for written answers", () => {
     const res = await handleSubmit({ ...base, answer: "wind" }, { supabase: client, grade: async () => ({ grade: 69, feedback: "" }) });
     expect((res.body as { response: { isCorrect: boolean } }).response.isCorrect).toBe(false);
   });
+  it("coding check-ins are AI graded and use the stored expected answer", async () => {
+    const q = { question_content: { question: "Reverse a list", type: "coding_simple", expectedAnswer: "lst[::-1]" }, question_number: 1, instructor_id: "i1", session_id: "s1" };
+    const { client } = makeMockSupabase({ live_questions: [{ data: q }], live_responses: [{ data: null }, { data: { id: "r1" } }] });
+    let seenExpected = "";
+    const res = await handleSubmit({ ...base, answer: "return lst[::-1]" }, {
+      supabase: client,
+      grade: async (input) => { seenExpected = input.expectedAnswer; return { grade: 95, feedback: "Nice" }; },
+    });
+    expect(seenExpected).toBe("lst[::-1]");
+    expect((res.body as { response: { aiGrade: number; isCorrect: boolean } }).response.aiGrade).toBe(95);
+    expect((res.body as { response: { isCorrect: boolean } }).response.isCorrect).toBe(true);
+  });
 });

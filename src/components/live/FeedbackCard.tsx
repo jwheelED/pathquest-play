@@ -21,7 +21,9 @@ export function FeedbackCard({ feedback, question, onDismiss }: FeedbackCardProp
           Your response
         </span>
         <h2 className="text-[32px] font-bold tracking-[-0.02em] text-[hsl(var(--ink))]">
-          {wasCorrect ? (
+          {isWritten && typeof aiGrade !== "number" ? (
+            "Answer received"
+          ) : wasCorrect ? (
             "Nice work!"
           ) : (
             <>

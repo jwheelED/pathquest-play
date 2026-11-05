@@ -19,6 +19,7 @@ interface QuestionContent {
   type?: string;
   options?: string[];
   correctAnswer?: string;
+  expectedAnswer?: string;
   questions?: Array<{ question?: string; type?: string; options?: string[]; correctAnswer?: string }>;
 }
 
@@ -88,12 +89,13 @@ export async function handleSubmit(
   // Written answers (short answer / coding) go through the AI grader.
   let aiGrade: number | null = null;
   let aiFeedback: string | null = null;
-  const isWritten = questionType === "short_answer" || questionType === "coding";
+  const isWritten =
+    questionType === "short_answer" || questionType === "coding" || questionType === "coding_simple";
   if (isWritten && normalizedStudentAnswer && deps.grade) {
     const questionText = questionContent.questions?.[0]?.question || questionContent.question || "";
     const result = await deps.grade({
       question: questionText,
-      expectedAnswer: correctAnswer,
+      expectedAnswer: correctAnswer || (questionContent.expectedAnswer ?? "").toString().trim(),
       answer: normalizedStudentAnswer,
       questionType,
     });

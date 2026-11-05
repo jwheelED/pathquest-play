@@ -611,6 +611,14 @@ serve(async (req) => {
       // Don't override with instructor's default preference
       finalType = 'short_answer';
       console.log(`📝 Respecting explicit short_answer type from preview dialog`);
+    } else if (
+      source === "passive_detection" &&
+      (normalizedSuggestedType === "multiple_choice" || normalizedSuggestedType === "poll")
+    ) {
+      // Sent from On Deck: the instructor saw this format, so send exactly that
+      // even if the choices weren't ready yet (they are generated below).
+      finalType = normalizedSuggestedType;
+      console.log(`📝 Respecting On Deck format: ${finalType}`);
     } else if (instructorPreference === "coding") {
       // When instructor prefers coding, fetch their coding style and use it
       const { data: codingPref } = await supabase
