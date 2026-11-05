@@ -51,6 +51,37 @@ export function RecapScreen({ title, items }: RecapScreenProps) {
         />
       </div>
 
+      {/* Answer pictures from this session */}
+      {items.some((i) => i.imageUrl) && (
+        <div className="flex flex-col gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--text-subtle))]">
+            Answers, illustrated
+          </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {items
+              .filter((i) => i.imageUrl)
+              .map((i) => (
+                <figure
+                  key={i.questionId}
+                  className="bg-white rounded-[var(--radius-xl)] border border-[hsl(var(--slate-200))] overflow-hidden"
+                >
+                  <img
+                    src={i.imageUrl ?? undefined}
+                    alt={`Illustration of the answer to question ${i.questionNumber}`}
+                    loading="lazy"
+                    className="w-full h-[140px] object-cover"
+                    onError={(e) => { e.currentTarget.parentElement?.remove(); }}
+                  />
+                  <figcaption className="p-3 text-sm text-[hsl(var(--text-muted-live))]">
+                    <span className="font-semibold text-[hsl(var(--ink))]">Q{i.questionNumber}</span>{" "}
+                    {i.question}
+                  </figcaption>
+                </figure>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Survey strip */}
       <div className="flex flex-col items-center gap-3 p-5 border border-dashed border-[hsl(var(--slate-300))] rounded-[var(--radius-xl)]">
         <p className="text-sm text-[hsl(var(--text-muted-live))]">

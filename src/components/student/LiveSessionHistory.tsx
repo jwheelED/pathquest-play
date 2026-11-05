@@ -16,6 +16,8 @@ interface LiveResponseRow {
   responded_at: string;
   live_questions: {
     question_number: number;
+    image_url: string | null;
+    image_status: string | null;
     question_content: { question?: string; correctAnswer?: string; type?: string } | null;
   } | null;
 }
@@ -64,7 +66,7 @@ export function LiveSessionHistory() {
             "id, joined_at, session_id, " +
               "live_sessions(title, session_code, created_at), " +
               "live_responses(id, answer, is_correct, confidence_level, ai_grade, ai_feedback, points_earned, responded_at, " +
-              "live_questions(question_number, question_content))",
+              "live_questions(question_number, question_content, image_url, image_status))",
           )
           .eq("user_id", authData.user.id)
           .order("joined_at", { ascending: false })
@@ -171,6 +173,15 @@ export function LiveSessionHistory() {
                               </Badge>
                             )}
                           </div>
+                          {resp.live_questions?.image_status === "ready" && resp.live_questions.image_url && (
+                            <img
+                              src={resp.live_questions.image_url}
+                              alt="Illustration of the correct answer"
+                              loading="lazy"
+                              className="mt-2 w-full max-w-sm h-32 object-cover rounded-md border border-border"
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                          )}
                           {resp.ai_feedback && (
                             <p className="text-xs text-muted-foreground mt-1.5 italic">
                               {resp.ai_feedback}

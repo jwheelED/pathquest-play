@@ -1,3 +1,4 @@
+import { stripOptionLabel } from "@/lib/optionLabel";
 import { toast as sonnerToast } from "sonner";
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -447,18 +448,32 @@ export function QuestionOnDeck({
   // Pre-generate the live-session picture while the question sits On Deck,
   // so it's ready the moment the instructor presses Send. The server skips
   // this when no live session is active.
-  const imagePrepRef = useRef<{ text: string; key: string } | null>(null);
+  // The picture illustrates the correct answer (shown after students answer),
+  // so wait until an answer exists and has settled before drawing it.
+  const imagePrepRef = useRef<{ text: string; solution: string; key: string } | null>(null);
+  const imageSolution = (() => {
+    if (effectiveFormat === 'multiple_choice') {
+      const idx = correctAnswer.charCodeAt(0) - 65;
+      return stripOptionLabel(mcqOptions[idx] || '').trim();
+    }
+    if (effectiveFormat === 'poll') return '';
+    return expectedAnswer.trim();
+  })();
   useEffect(() => {
-    if (!candidate?.text) return;
-    if (imagePrepRef.current?.text === candidate.text) return;
-    const key = crypto.randomUUID();
-    imagePrepRef.current = { text: candidate.text, key };
-    supabase.functions
-      .invoke('generate-question-image', {
-        body: { mode: 'prepare', prepKey: key, questionText: candidate.text },
-      })
-      .catch(() => { /* best effort — send falls back to generating */ });
-  }, [candidate?.text]);
+    if (!candidate?.text || !imageSolution) return;
+    const prev = imagePrepRef.current;
+    if (prev?.text === candidate.text && prev.solution === imageSolution) return;
+    const t = setTimeout(() => {
+      const key = crypto.randomUUID();
+      imagePrepRef.current = { text: candidate.text, solution: imageSolution, key };
+      supabase.functions
+        .invoke('generate-question-image', {
+          body: { mode: 'prepare', prepKey: key, questionText: candidate.text, solutionText: imageSolution },
+        })
+        .catch(() => { /* best effort — send falls back to generating */ });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [candidate?.text, imageSolution]);
 
   // Reset generated state when candidate is cleared
   useEffect(() => {
@@ -679,7 +694,9 @@ export function QuestionOnDeck({
     }
 
     const prep = imagePrepRef.current;
-    if (prep && candidate && prep.text === candidate.text) data.imagePrepKey = prep.key;
+    if (prep && candidate && prep.text === candidate.text && prep.solution === imageSolution) {
+      data.imagePrepKey = prep.key;
+    }
     onSendNow(questionText, data);
   };
 

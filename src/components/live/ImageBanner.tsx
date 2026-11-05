@@ -8,7 +8,7 @@ interface ImageBannerProps {
 }
 
 /** Stop showing an empty "drawing" box if the picture never arrives. */
-const PENDING_GIVE_UP_MS = 30_000;
+const PENDING_GIVE_UP_MS = 60_000;
 
 export function ImageBanner({ imageUrl, imageStatus }: ImageBannerProps) {
   const [loaded, setLoaded] = useState(false);
@@ -42,7 +42,7 @@ export function ImageBanner({ imageUrl, imageStatus }: ImageBannerProps) {
       {imageUrl && (
         <img
           src={imageUrl}
-          alt="Generated illustration for this check-in"
+          alt="Illustration of the correct answer"
           onLoad={() => setLoaded(true)}
           onError={() => setBroken(true)}
           className={`w-full h-full object-cover transition-all ${
@@ -68,12 +68,12 @@ export function ImageBanner({ imageUrl, imageStatus }: ImageBannerProps) {
           {isPending || !loaded ? (
             <>
               <WandSparkles className="w-3.5 h-3.5" />
-              Drawing from the last few minutes…
+              Illustrating the answer…
             </>
           ) : (
             <>
               <Sparkles className="w-3.5 h-3.5" />
-              Generated for this check-in
+              The answer, illustrated
             </>
           )}
         </div>

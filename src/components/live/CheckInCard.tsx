@@ -1,6 +1,5 @@
 import { Timer, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ImageBanner } from "./ImageBanner";
 import { ConfidenceRow } from "./ConfidenceRow";
 import type { LiveQuestion } from "./useSessionState";
 import { stripOptionLabel } from "@/lib/optionLabel";
@@ -31,10 +30,6 @@ export function CheckInCard({
 
   return (
     <div className="w-full max-w-[780px] mx-auto bg-white rounded-[var(--radius-xl)] shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Image banner */}
-      {question.image_kind && (
-        <ImageBanner imageUrl={question.image_url} imageStatus={question.image_status} />
-      )}
 
       {/* Body */}
       <div className="p-5 px-7 flex flex-col gap-3.5">

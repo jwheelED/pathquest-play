@@ -1,13 +1,15 @@
 import { ArrowRight, Lightbulb, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { FeedbackData } from "./useSessionState";
+import type { FeedbackData, LiveQuestion } from "./useSessionState";
+import { ImageBanner } from "./ImageBanner";
 
 interface FeedbackCardProps {
   feedback: FeedbackData;
+  question?: LiveQuestion | null;
   onDismiss: () => void;
 }
 
-export function FeedbackCard({ feedback, onDismiss }: FeedbackCardProps) {
+export function FeedbackCard({ feedback, question, onDismiss }: FeedbackCardProps) {
   const { wasCorrect, selectedAnswer, correctAnswer, explanation, sameAnswerPct, aiGrade, aiFeedback } = feedback;
   const isWritten = selectedAnswer.length > 1 && !/^[A-D]([).\-\s]|$)/.test(selectedAnswer);
 
@@ -57,6 +59,13 @@ export function FeedbackCard({ feedback, onDismiss }: FeedbackCardProps) {
           <AnswerTile letter={selectedAnswer} variant="incorrect" />
           <ArrowRight className="w-5 h-5 text-[hsl(var(--slate-400))]" />
           <AnswerTile letter={correctAnswer} variant="correct" />
+        </div>
+      )}
+
+      {/* Picture of the correct answer */}
+      {question?.image_kind && (
+        <div className="-mx-8 overflow-hidden">
+          <ImageBanner imageUrl={question.image_url} imageStatus={question.image_status} />
         </div>
       )}
 

@@ -19,6 +19,24 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 // Shuffle MCQ options so the correct answer isn't always A
 // Uses index tracking instead of indexOf to handle duplicate option text correctly
+/** Text describing the correct answer, used to draw the post-answer picture. */
+function solutionForImage(q: Record<string, unknown>): string {
+  const options = Array.isArray(q.options) ? (q.options as unknown[]).map(String) : [];
+  const ca = typeof q.correctAnswer === "string" ? q.correctAnswer.trim() : "";
+  let answer = "";
+  if (ca && options.length) {
+    const idx = /^[A-D]$/i.test(ca) ? ca.toUpperCase().charCodeAt(0) - 65 : -1;
+    answer = idx >= 0 && options[idx] ? options[idx] : ca;
+    answer = answer.replace(/^[A-D][).:]\s+/, "");
+  } else if (typeof q.expectedAnswer === "string") {
+    answer = q.expectedAnswer;
+  } else if (ca) {
+    answer = ca;
+  }
+  const explanation = typeof q.explanation === "string" ? q.explanation : "";
+  return [answer, explanation].filter(Boolean).join(" — ").slice(0, 600);
+}
+
 const shuffleMCQOptions = (mcq: { question: string; options: string[]; correctAnswer: string; explanation: string }) => {
   if (!mcq?.options || mcq.options.length !== 4 || !mcq.correctAnswer) return mcq;
 
@@ -1055,6 +1073,7 @@ serve(async (req) => {
           body: JSON.stringify({
             questionId: liveQuestion.id,
             questionText: formattedQuestion.question,
+            solutionText: solutionForImage(formattedQuestion),
             courseTitle,
             imageKind,
             prepKey,

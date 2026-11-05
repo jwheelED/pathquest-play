@@ -33,6 +33,7 @@ async function waitForPrepared(prepKey: string, maxMs: number): Promise<string |
 
 async function generateAndUpload(
   questionText: string,
+  solutionText: string,
   courseTitle: string | undefined,
   imageKind: "illustration" | "diagram",
   publicId?: string,
@@ -47,10 +48,15 @@ async function generateAndUpload(
     const styleGuide =
       imageKind === "diagram"
         ? "Clean, labeled educational diagram with simple shapes, arrows, and annotations. White background, minimal color palette using teal/emerald accents. No text beyond short labels."
-        : "Clean, flat educational illustration. Soft pastel colors with emerald/teal accents on a light background. Simple, conceptual, no photorealism. No text in the image.";
+        : "Clean, flat educational illustration. Soft pastel colors with emerald/teal accents on a light background. Simple, conceptual, no photorealism. The only text allowed is the key answer itself (a number, word or short label) shown large and legible.";
 
     const courseContext = courseTitle ? ` for a ${courseTitle} course` : "";
-    const prompt = `${styleGuide}\n\nConcept: ${questionText}${courseContext}\n\nCreate a simple, clear visual that helps a student understand this concept at a glance.`;
+    // The picture is shown AFTER the student answers, so it illustrates the
+    // correct answer (e.g. a large "206" surrounded by bones), not the question.
+    const solution = solutionText.trim();
+    const prompt = solution
+      ? `${styleGuide}\n\nQuestion${courseContext}: ${questionText}\nCorrect answer: ${solution}\n\nCreate a simple, memorable visual that shows and reinforces this correct answer. Make the answer the clear focal point (for a number or term, show it prominently with imagery of the concept around it).`
+      : `${styleGuide}\n\nConcept: ${questionText}${courseContext}\n\nCreate a simple, clear visual that helps a student understand this concept at a glance.`;
 
     // DALL-E 3 was retired by OpenAI. GPT Image models always return base64
     // and reject `response_format`; "low" quality is the fastest (~6s).
@@ -113,6 +119,8 @@ serve(async (req) => {
     questionId = body.questionId;
     isPrepare = body.mode === "prepare";
     const questionText: string = body.questionText;
+    const solutionText: string =
+      typeof body.solutionText === "string" ? body.solutionText.slice(0, 600) : "";
     const courseTitle: string | undefined = body.courseTitle;
     const imageKind: "illustration" | "diagram" = body.imageKind || "illustration";
     const prepKey: string | null =
@@ -146,7 +154,7 @@ serve(async (req) => {
       }
       const lower = questionText.toLowerCase();
       const kind = DIAGRAM_KEYWORDS.some((k) => lower.includes(k)) ? "diagram" : "illustration";
-      const url = await generateAndUpload(questionText, courseTitle, kind, prepPublicId(prepKey));
+      const url = await generateAndUpload(questionText, solutionText, courseTitle, kind, prepPublicId(prepKey));
       console.log(`✅ Pre-generated image ready: ${url}`);
       return new Response(JSON.stringify({ success: true, imageUrl: url }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -166,7 +174,7 @@ serve(async (req) => {
       if (publicUrl) console.log(`♻️ Reusing pre-generated image for ${questionId}`);
     }
     if (!publicUrl) {
-      publicUrl = await generateAndUpload(questionText, courseTitle, imageKind);
+      publicUrl = await generateAndUpload(questionText, solutionText, courseTitle, imageKind);
     }
 
     console.log(`✅ Image uploaded: ${publicUrl}`);

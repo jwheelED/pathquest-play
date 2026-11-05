@@ -59,6 +59,8 @@ export interface RecapItem {
   correctAnswer: string;
   confidence: number | null;
   changedMind: boolean;
+  questionId: string;
+  imageUrl: string | null;
 }
 
 const QUESTION_DURATION = 30;
@@ -191,6 +193,14 @@ export function useSessionState(sessionCode: string | undefined) {
         { event: "UPDATE", schema: "public", table: "live_questions", filter: `session_id=eq.${sessionId}` },
         (payload) => {
           const updated = payload.new as Record<string, unknown>;
+          if (updated.image_status === "ready" && typeof updated.image_url === "string") {
+            const url = updated.image_url;
+            setRecapData((items) =>
+              items.some((i) => i.questionId === updated.id && i.imageUrl !== url)
+                ? items.map((i) => (i.questionId === updated.id ? { ...i, imageUrl: url } : i))
+                : items,
+            );
+          }
           setCurrentQuestion((prev) => {
             if (!prev || prev.id !== updated.id) return prev;
             return {
@@ -342,6 +352,8 @@ export function useSessionState(sessionCode: string | undefined) {
         correctAnswer: correct || "",
         confidence,
         changedMind: false,
+        questionId: currentQuestion.id,
+        imageUrl: currentQuestion.image_status === "ready" ? currentQuestion.image_url : null,
       },
     ]);
 

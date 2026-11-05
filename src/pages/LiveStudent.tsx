@@ -93,7 +93,7 @@ const LiveStudent = () => {
         )}
 
         {phase === "feedback" && feedbackData && (
-          <FeedbackCard feedback={feedbackData} onDismiss={dismissFeedback} />
+          <FeedbackCard feedback={feedbackData} question={currentQuestion} onDismiss={dismissFeedback} />
         )}
 
         {phase === "recap" && (
