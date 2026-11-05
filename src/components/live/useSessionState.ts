@@ -152,10 +152,19 @@ export function useSessionState(sessionCode: string | undefined) {
 
   const handleNewQuestion = useCallback((raw: Record<string, unknown>) => {
     const q = normalizeQuestion(raw);
-    if (!q || answeredIdsRef.current.has(q.id)) return;
+    if (!q) return;
     // Same question again (fallback poll): only refresh its picture — never
-    // reset the participant's choice, confidence or timer.
+    // reset the participant's choice, confidence or timer. This must also run
+    // after answering, since the answer picture is shown on the feedback card.
     if (currentQuestionIdRef.current === q.id) {
+      if (q.image_status === "ready" && q.image_url) {
+        const url = q.image_url;
+        setRecapData((items) =>
+          items.some((i) => i.questionId === q.id && i.imageUrl !== url)
+            ? items.map((i) => (i.questionId === q.id ? { ...i, imageUrl: url } : i))
+            : items,
+        );
+      }
       setCurrentQuestion((prev) => {
         if (!prev || prev.id !== q.id) return prev;
         if (
@@ -167,6 +176,7 @@ export function useSessionState(sessionCode: string | undefined) {
       });
       return;
     }
+    if (answeredIdsRef.current.has(q.id)) return;
     currentQuestionIdRef.current = q.id;
     setCurrentQuestion(q);
     setSelectedOption(null);
@@ -265,7 +275,7 @@ export function useSessionState(sessionCode: string | undefined) {
   // Fallback polling. Guests can't always receive picture updates live, so
   // check more often while the current question's picture is still drawing.
   const waitingForImage =
-    phase === "checkin" &&
+    (phase === "checkin" || phase === "feedback") &&
     !!currentQuestion?.image_kind &&
     currentQuestion.image_status === "pending";
   useEffect(() => {
