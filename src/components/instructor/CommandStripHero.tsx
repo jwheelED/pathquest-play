@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { trackSessionStarted, trackSessionEnded } from "@/lib/posthogTracking";
+import { defaultSessionTitle } from "@/lib/sessionTitle";
 
 interface CommandStripHeroProps {
   activeSession: Record<string, unknown> | null;
@@ -77,14 +78,15 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides, 
   };
 
   const handleStartSession = async () => {
-    if (!sessionTitle.trim() || !selectedCourseId) {
-      toast.error(!sessionTitle.trim() ? "Enter a session title" : "Select a course first");
+    if (!selectedCourseId) {
+      toast.error("Select a course first");
       return;
     }
     setIsCreating(true);
     try {
+      const title = sessionTitle.trim() || defaultSessionTitle(selectedCourse?.title);
       const { data, error } = await supabase.functions.invoke("create-live-session", {
-        body: { title: sessionTitle.trim(), courseId: selectedCourseId },
+        body: { title, courseId: selectedCourseId },
       });
       if (error) throw error;
       setActiveSession?.(data.session);
@@ -198,14 +200,15 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides, 
             <p className="text-sm text-charcoal-subtle mb-4 flex items-center gap-1.5">
               <ExternalLink className="w-3.5 h-3.5" />
               Students join at <span className="font-medium">edvana.dev/join</span> with code <span className="font-mono font-semibold">{sessionCode}</span>
+              <span className="mx-1">·</span> Mic stays off until you press Start Recording
             </p>
           )}
 
-          {/* Start session input (when not live) */}
+          {/* Optional title (when not live) — defaults to course + date */}
           {!isLive && (
             <div className="flex flex-wrap items-center gap-3 mb-6">
               <Input
-                placeholder="Session title (e.g., 'Lecture 5 - Data Structures')"
+                placeholder={`Title (optional) — defaults to "${defaultSessionTitle(selectedCourse.title)}"`}
                 value={sessionTitle}
                 onChange={(e) => setSessionTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleStartSession()}
@@ -256,7 +259,7 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides, 
               <>
                 <Button
                   onClick={handleStartSession}
-                  disabled={isCreating || !sessionTitle.trim()}
+                  disabled={isCreating}
                   className={cn(
                     "rounded-full px-6 h-11 gap-2.5 font-medium shadow-sm",
                     "bg-emerald-600 hover:bg-emerald-700 text-white",
@@ -264,7 +267,7 @@ export function CommandStripHero({ activeSession, onStartLive, onPresentSlides, 
                   )}
                 >
                   <Radio className="w-4 h-4" />
-                  {isCreating ? "Starting..." : "Start Live Session"}
+                  {isCreating ? "Starting..." : "Start Session"}
                 </Button>
                 <Button
                   variant="outline"

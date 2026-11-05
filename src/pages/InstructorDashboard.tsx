@@ -34,6 +34,7 @@ import { SettingsPanel } from "@/components/instructor/SettingsPanel";
 import { cn } from "@/lib/utils";
 import { onInstructorPrefsUpdated } from "@/lib/instructorPrefsEvents";
 import { useCourseContext } from "@/hooks/useCourseContext";
+import { defaultSessionTitle } from "@/lib/sessionTitle";
 import { useLiveTranscriptBroadcast } from "@/hooks/useLiveTranscriptBroadcast";
 import { SavedSummariesTab } from "@/components/instructor/SavedSummariesTab";
 import { LiveSessionStrip } from "@/components/instructor/LiveSessionStrip";
@@ -130,7 +131,6 @@ export default function InstructorDashboard() {
   // recording (even without explicitly opening a live class). This lets
   // enrolled students see the live transcript from their class dashboard the
   // moment "Start Recording" is pressed.
-  const autoCreatedSessionRef = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const ensureSession = async () => {
@@ -140,15 +140,18 @@ export default function InstructorDashboard() {
         // / CommandStripHero) so the recording session gets a real session_code
         // and server-side validation instead of a bare client insert.
         const { data, error } = await supabase.functions.invoke("create-live-session", {
-          body: { title: "Recording session", courseId: selectedCourseId ?? undefined },
+          body: { title: defaultSessionTitle(selectedCourse?.title), courseId: selectedCourseId ?? undefined },
         });
         if (cancelled) return;
         if (error || !data?.session?.id) {
           console.warn("Failed to auto-create live session for recording", error);
           return;
         }
-        autoCreatedSessionRef.current = data.session.id;
+        // Becomes the real class session: join code + QR show immediately,
+        // and stopping the mic only pauses — "End Session" closes it.
+        setActiveSession(data.session);
         setLiveSessionId(data.session.id);
+        toast.success(`Session started! Students join with code ${data.session.session_code}`);
       } catch (err) {
         console.warn("Auto live_session creation threw", err);
       }
@@ -157,24 +160,7 @@ export default function InstructorDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [isListening, liveSessionId, currentUser?.id, selectedCourseId]);
-
-  // When recording stops, close out any session we auto-created so the
-  // "Live now" indicator disappears from the student dashboard.
-  useEffect(() => {
-    if (isListening) return;
-    const id = autoCreatedSessionRef.current;
-    if (!id) return;
-    autoCreatedSessionRef.current = null;
-    supabase
-      .from("live_sessions")
-      .update({ is_active: false })
-      .eq("id", id)
-      .then(({ error }) => {
-        if (error) console.warn("Failed to close auto live session", error);
-      });
-    setLiveSessionId((curr) => (curr === id ? null : curr));
-  }, [isListening]);
+  }, [isListening, liveSessionId, currentUser?.id, selectedCourseId, selectedCourse?.title]);
 
 
   useEffect(() => {
