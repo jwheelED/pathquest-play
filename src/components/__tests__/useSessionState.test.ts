@@ -40,6 +40,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); });
 
 describe("live question delivery", () => {
+  it("keeps an answer open past the former timeout and submits only on request", async () => {
+    mocks.invoke.mockResolvedValue(state([question(1)]));
+    const hook = renderHook(() => useSessionState("123456"));
+    await flush();
+    act(() => { hook.result.current.selectOption("B"); hook.result.current.selectConfidence(2); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(hook.result.current.phase).toBe("checkin");
+    expect(hook.result.current.selectedOption).toBe("B");
+    expect(mocks.invoke.mock.calls.filter(([name]) => name === "submit-live-response")).toHaveLength(0);
+    await act(async () => { await hook.result.current.submitAnswer(); });
+    expect(mocks.invoke).toHaveBeenCalledWith("submit-live-response", {
+      body: { questionId: "q1", participantId: "participant", answer: "B", confidenceLevel: "2", responseTimeMs: 120_000 },
+    });
+    expect(hook.result.current.phase).toBe("feedback");
+  });
+
   it("recovers a missed realtime question within three seconds without needing an image", async () => {
     const hook = renderHook(() => useSessionState("123456"));
     await flush();

@@ -23,7 +23,6 @@ const LiveStudent = () => {
     currentQuestion,
     selectedOption,
     confidence,
-    timeLeft,
     feedbackData,
     roomStats,
     recapData,
@@ -74,7 +73,6 @@ const LiveStudent = () => {
               question={currentQuestion}
               selectedOption={selectedOption}
               confidence={confidence}
-              timeLeft={timeLeft}
               onSelectOption={selectOption}
               onSelectConfidence={selectConfidence}
               onSubmit={submitAnswer}
@@ -84,7 +82,6 @@ const LiveStudent = () => {
               question={currentQuestion}
               selectedOption={selectedOption}
               confidence={confidence}
-              timeLeft={timeLeft}
               onSelectOption={selectOption}
               onSelectConfidence={selectConfidence}
               onSubmit={submitAnswer}

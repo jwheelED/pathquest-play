@@ -1,4 +1,4 @@
-import { Timer, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfidenceRow } from "./ConfidenceRow";
 import type { LiveQuestion } from "./useSessionState";
@@ -8,7 +8,6 @@ interface CheckInCardProps {
   question: LiveQuestion;
   selectedOption: string | null;
   confidence: number | null;
-  timeLeft: number;
   onSelectOption: (opt: string) => void;
   onSelectConfidence: (c: number) => void;
   onSubmit: () => void;
@@ -18,7 +17,6 @@ export function CheckInCard({
   question,
   selectedOption,
   confidence,
-  timeLeft,
   onSelectOption,
   onSelectConfidence,
   onSubmit,
@@ -26,7 +24,6 @@ export function CheckInCard({
   const qc = question.question_content;
   const options = qc.options || [];
   const canSubmit = !!selectedOption && selectedOption.trim() !== "" && confidence !== null;
-  const timerStr = `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, "0")}`;
 
   return (
     <div className="w-full max-w-[780px] mx-auto bg-white rounded-[var(--radius-xl)] shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -40,10 +37,6 @@ export function CheckInCard({
               {qc.type === "multiple_choice" ? "Check-in" : qc.type === "poll" ? "Poll" : "Question"}
             </span>
             <span className="text-xs text-[hsl(var(--text-subtle))]">From the last few minutes</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[hsl(var(--slate-100))] text-[13px] font-mono text-[hsl(var(--ink))]">
-            <Timer className="w-3.5 h-3.5" />
-            {timerStr}
           </div>
         </div>
 

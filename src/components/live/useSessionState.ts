@@ -33,8 +33,6 @@ export interface SessionState {
   currentQuestion: LiveQuestion | null;
   selectedOption: string | null;
   confidence: number | null;
-  timeLeft: number;
-  totalDuration: number;
   lostMeSentAt: number | null;
   feedbackData: FeedbackData | null;
   roomStats: { inRoom: number; sameAnswerPct: number | null };
@@ -63,7 +61,6 @@ export interface RecapItem {
   imageUrl: string | null;
 }
 
-const QUESTION_DURATION = 30;
 const LOST_ME_DEBOUNCE_MS = 60_000;
 
 export function useSessionState(sessionCode: string | undefined) {
@@ -74,8 +71,6 @@ export function useSessionState(sessionCode: string | undefined) {
   const [currentQuestion, setCurrentQuestion] = useState<LiveQuestion | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(QUESTION_DURATION);
   const [lostMeSentAt, setLostMeSentAt] = useState<number | null>(null);
   const [feedbackData, setFeedbackData] = useState<FeedbackData | null>(null);
   const [roomStats, setRoomStats] = useState({ inRoom: 0, sameAnswerPct: null as number | null });
@@ -86,7 +81,7 @@ export function useSessionState(sessionCode: string | undefined) {
   const showingQuestionRef = useRef(false);
   const sessionEndedRef = useRef(false);
   const initialQuestionNumberRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const questionOpenedAtRef = useRef(0);
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
   const [notFound, setNotFound] = useState(false);
@@ -164,15 +159,14 @@ export function useSessionState(sessionCode: string | undefined) {
     setConfidence(null);
     setFeedbackData(null);
     setPhase("checkin");
-    setTotalDuration(QUESTION_DURATION);
-    setTimeLeft(QUESTION_DURATION);
+    questionOpenedAtRef.current = Date.now();
   }, []);
 
   const handleNewQuestion = useCallback((raw: Record<string, unknown>) => {
     const q = normalizeQuestion(raw);
     if (!q) return;
     // Same question again (fallback poll): only refresh its picture — never
-    // reset the participant's choice, confidence or timer. This must also run
+    // reset the participant's choice or confidence. This must also run
     // after answering, since the answer picture is shown on the feedback card.
     if (currentQuestionIdRef.current === q.id) {
       if (q.image_status === "ready" && q.image_url) {
@@ -269,33 +263,6 @@ export function useSessionState(sessionCode: string | undefined) {
     };
   }, [sessionId, handleNewQuestion]);
 
-  // Timer countdown
-  useEffect(() => {
-    if (phase !== "checkin" || timeLeft <= 0) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      return;
-    }
-    timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [phase, timeLeft]);
-
-  // Auto-submit on timer expiry
-  useEffect(() => {
-    if (phase === "checkin" && timeLeft === 0 && currentQuestion && !answeredIdsRef.current.has(currentQuestion.id)) {
-      submitAnswer();
-    }
-  }, [timeLeft, phase]);
-
   // Guest delivery relies on polling, not authenticated Realtime. Recover
   // every newer row, in order, even when several arrived between polls.
   useEffect(() => {
@@ -371,7 +338,7 @@ export function useSessionState(sessionCode: string | undefined) {
           participantId,
           answer,
           confidenceLevel: confidence === null ? null : String(confidence),
-          responseTimeMs: (totalDuration - timeLeft) * 1000,
+          responseTimeMs: Math.max(0, Date.now() - questionOpenedAtRef.current),
         },
       });
       const resp = data?.response as
@@ -411,7 +378,7 @@ export function useSessionState(sessionCode: string | undefined) {
     ]);
 
     if (!sessionEndedRef.current) setPhase("feedback");
-  }, [currentQuestion, participantId, selectedOption, confidence, totalDuration, timeLeft]);
+  }, [currentQuestion, participantId, selectedOption, confidence]);
 
   const dismissFeedback = useCallback(() => {
     if (sessionEndedRef.current) return;
@@ -452,8 +419,6 @@ export function useSessionState(sessionCode: string | undefined) {
     currentQuestion,
     selectedOption,
     confidence,
-    timeLeft,
-    totalDuration,
     lostMeSentAt,
     feedbackData,
     roomStats,

@@ -1,4 +1,4 @@
-import { Timer, Send, Quote } from "lucide-react";
+import { Send, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImageBanner } from "./ImageBanner";
 import { ConfidenceRow } from "./ConfidenceRow";
@@ -9,7 +9,6 @@ interface DiagramCheckInProps {
   question: LiveQuestion;
   selectedOption: string | null;
   confidence: number | null;
-  timeLeft: number;
   onSelectOption: (opt: string) => void;
   onSelectConfidence: (c: number) => void;
   onSubmit: () => void;
@@ -19,7 +18,6 @@ export function DiagramCheckIn({
   question,
   selectedOption,
   confidence,
-  timeLeft,
   onSelectOption,
   onSelectConfidence,
   onSubmit,
@@ -27,7 +25,6 @@ export function DiagramCheckIn({
   const qc = question.question_content;
   const options = qc.options || [];
   const canSubmit = selectedOption !== null && confidence !== null;
-  const timerStr = `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, "0")}`;
 
   return (
     <div className="w-full max-w-[780px] mx-auto flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -56,10 +53,6 @@ export function DiagramCheckIn({
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--sky-600))]">
               Application
             </span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[hsl(var(--slate-100))] text-[13px] font-mono text-[hsl(var(--ink))]">
-            <Timer className="w-3.5 h-3.5" />
-            {timerStr}
           </div>
         </div>
 
