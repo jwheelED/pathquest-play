@@ -82,6 +82,10 @@ export function useSessionState(sessionCode: string | undefined) {
   const [recapData, setRecapData] = useState<RecapItem[]>([]);
 
   const answeredIdsRef = useRef<Set<string>>(new Set());
+  const pendingQuestionsRef = useRef<LiveQuestion[]>([]);
+  const showingQuestionRef = useRef(false);
+  const sessionEndedRef = useRef(false);
+  const initialQuestionNumberRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelsRef = useRef<RealtimeChannel[]>([]);
 
@@ -108,6 +112,7 @@ export function useSessionState(sessionCode: string | undefined) {
           return;
         }
         if (!data.session.is_active) {
+          sessionEndedRef.current = true;
           setPhase("recap");
           return;
         }
@@ -139,6 +144,7 @@ export function useSessionState(sessionCode: string | undefined) {
         }
 
         if (data.questions?.length > 0) {
+          initialQuestionNumberRef.current = Number(data.questions[0].question_number) || 0;
           handleNewQuestion(data.questions[0]);
         }
       } catch {
@@ -149,6 +155,18 @@ export function useSessionState(sessionCode: string | undefined) {
   }, [sessionCode]);
 
   const currentQuestionIdRef = useRef<string | null>(null);
+
+  const showQuestion = useCallback((q: LiveQuestion) => {
+    showingQuestionRef.current = true;
+    currentQuestionIdRef.current = q.id;
+    setCurrentQuestion(q);
+    setSelectedOption(null);
+    setConfidence(null);
+    setFeedbackData(null);
+    setPhase("checkin");
+    setTotalDuration(QUESTION_DURATION);
+    setTimeLeft(QUESTION_DURATION);
+  }, []);
 
   const handleNewQuestion = useCallback((raw: Record<string, unknown>) => {
     const q = normalizeQuestion(raw);
@@ -177,15 +195,19 @@ export function useSessionState(sessionCode: string | undefined) {
       return;
     }
     if (answeredIdsRef.current.has(q.id)) return;
-    currentQuestionIdRef.current = q.id;
-    setCurrentQuestion(q);
-    setSelectedOption(null);
-    setConfidence(null);
-    setFeedbackData(null);
-    setPhase("checkin");
-    setTotalDuration(QUESTION_DURATION);
-    setTimeLeft(QUESTION_DURATION);
-  }, []);
+    if (sessionEndedRef.current) return;
+    // Do not replay questions from before this participant opened the room.
+    if (q.question_number < initialQuestionNumberRef.current) return;
+    if (showingQuestionRef.current) {
+      const pending = pendingQuestionsRef.current;
+      const existing = pending.findIndex((item) => item.id === q.id);
+      if (existing >= 0) pending[existing] = q;
+      else pending.push(q);
+      pending.sort((a, b) => a.question_number - b.question_number);
+      return;
+    }
+    showQuestion(q);
+  }, [showQuestion]);
 
   // Realtime: new questions (INSERT) + image updates (UPDATE) + session end
   useEffect(() => {
@@ -231,6 +253,8 @@ export function useSessionState(sessionCode: string | undefined) {
         (payload) => {
           const updated = payload.new as Record<string, unknown>;
           if (updated.is_active === false) {
+            sessionEndedRef.current = true;
+            pendingQuestionsRef.current = [];
             setPhase("recap");
           }
         },
@@ -254,7 +278,7 @@ export function useSessionState(sessionCode: string | undefined) {
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
-          clearInterval(timerRef.current!);
+          if (timerRef.current) clearInterval(timerRef.current);
           return 0;
         }
         return t - 1;
@@ -272,31 +296,50 @@ export function useSessionState(sessionCode: string | undefined) {
     }
   }, [timeLeft, phase]);
 
-  // Fallback polling. Guests can't always receive picture updates live, so
-  // check more often while the current question's picture is still drawing.
-  const waitingForImage =
-    (phase === "checkin" || phase === "feedback") &&
-    !!currentQuestion?.image_kind &&
-    currentQuestion.image_status === "pending";
+  // Guest delivery relies on polling, not authenticated Realtime. Recover
+  // every newer row, in order, even when several arrived between polls.
   useEffect(() => {
     if (!sessionId || !sessionCode) return;
-    const interval = setInterval(async () => {
+    let cancelled = false;
+    let inFlight = false;
+    const poll = async () => {
+      if (inFlight || cancelled || sessionEndedRef.current) return;
+      inFlight = true;
       try {
-        const { data } = await supabase.functions.invoke("resolve-live-session", {
+        const { data, error } = await supabase.functions.invoke("resolve-live-session", {
           body: { sessionCode },
         });
-        if (data?.questions?.length > 0) {
-          handleNewQuestion(data.questions[0] as Record<string, unknown>);
-        }
+        if (cancelled || error) return;
         if (data?.session && !data.session.is_active) {
+          sessionEndedRef.current = true;
+          pendingQuestionsRef.current = [];
           setPhase("recap");
+          return;
+        }
+        if (Array.isArray(data?.questions)) {
+          const questions = data.questions as Record<string, unknown>[];
+          questions.slice().sort((a, b) => Number(a.question_number) - Number(b.question_number))
+            .forEach(handleNewQuestion);
         }
       } catch {
-        // silent
+        // The next poll or foreground event retries transient network errors.
+      } finally {
+        inFlight = false;
       }
-    }, waitingForImage ? 3_000 : 10_000);
-    return () => clearInterval(interval);
-  }, [sessionId, sessionCode, handleNewQuestion, waitingForImage]);
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") void poll(); };
+    const interval = setInterval(poll, 3_000);
+    window.addEventListener("online", poll);
+    window.addEventListener("focus", poll);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("online", poll);
+      window.removeEventListener("focus", poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [sessionId, sessionCode, handleNewQuestion]);
 
   const selectOption = useCallback((opt: string) => {
     if (phase !== "checkin") return;
@@ -308,7 +351,7 @@ export function useSessionState(sessionCode: string | undefined) {
   }, []);
 
   const submitAnswer = useCallback(async () => {
-    if (!currentQuestion || !participantId) return;
+    if (!currentQuestion || !participantId || answeredIdsRef.current.has(currentQuestion.id)) return;
     answeredIdsRef.current.add(currentQuestion.id);
 
     const answer = selectedOption || "";
@@ -367,14 +410,21 @@ export function useSessionState(sessionCode: string | undefined) {
       },
     ]);
 
-    setPhase("feedback");
+    if (!sessionEndedRef.current) setPhase("feedback");
   }, [currentQuestion, participantId, selectedOption, confidence, totalDuration, timeLeft]);
 
   const dismissFeedback = useCallback(() => {
+    if (sessionEndedRef.current) return;
+    const next = pendingQuestionsRef.current.shift();
+    if (next) {
+      showQuestion(next);
+      return;
+    }
+    showingQuestionRef.current = false;
     setPhase("listening");
     setCurrentQuestion(null);
     setFeedbackData(null);
-  }, []);
+  }, [showQuestion]);
 
   const sendLostMe = useCallback(async () => {
     if (!sessionId || !participantId) return;
