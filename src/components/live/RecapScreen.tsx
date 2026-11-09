@@ -69,7 +69,7 @@ export function RecapScreen({ title, items }: RecapScreenProps) {
                     src={i.imageUrl ?? undefined}
                     alt={`Illustration of the answer to question ${i.questionNumber}`}
                     loading="lazy"
-                    className="w-full h-[140px] object-cover"
+                    className="w-full aspect-[3/2] object-contain bg-[hsl(var(--slate-50))]"
                     onError={(e) => { e.currentTarget.parentElement?.remove(); }}
                   />
                   <figcaption className="p-3 text-sm text-[hsl(var(--text-muted-live))]">

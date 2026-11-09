@@ -178,7 +178,7 @@ export function LiveSessionHistory() {
                               src={resp.live_questions.image_url}
                               alt="Illustration of the correct answer"
                               loading="lazy"
-                              className="mt-2 w-full max-w-sm h-32 object-cover rounded-md border border-border"
+                              className="mt-2 w-full max-w-md aspect-[3/2] object-contain rounded-md border border-border bg-muted/40"
                               onError={(e) => { e.currentTarget.style.display = "none"; }}
                             />
                           )}

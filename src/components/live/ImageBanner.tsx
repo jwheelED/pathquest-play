@@ -38,14 +38,14 @@ export function ImageBanner({ imageUrl, imageStatus }: ImageBannerProps) {
   const isReady = imageStatus === "ready" && !!imageUrl && loaded;
 
   return (
-    <div className="relative w-full h-[168px] overflow-hidden bg-[hsl(var(--emerald-50))]">
+    <div className="relative w-full aspect-[3/2] max-h-[420px] overflow-hidden bg-[hsl(var(--emerald-50))]">
       {imageUrl && (
         <img
           src={imageUrl}
           alt="Illustration of the correct answer"
           onLoad={() => setLoaded(true)}
           onError={() => setBroken(true)}
-          className={`w-full h-full object-cover transition-all ${
+          className={`w-full h-full object-contain transition-all ${
             prefersReduced ? "duration-0" : "duration-[1200ms]"
           } ease-[cubic-bezier(.4,0,.2,1)] ${
             isReady

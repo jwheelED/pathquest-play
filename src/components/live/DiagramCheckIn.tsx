@@ -1,6 +1,5 @@
 import { Send, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ImageBanner } from "./ImageBanner";
 import { ConfidenceRow } from "./ConfidenceRow";
 import type { LiveQuestion } from "./useSessionState";
 import { stripOptionLabel } from "@/lib/optionLabel";
@@ -28,21 +27,18 @@ export function DiagramCheckIn({
 
   return (
     <div className="w-full max-w-[780px] mx-auto flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Top row: diagram + quote */}
-      <div className="grid grid-cols-[1fr_250px] gap-3 h-[190px]">
-        <div className="rounded-[var(--radius-xl)] overflow-hidden">
-          <ImageBanner imageUrl={question.image_url} imageStatus={question.image_status} />
-        </div>
-        <div className="flex flex-col gap-2 p-4 bg-white rounded-[var(--radius-xl)] border border-[hsl(var(--slate-200))]">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--text-subtle))]">
-            From the lecture
-          </span>
-          <div className="flex-1 flex items-start gap-2">
-            <Quote className="w-4 h-4 shrink-0 text-[hsl(var(--emerald-300))] mt-0.5" />
-            <p className="text-sm text-[hsl(var(--text-muted-live))] leading-relaxed line-clamp-5 italic">
-              {qc.question}
-            </p>
-          </div>
+      {/* Top row: lecture quote. The answer picture is intentionally not shown
+          here — it illustrates the correct answer and belongs on the feedback
+          screen only. */}
+      <div className="flex flex-col gap-2 p-4 bg-white rounded-[var(--radius-xl)] border border-[hsl(var(--slate-200))]">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--text-subtle))]">
+          From the lecture
+        </span>
+        <div className="flex items-start gap-2">
+          <Quote className="w-4 h-4 shrink-0 text-[hsl(var(--emerald-300))] mt-0.5" />
+          <p className="text-sm text-[hsl(var(--text-muted-live))] leading-relaxed italic">
+            {qc.question}
+          </p>
         </div>
       </div>
 
