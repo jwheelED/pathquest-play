@@ -1807,7 +1807,7 @@ export type Database = {
           confidence_level: string | null
           confidence_multiplier: number | null
           id: string
-          is_correct: boolean
+          is_correct: boolean | null
           participant_id: string
           points_earned: number | null
           question_id: string
@@ -1821,7 +1821,7 @@ export type Database = {
           confidence_level?: string | null
           confidence_multiplier?: number | null
           id?: string
-          is_correct: boolean
+          is_correct?: boolean | null
           participant_id: string
           points_earned?: number | null
           question_id: string
@@ -1835,7 +1835,7 @@ export type Database = {
           confidence_level?: string | null
           confidence_multiplier?: number | null
           id?: string
-          is_correct?: boolean
+          is_correct?: boolean | null
           participant_id?: string
           points_earned?: number | null
           question_id?: string

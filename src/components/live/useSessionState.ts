@@ -16,6 +16,8 @@ export interface LiveQuestion {
     type: string;
     language?: string;
     expectedAnswer?: string;
+    /** Auto-grade was off when sent: collected ungraded, grouped into themes. */
+    ungraded?: boolean;
   };
   question_number: number;
   sent_at: string;
@@ -47,6 +49,7 @@ export interface FeedbackData {
   sameAnswerPct: number | null;
   aiGrade?: number | null;
   aiFeedback?: string | null;
+  ungraded?: boolean;
 }
 
 export interface RecapItem {
@@ -360,6 +363,7 @@ export function useSessionState(sessionCode: string | undefined) {
       sameAnswerPct: null,
       aiGrade,
       aiFeedback,
+      ungraded: currentQuestion.question_content.ungraded === true,
     });
 
     setRecapData((prev) => [

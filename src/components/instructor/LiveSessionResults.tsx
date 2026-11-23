@@ -1,3 +1,4 @@
+import { LiveAnswerThemes } from "./LiveAnswerThemes";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ interface LiveResponse {
   participant_id: string;
   question_id: string;
   answer: string;
-  is_correct: boolean;
+  is_correct: boolean | null;
   responded_at: string;
   response_time_ms: number | null;
   ai_grade: number | null;
@@ -416,9 +417,9 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                       {/* Room signal badge */}
                       <Badge
                         variant="outline"
-                        className={`text-xs font-medium ${styles.badge}`}
+                        className={`text-xs font-medium ${group.question.question_content?.ungraded ? "" : styles.badge}`}
                       >
-                        {roomSignal.label}
+                        {group.question.question_content?.ungraded ? "Poll · not graded" : roomSignal.label}
                       </Badge>
                       {/* Response count */}
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -430,6 +431,14 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                 </AccordionTrigger>
 
                 <AccordionContent className="px-4 pb-4">
+                  {group.question.question_content?.ungraded ? (
+                    <div className="pt-2">
+                      <LiveAnswerThemes
+                        questionId={group.question.id}
+                        answers={group.responses.map((r) => ({ id: r.id, answer: r.answer }))}
+                      />
+                    </div>
+                  ) : (<>
                   <div className="space-y-3 pt-2">
                     {/* Room signal interpretation */}
                     <div className={`p-3 rounded-lg border ${styles.card}`}>
@@ -557,6 +566,7 @@ export const LiveSessionResults = ({ sessionId }: LiveSessionResultsProps) => {
                       );
                     })()}
                   </div>
+                  </>)}
                 </AccordionContent>
               </AccordionItem>
             );

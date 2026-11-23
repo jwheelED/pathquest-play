@@ -121,3 +121,26 @@ describe("handleSubmit AI grading for written answers", () => {
     expect((res.body as { response: { isCorrect: boolean } }).response.isCorrect).toBe(true);
   });
 });
+
+describe("ungraded short answers (auto-grade off)", () => {
+  const ungradedQ = {
+    question_content: { question: "Why do leaves change color?", type: "short_answer", correctAnswer: "Chlorophyll breaks down", ungraded: true },
+    question_number: 2, instructor_id: "i1", session_id: null,
+  };
+  it("stores the answer with no grade, no correctness and zero points, and never calls the grader", async () => {
+    const { client, calls } = makeMockSupabase({
+      live_questions: [{ data: ungradedQ }],
+      live_responses: [{ data: null }, { data: { id: "resp-u" } }],
+    });
+    let graderCalled = false;
+    const res = await handleSubmit({ ...base, answer: "the green goes away" }, {
+      supabase: client,
+      grade: async () => { graderCalled = true; return { grade: 100, feedback: "x" }; },
+    });
+    expect(res.status).toBe(200);
+    expect(graderCalled).toBe(false);
+    expect(res.body).toMatchObject({ response: { id: "resp-u", ungraded: true, isCorrect: null, pointsEarned: 0 } });
+    const insert = calls.find((c) => c.table === "live_responses" && c.op === "insert");
+    expect(insert?.payload).toMatchObject({ is_correct: null, points_earned: 0, ai_grade: null, confidence_level: null });
+  });
+});

@@ -10,8 +10,8 @@ interface FeedbackCardProps {
 }
 
 export function FeedbackCard({ feedback, question, onDismiss }: FeedbackCardProps) {
-  const { wasCorrect, selectedAnswer, correctAnswer, explanation, sameAnswerPct, aiGrade, aiFeedback } = feedback;
-  const isWritten = selectedAnswer.length > 1 && !/^[A-D]([).\-\s]|$)/.test(selectedAnswer);
+  const { wasCorrect, selectedAnswer, correctAnswer, explanation, sameAnswerPct, aiGrade, aiFeedback, ungraded } = feedback;
+  const isWritten = ungraded || (selectedAnswer.length > 1 && !/^[A-D]([).\-\s]|$)/.test(selectedAnswer));
 
   return (
     <div className="w-full max-w-[720px] mx-auto bg-white rounded-[var(--radius-xl)] shadow-md p-[30px_32px] flex flex-col gap-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -51,7 +51,7 @@ export function FeedbackCard({ feedback, question, onDismiss }: FeedbackCardProp
           {aiFeedback && <p className="text-sm leading-relaxed text-[hsl(var(--text-muted-live))]">{aiFeedback}</p>}
         </div>
       )}
-      {isWritten && typeof aiGrade !== "number" && (
+      {isWritten && !ungraded && typeof aiGrade !== "number" && (
         <p className="text-sm text-[hsl(var(--text-muted-live))]">Grading delayed — your instructor will review your answer.</p>
       )}
 

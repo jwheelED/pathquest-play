@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 interface LiveResponseRow {
   id: string;
   answer: string;
-  is_correct: boolean;
+  is_correct: boolean | null;
   confidence_level: string | null;
   ai_grade: number | null;
   ai_feedback: string | null;
@@ -133,7 +133,9 @@ export function LiveSessionHistory() {
                       className="rounded-lg border border-border bg-background p-3 space-y-1.5"
                     >
                       <div className="flex items-start gap-2">
-                        {resp.is_correct ? (
+                        {resp.is_correct === null ? (
+                          <MinusCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" aria-label="Not graded" />
+                        ) : resp.is_correct ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" aria-label="Correct" />
                         ) : resp.answer ? (
                           <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" aria-label="Incorrect" />
@@ -149,7 +151,9 @@ export function LiveSessionHistory() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Your answer: <span className="text-foreground">{resp.answer || "—"}</span>
-                            {!resp.is_correct && q?.correctAnswer ? (
+                            {resp.is_correct === null ? (
+                              <>{" · "}Not graded, shared with instructor</>
+                            ) : !resp.is_correct && q?.correctAnswer ? (
                               <>
                                 {" · "}Correct answer:{" "}
                                 <span className="text-emerald-700">{q.correctAnswer}</span>

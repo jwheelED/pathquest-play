@@ -23,7 +23,8 @@ export function CheckInCard({
 }: CheckInCardProps) {
   const qc = question.question_content;
   const options = qc.options || [];
-  const canSubmit = !!selectedOption && selectedOption.trim() !== "" && confidence !== null;
+  const ungraded = qc.ungraded === true;
+  const canSubmit = !!selectedOption && selectedOption.trim() !== "" && (ungraded || confidence !== null);
 
   return (
     <div className="w-full max-w-[780px] mx-auto bg-white rounded-[var(--radius-xl)] shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -97,7 +98,7 @@ export function CheckInCard({
         <div className="w-full h-px bg-[hsl(var(--slate-200))]" />
 
         {/* Confidence + Submit */}
-        <ConfidenceRow selected={confidence} onSelect={onSelectConfidence} />
+        {!ungraded && <ConfidenceRow selected={confidence} onSelect={onSelectConfidence} />}
 
         <Button
           onClick={onSubmit}
