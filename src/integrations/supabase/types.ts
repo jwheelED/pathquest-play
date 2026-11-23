@@ -5068,6 +5068,10 @@ export type Database = {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
+      is_live_participant_of_session: {
+        Args: { _participant_id: string; _session_id: string }
+        Returns: boolean
+      }
       is_org_owner: { Args: never; Returns: boolean }
       join_group_by_code: { Args: { _invite_code: string }; Returns: string }
       list_org_admins_with_scopes: {
