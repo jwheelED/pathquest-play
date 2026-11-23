@@ -1051,7 +1051,15 @@ serve(async (req) => {
         .insert({
           session_id: liveSession.id,
           instructor_id: user.id,
-          question_content: formattedQuestion,
+          question_content: (() => {
+            // Snapshot the auto-grade setting at send time: with short-answer
+            // auto-grade off, answers are collected ungraded and grouped into themes.
+            const fq = formattedQuestion as Record<string, unknown> & { questions?: Array<{ type?: string }>; type?: string };
+            const qType = fq?.questions?.[0]?.type ?? fq?.type;
+            return qType === "short_answer" && !autoGradePrefs.short_answer
+              ? { ...fq, ungraded: true }
+              : formattedQuestion;
+          })(),
           question_number: liveQuestionNumber,
           image_status: preparedUrl ? "ready" : "pending",
           image_url: preparedUrl,

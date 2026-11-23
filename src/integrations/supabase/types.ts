@@ -1710,6 +1710,51 @@ export type Database = {
           },
         ]
       }
+      live_question_themes: {
+        Row: {
+          created_at: string
+          id: string
+          question_id: string
+          response_count: number
+          session_id: string
+          themes: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          question_id: string
+          response_count?: number
+          session_id: string
+          themes?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          question_id?: string
+          response_count?: number
+          session_id?: string
+          themes?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_question_themes_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: true
+            referencedRelation: "live_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_question_themes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_questions: {
         Row: {
           id: string

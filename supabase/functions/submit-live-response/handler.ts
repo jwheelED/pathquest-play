@@ -20,6 +20,7 @@ interface QuestionContent {
   options?: string[];
   correctAnswer?: string;
   expectedAnswer?: string;
+  ungraded?: boolean;
   questions?: Array<{ question?: string; type?: string; options?: string[]; correctAnswer?: string }>;
 }
 
@@ -79,6 +80,37 @@ export async function handleSubmit(
         error: "Question has no correct answer configured. Please notify your instructor.",
         code: "MISSING_CORRECT_ANSWER",
       },
+    };
+  }
+
+  // Ungraded short answer (auto-grade was off when sent): store as a poll-style
+  // response — no grade, no correctness, no points. Instructor sees themes.
+  if (questionContent.ungraded === true && questionType === "short_answer") {
+    const text = answer!.toString().trim().slice(0, 4000);
+    const { data: dup } = await supabase
+      .from("live_responses").select("id")
+      .eq("question_id", questionId).eq("participant_id", participantId).single();
+    if (dup) return { status: 409, body: { error: "Response already submitted", existingId: dup.id } };
+    const { data: saved, error: saveErr } = await supabase
+      .from("live_responses")
+      .insert({
+        question_id: questionId,
+        participant_id: participantId,
+        answer: text,
+        is_correct: null,
+        confidence_level: null,
+        confidence_multiplier: null,
+        points_earned: 0,
+        response_time_ms: responseTimeMs,
+        ai_grade: null,
+        ai_feedback: null,
+      })
+      .select()
+      .single();
+    if (saveErr) return { status: 500, body: { error: "Failed to save response", details: saveErr.message } };
+    return {
+      status: 200,
+      body: { success: true, response: { id: saved.id, isCorrect: null, pointsEarned: 0, ungraded: true, aiGrade: null, aiFeedback: null } },
     };
   }
 
