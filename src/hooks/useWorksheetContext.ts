@@ -8,6 +8,7 @@ export interface WorksheetSheet {
   title: string;
 }
 
+const CHANGE_EVENT = "edvana:active-worksheet";
 const storageKey = (courseId: string) => `edvana.activeWorksheet.${courseId}`;
 
 /** Course worksheets, the pinned one for today, and its numbered items. */
@@ -16,6 +17,14 @@ export function useWorksheetContext(courseId: string | null | undefined) {
 
   useEffect(() => {
     setActiveIdState(courseId ? localStorage.getItem(storageKey(courseId)) : null);
+    if (!courseId) return;
+    // Keep every mounted copy (visible picker + hidden recorder) on the same pick.
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ courseId: string; id: string | null }>).detail;
+      if (detail?.courseId === courseId) setActiveIdState(detail.id);
+    };
+    window.addEventListener(CHANGE_EVENT, onChange);
+    return () => window.removeEventListener(CHANGE_EVENT, onChange);
   }, [courseId]);
 
   const setActiveId = useCallback((id: string | null) => {
@@ -23,6 +32,7 @@ export function useWorksheetContext(courseId: string | null | undefined) {
     if (!courseId) return;
     if (id) localStorage.setItem(storageKey(courseId), id);
     else localStorage.removeItem(storageKey(courseId));
+    window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { courseId, id } }));
   }, [courseId]);
 
   const { data: sheets = [] } = useQuery({

@@ -1128,7 +1128,7 @@ export const LectureTranscription = ({
     const { activeSheet, items } = worksheetRef.current;
     const spoken = `question ${cmd.number}${cmd.part}`;
     if (!activeSheet) {
-      sonnerToast.error("Pick a worksheet first", { description: `Heard "send ${spoken}". Choose one under "Active worksheet" in Live Copilot.` });
+      sonnerToast.error("Pick a worksheet first", { description: `Heard "send ${spoken}". Choose one under "Active worksheet" in Live Lecture Capture.` });
       return;
     }
     const item = findWorksheetItem(items, cmd);
@@ -3949,25 +3949,6 @@ export const LectureTranscription = ({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-          {worksheet.sheets.length > 0 && (
-            <div className="flex items-center justify-between gap-3 px-4 py-3 bg-card border border-border rounded-xl">
-              <div className="min-w-0">
-                <Label htmlFor="active-worksheet" className="text-sm font-semibold text-foreground">Active worksheet</Label>
-                <p className="text-xs mt-0.5 text-muted-foreground">Say “send question 2” to send it straight from the sheet</p>
-              </div>
-              <select
-                id="active-worksheet"
-                value={worksheet.activeSheet?.id ?? ""}
-                onChange={(e) => worksheet.setActiveId(e.target.value || null)}
-                className="h-9 max-w-[220px] rounded-md border border-input bg-background px-2 text-sm text-foreground"
-              >
-                <option value="">None</option>
-                {worksheet.sheets.map((sh) => (
-                  <option key={sh.id} value={sh.id}>{sh.title}</option>
-                ))}
-              </select>
-            </div>
-          )}
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button

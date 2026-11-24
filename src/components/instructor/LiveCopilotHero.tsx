@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { WorksheetPicker } from "@/components/instructor/WorksheetPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -989,6 +990,8 @@ export function LiveCopilotHero({
             </div>
           </div>
 
+          <WorksheetPicker courseId={courseId} className="mt-4" />
+
           <p className="text-xs text-neutral-400 mt-4">
             You review every check-in before anything is sent.
           </p>
@@ -1009,6 +1012,7 @@ export function LiveCopilotHero({
       />
 
       <div className="space-y-3">
+        <WorksheetPicker courseId={courseId} />
         {/* ── System Status Section ──────────────────────────────────────── */}
         <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="px-5 py-4">
