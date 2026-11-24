@@ -78,13 +78,35 @@ Deno.serve(async (req) => {
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: material } = await admin
       .from("lecture_materials")
-      .select("id, instructor_id, course_id, title, parsed_text, is_worksheet")
+      .select("id, instructor_id, course_id, title, parsed_text, is_worksheet, file_path, file_type")
       .eq("id", materialId)
       .maybeSingle();
     if (!material || material.instructor_id !== userId) return json({ error: "Not found" }, 404);
     if (material.is_worksheet === false && !force) return json({ is_worksheet: false, items: 0 });
-    const text = (material.parsed_text as string | null) ?? "";
-    if (text.length < 30) return json({ is_worksheet: false, items: 0, reason: "no_text" });
+    const rawText = (material.parsed_text as string | null) ?? "";
+    // Mostly-printable check: regex PDF extraction often returns compressed binary gibberish.
+    const printable = rawText.replace(/[^\x20-\x7E\n\r\t\u00A0-\u024F\u2000-\u22FF]/g, "").length;
+    const textLooksReal = rawText.length >= 30 && printable / rawText.length > 0.9 && /\b[a-z]{3,}\b.*\b[a-z]{3,}\b/i.test(rawText);
+    const filePath = (material.file_path as string | null) ?? "";
+    const isPdf = /\.pdf$/i.test(filePath) || /pdf/i.test(String(material.file_type ?? ""));
+    let pdfDataUrl: string | null = null;
+    if (isPdf && filePath) {
+      const { data: file } = await admin.storage.from("lecture-materials").download(filePath);
+      if (file && file.size < 15_000_000) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        pdfDataUrl = `data:application/pdf;base64,${btoa(bin)}`;
+      }
+    }
+    const text = textLooksReal ? rawText : "";
+    if (!pdfDataUrl && text.length < 30) return json({ is_worksheet: false, items: 0, reason: "no_text" });
+    const userContent = pdfDataUrl
+      ? [
+          { type: "text", text: `Title: ${material.title ?? ""}\n\nThe worksheet is the attached PDF. Read every page.` },
+          { type: "image_url", image_url: { url: pdfDataUrl } },
+        ]
+      : `Title: ${material.title ?? ""}\n\n${text}`;
 
     const res = await callClaude({
       model: GEMINI_FLASH,
@@ -104,7 +126,7 @@ Deno.serve(async (req) => {
             "Use short_answer only for open-ended prompts (explain, describe, prove) and give a model answer. " +
             "correct_answer must exactly equal one of the options for multiple_choice. Give a one-sentence explanation.",
         },
-        { role: "user", content: `Title: ${material.title ?? ""}\n\n${text}` },
+        { role: "user", content: userContent },
       ],
       tools: [TOOL],
       tool_choice: { type: "function", function: { name: "save_worksheet" } },
