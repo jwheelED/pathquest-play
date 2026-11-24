@@ -28,6 +28,8 @@ export function useWorksheetContext(courseId: string | null | undefined) {
   const { data: sheets = [] } = useQuery({
     queryKey: ["course-worksheets", courseId],
     enabled: !!courseId,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<WorksheetSheet[]> => {
       const { data, error } = await supabase
         .from("lecture_materials")
@@ -40,12 +42,17 @@ export function useWorksheetContext(courseId: string | null | undefined) {
     },
   });
 
+  // A saved pick that is no longer a worksheet is ignored; with exactly one
+  // worksheet in the course it is used automatically so no pick is needed.
+  const chosen = sheets.find((s) => s.id === activeId) ?? null;
+  const activeSheet = chosen ?? (sheets.length === 1 ? sheets[0] : null);
+  const effectiveId = activeSheet?.id ?? null;
+
   const { data: items = [] } = useQuery({
-    queryKey: ["worksheet-items", activeId],
-    enabled: !!activeId,
-    queryFn: () => fetchWorksheetItems(activeId as string),
+    queryKey: ["worksheet-items", effectiveId],
+    enabled: !!effectiveId,
+    queryFn: () => fetchWorksheetItems(effectiveId as string),
   });
 
-  const activeSheet = sheets.find((s) => s.id === activeId) ?? null;
   return { sheets, activeSheet, setActiveId, items: activeSheet ? items : ([] as WorksheetItem[]) };
 }

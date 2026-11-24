@@ -126,9 +126,11 @@ export function LectureMaterialsUpload() {
         if (result.data?.text) {
           await supabase.from("lecture_materials").update({ parsed_text: result.data.text } as Record<string, unknown>).eq("file_path", filePath);
           queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
           if (inserted?.id) {
             await runWorksheetExtraction(inserted.id);
             queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
             queryClient.invalidateQueries({ queryKey: ["worksheet-items", inserted.id] });
           }
         }
@@ -146,6 +148,7 @@ export function LectureMaterialsUpload() {
       setTitle(""); setDescription(""); setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
     },
     onError: (error: Error) => toast.error(error.message || "Failed to upload material"),
   });
@@ -162,6 +165,7 @@ export function LectureMaterialsUpload() {
     onSuccess: () => {
       toast.success("Material deleted");
       queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
       queryClient.invalidateQueries({ queryKey: ["slides"] });
       queryClient.invalidateQueries({ queryKey: ["presentations"] });
       setTimeout(() => setIsDeleting(false), 500);
@@ -185,6 +189,7 @@ export function LectureMaterialsUpload() {
       worksheetQueueRef.current.add(m.id);
       runWorksheetExtraction(m.id).then(() => {
         queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
         queryClient.invalidateQueries({ queryKey: ["worksheet-items", m.id] });
       }).catch((err) => console.error("[WORKSHEET CHECK FAILED]", err));
     }
@@ -203,6 +208,7 @@ export function LectureMaterialsUpload() {
           if (result.data?.text) {
             await supabase.from("lecture_materials").update({ parsed_text: result.data.text } as Record<string, unknown>).eq("id", material.id);
             queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
           }
         }).catch((err) => console.error("[AUTO-PARSE LOAD FAILED]", material.title, err));
     }
@@ -415,6 +421,7 @@ export function LectureMaterialsUpload() {
                                 await supabase.from("lecture_materials").update({ is_worksheet: false } as Record<string, unknown>).eq("id", material.id);
                               }
                               queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+              queryClient.invalidateQueries({ queryKey: ["course-worksheets"] });
                               queryClient.invalidateQueries({ queryKey: ["worksheet-items", material.id] });
                             }}
                           />
