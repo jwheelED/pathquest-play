@@ -1,6 +1,33 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import { callClaude } from "../_shared/anthropic.ts";
+import { GEMINI_FLASH } from "../_shared/models.ts";
+
+// Regex extraction can't read compressed PDF streams and returns binary gibberish.
+function looksReadable(t: string): boolean {
+  if (t.length < 30) return false;
+  const ok = t.replace(/[^\x20-\x7E\n\r\t\u00A0-\u024F\u2000-\u22FF]/g, "").length;
+  const words = (t.match(/\b[a-zA-Z]{3,}\b/g) ?? []).length;
+  return ok / t.length > 0.9 && words / Math.max(1, t.length / 6) > 0.3;
+}
+
+async function transcribePdfWithAi(bytes: Uint8Array): Promise<string> {
+  if (bytes.length > 15_000_000) return "";
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const res = await callClaude({
+    model: GEMINI_FLASH,
+    reasoning_effort: "low",
+    messages: [{ role: "user", content: [
+      { type: "text", text: "Transcribe all text in this PDF as plain text, keeping question numbering and answer choices. Use Unicode math (x², √), never LaTeX. Output only the text." },
+      { type: "image_url", image_url: { url: `data:application/pdf;base64,${btoa(bin)}` } },
+    ] }],
+  });
+  if (!res.ok) return "";
+  const data = await res.json();
+  return String(data?.choices?.[0]?.message?.content ?? "").trim();
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -239,6 +266,11 @@ serve(async (req) => {
     if (fileType === "pdf") {
       const bytes = new Uint8Array(await fileData.arrayBuffer());
       text = extractTextFromPdf(bytes);
+      if (!looksReadable(text)) {
+        const aiText = await transcribePdfWithAi(bytes).catch(() => "");
+        text = aiText ? aiText.slice(0, MAX_OUTPUT_CHARS) : "";
+        console.log(`🤖 PDF read by AI: ${text.length} chars`);
+      }
       console.log(`📄 PDF extracted: ${text.length} chars`);
     } else if (fileType === "pptx") {
       const bytes = new Uint8Array(await fileData.arrayBuffer());
