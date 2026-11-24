@@ -895,15 +895,15 @@ serve(async (req) => {
           answerKeyProblemId: answerKeyMcq.problemId,
           answerKeyMcqId: answerKeyMcq.mcqId,
         };
-      } else if (options && Array.isArray(options) && options.length === 4 && correct_answer) {
+      } else if (options && Array.isArray(options) && (options.length === 4 || (source === "worksheet" && options.length >= 2 && options.length <= 6)) && correct_answer) {
         // Use pre-generated options from preview dialog (allows instructor editing)
         console.log("📝 Using pre-generated MCQ options from preview dialog");
         // Normalize options to have letter prefixes so student UI grades correctly
-        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        const MCQ_LETTERS = ["A", "B", "C", "D", "E", "F"];
         const normalizedOptions = options.map((opt: string, i: number) => {
           const trimmed = opt.trim();
           // Already has a letter prefix like "A. text" or "A) text"
-          if (/^[A-D][\).\-\s]/i.test(trimmed)) return trimmed;
+          if (/^[A-F][\).\-\s]/i.test(trimmed)) return trimmed;
           return `${MCQ_LETTERS[i]}. ${trimmed}`;
         });
         formattedQuestion = {

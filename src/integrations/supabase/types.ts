@@ -1160,6 +1160,7 @@ export type Database = {
           file_type: string
           id: string
           instructor_id: string
+          is_worksheet: boolean | null
           org_id: string | null
           parsed_text: string | null
           pdf_conversion_status: string | null
@@ -1177,6 +1178,7 @@ export type Database = {
           file_type: string
           id?: string
           instructor_id: string
+          is_worksheet?: boolean | null
           org_id?: string | null
           parsed_text?: string | null
           pdf_conversion_status?: string | null
@@ -1194,6 +1196,7 @@ export type Database = {
           file_type?: string
           id?: string
           instructor_id?: string
+          is_worksheet?: boolean | null
           org_id?: string | null
           parsed_text?: string | null
           pdf_conversion_status?: string | null
@@ -4884,6 +4887,68 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "whiteboard_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      worksheet_items: {
+        Row: {
+          ai_filled: boolean
+          correct_answer: string | null
+          course_id: string | null
+          created_at: string
+          edited: boolean
+          explanation: string | null
+          id: string
+          instructor_id: string
+          material_id: string
+          number: number
+          options: Json | null
+          part: string
+          prompt: string
+          question_type: string
+          updated_at: string
+        }
+        Insert: {
+          ai_filled?: boolean
+          correct_answer?: string | null
+          course_id?: string | null
+          created_at?: string
+          edited?: boolean
+          explanation?: string | null
+          id?: string
+          instructor_id: string
+          material_id: string
+          number: number
+          options?: Json | null
+          part?: string
+          prompt: string
+          question_type?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_filled?: boolean
+          correct_answer?: string | null
+          course_id?: string | null
+          created_at?: string
+          edited?: boolean
+          explanation?: string | null
+          id?: string
+          instructor_id?: string
+          material_id?: string
+          number?: number
+          options?: Json | null
+          part?: string
+          prompt?: string
+          question_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worksheet_items_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_materials"
             referencedColumns: ["id"]
           },
         ]

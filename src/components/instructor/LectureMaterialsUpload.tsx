@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getOrgId } from "@/hooks/useOrgId";
 import { useCourseContext } from "@/hooks/useCourseContext";
 import { formatDistanceToNow } from "date-fns";
+import { WorksheetItemsPanel } from "./WorksheetItemsPanel";
 
 interface LectureMaterial {
   id: string;
@@ -26,7 +27,11 @@ interface LectureMaterial {
   description: string | null;
   created_at: string;
   parsed_text?: string | null;
+  is_worksheet?: boolean | null;
 }
+
+const runWorksheetExtraction = (materialId: string, force = false) =>
+  supabase.functions.invoke("extract-worksheet", { body: { materialId, force } });
 
 // --- Helpers ---
 
@@ -110,16 +115,22 @@ export function LectureMaterialsUpload() {
       const orgId = await getOrgId(user.id);
       const { error: uploadError } = await supabase.storage.from("lecture-materials").upload(filePath, selectedFile);
       if (uploadError) throw uploadError;
-      const { error: dbError } = await supabase.from("lecture_materials").insert({
+      const { data: inserted, error: dbError } = await supabase.from("lecture_materials").insert({
         instructor_id: user.id, org_id: orgId, course_id: selectedCourseId,
         file_name: selectedFile.name, file_path: filePath, file_type: selectedFile.type,
         file_size: selectedFile.size, title: title.trim(), description: description.trim() || null,
-      });
+      }).select("id").single();
       if (dbError) throw dbError;
+      if (inserted?.id) worksheetQueueRef.current.add(inserted.id);
       supabase.functions.invoke("parse-lecture-material", { body: { filePath } }).then(async (result) => {
         if (result.data?.text) {
           await supabase.from("lecture_materials").update({ parsed_text: result.data.text } as Record<string, unknown>).eq("file_path", filePath);
           queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+          if (inserted?.id) {
+            await runWorksheetExtraction(inserted.id);
+            queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+            queryClient.invalidateQueries({ queryKey: ["worksheet-items", inserted.id] });
+          }
         }
       }).catch((err) => console.error("[AUTO-PARSE FAILED]", err));
     },
@@ -165,6 +176,19 @@ export function LectureMaterialsUpload() {
     const a = document.createElement("a"); a.href = url; a.download = material.file_name; a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Check already-parsed materials once for worksheet questions
+  const worksheetQueueRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const m of materials) {
+      if (!m.parsed_text || m.is_worksheet !== null && m.is_worksheet !== undefined || worksheetQueueRef.current.has(m.id)) continue;
+      worksheetQueueRef.current.add(m.id);
+      runWorksheetExtraction(m.id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+        queryClient.invalidateQueries({ queryKey: ["worksheet-items", m.id] });
+      }).catch((err) => console.error("[WORKSHEET CHECK FAILED]", err));
+    }
+  }, [materials, queryClient]);
 
   // Auto-parse unparsed materials
   const parsingQueueRef = useRef<Set<string>>(new Set());
@@ -378,6 +402,23 @@ export function LectureMaterialsUpload() {
                             </Badge>
                           )}
                         </div>
+                        {isParsed && (
+                          <WorksheetItemsPanel
+                            materialId={material.id}
+                            isWorksheet={material.is_worksheet === true}
+                            onToggle={async (on) => {
+                              if (on) {
+                                toast.info("Finding the questions in this worksheet…");
+                                const { data } = await runWorksheetExtraction(material.id, true);
+                                if (!data?.items) toast.error("Couldn't find numbered questions in this file.");
+                              } else {
+                                await supabase.from("lecture_materials").update({ is_worksheet: false } as Record<string, unknown>).eq("id", material.id);
+                              }
+                              queryClient.invalidateQueries({ queryKey: ["lecture-materials"] });
+                              queryClient.invalidateQueries({ queryKey: ["worksheet-items", material.id] });
+                            }}
+                          />
+                        )}
                       </div>
 
                       {/* Actions */}

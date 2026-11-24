@@ -56,6 +56,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { usePresenterBroadcast } from "@/hooks/useLecturePresenterChannel";
 import { useDocumentPiP } from "@/hooks/useDocumentPiP";
 import { PiPPresenterWidget } from "./PiPPresenterWidget";
+import { useWorksheetContext } from "@/hooks/useWorksheetContext";
+import { parseWorksheetCommand, findWorksheetItem, suggestWorksheet } from "@/lib/worksheetCommand";
+import { itemLabel } from "./WorksheetItemsPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -146,6 +149,11 @@ export const LectureTranscription = ({
   
   // Get selected course for proper assignment scoping
   const { selectedCourseId, selectedCourse } = useCourseContext();
+  const worksheet = useWorksheetContext(selectedCourseId);
+  const worksheetRef = useRef(worksheet);
+  worksheetRef.current = worksheet;
+  const sentWorksheetItemsRef = useRef<Set<string>>(new Set());
+  const suggestedWorksheetRef = useRef<string | null>(null);
   
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -243,6 +251,17 @@ export const LectureTranscription = ({
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastDetectionTimeRef = useRef<number>(0);
   const lastDetectedChunkIndexRef = useRef<number>(-1);
+  const lastWorksheetSpeech = transcriptChunks.slice(-2).join(" ");
+  useEffect(() => {
+    if (!isRecording || worksheet.sheets.length === 0) return;
+    const match = suggestWorksheet(worksheet.sheets, lastWorksheetSpeech);
+    if (!match || match.id === worksheet.activeSheet?.id || match.id === suggestedWorksheetRef.current) return;
+    suggestedWorksheetRef.current = match.id;
+    sonnerToast(`Working on ${match.title}?`, {
+      duration: 10000,
+      action: { label: "Switch", onClick: () => worksheet.setActiveId(match.id) },
+    });
+  }, [lastWorksheetSpeech, isRecording, worksheet]);
   const lastQuestionSentTimeRef = useRef<number>(0);
   const recentlySentQuestionsRef = useRef<string[]>([]);
   const aiScanFailedAtRef = useRef<number>(0);
@@ -957,6 +976,16 @@ export const LectureTranscription = ({
       return false;
     }
 
+    // "Send question 2" → send item 2 from the pinned worksheet (no AI generation)
+    const worksheetCmd = parseWorksheetCommand(text.slice(-100));
+    if (worksheetCmd) {
+      if (Date.now() - lastDetectionTimeRef.current < MIN_DETECTION_INTERVAL) return false;
+      lastDetectionTimeRef.current = Date.now();
+      lastDetectedChunkIndexRef.current = currentChunkIndex;
+      handleWorksheetCommand(worksheetCmd);
+      return true;
+    }
+
     // Check if we're in a rate limit window
     const now = Date.now();
     if (now < nextQuestionAllowedAt) {
@@ -1086,6 +1115,54 @@ export const LectureTranscription = ({
     }
 
     return false;
+  };
+
+  const handleWorksheetCommand = (cmd: { number: number; part: string }) => {
+    const { activeSheet, items } = worksheetRef.current;
+    const spoken = `question ${cmd.number}${cmd.part}`;
+    if (!activeSheet) {
+      sonnerToast.error("Pick a worksheet first", { description: `Heard "send ${spoken}". Choose the active worksheet in the session controls.` });
+      return;
+    }
+    const item = findWorksheetItem(items, cmd);
+    if (!item) {
+      sonnerToast.error(`${activeSheet.title} has no ${spoken}.`);
+      return;
+    }
+    const label = itemLabel(item);
+    const sentBefore = sentWorksheetItemsRef.current.has(item.id);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      sentWorksheetItemsRef.current.add(item.id);
+      // A worksheet question counts as this interval's question
+      const now = Date.now();
+      lastAutoQuestionTimeRef.current = now;
+      setLastAutoQuestionTime(now);
+      const isMcq = item.question_type === "multiple_choice" && (item.options?.length ?? 0) >= 2;
+      void handleQuestionSend({
+        question_text: item.prompt,
+        suggested_type: isMcq ? "multiple_choice" : "short_answer",
+        options: isMcq ? item.options : undefined,
+        correct_answer: isMcq ? item.correct_answer : undefined,
+        explanation: item.explanation ?? undefined,
+        expected_answer: isMcq ? "" : item.correct_answer ?? "",
+        source: "worksheet",
+        confidence: 1,
+      });
+    }, 5000);
+    sonnerToast.success(`Sending ${label} from ${activeSheet.title}`, {
+      description: sentBefore ? "Sent before this session — sending again." : "Sends in 5 seconds.",
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          cancelled = true;
+          window.clearTimeout(timer);
+          sonnerToast(`${label} not sent`);
+        },
+      },
+    });
   };
 
   const handleVoiceCommandQuestion = async () => {
@@ -4234,6 +4311,26 @@ export const LectureTranscription = ({
       {/* Question on Deck — persistent autodraft card */}
       {isRecording && (
         <div className="mt-4">
+          {worksheet.sheets.length > 0 && (
+            <div className="mb-3 flex items-center justify-between gap-3 px-4 py-3 bg-card border border-border rounded-xl">
+              <div className="min-w-0">
+                <Label htmlFor="active-worksheet" className="text-sm font-semibold text-foreground">Active worksheet</Label>
+                <p className="text-xs mt-0.5 text-muted-foreground">Say “send question 2” to send it straight from the sheet</p>
+              </div>
+              <select
+                id="active-worksheet"
+                value={worksheet.activeSheet?.id ?? ""}
+                onChange={(e) => worksheet.setActiveId(e.target.value || null)}
+                className="h-9 max-w-[220px] rounded-md border border-input bg-background px-2 text-sm text-foreground"
+              >
+                <option value="">None</option>
+                {worksheet.sheets.map((sh) => (
+                  <option key={sh.id} value={sh.id}>{sh.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* AI question scanner toggle */}
           <div className="mb-3 flex items-start justify-between gap-3 px-4 py-3 bg-white border border-[#ededed] rounded-xl">
             <div className="min-w-0">
