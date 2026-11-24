@@ -989,7 +989,7 @@ export const LectureTranscription = ({
     // "Send question" with the number still on its way (Deepgram often splits
     // "send question" / "one." into two chunks): wait for the next chunk instead
     // of firing the generic AI extraction, which would block the worksheet send.
-    if (worksheetRef.current.activeSheet && /\b(?:send|push|submit)\s+(?:the\s+|a\s+)?(?:question|problem|number|item|exercise)\s*[.!?]?\s*$/i.test(text.trim())) {
+    if ((worksheetRef.current.activeSheet || worksheetRef.current.sheets.length > 0) && /\b(?:send|push|submit)\s+(?:the\s+|a\s+)?(?:question|problem|number|item|exercise)\s*[.!?]?\s*$/i.test(text.trim())) {
       return false;
     }
 
@@ -1229,6 +1229,14 @@ export const LectureTranscription = ({
       });
 
       if (error) {
+        // 422 = the AI found no complete question in recent speech. That's a
+        // "nothing to send" outcome, not a failure — don't show a red error.
+        const status = (error as { context?: { status?: number } }).context?.status;
+        if (status === 422) {
+          console.log("⚠️ Voice command: no complete question found in recent speech");
+          sonnerToast("No question heard", { description: "Ask the question out loud, then say \"send question\"." });
+          return;
+        }
         console.error("Extract error:", error);
         throw error;
       }
