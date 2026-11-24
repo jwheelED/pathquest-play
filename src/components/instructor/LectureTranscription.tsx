@@ -986,6 +986,13 @@ export const LectureTranscription = ({
       return true;
     }
 
+    // "Send question" with the number still on its way (Deepgram often splits
+    // "send question" / "one." into two chunks): wait for the next chunk instead
+    // of firing the generic AI extraction, which would block the worksheet send.
+    if (worksheetRef.current.activeSheet && /\b(?:send|push|submit)\s+(?:the\s+|a\s+)?(?:question|problem|number|item|exercise)\s*[.!?]?\s*$/i.test(text.trim())) {
+      return false;
+    }
+
     // Check if we're in a rate limit window
     const now = Date.now();
     if (now < nextQuestionAllowedAt) {

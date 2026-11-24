@@ -13,7 +13,7 @@ const WORDS: Record<string, number> = {
 };
 
 const PATTERN =
-  /\b(?:send|push|submit)\s+(?:the\s+)?(?:question|problem|number|item|exercise)\s+(?:number\s+)?(\d{1,2}|[a-z]+)(?:\s*(?:part\s+)?\(?([a-h])\)?)?\b/i;
+  /\b(?:send|push|submit)\s+(?:the\s+|a\s+)?(?:question|problem|number|item|exercise)\s+(?:number\s+)?(\d{1,2}|[a-z]+)(?:\s*(?:part\s+)?\(?([a-h])\)?)?\b/i;
 
 export function parseWorksheetCommand(text: string): WorksheetCommand | null {
   if (!text) return null;
